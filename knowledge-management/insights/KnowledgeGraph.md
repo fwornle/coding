@@ -1,92 +1,131 @@
 # KnowledgeGraph
 
-**Type:** Detail
+**Type:** SubComponent
 
-The KnowledgeGraph may also incorporate reasoning mechanisms, such as inference engines or rule-based systems, to derive new insights and relationships from the stored knowledge.
+The graph operations in the KnowledgeGraph sub-component are performed by the GraphOperator class in the graph-operator.ts file, enabling efficient querying and manipulation of the graph.
 
 ## What It Is  
 
-The **KnowledgeGraph** is the core data‑store that backs the semantic analysis capabilities of the system. According to the observations, it is realised with a **graph database**—for example Neo4j or Amazon Neptune—so that entities, concepts, and events can be modelled as **nodes** and the various causal or associative links between them as **edges**. The graph is not a passive repository; it is coupled with **reasoning mechanisms** (inference engines or rule‑based systems) that can derive new relationships and insights from the existing knowledge. The component lives inside the **SemanticAnalysisComponent** hierarchy (the parent component) and therefore participates directly in the semantic‑analysis workflow orchestrated by `SemanticAnalysisFramework.java`. No concrete file paths or class names for the KnowledgeGraph implementation were found in the supplied observations, so the description is limited to the architectural intent that has been documented.
+The **KnowledgeGraph** sub‑component lives in the `integrations/mcp-server-semantic-analysis/src/knowledge-graph/` directory (implicit from the file names) and is the core engine that stores, relates, and queries the semantic entities produced by the surrounding **SemanticAnalysis** component. Its primary source files are  
+
+* `knowledge-graph.ts` – the entry point that orchestrates the graph lifecycle,  
+* `entity-relationships.ts` – a declarative map that defines how entities are linked,  
+* `graph-operator.ts` – the `GraphOperator` class that implements the low‑level graph‑manipulation algorithms, and  
+* `graph-metadata.ts` – a lightweight store for auxiliary information about nodes, edges, and the graph as a whole.  
+
+Together these files provide a self‑contained, **scalable** and **performance‑optimized** knowledge‑graph implementation that can be queried through a **configurable** query‑rule engine. Because the sub‑component is a child of **SemanticAnalysis**, it receives the raw semantic payloads from agents such as `OntologyClassificationAgent` and `SemanticAnalysisAgent`, enriches them with relationships, and makes the resulting graph available to sibling modules like **Insights** and **Pipeline**.
 
 ---
 
 ## Architecture and Design  
 
-From the observations we can infer a **graph‑centric architecture**. The primary design decision is to store the domain knowledge in a purpose‑built graph database rather than a relational or document store. This choice enables **native traversal and pattern‑matching queries** (e.g., Cypher for Neo4j or Gremlin for Neptune) that are essential for exploring complex, multi‑hop relationships typical of semantic data.  
+The design follows a **modular, separation‑of‑concerns** architecture. Each logical responsibility is isolated in its own TypeScript file:
 
-The component follows a **separation‑of‑concerns** pattern: the low‑level persistence is handled by the graph database, while higher‑level reasoning is delegated to an **inference engine** or a **rule‑based system**. The inference layer consumes the graph’s schema (node and edge types) and applies logical rules to generate new edges or annotate existing nodes. Because the KnowledgeGraph is a child of **SemanticAnalysisComponent**, it is invoked by the semantic analysis framework whenever new observations are processed; the framework extracts entities and relationships (likely via the same library used by the sibling `SemanticAnalysisFramework`) and persists them into the graph.  
+* **Graph definition** (`knowledge-graph.ts`) – centralises the creation and exposure of the graph object.  
+* **Relationship modeling** (`entity-relationships.ts`) – encapsulates the schema of entity links, allowing the graph to evolve without touching the core engine.  
+* **Operational layer** (`graph-operator.ts`) – houses the `GraphOperator` class, which implements the algorithms for insertion, deletion, traversal, and bulk updates. By keeping these operations in a dedicated class the component can swap or optimise algorithms without affecting callers.  
+* **Metadata handling** (`graph-metadata.ts`) – stores non‑structural information (e.g., timestamps, provenance tags) that the graph may need for auditing or advanced queries.  
 
-Interaction with sibling components is minimal but purposeful. `CacheManager` may cache frequent query results from the KnowledgeGraph to reduce latency, while `SemanticAnalysisFramework` supplies the raw semantic payloads that populate the graph. The overall design therefore resembles a **pipeline**: raw observations → semantic extraction (SemanticAnalysisFramework) → graph persistence (KnowledgeGraph) → optional caching (CacheManager) → reasoning (inference engine) → downstream consumers.
+The component’s **querying process** is described as “configurable,” implying a rule‑based or strategy‑pattern approach where different query‑rules can be injected at runtime. This flexibility is essential for the **Insights** sibling, which may request custom aggregations or path analyses.
+
+From the hierarchy perspective, **KnowledgeGraph** is a child of **SemanticAnalysis**, inheriting the broader semantic pipeline’s data flow. Its sibling modules—**Pipeline**, **Ontology**, **Insights**, and **AgentManagement**—share the same high‑level architectural philosophy: each lives in its own directory, owns a clear API surface, and can be evolved independently. The parent component’s modular layout (evident from separate agents like `ontology-classification-agent.ts` and `semantic-analysis-agent.ts`) mirrors the KnowledgeGraph’s internal modularity, reinforcing a consistent system‑wide design language.
 
 ---
 
 ## Implementation Details  
 
-* **Graph Database Choice** – The observations mention Neo4j and Amazon Neptune as possible back‑ends. Both expose drivers (Bolt for Neo4j, Gremlin/REST for Neptune) that can be wrapped in a thin data‑access layer. The implementation would therefore contain a **connector class** (e.g., `Neo4jConnector` or `NeptuneClient`) responsible for opening sessions, executing parameterised queries, and handling transaction boundaries.  
+### Core Orchestration (`knowledge-graph.ts`)  
+This file creates an instance of the graph data structure (likely an adjacency list or matrix) and wires together the supporting modules. It imports the relationship map from `entity-relationships.ts`, the `GraphOperator` class, and the metadata store. During initialisation it registers the relationship definitions with the operator, ensuring that any new entity added later automatically receives the correct edges.
 
-* **Node & Edge Modelling** – Nodes represent **entities**, **concepts**, or **events**. Each node type likely carries a set of properties (e.g., `id`, `type`, `timestamp`, `payload`). Edges encode **causal** or **associative** relationships and may have directionality and weight attributes to support reasoning heuristics. The schema is probably defined in a separate **graph‑model definition file** (e.g., a Cypher schema script) that is loaded at application start‑up.  
+### Relationship Modeling (`entity-relationships.ts`)  
+The file exports a set of TypeScript interfaces or plain objects that describe permissible links, such as `Person → WorksAt → Organization` or `Concept → SubConceptOf → Concept`. Because the relationships are declared in a single place, adding a new link type is a matter of extending this file, satisfying the scalability claim (Observation 5). The static nature of the file also aids static analysis and tooling.
 
-* **Reasoning Mechanism** – The inference engine could be an embedded rule engine such as **Drools**, **Apache Jena**, or a custom rule evaluator. Rules are expressed over node/edge patterns (e.g., “if Event A causes Event B and Event B causes Event C, then infer a transitive causal link A → C”). The engine reads the current graph snapshot, evaluates the rule set, and writes back any newly inferred edges.  
+### Graph Operations (`graph-operator.ts`) – `GraphOperator`  
+`GraphOperator` encapsulates the heavy lifting:
 
-* **Integration Hooks** – Because the KnowledgeGraph lives inside `SemanticAnalysisComponent`, the component likely exposes a **service interface** (e.g., `KnowledgeGraphService`) that the `SemanticAnalysisFramework` calls after extracting entities. The service may provide methods such as `storeEntity(Node)`, `storeRelationship(Edge)`, and `runInference()`.  
+* **Insertion** – validates incoming entities against the relationship schema, updates adjacency structures, and writes related metadata.  
+* **Deletion** – safely removes nodes while preserving graph integrity (e.g., cascade‑deleting dependent edges).  
+* **Traversal & Query** – implements efficient algorithms (likely depth‑first, breadth‑first, or Dijkstra‑style for weighted paths) that underpin the “performance‑optimized” claim (Observation 6).  
+* **Batch Updates** – the class likely supports bulk operations to minimise overhead when large semantic payloads arrive from the agents.
 
-* **Absence of Concrete Paths** – The observations did not list any concrete file paths, class names, or method signatures for the KnowledgeGraph implementation. Consequently, the description above is based on the documented architectural intent rather than explicit source artefacts.
+Because the class is isolated, the component can replace the underlying algorithmic implementation (e.g., switch from a naïve BFS to a more sophisticated index‑based search) without touching the rest of the system.
+
+### Metadata Store (`graph-metadata.ts`)  
+Metadata such as creation timestamps, source identifiers, or confidence scores are kept separate from the structural graph. This design prevents the core adjacency structures from being polluted with auxiliary data, which improves both **performance** (lighter traversal) and **maintainability** (metadata changes do not ripple into graph logic).
+
+### Configurable Querying  
+While the concrete API is not listed, the observation that the querying process is “configurable” suggests an injectable query‑rule object or a strategy registry. Consumers (e.g., the **Insights** sub‑component) can register custom rule sets that the `GraphOperator` respects when executing a query, enabling tailored analytics without modifying the operator itself.
 
 ---
 
 ## Integration Points  
 
-1. **SemanticAnalysisFramework (Sibling)** – After the framework performs entity recognition and relationship extraction (using libraries such as Apache Stanbol or OpenNLP), it hands the resulting objects to the KnowledgeGraph via the `KnowledgeGraphService`. This hand‑off is the primary data‑flow entry point.  
+1. **Parent – SemanticAnalysis**  
+   * The parent component feeds raw semantic entities into `knowledge-graph.ts`. The agents (`ontology-classification-agent.ts` and `semantic-analysis-agent.ts`) produce classified entities that become nodes in the graph.  
+   * Conversely, the graph may expose an API (e.g., `getGraphSnapshot()`) that the parent uses to pass enriched data downstream to other pipelines.
 
-2. **CacheManager (Sibling)** – Frequently accessed sub‑graphs or inference results can be cached. `CacheManager` would wrap query results from the KnowledgeGraph, using a TTL or size‑based eviction policy (e.g., Redis or Ehcache). This reduces round‑trips to the graph database for repetitive analytical queries.  
+2. **Sibling – Ontology**  
+   * Ontology classification logic defines the permissible entity types that `entity-relationships.ts` later connects. Any change in ontology definitions (e.g., new upper‑ontology concepts) will cascade into the relationship map, illustrating tight but well‑defined coupling.
 
-3. **Parent Component – SemanticAnalysisComponent** – The parent orchestrates the overall semantic pipeline. It likely configures the graph database connection (credentials, endpoint URLs) and initialises the inference engine. It also defines the lifecycle of the KnowledgeGraph (startup, graceful shutdown, health checks).  
+3. **Sibling – Insights**  
+   * The **Insights** module consumes the configurable query interface to generate higher‑level observations (`insight-generator.ts`). Because query rules are configurable, Insights can request domain‑specific traversals (e.g., “find all concepts linked to a given policy”).
 
-4. **External Consumers** – Downstream services (e.g., recommendation engines, alerting modules) may query the KnowledgeGraph directly through a REST or gRPC façade exposed by `KnowledgeGraphService`. The façade would translate high‑level query requests into native graph queries, applying any necessary security or access‑control checks.  
+4. **Sibling – Pipeline**  
+   * The batch‑analysis pipeline (`batch-analysis.yaml`) may schedule periodic graph refreshes or snapshot exports, treating the KnowledgeGraph as a stage in the overall data‑processing flow.
 
-5. **Persistence & Backup** – For production deployments, the graph database would be backed by its own snapshot/backup mechanism (Neo4j’s backup tool, Neptune’s point‑in‑time recovery). The KnowledgeGraph component would expose administrative hooks to trigger these operations as part of the broader system’s maintenance schedule.
+5. **Sibling – AgentManagement**  
+   * Agent lifecycle events (creation, termination) are likely reflected in the graph as node additions or removals. The `agent-manager.ts` may call into `GraphOperator` to keep the graph in sync with the active agent set.
+
+All integration points are mediated through well‑defined TypeScript modules, avoiding circular dependencies and preserving the modular hierarchy.
 
 ---
 
 ## Usage Guidelines  
 
-* **Prefer Graph‑Native Queries** – When interacting with the KnowledgeGraph, use the database’s native query language (Cypher for Neo4j, Gremlin for Neptune). This ensures optimal traversal performance and leverages built‑in indexing.  
+* **Add New Entities via the Operator** – Always use `GraphOperator` methods (e.g., `addNode`, `addEdge`) rather than mutating the underlying data structures directly. This guarantees that relationship validation and metadata registration occur consistently.  
+* **Extend Relationships in `entity-relationships.ts`** – When a new domain concept emerges, declare its links in this file. Because the graph management process is designed for easy addition (Observation 5), no other code changes should be required.  
+* **Leverage Configurable Queries** – Register query rule objects early in the application start‑up if you need custom traversal behaviour. Do not hard‑code query logic inside consumer modules; instead, rely on the configurable interface to keep the graph decoupled from specific analytics.  
+* **Respect Performance Guidelines** – For bulk inserts, prefer the batch API (if provided) on `GraphOperator` to minimise per‑node overhead. Avoid deep traversals on very large sub‑graphs without applying filters, as even optimized algorithms can become costly.  
+* **Maintain Metadata Consistency** – When updating a node, also update its metadata via the utilities in `graph-metadata.ts`. Inconsistent metadata can break downstream audit or provenance features.  
 
-* **Batch Writes for High Throughput** – The semantic analysis framework can generate large volumes of entities per batch. Group inserts/updates into a single transaction to minimise round‑trip overhead and to keep the graph in a consistent state.  
-
-* **Rule Management** – Keep inference rules declarative and version‑controlled. Adding or modifying a rule should be followed by a full re‑run of the inference engine on the affected sub‑graph to guarantee consistency.  
-
-* **Cache Invalidation** – When new nodes or edges are added that could affect cached query results, explicitly invalidate the corresponding cache entries via `CacheManager`. Failure to do so can lead to stale insights.  
-
-* **Monitoring & Health** – Instrument the KnowledgeGraph connector with metrics (query latency, transaction success rate, connection pool usage). Integrate these metrics into the system’s observability stack to detect bottlenecks early.  
-
-* **Security** – Enforce least‑privilege access to the graph database. The KnowledgeGraph service should expose only the operations required by its consumers, and any direct database credentials must be stored in a secure vault.  
+Following these conventions ensures that the KnowledgeGraph remains **scalable**, **performant**, and **easy to maintain** across the evolving SemanticAnalysis ecosystem.
 
 ---
 
-### Summary of Architectural Insights  
+### Architectural Patterns Identified
+1. **Modular separation of concerns** – each responsibility (definition, relationships, operations, metadata) lives in its own file.  
+2. **Strategy / Configurable query pattern** – query behaviour can be customized at runtime.  
+3. **Facade (GraphOperator)** – provides a single, coherent API for all graph manipulations.  
 
-| Aspect | Insight (grounded in observations) |
-|--------|-------------------------------------|
-| **Architectural patterns identified** | Graph‑centric storage, separation of concerns (persistence vs. reasoning), pipeline integration with parent `SemanticAnalysisComponent`, optional caching (CacheManager) |
-| **Design decisions & trade‑offs** | *Graph DB choice* (Neo4j vs. Neptune) gives powerful traversal at the cost of operational complexity; *Inference engine* adds expressive power but introduces latency and rule‑management overhead |
-| **System structure insights** | KnowledgeGraph is a child of `SemanticAnalysisComponent`; it receives data from `SemanticAnalysisFramework` and may be accelerated by `CacheManager`. No explicit child components were observed. |
-| **Scalability considerations** | Horizontal scaling depends on the underlying graph database (Neptune offers managed scaling, Neo4j requires clustering). Caching frequently accessed sub‑graphs mitigates read pressure; batch writes improve ingest throughput. |
-| **Maintainability assessment** | Clear separation between data layer and reasoning layer aids maintainability. However, the lack of concrete code artefacts (paths, class names) suggests documentation gaps that should be addressed to reduce onboarding friction. |
+### Design Decisions and Trade‑offs  
+* **Dedicated relationship file** – simplifies schema evolution but introduces a single point of change that must be kept in sync with agents.  
+* **Separate metadata store** – improves traversal speed at the cost of an extra lookup when full node information is required.  
+* **Configurable querying** – offers flexibility for consumers (Insights) but adds complexity to the operator’s API surface.  
 
-*All statements above are derived directly from the supplied observations; no additional patterns or file locations have been invented.*
+### System Structure Insights  
+The KnowledgeGraph sits as a child module under **SemanticAnalysis**, mirroring the parent’s agent‑centric architecture. Its sibling modules each expose a single‑purpose TypeScript file, reinforcing a “one‑module‑one‑responsibility” structure across the codebase.  
+
+### Scalability Considerations  
+* **Entity addition** is designed to be straightforward; the relationship map can be extended without touching core logic.  
+* **Performance‑optimised algorithms** in `GraphOperator` suggest the use of indexed adjacency structures, enabling the graph to grow to large sizes while keeping query latency low.  
+* **Batch processing hooks** (implied by the Pipeline sibling) allow the system to ingest massive semantic payloads without overwhelming the operator.  
+
+### Maintainability Assessment  
+The clear file‑level boundaries and the encapsulation of graph operations inside `GraphOperator` make the component highly maintainable. Adding new entity types or query rules requires changes in only one location, and the parent‑child hierarchy ensures that impacts are localized. The only maintenance risk lies in keeping the relationship definitions aligned with evolving ontology definitions, but this risk is mitigated by the shared modular conventions across the entire **SemanticAnalysis** ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysisComponent](./SemanticAnalysisComponent.md) -- SemanticAnalysisComponent uses a semantic analysis framework in SemanticAnalysisFramework.java to perform semantic analysis of observations
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's modular architecture is evident in its separation of concerns, with distinct modules for agents such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts). This design choice allows for easier maintenance and updates, as changes to one agent do not affect the others. For instance, the OntologyClassificationAgent's classification logic is isolated within its own module, making it simpler to modify or replace without impacting the overall system.
 
 ### Siblings
-- [SemanticAnalysisFramework](./SemanticAnalysisFramework.md) -- The SemanticAnalysisFramework likely utilizes a specific semantic analysis library or framework, such as Apache Stanbol or OpenNLP, to perform entity recognition and relationship extraction.
-- [CacheManager](./CacheManager.md) -- The CacheManager may utilize a caching library, such as Redis or Ehcache, to store and retrieve analysis results, leveraging its built-in features for cache expiration, invalidation, and size management.
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a batch-analysis.yaml file to define the steps and dependencies for the batch processing pipeline.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the ontology definitions in the upper-ontology.ts and lower-ontology.ts files to classify entities.
+- [Insights](./Insights.md) -- The Insights sub-component uses the insight-generator.ts file to generate insights from the processed data.
+- [AgentManagement](./AgentManagement.md) -- The AgentManagement sub-component uses the agent-manager.ts file to manage the lifecycle of agents.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

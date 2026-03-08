@@ -2,128 +2,153 @@
 
 **Type:** Component
 
-The CodingPatterns component's emphasis on automation, as seen in scripts like setup-browser-access.sh and delete-coder-workspaces.py, streamlines the development process and reduces manual errors. The use of configuration files, such as config/teams/*.json, enables teams to customize their coding environments and adhere to project-wide standards. The modular structure, facilitated by integration modules like integrations/browser-access/ and integrations/code-graph-rag/, allows developers to easily add or remove modules as needed, without affecting the overall project structure. The documentation and examples within the integration modules provide a clear understanding of the component's architecture and design decisions, facilitating collaboration and knowledge sharing among developers. The graph database configuration and knowledge management system enable the storage and querying of complex coding relationships and patterns, providing valuable insights into the project's architecture and design.
+The CodingPatterns component's integration with the HookManagementModule, specifically the UnifiedHookManager class, allows for the loading and merging of hook configurations. This integration enables the component to influence coding pattern enforcement and provides a flexible way to manage hook configurations. The KnowledgeGraphConstructor, which is used to integrate knowledge graph management, also plays a critical role in this process, as it enables the component to leverage the knowledge graph to make informed decisions about coding patterns and conventions. The GraphDatabaseAdapter's createEntity() method is used to store hook configurations as entities, which are then used to guide coding decisions.
 
 ## What It Is  
 
-The **CodingPatterns** component lives under the root of the project’s knowledge hierarchy (`Coding/`) and is realized primarily through a set of **integration modules** located in `integrations/`. Two concrete examples are `integrations/browser‑access/` and `integrations/code‑graph‑rag/`. Each module ships its own **documentation** (`docs/`), **automation scripts** (e.g., `setup-browser-access.sh`, `delete‑coder‑workspaces.py`), and **team‑specific configuration** files (`config/teams/*.json`). Global configuration files such as `config/knowledge-management.json`, `config/graph-database-config.json`, and `config/logging-config.json` sit beside the integration directories and govern how coding‑pattern knowledge is stored, queried, and logged across the whole component. In short, CodingPatterns is a **config‑driven, modular library of coding‑pattern artefacts** that can be added to or removed from the project without disturbing the rest of the system.
+The **CodingPatterns** component lives at the heart of the `Coding` knowledge hierarchy and is realized through a set of tightly‑coupled modules that store, retrieve, and enforce coding conventions via a graph‑database‑backed knowledge graph. The core persistence logic resides in **`storage/graph-database-adapter.ts`**, where the **`GraphDatabaseAdapter`** class exposes the **`createEntity()`** method. This method is invoked by several child modules—*DesignPatternManager*, *SecurityStandardsModule*, *CodingConventionEnforcer*, and even the **`UnifiedHookManager`**—to materialize design patterns, security standards, anti‑patterns, testing practices, and hook configurations as first‑class entities in the underlying graph store.  
+
+Code analysis is performed by the **`CodeAnalysisModule`**, which delegates the heavy lifting to the **`CodeGraphAgent`** located in **`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`**. The agent walks the knowledge graph, matches stored pattern entities, and produces feedback for developers. Validation and enforcement of those patterns during entity creation and update flow through the **`EntityPersistenceModule`**, whose **`PersistenceAgent`** (found in **`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`**) runs **`mapEntityToSharedMemory()`** to verify metadata against the stored pattern entities before the data is placed in shared memory.  
+
+Together, these pieces form a **modular, agent‑centric architecture** that enables the component to act as both a repository of coding knowledge and an active enforcer of the conventions defined therein.  
 
 ---
 
 ## Architecture and Design  
 
-### Modular Integration‑Module Architecture  
-Observations repeatedly highlight a **modular structure**: every logical grouping of patterns lives in its own folder under `integrations/`. This mirrors the **Integration Module pattern** – a lightweight way to encapsulate a self‑contained capability (browser‑based coding environments, RAG‑backed code‑graph queries, etc.) behind a clear directory boundary. Because each module ships its own `docs/` and automation scripts, the component follows a **self‑documenting, self‑service** design that reduces coupling to the rest of the code base.
+The observations reveal a **modular, layered architecture** built around three primary concerns: **knowledge storage**, **agent‑driven processing**, and **hook‑based extensibility**.  
 
-### Configuration‑Centric Design  
-All behavioural aspects are driven by JSON files in the `config/` directory. `config/knowledge-management.json` acts as a **knowledge‑base registry**, while `config/graph-database-config.json` declares the connection details for the graph database used to store complex coding relationships. `config/logging-config.json` defines log levels, destinations, and formats, enabling a uniform observability surface. This **configuration‑as‑code** approach lets teams tailor the component to their workflows simply by editing JSON rather than touching source code.
+1. **Knowledge Storage Layer** – The **`GraphDatabaseAdapter`** abstracts the underlying graph database (Graphology + LevelDB) and provides a single entry point, **`createEntity()`**, for persisting any kind of coding artifact (design patterns, security standards, anti‑patterns, hook configurations, testing practices). By funneling all writes through this adapter, the component enforces a uniform schema and centralises error handling.  
 
-### Automation‑First Operations  
-Scripts such as `integrations/browser-access/setup-browser-access.sh` and `integrations/browser-access/delete-coder-workspaces.py` provide **infrastructure‑as‑code** for provisioning and tearing down coding environments. By automating repetitive steps, the component reduces manual error and enforces a consistent environment across developers and CI pipelines.
+2. **Agent Layer** – Two agents dominate this layer:  
+   * **`CodeGraphAgent`** (in *CodeAnalysisModule*) consumes the knowledge graph to perform static‑analysis‑style checks. It queries entities created by the storage adapter and correlates them with source‑code structures, delivering actionable guidance.  
+   * **`PersistenceAgent`** (in *EntityPersistenceModule*) validates incoming entity metadata against the stored pattern entities via **`mapEntityToSharedMemory()`**. This method ensures that any new or updated entity conforms to the established conventions before it is exposed to the rest of the system.  
 
-### Relationship to Sibling Components  
-The modular philosophy mirrors that of **LiveLoggingSystem** (separate logging, transcript, and ontology modules) and **LLMAbstraction** (service vs. provider registry). Like those siblings, CodingPatterns isolates concerns into directories and relies on shared configuration files, enabling a cohesive architectural language across the entire `Coding` parent component.
+   The agents embody an **agent‑oriented** design, where each agent has a single responsibility and communicates with the graph through the adapter, keeping the system loosely coupled.  
+
+3. **Hook‑Management Layer** – The **`UnifiedHookManager`** (part of the *HookManagementModule*) loads and merges hook configurations, which themselves are stored as entities via **`createEntity()`**. This design allows external tooling or custom scripts to inject additional validation or transformation steps without altering the core agents, providing a **plug‑in extensibility point**.  
+
+The component’s **dispersion across multiple integrations** (e.g., `integrations/mcp-server-semantic-analysis`) mirrors the broader **KnowledgeManagement** sibling, which also follows a modular agent‑based style. This shared architectural language across siblings (LiveLoggingSystem, LLMAbstraction, etc.) facilitates consistent onboarding and cross‑component collaboration while keeping each domain’s concerns isolated.  
 
 ---
 
 ## Implementation Details  
 
-1. **Integration Modules** – Each folder under `integrations/` contains a concrete implementation of a coding pattern.  
-   * `integrations/browser-access/` ships `setup-browser-access.sh`, a Bash script that likely performs Docker or VM provisioning, installs extensions, and configures the browser for code editing.  
-   * The same module also provides `delete-coder‑workspaces.py`, a Python utility that cleans up temporary workspaces, removes containers, and possibly updates `config/teams/*.json` to reflect the teardown.  
+### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
+* **`createEntity()`** is the sole public method used throughout the component. It receives a typed payload (e.g., a design pattern definition, a security rule, a hook spec) and persists it as a node in the graph database. The method also attaches metadata such as version, creator, and timestamps, which later agents use for validation.  
 
-2. **Configuration Files** –  
-   * `config/knowledge-management.json` stores a hierarchical map of pattern names, descriptions, and links to supporting artefacts (e.g., docs, scripts).  
-   * `config/graph-database-config.json` defines the endpoint, authentication, and schema details for the graph database used by the **KnowledgeManagement** sibling. This enables queries such as “find all patterns that depend on X” or “trace anti‑pattern propagation”.  
-   * `config/logging-config.json` follows a standard JSON logging schema (log level, formatter, handlers) that is consumed by any script or module that emits logs, ensuring a unified observability pipeline.  
+### PersistenceAgent (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`)  
+* The **`mapEntityToSharedMemory()`** routine first retrieves the relevant pattern entities via the adapter, then runs a series of **metadata validation rules** (e.g., required fields, naming conventions, test coverage flags). If validation passes, the entity is serialized into a shared‑memory segment that downstream modules (including the **`CodeAnalysisModule`**) can read without incurring additional I/O. This shared‑memory approach reduces latency when the **`CodeGraphAgent`** performs real‑time analysis.  
 
-3. **Team‑Specific Settings** – The wildcard path `config/teams/*.json` holds per‑team overrides (coding conventions, enabled patterns, linting rules). When a developer runs a script, the tooling reads the appropriate team file, merges it with the global config, and applies the resulting policy set.  
+### CodeGraphAgent (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`)  
+* Upon invocation by the **`CodeAnalysisFramework`**, the agent constructs a **sub‑graph** of the codebase (functions, classes, modules) and performs pattern‑matching queries against the stored entities. The matching algorithm leverages graph traversals that are optimized by the underlying Graphology engine. Results are emitted as diagnostics, which the **`CodeAnalysisFramework`** surfaces to developers.  
 
-4. **Documentation** – Inside each integration’s `docs/` folder, markdown files describe the purpose of the module, usage commands, and expected outputs. This documentation is version‑controlled alongside the code, guaranteeing that the “how‑to” stays in sync with the implementation.  
+### UnifiedHookManager (`HookManagementModule`)  
+* Hook configurations are represented as graph entities, enabling the manager to **load** (read from the graph) and **merge** (combine multiple hook definitions) them at runtime. The merged configuration is then supplied to the **`PersistenceAgent`** and **`CodeGraphAgent`**, allowing hooks to augment validation or analysis steps dynamically.  
 
-5. **Graph‑Database Interaction** – While no source code is visible, the presence of `config/graph-database-config.json` together with the sibling **KnowledgeManagement** component’s `GraphDatabaseAdapter` (see `storage/graph-database-adapter.ts`) strongly implies that CodingPatterns leverages the same adapter to persist pattern relationships. Queries are likely expressed in Gremlin or Cypher, enabling sophisticated analyses such as dependency heat‑maps or anti‑pattern detection.
+### KnowledgeGraphConstructor  
+* Although not directly exposed in a file path, this construct orchestrates the creation of the overall knowledge graph, wiring the **`GraphDatabaseAdapter`**, **`PersistenceAgent`**, and **`CodeGraphAgent`** together. It ensures that the graph schema is consistent across modules and that any new entity type (e.g., a new security standard) is registered with the appropriate validation rules.  
+
+### Child Modules  
+* **DesignPatternManager** – Calls **`createEntity()`** to store design patterns.  
+* **CodingConventionEnforcer** – Retrieves stored patterns via **DesignPatternManager** and applies them during validation.  
+* **SecurityStandardsModule** – Also uses **DesignPatternManager** to fetch security‑related patterns for enforcement.  
+* **KnowledgeGraphManager** – Provides higher‑level CRUD operations on the graph, delegating to the adapter.  
+
+All of these children share the same underlying storage and validation mechanisms, guaranteeing a **single source of truth** for coding conventions across the component.  
 
 ---
 
 ## Integration Points  
 
-* **Graph Database** – The component reads `config/graph-database-config.json` and, through the shared `GraphDatabaseAdapter`, writes pattern metadata, relationships, and usage statistics. This makes the pattern graph available to other components like **SemanticAnalysis** (which may classify patterns) and **ConstraintSystem** (which could enforce pattern‑based constraints).  
+1. **CodeAnalysisFramework (Sibling of CodeAnalysisModule)** – Consumes the **`CodeGraphAgent`** to run analyses. It expects the agent to return diagnostics in a predefined schema, which it then presents in IDE plugins or CI pipelines.  
 
-* **Logging Subsystem** – All scripts and modules import the logging configuration from `config/logging-config.json`. This aligns their output with the **LiveLoggingSystem** component, allowing live streaming of pattern‑related events to the central log aggregator.  
+2. **EntityPersistenceModule** – Supplies raw entity payloads (e.g., from user‑defined pattern files) to the **`PersistenceAgent`**. The module’s contract is the **`mapEntityToSharedMemory()`** method, which guarantees that only validated entities reach shared memory.  
 
-* **Team Configuration Service** – The `config/teams/*.json` files are consumed by the **LLMAbstraction** component when it generates code suggestions; the LLM can be nudged to follow team‑specific conventions stored in those files.  
+3. **HookManagementModule** – Provides hook specifications that are persisted as entities. The **`UnifiedHookManager`** merges these hooks and injects them into the processing pipelines of both the **`PersistenceAgent`** and **`CodeGraphAgent`**.  
 
-* **Automation Pipelines** – CI/CD pipelines can invoke `setup-browser-access.sh` to spin up a sandboxed coding environment for integration tests, then call `delete-coder-workspaces.py` in a post‑run cleanup step. Because the scripts are self‑contained, they do not require direct imports from other code; they merely rely on the configuration files described above.  
+4. **KnowledgeManagement Sibling** – Shares the same **graph‑database‑adapter** implementation, allowing cross‑component queries (e.g., the LiveLoggingSystem’s **`OntologyClassificationAgent`** could query coding‑pattern entities to enrich log classifications).  
 
-* **Documentation Portal** – The `docs/` directories can be harvested by a static‑site generator (e.g., Docusaurus) to expose a searchable knowledge base. This portal can cross‑reference the graph database to surface related patterns dynamically.
+5. **Parent Component – Coding** – The **CodingPatterns** component contributes to the overall coding knowledge base, exposing its stored entities to any other component that needs to reason about code quality, security, or best practices.  
+
+All interactions are **interface‑driven**: each module communicates through well‑defined methods (`createEntity()`, `mapEntityToSharedMemory()`, `loadHooks()`) and relies on the shared graph schema, which reduces coupling while still enabling rich, cross‑cutting concerns.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Add a New Pattern** – Create a new folder under `integrations/`, add a `docs/` README, and place any provisioning scripts there. Register the pattern in `config/knowledge-management.json` with a unique identifier and link to the documentation. If the pattern introduces new graph entities, update the schema via the shared `GraphDatabaseAdapter`.  
+* **Persisting a New Pattern** – Always invoke **`GraphDatabaseAdapter.createEntity()`** from the appropriate child manager (e.g., **DesignPatternManager**). Supply complete metadata (name, description, version, applicable languages) to avoid downstream validation failures.  
 
-2. **Configure Teams** – Edit the appropriate `config/teams/<team>.json` to enable or disable patterns for that team, set coding conventions (e.g., naming style, lint rules), and optionally override logging verbosity. Do not modify the global config unless the change is truly cross‑team.  
+* **Validating Entities** – When adding or updating entities, route the payload through **`PersistenceAgent.mapEntityToSharedMemory()`**. This step guarantees that the entity conforms to existing pattern definitions and that the shared‑memory cache stays consistent.  
 
-3. **Run Automation Scripts** – Use `setup-browser-access.sh` before starting a browser‑based coding session. The script expects environment variables defined in the team JSON (e.g., `BROWSER_VERSION`, `WORKSPACE_ID`). After work is finished, invoke `delete-coder-workspaces.py` to clean up resources; the script will also log the teardown outcome using the central logging configuration.  
+* **Extending via Hooks** – To introduce custom validation or transformation logic, create a hook configuration JSON/YAML and store it using **`createEntity()`**. The **`UnifiedHookManager`** will automatically merge it with existing hooks; ensure that hook IDs are unique to prevent accidental overrides.  
 
-4. **Query the Pattern Graph** – Leverage the graph‑database client (provided by **KnowledgeManagement**) to run queries defined in `config/graph-database-config.json`. Typical queries include fetching all patterns that a given module depends on, or identifying anti‑patterns that appear in a codebase.  
+* **Running Code Analysis** – Use the **`CodeAnalysisFramework`** to trigger the **`CodeGraphAgent`**. The framework expects the codebase to be represented as a graph (usually generated by a separate parser); keep this representation up‑to‑date to avoid stale diagnostics.  
 
-5. **Maintain Documentation** – Keep the `docs/` folder up‑to‑date whenever the integration’s behaviour changes. The documentation is the primary onboarding material for new developers and is referenced by the parent **Coding** component’s knowledge‑base UI.  
+* **Versioning and Migration** – Because the graph stores version metadata, any breaking change to a pattern schema should be accompanied by a migration script that updates existing nodes. This practice maintains compatibility across the **EntityPersistenceModule** and **CodeAnalysisModule**.  
+
+* **Performance Tips** – The shared‑memory cache accessed by **`mapEntityToSharedMemory()`** dramatically reduces latency for repeated analyses. When deploying at scale, monitor the size of this cache and configure eviction policies to avoid memory pressure.  
 
 ---
 
-### Architectural patterns identified  
-* **Modular Integration‑Module pattern** – each functional area lives in its own `integrations/*` directory.  
-* **Configuration‑as‑Code** – JSON files drive knowledge management, graph‑DB connectivity, logging, and team settings.  
-* **Automation‑First (Infrastructure‑as‑Code)** – Bash and Python scripts provision and clean up environments.  
+### 1. Architectural patterns identified  
 
-### Design decisions and trade‑offs  
-* **Explicit module boundaries** simplify addition/removal of patterns but introduce duplication of small utilities (e.g., each module ships its own docs).  
-* **Centralised JSON configuration** provides a single source of truth but can become a bottleneck if many teams edit the same files concurrently; version‑control mitigates this but requires disciplined PR processes.  
-* **Graph‑database backing** enables rich relationship queries at the cost of added operational complexity (deployment, backup, schema migrations).  
+* **Modular Layered Architecture** – Separation into storage, agent, and hook layers.  
+* **Agent‑Oriented Design** – Dedicated agents (**CodeGraphAgent**, **PersistenceAgent**) with single responsibilities.  
+* **Shared‑Memory Caching** – Used by the PersistenceAgent to accelerate read‑heavy operations.  
+* **Plug‑in Hook System** – UnifiedHookManager loads and merges hook entities for extensibility.  
 
-### System structure insights  
-* The component sits under the **Coding** parent and shares the same configuration conventions as its siblings, creating a uniform “config‑first” culture across the codebase.  
-* Child entities—**DesignPrinciples**, **SoftwarePatterns**, **AntiPatterns**, **IntegrationModules**, **TeamConfiguration**—are realized directly as files and folders, making the hierarchy visible in the repository layout.  
+### 2. Design decisions and trade‑offs  
 
-### Scalability considerations  
-* Adding new integration modules scales linearly; each module is isolated, so build times and CI pipelines can parallelise their tests.  
-* The graph database can handle growing numbers of pattern nodes, but query performance must be monitored; indexing strategies should be revisited as the pattern graph expands.  
-* Automation scripts should be written idempotent to support massive parallel provisioning (e.g., spin‑up 100 browser workspaces for a large test matrix).  
+* **Single Adapter (`GraphDatabaseAdapter`)** – Centralises persistence, simplifying schema enforcement but creates a potential bottleneck if many concurrent writes occur.  
+* **Graph‑Database as Knowledge Store** – Enables expressive relationship queries (ideal for pattern matching) at the cost of added operational complexity compared to a relational store.  
+* **Agent Decoupling** – Improves testability and independent evolution of analysis vs. persistence, yet introduces indirection that may increase latency if not cached.  
+* **Hook Merging at Runtime** – Provides flexibility for custom extensions but requires careful versioning to avoid hook conflicts.  
 
-### Maintainability assessment  
-* **High maintainability**: clear directory conventions, self‑contained docs, and configuration‑driven behaviour reduce cognitive load.  
-* **Potential risk**: reliance on many JSON files can lead to drift if documentation and config are not kept in sync; automated linting of config schemas is recommended.  
-* **Cross‑component consistency** is reinforced by shared logging and graph‑DB adapters, meaning improvements in those siblings (e.g., better log rotation) automatically benefit CodingPatterns.  
+### 3. System structure insights  
 
----  
+* The component is **dispersed** across multiple integration folders, mirroring the broader **KnowledgeManagement** sibling, which promotes reuse of agents and adapters.  
+* Child modules (DesignPatternManager, CodingConventionEnforcer, etc.) all converge on the same graph entities, ensuring a **single source of truth** for coding conventions.  
+* The **KnowledgeGraphConstructor** acts as the orchestrator, guaranteeing that schema registration, adapter wiring, and agent initialization happen in a deterministic order.  
 
-*End of technical insight document.*
+### 4. Scalability considerations  
+
+* **Write Scalability** – Since all writes funnel through `createEntity()`, horizontal scaling will require either sharding the graph database or introducing a write‑queue layer.  
+* **Read Scalability** – The shared‑memory cache and graph‑query optimisations (indexing on pattern type, version) support high‑throughput read scenarios typical of CI pipelines.  
+* **Hook Load** – Hook merging is performed at startup; large numbers of hooks could increase initialization time, so it is advisable to batch‑load or lazily evaluate rarely used hooks.  
+
+### 5. Maintainability assessment  
+
+* **High Maintainability** – The clear separation of concerns (storage, validation, analysis, extensibility) and the use of well‑named classes (`GraphDatabaseAdapter`, `PersistenceAgent`, `CodeGraphAgent`) make the codebase approachable.  
+* **Potential Risks** – The heavy reliance on a single adapter and shared‑memory cache means that bugs in these core pieces can have wide‑reaching impact. Comprehensive unit and integration tests around `createEntity()` and `mapEntityToSharedMemory()` are essential.  
+* **Documentation Needs** – Because hook configurations are stored as graph entities, developers must maintain up‑to‑date schema documentation to avoid mismatched expectations when creating new hooks.  
+
+Overall, the **CodingPatterns** component showcases a thoughtfully modular design that leverages a graph‑based knowledge store to deliver consistent, extensible enforcement of coding standards across the entire **Coding** ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component employs a modular architecture, with separate modules for logging, transcript conversion, and ontology classification.; LLMAbstraction: The LLMAbstraction component's architecture is designed with modularity in mind, as seen in the separation of concerns between the LLMService (lib/llm; DockerizedServices: The DockerizedServices component utilizes a microservices architecture, with each service potentially running in its own container. This is evident in; Trajectory: The Trajectory component's architecture is designed with flexibility and fault tolerance in mind, as evident from its ability to adapt to different co; KnowledgeManagement: The KnowledgeManagement component's reliance on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence and automatic JSON export; CodingPatterns: The CodingPatterns component demonstrates a modular structure through its use of various integration modules, such as integrations/browser-access/ and; ConstraintSystem: The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is a crucial aspect of its architecture. This adapter is respons; SemanticAnalysis: The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgen.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's use of the ProviderRegistry class (lib/llm/provider-registry.js) allows for easy management of available LLM providers.; DockerizedServices: The DockerizedServices component utilizes the retry-with-backoff pattern in the startServiceWithRetry function (lib/service-starter.js:104) to prevent; Trajectory: The SpecstoryAdapter in lib/integrations/specstory-adapter.js plays a crucial role in connecting to the Specstory extension, utilizing HTTP, IPC, or f; KnowledgeManagement: The KnowledgeManagement component follows a modular architecture, with separate modules for different functionalities, such as entity persistence, ont; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to ; ConstraintSystem: The ConstraintSystem component's architecture is designed with flexibility and customizability in mind, utilizing a modular design that allows for eas; SemanticAnalysis: The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for.
 
 ### Children
-- [DesignPrinciples](./DesignPrinciples.md) -- The config/teams/*.json files store team-specific settings and coding conventions, allowing for flexible project configuration.
-- [SoftwarePatterns](./SoftwarePatterns.md) -- The integrations/browser-access/ module provides a reusable solution for browser-based coding environments, demonstrating the software pattern of environment abstraction.
-- [AntiPatterns](./AntiPatterns.md) -- The AntiPatterns sub-component uses the SoftwarePatterns sub-component to identify and avoid common pitfalls in software design.
-- [IntegrationModules](./IntegrationModules.md) -- The integrations/browser-access/ module provides a modular structure for browser-based coding environments, demonstrating the integration pattern of environment abstraction.
-- [TeamConfiguration](./TeamConfiguration.md) -- The config/teams/*.json files store team-specific settings and coding conventions, allowing for flexible project configuration.
+- [DesignPatternManager](./DesignPatternManager.md) -- DesignPatternManager uses the createEntity() method in storage/graph-database-adapter.ts to store design patterns as entities in the graph database.
+- [CodingConventionEnforcer](./CodingConventionEnforcer.md) -- CodingConventionEnforcer uses the DesignPatternManager to retrieve stored design patterns for validation.
+- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
+- [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
+- [SecurityStandardsModule](./SecurityStandardsModule.md) -- SecurityStandardsModule uses the DesignPatternManager to retrieve stored design patterns for security standard enforcement.
+- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component employs a modular architecture, with separate modules for logging, transcript conversion, and ontology classification. This is evident in the organization of the codebase, where each module is responsible for a specific task. For instance, the logging module (integrations/mcp-server-semantic-analysis/src/logging.ts) handles log entries and provides a unified logging interface, while the TranscriptAdapter (lib/agent-api/transcript-api.js) abstracts transcript formats and provides a unified interface for reading and converting transcripts. The use of separate modules for each task allows for easier maintenance and modification of the codebase.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed with modularity in mind, as seen in the separation of concerns between the LLMService (lib/llm/llm-service.ts) and the provider registry (lib/llm/provider-registry.js). This modular design allows for the easy addition or removal of LLM providers, such as Anthropic and DMR, without affecting the core functionality of the component. Furthermore, the use of dependency injection in the LLMService enables the injection of various dependencies, including budget trackers, sensitivity classifiers, and quota trackers, which enhances the flexibility and customizability of the component.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service potentially running in its own container. This is evident in the use of the startServiceWithRetry function (lib/service-starter.js) for robust service startup with retry, timeout, and exponential backoff mechanisms. For instance, in scripts/api-service.js, the spawn function from the child_process module is used to start the API server, and in scripts/dashboard-service.js, it is used to start the dashboard. The startServiceWithRetry function ensures that these services are started with a retry mechanism, preventing endless loops and providing graceful degradation when optional services fail.
-- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed with flexibility and fault tolerance in mind, as evident from its ability to adapt to different connection methods such as HTTP, IPC, and file watch. This is achieved through the use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which provides a unified interface for connecting to the Specstory extension. The connectViaHTTP function in specstory-adapter.js demonstrates this flexibility by implementing a connection retry mechanism to handle transient connection issues.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's reliance on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence and automatic JSON export sync enables efficient data management. This is evident in the way the adapter leverages Graphology and LevelDB for robust graph database interactions. For instance, the 'syncJSONExport' function in graph-database-adapter.ts ensures that data remains consistent across different storage formats, thus supporting the project's data analysis goals.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is a crucial aspect of its architecture. This adapter is responsible for storing and retrieving constraint validation results, entity refresh results, and hook configurations. The GraphDatabaseAdapter is implemented in the graphdb-adapter.ts file, which provides methods for creating, reading, updating, and deleting data in the graph database. For instance, the createConstraintValidationResult method in this file creates a new node in the graph database to store the result of a constraint validation. The use of a graph database allows for efficient querying and retrieval of complex relationships between entities, which is essential for the ConstraintSystem component.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This modularity allows for easier maintenance and extension of the component, as new agents can be added or existing ones modified without affecting the overall system. For instance, the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) utilizes the LLMService for large language model-based analysis and generation, demonstrating the flexibility of the component's design. The use of a standardized agent interface, as defined in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts), ensures consistency across the different agents and facilitates communication between them.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, for classifying observations against an ontology system. This classification process is crucial for the system's ability to understand and process the live session data. The OntologyClassificationAgent is designed to work in conjunction with other modules, such as the LSLConfigValidator, to ensure that the system's configurations are validated and optimized. By leveraging the OntologyClassificationAgent, the LiveLoggingSystem can effectively categorize observations and provide meaningful insights into the interactions with various agents like Claude Code.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's use of the ProviderRegistry class (lib/llm/provider-registry.js) allows for easy management of available LLM providers. This is evident in the way providers are registered and retrieved using the registerProvider and getProvider methods. For example, the DMRProvider class (lib/llm/providers/dmr-provider.ts) is registered as a provider, enabling local LLM inference via Docker Desktop's Model Runner. The ProviderRegistry class also enables the addition or removal of providers, making it a flexible and scalable solution. Furthermore, the use of the ProviderRegistry class promotes loose coupling between the LLMAbstraction component and the LLM providers, allowing for changes to be made to the providers without affecting the component.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the retry-with-backoff pattern in the startServiceWithRetry function (lib/service-starter.js:104) to prevent endless loops and provide a more robust solution when optional services fail. This pattern allows the component to handle temporary failures and provides a way to recover from them. The implementation of this pattern is crucial for the overall reliability of the component, as it prevents cascading failures and ensures that the system remains operational even when some services are temporarily unavailable. Furthermore, the use of exponential backoff in the retry logic helps to prevent overwhelming the system with repeated requests, which can lead to further failures and decreased performance.
+- [Trajectory](./Trajectory.md) -- The SpecstoryAdapter in lib/integrations/specstory-adapter.js plays a crucial role in connecting to the Specstory extension, utilizing HTTP, IPC, or file watch mechanisms to ensure a stable and flexible connection. This adaptability is key to the component's design, allowing it to work seamlessly across different environments and setups. For instance, the connectViaHTTP method implements a retry mechanism to handle transient errors, showcasing the component's robustness and ability to recover from temporary connectivity issues. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance for the SpecstoryAdapter, which is vital for logging conversation entries and reporting any errors that may occur during the connection process.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component follows a modular architecture, with separate modules for different functionalities, such as entity persistence, ontology classification, and insight generation, as seen in the code organization of the src/agents directory, which contains the PersistenceAgent (src/agents/persistence-agent.ts) and the CodeGraphAgent (src/agents/code-graph-agent.ts). This modular approach allows for easier maintenance and scalability of the component, as each module can be updated or modified independently without affecting the rest of the component. For example, the PersistenceAgent is responsible for entity persistence, ontology classification, and content validation, and is used by the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the central Graphology+LevelDB knowledge graph.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is designed with flexibility and customizability in mind, utilizing a modular design that allows for easy extension and modification. This is evident in the use of the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which provides a central hub for hook management, handling hook event dispatch, handler registration, and configuration loading. The UnifiedHookManager uses a Map to store handlers for each event, allowing for efficient registration and retrieval of handlers. For example, the registerHandler function in hook-manager.js takes in an event name and a handler function, and stores them in the handlers Map for later retrieval.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for ontology-based classification, and the SemanticAnalysisAgent for analyzing git and vibe data. This is evident in the file structure, where each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent abstract class, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, standardizes the responses and confidence calculations across all agents, promoting consistency and maintainability.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

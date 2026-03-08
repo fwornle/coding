@@ -2,175 +2,87 @@
 
 **Type:** SubComponent
 
-The service implements authentication and authorization mechanisms using the auth-handler.js module
+APIService utilizes the ServiceStarter script in lib/service-starter.js for robust service startup with retry, timeout, and health verification.
 
 ## What It Is  
 
-APIService is the HTTP‑API layer of the system, implemented as an **Express.js** application. The entry point for the service is the **`scripts/api-service.js`** script, which spawns the Node process that runs the Express server. All request handling logic lives under the **`api/`** URL namespace (e.g., `api/*`), and the service is packaged as a Docker container together with the other micro‑services that compose **DockerizedServices**.  
-
-The codebase is deliberately split into small, single‑purpose modules:  
-
-* **`api-routes.js`** – declares the concrete REST endpoints and maps them to handler functions.  
-* **`data-access.js`** – abstracts all reads/writes against the underlying system data store.  
-* **`auth-handler.js`** – provides authentication and authorization middleware for protected routes.  
-* **`cache.js`** – implements an in‑process caching layer for frequently accessed data.  
-* **`error-handler.js`** – centralises error‑translation and response generation.  
-
-Together these pieces give APIService a clean, layered structure that isolates transport concerns (Express) from business logic (data‑access) and cross‑cutting concerns (auth, cache, error handling).
-
----
+APIService is the dedicated sub‑component that hosts the HTTP‑API layer of the platform. Its concrete entry point lives in **`scripts/api-service.js`**, which is the script executed (typically by the Docker container defined in the parent **DockerizedServices** component) to bring the API up and running.  The service is not a monolithic block; instead it relies on shared infrastructure – most notably the **`lib/service-starter.js`** utility – to guarantee a disciplined start‑up sequence, and it can delegate LLM‑related work to the **LLMServiceManager** via the **`lib/llm/llm-service.ts`** implementation.  In addition, APIService registers any spawned child processes with the **ProcessManagementService**, using the **ProcessStateManager** to keep a coherent view of process lifecycles.  Collectively these pieces give APIService a clean, extensible façade for all API operations while remaining tightly coupled to the surrounding service ecosystem.
 
 ## Architecture and Design  
 
-### Architectural style  
-APIService follows a **micro‑service style** as dictated by its parent component **DockerizedServices**. Each service runs in its own container and is started via the robust `startServiceWithRetry` helper (found in `lib/service-starter.js`). Within the container, the service adopts a **modular Express architecture**, where routing, data access, authentication, caching, and error handling are each encapsulated in their own module. No higher‑level architectural patterns (e.g., event‑driven, CQRS) are mentioned in the observations, so the design is grounded in conventional request‑response handling.
+The design of APIService follows a **service‑starter pattern**.  All Dockerized services – including APIService, DashboardService and any future services – invoke **`lib/service-starter.js`** which encapsulates retry logic, configurable time‑outs, and health‑check verification before marking a service as “ready”.  This pattern isolates start‑up concerns from business logic, making the API code in **`scripts/api-service.js`** focused on request routing, validation, and response handling.  
 
-### Design patterns evident in the code  
+APIService also adopts a **thin‑wrapper façade** over the LLM capabilities.  When an endpoint requires language‑model processing, the service forwards the request to **LLMServiceManager**, which in turn uses the **`lib/llm/llm-service.ts`** class.  This delegation keeps the API layer agnostic of LLM internals (mode routing, caching, circuit breaking) while still exposing a standardized interface for downstream callers.  
 
-| Pattern | Where it appears | What it achieves |
-|---------|------------------|------------------|
-| **Router / Middleware pattern** | `api-routes.js` (routes) + `auth-handler.js`, `cache.js`, `error-handler.js` (middleware) | Express’s built‑in routing and middleware chain cleanly separates concerns and allows composable request processing. |
-| **Facade / Data‑Access abstraction** | `data-access.js` | Hides the details of the underlying datastore (SQL, NoSQL, etc.) behind a simple API, enabling the rest of the service to stay storage‑agnostic. |
-| **Cache‑Aside** | `cache.js` (used by route handlers) | Frequently accessed data is first looked up in the in‑process cache; on miss, `data-access.js` is consulted and the result is cached for subsequent calls. |
-| **Error‑Handling Middleware** | `error-handler.js` | Centralises error conversion into HTTP responses, preventing duplicate try/catch blocks throughout the codebase. |
-| **Authentication/Authorization Middleware** | `auth-handler.js` | Guarantees that protected endpoints enforce security policies before business logic runs. |
+Process management is handled through a **centralised process registry**.  By calling into **ProcessManagementService** and its **ProcessStateManager**, APIService can spawn auxiliary workers (e.g., background jobs, streaming handlers) and have their state tracked uniformly across the DockerizedServices family.  This shared registry reduces duplication and enables coordinated shutdown or health reporting.  
 
-### Component interaction  
-When an HTTP request arrives at `api/*`, Express first executes the middleware stack in the order defined in `api-routes.js`. Typical flow:
-
-1. **Auth middleware** (`auth-handler.js`) validates the caller’s credentials and attaches a user context to the request object.  
-2. **Cache middleware** (`cache.js`) checks whether the requested resource is already cached; on a hit, it short‑circuits the request and returns the cached payload.  
-3. **Route handler** (defined in `api-routes.js`) invokes **`data-access.js`** for any required persistence operations.  
-4. Any thrown errors bubble to **`error-handler.js`**, which maps them to appropriate HTTP status codes and JSON error bodies.
-
-All modules are required directly by the main Express app (e.g., `const routes = require('./api-routes'); app.use('/api', routes);`), keeping the dependency graph shallow and explicit.
-
----
+Overall, the architecture is **container‑centric** (as described in the parent DockerizedServices component) and **modular**, with each concern – start‑up, LLM interaction, process tracking – encapsulated in its own library file.  The only coupling between APIService and its siblings (LLMServiceManager, ProcessManagementService, DashboardService) is through well‑defined interfaces, preserving loose coupling while allowing shared infrastructure.
 
 ## Implementation Details  
 
-### Core entry point – `scripts/api-service.js`  
-The script uses Node’s **`child_process.spawn`** (as described in the parent’s hierarchy) to launch the server process. It likely imports the Express app from a file such as `src/server.js` (not explicitly listed) and then calls `app.listen(port)`. Because the service lives inside Docker, the script also respects environment variables for configuration (e.g., `PORT`, `CACHE_TTL`).
+The **entry script** `scripts/api-service.js` performs three primary steps: (1) import the **ServiceStarter** from `lib/service-starter.js`, (2) configure the API server (Express, Fastify, or a custom router – the exact framework is not disclosed in the observations), and (3) hand the initialized server object to ServiceStarter’s `start()` method.  ServiceStarter wraps the supplied start function with retry loops, applies a configurable timeout, and periodically pings a health endpoint (often `/healthz`) until the service reports healthy.  Only then does it signal readiness to Docker/Kubernetes orchestrators.
 
-### Routing – `api-routes.js`  
-This module defines an **Express Router** instance. Each route registers a chain of middleware functions, for example:
+When an incoming request needs LLM processing, the API handler invokes a method on **LLMServiceManager** (e.g., `LLMServiceManager.processRequest(payload)`).  LLMServiceManager internally constructs or reuses an instance of **`LLMService`** defined in `lib/llm/llm-service.ts`.  That class implements higher‑level concerns such as **mode routing** (selecting the appropriate LLM model), **caching** of recent responses, and **circuit breaking** to protect the system from downstream LLM failures.  The APIService itself never touches these details; it merely forwards the payload and returns the processed result.
 
-```js
-router.get('/items/:id',
-  authHandler.ensureAuthenticated,
-  cache.getItem,
-  async (req, res, next) => {
-    const item = await dataAccess.getItem(req.params.id);
-    res.json(item);
-  });
-```
+For any background work, APIService may call `ProcessManagementService.registerChildProcess(child)` where `child` is a Node.js `ChildProcess` object.  The **ProcessStateManager** maintains a map of child identifiers to their current state (running, exited, error).  This enables the parent DockerizedServices component to query overall health, trigger graceful shutdowns, or restart failed subprocesses without each service re‑implementing its own bookkeeping logic.
 
-The file groups routes by resource (e.g., `/items`, `/users`) and keeps the handler logic thin, delegating heavy lifting to the data‑access layer.
-
-### Data Access – `data-access.js`  
-`data-access.js` exports functions such as `getItem(id)`, `createItem(payload)`, `updateItem(id, payload)`, etc. Internally it may use a database client (e.g., `pg`, `mongoose`) but that detail is abstracted away. By centralising all persistence calls, the service can swap the underlying store with minimal impact on the API layer.
-
-### Authentication – `auth-handler.js`  
-Provides two primary exports:
-
-* **`ensureAuthenticated`** – verifies a JWT or session token, rejecting unauthorised requests with a 401.  
-* **`ensureAuthorized(roles)`** – higher‑order middleware that checks the authenticated user’s role against a required list, returning 403 on mismatch.
-
-These functions are used as route‑level middleware, ensuring that security is enforced consistently across the API surface.
-
-### Caching – `cache.js`  
-Implements a simple in‑memory map (or possibly a wrapper around `node-cache`/`lru-cache`). The module exports middleware such as `cache.getItem` and helper methods `invalidate(key)`. The cache TTL and size limits are configurable via environment variables, enabling the service to tune memory usage per deployment.
-
-### Error Handling – `error-handler.js`  
-Registered as the **last** middleware in the Express stack (`app.use(errorHandler)`). It inspects the error object, distinguishes between client errors (validation, auth) and server errors, logs the incident (delegating to the sibling **LoggingService** via an HTTP call or shared logger), and sends a JSON response with `status`, `message`, and optional `details`.
-
----
+All three supporting libraries (`service-starter.js`, `llm-service.ts`, `process-state-manager`) are located under the **`lib/`** directory, reinforcing a clear separation between *runtime orchestration* (service‑starter), *domain‑specific logic* (LLM service), and *operational concerns* (process management).
 
 ## Integration Points  
 
-1. **Parent – DockerizedServices**  
-   * APIService is started by the **`scripts/api-service.js`** script, which is invoked through the generic `startServiceWithRetry` logic defined in `lib/service-starter.js`. This ensures the container restarts with exponential back‑off if the service crashes, aligning with the parent’s micro‑service orchestration strategy.  
+APIService’s primary integration surface is the **DockerizedServices** container definition, which supplies environment variables, network ports, and volume mounts required by `scripts/api-service.js`.  The service also depends on **LLMServiceManager** – a sibling component – for any LLM‑backed endpoint.  Because LLMServiceManager itself wraps the `lib/llm/llm-service.ts` class, APIService indirectly benefits from the caching and circuit‑breaking mechanisms without needing to understand their configuration.  
 
-2. **Sibling Services**  
-   * While APIService does not directly import sibling code, it likely communicates with them over HTTP/REST. For example, a route in `api-routes.js` could call the **LoggingService** (which uses `winston.js`) to emit structured logs, or the **MonitoringService** to push metrics. The shared Docker network makes these calls straightforward.  
+Process management is another integration node.  By registering child processes with **ProcessManagementService**, APIService contributes to a global view of process health that is shared across all Dockerized services.  This shared view is useful for orchestrators that may need to restart the entire DockerizedServices stack if a critical subprocess fails.  
 
-3. **External Dependencies**  
-   * The **`data-access.js`** module may reach out to a database container managed by the broader system (e.g., PostgreSQL, MongoDB).  
-   * The **`auth-handler.js`** could validate tokens issued by an authentication provider that is part of the overall platform (e.g., an OAuth2 service).  
+Health and readiness checks are standardized through the **ServiceStarter** pattern.  The health endpoint exposed by APIService (implemented in `scripts/api-service.js`) is probed by ServiceStarter during start‑up and is also used by external load balancers or Kubernetes liveness probes.  Consequently, any changes to health‑check semantics must be coordinated with ServiceStarter’s expectations.  
 
-4. **Cross‑cutting Concerns**  
-   * The **`error-handler.js`** may forward critical failures to the **ConstraintMonitoringService** or **MonitoringService** for alerting, though the exact mechanism is not detailed in the observations.  
-
-5. **Configuration**  
-   * All modules read configuration from environment variables supplied by the Docker runtime, ensuring that the same image can be reused across dev, staging, and production with different settings (e.g., cache size, auth secret).
-
----
+Finally, the **DashboardService** sibling may consume APIService’s public endpoints for monitoring or administrative UI purposes, but this relationship is indirect; the dashboard simply issues HTTP requests to the API’s exposed routes.
 
 ## Usage Guidelines  
 
-* **Route Definition** – When adding a new endpoint, extend `api-routes.js` and follow the existing middleware ordering: authentication → caching (if applicable) → business logic → error propagation. This preserves the uniform request pipeline.  
+Developers adding new API endpoints should place all route registration logic inside `scripts/api-service.js` (or a module imported by it) and avoid embedding start‑up concerns there.  The entry script must hand the server object to **ServiceStarter.start()**; failing to do so bypasses the retry, timeout, and health‑verification mechanisms that the rest of the platform relies on.  
 
-* **Data Access** – All persistence interactions must go through `data-access.js`. Direct database calls inside route handlers are discouraged because they bypass caching, logging, and future schema‑migration safeguards.  
+When an endpoint needs LLM capabilities, the correct pattern is to call **LLMServiceManager** rather than importing `llm-service.ts` directly.  This ensures that mode routing, caching, and circuit breaking remain consistent across the system.  If custom LLM behaviour is required, extend **LLMServiceManager** or provide configuration through its public API, not by modifying the underlying `LLMService` class.  
 
-* **Authentication** – Protect every route that manipulates or reveals sensitive data with `auth-handler.ensureAuthenticated`. For role‑based restrictions, wrap the handler with `auth-handler.ensureAuthorized(['admin'])` or the appropriate role list.  
+Any background worker spawned from an API handler should be registered with **ProcessManagementService** immediately after creation.  Developers must retain the returned registration handle so they can later deregister or query the child’s state; neglecting this step can lead to orphaned processes and inaccurate health reporting.  
 
-* **Caching** – Use `cache.js` only for read‑heavy, rarely changing resources. Remember to call `cache.invalidate(key)` after any write operation that could stale the cached value.  
+All configuration values (e.g., retry counts, timeout durations, health‑check URLs) should be supplied via environment variables or Docker compose files defined at the DockerizedServices level.  Hard‑coding such values inside `scripts/api-service.js` defeats the purpose of the shared **ServiceStarter** configuration and reduces portability.  
 
-* **Error Propagation** – Throw errors (or pass them to `next(err)`) rather than sending responses directly inside business logic. Let `error-handler.js` translate them into consistent HTTP responses and trigger logging.  
-
-* **Container Lifecycle** – Rely on the parent’s `startServiceWithRetry` mechanism; do not implement custom retry loops inside the service. Ensure the process exits with a non‑zero status on unrecoverable errors so the orchestrator can act.  
-
-* **Testing** – Unit‑test each module in isolation (e.g., mock `data-access.js` when testing route handlers). Integration tests should spin up the Docker container and hit the real `api/*` endpoints to verify end‑to‑end behaviour, including auth and cache interactions.
+Before committing changes, run the service locally using the same Docker image that DockerizedServices uses, and verify that ServiceStarter reports a successful start and that the health endpoint returns a 200 status.  This practice catches start‑up regressions early and guarantees that the service will behave correctly when deployed alongside its siblings.
 
 ---
 
-### Architectural patterns identified  
-
-* **Micro‑service containerisation** (via DockerizedServices)  
-* **Express router / middleware pattern**  
-* **Facade/Data‑Access abstraction** (`data-access.js`)  
-* **Cache‑Aside** (`cache.js`)  
-* **Authentication/Authorization middleware** (`auth-handler.js`)  
-* **Centralised error‑handling middleware** (`error-handler.js`)
+### Architectural patterns identified
+1. **Service‑Starter (Robust Startup) pattern** – encapsulated in `lib/service-starter.js`.  
+2. **Facade/Thin Wrapper** for LLM interactions – APIService delegates to LLMServiceManager.  
+3. **Centralised Process Registry** – ProcessManagementService + ProcessStateManager.  
+4. **Container‑centric microservice organization** – each sub‑component runs in its own Docker container under DockerizedServices.
 
 ### Design decisions and trade‑offs  
-
-* **Separation of concerns** – By isolating auth, cache, data, and error handling into distinct modules, the code is easier to reason about and test. The trade‑off is a slightly higher number of file imports per request, but Node’s module caching mitigates performance impact.  
-* **In‑process caching** – Simplicity and low latency are gained, but the cache is not shared across multiple container instances, limiting horizontal scalability for cache‑heavy workloads.  
-* **Express‑centric design** – Leveraging a well‑known framework reduces learning curve and tooling overhead, yet it confines the service to a synchronous request‑response model, which may not suit long‑running background tasks (those are delegated to other services like SemanticAnalysisService).  
+* **Separation of start‑up logic** keeps API code clean but adds an extra abstraction layer that developers must remember to invoke.  
+* **Delegating LLM work** to a manager isolates complex routing/caching concerns, at the cost of an additional network or in‑process call overhead.  
+* **Shared process state** simplifies health monitoring across services, yet creates a single point of failure if ProcessManagementService becomes unavailable.  
+* **Container‑per‑service** yields deployment flexibility and isolation, but introduces inter‑container latency for internal calls (e.g., API → LLMServiceManager).
 
 ### System structure insights  
-
-* APIService sits as one leaf node in a Docker‑based micro‑service graph, with a thin HTTP API surface that other components (DashboardService, MonitoringService) consume.  
-* The internal module hierarchy (`api-routes.js → auth-handler.js / cache.js → data-access.js`) reflects a classic **three‑layer** architecture: presentation (Express), business (auth, cache, validation), and data (data‑access).  
-* Shared utilities such as logging and monitoring are externalised to sibling services, keeping APIService focused on request handling.
+The system is organized around a **DockerizedServices** parent that treats each functional area (API, Dashboard, LLM management, process management) as an independent container.  Common utilities live under `lib/`, providing reusable capabilities (startup, LLM core, process tracking) that all siblings consume.  APIService sits at the edge, exposing HTTP endpoints while internally orchestrating these shared libraries.
 
 ### Scalability considerations  
-
-* **Horizontal scaling** – Adding more APIService containers behind a load balancer is straightforward because the service is stateless aside from the in‑process cache. However, cache consistency must be handled at the client or via a distributed cache if strict coherence is required.  
-* **Start‑up resilience** – The `startServiceWithRetry` logic provides exponential back‑off, protecting the system from cascading failures during container orchestration.  
-* **Resource limits** – In‑memory cache size should be tuned per container to avoid out‑of‑memory kills; Docker resource constraints (CPU, memory) can be used to enforce limits.  
+Because each service runs in its own container, horizontal scaling can be achieved by replicating the API container behind a load balancer; ServiceStarter’s health checks ensure only healthy instances receive traffic.  The LLMService’s built‑in caching and circuit‑breaker help mitigate load spikes on external LLM providers.  However, the centralized ProcessStateManager may become a bottleneck if the number of child processes grows dramatically; sharding or distributing that registry would be required for massive scale.
 
 ### Maintainability assessment  
-
-* **High** – The clear module boundaries and reliance on standard Express conventions make the codebase approachable for new developers.  
-* **Medium** – The in‑process cache introduces state that can become a source of subtle bugs when multiple instances run; moving to an external cache (e.g., Redis) would improve observability but adds operational complexity.  
-* **Low** – Error handling is centralised, reducing duplication and making future changes (e.g., adding error codes) straightforward.  
-* **Overall** – The design balances simplicity with enough structure to support evolution, and the Docker‑level orchestration ensures that deployment and recovery are automated, further enhancing long‑term maintainability.
+The clear division between entry script, start‑up utility, LLM façade, and process manager promotes **high maintainability**: changes to one concern rarely affect others.  The reliance on explicit file paths and well‑named modules (`api-service.js`, `service-starter.js`, `llm-service.ts`) makes navigation straightforward.  The main maintenance risk lies in the coordination of configuration across DockerizedServices and the individual services; inconsistent environment settings could lead to start‑up failures.  Overall, the architecture encourages clean, testable code and eases onboarding for new developers.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service potentially running in its own container. This is evident in the use of the startServiceWithRetry function (lib/service-starter.js) for robust service startup with retry, timeout, and exponential backoff mechanisms. For instance, in scripts/api-service.js, the spawn function from the child_process module is used to start the API server, and in scripts/dashboard-service.js, it is used to start the dashboard. The startServiceWithRetry function ensures that these services are started with a retry mechanism, preventing endless loops and providing graceful degradation when optional services fail.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component leverages a microservices architecture, where each service runs in its own container, providing flexibility, scalability, and ease of deployment. This is evident in the use of separate scripts for starting the API service (scripts/api-service.js) and the dashboard service (scripts/dashboard-service.js). The ServiceStarter script (lib/service-starter.js) is used for robust service startup with retry, timeout, and health verification, ensuring that services are properly initialized and registered. The LLMService class (lib/llm/llm-service.ts) handles high-level LLM operations, including mode routing, caching, and circuit breaking, which helps in managing the complexity of LLM-related tasks.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the spawn function from the child_process module in scripts/semantic-analysis-service.js to start the analysis server
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses the rules-engine.js module to evaluate constraints against system data
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- CodeGraphAnalysisService uses the graph-analysis.js module to perform graph algorithms on code graphs
-- [DashboardService](./DashboardService.md) -- DashboardService uses the react.js framework to handle user interface rendering and events
-- [LoggingService](./LoggingService.md) -- LoggingService uses the winston.js library to handle logging of system events and errors
-- [MonitoringService](./MonitoringService.md) -- MonitoringService uses the prometheus.js library to handle monitoring of system performance and health
+- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager leverages the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking for LLM-related tasks.
+- [ProcessManagementService](./ProcessManagementService.md) -- ProcessManagementService utilizes the ProcessStateManager to manage child processes, providing a centralized point for process management.
+- [DashboardService](./DashboardService.md) -- DashboardService uses the scripts/dashboard-service.js file to start the dashboard service, providing a clear entry point for dashboard-related functionality.
 
 
 ---

@@ -2,90 +2,131 @@
 
 **Type:** SubComponent
 
-The LLMServiceManager uses a microservices architecture, with multiple services such as semantic analysis, constraint monitoring, and code graph analysis, which are containerized using Docker.
+LLMServiceManager utilizes separate scripts for starting the API service and the dashboard service, such as scripts/api-service.js and scripts/dashboard-service.js, to provide flexibility and scalability.
 
 ## What It Is  
 
-The **LLMServiceManager** is the orchestration layer that controls the lifecycle of the Large‑Language‑Model (LLM) service within the broader *DockerizedServices* ecosystem. Its core definition lives in `lib/llm/llm-service.ts`, where the concrete LLM service class is declared. The manager itself does not contain the service implementation; instead, it initializes, configures, and monitors the service by delegating to the **LLMServiceInitializer** child component. Configuration values are injected through environment variables that are read from `config/graph-database-config.json`, allowing the same Docker image to be reused across development, staging, and production environments. Deployment and runtime orchestration are handled by Docker Compose, using the definition found in `integrations/code-graph-rag/docker-compose.yaml`. In this way, the LLMServiceManager provides a thin, replace‑able façade that can be swapped out or upgraded without ripple effects on the other micro‑services that share the same Docker Compose network.
+The **LLMServiceManager** lives inside the *DockerizedServices* component and is the orchestrator that prepares, starts, and supervises the LLM‑related services that run in their own containers. Its implementation is spread across a handful of concrete files that appear throughout the repository:
 
-## Architecture and Design  
+* **`lib/llm/llm-service.ts`** – the core `LLMService` class that supplies a uniform interface for all LLM operations (mode routing, caching, circuit‑breaking).  
+* **`lib/service-starter.js`** – a reusable start‑up helper that performs retries, enforces start‑up timeouts, and validates health checks before a service is considered “ready”.  
+* **`scripts/api-service.js`** and **`scripts/dashboard-service.js`** – thin entry‑point scripts used by the manager to launch the API and dashboard processes respectively.
 
-The observations make it clear that the system follows a **microservices architecture**. Each logical capability—semantic analysis, constraint monitoring, code‑graph analysis, and the LLM service itself—is packaged as an independent Docker container. The `docker-compose.yaml` file under `integrations/code‑graph‑rag/` declares these containers, their networking, and their scaling policies, enabling the **LLMServiceManager** to spin up or down the LLM service independently of its peers. This loose coupling is a deliberate design decision that promotes independent deployment cycles and fault isolation.  
-
-Configuration is externalised via environment variables, a pattern reinforced by the use of `config/graph-database-config.json`. By reading configuration at container start‑up, the LLMServiceManager can be re‑used across multiple environments without code changes, adhering to the **12‑factor app** principle of separating config from code.  
-
-The relationship hierarchy further clarifies the design: **DockerizedServices** is the parent component that aggregates several micro‑services, including the LLMServiceManager. Its siblings—**ServiceStarterManager** and **GraphDatabaseManager**—share the same Docker Compose foundation and configuration strategy, reinforcing a consistent architectural language across the system. The child **LLMServiceInitializer** encapsulates the concrete steps needed to instantiate the LLM service defined in `lib/llm/llm-service.ts`, embodying a simple *factory*‑like pattern that isolates construction logic from orchestration.
-
-## Implementation Details  
-
-At the heart of the manager is the TypeScript module `lib/llm/llm-service.ts`. This file exports a class (or set of functions) that implements the LLM service’s public API—such as request handling, model loading, and health‑check endpoints. The **LLMServiceInitializer** consumes this module; it is responsible for creating an instance, wiring any required dependencies (e.g., authentication tokens, model paths), and exposing the ready‑to‑use service to the manager.  
-
-Configuration values are sourced from `config/graph-database-config.json`. Although the file name suggests a graph‑database focus, the same JSON structure is leveraged by the LLMServiceManager to read environment‑specific settings (e.g., `LLM_ENDPOINT`, `LLM_API_KEY`). During container start‑up, Docker injects these values as environment variables, which the initializer reads via `process.env`.  
-
-The Docker Compose file `integrations/code-graph-rag/docker-compose.yaml` declares a service entry for the LLM component, typically named something like `llm-service`. It specifies the Docker image, the environment block (populated from the JSON config), port mappings, and a `restart: unless-stopped` policy. Scaling is expressed with the `deploy.replicas` field (or via `docker compose up --scale llm-service=3`), allowing the LLMServiceManager to request multiple instances without modifying application code.  
-
-Because the LLM service is containerised, the manager interacts with it over network calls (HTTP/gRPC) rather than in‑process calls. This separation means the manager only needs to know the service’s endpoint and contract, not its internal implementation. Consequently, swapping the underlying LLM implementation (e.g., moving from an open‑source model to a commercial API) only requires updating `lib/llm/llm-service.ts` and possibly the environment variables—no changes ripple to other micro‑services.
-
-## Integration Points  
-
-The LLMServiceManager sits within the **DockerizedServices** parent, sharing the same Docker network with its siblings **ServiceStarterManager** and **GraphDatabaseManager**. The ServiceStarterManager uses the same `docker-compose.yaml` to enforce startup order and health checks, ensuring the LLM service is reachable before dependent components begin processing. The GraphDatabaseManager reads the same `config/graph-database-config.json` for its own connectivity, demonstrating a unified configuration strategy across the stack.  
-
-Externally, any component that requires LLM capabilities—such as the semantic‑analysis service—communicates with the LLM service via the endpoint exposed by Docker Compose (e.g., `http://llm-service:8080`). The manager does not expose a direct API to other services; instead, it guarantees that the LLM container is up, correctly configured, and health‑checked. This indirect integration reduces coupling and allows downstream services to remain agnostic of the manager’s internal mechanics.  
-
-From a development perspective, the manager’s dependencies are limited to the TypeScript definitions in `lib/llm/llm-service.ts` and the runtime environment variables defined in `config/graph-database-config.json`. No other code symbols were discovered in the observations, indicating a deliberately narrow interface that simplifies testing and replacement.
-
-## Usage Guidelines  
-
-Developers adding or modifying LLM functionality should confine all business‑logic changes to `lib/llm/llm-service.ts`. If a new model version or a completely different provider is needed, update this file and adjust the relevant environment variables in `config/graph-database-config.json`. Because the LLM service is containerised, rebuild the Docker image only when the service code changes; otherwise, simply redeploy the container with updated env‑vars to achieve a hot‑swap.  
-
-When scaling, use Docker Compose’s scaling commands (`docker compose up --scale llm-service=N`) or edit the `deploy.replicas` field in `integrations/code-graph-rag/docker-compose.yaml`. Ensure that any downstream service that relies on the LLM respects load‑balancing semantics (Docker’s built‑in round‑robin DNS) to distribute requests evenly across replicas.  
-
-Do not modify the `docker-compose.yaml` entries unrelated to the LLM service unless you understand the impact on sibling services. Coordination with the **ServiceStarterManager** is advisable when changing startup dependencies or health‑check thresholds, as these affect the overall boot sequence of the DockerizedServices suite.  
-
-Finally, keep configuration values version‑controlled in `config/graph-database-config.json` and avoid hard‑coding secrets in the codebase. Use Docker secrets or environment variable injection pipelines to supply sensitive data (e.g., API keys) at runtime, preserving the portability highlighted in the observations.
+Together, these pieces give the manager the ability to spin up the LLM API and its accompanying UI in a reliable, repeatable fashion while delegating the heavy‑lifting of LLM request handling to `LLMService`.
 
 ---
 
-### Architectural Patterns Identified
-1. **Microservices Architecture** – each functional area runs in its own Docker container.  
-2. **Externalised Configuration (12‑factor)** – environment variables sourced from `config/graph-database-config.json`.  
-3. **Factory/Initializer Pattern** – `LLMServiceInitializer` encapsulates construction of the LLM service defined in `lib/llm/llm-service.ts`.  
-4. **Container Orchestration via Docker Compose** – service definition, scaling, and networking are managed in `integrations/code-graph-rag/docker-compose.yaml`.
+## Architecture and Design  
 
-### Design Decisions and Trade‑offs  
-* **Loose Coupling vs. Operational Overhead** – containerising each service isolates failures but introduces the need for orchestration and health‑check logic.  
-* **Config‑Driven Flexibility vs. Complexity** – using environment variables makes deployments portable, yet requires disciplined secret management.  
-* **Single‑Source Service Definition** – centralising the LLM implementation in `lib/llm/llm-service.ts` simplifies updates but creates a single point of change that must be carefully versioned.
+The observed code reveals a **service‑orchestration** architecture that leans on a few well‑defined responsibilities:
 
-### System Structure Insights  
-* **Parent‑Child Relationship** – DockerizedServices aggregates multiple micro‑services; LLMServiceManager is a child that further delegates to LLMServiceInitializer.  
-* **Sibling Symmetry** – ServiceStarterManager and GraphDatabaseManager share the same Docker Compose and configuration mechanisms, reinforcing a uniform architectural style.  
-* **Clear Separation of Concerns** – orchestration (LLMServiceManager), initialization (LLMServiceInitializer), and implementation (llm-service.ts) are distinct layers.
+1. **Standardised LLM façade** – `LLMService` (in `lib/llm/llm-service.ts`) encapsulates all LLM‑specific concerns (mode routing, caching, circuit‑breaking). By exposing a single, stable API, the manager can treat every LLM backend uniformly, which simplifies extension and testing.
 
-### Scalability Considerations  
-* Horizontal scaling is native to the Docker Compose definition; replicas can be increased without code changes.  
-* Network load‑balancing is handled by Docker’s internal DNS, but downstream services must be designed to be stateless or tolerant of request distribution.  
-* Configuration scaling (e.g., increasing model memory) requires updating the container image or runtime limits, which should be scripted in CI/CD pipelines.
+2. **Robust start‑up choreography** – `ServiceStarter` (in `lib/service‑starter.js`) implements a **retry‑with‑timeout** pattern combined with a health‑verification step. The manager invokes this helper for each child process (API or dashboard), ensuring that transient failures do not leave the system in a partially‑started state.
 
-### Maintainability Assessment  
-* **High Maintainability** – the ability to replace or update the LLM service by editing a single TypeScript file and environment variables minimizes ripple effects.  
-* **Clear Boundaries** – the manager’s narrow responsibility and the initializer’s encapsulation reduce cognitive load for new contributors.  
-* **Potential Risks** – reliance on external configuration files means that missing or malformed env‑vars can cause startup failures; automated validation of `config/graph-database-config.json` is advisable.  
+3. **Process registration** – The manager optionally collaborates with the **ProcessManagementService** (via its `ProcessStateManager`) to register child processes. This creates a single source of truth for process lifecycles across the DockerizedServices suite.
 
-Overall, the LLMServiceManager exemplifies a well‑structured, container‑first approach that balances flexibility, scalability, and maintainability while staying firmly grounded in the observed codebase and deployment artifacts.
+4. **Separation of entry points** – Distinct scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`) give the manager the flexibility to launch each component independently, supporting horizontal scaling (multiple API instances) or independent upgrades (dashboard only).
+
+These decisions collectively reflect a **component‑based** design where each concern (LLM logic, start‑up robustness, process bookkeeping) lives in its own module and is wired together by the manager. The parent component *DockerizedServices* supplies the containerised execution environment, while sibling components such as **ProcessManagementService**, **APIService**, and **DashboardService** share the same start‑up infrastructure (`ServiceStarter`) and process‑registration conventions.
+
+---
+
+## Implementation Details  
+
+### LLMService (`lib/llm/llm-service.ts`)  
+`LLMService` is the workhorse for all LLM interactions. Its public interface likely includes methods such as `runPrompt`, `setMode`, and `clearCache`. Internally it:
+
+* **Mode routing** – selects the appropriate LLM backend (e.g., GPT‑4, Claude) based on a configuration flag or request metadata.  
+* **Caching** – stores recent request‑response pairs, probably in an in‑memory map or a lightweight persistent store, to avoid redundant calls.  
+* **Circuit breaking** – monitors error rates and latency; when thresholds are breached it short‑circuits further calls and returns a fallback, protecting downstream services from cascading failures.
+
+Because the manager does not implement these behaviours itself, any change to caching strategy or circuit‑breaker thresholds is isolated to this file, keeping the manager thin.
+
+### ServiceStarter (`lib/service-starter.js`)  
+`ServiceStarter` provides a `start(serviceScript, options)` function (or similar) that:
+
+* **Spawns** a child process for the supplied script (`api-service.js` or `dashboard-service.js`).  
+* **Retries** the launch a configurable number of times if the process exits prematurely.  
+* **Enforces a timeout** after which the launch is considered failed.  
+* **Performs health verification**, likely by polling a health endpoint exposed by the child or checking a readiness flag.
+
+The manager calls this helper for each service, passing the appropriate script path and any environment variables required for the LLM mode.
+
+### Process Management Integration  
+When the manager “registers” a service, it hands the child‑process identifier to the **ProcessManagementService**. That service, backed by the `ProcessStateManager`, tracks the state (running, stopped, restarting) of each child, enabling coordinated shutdowns or restarts across the DockerizedServices ecosystem.
+
+### Startup Scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`)  
+These scripts are intentionally minimal: they import `LLMService`, configure it (e.g., select the desired mode), expose an HTTP server for API calls, and signal readiness (perhaps by writing to stdout or opening a health endpoint). Because the manager starts them via `ServiceStarter`, they inherit the same retry and health‑check guarantees as any other DockerizedServices child.
+
+---
+
+## Integration Points  
+
+* **Parent – DockerizedServices** – The manager is a sub‑component of DockerizedServices, meaning it runs inside a Docker container that also hosts its sibling services. Docker provides the isolation and networking needed for the API and dashboard to communicate with the LLM backend.
+
+* **Sibling – ProcessManagementService** – By delegating process bookkeeping to this sibling, the manager benefits from a centralized lifecycle view. The `ProcessStateManager` acts as the contract: the manager supplies a process ID and optional metadata; the sibling records state changes and can trigger restarts if needed.
+
+* **Sibling – APIService & DashboardService** – Both are started by the manager using the dedicated scripts. They share the same start‑up contract (`ServiceStarter`) and thus exhibit identical resilience characteristics (retry, timeout, health checks).
+
+* **LLMService (`lib/llm/llm-service.ts`)** – The manager does not call LLM APIs directly; it relies on this class to abstract away provider‑specific details. Any future LLM provider can be added by extending `LLMService` without touching the manager.
+
+* **External Dependencies** – While not explicitly listed, `LLMService` likely depends on third‑party SDKs or HTTP clients for contacting LLM providers. The manager’s only external contract is the script entry points, keeping its dependency surface small.
+
+---
+
+## Usage Guidelines  
+
+1. **Never invoke the child scripts directly** – Always use `LLMServiceManager` (or its underlying `ServiceStarter`) so that retries, timeouts, and health verification are applied uniformly. Direct execution bypasses the circuit‑breaker and process‑registration logic.
+
+2. **Configure LLM mode through `LLMService`** – If a new LLM backend is required, extend `LLMService` with the routing logic and update the configuration file read by the API script. The manager will automatically pick up the change because it only launches the script.
+
+3. **Leverage the ProcessManagementService for supervision** – Register any spawned process with `ProcessStateManager` immediately after start‑up. This ensures that graceful shutdowns (e.g., during container stop) propagate correctly and that restarts are coordinated across siblings.
+
+4. **Respect the health‑check contract** – The API and dashboard scripts must expose a health endpoint (or emit a readiness signal) that `ServiceStarter` can poll. Failure to do so will cause the manager to treat the service as unhealthy and trigger retries.
+
+5. **Cache and circuit‑breaker tuning** – Adjust caching TTLs and circuit‑breaker thresholds inside `LLMService` only. Because the manager does not cache results itself, changes remain localized and do not affect start‑up behaviour.
+
+---
+
+### Architectural patterns identified
+* **Circuit Breaker** – implemented inside `LLMService` to protect against flaky LLM providers.  
+* **Caching** – also within `LLMService` to reduce duplicate calls.  
+* **Retry‑with‑Timeout / Health‑Check start‑up pattern** – provided by `ServiceStarter`.  
+* **Process Registration / Centralised Process Management** – via `ProcessManagementService` and `ProcessStateManager`.
+
+### Design decisions and trade‑offs
+* **Separation of concerns** – LLM logic, start‑up robustness, and process bookkeeping live in distinct modules, improving testability but adding a small indirection overhead when tracing failures.  
+* **Thin manager** – The manager delegates most work, which keeps its codebase minimal but makes it dependent on the correctness of the helper scripts.  
+* **Explicit scripts per service** – Improves flexibility (different env vars per service) at the cost of duplicated boiler‑plate code in the entry points.
+
+### System structure insights
+* The DockerizedServices component forms a **container‑per‑service** topology; LLMServiceManager is the entry point that launches the API and dashboard containers from within the same host container.  
+* All child processes are tracked centrally by ProcessManagementService, providing a unified view of the system’s runtime state.  
+* The LLMService abstraction isolates provider‑specific changes, allowing the rest of the system to remain stable.
+
+### Scalability considerations
+* Because each API instance is launched via a separate script, horizontal scaling can be achieved by running multiple manager instances or by extending `ServiceStarter` to spawn multiple processes.  
+* Caching inside `LLMService` is local to the process; scaling out will require a distributed cache if shared state is needed.  
+* Circuit‑breaker thresholds can be tuned per instance, enabling graceful degradation under load without affecting other services.
+
+### Maintainability assessment
+* **High modularity** – Clear boundaries between LLM logic, start‑up, and process management make the codebase easy to navigate and modify.  
+* **Low coupling** – The manager communicates with siblings through well‑defined interfaces (`ServiceStarter`, `ProcessStateManager`), reducing ripple effects of changes.  
+* **Potential duplication** – The two start‑up scripts (`api-service.js`, `dashboard-service.js`) may share similar boiler‑plate; extracting a common bootstrap module could further improve maintainability.  
+
+Overall, the LLMServiceManager demonstrates a pragmatic, well‑encapsulated approach to orchestrating LLM‑related services within a Docker‑based micro‑service landscape, balancing reliability (through retries and circuit‑breaking) with extensibility (via the `LLMService` façade).
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with multiple services such as semantic analysis, constraint monitoring, and code graph analysis, which are containerized using Docker and managed through Docker Compose, as seen in the docker-compose.yaml file located at integrations/code-graph-rag/docker-compose.yaml. This approach enables loose coupling between services and facilitates easier maintenance, scaling, and deployment. For instance, the LLMService, defined in lib/llm/llm-service.ts, can be updated or replaced without affecting other services. The use of environment variables for configuration, as seen in the Graph Database configuration file config/graph-database-config.json, further enhances the flexibility and portability of the services.
-
-### Children
-- [LLMServiceInitializer](./LLMServiceInitializer.md) -- The LLMServiceInitializer utilizes the lib/llm/llm-service.ts file to define the LLM service, allowing for updates or replacements without affecting other services.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component leverages a microservices architecture, where each service runs in its own container, providing flexibility, scalability, and ease of deployment. This is evident in the use of separate scripts for starting the API service (scripts/api-service.js) and the dashboard service (scripts/dashboard-service.js). The ServiceStarter script (lib/service-starter.js) is used for robust service startup with retry, timeout, and health verification, ensuring that services are properly initialized and registered. The LLMService class (lib/llm/llm-service.ts) handles high-level LLM operations, including mode routing, caching, and circuit breaking, which helps in managing the complexity of LLM-related tasks.
 
 ### Siblings
-- [ServiceStarterManager](./ServiceStarterManager.md) -- ServiceStarterManager uses the docker-compose.yaml file to define the services and their dependencies, ensuring proper startup and health verification.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the config/graph-database-config.json file to configure the graph database, enhancing flexibility and portability.
+- [ProcessManagementService](./ProcessManagementService.md) -- ProcessManagementService utilizes the ProcessStateManager to manage child processes, providing a centralized point for process management.
+- [APIService](./APIService.md) -- APIService uses the scripts/api-service.js file to start the API service, providing a clear entry point for API-related functionality.
+- [DashboardService](./DashboardService.md) -- DashboardService uses the scripts/dashboard-service.js file to start the dashboard service, providing a clear entry point for dashboard-related functionality.
 
 
 ---

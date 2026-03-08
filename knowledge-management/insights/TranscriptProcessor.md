@@ -2,131 +2,131 @@
 
 **Type:** SubComponent
 
-The TranscriptConverter class (lib/agent-api/transcript-api.js) uses a factory pattern to create transcript converters based on the transcript format, allowing for easy addition of new formats.
+TranscriptProcessor leverages the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, for classifying observations against an ontology system.
 
 ## What It Is  
 
-**TranscriptProcessor** is a sub‑component that lives inside the **LiveLoggingSystem** package. All of its source code is found in the file **`lib/agent-api/transcript-api.js`**. Its primary responsibility is to orchestrate the flow of transcript data: retrieving raw transcripts, applying caching, converting the content into the required format, and finally delivering the result to callers. It does this by delegating to a set of tightly‑coupled collaborators – `TranscriptAdapter`, `TranscriptRepository`, `TranscriptCache`, and `TranscriptConverter` – each of which lives in the same module. Because the parent component, **LiveLoggingSystem**, already employs async logging and non‑blocking I/O, TranscriptProcessor is designed to be lightweight and non‑blocking as well, relying on caching to minimise expensive I/O or network calls when fetching transcripts.
+**TranscriptProcessor** is a sub‑component of the **LiveLoggingSystem** that is responsible for ingesting raw transcript data from live sessions, applying semantic enrichment, and preparing the material for downstream consumption (e.g., logging, markdown conversion, or ontology‑based insight generation). Although the exact source file is not listed in the observations, its placement is clearly within the LiveLoggingSystem hierarchy, which also contains the **OntologyClassificationAgent**, **LoggingManager**, **SessionConverter**, and **LSLConfigValidator**. The processor draws on the same semantic‑analysis capabilities that power the OntologyClassificationAgent (found at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) and respects the configuration validation rules enforced by the LSLConfigValidator. In practice, TranscriptProcessor acts as the bridge between raw speech/text streams and the higher‑level services that log, classify, and render those streams.
 
 ---
 
 ## Architecture and Design  
 
-The design of **TranscriptProcessor** is centred around *composition* of specialised helpers rather than monolithic logic. Three explicit design patterns surface from the observations:
+The design of TranscriptProcessor follows a **modular, composition‑based architecture** that mirrors its sibling components. Rather than embedding all responsibilities in a monolithic class, the processor delegates distinct concerns to dedicated collaborators:
 
-1. **Factory Pattern** – Implemented inside `TranscriptConverter`. The converter class contains a factory that selects and instantiates the appropriate concrete converter based on the transcript’s source format. This makes adding support for a new format a matter of plugging in a new concrete converter without touching the processor logic.
+1. **Semantic classification** – it forwards observations to the **OntologyClassificationAgent** (via the path mentioned above) to map utterances onto the system’s ontology. This reuse of an existing agent demonstrates a **service‑oriented composition** where the processor is a consumer of a classification service.  
 
-2. **Decorator Pattern** – Used by `TranscriptRepository`. The repository provides a core interface for fetching transcripts from any source, and decorators are layered on top to add **caching** and **logging** behaviour. This keeps the retrieval logic pure while still giving the system cross‑cutting concerns (cache hit/miss metrics, audit trails) without code duplication.
+2. **Configuration validation** – before any processing begins, the processor invokes the **LSLConfigValidator** to ensure that the transcript‑handling configuration (e.g., language model settings, buffer sizes) conforms to expected schemas. This reflects a **validation façade** pattern that isolates configuration concerns from core logic.  
 
-3. **Caching Mechanism** – Both `TranscriptAdapter` and `TranscriptCache` maintain in‑memory stores of frequently accessed transcripts. While not a formal “pattern” name in the observations, the repeated mention of caching indicates a deliberate performance optimisation strategy that aligns with the parent LiveLoggingSystem’s goal of high‑throughput, low‑latency processing.
+3. **Buffering** – the processor likely adopts the same **buffering mechanism** employed by **LoggingManager** (which “handles log entries, ensuring that they are properly stored and flushed”). By buffering incoming transcript chunks, the component can smooth out bursty input and avoid back‑pressure on upstream producers. This is a classic **producer‑consumer** pattern with an internal queue or ring buffer.  
 
-Interaction flow (as inferred from the file paths):
+4. **Data structures** – observations suggest the use of a **queue** (or possibly a **graph**) to manage the flow of transcript fragments through classification, enrichment, and conversion stages. The queue provides ordered, FIFO processing, while a graph could support more complex dependency tracking (e.g., linking related utterances).  
 
-- `TranscriptProcessor` calls **`TranscriptRepository.get()`** to obtain a raw transcript.  
-- The repository’s decorator stack first checks **`TranscriptCache`**; on a miss it forwards the request to the underlying source (e.g., a database or external service).  
-- Once retrieved, the processor hands the raw data to **`TranscriptConverter.createConverter(format)`**, which returns a concrete converter that normalises the transcript into the system’s canonical representation.  
-- The processed transcript is optionally stored back into **`TranscriptCache`** via **`TranscriptAdapter`**, allowing subsequent calls to hit the cache directly.
-
-The architecture is deliberately *layered*: the processor focuses on orchestration, the repository on data access, the cache on performance, and the converter on format handling. This separation of concerns simplifies testing and future extension.
+Overall, the architecture emphasizes **separation of concerns**, **re‑use of existing agents**, and **stream‑oriented processing**, all of which are evident from the way TranscriptProcessor interacts with its siblings and parent component.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes  
+Although the source code for TranscriptProcessor itself is not listed, the observations let us infer the key implementation elements:
 
-| Class / Module | File Path | Primary Role |
-|----------------|-----------|--------------|
-| **TranscriptProcessor** | `lib/agent-api/transcript-api.js` | Coordinates transcript retrieval, caching, and conversion. |
-| **TranscriptAdapter** | `lib/agent-api/transcript-api.js` | Provides a façade that couples the cache (`TranscriptCache`) with the repository, exposing a simplified API for the processor. |
-| **TranscriptRepository** | `lib/agent-api/transcript-api.js` | Abstracts the source of transcripts; decorated with caching and logging. |
-| **TranscriptCache** | `lib/agent-api/transcript-api.js` | In‑memory store (likely a Map or LRU cache) that holds recently accessed transcripts. |
-| **TranscriptConverter** | `lib/agent-api/transcript-api.js` | Factory that produces concrete converters based on format strings (e.g., `JSONConverter`, `XMLConverter`). |
+| Element | Likely Implementation | Rationale |
+|---------|----------------------|-----------|
+| **Classification Call** | `OntologyClassificationAgent.classify(observation)` | The processor “leverages the OntologyClassificationAgent… for classifying observations against an ontology system.” The agent’s path (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) indicates a TypeScript class with a `classify` method. |
+| **Configuration Validation** | `LSLConfigValidator.validate(config)` | The mention of “specific protocol… such as the LSLConfigValidator, to ensure configurations are validated and optimized” points to a validation function that throws on mis‑configuration. |
+| **Buffering Mechanism** | Internal `Buffer` or `RingBuffer` similar to `LoggingManager` | “Similar to the LoggingManager's buffering mechanism” suggests the processor holds incoming transcript chunks in a temporary store before batch processing. |
+| **Queue / Graph** | `const processingQueue = new Queue<TranscriptChunk>()` or a graph library (e.g., `graphlib`) | “May be using a specific data structure, such as a queue or a graph, to manage the processing and conversion of transcripts.” |
+| **Interaction with SessionConverter** | `SessionConverter.convert(processedTranscript)` | The processor “may have a specific interface or API for interacting with other components, such as the SessionConverter.” This likely involves passing a fully classified and enriched transcript object for markdown rendering. |
+| **NLP Library** | Import from a library such as `@nlpjs` or `spaCy` (via a Node wrapper) | “Could be using a natural language processing library” to pre‑process raw text (tokenization, speaker diarization) before classification. |
 
-### Mechanics  
+Typical flow (derived from the observations):
 
-1. **Caching** – Both `TranscriptAdapter` and `TranscriptRepository` reference `TranscriptCache`. When `TranscriptProcessor` requests a transcript, the cache is consulted first. On a hit, the cached payload is returned immediately, bypassing any I/O. On a miss, the request propagates down to the underlying source and the result is written back into the cache for future use.
-
-2. **Decorator Stack** – The repository is wrapped by two decorators:
-   - **LoggingDecorator** (implied by “logging functionality”) records each fetch attempt, including timestamps, cache‑hit/miss status, and possibly error conditions.
-   - **CachingDecorator** (the cache itself) intercepts calls to avoid duplicate fetches. The ordering (logging then caching, or vice‑versa) is not explicitly stated, but both concerns are orthogonal and can be composed in any order without affecting core retrieval logic.
-
-3. **Factory‑Based Conversion** – `TranscriptConverter` exposes a static method (e.g., `createConverter(format)`) that examines the supplied format identifier and returns an instance of a format‑specific converter class. Each concrete converter implements a common interface such as `convert(rawTranscript): CanonicalTranscript`. This design isolates format‑specific parsing rules and makes the addition of new formats a plug‑in activity.
-
-4. **Adapter Role** – `TranscriptAdapter` acts as the public façade for the processor. It hides the internal repository‑cache‑converter wiring, exposing methods like `getProcessedTranscript(id, format)` that internally orchestrate the cache lookup, repository fetch, conversion, and cache write‑back.
-
-Because the observations do not list individual functions, the above description abstracts the typical method names that would logically exist given the patterns (e.g., `fetch`, `store`, `convert`, `createConverter`). All of these live within the same JavaScript module, which keeps the component tightly scoped while still enabling clear separation through class boundaries.
+1. **Receive** raw transcript data (stream or batch).  
+2. **Validate** processing configuration via `LSLConfigValidator`.  
+3. **Enqueue** the data in the internal buffer/queue.  
+4. **Consume** buffered chunks, optionally applying **NLP preprocessing**.  
+5. **Classify** each chunk with `OntologyClassificationAgent`.  
+6. **Pass** the enriched transcript to `SessionConverter` (or other downstream services).  
+7. **Flush** the buffer when thresholds are met, mirroring the behavior of `LoggingManager`.
 
 ---
 
 ## Integration Points  
 
-- **Parent – LiveLoggingSystem**: The processor is a child of the LiveLoggingSystem component. LiveLoggingSystem already implements async logging and non‑blocking file I/O (see `integrations/mcp-server-semantic-analysis/src/logging.ts`). TranscriptProcessor inherits this environment, meaning its own logging (performed by the repository decorator) is expected to be asynchronous and non‑blocking, preserving the overall system’s high‑throughput characteristics.
+- **Parent – LiveLoggingSystem**: The LiveLoggingSystem owns the TranscriptProcessor, coordinating its lifecycle alongside other agents. LiveLoggingSystem likely orchestrates the start‑up sequence, ensuring the OntologyClassificationAgent and LSLConfigValidator are instantiated before TranscriptProcessor begins work.  
 
-- **Sibling – LoggingManager**: Both LoggingManager and TranscriptProcessor rely on the same async logging infrastructure. While LoggingManager focuses on generic log events, TranscriptProcessor’s repository decorator contributes transcript‑specific logs (e.g., cache hits). This shared logging backbone ensures consistent observability across the subsystem.
+- **Sibling – OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`): Direct service consumer; TranscriptProcessor sends observations for semantic mapping.  
 
-- **Sibling – SessionManager**: SessionManager creates sessions via `SessionFactory` (`lib/agent-api/session-api.js`). Although not directly coupled, both SessionManager and TranscriptProcessor are likely invoked during a user interaction flow: a session is created, and then transcript data is fetched/processed for that session. Their coexistence under LiveLoggingSystem suggests coordinated lifecycle management.
+- **Sibling – LSLConfigValidator**: Provides a validation façade; the processor calls into it early to guarantee that any configuration changes (e.g., buffer size, language model version) are safe.  
 
-- **Sibling – TranscriptAdapter**: The sibling named TranscriptAdapter is actually the same module that TranscriptProcessor uses to interact with caching and conversion. This close relationship underscores that the adapter is the primary integration surface for any other component needing transcript data (e.g., a downstream analytics service).
+- **Sibling – LoggingManager**: Shares the buffering strategy. TranscriptProcessor may reuse the same buffer implementation class or follow the same flush‑interval policy, ensuring consistent back‑pressure handling across logging and transcript pipelines.  
 
-- **External Sources**: The repository may pull transcripts from databases, external APIs, or file stores. The decorator pattern abstracts these sources, allowing the processor to remain agnostic of where the raw data originates.
+- **Sibling – SessionConverter**: Acts as the downstream consumer. After classification, TranscriptProcessor hands off the enriched transcript to SessionConverter for markdown or other format conversion.  
 
-All dependencies are internal to the `lib/agent-api` tree, meaning the component does not import third‑party services directly; instead, it composes its own helpers, which simplifies versioning and testing.
+- **External Libraries**: An NLP library (unspecified) is likely imported to handle tokenization, speaker detection, or language detection before classification.  
+
+All these integration points are **interface‑driven**: each sibling exposes a well‑defined method (e.g., `classify`, `validate`, `convert`) that TranscriptProcessor invokes, keeping coupling low and allowing independent evolution of each component.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer the Adapter API** – Callers should interact with `TranscriptAdapter` (or the higher‑level `TranscriptProcessor` façade) rather than reaching directly into the repository or cache. This guarantees that caching, logging, and conversion are applied consistently.
+1. **Validate before processing** – Always invoke `LSLConfigValidator.validate` with the intended configuration before instantiating or starting the processor. Mis‑validated configs can lead to buffer overflows or classification errors.  
 
-2. **Specify the Desired Format Explicitly** – When invoking the processor, always pass the target transcript format. The factory inside `TranscriptConverter` will select the correct converter; omitting the format may default to a generic or error‑prone path.
+2. **Respect buffer limits** – The internal buffering mechanism mirrors that of `LoggingManager`; therefore, adhere to the same size thresholds and flush intervals to avoid memory pressure. If you need to adjust these limits, do so through the configuration validated by LSLConfigValidator.  
 
-3. **Leverage Cache Warm‑up** – If a batch of transcripts is known to be needed (e.g., during a session start), pre‑populate `TranscriptCache` via the adapter. This reduces latency for the first user‑visible request.
+3. **Treat the classification service as a black box** – Pass raw or minimally pre‑processed transcript chunks to the OntologyClassificationAgent; avoid duplicating NLP preprocessing that the agent already performs.  
 
-4. **Observe Async Boundaries** – Because LiveLoggingSystem’s logging is async, any method that triggers logging (repository fetches) returns a promise. Ensure callers `await` the processor’s async methods to avoid race conditions.
+4. **Sequence of calls** – The typical processing pipeline is: receive → validate → enqueue → (optional NLP) → classify → convert. Maintaining this order ensures that each stage receives data in the expected shape.  
 
-5. **Extend Formats via the Factory** – To add a new transcript format, create a new concrete converter class implementing the expected `convert` interface and register it inside the `TranscriptConverter` factory map. No changes to the processor or repository are required.
+5. **Error handling** – Propagate classification or conversion errors up to the LiveLoggingSystem so that it can decide whether to retry, drop the chunk, or halt the session. Do not swallow exceptions inside the processor; surface them through a consistent error interface.  
 
-6. **Do Not Bypass Decorators** – Avoid direct calls to the underlying data source; doing so would skip caching and logging, defeating the design’s performance and observability goals.
+6. **Testing** – Unit tests should mock the OntologyClassificationAgent and SessionConverter to verify that TranscriptProcessor correctly buffers, validates, and forwards data. Integration tests can use the real agents to confirm end‑to‑end behavior within LiveLoggingSystem.
 
 ---
 
-### Summary Deliverables  
+### Architectural Patterns Identified  
 
-1. **Architectural patterns identified**  
-   - Factory Pattern (inside `TranscriptConverter`)  
-   - Decorator Pattern (applied to `TranscriptRepository` for caching & logging)  
-   - Explicit Caching Strategy (via `TranscriptCache` and `TranscriptAdapter`)
+* **Service‑Oriented Composition** – TranscriptProcessor consumes OntologyClassificationAgent and SessionConverter as external services.  
+* **Producer‑Consumer (Buffering)** – Internal queue/buffer mirrors LoggingManager’s buffering strategy.  
+* **Facade / Validation Layer** – LSLConfigValidator acts as a façade for configuration safety.  
+* **Pipeline / Stream Processing** – Sequential stages (validate → buffer → NLP → classify → convert) form a processing pipeline.
 
-2. **Design decisions and trade‑offs**  
-   - **Separation of concerns**: orchestration vs. data access vs. format handling improves testability but adds a few indirection layers.  
-   - **In‑memory caching**: drastically reduces I/O latency; however, it introduces cache‑coherency considerations and memory pressure in long‑running processes.  
-   - **Factory‑based conversion**: simplifies adding new formats but requires careful versioning of the factory map to avoid breaking existing callers.
+### Design Decisions & Trade‑offs  
 
-3. **System structure insights**  
-   - TranscriptProcessor sits one level below LiveLoggingSystem, sharing async logging infrastructure with sibling components.  
-   - All transcript‑related helpers are co‑located in `lib/agent-api/transcript-api.js`, promoting discoverability but also creating a relatively large module that may need refactoring as the feature set grows.
+* **Reuse of existing agents** reduces duplicate code but introduces a runtime dependency on the classification service’s stability.  
+* **Buffering** smooths bursty input but adds latency; buffer size must be tuned to balance memory usage vs. real‑time responsiveness.  
+* **Queue vs. Graph** choice influences complexity: a simple queue gives deterministic ordering, while a graph could enable richer context linking at the cost of additional implementation overhead.  
 
-4. **Scalability considerations**  
-   - The cache layer enables horizontal scaling of read‑heavy workloads; however, in a multi‑process or distributed deployment, the cache would need to be externalised (e.g., Redis) to maintain consistency.  
-   - The decorator pattern allows additional cross‑cutting concerns (e.g., metrics, security) to be added without altering core retrieval logic, supporting future scaling of observability.
+### System Structure Insights  
 
-5. **Maintainability assessment**  
-   - High maintainability thanks to clear boundaries: changes to transcript formats only affect the factory and concrete converters; changes to data sources only affect the repository implementation.  
-   - Potential risk: the single‑file concentration (`transcript-api.js`) could become a maintenance bottleneck if the number of formats, decorators, or caching strategies expands. Refactoring into sub‑modules (e.g., `cache/`, `converter/`, `repository/`) would preserve the current architecture while improving code‑base navigation.
+* TranscriptProcessor sits centrally within LiveLoggingSystem, acting as the data‑flow hub between raw transcript ingestion and downstream services (logging, conversion, insight generation).  
+* Its sibling components each specialize in a single concern (logging, conversion, classification, validation), reinforcing a **single‑responsibility** layout.  
+
+### Scalability Considerations  
+
+* **Horizontal scaling** can be achieved by running multiple instances of TranscriptProcessor behind a load balancer, each with its own buffer, provided the OntologyClassificationAgent can handle concurrent requests.  
+* **Back‑pressure handling** via the buffer mitigates spikes but requires careful monitoring; overflow strategies (dropping, throttling) should be defined.  
+
+### Maintainability Assessment  
+
+* The clear separation of concerns and reliance on well‑named sibling services make the component **easy to understand** and **test**.  
+* However, the lack of a dedicated source file in the observations suggests that documentation may be sparse; adding explicit type definitions and interface contracts would improve long‑term maintainability.  
+* Reusing buffering logic from LoggingManager reduces duplication but also couples the two components; any change to the buffer implementation must be evaluated for impact on both logging and transcript processing.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes async logging and non-blocking file I/O, as seen in the logging.ts file (integrations/mcp-server-semantic-analysis/src/logging.ts), to improve performance by preventing the system from waiting for logging operations to complete before proceeding with other tasks. This design decision allows the system to handle a high volume of logging requests without significant performance degradation. Furthermore, the use of caching mechanisms in the TranscriptAdapter (lib/agent-api/transcript-api.js) optimizes transcript retrieval and conversion, reducing the load on the system and improving overall efficiency.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, for classifying observations against an ontology system. This classification process is crucial for the system's ability to understand and process the live session data. The OntologyClassificationAgent is designed to work in conjunction with other modules, such as the LSLConfigValidator, to ensure that the system's configurations are validated and optimized. By leveraging the OntologyClassificationAgent, the LiveLoggingSystem can effectively categorize observations and provide meaningful insights into the interactions with various agents like Claude Code.
 
 ### Siblings
-- [LoggingManager](./LoggingManager.md) -- LoggingManager uses async logging (integrations/mcp-server-semantic-analysis/src/logging.ts) to prevent the system from waiting for logging operations to complete before proceeding with other tasks.
-- [SessionManager](./SessionManager.md) -- SessionManager creates new sessions, using the SessionFactory class (lib/agent-api/session-api.js) to create new session objects.
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the TranscriptConverter class (lib/agent-api/transcript-api.js) to convert transcripts between different formats.
+- [LoggingManager](./LoggingManager.md) -- LoggingManager likely employs a buffering mechanism to handle log entries, ensuring that they are properly stored and flushed when necessary.
+- [SessionConverter](./SessionConverter.md) -- SessionConverter likely utilizes a specific library or framework, such as a markdown library, to facilitate the conversion of sessions into LSL markdown.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent likely utilizes a specific library or framework, such as a natural language processing library, to facilitate the classification of observations.
+- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator likely utilizes a specific library or framework, such as a validation library, to facilitate the validation of configurations.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

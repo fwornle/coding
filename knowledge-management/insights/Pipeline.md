@@ -2,110 +2,117 @@
 
 **Type:** SubComponent
 
-The Pipeline sub-component uses a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts).
+The coordinator agent in integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
 
 ## What It Is  
 
-The **Pipeline** sub‑component lives inside the *SemanticAnalysis* feature set and is implemented under the `integrations/mcp-server-semantic-analysis/src/agents/` directory.  Its core is a **DAG‑based execution model** that orchestrates a set of agents (e.g., `SemanticAnalysisAgent`, `OntologyClassificationAgent`, `CodeAnalyzer`, `InsightGenerator`) through a topologically‑sorted workflow described in `batch-analysis.yaml`.  Each step in the YAML declares explicit `depends_on` edges, and the runtime engine materialises those edges in the `BatchScheduler` class (`integrations/mcp-server-semantic-analysis/src/agents/batch-scheduler.ts`).  The Pipeline therefore acts as a lightweight, extensible orchestrator that drives data through a series of specialised agents, each of which implements the common `BaseAgent` contract (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`).  
+The **Pipeline** sub‑component lives inside the *SemanticAnalysis* module and is realized by a collection of tightly‑coupled agents under the directory `integrations/mcp-server-semantic-analysis/src/agents/`.  The core orchestrator is the **CoordinatorAgent** (`integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts`), which drives a directed‑acyclic‑graph (DAG) of processing steps defined in `batch-analysis.yaml`.  Each step in the DAG declares explicit `depends_on` edges, allowing the coordinator to schedule work in a topologically‑sorted order.  Supporting agents – observation‑generation, KG‑operators, deduplication, persistence, and the generic `BaseAgent` – implement the individual stages of the pipeline, communicating through a shared message queue.  In short, Pipeline is the execution engine that transforms raw semantic inputs into enriched, deduplicated, and persisted knowledge graph entities, while handling errors, caching, and load‑balancing internally.
 
 ## Architecture and Design  
 
-The Pipeline follows a **modular, agent‑centric architecture**.  All functional units are modelled as agents that implement the standardized interface defined in `BaseAgent`.  This guarantees a uniform lifecycle (`init`, `run`, `shutdown`) and enables the `BatchScheduler` to treat every step as a black‑box node in a directed acyclic graph (DAG).  The DAG itself is a **data‑flow orchestration pattern** expressed declaratively in `batch-analysis.yaml`; the scheduler resolves execution order with a **topological sort** algorithm, guaranteeing that each agent runs only after its declared dependencies have completed.  
+The observed implementation follows a **pipeline‑orchestrated, agent‑based architecture**.  The `CoordinatorAgent` embodies the *pipeline coordinator* pattern: it reads a declarative DAG (`batch-analysis.yaml`), performs a topological sort, and dispatches work to downstream agents.  The agents themselves inherit from an abstract `BaseAgent` (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`), which standardises message handling, response formatting, and confidence calculation across the whole pipeline.  
 
-Concurrency is handled by the `WaveController` (`integrations/mcp-server-semantic-analysis/src/agents/wave-controller.ts`).  Its `runWithConcurrency()` method uses a **work‑stealing** strategy: a shared `nextIndex` counter is atomically incremented by any idle worker, allowing the pool to dynamically rebalance load without a central queue.  This design keeps the pipeline responsive under variable task durations and scales linearly with the number of workers.  
+Work distribution is achieved with a **work‑stealing algorithm** inside `kg-operators.ts`.  A shared `nextIndex` counter lets idle workers pull the next KG operation without centralised scheduling, reducing contention and improving throughput.  The **deduplication agent** (`deduplication-agent.ts`) applies a **Bloom filter** to filter out duplicate entities efficiently, a probabilistic data structure that trades a small false‑positive rate for O(1) membership checks.  The **persistence agent** (`persistence-agent.ts`) adds a **caching layer** that shields the database from repetitive writes, thereby lowering latency and database load.  
 
-The agents themselves are **single‑responsibility** components.  For example, `OntologyClassificationAgent` focuses solely on mapping observations to ontology classes, while `SemanticAnalysisAgent` delegates LLM‑driven analysis to the `LLMService` (`integrations/mcp-server-semantic-analysis/src/model/llm-service.ts`).  The `PersistenceAgent` (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) enriches entities with ontology metadata **up‑front** via `mapEntityToSharedMemory()`, eliminating redundant LLM re‑classification later in the pipeline.  This reflects a **caching‑or‑pre‑populate** optimisation pattern.  
+All agents exchange messages via a **message queue** (as referenced in `base-agent.ts`).  This decouples producers from consumers, enables asynchronous processing, and provides natural back‑pressure handling.  Error handling is centralized in the coordinator: exceptions are logged to a file and a notification is sent to the development team, ensuring visibility without crashing the whole pipeline.
 
 ## Implementation Details  
 
-* **BatchScheduler (`batch-scheduler.ts`)** – Parses `batch-analysis.yaml`, builds an adjacency list of steps, and executes a topological sort to produce a linearised order that respects `depends_on`.  It then hands each step to the `WaveController` for concurrent execution.  
+1. **CoordinatorAgent (`coordinator-agent.ts`)**  
+   * Reads `batch-analysis.yaml`, parses each step’s `depends_on` list, and builds an in‑memory DAG.  
+   * Executes a topological sort to obtain a linearised execution order that respects dependencies.  
+   * For each step, it creates a job payload and publishes it to the message queue.  
+   * Listens for completion or failure messages; on error it writes a detailed log entry and triggers a notification routine (e.g., via email or Slack).  
 
-* **BaseAgent (`base-agent.ts`)** – Declares the contract all agents must satisfy (e.g., `execute(context)`, `configure(options)`).  By inheriting from this base class, agents gain access to shared utilities such as logging, error handling, and a common execution context that carries the shared memory populated by `PersistenceAgent`.  
+2. **ObservationGenerationAgent (`observation-generation-agent.ts`)**  
+   * Before invoking any LLM for classification, it pre‑populates entity metadata fields (e.g., source, timestamps, preliminary type hints).  
+   * This reduces the number of round‑trips to the LLM service and avoids redundant re‑classification of the same entity.  
 
-* **PersistenceAgent (`persistence-agent.ts`)** – Implements `mapEntityToSharedMemory()`, which extracts the `entityType` and injects `metadata.ontologyClass` into the shared memory store before any LLM calls.  This pre‑population reduces downstream latency and LLM token usage.  
+3. **KgOperators (`kg-operators.ts`)**  
+   * Maintains a shared atomic `nextIndex` counter.  
+   * Worker threads repeatedly read and increment this counter, pulling the next KG operation from a shared list.  
+   * The work‑stealing approach ensures that idle workers automatically take over pending tasks, improving CPU utilisation.  
 
-* **WaveController (`wave-controller.ts`)** – Manages a pool of worker threads (or async tasks).  Its `runWithConcurrency()` method loops while `nextIndex < totalTasks`, atomically fetching the next task index.  Idle workers immediately “steal” work, achieving high CPU utilisation without a central dispatcher.  
+4. **DeduplicationAgent (`deduplication-agent.ts`)**  
+   * Instantiates a Bloom filter with parameters tuned to the expected entity cardinality.  
+   * As entities flow through the pipeline, each entity’s unique identifier is checked against the filter; duplicates are dropped early, preventing downstream waste.  
 
-* **SemanticAnalysisAgent (`semantic-analysis-agent.ts`)** – Calls into `LLMService` for generation and analysis tasks.  The agent receives enriched entities from the shared memory, passes them to the LLM, and writes results back to the pipeline context.  
+5. **PersistenceAgent (`persistence-agent.ts`)**  
+   * Implements an in‑process cache (likely a LRU map) that stores recently written entities.  
+   * Before persisting a new entity, the agent checks the cache; a hit bypasses the database write, reducing I/O pressure.  
 
-* **OntologyClassificationAgent (`ontology-classification-agent.ts`)** – Uses the ontology subsystem (a sibling component) to map raw observations to ontology concepts, relying on the pre‑populated metadata to avoid duplicate classification.  
+6. **BaseAgent (`base-agent.ts`)**  
+   * Provides a common interface for publishing and subscribing to the message queue.  
+   * Encapsulates response shaping (including confidence scores) so that every downstream consumer receives a uniform contract.  
 
-* **CodeAnalyzer (`code-analyzer.ts`)** – Demonstrates the extensibility of the Pipeline: a new agent was added without touching the scheduler or other agents, simply by declaring a new step in `batch-analysis.yaml` and implementing the `BaseAgent` interface.  
-
-The **DAGBasedExecutionModel** child component is realized by the combination of `batch-analysis.yaml` (declarative DAG) and the runtime topological sort in `BatchScheduler`.  This separation keeps the model definition data‑driven while the engine remains reusable across different pipelines.  
+All of these agents are siblings of other specialized agents in the *SemanticAnalysis* ecosystem, such as `ontology-classification-agent.ts`, `semantic-analysis-agent.ts`, and the `insight-generation-agent.ts`.  They share the `BaseAgent` abstraction, which guarantees consistent behaviour across the entire suite of agents.
 
 ## Integration Points  
 
-* **Parent – SemanticAnalysis** – The Pipeline is a core part of the `SemanticAnalysis` component.  It consumes the shared ontology definitions supplied by the sibling **Ontology** sub‑component and produces insight payloads consumed by the **Insights** and **InsightGenerator** sub‑components.  
+* **Parent – SemanticAnalysis**: Pipeline is a child of the `SemanticAnalysis` component, which aggregates the outputs of the pipeline (enriched KG entities) and feeds them to higher‑level modules like `SemanticInsightGenerator` and `Insights`.  The parent component expects the pipeline to deliver entities with fully populated metadata, de‑duplicated and persisted.  
 
-* **Sibling – LLMService** – Agents such as `SemanticAnalysisAgent` and any future LLM‑driven agents depend on the `LLMService` class (`integrations/mcp-server-semantic-analysis/src/model/llm-service.ts`).  The service abstracts model selection, prompt construction, and response handling, providing a clean contract for agents.  
+* **Sibling Agents**: The pipeline shares the `BaseAgent` contract with siblings such as `OntologyClassificationAgent` and `EntityValidationAgent`.  Because they all publish to the same message queue, they can be chained or run in parallel without additional wiring.  For example, the `OntologyClassificationAgent` may consume the observations produced by `ObservationGenerationAgent` before the KG operators enrich them.  
 
-* **Sibling – Ontology** – `OntologyClassificationAgent` interacts with the Ontology subsystem to validate and enrich classifications.  The shared metadata fields (`entityType`, `metadata.ontologyClass`) created by `PersistenceAgent` are the glue that aligns Pipeline data with the Ontology model.  
+* **Message Queue**: The queue is the primary integration surface.  Each agent registers a consumer for the message types it handles and publishes results using a standard payload schema defined in `BaseAgent`.  This design enables horizontal scaling – adding more worker instances simply creates additional consumers on the same queue.  
 
-* **Sibling – CodeAnalyzer / InsightGenerator** – These agents plug into the same DAG via new steps in `batch-analysis.yaml`.  Their only requirement is compliance with `BaseAgent`, illustrating the low‑coupling integration point.  
-
-* **Child – DAGBasedExecutionModel** – The DAG model is defined in `batch-analysis.yaml` and executed by `BatchScheduler`.  Any modification to execution order, parallelism, or dependency graph is performed by editing the YAML, not by code changes, making the integration point declarative.  
+* **External Services**: The deduplication agent’s Bloom filter and the persistence agent’s cache are internal optimisations, but the pipeline also interacts with external LLM services (via the observation generation step) and the underlying relational/graph database (via the persistence agent).  The coordinator’s error‑notification path integrates with the development‑team alerting infrastructure (e.g., a webhook or monitoring system).  
 
 ## Usage Guidelines  
 
-1. **Declare Steps Declaratively** – Add or modify pipeline stages by editing `batch-analysis.yaml`.  Ensure each step lists its `depends_on` edges so the topological sort can resolve a valid execution order.  
+1. **Define DAG Steps Explicitly** – When extending the pipeline, add new steps to `batch-analysis.yaml` with clear `depends_on` relationships.  The topological sorter in `CoordinatorAgent` will honor these edges automatically.  
 
-2. **Implement BaseAgent** – New agents must extend `BaseAgent` and implement the required methods (`execute`, `configure`, etc.).  Re‑use shared utilities (logging, context handling) provided by the base class to stay consistent with existing agents.  
+2. **Leverage BaseAgent** – New agents should extend `BaseAgent` to inherit queue handling, logging, and confidence calculation.  Follow the same message‑format conventions (e.g., include `entityId`, `payload`, `confidence`).  
 
-3. **Pre‑populate Metadata** – When an agent introduces new entity types, follow the pattern used in `PersistenceAgent.mapEntityToSharedMemory()` to add `entityType` and `metadata.ontologyClass` early.  This avoids redundant LLM classification later in the pipeline.  
+3. **Mind Work‑Stealing Bounds** – The `nextIndex` counter in `kg-operators.ts` assumes a finite list of tasks.  If a new agent generates an unbounded stream, consider partitioning the work into batches to keep the counter manageable and avoid integer overflow.  
 
-4. **Leverage Work‑Stealing Concurrency** – For CPU‑bound or I/O‑bound tasks, rely on `WaveController.runWithConcurrency()` rather than building custom thread pools.  The shared `nextIndex` counter is thread‑safe and maximises resource utilisation.  
+4. **Tune Bloom Filter Parameters** – The deduplication agent’s false‑positive rate depends on filter size and hash count.  When the expected entity volume changes dramatically (e.g., after a major data ingestion), recompute these parameters to keep duplicate‑filtering effective without excessive memory use.  
 
-5. **Respect Dependency Boundaries** – Do not introduce circular dependencies in `batch-analysis.yaml`.  The topological sort will fail, and the scheduler will abort the run.  Validate the DAG with a static analysis tool if possible.  
+5. **Cache Invalidation** – The persistence agent’s cache is only as fresh as its eviction policy.  If an entity is updated downstream, ensure the cache entry is invalidated or refreshed to avoid stale writes.  
 
-6. **Testing Agents in Isolation** – Because each agent adheres to a common interface, unit tests can instantiate an agent with a mock context and verify its behaviour without invoking the full pipeline.  Integration tests should exercise the full DAG to confirm end‑to‑end ordering and data flow.  
+6. **Error Visibility** – Errors are logged to a file and trigger team notifications.  Developers should monitor the log directory and the alerting channel to react promptly.  Do not suppress exceptions inside agents; let them propagate to the coordinator for consistent handling.  
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural Patterns Identified  
+1. **Pipeline / DAG‑based orchestration** – declarative execution order via `batch-analysis.yaml`.  
+2. **Agent‑based modularization** – each responsibility encapsulated in a dedicated agent class.  
+3. **Work‑stealing load‑balancing** – shared `nextIndex` counter in `kg-operators.ts`.  
+4. **Message‑queue decoupling** – asynchronous communication via the queue defined in `BaseAgent`.  
+5. **Bloom‑filter deduplication** – probabilistic duplicate detection in `deduplication-agent.ts`.  
+6. **Cache‑aside persistence** – caching layer in `persistence-agent.ts` to reduce DB load.  
 
-* **Modular Agent‑Based Architecture** – each functional piece is an independent agent implementing a shared interface (`BaseAgent`).  
-* **Declarative DAG Orchestration** – execution order is expressed in `batch-analysis.yaml` and materialised via topological sort (`BatchScheduler`).  
-* **Work‑Stealing Concurrency** – `WaveController.runWithConcurrency()` uses a shared counter to dynamically balance load.  
-* **Pre‑population / Caching** – `PersistenceAgent.mapEntityToSharedMemory()` enriches entities up‑front to avoid repeated LLM calls.  
+### Design Decisions and Trade‑offs  
+* **Declarative DAG vs. hard‑coded sequencing** – gives flexibility and easier re‑ordering, at the cost of needing a robust topological sorter and clear dependency definitions.  
+* **Work‑stealing vs. central scheduler** – improves CPU utilisation and reduces bottlenecks, but introduces shared mutable state (`nextIndex`) that must be atomically managed.  
+* **Bloom filter vs. exact set** – provides O(1) duplicate checks with minimal memory, accepting a small false‑positive risk; exact set would guarantee correctness but consume more memory.  
+* **Caching vs. immediate persistence** – lowers latency and DB pressure, but requires careful invalidation to avoid stale data.  
 
-### 2. Design decisions and trade‑offs  
+### System Structure Insights  
+The Pipeline sits as a child of **SemanticAnalysis**, acting as the processing backbone that prepares data for downstream insight generators.  Its agents are siblings to other specialised agents (ontology classification, entity validation, insight generation) and all share the `BaseAgent` abstraction, ensuring a uniform contract across the module.  The hierarchy promotes separation of concerns: each agent focuses on a single responsibility while the coordinator maintains global flow control.  
 
-* **Data‑driven DAG vs. hard‑coded flow** – Using a YAML‑defined DAG gives flexibility (easy re‑ordering, addition of steps) at the cost of needing validation logic to prevent malformed graphs.  
-* **Standardised BaseAgent** – Guarantees consistency and simplifies the scheduler but imposes a uniform lifecycle that may be overkill for very lightweight tasks.  
-* **Work‑stealing instead of fixed queues** – Improves throughput for heterogeneous task durations, though it introduces a shared mutable counter that must be atomic, adding a tiny synchronization overhead.  
-* **Early ontology metadata injection** – Saves LLM tokens and latency, but requires agents to trust the pre‑populated data, potentially propagating errors if the initial classification is wrong.  
+### Scalability Considerations  
+* **Horizontal scaling** is enabled by the message‑queue architecture; adding more consumer instances for any agent automatically increases throughput.  
+* **Work‑stealing** distributes work evenly among workers, preventing idle cores.  
+* **Bloom filter** scales well with entity volume, but filter size must be increased proportionally to keep false‑positive rates low.  
+* **Cache size** in the persistence agent should be sized based on expected write burst; oversized caches may exhaust memory, undersized caches may diminish the benefit.  
 
-### 3. System structure insights  
-
-The Pipeline sits under **SemanticAnalysis**, sharing the **BaseAgent** contract with sibling agents across the system.  Its child, **DAGBasedExecutionModel**, is a pure data‑driven layer that decouples *what* runs from *how* it runs.  The scheduler (`BatchScheduler`) bridges the declarative model and the runtime, while the `WaveController` provides the parallel execution engine.  All agents communicate through a shared context (populated by `PersistenceAgent`) and rely on external services such as **LLMService** and **Ontology** for domain‑specific logic.  
-
-### 4. Scalability considerations  
-
-* **Horizontal scaling** – Adding more worker threads or async workers in `WaveController.runWithConcurrency()` linearly increases throughput, thanks to the work‑stealing design.  
-* **DAG size** – Because the scheduler performs a topological sort on every run, extremely large DAGs could add noticeable O(N + E) overhead; however, typical pipelines remain modest in size.  
-* **LLM call cost** – The pre‑population strategy reduces the number of expensive LLM invocations, making the pipeline more cost‑effective as the volume of entities grows.  
-* **I/O bottlenecks** – Agents that perform heavy persistence or external API calls should be written as async operations to avoid blocking the worker pool.  
-
-### 5. Maintainability assessment  
-
-The **modular agent interface** and **declarative DAG** make the Pipeline highly maintainable.  Adding a new capability (e.g., the `CodeAnalyzer` agent) requires only a new class extending `BaseAgent` and a step entry in `batch-analysis.yaml`.  Existing agents remain untouched, limiting regression risk.  The clear separation between orchestration (`BatchScheduler`/`WaveController`) and business logic (individual agents) aids code readability and testability.  The main maintenance burden lies in keeping the DAG definition accurate—circular dependencies or missing edges will surface as runtime errors, so a CI‑time validation step is advisable.  Overall, the design favours extensibility and low coupling, supporting long‑term evolution of the SemanticAnalysis ecosystem.
+### Maintainability Assessment  
+The use of a common `BaseAgent` and a declarative DAG makes the codebase **highly maintainable**: new processing steps can be added without modifying existing agent logic, and shared behaviours (logging, queue handling) are centralized.  The explicit `depends_on` edges provide clear documentation of execution order, reducing hidden coupling.  However, the reliance on shared mutable counters (work‑stealing) and probabilistic structures (Bloom filter) introduces subtle concurrency and correctness considerations that require disciplined testing and monitoring.  Overall, the architecture balances extensibility with performance, offering a solid foundation for future enhancements.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This modularity allows for easier maintenance and extension of the component, as new agents can be added or existing ones modified without affecting the overall system. For instance, the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) utilizes the LLMService for large language model-based analysis and generation, demonstrating the flexibility of the component's design. The use of a standardized agent interface, as defined in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts), ensures consistency across the different agents and facilitates communication between them.
-
-### Children
-- [DAGBasedExecutionModel](./DAGBasedExecutionModel.md) -- The DAG-based execution model is implemented using topological sort in batch-analysis.yaml steps, as seen in the parent context of the Pipeline sub-component.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for ontology-based classification, and the SemanticAnalysisAgent for analyzing git and vibe data. This is evident in the file structure, where each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent abstract class, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, standardizes the responses and confidence calculations across all agents, promoting consistency and maintainability.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- The Ontology sub-component utilizes the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts).
-- [Insights](./Insights.md) -- The Insights sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer sub-component utilizes the CodeAnalyzer agent for analyzing code and generating insights, as seen in the CodeAnalyzer class (integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts).
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
-- [LLMService](./LLMService.md) -- The LLMService sub-component utilizes the LLMService class for providing large language model-based analysis and generation, as seen in the LLMService class (integrations/mcp-server-semantic-analysis/src/model/llm-service.ts).
+- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
+- [Insights](./Insights.md) -- The insight generation agent in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts utilizes a machine learning model to identify patterns in the data
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- The code knowledge graph constructor in integrations/mcp-server-semantic-analysis/src/code-knowledge-graph/code-knowledge-graph-constructor.ts utilizes an AST parser to parse the code and extract entities
+- [EntityValidationModule](./EntityValidationModule.md) -- The entity validation agent in integrations/mcp-server-semantic-analysis/src/entity-validation-module/entity-validation-agent.ts utilizes a rule-based system to validate entities
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The semantic insight generator agent in integrations/mcp-server-semantic-analysis/src/semantic-insight-generator/semantic-insight-generator-agent.ts utilizes a machine learning model to identify patterns in the code and entity relationships
+- [LLMIntegrationModule](./LLMIntegrationModule.md) -- The LLM integration agent in integrations/mcp-server-semantic-analysis/src/llm-integration-module/llm-integration-agent.ts initializes the LLM service and handles interactions
+- [BaseAgent](./BaseAgent.md) -- The BaseAgent class in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts provides a base class for all agents
 
 
 ---

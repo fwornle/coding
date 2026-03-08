@@ -2,96 +2,134 @@
 
 **Type:** SubComponent
 
-ProcessStateManager's ResourceAllocator class manages resource allocation and deallocation for processes, preventing resource leaks and ensuring efficient utilization
+ProcessStateManager includes methods for registering and unregistering services, such as registerService and unregisterService.
 
 ## What It Is  
 
-ProcessStateManager is a **sub‑component** that lives inside the `DockerizedServices` container‑oriented ecosystem.  Although the supplied observations do not list concrete file‑system locations (the “Key files” list is empty), the component is referenced throughout the architecture as the orchestrator for the lifecycle of individual processes that run inside Docker containers.  It brings together a set of dedicated managers—`ProcessRegistry`, `StateManager`, `ResourceAllocator`, `CleanupManager`, `RegistrationManager`, and `ProcessMonitor`—each responsible for a distinct aspect of process stewardship.  In practice, any service that needs to be started, tracked, and safely torn down within the DockerizedServices stack will interact with ProcessStateManager rather than manipulating containers or resources directly.
+ProcessStateManager is a **sub‑component** that lives inside the `DockerizedServices` module.  Although the concrete file path is not listed in the observations, the component is referenced as a member of `DockerizedServices` and it, in turn, owns a child component called **ServiceTracker**.  Its primary responsibility is to act as a *central registry* for the lifecycle of services that run inside the Dockerized environment.  It exposes a small public API – `registerService`, `unregisterService`, and `getState` – that lets the rest of the system add services to the registry, remove them, and query their current operational state.  The component also provides a `configureProviders` method that wires up provider objects used by the services, mirroring the provider‑based configuration style seen elsewhere in the code base (e.g., in `ConfigurationLoader` and `DependencyInjector`).  
 
-## Architecture and Design  
-
-The overall architecture of ProcessStateManager follows a **modular, manager‑centric design**.  Each concern (registration, state transitions, resource handling, cleanup, health monitoring) is encapsulated in its own class, promoting single‑responsibility and making the subsystem easy to extend.  The most explicit design pattern that emerges from the observations is the **Finite State Machine (FSM)** implemented by the `StateManager` class.  By enumerating states such as *Initialized*, *Running*, *Paused*, and *Terminated* and codifying allowed transitions, the FSM guarantees that a process never moves into an illegal state and that any required side‑effects (e.g., releasing resources) are performed consistently.
-
-Dynamic discovery and registration are achieved through the `ProcessRegistry` module, which the observations describe as a global store for process instances.  The hierarchical note that the registry is “likely to be implemented as a singleton” reinforces the **Singleton** pattern, providing a single point of truth for all components that need to locate a running process.  The `RegistrationManager` builds on this by handling service‑level registration and unregistration, enabling other DockerizedServices components (such as `LLMServiceManager` or `GraphQLAPI`) to plug in and out without manual wiring.
-
-Resource safety is addressed by the `ResourceAllocator`, which couples tightly with both the `ProcessRegistry` and the FSM‑driven `StateManager`.  Allocation occurs when a process enters the *Running* state, and deallocation is triggered on transition to *Terminated* or via the `CleanupManager`.  Finally, the `ProcessMonitor` provides proactive health checks, feeding signals back into the FSM so that a failing process can be moved to a *Paused* or *Terminated* state before it jeopardizes system stability.
-
-## Implementation Details  
-
-* **ProcessRegistry** – Acts as a central catalogue of active process objects.  While the source code is not directly visible, the description suggests a singleton implementation, exposing methods such as `register(processId, processInstance)`, `lookup(processId)`, and `unregister(processId)`.  Because it is a child of ProcessStateManager, all other managers obtain process references through this registry, ensuring a consistent view of the system.
-
-* **StateManager** – Implements a finite state machine.  Internally it likely defines an `enum ProcessState { Initialized, Running, Paused, Terminated }` and a transition table that maps `(currentState, event) → nextState`.  Transition methods (`enterRunning()`, `enterPaused()`, `enterTerminated()`) invoke callbacks on the `ResourceAllocator` and `CleanupManager` to enforce side‑effects.  The FSM guarantees that illegal transitions raise exceptions, protecting the integrity of the process lifecycle.
-
-* **ResourceAllocator** – Coordinates allocation of CPU, memory, or other Docker resources.  It probably subscribes to state‑change events from `StateManager`.  On a transition to *Running*, it requests container resources via Docker APIs; on *Terminated* it releases them.  By interacting with `ProcessRegistry`, it can map a high‑level process identifier to the concrete container that needs resources.
-
-* **CleanupManager** – Centralizes teardown logic.  When `StateManager` signals termination, `CleanupManager` invokes Docker stop/remove commands, clears temporary files, and deregisters the process from `ProcessRegistry`.  This manager ensures that no dangling containers or file handles survive a process’s lifecycle.
-
-* **RegistrationManager** – Provides a public façade for external services to register themselves with ProcessStateManager.  It records service metadata (e.g., health‑check endpoints) in `ProcessRegistry` and may trigger an initial *Initialized* state transition for newly registered processes.
-
-* **ProcessMonitor** – Runs periodic health checks (e.g., liveness probes, resource usage metrics).  Upon detecting anomalies, it emits events that the `StateManager` consumes, causing a state transition to *Paused* or *Terminated*.  This proactive monitoring reduces the risk of cascading failures across the DockerizedServices environment.
-
-All these classes are instantiated and wired together inside the ProcessStateManager module, which itself is a child of the top‑level `DockerizedServices` component.  The sibling components—`LLMServiceManager`, `ServiceStarter`, and `GraphQLAPI`—share the same overall philosophy of manager‑based orchestration (e.g., `LLMRouter`, `RetryStrategy`, `SchemaManager`), indicating a consistent design language across the codebase.
-
-## Integration Points  
-
-ProcessStateManager sits at the heart of the DockerizedServices stack.  Its primary integration surface is the **ProcessRegistry**, which other components query to discover running processes.  For example, `ServiceStarter` may ask the registry whether a required background service is already alive before attempting a start, while `LLMServiceManager` could retrieve the endpoint of an LLM container that has been registered.  The `RegistrationManager` exposes an API (likely a method such as `registerService(serviceDescriptor)`) that sibling services invoke during their own initialization phases.
-
-The `ResourceAllocator` interacts directly with Docker’s runtime (via the Docker Engine API or a Node.js Docker client) to request or release container resources.  Consequently, any change in Docker configuration (e.g., new resource limits) propagates through this manager without requiring changes in higher‑level services.  `ProcessMonitor` may consume metrics from a Prometheus exporter or a custom health‑check endpoint, feeding its findings back into the FSM.
-
-Because the parent component, `DockerizedServices`, already embraces Docker containerization and a microservices‑style deployment, ProcessStateManager’s responsibilities dovetail with the parent’s goals: dynamic registration, clean teardown, and efficient resource usage.  The component therefore acts as the glue that turns loosely coupled services into a coordinated, self‑healing system.
-
-## Usage Guidelines  
-
-1. **Register Early, Deregister Late** – Whenever a new service or background process is launched, invoke `RegistrationManager.registerService()` before the process begins its work.  This ensures the `ProcessRegistry` knows about the instance and that `StateManager` can immediately enforce the *Initialized* → *Running* transition.  Likewise, always allow `CleanupManager` to run its teardown routine rather than manually killing containers; this prevents resource leaks.
-
-2. **Respect the FSM** – All state changes must go through `StateManager`.  Directly manipulating Docker containers or freeing resources without informing the FSM can leave the system in an inconsistent state.  Use the provided transition methods (`enterRunning`, `enterPaused`, `enterTerminated`) rather than calling Docker APIs yourself.
-
-3. **Monitor Health Proactively** – Do not rely solely on external orchestration tools to detect failures.  Enable `ProcessMonitor` for each registered process and configure appropriate health‑check intervals.  The monitor will automatically push state‑change events when a process becomes unhealthy.
-
-4. **Avoid Duplicate Registrations** – Because `ProcessRegistry` is a singleton, attempting to register the same process identifier twice will raise an error.  Check `ProcessRegistry.lookup(id)` before registering a new instance.
-
-5. **Graceful Shutdown** – When the overall DockerizedServices system receives a termination signal, trigger a bulk shutdown through `CleanupManager`.  This will iterate over all entries in `ProcessRegistry`, transition each to *Terminated*, and clean up resources in a deterministic order.
+In short, ProcessStateManager is the **state‑tracking hub** for Docker‑hosted services, offering a fault‑tolerant, centrally managed view of which services are active, their configuration, and their health status.
 
 ---
 
-### Architectural Patterns Identified  
-* **Finite State Machine (FSM)** – Implemented by `StateManager` to enforce valid process state transitions.  
-* **Singleton** – Implied for `ProcessRegistry`, providing a global catalogue of process instances.  
-* **Manager / Facade** – Each concern (registration, allocation, cleanup, monitoring) is encapsulated in its own manager class, exposing a clear public API.
+## Architecture and Design  
 
-### Design Decisions and Trade‑offs  
-* **Explicit FSM vs. Ad‑hoc State Checks** – Choosing a formal FSM adds predictability and easier reasoning about lifecycle but introduces boilerplate for defining states and transitions.  
-* **Singleton Registry** – Guarantees a single source of truth but can become a bottleneck or a hidden global dependency if not carefully managed.  
-* **Separation of Concerns** – Splitting responsibilities into distinct managers improves modularity and testability, at the cost of a larger number of interacting objects that must be correctly wired.
+The observations reveal three architectural cues that shape ProcessStateManager’s design:
 
-### System Structure Insights  
-ProcessStateManager is a central orchestrator within the DockerizedServices hierarchy, with child modules (`ProcessRegistry`, `StateManager`, `ResourceAllocator`, etc.) handling specific lifecycle aspects.  Its siblings follow a similar manager‑oriented pattern, reinforcing a consistent architectural style across the platform.
+1. **Provider‑Based Configuration** – The `configureProviders` method indicates that ProcessStateManager does not hard‑code service dependencies.  Instead, it receives *provider* objects (likely factories or configuration objects) that supply the concrete implementations required by each service.  This mirrors the provider pattern used by sibling components such as `ConfigurationLoader` and `DependencyInjector`, promoting a consistent way of injecting configuration throughout the system.
 
-### Scalability Considerations  
-* **Horizontal Scaling** – Because the registry is a singleton, scaling the ProcessStateManager across multiple Docker hosts would require a distributed registry (e.g., backed by Redis) to avoid a single point of failure.  
-* **Resource Allocation** – `ResourceAllocator` can be extended to incorporate quota management, enabling the system to handle a larger number of concurrent processes without over‑committing host resources.  
-* **Monitoring Load** – `ProcessMonitor` should be configurable in terms of polling frequency to prevent excessive CPU usage when many processes are tracked.
+2. **Centralized Service Registry / Service Tracker** – By housing a child component named **ServiceTracker**, ProcessStateManager follows a *registry* style architecture.  All services are registered once, and the registry maintains their state.  This centralization gives the parent component (`DockerizedServices`) and its siblings (e.g., `ServiceOrchestrator`, `LLMManager`) a single source of truth for service health, simplifying coordination and orchestration logic.
 
-### Maintainability Assessment  
-The manager‑centric decomposition yields high maintainability: each class can be unit‑tested in isolation, and changes to one concern (e.g., improving cleanup logic) do not ripple through unrelated code.  The explicit FSM provides a clear contract for state transitions, simplifying debugging.  The main maintenance risk lies in the singleton `ProcessRegistry`; any change to its storage mechanism must be propagated to all dependent managers.  Overall, the design is clean, well‑encapsulated, and aligns with the broader DockerizedServices architecture, making future extensions and refactors straightforward.
+3. **State‑Based Management** – The presence of a `getState` method and the repeated mention of “state‑based approach” show that each service’s lifecycle is represented as a discrete state (e.g., *registered*, *running*, *failed*, *unregistered*).  This state machine‑like handling enables fault‑tolerant behavior: callers can react to state transitions, and the manager can enforce consistency checks before allowing operations such as unregistering a running service.
+
+These patterns are not speculative; they are directly supported by the observed method names and component relationships.  No other architectural styles (e.g., micro‑services, event‑driven pipelines) are introduced beyond what the observations explicitly describe.
+
+---
+
+## Implementation Details  
+
+The core implementation revolves around a handful of public methods:
+
+| Method | Purpose | Likely Mechanics |
+|--------|---------|------------------|
+| `configureProviders` | Accepts a collection of provider objects that describe how services should be instantiated or configured. | Iterates over the supplied providers, stores them internally (e.g., in a map keyed by service type), and makes them available to `registerService`. |
+| `registerService(serviceId, providerKey)` | Adds a new service to the registry. | Looks up the appropriate provider using `providerKey`, creates the service instance, records it in an internal dictionary, and sets its initial state (e.g., *registered*). |
+| `unregisterService(serviceId)` | Removes a service from the registry. | Checks the current state (must be *stopped* or *failed*), cleans up resources, removes the entry, and updates the state to *unregistered*. |
+| `getState(serviceId)` | Returns the current lifecycle state of a given service. | Reads the state value from the internal tracking structure maintained by **ServiceTracker**. |
+
+**ServiceTracker** – Although its internal code is not shown, the name and the parent‑child relationship strongly imply that it encapsulates the state‑keeping logic.  It likely maintains a map of `serviceId → ServiceState` and provides mutation methods that are invoked by `registerService`/`unregisterService`.  By delegating state handling to a dedicated child, ProcessStateManager keeps its public API thin while still offering robust fault‑tolerance (e.g., preventing double registration or premature unregistration).
+
+Because ProcessStateManager lives inside `DockerizedServices`, it benefits from the same dependency‑injection facilities used by `LLMService` (as described in the parent component’s context).  The `configureProviders` step probably runs early in the Docker container startup, ensuring that every service the container will host has a ready‑to‑use provider.
+
+---
+
+## Integration Points  
+
+1. **Parent – DockerizedServices** – The parent component orchestrates Docker containers and relies on ProcessStateManager to keep track of which services are running inside each container.  When DockerizedServices starts or stops a container, it will invoke `registerService` or `unregisterService` accordingly, and may query `getState` to decide whether a container is healthy.
+
+2. **Siblings – ServiceOrchestrator & LLMManager** – Both siblings use the same `LLMService` class and share the provider‑based configuration approach.  They can query ProcessStateManager to verify that dependent services (e.g., a language‑model server) are registered and in a *running* state before attempting to route traffic.  Conversely, they may trigger `unregisterService` when a graceful shutdown is required.
+
+3. **ConfigurationLoader & DependencyInjector** – These siblings are responsible for building the provider objects that ProcessStateManager consumes.  `ConfigurationLoader` reads configuration files and produces provider definitions; `DependencyInjector` resolves those definitions into concrete instances.  The output of these siblings is passed into `configureProviders`.
+
+4. **Child – ServiceTracker** – All state mutations flow through ServiceTracker.  Any external component that needs to observe state changes (e.g., a health‑check endpoint) can subscribe to ServiceTracker events, if such an event system exists, or simply poll `getState`.
+
+The integration pattern is therefore **provider‑driven composition**: configuration and dependency layers produce providers, ProcessStateManager consumes them to instantiate services, and higher‑level orchestration components query the manager for runtime state.
+
+---
+
+## Usage Guidelines  
+
+* **Initialize early** – Call `configureProviders` as part of the Docker container bootstrap before any service registration occurs.  This guarantees that every `registerService` call can resolve its provider instantly.
+
+* **Respect state transitions** – Only invoke `unregisterService` when the service is known to be stopped or has failed.  Attempting to unregister a service that is still *running* will likely be rejected by ServiceTracker’s internal state checks.
+
+* **Prefer IDs over raw objects** – The public API works with `serviceId` strings (or similar identifiers).  Keep these IDs stable and unique across the lifetime of the container to avoid accidental collisions.
+
+* **Leverage sibling providers** – When adding new services, reuse the provider‑creation logic from `ConfigurationLoader` and `DependencyInjector`.  This keeps the configuration surface consistent and reduces duplication.
+
+* **Monitor state** – Use `getState` (or, if available, subscribe to ServiceTracker events) to build health‑check dashboards.  Because ProcessStateManager is the single source of truth, any discrepancy between expected and actual state should be investigated at this level.
+
+---
+
+## Architectural Patterns Identified  
+
+1. **Provider / Dependency‑Injection Pattern** – Evident in `configureProviders` and shared with `ConfigurationLoader` and `DependencyInjector`.  
+2. **Service Registry / Tracker Pattern** – Implemented via the parent‑child relationship with **ServiceTracker** and the `registerService` / `unregisterService` API.  
+3. **State‑Machine / State‑Based Management** – Manifested through the `getState` method and the fault‑tolerant handling of service lifecycles.
+
+---
+
+## Design Decisions and Trade‑offs  
+
+* **Centralized vs. Distributed Registry** – Choosing a single ProcessStateManager simplifies state consistency but creates a single point of failure.  The fault‑tolerant design (state checks, provider validation) mitigates this risk, but scaling to many containers may require replication or sharding in the future.  
+* **Provider‑Based Configuration** – This decision decouples service implementations from the manager, enabling easy swapping of service versions.  The trade‑off is the added complexity of maintaining a provider catalog and ensuring providers are correctly wired before registration.  
+* **Explicit State Exposure** – By exposing `getState`, callers can make informed decisions, but it also obliges the manager to keep the state model up‑to‑date, increasing implementation overhead in ServiceTracker.
+
+---
+
+## System Structure Insights  
+
+The system follows a **layered composition**: low‑level configuration loaders produce providers, the dependency injector resolves them, ProcessStateManager consumes them to instantiate services, and higher‑level orchestrators (ServiceOrchestrator, LLMManager) coordinate runtime behavior based on the manager’s state.  The hierarchy (`DockerizedServices → ProcessStateManager → ServiceTracker`) enforces a clear separation of concerns: configuration, registration, and state tracking are each isolated in their own module.
+
+---
+
+## Scalability Considerations  
+
+* **Horizontal Scaling** – Because ProcessStateManager holds a single in‑memory map of service states, scaling across multiple Docker containers would require a shared state store (e.g., Redis) or a distributed registry.  The current design is optimal for a single‑host scenario.  
+* **Provider Load** – Adding many providers may increase the cost of `configureProviders`.  Lazy loading of providers (instantiating only when `registerService` is called) could improve startup latency.  
+* **State Query Frequency** – Frequent calls to `getState` are cheap (simple map look‑ups) but could become a bottleneck if the number of services grows into the thousands.  Caching or batched queries may be needed in high‑throughput environments.
+
+---
+
+## Maintainability Assessment  
+
+ProcessStateManager’s **provider‑based** and **state‑tracker** design yields high maintainability:
+
+* **Modularity** – Providers can be added, removed, or swapped without touching the manager’s core logic.  
+* **Clear API** – A small, well‑named set of public methods (`registerService`, `unregisterService`, `getState`, `configureProviders`) reduces the learning curve for new developers.  
+* **Separation of Concerns** – Delegating state handling to ServiceTracker isolates mutation logic, making unit testing straightforward.  
+* **Consistency Across Siblings** – Sharing the same configuration and injection patterns with `ConfigurationLoader` and `DependencyInjector` ensures that changes in provider handling propagate uniformly.
+
+Potential maintenance risks stem from the **centralized state store**; any bug in ServiceTracker could affect all services.  Mitigation strategies include comprehensive unit tests for state transitions and defensive checks in the registration/unregistration pathways.  
+
+Overall, ProcessStateManager is a well‑encapsulated, fault‑tolerant hub that fits cleanly into the DockerizedServices ecosystem while leveraging the same provider‑centric philosophy used throughout the code base.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The component also employs various technologies, such as Node.js, TypeScript, and GraphQL, to build its services and APIs. The use of process managers, like the ProcessStateManager, enables the registration and unregistration of services, ensuring proper cleanup and resource management. Overall, the DockerizedServices component provides a flexible and scalable framework for coding services, leveraging Docker containerization and a microservices-based architecture.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService class (lib/llm/llm-service.ts) for managing LLM operations. This class plays a crucial role in mode routing, caching, and circuit breaking, ensuring that the system remains robust and fault-tolerant. The use of this class allows for flexibility and maintainability, as it provides a centralized location for managing these operations. For example, the LLMService class includes methods such as startMode and stopMode, which are used to manage the lifecycle of LLM operations. Additionally, the class employs dependency injection for initializing providers and configuring them based on the loaded configuration, as seen in the configureProviders method.
 
 ### Children
-- [ProcessRegistry](./ProcessRegistry.md) -- The ProcessRegistry module is likely to be implemented as a singleton, providing a global point of access for process instances, similar to the pattern used in the DockerizedServices component.
-- [StateManager](./StateManager.md) -- The StateManager would likely implement a finite state machine using an enumeration of states (e.g., Initialized, Running, Paused, Terminated) and define transitions between these states based on specific events or actions.
-- [ResourceAllocator](./ResourceAllocator.md) -- The ResourceAllocator would need to interact with the ProcessRegistry and StateManager to ensure that resource allocation and deallocation are properly synchronized with process instance creation and state transitions.
+- [ServiceTracker](./ServiceTracker.md) -- Based on the parent context, the ServiceTracker likely interacts with the ServiceRegistrar and ServiceUnregistrar to update service state.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a routing mechanism in its LLMRouter class to direct incoming requests to the appropriate LLM service
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses a RetryStrategy class to implement a retry-with-backoff pattern, preventing endless loops and ensuring reliable service startup
-- [GraphQLAPI](./GraphQLAPI.md) -- GraphQLAPI uses a SchemaManager class to manage GraphQL schema definitions, enabling dynamic schema updates and registration
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
+- [LLMManager](./LLMManager.md) -- LLMManager uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
+- [ConfigurationLoader](./ConfigurationLoader.md) -- ConfigurationLoader uses a provider-based approach for loading and managing the configuration of the system.
+- [DependencyInjector](./DependencyInjector.md) -- DependencyInjector uses a provider-based approach for managing the dependencies of the system.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*
