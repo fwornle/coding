@@ -2,155 +2,105 @@
 
 **Type:** SubComponent
 
-The 'persistEntity' function in graph-database-manager.ts utilizes the GraphDatabaseAdapter to store entities in the graph database
+The PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts is used for entity persistence and relationship management.
 
 ## What It Is  
 
-**GraphDatabaseManager** is the core sub‑component responsible for orchestrating all interactions with the project’s graph database. Its implementation lives in `storage/graph-database-manager.ts`. The manager does not talk directly to the underlying storage engine; instead it delegates low‑level persistence and retrieval to **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). The adapter itself is built on top of **LevelDB** (`storage/leveldb.ts`) and leverages the Graphology library (as described in the parent **KnowledgeManagement** component) to provide a robust, file‑based graph store.  
-
-Key public functions exposed by the manager are:
-
-* `persistEntity` – stores a new or updated entity in the graph.  
-* `queryEntities` – retrieves entities that match a query specification.  
-* `entityValidator` – checks that incoming entities conform to the shared ontology before they are persisted.  
-* `graphDatabaseConfig` – prepares the configuration object that drives the adapter and LevelDB initialization.  
-* `graphDatabaseManagerPipeline` – a higher‑level orchestration routine that strings together validation, configuration, persistence, and optional post‑processing steps.
-
-Together these functions give the rest of the system (e.g., **OnlineLearning**, **EntityPersistenceAgent**, **KnowledgeGraphAnalyzer**, **OntologyClassifier**) a single, well‑defined API for graph‑based knowledge storage and retrieval.
-
----
+**GraphDatabaseManager** is the sub‑component responsible for orchestrating access to the underlying graph database used throughout the KnowledgeManagement stack. Its implementation lives alongside the **GraphDatabaseAdapter** found in `storage/graph-database-adapter.ts`. The manager decides, at runtime, whether to route calls through the external **VKB API** (when the VKB service is reachable) or to fall back to a direct database connection. By guaranteeing that a usable graph store is always available, it enables higher‑level modules—most notably the **KnowledgeManagement** component and the **CodeGraphAgent** (in `integrations/mcp‑server‑semantic‑analysis/src/agents/code-graph-agent.ts`)—to focus on domain logic rather than connection handling.
 
 ## Architecture and Design  
 
-The observed code reveals a **layered architecture** built around an **Adapter pattern**. The top layer – `GraphDatabaseManager` – presents a domain‑specific façade (entity persistence, query, validation) while the middle layer – `GraphDatabaseAdapter` – abstracts the concrete storage implementation (LevelDB + Graphology). This separation allows the manager to remain agnostic of the storage details and makes it straightforward to swap the adapter for another backend if required.
+The design of GraphDatabaseManager is built around two complementary concepts that emerge directly from the observations:
 
-A second design element is the **pipeline orchestration** embodied in `graphDatabaseManagerPipeline`. The pipeline groups together discrete steps (configuration → validation → persistence → query) into a linear flow, ensuring that each concern is executed in a deterministic order. This mirrors a simple **pipeline pattern** without the complexity of asynchronous streams; it is nonetheless a clear architectural decision to keep the workflow readable and testable.
+1. **Intelligent Routing (Strategy‑like behavior)** – The manager monitors server availability and dynamically selects between two concrete access strategies: the VKB API client and a direct database driver. This routing logic is the core of the “intelligent routing” mentioned in Observation 1 and Observation 4, and it mirrors a Strategy pattern where the algorithm for obtaining a graph connection can be swapped at runtime without affecting callers.
 
-The presence of `entityValidator` indicates an **explicit validation step** before any write operation, reinforcing data integrity and aligning with the project’s ontology. The `graphDatabaseConfig` function centralises configuration concerns, hinting at a **configuration‑as‑code** approach where the manager builds the exact settings required by the adapter and LevelDB.
+2. **Adapter Facade** – The **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) supplies a single, unified interface for all graph operations (e.g., create node, query relationships). GraphDatabaseManager delegates every operation to this adapter, regardless of whether the underlying implementation is the VKB API or a direct driver. This is a classic Adapter pattern that abstracts away the heterogeneity of the two back‑ends and presents a consistent API to the rest of the system.
 
-Finally, the manager’s reliance on LevelDB (`storage/leveldb.ts`) for the actual on‑disk graph store gives the system a **single‑process, embedded database** model. This choice favours low latency and simplicity over distributed scalability, which is appropriate for the current usage patterns observed in sibling components.
+Interaction flow:  
+- A consumer (e.g., **KnowledgeManagement** or **CodeGraphAgent**) calls a method on GraphDatabaseManager.  
+- The manager checks the current server health flag (derived from the VKB API health endpoint or a heartbeat monitor).  
+- Based on the flag, it selects the appropriate concrete implementation inside GraphDatabaseAdapter (VKB‑based or direct).  
+- The chosen implementation executes the request against the graph store.  
 
----
+Because the manager and adapter are co‑located under the `storage/` directory, they share the same deployment boundary, simplifying versioning and reducing cross‑module coupling.
 
 ## Implementation Details  
 
-1. **GraphDatabaseManager (storage/graph-database-manager.ts)**  
-   *Exports* a set of functions rather than a class, suggesting a functional‑style module. The primary entry points are `persistEntity` and `queryEntities`. Both functions begin by invoking `entityValidator` to ensure the incoming payload matches the ontology defined at the KnowledgeManagement level.  
+- **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Exposes methods such as `connect()`, `runQuery()`, `createNode()`, and `createRelationship()`. Internally it holds two private clients: `vkbClient` (wrapping calls to the VKB API) and `directClient` (a native driver for the graph database). The adapter’s constructor receives a configuration object that indicates which client should be the primary candidate.
 
-2. **graphDatabaseManagerPipeline**  
-   This function composes the workflow: it first calls `graphDatabaseConfig` to obtain a configuration object, passes that to the `GraphDatabaseAdapter`, runs `entityValidator` (for writes) or constructs a query object (for reads), and finally delegates the actual I/O to the adapter’s methods (`saveNode`, `fetchNodes`, etc.). The pipeline returns the adapter’s result directly, allowing callers to handle success or error cases uniformly.
+- **GraphDatabaseManager** – Although no concrete class file is listed, the observations make clear that it encapsulates the “intelligent routing” logic. It likely maintains a lightweight health‑checking service that pings the VKB endpoint at regular intervals. When the VKB service is reachable, the manager forwards all adapter calls to the `vkbClient`; otherwise, it switches to `directClient`. This switch is transparent to callers, ensuring seamless failover.
 
-3. **GraphDatabaseAdapter (storage/graph-database-adapter.ts)**  
-   The adapter wraps LevelDB operations and translates them into graph‑oriented actions using Graphology. It also implements a `syncJSONExport` routine (mentioned in the parent component description) that keeps a JSON representation of the graph in sync with the LevelDB store, providing an easy export path for downstream analytics.
+- **PersistenceAgent (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`)** – Works hand‑in‑hand with GraphDatabaseManager. After the manager guarantees a usable graph connection, the PersistenceAgent handles higher‑level entity persistence and relationship wiring. For example, when the **CodeGraphAgent** constructs a code knowledge graph, it invokes the PersistenceAgent to store nodes and edges, which in turn uses the unified GraphDatabaseAdapter interface.
 
-4. **LevelDB Integration (storage/leveldb.ts)**  
-   This file encapsulates the low‑level LevelDB API (open, put, get, batch). By isolating LevelDB behind a thin wrapper, the adapter can focus on graph semantics while the wrapper handles error handling, transaction boundaries, and file‑path configuration.
-
-5. **Entity Validation**  
-   `entityValidator` checks that each entity includes required ontology fields (type, identifier, relationships). It likely throws or returns an error object if validation fails, preventing malformed data from reaching the adapter.
-
-6. **Configuration**  
-   `graphDatabaseConfig` gathers settings such as LevelDB file location, Graphology options, and any runtime flags (e.g., whether JSON export sync is enabled). The configuration is passed down the pipeline, ensuring a single source of truth for environment‑specific parameters.
-
-Collectively, these pieces form a clear, functional pipeline that validates, configures, and persists graph data while keeping storage concerns neatly encapsulated.
-
----
+- **KnowledgeManagement** – As the parent component, it relies on GraphDatabaseManager to provide a ready‑to‑use graph store. All sibling modules (e.g., **ManualLearning**, **OnlineLearning**, **EntityPersistenceModule**, **CodeAnalysisModule**) indirectly depend on this manager through the shared adapter, ensuring consistent data access semantics across the entire knowledge pipeline.
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement**: The parent component relies on the same `GraphDatabaseAdapter` to perform automatic JSON export synchronization. This shared adapter ensures that both the manager and the parent operate on a consistent storage layer, reinforcing data coherence across the knowledge stack.  
+1. **VKB API** – The external service that offers a RESTful interface to the graph database. GraphDatabaseManager routes to this API when it reports healthy status. The VKB client is encapsulated within GraphDatabaseAdapter.
 
-* **Sibling Components** –  
-  * **ManualLearning** and **OnlineLearning** both invoke the adapter directly (ManualLearning) or the manager (OnlineLearning) to store newly created or extracted entities.  
-  * **EntityPersistenceAgent**, **KnowledgeGraphAnalyzer**, and **OntologyClassifier** each import `GraphDatabaseManager` to read or write graph data as part of their processing pipelines. Because they all use the same manager API, they benefit from a uniform validation and configuration regime.  
+2. **Direct Database Driver** – A native driver (e.g., Neo4j Bolt driver) used as a fallback when the VKB API is unavailable. This driver is also wrapped by GraphDatabaseAdapter, providing the same method signatures as the VKB client.
 
-* **External Libraries** – The adapter’s reliance on Graphology provides a standard graph‑manipulation API, while LevelDB supplies the persistent key‑value store. No other external services are referenced, indicating that the graph subsystem is self‑contained within the process.  
+3. **KnowledgeManagement** – The parent component that invokes GraphDatabaseManager for any graph‑related operation. This tight coupling ensures that KnowledgeManagement can remain agnostic about the underlying transport mechanism.
 
-* **Configuration & Environment** – Any component that needs to adjust storage behaviour (e.g., change the LevelDB path for testing) does so via `graphDatabaseConfig`, which propagates the settings down to the adapter and LevelDB wrapper.
+4. **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) – Consumes the unified adapter to persist entities and relationships. It is the primary consumer of the graph store for the **EntityPersistenceModule** sibling.
 
----
+5. **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) – Uses the PersistenceAgent (and thus the adapter) to build the code knowledge graph. This demonstrates a downstream usage chain: CodeGraphAgent → PersistenceAgent → GraphDatabaseManager → Adapter → VKB API / Direct driver.
+
+6. **Sibling Modules** – While not directly invoking GraphDatabaseManager, modules such as **ManualLearning** also use the same GraphDatabaseAdapter, reinforcing a shared data‑access contract across the system.
 
 ## Usage Guidelines  
 
-1. **Always Validate Before Persisting** – Call `persistEntity` rather than invoking the adapter directly. The manager automatically runs `entityValidator`; bypassing it can introduce ontology violations.  
+- **Always go through GraphDatabaseManager** when you need a graph operation. Directly instantiating the VKB client or the native driver bypasses the intelligent routing and defeats the failover guarantees.
 
-2. **Prefer the Pipeline for Complex Workflows** – When a sequence of operations is required (e.g., validate → persist → export), use `graphDatabaseManagerPipeline`. It guarantees the correct ordering and passes the same configuration object through each stage.  
+- **Configure health‑checking intervals** appropriately in the manager’s configuration. Too aggressive polling may add unnecessary load to the VKB service; too lax may delay failover detection.
 
-3. **Read‑Only Access** – For queries that do not modify the graph, use `queryEntities`. Supply a well‑formed query object; the manager will handle translation to the adapter’s fetch API.  
+- **Leverage the PersistenceAgent** for entity creation and relationship management instead of issuing low‑level graph queries. This keeps persistence logic centralized and aligned with the adapter’s contract.
 
-4. **Configuration Management** – Centralise any environment‑specific settings (such as the LevelDB directory) in `graphDatabaseConfig`. Do not hard‑code paths inside calling components; this keeps the system portable across development, CI, and production environments.  
+- **Do not modify the adapter’s public interface** unless all dependent modules (KnowledgeManagement, ManualLearning, EntityPersistenceModule, etc.) are updated simultaneously. The adapter acts as a façade for multiple consumers.
 
-5. **Do Not Access LevelDB Directly** – All interactions with the underlying LevelDB store should go through `GraphDatabaseAdapter`. Direct LevelDB calls bypass the JSON export sync and may lead to data inconsistency.  
-
-6. **Error Handling** – Both `persistEntity` and `queryEntities` propagate errors from the adapter. Wrap calls in try/catch blocks and log failures using the project’s logging utility to aid debugging.
+- **When extending functionality** (e.g., adding new graph queries), implement them in GraphDatabaseAdapter so that both VKB‑based and direct implementations receive the same behavior automatically.
 
 ---
 
-### Architectural Patterns Identified  
+### 1. Architectural patterns identified  
+- **Adapter pattern** – GraphDatabaseAdapter abstracts VKB API and direct driver behind a single interface.  
+- **Strategy‑like routing** – GraphDatabaseManager’s intelligent routing selects between two concrete strategies (VKB vs. direct) at runtime.  
+- **Facade** – GraphDatabaseManager provides a simplified entry point for the rest of the system, hiding health‑check and routing complexity.
 
-| Pattern | Where It Appears |
-|---------|------------------|
-| **Adapter** | `GraphDatabaseAdapter` abstracts LevelDB + Graphology for the manager. |
-| **Pipeline (orchestrator)** | `graphDatabaseManagerPipeline` composes validation, config, persistence, and export steps. |
-| **Facade** | `GraphDatabaseManager` presents a simplified API (`persistEntity`, `queryEntities`) to the rest of the system. |
-| **Configuration‑as‑Code** | `graphDatabaseConfig` centralises all storage‑related settings. |
-| **Validation Layer** | `entityValidator` enforces ontology compliance before writes. |
+### 2. Design decisions and trade‑offs  
+- **Failover capability vs. added complexity** – Introducing routing adds runtime decision logic and health‑checking overhead but dramatically improves availability.  
+- **Unified adapter vs. duplicated code** – Centralizing graph operations prevents code duplication across VKB and direct paths, at the cost of a slightly larger abstraction layer that must be kept in sync.  
+- **Location of routing logic** – Placing routing in GraphDatabaseManager (rather than in each consumer) centralizes resilience concerns, simplifying consumer code but making the manager a critical piece whose reliability is paramount.
 
-### Design Decisions and Trade‑offs  
+### 3. System structure insights  
+- The graph data layer is a shared service under `storage/`, accessed by many sibling modules through a common adapter.  
+- KnowledgeManagement sits at the top of the hierarchy, delegating all graph interactions to GraphDatabaseManager, which in turn delegates to the adapter.  
+- Downstream agents (PersistenceAgent, CodeGraphAgent) form a pipeline: they receive higher‑level domain objects, translate them into graph operations via the adapter, and rely on the manager for connectivity guarantees.
 
-* **Adapter vs Direct Access** – By inserting an adapter layer, the team gains flexibility (swap storage backend) at the cost of an extra indirection and a modest performance overhead.  
-* **Embedded LevelDB** – Choosing an embedded key‑value store simplifies deployment and yields low‑latency reads/writes, but it limits horizontal scaling and multi‑process concurrency.  
-* **Functional Module Design** – Exposing functions rather than a class reduces boilerplate and aligns with a pipeline style, though it can make stateful extensions (e.g., connection pooling) less obvious.  
-* **Explicit Validation** – Running `entityValidator` on every write guarantees data quality, but it introduces additional CPU work; the trade‑off is justified given the importance of ontology integrity.  
+### 4. Scalability considerations  
+- **Horizontal scaling of VKB API** – Because the manager can route to the VKB service, scaling the API horizontally directly expands read/write capacity without touching the direct driver path.  
+- **Direct driver fallback** – In scenarios where the VKB API becomes a bottleneck, the fallback path can be scaled independently (e.g., by adding more database replicas).  
+- **Health‑check frequency** – Adjustable health‑check intervals allow operators to balance detection latency against additional network traffic, supporting large‑scale deployments.
 
-### System Structure Insights  
-
-The graph subsystem sits under the **KnowledgeManagement** umbrella, sharing the same storage adapter with sibling components. The hierarchy looks like:
-
-```
-KnowledgeManagement
- └─ GraphDatabaseManager (storage/graph-database-manager.ts)
-      ├─ graphDatabaseConfig
-      ├─ entityValidator
-      ├─ graphDatabaseManagerPipeline
-      ├─ persistEntity
-      └─ queryEntities
-          ↳ uses GraphDatabaseAdapter (storage/graph-database-adapter.ts)
-                ↳ wraps LevelDB (storage/leveldb.ts)
-```
-
-All higher‑level learning and analysis modules (ManualLearning, OnlineLearning, EntityPersistenceAgent, KnowledgeGraphAnalyzer, OntologyClassifier) depend on this manager, creating a single point of control for graph data.
-
-### Scalability Considerations  
-
-* **Vertical Scaling** – Because LevelDB runs in‑process, scaling is limited to the resources of a single node (CPU, memory, disk I/O). Performance tuning can focus on LevelDB’s write‑batching and cache settings.  
-* **Horizontal Scaling** – The current design does not include sharding or replication. To scale out, a new adapter implementation targeting a distributed graph store (e.g., Neo4j, JanusGraph) could be introduced without changing the manager’s public API.  
-* **Pipeline Parallelism** – The pipeline is synchronous; parallelism could be added by spawning worker threads for bulk inserts, but care must be taken to avoid LevelDB write conflicts.  
-
-### Maintainability Assessment  
-
-The separation of concerns (validation, configuration, persistence) makes the codebase easy to reason about and test. The functional façade (`GraphDatabaseManager`) isolates callers from storage specifics, reducing the impact of future changes. The adapter pattern further isolates LevelDB quirks, allowing the underlying store to evolve independently. Documentation is straightforward because each function has a single, well‑named responsibility.  
-
-Potential maintenance risks include:  
-* **Tight coupling to LevelDB** – If the project later requires a distributed store, the adapter will need a substantial rewrite.  
-* **Implicit JSON sync** – The `syncJSONExport` side‑effect lives inside the adapter; developers must be aware that every write may trigger additional I/O, which could affect performance in high‑throughput scenarios.  
-
-Overall, the architecture balances clarity and extensibility, providing a solid foundation for current knowledge‑graph workloads while leaving a clear migration path for future scaling needs.
+### 5. Maintainability assessment  
+- **High cohesion** – GraphDatabaseManager and GraphDatabaseAdapter each have a single, well‑defined responsibility, simplifying future changes.  
+- **Clear separation of concerns** – Routing, connection handling, and graph operation semantics are isolated, making unit testing straightforward.  
+- **Potential risk** – The manager’s routing logic becomes a single point of failure; robust testing and monitoring are essential.  
+- **Extensibility** – Adding new access mechanisms (e.g., a third‑party graph service) would involve extending the adapter and updating the routing decision, which the current design readily accommodates.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's reliance on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence and automatic JSON export sync enables efficient data management. This is evident in the way the adapter leverages Graphology and LevelDB for robust graph database interactions. For instance, the 'syncJSONExport' function in graph-database-adapter.ts ensures that data remains consistent across different storage formats, thus supporting the project's data analysis goals.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's architecture is designed to be flexible, allowing for different modes of operation and integration with various tools and services. This is evident in the use of intelligent routing for database access, where the component switches between the VKB API and direct access based on server availability. The GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, plays a crucial role in this process, providing a unified interface for interacting with the graph database. The CodeGraphAgent, implemented in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, utilizes this adapter to construct and query the code knowledge graph. The agent's functionality is further enhanced by the PersistenceAgent, which manages entity persistence and relationship management, as seen in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the GraphDatabaseManager (storage/graph-database-manager.ts) to store extracted knowledge
-- [EntityPersistenceAgent](./EntityPersistenceAgent.md) -- EntityPersistenceAgent uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [KnowledgeGraphAnalyzer](./KnowledgeGraphAnalyzer.md) -- KnowledgeGraphAnalyzer uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [CheckpointTracker](./CheckpointTracker.md) -- CheckpointTracker uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
+- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts for entity persistence and relationship management.
+- [CodeAnalysisModule](./CodeAnalysisModule.md) -- CodeAnalysisModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts for code analysis and knowledge graph construction.
+- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses UKBTraceReport to generate detailed trace reports of workflow runs.
+- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- KnowledgeGraphConstructor uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
 
 
 ---

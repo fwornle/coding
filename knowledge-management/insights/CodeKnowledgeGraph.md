@@ -2,93 +2,121 @@
 
 **Type:** SubComponent
 
-CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+The code knowledge graph constructor in integrations/mcp-server-semantic-analysis/src/code-knowledge-graph/code-knowledge-graph-constructor.ts handles errors and exceptions by logging them to a file and notifying the development team
 
 ## What It Is  
 
-`CodeKnowledgeGraph` is the sub‑component that materialises a graph representation of source‑code artefacts for the **SemanticAnalysis** system. The core of the implementation lives in a dedicated module that exposes a small, well‑defined public API: `CodeKnowledgeGraphBuilder.buildGraph()`, `CodeEntityMapper.mapCodeEntity()`, `CodeKnowledgeGraphQuery.queryGraph()`, `CodeKnowledgeGraphManager.loadGraph()` and the supporting utility `CodeKnowledgeGraphUtils.getNodeClass()`. The shape of the graph—its node types, edge types and property schema—is declared declaratively in **CodeKnowledgeGraphConfiguration.yaml**. Together, these pieces turn raw source files into an AST, map the resulting entities onto graph nodes, persist the structure in Memgraph, and provide a query façade for downstream agents. Because `SemanticAnalysis` “contains” `CodeKnowledgeGraph`, the graph is a central knowledge store that other sibling components (e.g., **Insights**, **Ontology**, **EntityValidator**) consume when they need a structural view of the code base.
-
-## Architecture and Design  
-
-The design follows a **configuration‑driven, layered architecture**. At the bottom lies the **AstParser** child component, which the `CodeKnowledgeGraphBuilder` invokes to obtain an abstract syntax tree for each source file. The builder then orchestrates a **Builder pattern** (`CodeKnowledgeGraphBuilder.buildGraph()`) that assembles the graph by delegating to `CodeEntityMapper.mapCodeEntity()`. The mapper embodies a classic **Mapper/Transformer** pattern: it converts AST nodes into domain‑specific graph nodes, consulting `CodeKnowledgeGraphUtils.getNodeClass()` to resolve the concrete class that matches a node definition from the YAML configuration.
-
-Persistence is handled by a thin **Adapter** layer—implicit in the observations but evident from the sibling `MemgraphAdapter`—which abstracts the underlying **Memgraph** in‑memory graph database. The `CodeKnowledgeGraphManager.loadGraph()` method reads **CodeKnowledgeGraphConfiguration.yaml**, creates the schema in Memgraph, and materialises the graph data produced by the builder. Finally, `CodeKnowledgeGraphQuery.queryGraph()` offers a **Query Interface** that shields callers from the raw Cypher (or equivalent) syntax, exposing higher‑level methods that sibling components can invoke.
-
-All interactions are explicit and decoupled: the configuration file defines the contract, the builder respects that contract, the mapper enforces it, and the manager and query façade provide lifecycle and access services. This separation mirrors the modular philosophy of the parent **SemanticAnalysis** component, where each agent (ontology classification, content validation, etc.) works against well‑specified interfaces.
-
-## Implementation Details  
-
-1. **Graph Construction (`CodeKnowledgeGraphBuilder.buildGraph`)** – The builder iterates over source files, calls the **AstParser** (its child) to obtain an AST, and walks the tree. For each relevant AST node it invokes `CodeEntityMapper.mapCodeEntity()`. The mapper uses `CodeKnowledgeGraphUtils.getNodeClass()` to look up the concrete node class defined in **CodeKnowledgeGraphConfiguration.yaml** (e.g., `FunctionNode`, `ClassNode`). Once a node instance is created, the builder adds it to the Memgraph session, establishing edges according to the edge definitions in the same YAML file.
-
-2. **Entity Mapping (`CodeEntityMapper.mapCodeEntity`)** – This class encapsulates the translation logic. It extracts identifier names, visibility modifiers, type annotations, and relationships (e.g., “calls”, “inherits”) from the AST node, then populates the corresponding graph node properties. The mapper is deliberately stateless; it receives the raw AST node and the target node class, returning a fully‑initialised graph object ready for persistence.
-
-3. **Configuration (`CodeKnowledgeGraphConfiguration.yaml`)** – The YAML file is the single source of truth for the graph schema. It lists node types with their expected properties, edge types with source/target constraints, and any default indexing hints. Because the schema lives outside the code, adding a new node type (for example, a `MacroNode`) only requires a YAML entry and a matching Python class; no changes to the builder or mapper are needed.
-
-4. **Lifecycle Management (`CodeKnowledgeGraphManager.loadGraph`)** – On system start‑up, the manager reads the configuration, creates the graph schema in Memgraph (creating indexes, constraints, etc.), and optionally pre‑loads any static entities. It also provides a hook for re‑loading the graph when the underlying source changes, ensuring the knowledge graph stays in sync with the repository.
-
-5. **Query Facade (`CodeKnowledgeGraphQuery.queryGraph`)** – This class abstracts Cypher queries behind domain‑specific methods such as `findFunctionsByName`, `listClassesImplementingInterface`, or generic traversal helpers. Internally it builds Cypher strings using the node/edge definitions from the configuration, guaranteeing that queries remain compatible even if the schema evolves.
-
-## Integration Points  
-
-`CodeKnowledgeGraph` sits at the heart of **SemanticAnalysis**. Its primary inputs are source files supplied by the **Pipeline** component (which orchestrates git‑history extraction). The **AstParser** child consumes those files, producing ASTs that the builder consumes. Once the graph is populated, sibling components such as **Insights** (via `InsightGenerator.generateInsights()`), **Ontology** (via `OntologyClassifier`), and **EntityValidator** query the graph through `CodeKnowledgeGraphQuery`. The persistence layer is the **MemgraphAdapter**, which aligns with the system‑wide `GraphDatabaseAdapter` abstraction used by other components (e.g., `WorkflowOrchestrator`). Configuration changes flow through the same YAML mechanism used by the **Pipeline** (`pipeline-configuration.yaml`) and **Ontology** (`ontology-definitions.yaml`), reinforcing a consistent, declarative approach across the code base.
-
-## Usage Guidelines  
-
-1. **Never modify the graph schema directly in code** – always edit **CodeKnowledgeGraphConfiguration.yaml** and add a matching node class if needed. This keeps the builder and mapper agnostic to schema changes.  
-2. **Invoke the builder through `CodeKnowledgeGraphManager.loadGraph()`** rather than calling `buildGraph()` directly; the manager ensures the Memgraph schema is prepared and that any required indexes are in place.  
-3. **Use the query façade (`CodeKnowledgeGraphQuery`) for all reads**. Direct Cypher execution bypasses the abstraction and can lead to brittle code that breaks when the YAML schema evolves.  
-4. **Treat `CodeEntityMapper` as a pure function** – it should not retain state between calls. If you need custom mapping logic, subclass the mapper and register the subclass in the configuration rather than patching the original class.  
-5. **Keep AST parsing lightweight** – if the code base is large, consider parallelising the `AstParser` calls at the pipeline level; the builder itself is single‑threaded but is fast once it receives an AST.  
+The **CodeKnowledgeGraph** sub‑component lives under the *SemanticAnalysis* umbrella in the repository path `integrations/mcp-server-semantic-analysis/src/code-knowledge-graph/`. Its core responsibilities are to **parse source code into an abstract syntax tree (AST), extract code entities, model the relationships between those entities, and persist the resulting graph**. The entry point for this work is the **`code-knowledge-graph-constructor.ts`** file, which drives the AST parsing, error handling, and coordination with the **`entity-relationship-manager.ts`**. The final graph is stored through the **`code-knowledge-graph-db.ts`** module, which talks to a graph‑database backend. Down‑stream agents—most notably the **Insight Generation Agent**—consume the persisted graph to produce higher‑level insights about the code base.
 
 ---
 
-### Architectural patterns identified  
-- **Builder pattern** (`CodeKnowledgeGraphBuilder`)  
-- **Mapper/Transformer pattern** (`CodeEntityMapper`)  
-- **Configuration‑driven schema** (YAML file)  
-- **Adapter pattern** for Memgraph persistence (`MemgraphAdapter`)  
-- **Facade/Query Interface** (`CodeKnowledgeGraphQuery`)  
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-- **Declarative schema** via YAML gives flexibility but adds a runtime dependency on correct configuration parsing.  
-- **Separation of builder, mapper, manager, and query** improves testability and maintainability at the cost of more classes and indirection.  
-- **In‑memory graph (Memgraph)** offers high query performance but requires sufficient RAM for large codebases; swapping to a persistent graph store would need a different adapter.  
+The observations reveal a **modular, decoupled architecture** built around three primary responsibilities:
 
-### System structure insights  
-- `CodeKnowledgeGraph` is a **knowledge‑store sub‑component** nested under **SemanticAnalysis**, sharing the same modular execution model as its siblings.  
-- The **AstParser** child provides the only direct source‑code analysis; all other components interact with the graph rather than raw code.  
-- Configuration files across the system (pipeline, ontology, graph) follow a uniform declarative style, reinforcing a **configuration‑as‑code** discipline.  
+1. **Parsing & Construction** – `code-knowledge-graph-constructor.ts` owns the AST parsing step. By isolating parsing logic in its own module, the design follows a *separation‑of‑concerns* approach that keeps the heavy language‑specific processing independent from relationship handling.  
 
-### Scalability considerations  
-- Memgraph’s in‑memory nature scales well for medium‑size projects; for very large repositories, sharding or streaming graph construction may be required.  
-- The builder’s linear walk over ASTs can be parallelised upstream (e.g., by the **Pipeline**), allowing horizontal scaling across CPU cores.  
-- Adding new node/edge types does not affect runtime complexity because the mapper looks up classes in O(1) via the utility function.  
+2. **Relationship Management** – `entity-relationship-manager.ts` is dedicated to building and maintaining the edges between entities. It persists those edges in a **graph database** (explicitly noted in observation 5), which is a natural fit for representing code‑level relationships such as inheritance, calls, and imports.  
 
-### Maintainability assessment  
-- High maintainability due to **clear separation of concerns**, **stateless mapper**, and **configuration‑driven schema**.  
-- The main risk is **schema drift**: if the YAML definition and the Python node classes diverge, runtime errors will surface; automated validation of the configuration against the code base is advisable.  
-- The reliance on a single graph database (Memgraph) simplifies the code path but creates a **single point of failure**; abstracting it behind `GraphDatabaseAdapter` mitigates future migration effort.
+3. **Persistence Layer** – `code-knowledge-graph-db.ts` abstracts the underlying storage details, offering a single point of interaction for both the constructor and the relationship manager.  
+
+Communication between the constructor and the relationship manager occurs **asynchronously via a message queue** (observation 6). This introduces an *event‑driven* style of interaction without labeling it as a formal pattern; the queue decouples the two modules, allowing each to scale or be replaced independently.  
+
+Error handling is centralized in the constructor: any parsing or processing failure is **logged to a file and a notification is sent to the development team** (observation 4). This explicit logging‑plus‑alert strategy ensures that problems are visible early in the pipeline.
+
+Because **CodeKnowledgeGraph** is a child of **SemanticAnalysis**, it inherits the broader modular philosophy described for sibling agents (e.g., OntologyClassificationAgent, InsightGenerationAgent). All agents share a common **BaseAgent** abstract class, which standardizes response structures and confidence calculations, although the graph component itself is not an agent but a supporting data service.
+
+---
+
+## Implementation Details  
+
+### Constructor (`code-knowledge-graph-constructor.ts`)  
+- **AST Parsing** – The constructor invokes an AST parser (the specific parser library is not named) to walk through source files. During this walk it extracts **entities** such as classes, functions, variables, and modules.  
+- **Error Management** – All exceptions thrown by the parser or downstream steps are caught, written to a log file, and a notification mechanism (likely an internal alert service) informs the development team, ensuring rapid visibility of parsing issues.  
+
+### Entity Relationship Manager (`entity-relationship-manager.ts`)  
+- **Graph Database Interaction** – The manager uses a graph database (e.g., Neo4j, JanusGraph – the exact product is not specified) to store **entity relationships**. Nodes represent code entities; edges encode relationships like “calls”, “inherits”, or “imports”.  
+- **Message Queue Integration** – The constructor publishes messages (containing parsed entity payloads) to a queue. The relationship manager consumes these messages, transforms the payload into graph operations, and writes them to the database. This async hand‑off isolates parsing latency from database write latency.  
+
+### Persistence (`code-knowledge-graph-db.ts`)  
+- Provides a thin wrapper around the graph database driver, exposing CRUD‑style methods that the relationship manager uses. By centralizing DB access, the module makes it easier to swap the underlying storage technology if needed.  
+
+### Consumption by Insight Generation  
+- The **Insight Generation Agent** (found at `integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts`) queries the persisted graph to discover patterns, dependencies, or architectural smells. This downstream usage demonstrates that the graph is the canonical source of truth for code‑level knowledge within the SemanticAnalysis subsystem.  
+
+---
+
+## Integration Points  
+
+1. **Upstream – SemanticAnalysis**  
+   - The **SemanticAnalysis** component orchestrates the overall pipeline. It triggers the CodeKnowledgeGraph constructor as part of the code‑analysis stage, ensuring that the graph is up‑to‑date before any insight agents run.  
+
+2. **Sibling Agents**  
+   - While the **OntologyClassificationAgent** focuses on classifying entities against an ontology, it can leverage the same entity identifiers produced by the constructor. The **EntityValidationModule** may later validate the relationships stored by the manager, using the same graph database as its data source.  
+
+3. **Message Queue**  
+   - The queue (type not specified) acts as the contract between the constructor and the relationship manager. Any changes to the message schema must be coordinated across both modules.  
+
+4. **Graph Database**  
+   - Both the relationship manager and any downstream agents (e.g., InsightGenerationAgent, SemanticInsightGenerator) read from the same graph store, providing a unified view of code relationships.  
+
+5. **Error Notification System**  
+   - The logging and notification mechanism referenced in observation 4 likely integrates with the broader observability stack of the MCP server (e.g., centralized log aggregation, alerting service).  
+
+---
+
+## Usage Guidelines  
+
+- **Invoke via SemanticAnalysis** – Developers should not call the constructor directly; instead, they trigger the **SemanticAnalysis** pipeline, which ensures that the graph is built in the correct order relative to other agents.  
+- **Message Schema Stability** – When extending the data extracted by the constructor (e.g., adding new entity attributes), update the message payload definition and ensure the relationship manager’s consumer logic is updated simultaneously to avoid deserialization errors.  
+- **Error Monitoring** – Monitor the constructor’s log file and the associated alert channel. Frequent parsing errors may indicate unsupported language features or malformed source files and should be addressed promptly.  
+- **Graph Database Maintenance** – Periodically review the graph database’s health (index usage, storage growth). Since the graph grows with each codebase analysis, consider archiving older snapshots if long‑term retention is not required.  
+- **Testing** – Unit‑test the constructor’s AST extraction logic with representative source files. Integration tests should cover the end‑to‑end flow: source → queue → relationship manager → graph DB, verifying that expected nodes/edges appear.  
+
+---
+
+### 1. Architectural patterns identified  
+- **Separation of Concerns** – distinct modules for parsing, relationship handling, and persistence.  
+- **Asynchronous Messaging** – use of a message queue to decouple the constructor from the relationship manager.  
+- **Graph‑Database Persistence** – entities and relationships are stored in a graph database, matching the domain model.  
+- **Centralized Error Logging & Notification** – constructor‑level error handling with file logging and team alerts.
+
+### 2. Design decisions and trade‑offs  
+- **Async queue vs. direct calls** – improves scalability and fault isolation but adds latency and operational overhead (queue management, message schema versioning).  
+- **Graph DB choice** – excellent for relationship queries, but introduces a specialized storage dependency and may require graph‑specific tuning.  
+- **Dedicated constructor** – isolates language‑specific parsing, making it easier to extend to new languages, yet it duplicates some error‑handling logic that could be shared elsewhere.  
+
+### 3. System structure insights  
+- CodeKnowledgeGraph sits as a **child component** of SemanticAnalysis and serves as the **data foundation** for sibling agents that perform classification, validation, and insight generation.  
+- The three‑file module set (`code-knowledge-graph-constructor.ts`, `entity-relationship-manager.ts`, `code-knowledge-graph-db.ts`) forms a clear vertical slice: input → transformation → storage.  
+
+### 4. Scalability considerations  
+- The **message queue** enables horizontal scaling of both the constructor (multiple parsers) and the relationship manager (multiple consumers), allowing the system to handle larger codebases.  
+- The **graph database** can scale horizontally (sharding) or vertically (more memory) depending on the chosen product, but query performance must be monitored as the node/edge count grows.  
+
+### 5. Maintainability assessment  
+- **High maintainability** thanks to well‑defined responsibilities and isolated modules.  
+- The explicit error‑logging path provides clear failure signals, simplifying debugging.  
+- Potential maintenance burden lies in managing the message schema and graph‑DB schema evolution; careful versioning and backward‑compatible changes are essential.  
+
+Overall, the **CodeKnowledgeGraph** sub‑component exemplifies a clean, modular approach to building a persistent, queryable representation of source‑code structure, tightly integrated with the broader SemanticAnalysis pipeline while remaining independently scalable and testable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
-
-### Children
-- [AstParser](./AstParser.md) -- The CodeKnowledgeGraphBuilder uses AST parsing to construct the graph, as hinted by the parent context of SemanticAnalysis and the mention of CodeKnowledgeGraphBuilder.buildGraph()
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for ontology-based classification, and the SemanticAnalysisAgent for analyzing git and vibe data. This is evident in the file structure, where each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent abstract class, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, standardizes the responses and confidence calculations across all agents, promoting consistency and maintainability.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
-- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
-- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
-- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
+- [Pipeline](./Pipeline.md) -- The coordinator agent in integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
+- [Insights](./Insights.md) -- The insight generation agent in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts utilizes a machine learning model to identify patterns in the data
+- [EntityValidationModule](./EntityValidationModule.md) -- The entity validation agent in integrations/mcp-server-semantic-analysis/src/entity-validation-module/entity-validation-agent.ts utilizes a rule-based system to validate entities
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The semantic insight generator agent in integrations/mcp-server-semantic-analysis/src/semantic-insight-generator/semantic-insight-generator-agent.ts utilizes a machine learning model to identify patterns in the code and entity relationships
+- [LLMIntegrationModule](./LLMIntegrationModule.md) -- The LLM integration agent in integrations/mcp-server-semantic-analysis/src/llm-integration-module/llm-integration-agent.ts initializes the LLM service and handles interactions
+- [BaseAgent](./BaseAgent.md) -- The BaseAgent class in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts provides a base class for all agents
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

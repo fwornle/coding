@@ -2,113 +2,140 @@
 
 **Type:** SubComponent
 
-The LLMService sub-component provides a modular architecture, with each agent responsible for a specific task, such as the LLMService class for providing language model-based analysis, as seen in the LLMService class (integrations/mcp-server-semantic-analysis/src/model/llm-service.ts).
+The LLMService sub-component, implemented in the LLMService.py file within the LLMAbstraction module, utilizes the mode_routing.py function to dynamically route requests to appropriate LLM providers based on input parameters and configuration settings defined in the llm_config.json file.
 
 ## What It Is  
 
-The **LLMService** sub‑component lives in the **integrations/mcp‑server‑semantic‑analysis** codebase. Its primary implementation files are  
+The **LLMService** sub‑component lives inside the **LLMAbstraction** module and is the primary façade through which the rest of the codebase interacts with large‑language‑model (LLM) providers. Two concrete source files implement this façade:  
 
-* `integrations/mcp-server-semantic-analysis/src/model/llm-service.ts` – the `LLMService` class that delivers large‑language‑model (LLM)‑based analysis and generation.  
-* `integrations/mcp-server-semantic-analysis/src/model/language-model-trainer.ts` – the `LanguageModelTrainer` class that handles model training and evaluation.  
+* **`lib/llm/llm-service.ts`** – a TypeScript class that exposes a unified API for all LLM operations.  
+* **`LLMService.py`** – a Python implementation that lives in the same logical module and delegates request routing to the shared **`mode_routing.py`** helper.  
 
-LLMService is a child of the **SemanticAnalysis** component, which orchestrates a set of agents to perform end‑to‑end semantic processing. Within that hierarchy the `SemanticAnalysisAgent` (found at `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`) invokes the `LLMService` to obtain insights, reports, or other LLM‑driven artefacts. The sub‑component therefore represents the concrete “brain” that powers language‑model reasoning for the broader SemanticAnalysis pipeline.
+Both implementations consult the **`llm_config.json`** configuration file to determine which provider should handle a given request, and they rely on the **ProviderRegistry** (found in **`lib/llm/provider-registry.js`**) to obtain concrete provider instances. In short, LLMService is the high‑level entry point that abstracts away provider‑specific details, offering a single, consistent surface for calling LLMs, performing caching, circuit‑breaking, budget checks, and fallback logic.
 
 ---
 
 ## Architecture and Design  
 
-The architecture exposed by the observations is **agent‑centric and modular**. Each functional piece of the SemanticAnalysis system is encapsulated in an *agent* that implements a common contract defined by `BaseAgent` (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`). This standardized interface guarantees that all agents—whether they perform ontology classification, batch scheduling, or code analysis—communicate in a uniform way, simplifying orchestration and substitution.
+The architecture of LLMService is deliberately **modular and extensible**. The key design choices evident from the source observations are:
 
-`LLMService` itself is a **service class** that conforms to the same agent contract indirectly: it is consumed by `SemanticAnalysisAgent`, which adheres to `BaseAgent`. The design therefore follows a **Facade‑like pattern**—`LLMService` hides the complexity of interacting with the underlying language model (including prompt construction, API calls, and response parsing) behind a simple, reusable API. The presence of `LanguageModelTrainer` indicates a **separate concern** for model lifecycle management, adhering to the **Single Responsibility Principle**. Training, evaluation, and inference are split into distinct classes, allowing independent evolution.
+1. **Registry Pattern** – The **ProviderRegistry** class (`lib/llm/provider-registry.js`) acts as a central catalogue of available LLM providers. New providers can be registered through a simple interface, allowing the system to grow without touching the core routing logic. This registry is a sibling component to LLMService and is shared by both the TypeScript and Python implementations.
 
-Extensibility is a first‑class concern. Because `LLMService` is a concrete class that lives under the `model` package, new language‑model providers or additional analysis capabilities can be introduced by extending this class or by adding new service implementations that still satisfy the `BaseAgent` contract. This mirrors a **Strategy**‑style approach where the concrete strategy (the specific LLM) can be swapped without altering the agents that depend on it.
+2. **Facade Pattern** – LLMService (`lib/llm/llm-service.ts` and `LLMService.py`) presents a single façade that hides the complexity of provider selection, caching, circuit‑breaking, and budget/sensitivity enforcement. Callers interact only with the façade, while the underlying mechanisms are delegated to specialized helpers.
+
+3. **Strategy / Dynamic Routing** – The **`mode_routing.py`** function encapsulates the decision‑making process that selects the appropriate provider based on input parameters and the **`llm_config.json`** settings. This mirrors a strategy pattern where the routing logic can be swapped or extended without altering the façade.
+
+4. **Configuration‑Driven Behavior** – All routing, fallback, and provider‑specific settings are defined in **`llm_config.json`**, making the system behavior adjustable at deployment time rather than compile time.
+
+These patterns interlock: the façade calls the routing strategy, which queries the registry for a concrete provider, and the provider is then invoked under the constraints (caching, circuit‑breakers, budgets) enforced by the façade. The parent component **LLMAbstraction** supplies the overall modular scaffolding, while ProviderRegistry and LLMService share the same extensibility goals.
 
 ---
 
 ## Implementation Details  
 
-* **LLMService (`llm-service.ts`)** – Provides methods for *analysis* and *generation*. The class likely encapsulates a client to an external LLM API (e.g., OpenAI, Anthropic) and offers high‑level operations such as `analyzeText()` and `generateReport()`. The class is referenced directly by `SemanticAnalysisAgent`, which delegates the heavy‑lifting of natural‑language reasoning to it.  
+### Core Classes and Files  
 
-* **LanguageModelTrainer (`language-model-trainer.ts`)** – Handles the *training* and *evaluation* phases of a language model. It probably exposes functions like `trainModel(dataset)` and `evaluateModel(testSet)`. By isolating these concerns, the system can retrain models without touching inference code, supporting continuous improvement of LLM performance.  
+* **`lib/llm/llm-service.ts`** – Implements the TypeScript façade. Its public methods likely include `generate`, `chat`, and other LLM primitives. Internally it:
+  * Reads **`llm_config.json`** to obtain mode‑specific configuration.
+  * Calls the routing logic (mirrored in the Python side) to resolve the correct provider.
+  * Wraps the provider call with **caching**, **circuit‑breaker** checks, and **budget/sensitivity** validation.
+  * Handles **fallback** to secondary providers if the primary fails.
 
-* **BaseAgent (`base-agent.ts`)** – Defines the standardized interface all agents must implement (e.g., `execute(context)` or `run(input)`). This interface is the glue that lets `SemanticAnalysisAgent` interact with `LLMService` in a type‑safe, predictable manner.  
+* **`LLMService.py`** – Provides the same façade in Python. It delegates the routing step to **`mode_routing.py`**, which examines the request payload and configuration to pick a provider from the registry.
 
-* **SemanticAnalysisAgent (`semantic-analysis-agent.ts`)** – Acts as the orchestrator for semantic analysis tasks. It receives raw observations, calls into `LLMService` for language‑model‑based reasoning, and returns structured insights to downstream components (e.g., the Insights sub‑component). The agent’s reliance on `LLMService` demonstrates the modular plug‑in nature of the design.
+* **`mode_routing.py`** – A pure function (or small module) that interprets the request’s “mode” (e.g., `completion`, `chat`, `embedding`) and consults **`llm_config.json`** to map that mode to a registered provider name. It then asks **ProviderRegistry** for the concrete provider instance.
 
-The code organization places all model‑related classes under `src/model/` and all agents under `src/agents/`, reinforcing a clear separation between *domain logic* (LLM interaction, training) and *workflow orchestration* (agents). No other files are mentioned, so the implementation appears deliberately minimalistic, focusing on core responsibilities.
+* **`lib/llm/provider-registry.js`** – Maintains a map of provider identifiers to provider implementation objects. It exposes methods such as `registerProvider(name, providerInstance)` and `getProvider(name)`. Adding a new provider (e.g., Anthropic, DMR) is as simple as calling `registerProvider` with the appropriate class.
+
+* **`llm_config.json`** – A JSON file that defines per‑mode routing tables, budget limits, sensitivity thresholds, and fallback chains. Because the configuration is external, changing provider assignments does not require code changes.
+
+### Technical Mechanics  
+
+When a client calls `LLMService.generate(prompt, options)`, the following sequence occurs (conceptually identical in TS and Python):  
+
+1. **Configuration Load** – The façade loads the relevant section of `llm_config.json` (cached in memory after the first read).  
+2. **Mode Routing** – `mode_routing` evaluates `options.mode` and selects the provider name according to the routing table.  
+3. **Provider Retrieval** – `ProviderRegistry.getProvider(name)` returns a concrete provider object that implements a known interface (e.g., `call(prompt, params)`).  
+4. **Pre‑flight Checks** – The façade verifies that the request respects the current budget and sensitivity constraints. If a circuit‑breaker is open for the selected provider, it either aborts or proceeds to a fallback provider.  
+5. **Invocation & Caching** – The request is sent to the provider. If caching is enabled and an identical request exists, the cached response is returned instead of invoking the provider.  
+6. **Fallback Handling** – On provider error, the façade consults the fallback chain defined in the config and retries with the next provider.  
+
+All of these steps are orchestrated without the caller needing to know which provider is being used, which provider failed, or how the budget is enforced.
 
 ---
 
 ## Integration Points  
 
-* **Parent Component – SemanticAnalysis** – The `SemanticAnalysis` component aggregates several agents, each responsible for a distinct phase of the pipeline. `SemanticAnalysisAgent` consumes `LLMService` to perform the core language‑model analysis, making LLMService the primary *analysis engine* within this parent.  
+LLMService sits at the intersection of several system layers:
 
-* **Sibling Components** –  
-  * **Pipeline** supplies a DAG‑based execution model (via `BatchScheduler`) that determines the order in which agents run. `LLMService` indirectly benefits from this scheduling because the `SemanticAnalysisAgent` will only be invoked when its upstream dependencies are satisfied.  
-  * **Ontology** provides classification capabilities through `OntologyClassificationAgent`. While orthogonal to LLMService, both agents share the same `BaseAgent` contract, allowing them to be chained or run in parallel within the same workflow.  
-  * **Insights**, **CodeAnalyzer**, and **InsightGenerator** each expose agents that consume the output of `SemanticAnalysisAgent`. The outputs generated by `LLMService` (e.g., reports, insight drafts) become inputs to these sibling agents, forming a downstream data flow.  
+* **Parent Component – LLMAbstraction** – LLMService is the primary export of the LLMAbstraction module. Any higher‑level business logic that needs LLM capabilities imports LLMService directly from this parent component.
 
-* **Interfaces & Dependencies** – The only explicit interface is the one defined in `BaseAgent`. `LLMService` does not implement `BaseAgent` directly but is used by an agent that does, preserving loose coupling. The `LanguageModelTrainer` is likely invoked by a separate maintenance or CI job rather than at runtime, but it shares the same package namespace, making it straightforward to import when needed.
+* **Sibling – ProviderRegistry** – The registry is the sole source of truth for available providers. Any new provider implementation must register itself with ProviderRegistry, typically during application start‑up.
+
+* **Configuration – llm_config.json** – All routing, budget, and fallback policies are defined here. The façade reads this file at initialization; changes to the file affect routing without code redeployment.
+
+* **External Provider SDKs** – Concrete provider classes (e.g., Anthropic SDK wrapper, DMR client) are not described in the observations but are implied to be instantiated and registered with ProviderRegistry. LLMService interacts with them only through the abstract provider interface.
+
+* **Cross‑Language Boundary** – Because both a TypeScript and a Python façade exist, the rest of the system may choose either runtime. The shared `mode_routing.py` and `ProviderRegistry` (JavaScript) act as language‑agnostic contracts, ensuring consistent behavior across runtimes.
+
+* **Auxiliary Concerns** – Caching, circuit‑breaker, and budget logic are embedded within the façade; they may rely on external services (e.g., Redis for cache, a monitoring system for circuit‑breaker state) but those dependencies are encapsulated behind the façade’s methods.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Consume via an Agent** – Developers should not instantiate `LLMService` directly in application code. Instead, invoke it through an agent that implements `BaseAgent` (e.g., `SemanticAnalysisAgent`). This ensures that any required preprocessing, context handling, or error handling defined at the agent level is applied consistently.  
+1. **Always go through the façade** – Callers should import `LLMService` from the LLMAbstraction module (either the TS or Python version) and never instantiate providers directly. This guarantees that caching, budget checks, and fallback logic are applied uniformly.
 
-2. **Extend for New Models** – To add support for a different LLM provider, create a subclass of `LLMService` (or a new service class) that implements the same public methods. Register the new class in the dependency injection configuration used by the agents, if any, so that `SemanticAnalysisAgent` can swap the implementation without code changes.  
+2. **Configure via `llm_config.json`** – Adjust routing, budget limits, or fallback providers by editing the JSON file. After a change, ensure the application reloads the configuration (most implementations cache the file on first load, so a restart may be required).
 
-3. **Separate Training from Inference** – Use `LanguageModelTrainer` only in offline or CI pipelines. Keep inference paths (calls to `LLMService` from agents) lightweight; avoid embedding training logic in request‑handling code to preserve latency guarantees.  
+3. **Register new providers early** – When adding a new LLM provider, create a wrapper that implements the expected provider interface and register it with `ProviderRegistry.registerProvider(name, instance)` during application start‑up. No changes to LLMService are needed.
 
-4. **Respect the Agent Contract** – When adding new agents that need LLM capabilities, follow the `BaseAgent` interface contract (`execute`, `run`, etc.). This guarantees compatibility with the DAG scheduler used by the `Pipeline` sibling component.  
+4. **Respect mode semantics** – The `mode` field in request options determines which routing rule is applied. Use documented mode strings (e.g., `"completion"`, `"chat"`) to trigger the intended provider selection.
 
-5. **Error Propagation** – Since `LLMService` may surface external API errors, agents should translate those into the standardized error types defined by the system (if any) to keep downstream components (Insights, CodeAnalyzer) robust.
+5. **Monitor budget and circuit‑breaker state** – Although the façade enforces limits, developers should still instrument their services to observe budget consumption and circuit‑breaker trips, especially when operating near limits.
+
+6. **Handle fallback transparently** – Because LLMService automatically falls back to secondary providers on failure, callers generally do not need to implement their own retry logic. However, they should be prepared for possible variations in response format across providers.
 
 ---
 
 ### Architectural patterns identified  
-* **Agent‑based modular architecture** – each functional piece is an agent implementing `BaseAgent`.  
-* **Facade/Service pattern** – `LLMService` abstracts LLM interaction behind a simple API.  
-* **Strategy‑like extensibility** – new language‑model implementations can be swapped without changing agents.  
-* **Separation of Concerns** – training (`LanguageModelTrainer`) is isolated from inference (`LLMService`).  
+
+* **Registry pattern** – `ProviderRegistry` centralises provider management.  
+* **Facade pattern** – `LLMService` offers a unified, high‑level API.  
+* **Strategy / Dynamic routing** – `mode_routing.py` selects providers based on configuration and request parameters.  
+* **Configuration‑driven design** – `llm_config.json` governs routing, budgets, and fallbacks.  
 
 ### Design decisions and trade‑offs  
-* **Standardized agent interface** trades flexibility for consistency; all agents must conform to `BaseAgent`, simplifying orchestration but limiting unconventional APIs.  
-* **Modular service class** enables easy replacement of LLM providers but adds an indirection layer that may incur minimal overhead.  
-* **Separate trainer** allows continuous model improvement without affecting runtime performance, at the cost of maintaining an additional code path and possible duplication of configuration.  
+
+* **Extensibility vs. Runtime Overhead** – Using a registry and dynamic routing adds a small indirection cost but enables adding providers without code changes.  
+* **Single source of truth for config** – Storing routing logic in JSON simplifies deployment but requires careful version control to avoid mismatched configurations across environments.  
+* **Language duplication** – Maintaining both TypeScript and Python façades increases maintenance effort but allows the component to be used in heterogeneous stacks.  
 
 ### System structure insights  
-* The codebase is organized by responsibility: `src/model/` for domain services (LLM, training) and `src/agents/` for workflow components.  
-* The parent **SemanticAnalysis** component orchestrates agents, while sibling components (Pipeline, Ontology, Insights, etc.) interact through shared contracts and a DAG scheduler, forming a loosely coupled yet coordinated system.  
+
+LLMService is a leaf sub‑component of **LLMAbstraction**, directly dependent on **ProviderRegistry** (sibling) and **llm_config.json** (external artifact). The provider wrappers act as leaf nodes beneath the registry, while caching, circuit‑breaker, and budget modules are internal concerns of the façade.
 
 ### Scalability considerations  
-* Because inference is encapsulated in `LLMService`, scaling the LLM (e.g., moving to a larger model or a hosted service with auto‑scaling) can be done by swapping the implementation without touching agents.  
-* The DAG‑based `Pipeline` can parallelize independent agents, allowing the LLM‑driven analysis to run concurrently with ontology classification or code analysis, provided the underlying LLM endpoint can handle the load.  
-* Training (`LanguageModelTrainer`) is isolated, so heavy compute can be off‑loaded to dedicated hardware or cloud resources without impacting request‑time latency.  
+
+* **Provider‑level scaling** – Since each provider is invoked independently, scaling the underlying provider clients (e.g., connection pools) can be done per provider without affecting the façade.  
+* **Configuration‑driven routing** – Adding more providers or routing rules does not increase code complexity; only the config grows.  
+* **Caching** – Centralised caching within the façade can dramatically reduce request volume to providers, improving throughput.  
+* **Circuit‑breaker** – Prevents cascading failures when a provider becomes saturated, preserving overall system stability.
 
 ### Maintainability assessment  
-* **High** – The clear separation between agents, services, and trainers, together with a single `BaseAgent` contract, makes the codebase easy to navigate and extend.  
-* Adding new language models or analysis capabilities involves creating a new subclass or method in `LLMService` and optionally a new agent, without ripple effects.  
-* The reliance on explicit file paths and class names in the observations suggests a well‑structured repository, which further aids onboarding and future refactoring.  
 
----  
-
-*All statements above are directly grounded in the provided observations and file references.*
+The modular registry‑facade architecture yields high maintainability: new providers are added by registration alone, and routing changes are confined to `llm_config.json`. The clear separation of concerns (routing, provider lookup, budget checks) makes the codebase approachable. The main maintenance burden lies in keeping the TypeScript and Python implementations synchronized; however, because both delegate to the same routing logic and configuration, divergence is limited. Overall, the design balances flexibility with a low cognitive load for developers extending the LLM capabilities.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This modularity allows for easier maintenance and extension of the component, as new agents can be added or existing ones modified without affecting the overall system. For instance, the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) utilizes the LLMService for large language model-based analysis and generation, demonstrating the flexibility of the component's design. The use of a standardized agent interface, as defined in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts), ensures consistency across the different agents and facilitates communication between them.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed to be modular and extensible, with a focus on flexibility and scalability, as evident from the use of the ProviderRegistry class (lib/llm/provider-registry.js) which allows for easy addition of new LLM providers. This approach enables the component to accommodate different LLM services, such as Anthropic and DMR, without requiring significant modifications to the existing codebase. The LLMService class (lib/llm/llm-service.ts) serves as a high-level facade for all LLM operations, handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback, thereby providing a unified interface for interacting with various LLM providers.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges, as seen in the BatchScheduler class (integrations/mcp-server-semantic-analysis/src/agents/batch-scheduler.ts).
-- [Ontology](./Ontology.md) -- The Ontology sub-component utilizes the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts).
-- [Insights](./Insights.md) -- The Insights sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer sub-component utilizes the CodeAnalyzer agent for analyzing code and generating insights, as seen in the CodeAnalyzer class (integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts).
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
+- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class (lib/llm/provider-registry.js) uses a modular design, enabling the registration of new LLM providers through a simple and extensible interface.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

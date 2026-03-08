@@ -2,105 +2,136 @@
 
 **Type:** SubComponent
 
-OnlineLearning's 'extractedKnowledgeValidator' function in online-learning.ts ensures extracted knowledge adheres to the project's ontology
+OnlineLearning could leverage the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the central knowledge graph and store automatically extracted data.
 
 ## What It Is  
 
-**OnlineLearning** is a sub‑component of the **KnowledgeManagement** domain that automatically extracts, validates, and persists knowledge gathered from a developer’s workflow. The core implementation lives in `online-learning.ts`, where a set of focused analyzers (`gitHistoryAnalyzer`, `lslSessionAnalyzer`, `codeAnalyzer`) feed extracted facts into the **GraphDatabaseManager** (`storage/graph-database-manager.ts`). The orchestrator function `onlineLearningPipeline` strings these steps together, ending with a call to `extractKnowledge` that writes the validated knowledge into the graph store. A dedicated `extractedKnowledgeValidator` guarantees that every piece of newly‑created knowledge conforms to the project‑wide ontology before it is persisted.
+OnlineLearning is a **sub‑component** of the larger **KnowledgeManagement** system.  Its implementation lives in the same repository as the other KnowledgeManagement modules and is expected to orchestrate the automatic extraction, transformation, and persistence of learning‑related insights.  The observations point to concrete artefacts that OnlineLearning will call directly:  
 
-## Architecture and Design  
+* **PersistenceAgent** – `src/agents/persistence-agent.ts` – the agent responsible for persisting entities, performing ontology classification, and validating content before they are written to the graph.  
+* **CodeGraphAgent** – `src/agents/code-graph-agent.ts` – the agent that builds a code‑oriented knowledge graph from extracted entities.  
+* **GraphDatabaseAdapter** – `storage/graph-database-adapter.ts` – the adapter that hides the details of the underlying Graphology + LevelDB store and provides a uniform API for graph operations.  
 
-The observable design follows a **pipeline / orchestration** pattern. Individual analysis functions act as independent stages that each produce a slice of knowledge. `onlineLearningPipeline` composes these stages in a deterministic order, allowing the system to be extended with additional analyzers without touching the orchestration logic. This modularity mirrors the sibling components (e.g., **ManualLearning**, **KnowledgeGraphAnalyzer**) that also rely on the same underlying **GraphDatabaseManager**, indicating a shared data‑access layer across the KnowledgeManagement family.
-
-Persistence is abstracted through **GraphDatabaseManager** (found in `storage/graph-database-manager.ts`). All sub‑components that need to write or read graph data—including **OnlineLearning**, **EntityPersistenceAgent**, **OntologyClassifier**, and **KnowledgeGraphAnalyzer**—delegate to this manager, which itself wraps the lower‑level **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). This two‑tier data‑access approach isolates business logic from storage concerns and enables consistent JSON export via the adapter’s `syncJSONExport` capability (as described in the parent component documentation).
-
-Validation is performed by `extractedKnowledgeValidator` before any write operation. By placing validation as a separate, reusable function, the design enforces a **separation of concerns**: extraction logic does not need to be aware of ontology rules, and the validator can be unit‑tested in isolation.
-
-## Implementation Details  
-
-1. **Analyzers** – Each analyzer lives in `online-learning.ts`:
-   * `gitHistoryAnalyzer` walks the Git commit history, parses commit messages, diff metadata, and extracts domain‑specific concepts (e.g., newly introduced APIs or bug‑fix patterns).
-   * `lslSessionAnalyzer` consumes logs from LSL (Live Session Logging) sessions, translating runtime events into declarative knowledge objects.
-   * `codeAnalyzer` parses source files, identifies architectural motifs, and surfaces refactoring opportunities.
-
-   All three return a common “knowledge payload” that the pipeline can merge.
-
-2. **Knowledge Extraction & Persistence** – The `extractKnowledge` function receives the merged payload, invokes `extractedKnowledgeValidator` to ensure ontology compliance, and finally calls methods on **GraphDatabaseManager** (e.g., `addNode`, `addEdge`) to persist the data. Because the manager is imported from `storage/graph-database-manager.ts`, the persistence path is consistent with other components that interact with the graph store.
-
-3. **Pipeline Orchestration** – `onlineLearningPipeline` is the entry point for the automated learning flow. It sequentially:
-   * Triggers each analyzer,
-   * Aggregates their outputs,
-   * Calls `extractKnowledge`,
-   * Handles any validation errors (typically by logging and aborting the current cycle).
-
-   This deterministic flow makes the component easy to invoke from CI jobs, background workers, or interactive developer tools.
-
-4. **Validator** – `extractedKnowledgeValidator` checks that every node and edge respects the ontology defined at the KnowledgeManagement level. It likely inspects required properties, type hierarchies, and relationship constraints before allowing the manager to write.
-
-## Integration Points  
-
-* **Parent – KnowledgeManagement** – OnlineLearning is a child of the broader KnowledgeManagement component, inheriting the ontology and data‑sync expectations described for the parent (e.g., the `syncJSONExport` routine in the adapter). The validator aligns extracted knowledge with the ontology enforced at the parent level.
-
-* **Sibling – GraphDatabaseManager** – OnlineLearning directly consumes the manager (`storage/graph-database-manager.ts`). This is the same manager used by **EntityPersistenceAgent**, **KnowledgeGraphAnalyzer**, and **OntologyClassifier**, providing a unified API for graph operations. Any change to the manager’s contract propagates uniformly across these siblings.
-
-* **Sibling – ManualLearning** – While ManualLearning writes manually curated entities via the **GraphDatabaseAdapter**, OnlineLearning writes automatically extracted entities via the manager. Both ultimately store data in the same underlying graph, ensuring that manual and automated knowledge coexist seamlessly.
-
-* **External Triggers** – The pipeline can be invoked by scheduled jobs, Git hooks, or IDE extensions that monitor developer activity. Because the pipeline is a pure function composition, it can be called programmatically without side‑effects beyond the validated persistence step.
-
-## Usage Guidelines  
-
-1. **Do not bypass the validator** – All knowledge must flow through `extractedKnowledgeValidator`. Direct calls to GraphDatabaseManager from new code should be avoided unless the caller replicates the same validation logic.
-
-2. **Extend via new analyzers** – When adding a new source of knowledge (e.g., issue‑tracker mining), implement a function in `online-learning.ts` that returns a payload compatible with existing ones and register it inside `onlineLearningPipeline`. This respects the established pipeline pattern and avoids invasive changes.
-
-3. **Keep the pipeline deterministic** – The order of analyzer execution matters only insofar as later stages may depend on earlier outputs (e.g., code analysis might reference git‑derived module names). Document any such dependencies clearly in the pipeline code.
-
-4. **Unit‑test each stage** – Because the design isolates extraction, validation, and persistence, developers should write unit tests for each analyzer, for the validator against the ontology, and for the manager’s interaction contract. This mirrors the testing approach used by sibling components such as **OntologyClassifier**.
-
-5. **Monitor performance** – Extraction can be I/O‑heavy (reading Git history, parsing large codebases). If latency becomes a concern, consider batching the work or running the pipeline asynchronously, but retain the same function signatures to keep the integration surface stable.
+In practice, OnlineLearning consumes raw, unstructured learning material (documents, videos, code snippets, etc.), runs it through a **data‑processing pipeline** that may include natural‑language‑processing (NLP) or computer‑vision models, schedules the extraction jobs (potentially with Apache Airflow), and finally stores the resulting entities and insights via the PersistenceAgent and GraphDatabaseAdapter.  The resulting artefacts become part of the central knowledge graph that the rest of KnowledgeManagement (e.g., InsightGenerationModule, OntologyClassificationModule) can query.
 
 ---
 
-### Architectural Patterns Identified
-* **Pipeline / Orchestration** – `onlineLearningPipeline` composes independent analysis stages.
-* **Facade (GraphDatabaseManager)** – Provides a simplified API over the lower‑level GraphDatabaseAdapter.
-* **Validator (Specification)** – `extractedKnowledgeValidator` enforces ontology rules before persistence.
-* **Separation of Concerns** – Extraction, validation, and persistence are cleanly separated into distinct functions/modules.
+## Architecture and Design  
 
-### Design Decisions & Trade‑offs
-* **Centralised Graph Access** – Using a single manager reduces duplication but creates a single point of failure; any performance bottleneck in the manager impacts all siblings.
-* **Synchronous Pipeline** – Simplicity and deterministic ordering are gained at the cost of potential latency for large repositories.
-* **Explicit Validation** – Guarantees data integrity but adds overhead; however, the cost is justified by the need to keep the knowledge graph consistent across manual and automated inputs.
+The architecture that emerges from the observations is a **modular, agent‑driven** design anchored by a **graph‑centric data store**.  Each functional concern is encapsulated in its own module (agents, adapters, pipelines), mirroring the modular approach described for the parent KnowledgeManagement component.  
 
-### System Structure Insights
-* **Hierarchical** – OnlineLearning sits under KnowledgeManagement, sharing ontology and export mechanisms.
-* **Sibling Cohesion** – Multiple components (ManualLearning, EntityPersistenceAgent, etc.) converge on the same persistence layer, promoting data consistency.
-* **No Child Components** – OnlineLearning does not expose further sub‑components; its responsibilities are fully encapsulated within the pipeline and its helper functions.
+* **Agent pattern** – Both `PersistenceAgent` and `CodeGraphAgent` are thin, purpose‑built services that expose high‑level operations (e.g., `storeEntity`, `buildCodeGraph`).  They hide the complexity of interacting with the underlying storage layer and any domain‑specific validation logic.  
+* **Adapter pattern** – `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`) acts as a façade over the Graphology + LevelDB graph database, translating generic graph operations into the concrete API of the storage engine.  This decouples OnlineLearning (and its sibling modules) from the specifics of the graph implementation, making it possible to swap the backend with minimal code changes.  
+* **Pipeline orchestration** – The mention of a “data processing pipeline” and a scheduling library such as **Apache Airflow** indicates a batch‑oriented workflow where extraction jobs are defined as DAGs (directed acyclic graphs).  Each stage of the DAG can invoke an ML model, transform the output into entities, and finally call the agents for persistence.  
 
-### Scalability Considerations
-* **Graph Database Scaling** – Since all knowledge funnels through GraphDatabaseManager, scaling the underlying graph store (via LevelDB or Graphology configuration) directly benefits OnlineLearning.
-* **Parallel Analyzer Execution** – The current pipeline is sequential; future scalability could be achieved by running independent analyzers in parallel threads or worker processes, provided the validator remains thread‑safe.
-* **Incremental Extraction** – To avoid re‑processing the entire Git history on each run, an incremental checkpoint (potentially managed by **CheckpointTracker**) could be introduced.
+Interaction flow (high‑level):  
 
-### Maintainability Assessment
-* **High Modularity** – Clear functional boundaries make the codebase approachable; adding new analyzers or tweaking validation rules does not ripple through unrelated parts.
-* **Shared Dependencies** – Heavy reliance on GraphDatabaseManager means changes to its API require coordinated updates across all siblings, demanding careful versioning and thorough integration testing.
-* **Documentation Alignment** – Because the component’s purpose and interactions are explicitly described in the observations, developers can quickly locate the relevant files (`online-learning.ts`, `storage/graph-database-manager.ts`) and understand the data flow, supporting long‑term maintainability.
+1. **Scheduler** (Airflow) triggers a pipeline run for a new learning artefact.  
+2. The pipeline invokes an **ML model** (NLP for text, CV for images/video) to produce raw insights.  
+3. Raw insights are normalized into **entity objects** that conform to the ontology used by KnowledgeManagement.  
+4. The **PersistenceAgent** validates and enriches these entities, then hands them to the **GraphDatabaseAdapter**, which writes them into the central graph.  
+5. If the artefact contains code, the **CodeGraphAgent** builds a supplemental code‑knowledge sub‑graph, again persisted via the adapter.  
+
+Because the same agents and adapter are shared with sibling components (ManualLearning, EntityPersistenceModule, OntologyClassificationModule, InsightGenerationModule, CodeGraphModule), OnlineLearning benefits from **reuse** and **consistent data contracts** across the whole KnowledgeManagement domain.
+
+---
+
+## Implementation Details  
+
+### PersistenceAgent (`src/agents/persistence-agent.ts`)  
+The agent likely exports a class (e.g., `PersistenceAgent`) with methods such as `storeEntity(entity: Entity): Promise<void>` and `validateContent(content: any): ValidationResult`.  Internally it may invoke the **GraphDatabaseAdapter** to perform the actual write.  The agent also appears to handle **ontology classification**, suggesting it contains or delegates to a classifier that maps raw entity attributes to the system’s ontology nodes before persistence.
+
+### CodeGraphAgent (`src/agents/code-graph-agent.ts`)  
+This agent is specialized for code‑related knowledge.  Its core method might be `buildCodeGraph(sourceFiles: string[]): Promise<GraphSubsection>` which parses source code, extracts symbols, and creates relationships (e.g., “calls”, “inherits”).  The resulting sub‑graph is then persisted through the same GraphDatabaseAdapter, ensuring that code knowledge lives alongside other learning entities.
+
+### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
+Implemented as a thin wrapper around **Graphology** (a JavaScript graph library) backed by **LevelDB** for durability.  Expected public API includes `addNode(node: GraphNode)`, `addEdge(edge: GraphEdge)`, `query(criteria: QuerySpec)`.  By centralising all graph operations here, the system isolates the rest of the codebase from storage‑specific concerns such as transaction handling, indexing, or serialization format.
+
+### Data‑Processing Pipeline & ML Models  
+Although concrete code is not listed, the observations indicate a pipeline that calls out to **machine‑learning models** (NLP for document summarisation, CV for extracting text from images/video).  These models are likely encapsulated behind service interfaces (e.g., `NLPService.analyze(text)`) and invoked from Airflow tasks.  The pipeline then maps model outputs to the **Entity** schema expected by the PersistenceAgent.
+
+### Scheduling with Apache Airflow  
+Airflow DAGs would be defined in a `dags/online_learning/` directory (not shown) and would reference Python operators that call into the Node.js services (perhaps via HTTP or a message queue).  This external scheduler is not part of the repo but is a critical integration point for automated extraction.
+
+### Data Warehouse  
+The observation that a “data warehouse” may be used suggests a secondary storage layer for analytical queries (e.g., reporting on extraction throughput, model accuracy).  The pipeline could push a denormalised view of extracted entities into the warehouse after successful persistence, enabling downstream BI tools without overloading the graph store.
+
+---
+
+## Integration Points  
+
+1. **Parent – KnowledgeManagement** – OnlineLearning contributes automatically extracted entities to the central knowledge graph that the parent component orchestrates.  All other sibling modules (ManualLearning, InsightGenerationModule, etc.) read from and write to the same graph via the shared agents and adapter, guaranteeing a single source of truth.  
+
+2. **Sibling – PersistenceAgent & CodeGraphAgent** – Both agents are reused across siblings.  For example, **ManualLearning** uses `PersistenceAgent` to store manually curated entities, while **CodeGraphModule** uses `CodeGraphAgent` for code‑graph construction.  OnlineLearning’s reliance on the same agents ensures that automatically extracted entities are indistinguishable from manually entered ones at the graph level.  
+
+3. **GraphDatabaseAdapter** – Serves as the primary persistence contract for every module that needs graph access.  Any change to the underlying LevelDB configuration or Graphology version is isolated to this file, protecting the rest of the system.  
+
+4. **External Scheduler (Airflow)** – The DAG definitions are external to the codebase but invoke the pipeline’s entry points (likely HTTP endpoints exposed by a thin Express server).  The Airflow‑to‑Node.js bridge is a critical integration surface; failures here affect the timeliness of automatic extraction.  
+
+5. **Machine‑Learning Services** – Whether hosted locally or as remote inference endpoints, the ML models are called from the pipeline.  Their contracts (input schema, output format) must align with the entity model expected by `PersistenceAgent`.  Versioning of these models is a hidden integration concern that impacts downstream insight quality.  
+
+6. **Data Warehouse** – If present, the warehouse receives a copy of the extracted data for analytics.  The integration likely uses a streaming connector (e.g., Kafka → Snowflake) or a batch export step after each successful pipeline run.
+
+---
+
+## Usage Guidelines  
+
+* **Always route entity creation through `PersistenceAgent`.**  Direct writes to the graph bypass validation, ontology classification, and content checks that the agent enforces.  This rule applies whether the entity originates from OnlineLearning, ManualLearning, or any other module.  
+
+* **Treat `CodeGraphAgent` as the sole entry point for code‑related graph mutations.**  Its internal parsing logic expects source files in a specific format; feeding it malformed code can corrupt the code sub‑graph.  
+
+* **Do not modify `GraphDatabaseAdapter` unless you need to change the underlying storage technology.**  Because every module depends on this adapter, any API change will ripple throughout the KnowledgeManagement system.  
+
+* **When extending the data‑processing pipeline, keep the Airflow DAGs declarative and idempotent.**  Each task should be able to rerun without creating duplicate entities—relying on the agent’s upsert semantics (e.g., `storeEntity` should check for existing IDs).  
+
+* **Version ML models explicitly and store their metadata alongside extracted entities.**  This practice enables reproducibility of insights and eases rollback if a model regression is detected.  
+
+* **If a data warehouse is used for reporting, schedule the export step only after the graph transaction commits successfully.**  This ordering guarantees consistency between the operational graph and analytical views.  
+
+* **Monitor the Airflow scheduler and the GraphDatabaseAdapter health.**  Since OnlineLearning’s throughput depends on timely DAG execution and reliable graph writes, alerts should be set up for task failures, queue back‑logs, or LevelDB disk‑space warnings.
+
+---
+
+### Architectural patterns identified  
+
+* **Agent pattern** – `PersistenceAgent`, `CodeGraphAgent` encapsulate domain‑specific operations.  
+* **Adapter (Façade) pattern** – `GraphDatabaseAdapter` abstracts the Graphology + LevelDB implementation.  
+* **Modular architecture** – Separate directories (`src/agents`, `storage/`) enforce clear boundaries.  
+* **Pipeline / DAG orchestration** – Use of Apache Airflow to schedule extraction workflows.  
+
+### Design decisions and trade‑offs  
+
+* **Centralised graph store** provides a unified query surface but introduces a single point of contention; LevelDB’s on‑disk nature favors durability over low‑latency random access.  
+* **Reusing agents across manual and automatic flows** reduces code duplication and ensures data consistency, at the cost of a tighter coupling between modules.  
+* **External scheduling (Airflow)** offers powerful dependency management and scalability, but adds operational overhead and a separate technology stack to maintain.  
+
+### System structure insights  
+
+The system is layered: **pipeline → agents → adapter → graph**.  Sibling modules share the lower layers (agents, adapter), while the upper pipeline layer is where OnlineLearning differentiates itself (ML‑driven extraction, scheduled runs).  
+
+### Scalability considerations  
+
+* **Horizontal scaling of extraction pipelines** can be achieved by adding more Airflow workers and replicating the ML inference services.  
+* **Graph database scaling** is limited by LevelDB’s single‑process design; for very large knowledge graphs a move to a distributed graph store would be required.  
+* **Agent statelessness** (assuming they are) enables multiple instances behind a load balancer, improving throughput for concurrent persistence requests.  
+
+### Maintainability assessment  
+
+The **modular, agent‑centric** layout promotes maintainability: changes to persistence rules or code‑graph construction are isolated to their respective agents.  The **adapter** further isolates storage concerns, making future migrations straightforward.  However, the reliance on an external scheduler and multiple ML model versions introduces cross‑cutting concerns that require disciplined versioning, testing, and monitoring to keep the system maintainable over time.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's reliance on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence and automatic JSON export sync enables efficient data management. This is evident in the way the adapter leverages Graphology and LevelDB for robust graph database interactions. For instance, the 'syncJSONExport' function in graph-database-adapter.ts ensures that data remains consistent across different storage formats, thus supporting the project's data analysis goals.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component follows a modular architecture, with separate modules for different functionalities, such as entity persistence, ontology classification, and insight generation, as seen in the code organization of the src/agents directory, which contains the PersistenceAgent (src/agents/persistence-agent.ts) and the CodeGraphAgent (src/agents/code-graph-agent.ts). This modular approach allows for easier maintenance and scalability of the component, as each module can be updated or modified independently without affecting the rest of the component. For example, the PersistenceAgent is responsible for entity persistence, ontology classification, and content validation, and is used by the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the central Graphology+LevelDB knowledge graph.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the graph database
-- [EntityPersistenceAgent](./EntityPersistenceAgent.md) -- EntityPersistenceAgent uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [KnowledgeGraphAnalyzer](./KnowledgeGraphAnalyzer.md) -- KnowledgeGraphAnalyzer uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [CheckpointTracker](./CheckpointTracker.md) -- CheckpointTracker uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store manually created entities in the knowledge graph.
+- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store entities in the knowledge graph.
+- [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store classified entities in the knowledge graph.
+- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store generated insights in the knowledge graph.
+- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct and query the code knowledge graph.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store and retrieve data from the knowledge graph.
 
 
 ---

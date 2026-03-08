@@ -1,115 +1,140 @@
 # SpecstoryIntegration
 
-**Type:** Detail
+**Type:** SubComponent
 
-The SpecstoryIntegration likely provides a callback or event-driven interface, notifying the ProjectMilestoneManager of changes to project milestones in the Specstory extension, similar to the EventDr...
+SpecstoryIntegration utilizes the createLogger function from logging/Logger.js to establish a logger instance for logging conversation entries and reporting errors.
 
 ## What It Is  
 
-**SpecstoryIntegration** is the concrete bridge that enables the *ProjectMilestoneManager* to interact with the external **Specstory** extension.  The integration lives in the codebase under the **`lib/integrations/specstory-adapter.js`** file, where the **`SpecstoryAdapter`** class is defined.  This adapter encapsulates all communication details—API calls, authentication hand‑shakes, and event subscription—so that the higher‑level milestone‑management components can work with a simple, domain‑focused interface.  In practice, *ProjectMilestoneManager* contains an instance of **SpecstoryIntegration**, which in turn delegates to **`SpecstoryAdapter`** for every operation that touches the Specstory service.  Sibling components such as **MilestoneTracker** also rely on the same adapter, reinforcing a single source of truth for external Specstory interactions.
+**SpecstoryIntegration** is a sub‑component that lives inside the **Trajectory** parent component. Its implementation is spread across two concrete locations that the observations point to:
+
+* **`lib/integrations/specstory-adapter.js`** – houses the **SpecstoryAdapter** class. This class is the work‑horse that establishes a connection to the external Specstory extension.  
+* **`logging/Logger.js`** – provides the **`createLogger`** factory used by the adapter (and by the child **ConversationLogger**) to emit structured logs for conversation entries and error reporting.
+
+Within the hierarchy, **SpecstoryIntegration** contains a **ConversationLogger** child component that re‑uses the same logger instance created via `createLogger`. The sibling components **ConnectionManager**, **Logger**, and **RetryMechanism** all interact with the same underlying adapter, reinforcing a tightly‑coupled but clearly delineated responsibility set.
+
+In short, SpecstoryIntegration is the glue that lets the broader Trajectory system talk to the Specstory extension, handling connection setup, error resilience, and logging in a reusable, environment‑agnostic way.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **layered integration pattern** where the *SpecstoryIntegration* layer sits between the core domain (project‑milestone logic) and the external Specstory extension.  The key design patterns that emerge from the observations are:
+The observations reveal a classic **Adapter** architecture. The **SpecstoryAdapter** abstracts away the details of how the system reaches the Specstory extension—whether through HTTP, inter‑process communication (IPC), or a file‑watch mechanism. By exposing a single public entry point (`connectViaHTTP`) the adapter presents a uniform interface to its consumers (e.g., **ConnectionManager**, **SpecstoryIntegration** itself).  
 
-1. **Adapter Pattern** – embodied by the **`SpecstoryAdapter`** class in `lib/integrations/specstory-adapter.js`.  It translates the internal method signatures used by *ProjectMilestoneManager* and *MilestoneTracker* into the request/response format expected by the Specstory extension.  
+A **Retry** strategy is baked directly into `connectViaHTTP`. The method implements a retry loop that catches transient errors and re‑attempts the connection, demonstrating an **error‑handling pattern** that prioritises robustness over immediate failure. This is reinforced by the sibling **RetryMechanism** component, which likely encapsulates shared retry logic that the adapter leverages.
 
-2. **ProviderFallbackConfig‑style authentication** – the integration “may implement authentication and authorization mechanisms … using a pattern similar to the ProviderFallbackConfig.”  This suggests a configuration‑driven fallback chain for credentials (e.g., primary token, secondary API key) that the adapter consults before each outbound call, providing resilience against missing or expired credentials.  
+Logging is handled via the **Factory** pattern: `createLogger` from `logging/Logger.js` produces a logger instance that is passed into the adapter and downstream **ConversationLogger**. This centralises log configuration and ensures consistent message formatting across the sub‑component.
 
-3. **Event‑Driven Pipeline‑style notification** – the integration “likely provides a callback or event‑driven interface, notifying the ProjectMilestoneManager of changes … similar to the EventDrivenPipeline pattern.”  In practice the adapter registers listeners with the Specstory extension and emits internal events (or invokes callbacks) that cascade up to *ProjectMilestoneManager*, enabling reactive updates to milestone state without polling.
+Interaction flow:
 
-Interaction flow: *ProjectMilestoneManager* invokes a high‑level method on **SpecstoryIntegration** (e.g., `syncMilestones`).  The integration forwards the request to **`SpecstoryAdapter`**, which first resolves authentication via the ProviderFallbackConfig‑style logic, then performs the remote API call.  If the Specstory extension pushes a change (e.g., a milestone status update), the adapter’s event listener fires, propagating an internal event that *ProjectMilestoneManager* consumes to refresh its local view.  This design isolates external variability while preserving a clean, event‑centric contract for the domain layer.
+1. **Trajectory** (parent) invokes **SpecstoryIntegration**.  
+2. **SpecstoryIntegration** creates a logger (`createLogger`) and hands it to **SpecstoryAdapter**.  
+3. **SpecstoryAdapter.connectViaHTTP** attempts an HTTP connection, falling back to other mechanisms if needed, while applying its retry logic.  
+4. Successful connection is reported back to **ConnectionManager** (sibling) and conversation data is handed to **ConversationLogger** (child) for persistent logging.
+
+No higher‑level patterns such as micro‑services or event‑driven architectures are mentioned, so the design stays within the process‑boundary, focusing on adaptability and resilience.
 
 ---
 
 ## Implementation Details  
 
-### Core Class – `SpecstoryAdapter`  
-Located at **`lib/integrations/specstory-adapter.js`**, the class exposes methods such as `fetchMilestones()`, `createMilestone(data)`, `updateMilestone(id, data)`, and `subscribeToChanges(callback)`.  Internally it:
+### SpecstoryAdapter (`lib/integrations/specstory-adapter.js`)  
+* **Class**: `SpecstoryAdapter` – encapsulates all connectivity concerns.  
+* **Method**: `connectViaHTTP()` – the primary entry point for establishing a stable HTTP link. The method contains a **retry loop** that catches transient network or protocol errors, re‑issues the request after a short back‑off, and ultimately surfaces a definitive error if retries are exhausted.  
+* **Flexibility**: The adapter is deliberately written to support alternative transports (IPC, file watch). Although the concrete code for those alternatives is not enumerated in the observations, the design intention is explicit: the same adapter can switch its underlying transport without changing the public API.
 
-* **Authentication handling** – before each request it consults a configuration object that mirrors the *ProviderFallbackConfig* approach.  The config may contain multiple credential providers (environment variable, secret store, fallback static token).  The adapter iterates these providers until a valid token is obtained, then attaches it to the request header.  
+### Logger (`logging/Logger.js`)  
+* **Factory Function**: `createLogger()` – returns a logger instance configured for the Specstory context. This logger is used for two purposes:  
+  1. **Conversation entries** – the **ConversationLogger** child component writes each dialogue turn to the log.  
+  2. **Error reporting** – any failure inside `connectViaHTTP` (including retry exhaustion) is recorded with stack traces and contextual metadata.
 
-* **Request abstraction** – the adapter builds HTTP (or WebSocket) payloads specific to the Specstory API, abstracting away endpoint URLs, query parameters, and response parsing.  Errors are normalized into a common `SpecstoryError` type, simplifying downstream error handling.  
+### ConversationLogger (child of SpecstoryIntegration)  
+* While no source file is listed, the observations confirm it relies on the same logger instance created by `createLogger`. Its responsibility is to persist conversation data, likely in a structured format (JSON or similar) that downstream analytics can consume.
 
-* **Event subscription** – using the Specstory extension’s push mechanism (e.g., WebSocket or server‑sent events), the adapter registers a listener in `subscribeToChanges`.  When a change message arrives, the adapter translates the raw payload into a domain‑friendly event object and invokes the supplied callback.  This mirrors the *EventDrivenPipeline* pattern, allowing the parent *ProjectMilestoneManager* to react instantly.  
-
-### Integration Wrapper – `SpecstoryIntegration` (conceptual)  
-While a concrete file for *SpecstoryIntegration* is not listed, the observations describe it as the façade that *ProjectMilestoneManager* uses.  It likely composes a `new SpecstoryAdapter()` and provides higher‑level methods such as `syncAllMilestones()` or `listenForMilestoneUpdates()`.  These methods hide the adapter’s low‑level details and present a stable API to the parent component.  
-
-### Relationship to Siblings  
-*MilestoneTracker* also imports **`SpecstoryAdapter`** from the same path, reusing the exact communication logic.  This shared usage enforces consistency across components that need milestone data from Specstory.  *MilestoneManager*, by contrast, focuses on persistence (potentially via a *SharedMemoryStore* pattern) and does not directly touch the adapter, illustrating a clear separation between external integration and internal storage concerns.
+### Interaction with Siblings  
+* **ConnectionManager** – calls `SpecstoryAdapter.connectViaHTTP()` to initiate the link. It benefits from the adapter’s retry logic, meaning the manager does not need its own error‑handling code.  
+* **RetryMechanism** – may expose reusable retry utilities (e.g., exponential back‑off) that the adapter imports, ensuring a consistent retry policy across the codebase.  
+* **Logger** – the sibling component that also uses `createLogger`, reinforcing a single source of truth for logging configuration.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – ProjectMilestoneManager**  
-   *ProjectMilestoneManager* holds an instance of *SpecstoryIntegration* and calls its public methods to keep the internal milestone model synchronized with Specstory.  The manager also registers callbacks supplied by the integration to receive real‑time updates.  
+1. **Parent – Trajectory**: Trajectory owns SpecstoryIntegration, so any lifecycle events (initialisation, shutdown) are propagated down. When Trajectory starts, it likely constructs the logger via `createLogger`, then instantiates **SpecstoryAdapter** and triggers `connectViaHTTP`.  
 
-2. **Sibling – MilestoneTracker**  
-   Shares the exact **`SpecstoryAdapter`** implementation, meaning any change to authentication handling or event subscription logic automatically propagates to the tracker.  This reduces duplication and ensures that both tracker and manager view the same external state.  
+2. **Sibling – ConnectionManager**: Acts as the orchestrator that decides *when* to request a connection. It invokes the adapter’s `connectViaHTTP` and reacts to its success/failure signals, possibly updating UI state or retry counters.  
 
-3. **External – Specstory Extension**  
-   The adapter’s network layer communicates with the Specstory extension’s public API.  Authentication credentials flow through the ProviderFallbackConfig‑style chain, and change notifications travel back via the extension’s event channel.  
+3. **Sibling – Logger**: Provides the `createLogger` function that both SpecstoryIntegration and ConversationLogger consume, ensuring uniform log output across the subsystem.  
 
-4. **Potential Persistence – MilestoneManager**  
-   Though not directly coupled, *MilestoneManager* may consume the milestone data that *ProjectMilestoneManager* receives from Specstory and persist it using a *SharedMemoryStore*‑like mechanism.  This indirect integration highlights a data‑flow pipeline: Specstory → Adapter → Integration → Manager → Store.
+4. **Sibling – RetryMechanism**: Supplies retry policies (delay intervals, max attempts). The adapter’s retry loop is a concrete application of this shared policy.  
+
+5. **Child – ConversationLogger**: Receives the logger instance and writes each conversation turn. It may also expose methods for retrieving logged conversations for analytics or debugging.  
+
+All dependencies are explicit: the adapter imports `createLogger` from `logging/Logger.js`; the retry logic is either internal or imported from the **RetryMechanism** sibling. No hidden or implicit couplings are inferred from the observations.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate through the parent** – Developers should let *ProjectMilestoneManager* own the lifecycle of *SpecstoryIntegration*.  Directly creating a `new SpecstoryAdapter()` outside the manager risks divergent configuration (e.g., mismatched auth providers).  
+* **Instantiate the logger first** – Always call `createLogger()` from `logging/Logger.js` before constructing the **SpecstoryAdapter**. Pass the returned logger into the adapter (and subsequently into **ConversationLogger**) to guarantee that all logs share the same context and formatting.  
 
-* **Configure authentication once** – The ProviderFallbackConfig‑style credentials should be defined in a central configuration file (e.g., `config/provider-fallback.json`).  Adding or reordering providers must be done deliberately, as the adapter will iterate them in order on every request.  
+* **Prefer the adapter’s public API** – Consumers such as **ConnectionManager** should only call `SpecstoryAdapter.connectViaHTTP()`. The underlying transport selection (HTTP, IPC, file watch) is handled internally; attempting to bypass the adapter would break the flexibility guarantee.  
 
-* **Prefer event‑driven updates** – Instead of polling the Specstory API, register a callback via `subscribeToChanges`.  This leverages the EventDrivenPipeline‑style mechanism and reduces network overhead while keeping milestones fresh.  
+* **Respect the retry contract** – The built‑in retry mechanism will automatically retry transient errors. Do not implement additional retries around `connectViaHTTP` unless you have a very specific need, as this could lead to exponential back‑off explosion.  
 
-* **Handle normalized errors** – All adapter errors surface as `SpecstoryError`.  Consumers (e.g., *ProjectMilestoneManager*) should catch this type and implement retry or fallback logic rather than inspecting raw HTTP responses.  
+* **Handle errors centrally** – Errors emitted by the adapter are already logged via the shared logger. Higher‑level components should listen for failure callbacks or promise rejections and decide on user‑visible actions (e.g., display a “connection lost” banner) rather than re‑logging the same error.  
 
-* **Do not modify the adapter for domain logic** – Keep business rules inside *ProjectMilestoneManager* or *MilestoneTracker*.  The adapter’s responsibility is strictly transport, authentication, and event translation.  This separation simplifies testing and future replacement of the Specstory extension.
+* **Leverage ConversationLogger for audit** – When persisting conversation data, use the child **ConversationLogger** rather than writing directly to files or databases. This ensures the same logger configuration and future‑proofs the component against changes in logging format.  
+
+* **Testing considerations** – Because the adapter abstracts transport mechanisms, unit tests can mock the HTTP, IPC, or file‑watch layers while still exercising the retry logic and logger interactions.  
 
 ---
 
 ### Architectural patterns identified  
 
-* **Adapter Pattern** – `SpecstoryAdapter` abstracts external API details.  
-* **ProviderFallbackConfig‑style authentication** – configuration‑driven credential fallback.  
-* **EventDrivenPipeline pattern** – callback/event subscription for real‑time updates.  
+1. **Adapter pattern** – `SpecstoryAdapter` abstracts multiple transport mechanisms behind a single interface.  
+2. **Factory pattern** – `createLogger` produces logger instances on demand.  
+3. **Retry (Resilience) pattern** – Built‑in retry loop in `connectViaHTTP` (potentially shared via the **RetryMechanism** sibling).  
 
 ### Design decisions and trade‑offs  
 
-* **Single adapter instance** – promotes consistency but introduces a single point of failure; mitigated by fallback auth providers.  
-* **Event‑driven vs. polling** – event model reduces latency and load but requires reliable push support from Specstory; fallback polling could be added if needed.  
-* **Separation of integration and persistence** – keeps the adapter lightweight; however, it adds an extra layer (ProjectMilestoneManager) that must coordinate data flow to MilestoneManager.  
+* **Flexibility vs. Complexity** – Supporting HTTP, IPC, and file‑watch in one adapter adds code paths but yields a single integration point for callers.  
+* **Embedded retry vs. external policy** – Placing retry logic inside `connectViaHTTP` simplifies caller code but couples the adapter to a specific retry strategy; sharing a common **RetryMechanism** mitigates this coupling.  
+* **Centralised logging** – Using a shared logger reduces duplication and ensures consistent diagnostics, at the cost of a single point of configuration that must be kept up‑to‑date.  
 
 ### System structure insights  
 
-The system is organized around a clear vertical slice: *ProjectMilestoneManager* (domain) → *SpecstoryIntegration* (facade) → `SpecstoryAdapter` (transport).  Siblings share the transport layer, while persistence lives in a separate slice (*MilestoneManager* with a *SharedMemoryStore*‑like approach).  This modular layering supports independent evolution of external integration and internal storage.  
+* The hierarchy is clean: **Trajectory → SpecstoryIntegration → ConversationLogger**, with parallel siblings handling connection orchestration, logging, and retry policy.  
+* All communication to the external Specstory extension funnels through **SpecstoryAdapter**, making it the natural place for future transport extensions (e.g., WebSocket).  
 
 ### Scalability considerations  
 
-* **Authentication fallback** scales horizontally because each adapter instance resolves credentials locally without a central lock.  
-* **Event‑driven updates** scale well as the number of milestones grows; the adapter merely forwards events rather than iterating over large collections.  
-* **Potential bottleneck** – if many components subscribe to the same Specstory event stream, the underlying connection could become saturated; a multiplexing strategy or shared event bus may be required.  
+* **Connection scalability** – Because the adapter encapsulates transport selection, scaling to multiple concurrent connections would involve instantiating multiple adapter instances, each with its own logger context.  
+* **Logging throughput** – Centralising logs via `createLogger` means the logger must be capable of handling the combined volume from both connection error logs and conversation entries; configuring asynchronous log sinks (e.g., rotating files, external log services) would be advisable as load grows.  
 
 ### Maintainability assessment  
 
-The use of an explicit adapter class isolates external changes, making upgrades to the Specstory API a matter of updating `lib/integrations/specstory-adapter.js`.  The ProviderFallbackConfig‑style auth configuration centralizes credential management, reducing the risk of scattered secrets.  Event‑driven callbacks keep the domain layer decoupled from transport timing, simplifying unit testing (mocks can emit events).  Overall, the design promotes high maintainability, provided that the adapter remains the sole gatekeeper to the Specstory extension and that configuration files are version‑controlled alongside code.
+* **High cohesion** – Each component (adapter, logger, conversation logger) has a single, well‑defined responsibility, facilitating isolated changes.  
+* **Explicit dependencies** – File‑level imports (`logging/Logger.js`, `lib/integrations/specstory-adapter.js`) make the dependency graph transparent, aiding impact analysis.  
+* **Potential coupling** – The retry logic being inside the adapter could become a maintenance hotspot if retry policies need to evolve; extracting it fully into the **RetryMechanism** sibling would improve modularity.  
+
+Overall, SpecstoryIntegration exhibits a pragmatic, resilience‑focused design that balances flexibility with straightforward, well‑documented interactions across its parent, sibling, and child entities.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage project milestones.
+- [Trajectory](./Trajectory.md) -- The SpecstoryAdapter in lib/integrations/specstory-adapter.js plays a crucial role in connecting to the Specstory extension, utilizing HTTP, IPC, or file watch mechanisms to ensure a stable and flexible connection. This adaptability is key to the component's design, allowing it to work seamlessly across different environments and setups. For instance, the connectViaHTTP method implements a retry mechanism to handle transient errors, showcasing the component's robustness and ability to recover from temporary connectivity issues. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance for the SpecstoryAdapter, which is vital for logging conversation entries and reporting any errors that may occur during the connection process.
+
+### Children
+- [ConversationLogger](./ConversationLogger.md) -- The createLogger function from logging/Logger.js is used to establish a logger instance for logging conversation entries and reporting errors.
 
 ### Siblings
-- [MilestoneTracker](./MilestoneTracker.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to connect to the Specstory extension, enabling the MilestoneTracker to manage project milestones.
-- [MilestoneManager](./MilestoneManager.md) -- The MilestoneManager may utilize a data storage mechanism, such as a database or file system, to persist project milestone information, similar to the SharedMemoryStore pattern.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager utilizes the SpecstoryAdapter's connectViaHTTP method to establish a connection to the Specstory extension.
+- [Logger](./Logger.md) -- The createLogger function from logging/Logger.js is used to establish a logger instance for logging conversation entries and reporting errors.
+- [RetryMechanism](./RetryMechanism.md) -- The connectViaHTTP method in the SpecstoryAdapter implements a retry mechanism to handle transient errors.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

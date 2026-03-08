@@ -1,58 +1,122 @@
 # RetryMechanism
 
-**Type:** Detail
+**Type:** SubComponent
 
-The use of exponential backoff in the retry mechanism implies a design decision to balance between retrying failed services and avoiding overwhelming the system with repeated attempts.
+The RetryMechanism is responsible for handling retry logic, including determining the number of retries and the retry interval.
 
 ## What It Is  
 
-The **RetryMechanism** lives inside the `ServiceStarter.py` module, which is the parent component responsible for launching services.  Within this file the ServiceStarter sub‑component invokes a retry mechanism that employs **exponential backoff** to cope with transient failures that can occur when a service is started.  Although the source code does not expose concrete class or function names, the observation that “ServiceStarter contains RetryMechanism” makes it clear that the retry logic is packaged as a distinct, reusable entity that the ServiceStarter calls whenever a start‑up attempt fails.  Its purpose is singular: to repeatedly attempt a service start while progressively increasing the wait interval, thereby giving the underlying system time to recover without overwhelming it with rapid-fire retries.
+The **RetryMechanism** is a sub‑component that lives inside the **Trajectory** component and is responsible for the retry logic used when the `SpecstoryAdapter` attempts to open a connection to the Specstory extension. The concrete entry point for this logic is the `connectViaHTTP` method defined in `lib/integrations/specstory-adapter.js`. Whenever that method encounters a transient error, it delegates the decision‑making (how many attempts to make, how long to wait between attempts) to the `RetryMechanism`. The mechanism also pulls in a logger instance created by `createLogger` from `logging/Logger.js` so that every retry attempt, success, or failure is recorded. Internally the mechanism owns a **RetryPolicy** object that encapsulates the concrete policy (maximum retries, back‑off interval, etc.).  
 
-## Architecture and Design  
-
-From the limited evidence the architecture follows a **Retry‑with‑Exponential‑Backoff** pattern.  The parent component `ServiceStarter` acts as the orchestrator, delegating the responsibility of handling start‑up failures to the **RetryMechanism**.  This separation of concerns is a classic *strategy*‑like design: the ServiceStarter does not embed retry logic directly but instead composes it, allowing the backoff strategy to be swapped or tuned independently.  Interaction is straightforward – ServiceStarter detects a failure condition, invokes the retry mechanism, and the mechanism returns either a successful start signal or a final failure after exhausting its retry budget.  Because the mechanism is housed in the same file (`ServiceStarter.py`), the coupling is tight enough for easy access but logically isolated, preserving a clean boundary between service orchestration and resilience handling.
-
-## Implementation Details  
-
-The implementation hinges on **exponential backoff**.  When ServiceStarter catches a transient start exception, it likely calls a function (e.g., `retry_start`) that internally tracks the number of attempts.  After each failed attempt the wait time is multiplied by a factor (commonly 2), producing a series such as 1 s, 2 s, 4 s, 8 s, etc., up to a configurable maximum delay or retry count.  The mechanism probably respects a ceiling to prevent unbounded waiting and may include jitter to avoid thundering‑herd effects, although jitter is not explicitly mentioned in the observations.  Because the observations note that “the retry mechanism is a key aspect of the ServiceStarter's functionality,” we can infer that the retry loop is tightly integrated with ServiceStarter’s start‑up workflow, possibly wrapping the actual service launch call inside a `while` loop that breaks on success or when the retry budget is exhausted.
-
-## Integration Points  
-
-**RetryMechanism** is invoked exclusively by its parent, **ServiceStarter**, and therefore its public interface is likely a single entry point such as `execute_with_retry(callable, *args, **kwargs)`.  The only external dependency evident from the observations is the service start routine itself, which the retry mechanism treats as a black‑box operation to be re‑executed.  No sibling components are mentioned, so the retry logic does not appear to be shared across other parts of the system; its encapsulation inside `ServiceStarter.py` suggests a local integration scope.  If other components later need similar resilience, they would either import the same module or replicate the pattern, but the current design keeps the coupling limited to ServiceStarter.
-
-## Usage Guidelines  
-
-Developers adding new services to the system should rely on ServiceStarter’s built‑in retry capability rather than implementing ad‑hoc loops.  When invoking ServiceStarter, ensure that any exceptions raised by the service’s start routine are *transient* (e.g., network timeouts, temporary resource contention) so that the exponential backoff strategy remains appropriate.  If a service is expected to require a longer stabilization period, consider configuring the retry mechanism’s maximum attempts or backoff ceiling—these values are presumably exposed as parameters in the ServiceStarter configuration.  Avoid disabling the retry mechanism; doing so would forfeit the protective “balance between retrying failed services and avoiding overwhelming the system” that the design intentionally provides.
+In short, `RetryMechanism` is the reusable, environment‑agnostic engine that turns a flaky HTTP handshake into a stable, recoverable operation, keeping the rest of the system (e.g., `SpecstoryIntegration`, `ConnectionManager`) insulated from transient network glitches.
 
 ---
 
-### Architectural patterns identified  
-* **Retry‑with‑Exponential‑Backoff** – a resilience pattern that spaces out repeated attempts.  
-* Implicit **Strategy/Composition** – ServiceStarter composes the RetryMechanism rather than hard‑coding retry logic.
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Exponential backoff** trades faster recovery (short intervals) for system stability (longer intervals after repeated failures).  
-* Keeping the mechanism within `ServiceStarter.py` simplifies access but limits reuse across unrelated modules.
+The architecture follows a **composition‑based separation of concerns**. `Trajectory` aggregates a `RetryMechanism`, which in turn **contains** a `RetryPolicy`. This hierarchy makes the retry behaviour pluggable: the policy can be swapped or tuned without touching the surrounding connection code.  
 
-### System structure insights  
-* The system is organized around a clear parent‑child relationship: `ServiceStarter` → `RetryMechanism`.  
-* Retry logic is isolated enough to be understood independently yet remains tightly coupled to the service start workflow.
+The design also demonstrates **dependency injection** for logging. Rather than hard‑coding a logger, the mechanism imports `createLogger` from `logging/Logger.js` and obtains a logger instance at runtime. This mirrors the pattern used by sibling components such as `SpecstoryIntegration` and `ConnectionManager`, which also rely on the same logger factory, ensuring a consistent logging surface across the integration layer.  
 
-### Scalability considerations  
-* Exponential backoff inherently throttles retry traffic, which helps the system scale under bursty failure conditions.  
-* If many services are started concurrently, the backoff schedule prevents a cascade of simultaneous retries that could saturate resources.
+Interaction flow:  
 
-### Maintainability assessment  
-* Encapsulating retry behavior in a dedicated mechanism improves maintainability: changes to backoff parameters or the retry loop affect only one location.  
-* The lack of explicit class or function names in the current codebase may hinder discoverability; documenting the entry point (e.g., `execute_with_retry`) would further aid future developers.
+1. `ConnectionManager` calls `SpecstoryAdapter.connectViaHTTP` (found in `lib/integrations/specstory-adapter.js`).  
+2. On a transient error, `connectViaHTTP` invokes the `RetryMechanism`.  
+3. `RetryMechanism` consults its `RetryPolicy` to decide whether another attempt is allowed and what the next delay should be.  
+4. Each attempt and its outcome are logged via the logger created from `logging/Logger.js`.  
+
+This layered interaction isolates **retry decision logic** from **transport logic**, making the system easier to reason about and test.
+
+---
+
+## Implementation Details  
+
+* **Entry point** – `connectViaHTTP` (in `lib/integrations/specstory-adapter.js`) contains a try/catch block that catches transient network exceptions. Inside the catch, it forwards control to the `RetryMechanism`.  
+
+* **RetryMechanism** – Although the source file is not listed, the observations make clear that the class (or module) exposes at least two configurable knobs: *number of retries* and *retry interval*. These values are read from its embedded `RetryPolicy`. The mechanism likely exposes a method such as `execute(fn)` or `runWithRetry(fn)` that receives the original HTTP call as a callback and wraps it in a loop governed by the policy.  
+
+* **RetryPolicy** – As a child component, `RetryPolicy` encapsulates the concrete numbers (e.g., `maxAttempts = 3`, `initialDelayMs = 200`). The policy may also provide a simple back‑off strategy (linear or fixed) because the observations only mention “retry interval” without specifying exponential growth.  
+
+* **Logging** – Both the mechanism and the adapter import `createLogger` from `logging/Logger.js`. The logger is used to emit events such as “retry attempt #n”, “retry succeeded”, and “retry exhausted”. This mirrors the logging approach used by `SpecstoryIntegration` and `Logger` sibling components, ensuring that all retry‑related telemetry appears in the same log stream.  
+
+* **Flexibility** – Because the mechanism does not hard‑code any environment‑specific details (e.g., HTTP vs. IPC vs. file‑watch), it can be reused by any part of the system that needs retry behaviour. The only required contract is a callable that may throw a transient error, which the mechanism will re‑invoke according to the policy.
+
+---
+
+## Integration Points  
+
+* **Parent – Trajectory** – `Trajectory` owns the `RetryMechanism`, meaning any higher‑level workflow that lives inside `Trajectory` can invoke retry‑aware operations without re‑implementing the logic.  
+
+* **Sibling – ConnectionManager** – `ConnectionManager` relies on the `SpecstoryAdapter.connectViaHTTP` method, which in turn delegates to the `RetryMechanism`. Thus, `ConnectionManager` indirectly benefits from the retry policy without needing to know its internals.  
+
+* **Sibling – SpecstoryIntegration** – While `SpecstoryIntegration` also uses the same logger (`createLogger`), it does not directly call the retry mechanism. However, the shared logger creates a unified observability surface for both connection establishment and higher‑level integration events.  
+
+* **Child – RetryPolicy** – The policy object is the concrete configuration point. Changing the policy (e.g., increasing `maxAttempts` for a high‑latency environment) instantly alters the behaviour of the entire retry stack.  
+
+* **External – logging/Logger.js** – The only external dependency is the logger factory. By centralising logging, the mechanism can be swapped into other environments (e.g., test harnesses) that provide a mock logger, facilitating unit testing.  
+
+* **Potential Extension – Other Transport Methods** – Because the mechanism is agnostic to the transport, future adapters (e.g., IPC or file‑watch) could reuse the same `RetryMechanism` simply by passing their own connection function.
+
+---
+
+## Usage Guidelines  
+
+1. **Configure a RetryPolicy** – Before invoking any connection routine, instantiate a `RetryPolicy` with appropriate `maxRetries` and `retryIntervalMs`. Pass this policy to the `RetryMechanism` constructor (or setter) so the mechanism knows its limits.  
+
+2. **Wrap the Call** – Use the mechanism’s public method (e.g., `runWithRetry`) to execute the actual HTTP call. Do **not** embed retry loops inside `connectViaHTTP`; let the mechanism own that responsibility.  
+
+3. **Log Consistently** – Rely on the logger obtained from `createLogger` for all retry‑related messages. Follow the same log‑level conventions used by `SpecstoryIntegration` and `ConnectionManager` (e.g., `info` for each attempt, `warn` when a retry is about to happen, `error` when the policy is exhausted).  
+
+4. **Handle Exhaustion** – After the `RetryMechanism` reports that the policy is exhausted, propagate a clear, domain‑specific error up to `ConnectionManager` so the rest of the system can decide whether to abort, fallback, or alert the user.  
+
+5. **Testing** – When writing unit tests for components that depend on the retry logic, inject a mock `RetryPolicy` with a low `maxRetries` and a zero `retryIntervalMs` to keep tests fast. Mock the logger from `logging/Logger.js` to verify that retry events are emitted as expected.  
+
+---
+
+### Architectural Patterns Identified  
+
+* **Composition over Inheritance** – `Trajectory` composes a `RetryMechanism`; `RetryMechanism` composes a `RetryPolicy`.  
+* **Dependency Injection** – Logger instance is injected via `createLogger`; policy can be injected into the mechanism.  
+* **Separation of Concerns** – Transport logic (`connectViaHTTP`) is separated from retry decision logic (`RetryMechanism`).  
+
+### Design Decisions & Trade‑offs  
+
+* **Flexibility vs. Simplicity** – By keeping the retry logic generic (no hard‑coded transport), the mechanism can be reused across HTTP, IPC, or file‑watch. The trade‑off is that more complex back‑off strategies (e.g., jitter) must be added explicitly to the policy if needed.  
+* **Centralised Logging** – Using a shared logger simplifies observability but creates a single point of failure if the logger initialization fails; however, the system already treats logging as non‑critical (errors still surface via exceptions).  
+
+### System Structure Insights  
+
+* The retry stack sits **between** the low‑level adapter (`SpecstoryAdapter`) and the higher‑level orchestration (`Trajectory`).  
+* Sibling components (`SpecstoryIntegration`, `ConnectionManager`, `Logger`) all converge on the same logging infrastructure, indicating a deliberate consistency strategy across the integration layer.  
+
+### Scalability Considerations  
+
+* Because the retry logic is decoupled from the transport, scaling the number of concurrent connections (e.g., many parallel HTTP calls) does not increase the complexity of the retry code. Each call can obtain its own `RetryMechanism` instance or share a stateless implementation, keeping memory overhead minimal.  
+* The only scalability bottleneck could be the logger if it performs synchronous I/O; however, this is a shared concern across all siblings and can be mitigated by configuring asynchronous logging in `logging/Logger.js`.  
+
+### Maintainability Assessment  
+
+* **High maintainability** – The clear separation (adapter ↔ retry ↔ policy) makes each piece independently testable and replaceable.  
+* **Ease of updates** – Adjusting retry behaviour only requires changing the `RetryPolicy` configuration; no modifications to `SpecstoryAdapter` or `Trajectory` are needed.  
+* **Documentation alignment** – The observations already map the component hierarchy (Trajectory → RetryMechanism → RetryPolicy), which aids future developers in locating the relevant code.  
+
+Overall, the **RetryMechanism** embodies a well‑encapsulated, flexible retry engine that strengthens the stability of the Specstory integration while remaining easy to configure, test, and extend.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes a retry mechanism with exponential backoff in ServiceStarter.py, handling transient service start failures
+- [Trajectory](./Trajectory.md) -- The SpecstoryAdapter in lib/integrations/specstory-adapter.js plays a crucial role in connecting to the Specstory extension, utilizing HTTP, IPC, or file watch mechanisms to ensure a stable and flexible connection. This adaptability is key to the component's design, allowing it to work seamlessly across different environments and setups. For instance, the connectViaHTTP method implements a retry mechanism to handle transient errors, showcasing the component's robustness and ability to recover from temporary connectivity issues. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance for the SpecstoryAdapter, which is vital for logging conversation entries and reporting any errors that may occur during the connection process.
+
+### Children
+- [RetryPolicy](./RetryPolicy.md) -- The parent context suggests a retry mechanism with a limited number of retries, implying a RetryPolicy is in place to govern this behavior.
+
+### Siblings
+- [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryIntegration utilizes the createLogger function from logging/Logger.js to establish a logger instance for logging conversation entries and reporting errors.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager utilizes the SpecstoryAdapter's connectViaHTTP method to establish a connection to the Specstory extension.
+- [Logger](./Logger.md) -- The createLogger function from logging/Logger.js is used to establish a logger instance for logging conversation entries and reporting errors.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
