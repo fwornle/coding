@@ -70,12 +70,13 @@ Plans:
   2. Running the pipeline twice on the same codebase does not create duplicate entities -- dedup operator with fuzzy name matching merges them
   3. The merge operator preserves parentId during entity merging (no null-coalesce overwrites that break hierarchy)
   4. Aggregation and prediction operators produce derived metadata (e.g., importance scores, relationship predictions) visible on entities
-**Plans:** 3/3 plans complete
+**Plans:** 4 plans (3 complete + 1 gap closure)
 
 Plans:
 - [ ] 10-01-PLAN.md -- Embedding infrastructure: Python script, batch generateEmbeddings(), mergeEntities hierarchy fix
 - [ ] 10-02-PLAN.md -- Operator logic fixes: hierarchy-aware dedup, cross-branch edge prediction, conv adaptation
 - [ ] 10-03-PLAN.md -- Wave-controller integration: wire all 6 operators, Dockerfile update, end-to-end verification
+- [ ] 10-04-PLAN.md -- Gap closure: persist operator-enriched fields, preserve ontology metadata, SSE progress flush
 
 #### Phase 11: Content Quality Gate
 **Goal**: Every agent output passes through content validation and QA review before persistence, with the coordinator able to reject and retry outputs that fail quality checks
