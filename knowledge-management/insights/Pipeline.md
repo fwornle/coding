@@ -2,87 +2,123 @@
 
 **Type:** SubComponent
 
-The persistence agent in the Pipeline utilizes the PersistenceAgent.mapEntityToSharedMemory() function to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
+The batch processing pipeline is defined in the batch-analysis.yaml file, which declares the steps and their dependencies using the depends_on edges.
 
 ## What It Is  
 
-The **Pipeline** sub‑component lives inside the *SemanticAnalysis* code‑base under the path `integrations/mcp-server-semantic-analysis/src/agents/`.  Its orchestration logic is defined in `batch‑analysis.yaml`, where a coordinator agent drives batch processing using a **directed‑acyclic‑graph (DAG)** model.  Individual agents – observation‑generation, KG‑operators, deduplication, and persistence – are each implemented in their own TypeScript files (`observation-generation-agent.ts`, `kg-operators.ts`, `deduplication-agent.ts`, `base-agent.ts`), and they all share the common entry point `BaseAgent.execute()`.
+The **Pipeline** sub‑component lives in the batch‑analysis portion of the code base and is orchestrated from the file **`batch-analysis.yaml`**. This YAML manifest declares each processing step and the explicit `depends_on` edges that form a directed‑acyclic graph (DAG). At runtime the **`PipelineAgent`** class (found in **`pipeline-agent.ts`**) reads this manifest and drives execution by performing a topological sort over the DAG. The pipeline’s purpose is to take raw input data, turn it into structured observations, enrich those observations with knowledge‑graph operations, de‑duplicate the result set, and finally persist the clean observations for downstream analysis. The concrete processing stages are implemented by the following classes:
 
-The Pipeline’s purpose is to transform raw input data into structured knowledge‑graph entities, remove duplicates, enrich those entities with ontology metadata, and finally persist the results for downstream consumption (e.g., the InsightGenerationAgent).  Because it is a child of the broader **SemanticAnalysis** component, it inherits the same modular philosophy that the sibling agents (OntologyClassificationAgent, InsightGenerationAgent, AgentManager) use: each agent is self‑contained, configurable, and invoked through a standardized `execute` contract.
+* **`ObservationGeneration`** – `observation-generation.ts`  
+* **`KGOperator`** – `kg-operator.ts`  
+* **`Deduplication`** – `deduplication.ts`  
+* **`PersistenceAgent`** – `persistence-agent.ts`  
 
-## Architecture and Design  
-
-The Pipeline adopts a **modular, agent‑centric architecture**.  The coordinator agent reads the DAG description from `batch‑analysis.yaml` and performs a **topological sort** to determine a safe execution order.  This design isolates concerns: every node in the DAG corresponds to a concrete agent class, and the coordinator merely sequences them without embedding business logic.  
-
-Interaction between agents follows a **pipeline pattern** where the output of one agent becomes the input of the next.  For example, the *ObservationGenerationAgent* calls `generateObservations` (in `observation-generation-agent.ts`) to produce raw observations, which are then handed to the *KGOperators* (implemented in `kg-operators.ts`) for graph‑based enrichment such as entity resolution.  The *DeduplicationAgent* (in `deduplication-agent.ts`) applies a **hash‑based deduplication strategy** to the enriched entities, and finally the *PersistenceAgent* invokes `PersistenceAgent.mapEntityToSharedMemory()` to cache ontology metadata and avoid redundant LLM re‑classification.  
-
-All agents inherit from `BaseAgent` (`base-agent.ts`).  Its `execute` method supplies a **standardized interface** (initialization, input validation, error handling) that guarantees consistency across the Pipeline and its siblings.  Because the same base class is used by the OntologyClassificationAgent, InsightGenerationAgent, and AgentManager, the system enjoys a uniform lifecycle and can be extended by adding new agents that simply plug into the existing DAG.
-
-## Implementation Details  
-
-* **Coordinator Agent & DAG Execution** – The coordinator parses `batch‑analysis.yaml`, builds an in‑memory representation of the DAG, and runs a topological sort algorithm.  The sorted list dictates the order in which each agent’s `execute` method is called, guaranteeing that dependencies are satisfied (e.g., KG operations run after observations are generated).  
-
-* **ObservationGenerationAgent** – Located in `observation-generation-agent.ts`, the core function `generateObservations(input)` iterates over the raw payload, extracts salient features, and emits a collection of `Observation` objects.  These objects conform to an internal schema that downstream agents understand, eliminating the need for ad‑hoc transformation code.  
-
-* **KG Operators** – Implemented in `kg-operators.ts`, this module wraps the **knowledge‑graph library**.  Functions such as `resolveEntities(observations)` and `extractRelationships(observations)` perform graph traversals, entity linking, and relationship inference.  The operators return enriched entities that carry both the original observation data and newly discovered graph connections.  
-
-* **DeduplicationAgent** – In `deduplication-agent.ts`, the agent computes a deterministic hash for each entity (typically a combination of canonical identifiers and content fingerprints).  Entities sharing the same hash are collapsed, ensuring that only unique entities proceed to persistence.  This hash‑based approach is deterministic, fast, and scales linearly with the number of entities.  
-
-* **PersistenceAgent** – The method `PersistenceAgent.mapEntityToSharedMemory(entity)` (found in the same file as the base agent) writes enriched entities into a shared‑memory cache that holds ontology metadata.  By pre‑populating these fields, the Pipeline prevents the large language model (LLM) from re‑classifying already‑known concepts, reducing latency and API costs.  
-
-* **BaseAgent.execute()** – Every agent overrides `execute(context)` defined in `base-agent.ts`.  The base implementation handles common concerns: loading configuration, injecting dependencies (e.g., the KG library), logging, and propagating errors up the call stack.  This uniform contract simplifies testing because each agent can be invoked in isolation with a mock context.
-
-## Integration Points  
-
-The Pipeline sits at the heart of **SemanticAnalysis**.  Its output—deduplicated, graph‑enriched entities stored in shared memory—is consumed by the **InsightGenerationAgent** (sibling under *Insights*) to produce higher‑level insights.  Conversely, the **OntologyClassificationAgent** (sibling under *Ontology*) may provide classification rules that the KG operators consult when resolving entities.  The **AgentManager** (sibling under *AgentManagement*) is responsible for instantiating the Pipeline’s agents, loading their configuration files, and injecting shared services such as logging and telemetry.  
-
-External dependencies include the **knowledge‑graph library** (imported by `kg-operators.ts`) and any LLM services that the PersistenceAgent avoids re‑invoking.  The DAG definition file `batch‑analysis.yaml` acts as a declarative contract between the coordinator and the agents, allowing operators to modify the pipeline flow without touching code.  All agents communicate via plain JavaScript/TypeScript objects passed through the `execute` chain, keeping the integration surface minimal and type‑safe.
-
-## Usage Guidelines  
-
-1. **Define the DAG declaratively** – Always edit `batch‑analysis.yaml` to add, remove, or reorder agents.  Ensure the graph remains acyclic; the coordinator will reject cyclic definitions at start‑up.  
-2. **Implement agents by extending `BaseAgent`** – New agents should inherit from `BaseAgent` and override only the domain‑specific `execute` logic.  Reuse the base class’s configuration loading and error handling to stay consistent with existing agents.  
-3. **Leverage the shared‑memory cache** – When adding new metadata fields, update `PersistenceAgent.mapEntityToSharedMemory` so that downstream LLM calls can skip redundant classification.  This preserves the performance gains observed in the current Pipeline.  
-4. **Maintain hash determinism** – If the deduplication strategy is altered, keep the hash function deterministic across runs; otherwise, duplicate detection may become flaky, leading to inflated storage and downstream processing.  
-5. **Test agents in isolation** – Because each agent is a self‑contained module, unit tests should mock the input context and verify that the `execute` method respects the contract (returns enriched entities, logs appropriately, propagates errors).  Integration tests can validate the full DAG execution using a small sample `batch‑analysis.yaml`.  
+Together they form a linear‑ish but dependency‑aware batch workflow that feeds the higher‑level **SemanticAnalysis** component (its parent) with ready‑to‑use observations.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Modular agent‑centric architecture** – each functional piece is an independent agent.  
-* **Pipeline/DAG orchestration** – topological‑sorted execution based on `batch‑analysis.yaml`.  
-* **Template method (BaseAgent)** – `execute` provides a fixed skeleton with hook points for concrete agents.  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **DAG over linear pipeline** – enables flexible ordering and parallelism but requires careful acyclicity checks.  
-* **Hash‑based deduplication** – fast and deterministic, but relies on a good hash design; collisions could cause false positives.  
-* **Shared‑memory metadata caching** – reduces LLM calls and latency, at the cost of additional memory usage and cache‑coherency considerations.  
+The architecture follows a **pipeline‑oriented, DAG‑driven execution model**. The manifest (`batch-analysis.yaml`) is the single source of truth for step ordering, allowing the pipeline to be re‑configured without code changes. The **`PipelineAgent`** embodies the **Pipeline pattern**: it interprets the manifest, constructs an in‑memory DAG, and executes each node once all its predecessor nodes have completed. The topological sort guarantees that cyclic dependencies are impossible, which is a deliberate design decision to keep the execution model deterministic and safe for batch jobs.
 
-### 3. System structure insights  
-* The Pipeline is a child of **SemanticAnalysis**, inheriting its modular configuration approach.  
-* Sibling agents (OntologyClassificationAgent, InsightGenerationAgent, AgentManager) share the same `BaseAgent` contract, promoting uniform lifecycle management.  
-* The DAG file (`batch‑analysis.yaml`) acts as the sole declarative integration point, decoupling orchestration from implementation.  
+Each processing stage is encapsulated in its own class, reflecting a **separation‑of‑concerns** design. `ObservationGeneration` focuses solely on translating raw input into observation objects based on the ontology definitions, while `KGOperator` applies knowledge‑graph transformations (e.g., linking, inference) to those observations. `Deduplication` removes redundant entries, and `PersistenceAgent` writes the final payload into a shared memory store used by other components such as **InsightGenerator** (a sibling under the *Insights* component). This modular decomposition enables independent evolution of each stage and simplifies testing.
 
-### 4. Scalability considerations  
-* **Horizontal scaling** – because agents are independent, they can be instantiated in multiple worker processes or containers, each processing a slice of the DAG.  
-* **Deduplication throughput** – hash computation is O(1) per entity, so the deduplication step scales linearly with input size.  
-* **Knowledge‑graph operations** – performance depends on the underlying KG library; large graphs may require sharding or caching strategies.  
+Interaction between components is explicit and interface‑driven: each class exposes a method (e.g., `process()`) that accepts and returns a typed collection of observations. The pipeline glue code in `pipeline-agent.ts` invokes these methods in the order dictated by the DAG. Because the pipeline is defined declaratively, adding a new step (for example, a future **Enrichment** stage) only requires updating the YAML file and providing a corresponding implementation class—no changes to the core agent logic are needed.
 
-### 5. Maintainability assessment  
-The strict separation of concerns, the single entry point `BaseAgent.execute`, and the declarative DAG make the Pipeline highly maintainable.  Adding or swapping agents only requires updating `batch‑analysis.yaml` and providing a new class that extends `BaseAgent`.  The reuse of patterns across siblings (Ontology, Insights, AgentManagement) further reduces cognitive load for developers familiar with the SemanticAnalysis ecosystem.
+---
+
+## Implementation Details  
+
+**`batch-analysis.yaml`** – The YAML file lists steps such as `observation_generation`, `kg_operator`, `deduplication`, and `persistence`. Each entry contains a `depends_on` array that the **`PipelineAgent`** parses to build adjacency lists for the DAG. Example fragment:
+
+```yaml
+steps:
+  observation_generation:
+    depends_on: []
+  kg_operator:
+    depends_on: [observation_generation]
+  deduplication:
+    depends_on: [kg_operator]
+  persistence:
+    depends_on: [deduplication]
+```
+
+**`pipeline-agent.ts`** – The `PipelineAgent` class reads the manifest, validates that the graph is acyclic, and then performs a topological sort (e.g., Kahn’s algorithm). It stores a mapping from step names to the concrete class constructors (`ObservationGeneration`, `KGOperator`, etc.). During execution it iterates over the sorted list, instantiating each class (or re‑using a singleton if appropriate) and invoking its `process(observations)` method, passing forward the observation collection produced by the previous step.
+
+**`observation-generation.ts`** – `ObservationGeneration` consumes raw input payloads and leverages the ontology definitions supplied by the **Ontology** sibling (`OntologyDefinition` class). It creates observation objects that embed semantic tags derived from the upper and lower ontology layers. The class is deliberately stateless, making it easy to run in parallel if the upstream data source is sharded.
+
+**`kg-operator.ts`** – `KGOperator` receives the observations and applies knowledge‑graph operations such as entity linking, relationship inference, and property propagation. It interacts with the knowledge‑graph layer (not detailed in the observations) through a well‑defined API, ensuring that graph mutations remain isolated from the rest of the pipeline.
+
+**`deduplication.ts`** – `Deduplication` implements a deterministic duplicate‑removal algorithm, typically based on a hash of the observation’s canonical representation. By performing this step before persistence, the pipeline avoids unnecessary storage bloat and downstream re‑processing.
+
+**`persistence-agent.ts`** – `PersistenceAgent` writes the final, deduplicated observation set into a shared memory store that is later consumed by the **SemanticAnalysis** component and the **InsightGenerator** sibling. The persistence logic abstracts the underlying storage mechanism (e.g., in‑memory cache, Redis, or a file‑based store) behind a simple `save(observations)` method.
+
+All classes follow a **single‑responsibility** principle, expose clear input/output contracts, and are deliberately lightweight to keep the batch job’s memory footprint modest.
+
+---
+
+## Integration Points  
+
+The **Pipeline** sub‑component sits directly under **SemanticAnalysis**. The **OntologyClassificationAgent** (found in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) supplies the ontology configuration that `ObservationGeneration` consumes, establishing a tight coupling between the ontology definitions and the observation creation step. Configuration data is loaded by the sibling **ConfigurationManagement** component via `ConfigurationLoader` (`configuration-loader.ts`), which the pipeline agents use to obtain runtime parameters such as batch size, retry limits, or external service endpoints.
+
+After the pipeline finishes, the persisted observations become the input for the **Insights** sibling, specifically the `InsightGenerator` class (`insight-generator.ts`). This downstream consumer reads from the same shared memory store that `PersistenceAgent` writes to, enabling a clean hand‑off without additional transformation layers.
+
+The **LLMIntegration** sibling (`LLMClient` in `llm-client.ts`) does not directly participate in the batch pipeline, but the observations produced by the pipeline can be fed into language‑model prompts for higher‑level reasoning, illustrating a potential extension point.
+
+Overall, the pipeline’s dependencies are limited to configuration loading, ontology definitions, and the shared memory abstraction, keeping its external surface area small and well‑defined.
+
+---
+
+## Usage Guidelines  
+
+1. **Declare Steps Declaratively** – Always add, remove, or reorder processing stages by editing `batch-analysis.yaml`. Ensure that each new step’s `depends_on` list accurately reflects its true data dependencies; the DAG validation in `PipelineAgent` will reject cycles or missing references.
+
+2. **Stateless Stage Implementations** – Implement new stage classes as pure functions of their input observations. Avoid retaining mutable global state; this preserves the ability of `PipelineAgent` to instantiate stages on demand and facilitates parallel execution in the future.
+
+3. **Leverage ConfigurationLoader** – Retrieve any runtime parameters (e.g., thresholds, external service URLs) through the `ConfigurationLoader` API rather than hard‑coding values. This keeps the pipeline flexible across environments and aligns with the configuration‑centric approach used by the parent **SemanticAnalysis** component.
+
+4. **Respect Ontology Contracts** – When extending `ObservationGeneration`, use the ontology structures defined by `OntologyDefinition`. Changing the ontology schema without updating the generation logic will lead to mismatched observations and downstream failures in `KGOperator` or `InsightGenerator`.
+
+5. **Test at the DAG Level** – Unit‑test each stage in isolation, but also include integration tests that load a miniature `batch-analysis.yaml` and run the full `PipelineAgent` to verify that topological ordering and data flow behave as expected.
+
+6. **Monitor Persistence** – Verify that `PersistenceAgent` successfully writes to the shared memory store; any failure here will block downstream Insight generation. Implement retry logic or health checks if the underlying store is external.
+
+Following these conventions ensures that the pipeline remains predictable, extensible, and easy to maintain.
+
+---
+
+### Architectural patterns identified  
+* **Pipeline pattern** driven by a declarative DAG manifest.  
+* **Topological sort** for deterministic execution order.  
+* **Separation of concerns / Single‑responsibility** across stage classes.  
+
+### Design decisions and trade‑offs  
+* **Declarative YAML configuration** trades compile‑time safety for runtime flexibility; changes require only manifest edits, but invalid DAGs are only caught at start‑up.  
+* **Stateless stage classes** simplify testing and scaling but may require explicit passing of context that could otherwise be shared.  
+* **In‑process DAG execution** keeps latency low for batch jobs but does not inherently provide distributed execution; scaling out would need additional orchestration.  
+
+### System structure insights  
+The pipeline forms a linear chain of dependent stages under the broader **SemanticAnalysis** hierarchy, with clear upstream (ontology, configuration) and downstream (insight generation) boundaries. Sibling components share common utilities (configuration loader) but remain loosely coupled through well‑defined data contracts (observations).  
+
+### Scalability considerations  
+Because each stage processes collections of observations, horizontal scaling can be achieved by sharding the input data and running multiple independent pipeline instances, each with its own DAG execution. The current design does not embed a distributed scheduler, so adding one would be a future enhancement. The DAG‑based ordering guarantees that parallelism respects data dependencies.  
+
+### Maintainability assessment  
+The clear separation of responsibilities, minimal coupling to external services, and the use of a single configuration source make the pipeline highly maintainable. Adding new functionality generally requires only a new class and a YAML entry, avoiding modifications to existing logic. The primary maintenance burden lies in keeping the DAG definition accurate and ensuring that ontology changes propagate correctly through `ObservationGeneration`. Regular integration tests that execute the full DAG will catch regressions early.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic. For instance, the OntologyClassificationAgent has its own configuration file (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) that defines its behavior and dependencies. This modular approach allows for easier maintenance and extension of the agents, as each agent can be developed and tested independently. The execute method in the base-agent.ts file (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serves as the entry point for each agent's execution, providing a standardized interface for agent interactions.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, utilizes a configuration file to initialize the ontology system. This configuration file is crucial for the agent's functionality, as it provides the necessary information for classifying observations against the ontology. The agent's reliance on this configuration file highlights the importance of proper configuration management in the SemanticAnalysis component. Furthermore, the use of a configuration file allows for flexibility and ease of modification, as changes to the ontology system can be made by updating the configuration file without requiring modifications to the agent's code.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to define its behavior and dependencies.
-- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
-- [AgentManagement](./AgentManagement.md) -- The AgentManager utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts to define its behavior and dependencies.
+- [Ontology](./Ontology.md) -- The OntologyDefinition class in ontology-definition.ts defines the upper and lower ontology structures.
+- [Insights](./Insights.md) -- The InsightGenerator class in insight-generator.ts generates insights based on the processed observations.
+- [LLMIntegration](./LLMIntegration.md) -- The LLMClient class in llm-client.ts provides a provider-agnostic interface for interacting with language models.
+- [ConfigurationManagement](./ConfigurationManagement.md) -- The ConfigurationLoader class in configuration-loader.ts loads the configuration files and provides an interface for accessing the configuration data.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

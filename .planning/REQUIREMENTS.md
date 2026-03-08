@@ -63,6 +63,20 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 - [ ] **OBSV-03**: Trace modal displays model info (which LLM, provider)
 - [ ] **OBSV-04**: Trace modal shows data flow — what went in/out of each agent to diagnose information loss
 
+### Code Graph Integration
+
+- [ ] **CGR-01**: Code-graph-rag (CGR) wired into wave pipeline as code-evidence source for entity observations
+- [ ] **CGR-02**: Wave agents query CGR for call graphs, dependencies, and code snippets relevant to each entity
+- [ ] **CGR-03**: CGR evidence attached to entities as code-grounded observations (not just LLM-generated text)
+- [ ] **CGR-04**: CGR index refreshed automatically at wave1_init before analysis begins
+
+### Documentation Generation
+
+- [ ] **DOC-01**: Docs agent generates PlantUML diagrams (.puml) for architectural entities (Component, SubComponent)
+- [ ] **DOC-02**: PlantUML diagrams compiled to PNG and embedded in entity insight markdown documents
+- [ ] **DOC-03**: Constraint agent validates pipeline outputs before persistence (content quality, naming, observation count)
+- [ ] **DOC-04**: Generated documentation includes entity relationships, hierarchy context, and cross-references
+
 ## Future Requirements
 
 ### VKB Navigation (v2.2)
@@ -138,10 +152,19 @@ Which phases cover which requirements.
 | OBSV-03 | Phase 12 | Pending |
 | OBSV-04 | Phase 12 | Pending |
 
+| CGR-01 | Phase 13 | Pending |
+| CGR-02 | Phase 13 | Pending |
+| CGR-03 | Phase 13 | Pending |
+| CGR-04 | Phase 13 | Pending |
+| DOC-01 | Phase 14 | Pending |
+| DOC-02 | Phase 14 | Pending |
+| DOC-03 | Phase 14 | Pending |
+| DOC-04 | Phase 14 | Pending |
+
 **Coverage:**
-- v2.1 requirements: 19 total
-- Mapped to phases: 19
+- v2.1 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0
 
 ---
-*Last updated: 2026-03-07 after v2.1 roadmap creation*
+*Last updated: 2026-03-08 after adding phases 13-14*

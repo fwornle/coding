@@ -2,102 +2,98 @@
 
 **Type:** SubComponent
 
-ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
+The connectViaHTTP method in lib/integrations/specstory-adapter.js uses a specific backoff strategy to handle connection failures, ensuring efficient reconnection attempts.
 
 ## What It Is  
 
-`ConnectionManager` is a **sub‑component** that lives inside the **Trajectory** component.  Its implementation is tied to the integration layer found at `lib/integrations/specstory-adapter.js`, where it consumes the **SpecstoryAdapter** class to open a communication channel with the external **Specstory** browser extension.  The manager’s sole responsibility is to **oversee all connection methods** required by the Trajectory system, providing a single, reusable entry point for establishing, maintaining, and tearing down that link.  By encapsulating the connection logic in a dedicated class, the rest of the codebase (e.g., `SpecstoryConnector`, `ErrorManager`, `DataFormatter`) can remain agnostic of the low‑level details of how the Specstory extension is reached.
+**ConnectionManager** is a sub‑component that lives inside the *Trajectory* component. Its implementation is centred in the file **`lib/integrations/specstory-adapter.js`**, where the **`SpecstoryAdapter`** class houses the core logic. Within this class the **`connectViaHTTP`** method embodies the ConnectionManager’s responsibility: providing a flexible, retry‑aware way to establish a link to the Specstory extension. The sub‑component also owns the **`HTTPConnectionHandler`** child, which encapsulates the low‑level HTTP‑specific handling required by the manager.
 
 ## Architecture and Design  
 
-The observed design follows a **modular component architecture** where each logical concern is isolated into its own class or sub‑component.  `ConnectionManager` acts as a **facade** for the underlying `SpecstoryAdapter`, exposing a simplified API for other parts of the system while hiding the adapter’s intricacies.  This façade pattern is reinforced by the fact that sibling components such as `SpecstoryConnector` also depend on the same adapter, demonstrating **shared reusable infrastructure**.
+The architecture exposed by the observations is deliberately **modular**. *Trajectory* delegates all Specstory‑related communication to the **SpecstoryAdapter**, and the **ConnectionManager** sits as a thin orchestration layer that selects among the available connection strategies (HTTP, IPC, file‑watch). This is an instance of the **Facade** style: the ConnectionManager presents a single, unified interface while the underlying **SpecstoryAdapter** hides the complexity of the multiple protocols.
 
-The component embraces **asynchronous programming** as a core design principle.  Initialization of the connection is performed with `async` functions and **Promises**, guaranteeing that the operation does not block the event loop.  This non‑blocking behavior aligns with the broader Trajectory pattern, where the `initialize` method in the parent component also returns a promise to allow concurrent start‑up of multiple subsystems.
+A key design pattern that surfaces is the **retry‑with‑backoff** strategy. The `connectViaHTTP` method implements this pattern explicitly, using a backoff algorithm to space out reconnection attempts after a failure. This pattern is also reflected in the sibling **RetryMechanism** component, which shares the same backoff logic, reinforcing a consistent error‑recovery approach across the system.
 
-Error handling is deliberately **delegated** to the `ErrorManager` sub‑component.  Rather than embedding try‑catch logic inside the connection code, `ConnectionManager` forwards exceptions to `ErrorManager`, which centralises logging and recovery strategies.  Likewise, data that must be sent to Specstory is first passed through the `DataFormatter` sub‑component, ensuring that every payload conforms to the extension’s schema before transmission.  This separation of concerns yields a clean, testable architecture.
+Flexibility is achieved through **Strategy‑like** separation of connection methods. Although not named as a formal Strategy pattern in the source, the existence of distinct connection pathways (HTTP, IPC, file‑watch) that can be chosen at runtime gives the system the ability to adapt to different deployment environments without altering the higher‑level logic.
 
 ## Implementation Details  
 
-At the heart of the implementation is the **SpecstoryAdapter** class located in `lib/integrations/specstory-adapter.js`.  `ConnectionManager` creates an instance of this adapter and invokes its connection‑establishment methods (e.g., `connect()`, `disconnect()`).  The manager’s public API likely includes an `async initialize()` method that returns a promise, mirroring the pattern described for the parent `Trajectory` component.  Inside `initialize`, the manager:
+The heart of the ConnectionManager is the **`SpecstoryAdapter`** class in `lib/integrations/specstory-adapter.js`. Within this class:
 
-1. Instantiates `SpecstoryAdapter`.
-2. Calls the adapter’s async connection routine.
-3. Awaits the result, allowing the event loop to continue processing other tasks.
-4. On success, stores the active connection handle for later reuse.
-5. Catches any thrown errors and forwards them to `ErrorManager.handleConnectionError(error)`.
+* **`connectViaHTTP`** – Implements the retry‑with‑backoff algorithm. On each attempt it tries to open an HTTP channel to the Specstory extension; if the attempt fails, it waits for a backoff interval that grows (typically exponentially) before retrying. This ensures the component can survive transient network glitches while avoiding tight retry loops that could overwhelm the network or the remote service.
 
-Because the manager also utilizes `DataFormatter`, any outbound data is first handed to `DataFormatter.formatForSpecstory(payload)` before the adapter transmits it.  This ensures strict adherence to Specstory’s expected data shape and reduces the likelihood of runtime protocol errors.
+* **Unified Interface** – The adapter exposes a single entry point for all connection types, allowing callers (including the **ConnectionManager** and its child **HTTPConnectionHandler**) to invoke the same high‑level method regardless of the underlying transport. This reduces coupling between the manager and the specifics of each protocol.
 
-The component’s **promise‑based workflow** enables concurrent execution of multiple connection attempts or parallel initialisation of other subsystems (e.g., `SpecstoryConnector`).  By returning a promise, callers can `await ConnectionManager.initialize()` or attach `.then()`/`.catch()` handlers, integrating seamlessly with the rest of the asynchronous system.
+* **`HTTPConnectionHandler`** – As a child component, it encapsulates the low‑level details of constructing HTTP requests, handling responses, and exposing the result back to the manager. The handler relies on the retry‑with‑backoff logic supplied by `connectViaHTTP`, meaning it does not implement its own retry loop but delegates to the shared mechanism.
+
+The sibling **LoggingMechanism** interacts with the same `SpecstoryAdapter` via the `logConversation` method (also defined in `specstory-adapter.js`). This shared usage demonstrates that the adapter is a central hub not only for connectivity but also for ancillary services such as logging.
 
 ## Integration Points  
 
-`ConnectionManager` sits at the intersection of three major integration pathways:
+* **Parent – Trajectory**: Trajectory contains the ConnectionManager and therefore depends on the manager’s ability to reliably open a channel to the Specstory extension. Trajectory’s higher‑level workflows invoke the manager’s public API, trusting the unified interface to select the appropriate connection method.
 
-* **SpecstoryAdapter (`lib/integrations/specstory-adapter.js`)** – the low‑level bridge to the external Specstory extension.  All raw socket or messaging calls are funneled through this adapter.
-* **ErrorManager** – receives any connection‑related exceptions.  The manager invokes `ErrorManager.logConnectionError(error)` (or a similarly named method) to centralise diagnostics.
-* **DataFormatter** – formats outbound data before it reaches the adapter, guaranteeing compliance with Specstory’s protocol.
+* **Sibling – LoggingMechanism**: Uses `logConversation` on the same `SpecstoryAdapter`. Because both logging and connection share the adapter, any change to the adapter’s error‑handling (e.g., a modification to the backoff algorithm) will uniformly affect both connection reliability and logging robustness.
 
-Beyond these direct dependencies, `ConnectionManager` is consumed by its **parent component**, `Trajectory`, which orchestrates the overall lifecycle of the system.  Sibling components such as `SpecstoryConnector` also rely on the same `SpecstoryAdapter`, meaning that any change to the adapter’s contract will ripple through both the connector and the manager.  Conversely, `ErrorManager` itself uses `ConnectionManager` to log errors that occur during connection attempts, creating a bidirectional relationship that reinforces consistent error handling across the module.
+* **Sibling – RetryMechanism**: Mirrors the backoff strategy used in `connectViaHTTP`. The two components likely share configuration (e.g., max retries, backoff factor) to keep retry behaviour consistent throughout the system.
+
+* **Child – HTTPConnectionHandler**: Directly called by the ConnectionManager when an HTTP connection is required. It receives the retry policy from `connectViaHTTP` and performs the actual socket/HTTP request work.
+
+All of these integration points are confined to the `lib/integrations/specstory-adapter.js` file, making the module a clear boundary for external interactions.
 
 ## Usage Guidelines  
 
-1. **Initialize Asynchronously** – Always call `await ConnectionManager.initialize()` (or handle the returned promise) during the start‑up phase of `Trajectory`.  This guarantees that the connection is ready before any dependent operation runs, while still allowing other asynchronous initialisations to proceed in parallel.  
+1. **Prefer the Unified Interface** – Callers should interact with the ConnectionManager through the high‑level methods exposed by `SpecstoryAdapter` rather than invoking protocol‑specific code directly. This guarantees that the retry‑with‑backoff logic and any future connection strategies are applied automatically.
 
-2. **Do Not Bypass the Facade** – Direct interaction with `SpecstoryAdapter` from other components defeats the encapsulation purpose of `ConnectionManager`.  Use the manager’s public methods for all connection‑related actions (e.g., `connect()`, `disconnect()`, `send(payload)`).  
+2. **Do Not Re‑Implement Retries** – Because the retry‑with‑backoff pattern is already encapsulated in `connectViaHTTP`, developers should avoid adding duplicate retry loops around the call. Doing so would interfere with the exponential backoff timing and could lead to excessive request traffic.
 
-3. **Delegate Errors** – When catching errors inside custom logic that involves the manager, re‑throw or pass the error to `ErrorManager.handleConnectionError`.  This maintains a single source of truth for logging and recovery.  
+3. **Configure Backoff Consistently** – If the system needs to adjust backoff parameters (max attempts, initial delay, multiplier), the change should be made in the shared configuration used by both ConnectionManager and RetryMechanism. This ensures uniform behaviour across connection and other retry‑sensitive components.
 
-4. **Format Data First** – Before sending any payload through the manager, run it through `DataFormatter.formatForSpecstory`.  The manager assumes the data is already compliant; feeding malformed data can cause silent protocol failures.  
+4. **Leverage HTTPConnectionHandler for Low‑Level Needs** – Only advanced use‑cases that require direct manipulation of HTTP headers or custom request pipelines should reach into `HTTPConnectionHandler`. All standard scenarios should remain at the manager level.
 
-5. **Avoid Long‑Running Synchronous Work** – Because the manager’s methods are promise‑based, inserting heavy synchronous computation inside them will block the event loop and negate the intended concurrency benefits.  Off‑load such work to worker threads or separate async functions.
+5. **Respect the Parent‑Child Contract** – Trajectory expects the ConnectionManager to either succeed in establishing a connection or surface a controlled failure after exhausting retries. Consumers should handle the final error gracefully, possibly falling back to alternative connection methods (IPC or file‑watch) if those are available.
 
 ---
 
-### Architectural Patterns Identified
-* **Modular Component Architecture** – distinct sub‑components (ConnectionManager, ErrorManager, DataFormatter) each own a single responsibility.  
-* **Facade Pattern** – `ConnectionManager` provides a simplified interface over `SpecstoryAdapter`.  
-* **Adapter Pattern** – `SpecstoryAdapter` adapts the external Specstory extension’s API to the internal contract.  
-* **Asynchronous/Promise‑Based Concurrency** – initialization and connection methods return promises.  
+### 1. Architectural patterns identified  
+* **Facade / Unified Interface** – ConnectionManager presents a single API while delegating to multiple connection strategies inside `SpecstoryAdapter`.  
+* **Retry‑with‑Backoff** – Implemented in `connectViaHTTP`; also reflected in the sibling RetryMechanism.  
+* **Strategy‑like separation of connection methods** – Multiple protocols (HTTP, IPC, file‑watch) selectable at runtime.
 
-### Design Decisions & Trade‑offs
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Centralised `ConnectionManager` | Encapsulates all connection logic, promotes reuse across siblings. | Adds an extra indirection layer; potential bottleneck if a single instance handles many concurrent connections. |
-| Async `initialize` returning a Promise | Non‑blocking start‑up, aligns with Trajectory’s async model. | Requires callers to handle promises correctly; error propagation must be explicit. |
-| Delegating errors to `ErrorManager` | Keeps connection code clean, consolidates logging/recovery. | Error handling becomes distributed; developers must remember to forward errors. |
-| Using `DataFormatter` before transmission | Guarantees protocol compliance, isolates formatting rules. | Slight performance overhead for formatting step; must keep formatter in sync with Specstory spec. |
+### 2. Design decisions and trade‑offs  
+* **Centralising connection logic** in `SpecstoryAdapter` simplifies usage but creates a single point of failure; however, the built‑in retry mitigates transient failures.  
+* **Choosing retry‑with‑backoff** balances resilience against network hiccups with the risk of delayed failure reporting; the exponential growth prevents overload but may increase latency for persistent failures.  
+* **Exposing a unified interface** reduces coupling for callers (Trajectory, LoggingMechanism) but limits fine‑grained control for specialized scenarios unless the child `HTTPConnectionHandler` is used directly.
 
-### System Structure Insights
-* **Parent‑Child Relationship:** `Trajectory` owns `ConnectionManager`, orchestrating its life‑cycle alongside other subsystems.  
-* **Sibling Collaboration:** `SpecstoryConnector`, `ConversationLogger`, `DataFormatter`, and `TrajectoryInitializer` all share the same `SpecstoryAdapter`, indicating a common integration contract.  
-* **Bidirectional Dependency:** `ErrorManager` both consumes and is consumed by `ConnectionManager`, forming a feedback loop for robust error reporting.  
+### 3. System structure insights  
+* The hierarchy is **Trajectory → ConnectionManager → HTTPConnectionHandler**, with the `SpecstoryAdapter` acting as the shared implementation host.  
+* Sibling components (LoggingMechanism, RetryMechanism) interact with the same adapter, reinforcing a tightly coupled but cohesive module boundary.  
+* The lack of separate files for each connection type suggests a deliberately compact design focused on ease of maintenance.
 
-### Scalability Considerations
-* The promise‑based, non‑blocking design allows multiple connection attempts to run in parallel, supporting scaling to many simultaneous Specstory sessions.  
-* However, a single `ConnectionManager` instance could become a contention point under heavy load; future scaling might involve pooling multiple managers or sharding connections per user/session.  
-* The reliance on `SpecstoryAdapter` means that any performance limits in the underlying adapter (e.g., browser‑extension messaging latency) will directly affect overall scalability.  
+### 4. Scalability considerations  
+* Because the retry logic is local to each connection attempt, scaling the number of concurrent connections does not introduce additional coordination overhead.  
+* The exponential backoff inherently throttles reconnection storms, which is beneficial when many instances of Trajectory experience a simultaneous outage.  
+* Adding new connection strategies (e.g., WebSocket) would fit naturally into the existing unified interface without disrupting current behaviour.
 
-### Maintainability Assessment
-* **High maintainability** thanks to clear separation of concerns: connection logic, error handling, and data formatting are each isolated.  
-* Encapsulation via the façade (`ConnectionManager`) means changes to the adapter or to connection protocols can be made in one place without rippling through the entire codebase.  
-* The explicit async contract and promise returns make the flow easy to test with mock adapters and error managers.  
-* The main risk to maintainability is the tight coupling to `SpecstoryAdapter`; any breaking change in the external extension’s API will necessitate coordinated updates across all sibling components that also depend on the adapter.  Keeping the adapter versioned and well‑documented mitigates this risk.
+### 5. Maintainability assessment  
+* **High maintainability**: All connection‑related code lives in a single, well‑named file (`specstory-adapter.js`), making it easy to locate and modify.  
+* The shared retry implementation reduces duplication, lowering the risk of divergent error‑handling logic.  
+* However, the concentration of multiple responsibilities (connection, logging, retry) in one class could become a maintenance burden if the adapter grows substantially; future refactoring into smaller, purpose‑specific classes may be warranted.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's modular design pattern is evident in its use of classes and objects, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which enables encapsulation and reuse of code. This modularity is further enhanced by the component's asynchronous programming model, which allows for efficient and concurrent execution of tasks. For instance, the initialize method in the Trajectory class utilizes asynchronous programming to initialize the component without blocking other tasks. The use of promises in this method, as seen in the return statement, ensures that the component's initialization is non-blocking and efficient.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is centered around the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which provides a unified interface for interacting with the Specstory extension. This class implements multiple connection methods, including HTTP, IPC, and file watch, allowing for flexibility in how the component connects to the Specstory extension. For example, the connectViaHTTP method in lib/integrations/specstory-adapter.js uses a retry-with-backoff pattern to handle connection failures, ensuring that the component can recover from temporary network issues. The SpecstoryAdapter class also logs conversation entries via the logConversation method, which formats the entries and logs them via the Specstory extension.
+
+### Children
+- [HTTPConnectionHandler](./HTTPConnectionHandler.md) -- The connectViaHTTP method in lib/integrations/specstory-adapter.js implements the retry-with-backoff pattern to handle connection failures.
 
 ### Siblings
-- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the DataFormatter sub-component to format data according to Specstory's requirements
-- [ErrorManager](./ErrorManager.md) -- ErrorManager uses the ConnectionManager sub-component to oversee the connection methods used to log errors
-- [DataFormatter](./DataFormatter.md) -- DataFormatter uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to format data according to Specstory's requirements
-- [TrajectoryInitializer](./TrajectoryInitializer.md) -- TrajectoryInitializer uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to initialize the Trajectory component
+- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism uses the logConversation method in lib/integrations/specstory-adapter.js to format conversation entries and log them via the Specstory extension.
+- [RetryMechanism](./RetryMechanism.md) -- RetryMechanism uses a retry-with-backoff pattern in connectViaHTTP method in lib/integrations/specstory-adapter.js to handle connection failures.
+- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter provides a unified interface for interacting with the Specstory extension, including connection methods and logging.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

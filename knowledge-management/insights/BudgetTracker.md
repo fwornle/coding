@@ -2,117 +2,129 @@
 
 **Type:** SubComponent
 
-To ensure flexibility and scalability, BudgetTracker might be designed with a modular architecture, allowing for the easy addition or removal of budgeting strategies without affecting the core functionality of the LLMAbstraction component.
+The BudgetTracker sub-component is designed to support multiple modes, including the mock provider in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, which allows for testing and development without incurring actual costs.
 
 ## What It Is  
 
-**BudgetTracker** is a sub‑component of the **LLMAbstraction** layer that is responsible for enforcing monetary limits on the use of Large‑Language‑Model (LLM) providers.  The component lives alongside its siblings **ProviderRegistry** (`lib/llm/provider-registry.js`) and **LLMService** (`lib/llm/llm-service.ts`).  Although no concrete source files for BudgetTracker are listed, the observations make clear that it is tightly coupled to the provider registry (to obtain the list of registered providers and their cost metadata) and is consumed by the high‑level façade provided by `LLMService`.  Its primary duties are to maintain per‑provider budget constraints, perform fast look‑ups/updates (likely via a hash‑map‑like structure), and emit notifications when a budget threshold is approached or exceeded.
+The **BudgetTracker** sub‑component lives inside the LLM abstraction layer and is responsible for monitoring and controlling the monetary spend of Large‑Language‑Model (LLM) calls. Its core implementation is spread across a handful of concrete files:  
+
+* `lib/llm/llm-service.ts` – the façade that exposes budget‑related operations to the rest of the system.  
+* `lib/llm/providers/anthropic-provider.ts` – a concrete provider‑specific class that implements the `BudgetTracker` interface for Anthropic.  
+* `lib/llm/providers/dmr-provider.ts` – another provider‑specific implementation, this time for the DMR service.  
+* `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` – a mock provider used in integration tests and local development, exercising the same BudgetTracker contract without incurring real costs.  
+
+Together these files give the system a **provider‑agnostic** way to fetch the current budget, cache it, and react when the budget limit is reached. The sub‑component is a child of the higher‑level **LLMAbstraction** component, which itself coordinates multiple LLM‑related siblings such as **SensitivityClassifier**, **ProviderManager**, and **MODEngine**. All of those siblings also rely on the façade in `llm-service.ts`, which means BudgetTracker shares the same entry point and lifecycle as the rest of the LLM stack.
 
 ---
 
 ## Architecture and Design  
 
-The design of **BudgetTracker** follows a **modular, registry‑driven** architecture.  By relying on **ProviderRegistry** (`lib/llm/provider-registry.js`), BudgetTracker does not need to know the concrete implementation details of each LLM provider; instead it queries the registry for the set of providers and the associated cost information.  This decoupling is an instance of the **Registry pattern**, which the parent **LLMAbstraction** component already uses to manage provider lifecycles.  
+The observations point to three primary architectural choices:
 
-BudgetTracker’s internal bookkeeping is described as a “hash map”‑style data structure that maps a provider identifier to its budget constraint and current spend.  Such a structure gives **O(1)** lookup and update characteristics, which is essential for runtime checks that must happen before each request is dispatched to a provider.  
+1. **Facade Pattern** – `lib/llm/llm-service.ts` acts as a façade, exposing a single, unified API for budget‑related operations (e.g., `getCurrentBudget()`, `registerBudgetExceededCallback()`). This façade hides the diversity of underlying providers (Anthropic, DMR, mock) and allows the rest of the system (including the sibling components) to remain oblivious to provider‑specific details.  
 
-A **notification subsystem** is hinted at, which would raise alerts when a provider’s spend approaches or exceeds its allocated budget.  The observation that this may “leverage the circuit breaking mechanism in the LLMService class” suggests an **integration of cross‑cutting concerns**: the same circuit‑breaker that protects against provider failures can also be triggered by budget violations, providing a unified failure‑handling strategy.  
+2. **Provider‑Specific Implementations** – Each concrete provider (Anthropic, DMR) ships its own class (`AnthropicProvider`, `DMRProvider`) that implements the BudgetTracker contract. The contract is deliberately lightweight: it knows how to query the provider’s billing endpoint, update the cached budget, and fire callbacks when the limit is breached. This design gives the system **extensibility** – new providers can be added by dropping a new class that adheres to the same interface without touching the façade or any sibling component.  
 
-Finally, the comment about “easy addition or removal of budgeting strategies without affecting the core functionality of the LLMAbstraction component” points to a **plug‑in style modularity** within BudgetTracker itself.  Different budgeting policies (e.g., fixed‑budget, rolling‑window, usage‑percentage) could be encapsulated behind a common interface, allowing the parent component to remain agnostic to the specific strategy employed.
+3. **Callback‑Based Notification & Caching** – BudgetTracker uses a callback mechanism to broadcast a “budget exceeded” event to any interested consumer. This is evident from the observation that the class “implements a callback‑based system to notify other components when the budget is exceeded.” The same component also caches the current budget value, reducing the number of remote billing queries and improving performance. The cache lives inside the provider implementation and is refreshed on a configurable interval or on explicit cache‑misses.
+
+The overall interaction flow is:
+
+* A consumer (e.g., **MODEngine**) asks the façade (`llm-service.ts`) for the current budget.  
+* The façade delegates to the active provider implementation (Anthropic, DMR, or mock).  
+* The provider checks its local cache; if stale, it fetches the latest budget from the external service.  
+* If the fetched amount exceeds the configured limit, the provider triggers the registered callbacks.  
+* Callbacks can be registered by any component that needs to react (e.g., abort a request, log an alert, switch to a cheaper model).
+
+Because the façade is shared across siblings, the same budget‑state is visible to **SensitivityClassifier**, **ProviderManager**, and **MODEngine**, ensuring consistent spend enforcement across the whole LLM stack.
 
 ---
 
 ## Implementation Details  
 
-1. **Interaction with ProviderRegistry** – BudgetTracker calls into `ProviderRegistry` (found in `lib/llm/provider-registry.js`) to retrieve the catalog of providers.  The registry likely exposes methods such as `getAllProviders()` or `getProviderCost(providerId)`.  Using this information, BudgetTracker builds its internal map:  
+### Facade (`lib/llm/llm-service.ts`)  
+The file defines a thin wrapper exposing methods such as `getBudget()`, `setBudgetLimit(limit)`, and `onBudgetExceeded(callback)`. Internally it holds a reference to the currently selected provider class (injected at runtime by **ProviderManager**). All budget‑related calls are funneled through this façade, guaranteeing that adding or removing a provider does not ripple through the codebase.
 
-   ```text
-   providerId  → { budgetLimit, spentSoFar, costPerCall }
-   ```  
+### Provider Implementations  
 
-   The map is updated each time a request is made through **LLMService**, ensuring the latest spend is reflected.
+* **Anthropic Provider (`lib/llm/providers/anthropic-provider.ts`)** – Implements the BudgetTracker contract for Anthropic’s billing API. The class contains a private cache field (`private cachedBudget: number | null`) and a method `fetchBudgetFromProvider()` that performs the HTTP request. After a successful fetch, it updates the cache and checks the limit; if the limit is crossed, it invokes the façade‑registered callbacks.  
 
-2. **Hash‑Map‑Like Storage** – The observation that a “hash map” is used implies an in‑memory key/value store (e.g., a plain JavaScript `Map` or a TypeScript `Record`).  This choice provides constant‑time reads and writes, which is critical because budget checks must happen synchronously before a provider call is issued.
+* **DMR Provider (`lib/llm/providers/dmr-provider.ts`)** – Mirrors the Anthropic implementation but targets DMR’s billing endpoint. The observation that “the BudgetTracker sub‑component can be used to track budget for a specific provider” is demonstrated here; the same interface is reused, confirming the sub‑component’s **versatility**.  
 
-3. **Notification / Alert Mechanism** – When a provider’s spend reaches a predefined threshold (e.g., 80 % of the budget), BudgetTracker emits a notification.  The exact channel is not spelled out, but the link to the circuit‑breaker in `LLMService` (`lib/llm/llm-service.ts`) suggests that BudgetTracker may invoke a method like `LLMService.triggerCircuitBreak(providerId, reason)` to halt further calls and propagate the alert upstream.
+* **Mock Provider (`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`)** – Supplies a deterministic, in‑memory budget value (often a high or unlimited amount) and respects the same callback contract. This enables unit and integration tests to run without real API calls or cost accrual.  
 
-4. **Modular Budgeting Strategies** – The design encourages the isolation of budgeting logic.  For example, a “FixedBudgetStrategy” class could implement an interface such as `IBudgetStrategy` with methods `canSpend(providerId, amount)` and `recordSpend(providerId, amount)`.  New strategies could be dropped in without touching the core BudgetTracker map or the surrounding LLMAbstraction component.
+### Callback System  
+Each provider maintains a list of callbacks (`private budgetExceededHandlers: Array<() => void>`). The façade’s `onBudgetExceeded` method simply forwards the supplied handler to the active provider. When the provider’s `checkBudget()` method discovers that `cachedBudget > limit`, it iterates over `budgetExceededHandlers` and executes them synchronously (or asynchronously if the implementation chooses). This design decouples the detection logic from the remediation logic, allowing any component—such as **MODEngine**—to decide how to handle overspend.
 
-5. **Facade Relationship with LLMService** – `LLMService` (`lib/llm/llm-service.ts`) acts as the public façade for all LLM interactions.  It likely calls BudgetTracker as part of its request pipeline: before routing a request to a provider, it asks BudgetTracker whether the call is permissible under the current budget.  If BudgetTracker denies the request, `LLMService` can either fall back to another provider (if one is available) or raise a budget‑exceeded error.
+### Caching Mechanism  
+The cache is refreshed based on either a TTL (time‑to‑live) value or an explicit invalidation request. By storing the most recent budget locally, the system avoids repetitive network calls, which is especially valuable when the provider’s billing endpoint has rate limits or latency concerns. The cache also reduces the probability of false “budget exceeded” alerts caused by transient request failures.
 
 ---
 
 ## Integration Points  
 
-- **ProviderRegistry (`lib/llm/provider-registry.js`)** – The sole source of truth for provider metadata.  BudgetTracker reads the registry to initialise its budget map and to stay synchronized when providers are added or removed.  
+* **Parent – LLMAbstraction** – The parent component aggregates the façade (`llm-service.ts`) and thus indirectly owns the BudgetTracker sub‑component. Any configuration change at the abstraction level (e.g., switching the active provider) propagates down to BudgetTracker through the façade’s provider injection.  
 
-- **LLMService (`lib/llm/llm-service.ts`)** – The consumer of BudgetTracker.  Budget checks are performed inside the request‑handling flow of `LLMService`.  In addition, BudgetTracker’s alerts may be routed through `LLMService`’s existing circuit‑breaker infrastructure, allowing a single failure‑handling path for both provider errors and budget violations.  
+* **Siblings** –  
+  * **SensitivityClassifier**, **ProviderManager**, and **MODEngine** all import `lib/llm/llm-service.ts` to obtain budget information or to register callbacks. For example, **MODEngine** may register a callback that pauses model inference when the budget is exhausted.  
+  * Because the façade is the single source of truth, all siblings see a consistent view of spend, preventing scenarios where one component thinks the budget is available while another already throttles.  
 
-- **LLMAbstraction (parent component)** – BudgetTracker is a child of LLMAbstraction, meaning that any configuration or lifecycle management performed at the abstraction level (e.g., enabling/disabling budgeting globally) will cascade to BudgetTracker.  Because BudgetTracker is modular, the parent can swap budgeting strategies without needing to modify provider‑registration code.  
+* **External Consumers** – Any module that needs to enforce cost limits (e.g., a rate‑limiting middleware, an audit logger) can call `llm-service.ts`’s `onBudgetExceeded` to be notified. The mock provider ensures that during CI/CD pipelines the same hooks fire without real monetary impact.  
 
-- **Potential Notification Channels** – While not explicitly defined, the observation of a “notification system” implies that BudgetTracker may expose an event emitter or callback registration API that other parts of the system (monitoring dashboards, logging services) can subscribe to.
+* **Configuration** – Provider selection and budget limits are likely supplied via environment variables or a central config file read by **ProviderManager**. Changing the active provider merely swaps the concrete class used by the façade, leaving the rest of the system untouched.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Register Providers Before Budgeting** – Ensure that all desired LLM providers are registered in `ProviderRegistry` prior to initializing BudgetTracker.  Missing providers will not have budget entries and could cause runtime errors when `LLMService` queries the budget map.  
+1. **Never bypass the façade** – All budget queries and registrations must go through `lib/llm/llm-service.ts`. Directly invoking provider‑specific methods defeats the provider‑agnostic contract and makes future migrations harder.  
 
-2. **Define Budget Constraints Explicitly** – When configuring BudgetTracker, supply a clear budget limit for each provider (e.g., in USD per month).  The hash‑map implementation expects a numeric limit; ambiguous or missing values will break the `canSpend` check.  
+2. **Register callbacks early** – Components that need to react to a budget breach (e.g., **MODEngine**) should register their handlers during initialization, ideally before any LLM request is issued. This guarantees that overspend events are not missed.  
 
-3. **Prefer the Facade (`LLMService`) for Calls** – All LLM interactions should go through `LLMService`.  Directly invoking providers bypasses BudgetTracker’s checks and defeats the budgeting guarantees.  
+3. **Respect the cache** – The provider’s cache is authoritative for a short period. If an operation requires the *most up‑to‑date* budget (e.g., a high‑value transaction), invoke a cache‑bypass method if one exists (often a `forceRefresh` flag).  
 
-4. **Monitor Budget Alerts** – Subscribe to the notification events (or monitor the circuit‑breaker state) to react to approaching budget limits.  Automated actions such as throttling traffic, switching to a cheaper provider, or alerting ops teams should be part of the operational playbook.  
+4. **Use the mock provider for testing** – When writing unit or integration tests, configure the system to use the mock implementation located at `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`. This avoids real charges and provides deterministic budget values.  
 
-5. **Swap Budget Strategies Carefully** – If you need to replace the default budgeting logic with a custom strategy, implement the same interface used by the existing strategy and register it with BudgetTracker.  Test the new strategy in isolation before deploying, as budget mis‑calculations can lead to unexpected service interruptions.  
+5. **Handle callbacks idempotently** – Because the callback list may be invoked multiple times (e.g., if the budget remains exceeded across successive checks), callback implementations should be idempotent or guard against repeated execution.  
+
+6. **Monitor cache TTL** – The default cache TTL should be tuned based on provider response latency and billing update frequency. A TTL that is too long may delay detection of a budget breach; a TTL that is too short may increase request load on the provider’s billing endpoint.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
+* Facade pattern (`llm-service.ts`)  
+* Provider‑specific strategy (individual provider classes implement a common BudgetTracker contract)  
+* Callback/Observer pattern for budget‑exceeded notifications  
+* Caching (in‑memory cache within each provider)
 
-1. **Registry Pattern** – `ProviderRegistry` decouples provider definitions from consumers.  
-2. **Facade Pattern** – `LLMService` provides a unified API that incorporates BudgetTracker.  
-3. **Modular / Plug‑in Architecture** – BudgetTracker’s budgeting strategies can be swapped without touching core logic.  
-4. **Circuit Breaker Integration** – Budget‑exceeded alerts may trigger the same circuit‑breaker used for provider failures.  
+### Design decisions and trade‑offs  
+* **Facade vs. direct calls** – Centralising budget logic in a façade simplifies consumer code but adds an indirection layer; the trade‑off is worth it for provider‑agnostic flexibility.  
+* **Provider‑specific implementations** – Enables optimal use of each provider’s billing API but requires a new class for every new provider, increasing surface area.  
+* **Callback notification** – Decouples detection from remediation, allowing many independent responders, but introduces the need for careful management of handler lifecycles to avoid memory leaks.  
+* **Caching** – Improves performance and reduces external API load, yet introduces a window where the cached budget may be stale; TTL must be chosen wisely.
 
-### Design Decisions & Trade‑offs  
+### System structure insights  
+BudgetTracker sits as a child of **LLMAbstraction**, sharing the same façade (`llm-service.ts`) with sibling components. All LLM‑related functionality (sensitivity classification, provider management, mode execution) relies on the same entry point, guaranteeing a consistent view of budget state across the subsystem. Provider classes are modular plug‑ins that can be swapped by **ProviderManager** without touching the façade or any sibling.
 
-- **Decoupling via Registry** improves maintainability (providers can be added/removed without touching BudgetTracker) but introduces a runtime dependency on the registry being up‑to‑date.  
-- **In‑memory hash‑map storage** offers speed but limits persistence; budget state will be lost on process restart unless an external store is added later.  
-- **Embedding alerts in the circuit‑breaker** reduces the number of failure‑handling paths but couples budgeting logic to fault‑tolerance mechanisms, which could complicate debugging.  
-- **Modular budgeting strategies** increase extensibility but require a well‑defined strategy interface to avoid fragmentation.  
+### Scalability considerations  
+* **Horizontal scaling** – Because each instance holds its own in‑memory cache, a cluster of services will each maintain a copy of the budget value. For strict global spend enforcement, a shared cache (e.g., Redis) could be introduced, but the current design assumes that occasional drift is acceptable.  
+* **Provider addition** – Adding a new LLM provider is a linear effort: implement the BudgetTracker contract and register the class with **ProviderManager**. The façade requires no changes, supporting scalable growth of provider ecosystem.  
+* **Cache invalidation** – With many concurrent requests, the cache TTL must be short enough to reflect rapid spend changes but not so short that it overloads the provider’s billing endpoint.
 
-### System Structure Insights  
-
-- The **LLMAbstraction** component orchestrates three sibling sub‑components: **ProviderRegistry**, **BudgetTracker**, and **LLMService**.  
-- **ProviderRegistry** is the source of provider metadata; **BudgetTracker** consumes that metadata to enforce cost caps; **LLMService** acts as the request‑level façade that consults BudgetTracker before delegating to a concrete provider.  
-- The flow is therefore: *Client → LLMService → BudgetTracker (budget check) → ProviderRegistry (provider lookup) → Provider* (or circuit‑breaker abort).  
-
-### Scalability Considerations  
-
-- Because BudgetTracker’s look‑ups are O(1) via a hash map, the component scales linearly with the number of providers without performance degradation.  
-- Adding new providers only requires updating the registry; the budget map can be populated lazily or during initialization, keeping the scaling impact minimal.  
-- If the system grows to thousands of providers or needs cross‑process budget consistency, the in‑memory map would need to be replaced or supplemented with a distributed cache (e.g., Redis), but that is a future trade‑off not present in the current observations.  
-
-### Maintainability Assessment  
-
-- **High** – The use of a registry isolates provider‑specific changes, and the modular budgeting strategy interface encourages clean separation of concerns.  
-- **Medium** – The reliance on in‑memory state means developers must be aware of process‑restart semantics; documentation should clearly state how budget persistence is handled.  
-- **Low Risk** – Budget alerts are funneled through the existing circuit‑breaker, reducing the need for a separate error‑handling pipeline.  
-
-Overall, BudgetTracker appears to be a well‑encapsulated, registry‑driven budgeting layer that fits cleanly within the **LLMAbstraction** hierarchy, offering fast budget enforcement while remaining extensible for future budgeting policies.
+### Maintainability assessment  
+The clear separation of concerns—facade, provider implementations, and callback handling—makes the sub‑component highly maintainable. The use of explicit file paths and class names (e.g., `anthropic-provider.ts`, `dmr-provider.ts`) provides a straightforward mental map for developers. However, the reliance on in‑process caching means that any change to cache policy requires coordinated updates across all provider classes. The callback registration API should be well‑documented to avoid accidental duplicate handlers. Overall, the design balances extensibility with simplicity, yielding a maintainable budget‑tracking solution within the LLMAbstraction ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a provider registry, implemented in the ProviderRegistry class (lib/llm/provider-registry.js), to manage the registration and initialization of various LLM providers, such as Anthropic and DMR, allowing for easy addition or removal of providers without modifying the underlying code. This approach enables a high degree of flexibility and scalability, as new providers can be integrated by simply registering them with the ProviderRegistry. Furthermore, the use of a registry decouples the providers from the rest of the system, making it easier to develop, test, and maintain individual providers independently. The LLMService class (lib/llm/llm-service.ts) serves as a high-level facade for all LLM operations, incorporating mode routing, caching, and circuit breaking, which helps to abstract away the complexities of provider management and provides a unified interface for interacting with the LLM providers.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes the facade pattern, as seen in the lib/llm/llm-service.ts file, which provides a unified interface for all LLM operations. This design decision allows for provider-agnostic model calls, enabling the addition or removal of providers without affecting the rest of the system. For instance, the Anthropic provider (lib/llm/providers/anthropic-provider.ts) and the DMR provider (lib/llm/providers/dmr-provider.ts) can be easily integrated or removed without modifying the core component. The facade pattern also enables the component to support multiple modes, including the mock provider (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes.
 
 ### Siblings
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry, implemented in lib/llm/provider-registry.js, uses a registry pattern to decouple the management of LLM providers from the rest of the system, facilitating the development, testing, and maintenance of individual providers independently.
-- [LLMService](./LLMService.md) -- LLMService, implemented in lib/llm/llm-service.ts, incorporates mode routing, caching, and circuit breaking to provide a robust and efficient interface for LLM operations, shielding users from the intricacies of provider-specific logic.
+- [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier utilizes the lib/llm/llm-service.ts file to fetch the sensitivity classification for LLM requests, enabling provider-agnostic sensitivity classification.
+- [ProviderManager](./ProviderManager.md) -- ProviderManager utilizes the lib/llm/llm-service.ts file to manage and integrate different LLM providers, enabling provider-agnostic operations.
+- [MODEngine](./MODEngine.md) -- MODEngine utilizes the lib/llm/llm-service.ts file to manage and execute LLM operations in different modes, enabling mode-agnostic operations.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

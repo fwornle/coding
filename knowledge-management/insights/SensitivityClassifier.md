@@ -2,157 +2,92 @@
 
 **Type:** SubComponent
 
-The SensitivityClassifier implements a sensitivity alerting mechanism to notify dependent components of sensitivity-related issues, facilitating prompt action and minimizing data breaches.
+The SensitivityClassifier sub-component is designed to support multiple modes, including the mock provider in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, which allows for testing and development without incurring actual costs.
 
 ## What It Is  
 
-The **SensitivityClassifier** is a sub‑component of the **LLMAbstraction** layer that is responsible for discovering, classifying, and managing information about sensitive data flowing through the system.  Although the source repository does not expose a concrete file path for the classifier itself (the “0 code symbols found” observation), its presence is explicitly referenced in the architecture of **LLMAbstraction** – particularly in the dependency‑injection wiring of `lib/llm/llm‑service.ts`.  The classifier supplies a suite of services that include:
-
-* **Classification** – assigning a sensitivity label to data items.  
-* **Notification & Alerting** – emitting events when sensitivity‑related conditions arise.  
-* **Query Interface** – allowing other components to look up the current sensitivity status of a datum.  
-* **Custom Mechanism Registration** – letting callers plug in their own classification logic.  
-* **Analytics & Auditing** – collecting metrics and audit trails for compliance and optimisation.
-
-Together these capabilities enable downstream components (e.g., the `LLMService`, budget trackers, quota trackers) to make informed decisions about data handling, enforce compliance policies, and react promptly to potential breaches.
-
----
+The **SensitivityClassifier** is a sub‑component that lives inside the *LLMAbstraction* hierarchy and is responsible for determining how sensitive a given LLM request is.  Its core implementation resides in the provider‑specific files **`lib/llm/providers/anthropic-provider.ts`** and **`lib/llm/providers/dmr-provider.ts`**, while the orchestration logic that makes the classifier provider‑agnostic lives in **`lib/llm/llm-service.ts`**.  A mock implementation for development and testing is provided in **`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`**.  The classifier is driven by a machine‑learning model and persists its results in an internal data‑storage mechanism so that downstream components can retrieve classification outcomes for analysis or policy enforcement.
 
 ## Architecture and Design  
 
-### Modular, Plug‑in‑Friendly Structure  
-The parent **LLMAbstraction** component is deliberately modular – its `LLMService` (found in `lib/llm/llm-service.ts`) receives a *sensitivity classifier* via constructor injection.  This design signals a **dependency‑injection** pattern that decouples the classifier from concrete implementations, making it replaceable or extensible without touching the service core.
+The design of **SensitivityClassifier** is anchored in the **facade pattern** as explicitly noted in observation 3.  The file **`lib/llm/llm-service.ts`** acts as the façade, exposing a single, unified API for “classify sensitivity” regardless of which underlying LLM provider is in use.  This façade decouples the rest of the system (e.g., *BudgetTracker*, *ProviderManager*, *MODEngine*) from provider‑specific details, allowing new providers to be added or removed without ripple effects.  
 
-### Strategy‑style Custom Classification  
-Observation 4 notes that the classifier *“supports the registration of custom sensitivity classification mechanisms.”*  This is a textbook **Strategy** pattern: the core classifier defines an interface (e.g., `ISensitivityStrategy`) and external code can supply alternative strategies at runtime.  The registration API acts as the “strategy selector,” allowing the system to adapt to domain‑specific sensitivity rules (PII, PHI, GDPR‑related tags, etc.) without recompiling the classifier.
+Provider‑specific logic lives in the **provider modules** under `lib/llm/providers/`.  Both **`anthropic-provider.ts`** and **`dmr-provider.ts`** contain concrete implementations of a `SensitivityClassifier` class that adhere to the interface expected by the façade.  Because each provider module implements the same contract, the system achieves **provider‑agnostic** behavior while still allowing each vendor to leverage its own API quirks or model endpoints.  
 
-### Observer / Pub‑Sub for Events  
-Both observations 2 and 6 describe a *“sensitivity notification mechanism”* and a *“sensitivity alerting mechanism”* that *“inform dependent components of sensitivity‑related events/issues.”*  The natural fit is an **Observer** (or lightweight Pub‑Sub) pattern: the classifier publishes events (e.g., `SensitiveDataDetected`, `ClassificationChanged`, `AlertThresholdExceeded`) and any component that has registered a listener (budget tracker, quota manager, logging service) receives them asynchronously.  This keeps the classifier’s core logic pure while enabling reactive behaviour elsewhere.
+A **mock mode** is introduced via **`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`** (observation 4).  This mock provider implements the same façade contract but returns deterministic or stubbed classification results, enabling safe testing and development without incurring real LLM costs.  The presence of a mock mode demonstrates an explicit **mode‑support strategy**, where the façade can be swapped at runtime based on configuration.  
 
-### Query Service Interface  
-Observation 3 mentions a *“query interface to retrieve sensitivity data.”*  This is akin to a **Repository** or **Facade** that abstracts the underlying storage (in‑memory map, database, or external policy store).  Callers ask the classifier *“what is the current label for this token?”* and receive a deterministic answer, supporting both synchronous look‑ups (e.g., during request handling) and batch queries (e.g., for analytics).
-
-### Analytics & Auditing Sub‑systems  
-Observations 5 and 7 introduce two orthogonal concerns: **sensitivity analytics** (trend analysis, risk scoring) and **sensitivity auditing** (tamper‑evident logs of classification decisions).  These are likely implemented as separate internal modules that consume the same event stream generated by the notification/alerting system.  By re‑using the same publish channel, the architecture avoids duplication and guarantees that analytics and audit trails are always in sync with the classifier’s decisions.
-
----
+Finally, the classifier incorporates a **data‑storage mechanism** (observation 7) to persist classification outcomes.  While the exact storage technology is not detailed, the existence of this layer indicates a separation between the classification engine and the persistence layer, supporting later analytics or audit requirements.
 
 ## Implementation Details  
 
-Even though the repository does not expose concrete symbols for the classifier, the observations let us infer the following logical pieces:
+At the heart of the classifier is the **`SensitivityClassifier` class** defined in each provider file.  In **`anthropic-provider.ts`**, the class likely implements a method such as `classify(request: LLMRequest): SensitivityResult` that forwards the request to Anthropic’s endpoint, receives a response, and translates it into a structured sensitivity rating.  Observation 5 confirms that the classification uses a **machine‑learning‑based approach**, meaning the provider call probably invokes a model fine‑tuned for sensitivity detection rather than a simple rule‑based check.  
 
-| Concern | Likely Artefact | Role |
-|---------|----------------|------|
-| **Core Engine** | `SensitivityClassifier` class (module location not disclosed) | Holds the classification rules, maintains a map of data identifiers → sensitivity labels, and orchestrates event emission. |
-| **Strategy Registration** | `registerStrategy(name: string, impl: ISensitivityStrategy)` | Stores a lookup table of custom strategies; the engine delegates classification calls to the selected strategy based on configuration or data type. |
-| **Notification System** | `on(event: SensitivityEvent, handler: fn)` / `emit(event: SensitivityEvent, payload)` | Implements the Observer pattern; other components subscribe via the LLM service’s DI container. |
-| **Alerting Layer** | `AlertManager` (internal) | Subscribes to high‑severity events (e.g., “PHI detected in unencrypted channel”) and forwards them to alert sinks (logging, monitoring, or external incident‑response services). |
-| **Query API** | `getSensitivity(id: string): SensitivityLabel` | Provides a synchronous read‑only view of the current classification state. |
-| **Analytics Module** | `SensitivityAnalytics` | Consumes the event stream, aggregates metrics (frequency of each label, time‑to‑remediation), and surfaces dashboards or API endpoints for downstream optimisation. |
-| **Auditing Module** | `SensitivityAuditLog` | Writes immutable audit entries (timestamp, data id, old label, new label, triggering component) to a secure store (e.g., append‑only log or compliance DB). |
+The **`dmr-provider.ts`** file mirrors this structure, showing that the same `SensitivityClassifier` contract can be satisfied by a completely different vendor (DMR).  Both implementations rely on the **facade** in `llm-service.ts` to expose a common method like `getSensitivity(request)`.  The façade internally resolves the appropriate provider based on configuration (e.g., environment variables, runtime flags) and delegates the call.  
 
-All of these pieces are wired into the **LLMAbstraction** dependency graph.  In `lib/llm/llm-service.ts`, the constructor likely resembles:
+The **mock provider** in `llm-mock-service.ts` implements the same interface but bypasses any external ML call.  Instead, it may return a pre‑configured sensitivity level (e.g., “low”) or a deterministic mapping based on request content, which is useful for unit tests and CI pipelines.  
 
-```ts
-export class LLMService {
-  constructor(
-    private readonly budgetTracker: BudgetTracker,
-    private readonly sensitivityClassifier: SensitivityClassifier,
-    private readonly quotaTracker: QuotaTracker,
-    // …other deps
-  ) {}
-}
-```
-
-Thus the service can call `sensitivityClassifier.classify(request.payload)` before invoking the LLM provider, and can also subscribe to `sensitivityClassifier.on('alert', ...)` to react to breaches.
-
----
+After classification, the result is written to a **data storage component**.  While the observation does not name the storage class, the pattern suggests a repository‑style abstraction (e.g., `SensitivityResultRepository.save(result)`) that decouples persistence from classification logic.  This design enables later retrieval for audit logs, compliance checks, or feeding back into model retraining pipelines.
 
 ## Integration Points  
 
-1. **LLMService (parent)** – receives the classifier via DI; uses it to pre‑process prompts, enforce budget limits based on data sensitivity, and to tag outbound responses.  
-2. **BudgetTracker & QuotaTracker (siblings)** – may subscribe to sensitivity alerts to adjust cost‑allocation rules (e.g., higher cost for processing highly sensitive data).  
-3. **ProviderRegistryManager** – does not directly interact with the classifier, but the registry may expose provider‑specific sensitivity capabilities that the classifier can query.  
-4. **MockModeManager** – when generating mock data, it can invoke the classifier’s *query* API to ensure mock payloads respect sensitivity constraints.  
-5. **CachingMechanism** – cached results are likely stored together with their sensitivity metadata, allowing the cache to invalidate entries if the classification changes (driven by the classifier’s audit events).  
-6. **CircuitBreakerManager** – could be configured to trip on repeated sensitivity‑related alerts, preventing a runaway request pattern that repeatedly violates compliance.
+**SensitivityClassifier** is tightly integrated with its parent **LLMAbstraction**.  LLMAbstraction invokes the façade in `llm-service.ts` whenever a request needs a sensitivity check, ensuring that every LLM operation (including those managed by *BudgetTracker*, *ProviderManager*, and *MODEngine*) benefits from consistent classification.  Because the siblings all share the same façade, any change to the classification contract propagates uniformly across budgeting, provider management, and model execution logic.  
 
-The classifier’s **registration API** also opens a pathway for external plugins (e.g., a regulatory‑team‑provided rule set) to be injected without touching any sibling code.
+The classifier depends on two primary external contracts:  
 
----
+1. **LLM Provider SDKs** – each concrete provider (Anthropic, DMR) supplies its own client library, which the provider‑specific `SensitivityClassifier` wraps.  
+2. **Persistence Layer** – the storage mechanism (likely an abstraction over a database or log store) is injected or accessed by the classifier to record results.  
+
+Configuration files or environment settings determine which provider implementation the façade resolves at runtime, allowing seamless switching between real providers and the mock implementation used in integration tests (`integrations/mcp-server-semantic-analysis`).  
 
 ## Usage Guidelines  
 
-* **Inject, Don’t Instantiate** – Always obtain the `SensitivityClassifier` through the LLMAbstraction DI container (as shown in `llm-service.ts`).  Direct construction bypasses registration of observers and custom strategies.  
-* **Register Strategies Early** – Custom classification strategies should be registered during application bootstrap, before any request handling begins, to guarantee deterministic behaviour.  
-* **Subscribe to Events Sparingly** – Only components that need to react to sensitivity changes (budget, alerting, compliance) should attach listeners; unnecessary listeners increase memory pressure and may cause cascading latency.  
-* **Treat the Query API as Read‑Only** – Do not attempt to mutate classification state via the query methods; all changes must flow through the classifier’s `classify` or `updateLabel` functions to ensure audit logging.  
-* **Respect Auditing** – When overriding a label (e.g., after a manual review), ensure the audit module is invoked so that the change is recorded for compliance.  
-* **Performance Considerations** – Classification can be computationally expensive if custom strategies involve external services.  Cache classification results where possible, but invalidate the cache on audit events to avoid stale sensitivity data.  
+1. **Always invoke classification through the façade** (`llm-service.ts`).  Directly calling a provider‑specific `SensitivityClassifier` circumvents the abstraction and makes the code brittle to provider changes.  
+2. **Select the appropriate mode via configuration**.  For local development or CI, set the system to use the mock provider (`llm-mock-service.ts`) to avoid external API calls and cost.  In production, configure the façade to point at the desired real provider (Anthropic or DMR).  
+3. **Persist and retrieve classification results** using the provided storage API.  Do not attempt to write directly to the database; rely on the repository abstraction to maintain consistency and enable future analytics.  
+4. **Handle classification failures gracefully**.  Because the classifier depends on external ML services, network or model errors may occur; callers should fallback to a safe default (e.g., “unknown” or “high”) and log the incident.  
+5. **Do not modify provider‑specific files** unless adding a new vendor.  Extending the system should be done by creating a new provider module that implements the same `SensitivityClassifier` contract, then registering it in the façade’s provider map.
 
 ---
 
-## Architectural Patterns Identified  
+### 1. Architectural patterns identified  
+* **Facade pattern** – `lib/llm/llm-service.ts` provides a unified interface for sensitivity classification.  
+* **Provider (Strategy) pattern** – each concrete provider (`anthropic-provider.ts`, `dmr-provider.ts`) implements the same classifier contract, allowing runtime selection.  
+* **Mock/Stub mode** – a dedicated mock implementation (`llm-mock-service.ts`) enables testing without external calls.  
+* **Repository/Storage abstraction** – classification results are persisted via a data‑storage mechanism separate from the classification logic.
 
-| Pattern | Evidence |
-|---------|----------|
-| Dependency Injection | LLMService receives the classifier via constructor (parent hierarchy description). |
-| Strategy (Pluggable Classification) | Observation 4 – “registration of custom sensitivity classification mechanisms.” |
-| Observer / Pub‑Sub | Observations 2 & 6 – “notification mechanism” and “alerting mechanism.” |
-| Facade / Repository (Query Interface) | Observation 3 – “provides a query interface to retrieve sensitivity data.” |
-| Analytics/Audit Sub‑systems (Separation of Concerns) | Observations 5 & 7 – distinct analytics and auditing mechanisms. |
+### 2. Design decisions and trade‑offs  
+* **Provider‑agnostic façade** simplifies consumer code and eases addition/removal of providers, at the cost of an extra indirection layer.  
+* **Separate mock provider** avoids cost and flakiness in tests, but requires maintaining parity of the mock contract with real providers.  
+* **Machine‑learning‑based classification** yields higher accuracy but introduces dependency on external ML services and potential latency.  
+* **Persisting results** supports auditability and analytics but adds storage overhead and necessitates cleanup/retention policies.
 
----
+### 3. System structure insights  
+* SensitivityClassifier is a child of **LLMAbstraction** and shares the same façade (`llm-service.ts`) with sibling components (*BudgetTracker*, *ProviderManager*, *MODEngine*).  
+* Provider‑specific implementations reside under `lib/llm/providers/`, while the mock lives in the integration test tree, reflecting a clear separation between production and testing code.  
+* The data‑storage layer is likely a shared service used by other sub‑components that need to log LLM‑related metadata.
 
-## Design Decisions and Trade‑offs  
+### 4. Scalability considerations  
+* Adding new providers scales horizontally; the façade’s provider map can be extended without affecting existing consumers.  
+* The mock mode scales trivially for parallel test execution because it does not depend on external services.  
+* Persisted classification results must be stored in a scalable datastore (e.g., a time‑series DB or document store) to handle high request volumes without becoming a bottleneck.  
+* Machine‑learning inference latency can be mitigated by batching requests or caching recent classifications.
 
-* **Extensibility vs. Simplicity** – Allowing custom strategies dramatically increases flexibility (different domains can plug in their own rules) but adds runtime indirection and a larger surface area for bugs.  
-* **Event‑Driven Notification vs. Synchronous Calls** – Publishing events decouples the classifier from downstream components, improving modularity, yet introduces eventual‑consistency semantics; components must tolerate slightly delayed reactions.  
-* **Centralised Auditing vs. Distributed Logging** – A dedicated audit module guarantees a single source of truth for compliance, but it can become a bottleneck if every classification change forces an I/O write.  Batching or async logging may be required.  
-* **Analytics Coupled to Event Stream** – Re‑using the same event bus for analytics avoids duplicate instrumentation, but heavy analytics processing could impact latency unless off‑loaded to a background worker.  
-
----
-
-## System Structure Insights  
-
-* The **LLMAbstraction** layer acts as a composition root, orchestrating several orthogonal concerns (LLM providers, budget, sensitivity, caching).  The **SensitivityClassifier** sits alongside other cross‑cutting services (budget, quota) and is injected wherever needed.  
-* Sibling components share the same DI container, enabling them to cooperate (e.g., the **CachingMechanism** can store sensitivity metadata alongside cached results).  
-* The classifier’s internal modules (strategy registry, event bus, analytics, audit) form a **micro‑kernel** style core that can be extended without altering the outer service façade.  
-
----
-
-## Scalability Considerations  
-
-* **Horizontal Scaling** – Because classification decisions are stateless aside from the strategy registry and possibly a shared rule store, multiple instances of the classifier can run behind a load balancer.  The event bus should be backed by a distributed system (e.g., a message queue) to propagate notifications across instances.  
-* **Cache Warm‑up** – When scaling out, warm the classification cache (or share a distributed cache) to avoid a thundering‑herd of first‑time classifications.  
-* **Analytics Load** – Analytics should be off‑loaded to a streaming pipeline (Kafka, Kinesis) rather than processed synchronously, ensuring that request latency remains low even under heavy traffic.  
-* **Audit Storage** – Audit logs can grow quickly; consider partitioning by time or sensitivity level and using append‑only, immutable storage (e.g., cloud object storage with WORM policies) to keep write throughput high.  
-
----
-
-## Maintainability Assessment  
-
-* **High Modularity** – The clear separation between classification logic, strategy registration, event handling, analytics, and auditing makes the codebase easier to navigate and test.  
-* **Clear Extension Points** – Developers can add new sensitivity rules by implementing a strategy and registering it, without touching the core classifier.  
-* **Potential Coupling via Global Event Bus** – If the event system is a singleton, inadvertent cross‑talk between unrelated modules could arise; documenting event contracts mitigates this risk.  
-* **Lack of Visible Tests/Interfaces** – The observations do not mention unit tests or type definitions; adding a well‑defined TypeScript interface for the classifier (e.g., `ISensitivityClassifier`) would improve compile‑time safety and onboarding.  
-* **Observability** – Because analytics and auditing are built‑in, operators have good visibility into classifier behaviour, which aids debugging and compliance audits.  
-
-Overall, the **SensitivityClassifier** exhibits a thoughtfully layered design that balances flexibility (custom strategies, event‑driven notifications) with the need for strong compliance guarantees (auditing, analytics).  Its integration through dependency injection aligns it tightly with the broader **LLMAbstraction** ecosystem while preserving clear boundaries that support scalability and maintainability.
+### 5. Maintainability assessment  
+* The clear separation of concerns (facade, provider modules, mock, storage) promotes high maintainability; changes in one provider do not ripple to others.  
+* Centralizing the API in `llm-service.ts` ensures a single source of truth for consumers, reducing duplication.  
+* However, the reliance on a consistent contract across providers means that any contract change requires coordinated updates in every provider implementation and the mock.  
+* Documentation of the storage schema and retention policy is essential to avoid drift as the system evolves.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed with modularity in mind, as seen in the separation of concerns between the LLMService (lib/llm/llm-service.ts) and the provider registry (lib/llm/provider-registry.js). This modular design allows for the easy addition or removal of LLM providers, such as Anthropic and DMR, without affecting the core functionality of the component. Furthermore, the use of dependency injection in the LLMService enables the injection of various dependencies, including budget trackers, sensitivity classifiers, and quota trackers, which enhances the flexibility and customizability of the component.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes the facade pattern, as seen in the lib/llm/llm-service.ts file, which provides a unified interface for all LLM operations. This design decision allows for provider-agnostic model calls, enabling the addition or removal of providers without affecting the rest of the system. For instance, the Anthropic provider (lib/llm/providers/anthropic-provider.ts) and the DMR provider (lib/llm/providers/dmr-provider.ts) can be easily integrated or removed without modifying the core component. The facade pattern also enables the component to support multiple modes, including the mock provider (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes.
 
 ### Siblings
-- [LLMServiceProvider](./LLMServiceProvider.md) -- LLMServiceProvider uses dependency injection in lib/llm/llm-service.ts to enable the injection of various dependencies, such as budget trackers and sensitivity classifiers.
-- [ProviderRegistryManager](./ProviderRegistryManager.md) -- The ProviderRegistryManager class in lib/llm/provider-registry.js maintains a registry of available LLM providers, facilitating the addition or removal of providers.
-- [MockModeManager](./MockModeManager.md) -- The MockModeManager utilizes a data generation mechanism to create mock data for testing purposes, reducing the reliance on external services.
-- [CachingMechanism](./CachingMechanism.md) -- The CachingMechanism utilizes a cache storage mechanism to store recent results, reducing the overhead of frequent API calls.
-- [CircuitBreakerManager](./CircuitBreakerManager.md) -- The CircuitBreakerManager utilizes a failure detection mechanism to identify failing services, preventing cascading failures.
-- [BudgetTracker](./BudgetTracker.md) -- The BudgetTracker utilizes a budget tracking mechanism to monitor and report on budget usage, facilitating cost management and optimization.
+- [BudgetTracker](./BudgetTracker.md) -- BudgetTracker utilizes the lib/llm/llm-service.ts file to fetch the current budget for LLM operations, enabling provider-agnostic budget management.
+- [ProviderManager](./ProviderManager.md) -- ProviderManager utilizes the lib/llm/llm-service.ts file to manage and integrate different LLM providers, enabling provider-agnostic operations.
+- [MODEngine](./MODEngine.md) -- MODEngine utilizes the lib/llm/llm-service.ts file to manage and execute LLM operations in different modes, enabling mode-agnostic operations.
 
 
 ---
