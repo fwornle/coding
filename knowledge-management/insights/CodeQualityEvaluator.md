@@ -2,92 +2,90 @@
 
 **Type:** SubComponent
 
-The CodeQualityEvaluator sub-component is configured using the config/code-quality-evaluator-config.json file, which defines the coding standards to be used for evaluation.
+The CodeQualityEvaluator sub-component utilizes the GraphDatabaseManager to manage interactions with the graph database, including data storage and retrieval, to support its code quality evaluation.
 
 ## What It Is  
 
-The **CodeQualityEvaluator** is a sub‑component that lives inside the **CodingPatterns** domain. Its concrete implementation resides in the `lib/llm/llm-service.ts` file, where the `LLMService` class (or a similarly named class) exposes two public methods – `evaluateCodeQuality` and `getCodeQualityScore`. These methods are responsible for analysing a codebase, applying the coding standards defined in `config/code-quality-evaluator-config.json`, and producing a numeric quality score that can be persisted. The evaluator relies on the `graph-database-config.json` file (found in the top‑level `config` directory) to obtain connection details for the underlying graph database. In addition to its own logic, the evaluator delegates to two sibling sub‑components: **CodingConvention** (for enforcing coding‑style rules) and **DesignPatternAnalyzer** (for detecting and scoring design‑pattern usage).  
+**CodeQualityEvaluator** is a sub‑component that lives inside the **CodingPatterns** domain and is implemented across several concrete files, the most salient being `lib/llm/llm‑service.ts`.  The evaluator orchestrates a set of services—`LLMService`, `GraphDatabaseAdapter`, `GraphDatabaseManager`, `CodingConventionManager`, and `DesignPatternAnalyzer`—to automatically assess the quality of a codebase.  It does not contain its own source files (the observation list reports *0 code symbols found*), but its behaviour is defined by the way it composes and invokes the surrounding classes.  In practice, a consumer of **CodeQualityEvaluator** calls into the LLM‑driven service, which in turn queries the graph database via the adapter, checks coding‑convention compliance, and runs design‑pattern analysis, returning a structured quality report.
 
 ## Architecture and Design  
 
-The observed structure reveals a **layered, configuration‑driven architecture**. The `CodeQualityEvaluator` sits on a service layer (`lib/llm/llm-service.ts`) that orchestrates the evaluation workflow while delegating persistence to the **GraphDatabaseAdapter**. The adapter acts as an abstraction over the graph database, a classic **Adapter pattern**, allowing the evaluator (and its siblings) to remain agnostic of the concrete database implementation. All persistence interactions—whether storing evaluation results, coding conventions, or design‑pattern analyses—are funneled through the same adapter, promoting reuse and consistency across the sibling components.  
+The architecture that emerges from the observations is **component‑centric** with a strong emphasis on **abstraction** and **centralised management**.  The `LLMService` class (found in `lib/llm/llm‑service.ts`) acts as a *provider‑agnostic* façade for large‑language‑model calls; it hides the specifics of the underlying LLM vendor behind a uniform interface.  This façade is shared by multiple sibling components—`DesignPatternAnalyzer`, `CodingConventionManager`, and `GraphDatabaseManager`—all of which rely on the same abstraction to request model inference.  
 
-Configuration files (`graph-database-config.json` and `code-quality-evaluator-config.json`) provide **externalised configuration**, enabling the evaluator to be re‑configured without code changes. This reflects a **Configuration‑Based Design** where behaviour (e.g., which coding standards to enforce) is driven by JSON descriptors rather than hard‑coded values. The evaluator’s reliance on **CodingConvention** and **DesignPatternAnalyzer** demonstrates **composition**: the evaluator composes the capabilities of these sub‑components to build a holistic quality assessment.  
+Interaction with the persistent store is handled through a classic **Adapter** pattern: the `GraphDatabaseAdapter` presents a stable, domain‑specific API for graph‑database operations (retrieval, storage, querying) while shielding callers from the concrete driver or query language.  Both `CodeQualityEvaluator` and its sibling `GraphDatabaseManager` depend on this adapter, demonstrating a **shared‑adapter** strategy that reduces duplication and enforces a single point of change for database‑related concerns.  
+
+Management responsibilities are split into dedicated **Manager** classes.  `GraphDatabaseManager` coordinates the lifecycle of graph‑database interactions (e.g., opening connections, handling transactions), whereas `CodingConventionManager` encapsulates the rules and checks that enforce the project’s coding standards.  By delegating these concerns to managers, the evaluator remains focused on *orchestration* rather than low‑level details, a design decision that improves separation of concerns and testability.
 
 ## Implementation Details  
 
-The core of the evaluator lives in `lib/llm/llm-service.ts`. Two key functions are exposed:
+The core implementation path begins in `lib/llm/llm‑service.ts`.  Here, `LLMService` exposes methods such as `invokeModel(prompt: string): Promise<string>` (the exact signature is inferred from the “provider‑agnostic model calls” description).  Internally, the service selects a provider at runtime—allowing the same call site to work with OpenAI, Anthropic, or any future LLM—thereby satisfying the “abstract away underlying database complexities” requirement for LLM interactions.  
 
-1. **`evaluateCodeQuality`** – This method receives a representation of the target codebase (likely as source files or an AST) and orchestrates a multi‑step analysis:  
-   * It loads the coding‑standard rules from `config/code-quality-evaluator-config.json`.  
-   * It invokes the **CodingConvention** sub‑component to check adherence to style and best‑practice rules.  
-   * It calls the **DesignPatternAnalyzer** sub‑component to identify implemented design patterns and assess their appropriateness.  
-   * It aggregates the findings into an intermediate result object, which is then handed to the **GraphDatabaseAdapter** for persistence.  
+When **CodeQualityEvaluator** needs to persist or retrieve analysis artefacts, it calls into the `GraphDatabaseAdapter`.  Although the adapter’s file location is not explicitly listed, the observations tie it to the same `llm‑service.ts` file via the parent component’s description, indicating that the adapter is either imported there or co‑located.  The adapter implements methods such as `runQuery(cypher: string, params?: any): Promise<any>` and `storeNode(label: string, properties: object): Promise<string>`, providing a uniform contract for graph operations.  
 
-2. **`getCodeQualityScore`** – After evaluation data has been stored, this method queries the graph database (again via the **GraphDatabaseAdapter**) to retrieve the persisted results and compute a single numeric score. The exact scoring algorithm is not detailed in the observations, but the method’s presence indicates that the evaluator abstracts the raw analysis into a consumable metric.  
+The evaluator then invokes `CodingConventionManager` to run lint‑style checks.  This manager likely exposes a method like `validate(source: string): ConventionResult[]`, returning any violations of the project’s coding conventions.  Subsequently, `DesignPatternAnalyzer` is called to assess whether the code follows prescribed design patterns; its method could be `analyze(source: string): PatternReport`.  Both managers receive the raw source code (or an AST) and return structured data that the evaluator aggregates.  
 
-Both methods depend on the **GraphDatabaseAdapter**, which reads connection parameters from `config/graph-database-config.json`. The adapter encapsulates CRUD operations against the graph store, ensuring that the evaluator does not need to manage low‑level database APIs.  
+Finally, `GraphDatabaseManager` may be used to batch‑store the combined results into the graph database, ensuring that quality metrics are queryable alongside other domain entities.  The overall flow can be visualised as:  
+
+1. **LLMService** → generate prompt‑based evaluation.  
+2. **GraphDatabaseAdapter** → fetch existing metadata needed for context.  
+3. **CodingConventionManager** → run convention checks.  
+4. **DesignPatternAnalyzer** → evaluate design‑pattern adherence.  
+5. **GraphDatabaseManager** → persist the final quality report.
 
 ## Integration Points  
 
-- **Parent Component – CodingPatterns**: The evaluator is a child of the broader **CodingPatterns** component. `CodingPatterns` itself uses the **GraphDatabaseAdapter** for persistence, meaning the evaluator inherits the same persistence strategy and benefits from any shared transaction or connection pooling logic defined at the parent level.  
+**CodeQualityEvaluator** sits at the intersection of several system boundaries.  Its primary external dependency is the **LLMService** (`lib/llm/llm‑service.ts`), which it consumes for any LLM‑driven reasoning.  Because the service is provider‑agnostic, the evaluator can be integrated into environments that use different LLM vendors without code changes.  
 
-- **Sibling Components**:  
-  * **CodingConvention** – Provides rule‑checking services; the evaluator invokes its public interface (likely a `checkConventions` method) to validate coding‑style compliance.  
-  * **DesignPatternAnalyzer** – Supplies design‑pattern detection; the evaluator calls its analysis routine (e.g., `analyzePatterns`).  
-  * **PatternStorage** – Although not directly referenced in the evaluator’s observations, it shares the same persistence adapter, suggesting that any pattern‑related data produced by the evaluator could be stored alongside other pattern entities.  
-  * **GraphDatabaseAdapter** – The sole persistence gateway for all these components; it reads `graph-database-config.json` to establish connections.  
+The graph‑database layer is accessed through two distinct contracts: the **GraphDatabaseAdapter** (low‑level query execution) and the **GraphDatabaseManager** (higher‑level lifecycle handling).  Any component that needs to read or write quality‑related data—such as dashboards, CI pipelines, or other analysis tools—can do so via the same adapter, guaranteeing a consistent data model across the codebase.  
 
-- **Configuration Files**: The evaluator reads `config/code-quality-evaluator-config.json` for rule definitions and `config/graph-database-config.json` for database connectivity. These files serve as contract points for DevOps or platform engineers to adjust behaviour without touching code.  
+Sibling components (`DesignPatternAnalyzer`, `CodingConventionManager`, `GraphDatabaseManager`, and `LLMService`) all share the same adapter and service imports, which means that updates to the adapter’s API ripple uniformly through the entire **CodingPatterns** subtree.  This tight coupling is intentional: it enforces a unified interaction model with the graph database and LLM providers, simplifying onboarding for new developers and reducing the surface area for integration bugs.  
+
+From a deployment perspective, the only required runtime artefacts are the LLM provider credentials, the graph‑database connection string, and the configuration for coding conventions.  Because the evaluator does not introduce its own network endpoints, it can be invoked as a library call from any host process (e.g., a CLI tool, a CI job, or a web service) that has access to those resources.
 
 ## Usage Guidelines  
 
-1. **Configuration First** – Before invoking `evaluateCodeQuality`, ensure that `config/code-quality-evaluator-config.json` accurately reflects the coding standards your organization expects. Missing or malformed entries will lead to incomplete evaluations.  
+1. **Invoke via LLMService** – Always obtain the `LLMService` instance from the central factory (or DI container) used by the project.  Passing a raw provider client circumvents the abstraction and may break future upgrades.  
 
-2. **Database Availability** – The graph database must be reachable using the credentials and endpoint specified in `config/graph-database-config.json`. Since the evaluator relies on the **GraphDatabaseAdapter**, any connectivity issue will cause both evaluation storage and score retrieval to fail.  
+2. **Supply a complete source snapshot** – The evaluator expects the full source code (or an AST) for accurate convention and pattern analysis.  Supplying only fragments can lead to false‑positive violations, as the managers rely on contextual information.  
 
-3. **Invoke Dependencies in Order** – When building a custom evaluation pipeline, call `evaluateCodeQuality` **before** `getCodeQualityScore`. The score method expects persisted results; calling it prematurely will return empty or default values.  
+3. **Handle async flows** – All interactions with the LLM and the graph database are asynchronous.  Callers should `await` the evaluator’s `runEvaluation()` method (or equivalent) and be prepared to handle `Promise` rejections that may arise from network timeouts or database errors.  
 
-4. **Do Not Bypass the Adapter** – Direct database calls from the evaluator (or its callers) break the abstraction and can lead to inconsistent state. All persistence should be routed through the **GraphDatabaseAdapter** to maintain transactional integrity across sibling components.  
+4. **Persist results through GraphDatabaseManager** – After obtaining the quality report, use `GraphDatabaseManager` to store the data.  Directly writing via the adapter bypasses transaction handling and may leave the graph in an inconsistent state.  
 
-5. **Extending Rules** – To add new coding‑standard checks, extend `config/code-quality-evaluator-config.json` and, if necessary, augment the **CodingConvention** sub‑component. The evaluator will automatically pick up the new rules on the next run.  
+5. **Respect the shared adapter contract** – If you need to extend the graph schema (e.g., adding new node types for custom quality metrics), modify the `GraphDatabaseAdapter` interface and update all sibling components accordingly.  Because the adapter is a shared contract, any breaking change must be coordinated across the entire **CodingPatterns** component.  
 
 ---
 
-### 1. Architectural patterns identified  
-* **Adapter Pattern** – embodied by `GraphDatabaseAdapter`, providing a uniform interface to the underlying graph database.  
-* **Configuration‑Based Design** – external JSON files (`graph-database-config.json`, `code-quality-evaluator-config.json`) drive connection details and rule sets.  
-* **Composition** – `CodeQualityEvaluator` composes functionality from `CodingConvention` and `DesignPatternAnalyzer`.  
+### Architectural patterns identified  
+* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the concrete graph‑database implementation.  
+* **Facade/Provider‑agnostic Service** – `LLMService` presents a uniform API over multiple LLM providers.  
+* **Manager Pattern** – `GraphDatabaseManager`, `CodingConventionManager`, and `DesignPatternAnalyzer` each encapsulate a specific domain concern.  
 
-### 2. Design decisions and trade‑offs  
-* **Single persistence gateway** simplifies data consistency but creates a single point of failure; any adapter bug impacts all siblings.  
-* **JSON‑driven rule definitions** enable rapid updates without recompilation, at the cost of runtime validation overhead.  
-* **Centralised evaluation service (`llm-service.ts`)** keeps related logic together, but the file may become a “god class” if more evaluation features are added without further modularisation.  
+### Design decisions and trade‑offs  
+* **Centralised adapter** reduces duplication but creates a single point of failure; scaling the adapter may require sharding or caching.  
+* **Provider‑agnostic LLM service** future‑proofs the system against vendor lock‑in, at the cost of a slightly more complex configuration layer.  
+* **Separate managers** improve separation of concerns and testability, yet increase the number of classes developers must understand.  
 
-### 3. System structure insights  
-* The hierarchy is **CodingPatterns → CodeQualityEvaluator** (child) with siblings **CodingConvention**, **DesignPatternAnalyzer**, **PatternStorage**, and **GraphDatabaseAdapter**.  
-* All persistence interactions converge on the same adapter, reinforcing a **shared data‑access layer** across the domain.  
+### System structure insights  
+The **CodingPatterns** parent component acts as a hub, exposing the graph‑database adapter and LLM service to all its children.  Sibling sub‑components share these services, reinforcing a **horizontal reuse** model.  **CodeQualityEvaluator** functions as an orchestrator that composes the capabilities of its siblings without owning unique data structures.  
 
-### 4. Scalability considerations  
-* Because the evaluator writes results to a graph database, scaling read/write throughput depends on the underlying graph store’s capabilities and on connection pooling managed by the adapter.  
-* Adding more evaluation rules or increasing codebase size will increase the workload of `evaluateCodeQuality`; if the method grows too heavy, consider breaking it into smaller, async‑friendly services.  
+### Scalability considerations  
+Because LLM calls and graph queries are both I/O‑bound, the system can scale horizontally by adding more worker processes that each obtain their own `LLMService` instance and connection pool to the graph database.  The adapter must be thread‑safe; if it holds mutable state, additional synchronization may be required.  Provider‑agnostic design also allows scaling out to more powerful LLM providers as demand grows.  
 
-### 5. Maintainability assessment  
-* **Positive aspects**: Clear separation of concerns (evaluation vs. persistence), externalised configuration, and reuse of the adapter across siblings promote maintainability.  
-* **Potential risks**: The concentration of multiple responsibilities in `lib/llm/llm-service.ts` could hinder readability; future growth should consider extracting dedicated service classes for coding‑convention checks and design‑pattern analysis.  
-* Overall, the current design is **moderately maintainable**, provided that developers keep configuration files in sync and avoid direct database access outside the adapter.
+### Maintainability assessment  
+The heavy reliance on shared abstractions (adapter, service, managers) promotes **high maintainability**: changes to database drivers or LLM providers are localized.  However, the tight coupling means that any breaking change to the adapter’s contract forces coordinated updates across all siblings, so versioning and thorough integration tests are essential.  Clear documentation of the contracts and the orchestration flow mitigates this risk and keeps the codebase approachable for new contributors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabase class for persistence, as indicated by the presence of graph-database-config.json in the config directory. This configuration file suggests that the component is designed to work with a graph database, which is ideal for storing complex relationships between coding patterns and entities. The GraphDatabaseAdapter, used by the PatternStorage sub-component, provides a layer of abstraction between the component and the graph database, allowing for easier switching between different database implementations if needed. This design decision is evident in the lib/llm/llm-service.ts file, where the LLMService class interacts with the GraphDatabaseAdapter to store and retrieve coding patterns.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter in lib/llm/llm-service.ts for graph database interactions and data storage. This design decision allows for a centralized and efficient management of data, promoting code quality and consistency throughout the project. By employing this adapter, the component can seamlessly interact with the graph database, enabling features such as data retrieval, storage, and querying. For instance, the LLMService class in lib/llm/llm-service.ts uses the GraphDatabaseAdapter to perform provider-agnostic model calls, demonstrating the component's ability to abstract away underlying database complexities. Furthermore, the use of this adapter facilitates collaboration among developers, as it provides a standardized interface for database interactions, making it easier for team members to understand and contribute to the codebase.
 
 ### Siblings
-- [CodingConvention](./CodingConvention.md) -- CodingConvention interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve coding conventions.
-- [DesignPatternAnalyzer](./DesignPatternAnalyzer.md) -- DesignPatternAnalyzer interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve design pattern analysis results.
-- [PatternStorage](./PatternStorage.md) -- PatternStorage interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve coding patterns and entities.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter interacts with the graph database using the graph-database-config.json file in the config directory.
+- [DesignPatternAnalyzer](./DesignPatternAnalyzer.md) -- DesignPatternAnalyzer uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
+- [CodingConventionManager](./CodingConventionManager.md) -- CodingConventionManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
+- [LLMService](./LLMService.md) -- LLMService uses the GraphDatabaseAdapter to interact with the graph database, enabling features such as data retrieval, storage, and querying.
 
 
 ---
