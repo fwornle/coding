@@ -1,123 +1,128 @@
 # EntityClassifier
 
-**Type:** Detail
+**Type:** SubComponent
 
-The hierarchical classification model implies a tree-like structure, where entities are classified based on their relationships and properties defined in the ontology, potentially using techniques like recursive traversal or depth-first search.
+EntityClassifier's classification results are automatically exported to a JSON file using the automatic JSON export sync feature in graph-database-adapter.ts
 
 ## What It Is  
 
-**EntityClassifier** is a core component of the **OntologyManagement** subsystem. It lives under the same logical boundary as the `OntologyLoader` and `ValidationRulesEngine` and is responsible for assigning concrete entities to the appropriate concepts defined in the system’s ontology. The classifier does not appear as a stand‑alone file in the current observations (no explicit file paths were reported), but its existence is implied by the hierarchical classification model described in the documentation.  
+**EntityClassifier** is a sub‑component that lives under the **KnowledgeManagement** component. Its implementation is spread across three core source files:  
 
-The classifier consumes the ontology that has been materialised by **OntologyLoader** (via `OntologyManager.loadOntology()`) and applies a tree‑like, hierarchical reasoning process—typically a recursive depth‑first traversal or a decision‑tree‑style algorithm—to determine the most specific classification for each entity. Because the ontology is sourced from a graph database through a dedicated adapter, the classifier’s output is tightly coupled to the fidelity of that loaded graph.
+* `entity-classifier.ts` – defines the public `classifyEntity` method that drives the classification workflow.  
+* `ontology.ts` – supplies the `getOntologyClass` helper used to map a raw entity to an ontology class.  
+* `ontology-sources.ts` – contains the concrete ontology source definitions that guide the mapping logic.  
+
+Once an entity has been classified, the result is persisted through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). That adapter not only writes to the underlying Graphology + LevelDB graph store but also automatically synchronises the updated graph to a JSON file via its built‑in “automatic JSON export sync” feature.  
+
+The classification routine is invoked from two distinct learning pipelines: the **ManualLearning** component (when a user creates a new entity) and the **OnlineLearning** component (as part of the knowledge‑extraction batch). Thus, EntityClassifier acts as the bridge that turns newly‑ingested or discovered entities into semantically typed nodes inside the knowledge graph.
 
 ---
 
 ## Architecture and Design  
 
-The design of **EntityClassifier** follows a **separation‑of‑concerns** approach that is evident from the surrounding hierarchy:
+The observed code reveals a **layered, domain‑driven architecture**:
 
-1. **Parent‑level coordination** – The parent component **OntologyManagement** orchestrates the overall lifecycle: `OntologyManager.loadOntology()` pulls the ontology from a graph database using a **graph‑database adapter**. This adapter abstracts the persistence details, allowing the classifier to work with an in‑memory representation without knowing the storage specifics.  
+1. **Domain Layer (EntityClassificationEngine)** – The child component `EntityClassificationEngine` encapsulates the pure classification logic. It is called by `EntityClassifier` (the façade exposed to the rest of the system) and lives entirely in `entity-classifier.ts`.  
+2. **Ontology Service Layer** – `ontology.ts` together with `ontology-sources.ts` form a small service that resolves an entity’s semantic type. This layer isolates ontology data from the classification algorithm, making it easy to swap or extend sources.  
+3. **Infrastructure Layer (GraphDatabaseAdapter)** – All persistence concerns are funneled through `storage/graph-database-adapter.ts`. The adapter abstracts the underlying Graphology + LevelDB implementation and adds an automatic JSON export capability, effectively providing a **synchronisation façade** for downstream consumers.  
 
-2. **Sibling collaboration** – `OntologyLoader` is the dedicated loader that translates the raw graph data into a usable ontology model. `ValidationRulesEngine` sits alongside the classifier and consumes its results to enforce domain‑specific constraints. Both siblings share a common contract: they operate on the same ontology object, which enforces **data consistency and integrity** across the subsystem.  
+Interaction flow (as inferred from the observations):
 
-3. **Hierarchical classification pattern** – The observations describe a **tree‑like structure** and the use of **recursive traversal or depth‑first search**. This indicates an implicit **Composite**‑style representation of the ontology (concept nodes with child‑concepts) and a **Strategy**‑like mechanism for swapping the underlying algorithm (e.g., a decision‑tree classifier vs. a clustering algorithm). The classifier therefore embodies two architectural patterns:  
-   * **Composite** – the ontology is modeled as a hierarchy of concepts.  
-   * **Strategy** – the actual classification algorithm can be selected at runtime (decision tree, clustering, etc.).  
+* **Trigger** – Either `ManualLearning` (entity creation) or `OnlineLearning` (knowledge extraction) calls `EntityClassifier.classifyEntity`.  
+* **Classification** – `classifyEntity` consults `getOntologyClass` (ontology service) which reads the definitions from `ontology-sources.ts`.  
+* **Persistence** – The resulting classification is handed to `GraphDatabaseAdapter`, which writes the node/edge into the graph store and instantly mirrors the state to a JSON file.  
 
-4. **Interaction flow** – The typical flow is:  
-   * `OntologyManager.loadOntology()` → graph‑DB adapter → **OntologyLoader** builds the ontology graph.  
-   * **EntityClassifier** receives the populated ontology, walks the hierarchy (DFS/recursive) and assigns entities to leaf concepts.  
-   * The classified entities are handed off to **ValidationRulesEngine** for rule‑based validation.
-
-No explicit micro‑service or event‑driven mechanisms are mentioned; the design is monolithic within the OntologyManagement boundary, relying on direct method calls and shared in‑memory objects.
+No explicit architectural patterns such as “microservices” or “event‑driven” are mentioned, but the **Facade** pattern is evident in the way `EntityClassifier` hides the complexity of ontology lookup and graph persistence behind a single method. The automatic JSON export behaves like an **Observer** (the adapter observes changes to the graph and reacts by writing a JSON snapshot).
 
 ---
 
 ## Implementation Details  
 
-Although the source code is not enumerated in the observations, the functional description reveals several concrete implementation aspects:
+### Core Classification (`entity-classifier.ts`)  
+The `classifyEntity` function receives a raw entity object. It first extracts the entity’s identifier and any relevant attributes, then delegates to `getOntologyClass` (from `ontology.ts`). The returned ontology class (e.g., `Person`, `Component`, `API`) is attached to the entity’s metadata, forming a fully typed graph node.
 
-| Aspect | Likely Implementation (grounded in observations) |
-|--------|---------------------------------------------------|
-| **Ontology Representation** | A node‑based structure (e.g., `ConceptNode` objects) forming a tree/graph. Each node holds references to child concepts and possibly metadata (properties, constraints). |
-| **Classification Engine** | A class (e.g., `EntityClassifier`) exposing a method such as `classify(Entity e)`. Internally it performs a **recursive depth‑first search** starting at the root concept, evaluating entity properties against node criteria until the most specific leaf is found. |
-| **Algorithm Selection** | The classifier may accept a pluggable **Strategy** object (`ClassificationStrategy`) that encapsulates either a **decision‑tree** algorithm (rule‑based splits) or a **clustering** algorithm (e.g., hierarchical agglomerative clustering). This aligns with the observation that “specific algorithms or libraries” can be used. |
-| **Data Consistency Checks** | Prior to classification, the classifier validates that the ontology object supplied by `OntologyLoader` matches the expected schema (e.g., all required relationships are present). This safeguards against mismatches caused by partial loads from the graph database. |
-| **Error Handling** | If a traversal reaches a node without a clear leaf match, the classifier may raise a `ClassificationException` or fall back to a default “Unclassified” concept, ensuring the system remains robust even with incomplete ontology definitions. |
+### Ontology Resolution (`ontology.ts` + `ontology-sources.ts`)  
+`ontology.ts` provides the public API `getOntologyClass(entity)`. Internally it reads from the static data structures defined in `ontology-sources.ts`. These sources enumerate the mapping rules—typically a list of regexes, keyword sets, or type hierarchies—that associate raw entity signatures with ontology classes. Because the source file is a plain TypeScript module, adding or updating mappings is a matter of editing `ontology-sources.ts`, after which the classifier immediately picks up the new rules on the next run.
 
-Because no concrete file paths or class names were captured, the above terminology mirrors the terminology used in the observations (e.g., “EntityClassifier”, “OntologyLoader”, “OntologyManager.loadOntology()”).
+### Persistence (`storage/graph-database-adapter.ts`)  
+`GraphDatabaseAdapter` abstracts Graphology’s API and LevelDB’s storage backend. The adapter exposes methods such as `addNode`, `addEdge`, and `upsertEntity`. When `classifyEntity` finishes, it calls the appropriate adapter method to store the classified node. The same file implements an **automatic JSON export sync**: after any successful write operation, a listener serialises the entire graph to a JSON file on disk. This file is the single source of truth for any external tool that needs a snapshot of the knowledge graph (e.g., visualization dashboards, downstream analytics pipelines).
+
+### Trigger Points  
+* **ManualLearning** – When a user manually creates an entity, the ManualLearning workflow invokes `EntityClassifier.classifyEntity` before persisting the entity.  
+* **OnlineLearning** – The batch analysis pipeline defined in `batch-analysis.yaml` extracts entities from git history, LSL sessions, and code analysis. Each extracted entity is fed into the same `classifyEntity` entry point, ensuring consistent semantic typing across both manual and automated ingestion paths.
 
 ---
 
 ## Integration Points  
 
-1. **OntologyLoader** – The primary upstream dependency. `EntityClassifier` expects the ontology to be fully materialised before any classification request. The loader’s contract is effectively: “provide a complete, validated ontology graph.”  
-
-2. **Graph‑Database Adapter** – Indirectly influences the classifier’s performance. The adapter determines how quickly the ontology can be fetched and how up‑to‑date it is. Any latency or schema change at this layer propagates to the classifier.  
-
-3. **ValidationRulesEngine** – Downstream consumer. After classification, entities are passed to the rules engine, which applies domain‑specific validation (e.g., “a Person must belong to a ‘Human’ concept”). The two components share the same ontology model, ensuring that validation rules reference the exact same concept identifiers used during classification.  
-
-4. **External Consumers** – Although not explicitly listed, any service or UI that needs to present classified entities will invoke `EntityClassifier` through the OntologyManagement façade. The façade likely offers a method such as `OntologyManagement.classifyEntity(Entity e)`.  
-
-5. **Configuration** – The choice of classification algorithm (decision tree vs. clustering) is expected to be configurable, possibly via a properties file or dependency‑injection container that supplies the appropriate `ClassificationStrategy` implementation.
+* **Parent – KnowledgeManagement** – The parent component aggregates the classification results into the broader knowledge graph. It relies on the GraphDatabaseAdapter’s JSON export to keep its persisted view synchronised.  
+* **Siblings** – `ManualLearning`, `OnlineLearning`, `ObservationDeriver`, `InsightGenerator`, `CodeGraphConstructor`, and `TraceReportGenerator` all share the same `GraphDatabaseAdapter`. This common persistence layer guarantees that any node or relationship created by a sibling is immediately visible to EntityClassifier and vice‑versa.  
+* **Child – EntityClassificationEngine** – The engine houses the pure algorithmic part of classification. It is invoked by `EntityClassifier` and can be unit‑tested in isolation because it does not depend on the graph adapter or ontology files.  
+* **Ontology Service** – The classifier’s dependency on `ontology.ts` and `ontology-sources.ts` makes the ontology module a clear integration contract. Any consumer that wishes to extend the taxonomy only needs to modify the source file; no changes to the classifier logic are required.  
+* **External Consumers** – The JSON file produced by the automatic export is the de‑facto integration point for any external system (e.g., UI visualisers, reporting services). Because the export is triggered on every classification, downstream consumers always see the latest classification state without polling the graph database directly.
 
 ---
 
 ## Usage Guidelines  
 
-* **Load Before Classify** – Always ensure `OntologyManager.loadOntology()` has completed successfully and the ontology object is passed to `EntityClassifier`. Attempting classification on a partially loaded or stale ontology can produce inconsistent results.  
-
-* **Algorithm Selection** – Choose the classification strategy that matches the data characteristics:  
-  * Use a **decision‑tree** approach when the ontology contains clear, rule‑driven splits.  
-  * Prefer **clustering** when entities exhibit similarity patterns that are not easily expressed as explicit rules.  
-
-* **Maintain Ontology Integrity** – Any change to the ontology schema (adding/removing concepts, altering relationships) must be coordinated with both the loader and the classifier. Run the ontology validation step (potentially provided by `ValidationRulesEngine`) after each modification to catch mismatches early.  
-
-* **Handle Large Hierarchies** – For deep or wide ontologies, be aware of recursion limits. If the Java/Scala runtime stack depth is a concern, consider refactoring the traversal to an iterative approach using an explicit stack.  
-
-* **Error Reporting** – Capture classification failures (e.g., no matching leaf) and surface them through a well‑defined exception type. This enables callers to decide whether to assign a default concept or to trigger a remediation workflow.  
-
-* **Testing** – Unit‑test the classifier with a minimal ontology fixture that covers edge cases (root‑only, deep branch, ambiguous paths). Integration tests should verify that the end‑to‑end flow (loader → classifier → validation engine) respects data consistency.  
+1. **Always invoke classification through the façade** – Call `EntityClassifier.classifyEntity` rather than directly using the `EntityClassificationEngine`. This ensures that ontology lookup and graph persistence happen atomically.  
+2. **Keep ontology sources up‑to‑date** – When adding new entity types, edit `ontology-sources.ts` and, if necessary, extend `getOntologyClass` logic. After a change, rerun any pending classification jobs so the new rules are applied.  
+3. **Do not bypass the GraphDatabaseAdapter** – All writes to the knowledge graph must go through the adapter to guarantee that the automatic JSON export remains consistent. Direct Graphology calls will break the export sync.  
+4. **Respect the trigger contracts** – Manual entity creation should call the classifier *before* persisting the raw entity, mirroring the pattern used by `ManualLearning`. Automated extraction pipelines (`OnlineLearning`) must follow the same ordering to avoid orphaned un‑typed nodes.  
+5. **Version the JSON export** – Because the JSON file is the integration artefact for other components, consider version‑naming the output (e.g., `graph-export-v{timestamp}.json`) if multiple concurrent processes may read it.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Composite** – Ontology modeled as a hierarchical tree of concepts.  
-* **Strategy** – Pluggable classification algorithms (decision tree, clustering).  
-* **Separation of Concerns** – Distinct loader, classifier, and validation engine components.  
+### Architectural patterns identified  
 
-### 2. Design decisions and trade‑offs  
-* **Tight coupling to OntologyLoader** ensures up‑to‑date definitions but requires strict load‑order enforcement.  
-* **Recursive DFS** offers simple, readable code but may hit stack limits on very deep ontologies; an iterative alternative trades readability for robustness.  
-* **Algorithm flexibility** (strategy) adds extensibility at the cost of additional configuration and testing overhead.  
+* **Facade** – `EntityClassifier` hides ontology lookup and persistence behind a single method.  
+* **Adapter** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB, providing a uniform persistence API.  
+* **Observer‑like sync** – The automatic JSON export reacts to graph mutations, keeping an external representation up‑to‑date.  
 
-### 3. System structure insights  
-* **OntologyManagement** is the parent container, orchestrating loading and classification.  
-* **EntityClassifier** sits alongside **OntologyLoader** and **ValidationRulesEngine**, sharing the same ontology instance, which guarantees consistent view of concepts across the subsystem.  
+### Design decisions and trade‑offs  
 
-### 4. Scalability considerations  
-* Large ontologies increase traversal time; algorithmic complexity is O(N) with respect to the number of concepts visited.  
-* Switching to an iterative traversal or parallelising sub‑tree evaluation can mitigate performance bottlenecks.  
-* The graph‑database adapter’s ability to stream portions of the ontology may reduce memory pressure during loading.  
+* **Centralised classification entry point** – simplifies usage but creates a single point of failure; however, the clear separation of concerns (engine vs. façade) mitigates risk.  
+* **Static ontology source file** – easy to edit and version, but requires a code change/re‑deployment to update mappings; a more dynamic source (e.g., DB‑backed) would improve flexibility at the cost of added complexity.  
+* **Automatic JSON export** – guarantees downstream consistency, yet introduces I/O overhead on every classification; for very high‑throughput scenarios the sync could be throttled or made asynchronous.  
 
-### 5. Maintainability assessment  
-* Clear separation between loading, classification, and validation promotes independent evolution of each concern.  
-* Reliance on a single ontology source simplifies versioning but mandates rigorous change‑management processes.  
-* Providing a well‑defined `ClassificationStrategy` interface makes it straightforward to introduce new algorithms without touching the core classifier logic.  
+### System structure insights  
 
-By adhering to the observations and avoiding unfounded speculation, this insight document captures the essential architectural and design characteristics of **EntityClassifier** within the OntologyManagement ecosystem.
+The system follows a **vertical slice** organization: each functional slice (classification, ontology, persistence) is co‑located in its own module, while cross‑cutting concerns (graph storage, export) are provided by a shared infrastructure component. Sibling components reuse the same storage adapter, reinforcing a **single source of truth** for the knowledge graph.
+
+### Scalability considerations  
+
+* **GraphDatabaseAdapter** scales with LevelDB’s on‑disk performance; horizontal scaling would require sharding the graph or moving to a distributed graph store.  
+* **Classification throughput** is bounded by the synchronous JSON export – in high‑volume ingestion (e.g., massive online learning batches) the export could become a bottleneck. Decoupling the export into an asynchronous background worker would improve scalability.  
+* **Ontology lookup** is O(1) for static in‑memory structures; expanding to a large, dynamic ontology may necessitate caching or indexed retrieval.  
+
+### Maintainability assessment  
+
+The current design is **highly maintainable**:  
+* Clear separation between classification logic, ontology definitions, and persistence.  
+* Small, focused files (`entity-classifier.ts`, `ontology.ts`, `ontology-sources.ts`, `graph-database-adapter.ts`) make code navigation straightforward.  
+* The automatic JSON export removes the need for manual synchronisation scripts, reducing operational debt.  
+
+Potential maintenance risks stem from the static nature of `ontology-sources.ts`; as the taxonomy grows, developers must remember to keep this file in sync with domain experts. Introducing unit tests around `getOntologyClass` and the adapter’s export hook will further safeguard against regressions.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data from a graph database, which is implemented using Graphology and LevelDB. This allows for efficient querying and retrieval of entities and relationships within the knowledge graph. The automatic JSON export sync feature ensures that data is consistently updated across the system. For example, when a new entity is added to the graph, the GraphDatabaseAdapter will automatically export the updated graph data to a JSON file, which can then be used by other components or services.
+
+### Children
+- [EntityClassificationEngine](./EntityClassificationEngine.md) -- The EntityClassifier sub-component uses the classifyEntity method in entity-classifier.ts to classify entities in the graph, which is likely handled by the EntityClassificationEngine.
 
 ### Siblings
-- [OntologyLoader](./OntologyLoader.md) -- OntologyManager.loadOntology() in the parent context suggests the existence of a dedicated loader, which is likely implemented as a separate module or class to encapsulate the loading logic.
-- [ValidationRulesEngine](./ValidationRulesEngine.md) -- The ValidationRulesEngine likely utilizes a rules-based system, where validation rules are defined and stored in a configurable manner, allowing for easy modification or extension of the rules without altering the underlying code.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store manually created entities
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline in batch-analysis.yaml to extract knowledge from git history, LSL sessions, and code analysis
+- [ObservationDeriver](./ObservationDeriver.md) -- ObservationDeriver uses the deriveObservations method in observation-deriver.ts to derive observations from entities and relationships in the graph
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the generateInsights method in insight-generator.ts to generate insights from observations and entities in the graph
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the constructCodeGraph method in code-graph-constructor.ts to construct the code graph
+- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the generateTraceReport method in trace-report-generator.ts to generate trace reports
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology library to interact with the graph database
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

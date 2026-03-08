@@ -2,110 +2,79 @@
 
 **Type:** SubComponent
 
-The ServiceStarter provides a mechanism for ensuring services are started and running correctly.
+The retry-with-backoff pattern in lib/service-starter.js allows for flexible configuration of retry policies, enabling customization for different service startup scenarios.
 
 ## What It Is  
 
-**ServiceStarter** is a sub‑component that lives in the codebase under `lib/service-starter.js`.  It is responsible for the complete lifecycle of a service – starting it, keeping it running, and shutting it down cleanly.  The component exposes explicit methods for *start*, *stop* and *restart* and wraps all of those operations in robust error handling.  A central piece of its behavior is the `startServiceWithRetry` function, which implements an exponential‑backoff retry loop to re‑attempt service startup when transient failures occur.  Because the **Trajectory** component declares “contains ServiceStarter”, ServiceStarter is instantiated and orchestrated by Trajectory as part of the overall execution pipeline.
-
----
+**ServiceStarter** is a sub‑component that lives in `lib/service-starter.js`.  It is a dedicated class whose sole responsibility is to orchestrate the startup of optional services that DockerizedServices depends on.  The class exposes a single, unified interface for “starting” a service and internally applies a **retry‑with‑backoff** strategy (implemented in its child component **RetryWithBackoff**) to guard against transient failures.  By centralising this logic, ServiceStarter makes it straightforward to add or remove services without scattering start‑up code throughout the code‑base.
 
 ## Architecture and Design  
 
-The design of ServiceStarter follows a **service‑lifecycle management** approach.  Rather than scattering start‑up logic throughout the codebase, all lifecycle concerns are centralized in this sub‑component.  The observations highlight three concrete design choices:
+The observations reveal a **modular, fault‑tolerant design**.  ServiceStarter is isolated in its own file (`lib/service-starter.js`) and encapsulates both the coordination of service start‑up and the retry policy.  The primary architectural pattern evident is the **Retry‑With‑Backoff** pattern, which is used to prevent endless loops when an optional service cannot start and to allow graceful degradation.  This pattern is exposed as a child component named **RetryWithBackoff**, indicating a clear separation of concerns: ServiceStarter delegates the timing and back‑off calculations to RetryWithBackoff while it focuses on the higher‑level orchestration.
 
-1. **Retry‑with‑Exponential‑Backoff** – The `startServiceWithRetry` function (found in `lib/service-starter.js`) encapsulates the retry policy.  This pattern is also referenced in the parent component description, which notes that the same retry logic is used by the `SpecstoryAdapter` (located in `lib/integrations/specstory-adapter.js`).  By re‑using the same function, the system enforces a consistent resilience strategy across different service connections.
-
-2. **Explicit Lifecycle API** – ServiceStarter provides distinct methods for *starting*, *stopping*, and *restarting* services.  This clear API mirrors the façade pattern: callers (e.g., Trajectory) interact with a single, well‑defined interface instead of dealing with the underlying implementation details.
-
-3. **Error‑and‑Exception Guardrails** – All entry points (start, stop, restart) are wrapped with error handling that captures exceptions raised during service operations.  This defensive programming stance ensures that a failure in one service does not cascade and bring down the entire system.
-
-Interaction with siblings such as **SpecstoryConnector**, **GraphDatabaseManager**, **LLMInitializer**, **ConcurrencyController**, **PipelineCoordinator**, and **SpecstoryAdapterFactory** is indirect: those components each manage their own resources, but they all rely on the same underlying principle of robust start‑up and shutdown, often delegating to ServiceStarter or to the shared `startServiceWithRetry` utility.  The parent **Trajectory** orchestrates these sub‑components, using ServiceStarter to guarantee that each service is available before proceeding with higher‑level workflow coordination.
-
----
+ServiceStarter also follows a **Facade**‑like approach.  By presenting a single “start” method (or similar unified interface) it hides the complexity of individual service start‑up sequences, logging, and error handling from callers.  This design aligns with the parent component **DockerizedServices**, which aggregates multiple sub‑components (including ServiceStarter) to deliver a container‑based micro‑service environment.  The sibling component **LLMServiceManager** demonstrates a similar separation‑of‑concerns philosophy, using its own facade (LLMService) for mode routing, suggesting a consistent architectural language across the codebase.
 
 ## Implementation Details  
 
-The core of ServiceStarter resides in `lib/service-starter.js`.  The file defines:
+- **Class `ServiceStarter` (lib/service-starter.js)** – The core orchestrator.  Its constructor likely receives a collection of service descriptors or factories.  When `startAll()` (or an equivalent method) is invoked, it iterates over each service, attempts to start it, and catches any startup error.  
+- **Retry‑With‑Backoff** – Implemented as a child component (`RetryWithBackoff`).  ServiceStarter hands off the retry logic to this module, which probably exposes a function like `executeWithRetry(fn, options)`.  The options allow flexible configuration of maximum attempts, initial delay, back‑off multiplier, and jitter, as noted in observation 5 (“flexible configuration of retry policies”).  
+- **Error Handling & Logging** – Observation 6 states that ServiceStarter provides detailed logging for startup failures.  This likely means that each catch block records the service name, error stack, and the current retry attempt, helping developers trace problematic services.  
+- **Graceful Degradation** – Because the retry loop is bounded (back‑off prevents endless looping), ServiceStarter can decide to continue bootstrapping the rest of the system even if an optional service ultimately fails, fulfilling the “graceful degradation” goal described in observation 1.  
 
-* **`startServiceWithRetry(serviceInstance, options)`** – Accepts a concrete service implementation (the “specific service implementation” mentioned in the observations) and an options object that likely contains max‑retry count and backoff parameters.  The function attempts to invoke the service’s native start routine; on failure it waits for an exponentially increasing delay before retrying, ultimately bubbling up an error if the retry limit is exceeded.
-
-* **Lifecycle Methods** –  
-  * `start()` – Calls `startServiceWithRetry` to bring the service up.  Successful start transitions the internal state to *running*.  
-  * `stop()` – Invokes the service’s shutdown routine, catching any exceptions to prevent unhandled rejections.  
-  * `restart()` – A convenience wrapper that first calls `stop()` (ignoring non‑critical errors) and then `start()` again, thereby re‑using the same retry logic.
-
-* **Error Handling** – Each public method is surrounded by `try / catch` blocks.  When an exception occurs, the component logs the incident (the exact logging mechanism is not described in the observations) and re‑throws a domain‑specific error, allowing callers such as Trajectory to decide whether to abort or continue.
-
-* **Service Implementation Dependency** – The observations state that ServiceStarter “uses a specific service implementation”.  This implies that ServiceStarter is generic with respect to the concrete service class; the actual service object is injected at construction time, enabling the same starter logic to be reused for different services (e.g., a database connection, an LLM instance, or a Specstory adapter).
-
-Because no additional symbols were discovered, the implementation appears intentionally lightweight, focusing on reliability rather than feature bloat.  The reuse of `startServiceWithRetry` across both ServiceStarter and the SpecstoryAdapter reinforces a single source of truth for retry semantics.
-
----
+The modular layout means that the retry policy can be swapped or tuned without touching the ServiceStarter orchestration code, reinforcing the separation highlighted in observation 3.
 
 ## Integration Points  
 
-ServiceStarter sits directly under the **Trajectory** component, which coordinates the overall workflow.  When Trajectory boots, it creates a ServiceStarter instance, passes the concrete service object (for example, the `SpecstoryAdapter` from `lib/integrations/specstory-adapter.js`), and invokes `start()`.  The successful start of ServiceStarter is a prerequisite for the **PipelineCoordinator**, **ConcurrencyController**, and other siblings that depend on the underlying service being alive.
-
-* **SpecstoryAdapter** – Uses the same `startServiceWithRetry` function, meaning that both components share the same retry policy and can be swapped or combined without altering the retry logic.  
-
-* **GraphDatabaseManager**, **LLMInitializer**, **ConcurrencyController**, **PipelineCoordinator**, **SpecstoryAdapterFactory** – These siblings each manage their own resources but follow the same pattern of exposing start/stop semantics.  When they need to launch a dependent service, they can delegate to ServiceStarter or reuse its retry helper, ensuring consistent behavior across the codebase.
-
-* **External Interfaces** – The only explicit external dependency mentioned is the concrete service implementation supplied to ServiceStarter.  Because ServiceStarter does not embed any protocol‑specific code (e.g., HTTP, IPC), it remains agnostic to how the service communicates, making it a clean integration point for any future service type.
-
----
+- **Parent – DockerizedServices** – ServiceStarter is a child of DockerizedServices, which orchestrates the overall Docker‑based deployment.  DockerizedServices likely invokes ServiceStarter during its own initialization phase to ensure all dependent containers are up before exposing higher‑level APIs.  
+- **Sibling – LLMServiceManager** – While not directly coupled, LLMServiceManager shares the same architectural intent: providing a clean façade over a complex subsystem (LLMService).  Both components benefit from the parent’s modular container strategy and may be started in parallel by DockerizedServices.  
+- **Child – RetryWithBackoff** – The retry logic lives in its own module, enabling reuse across other parts of the system that may need similar resilience (e.g., network calls, database connections).  ServiceStarter imports and configures this child component, passing in service‑specific retry parameters.  
+- **External Dependencies** – ServiceStarter depends on the concrete service implementations it starts (e.g., a database container, a cache, an optional analytics service).  It also relies on a logging facility (perhaps `console` or a logger library) to emit the detailed diagnostics mentioned in observation 6.
 
 ## Usage Guidelines  
 
-1. **Inject a Fully Constructed Service** – When constructing ServiceStarter, provide a service instance that implements `start()` and `stop()` (or equivalent) methods.  This keeps ServiceStarter decoupled from the specifics of the service implementation.
-
-2. **Prefer `start()` Over Direct Calls** – Always invoke the `start()` method of ServiceStarter rather than calling the underlying service’s start routine directly.  This guarantees that the exponential‑backoff retry logic is applied, protecting the system from transient failures.
-
-3. **Handle Exceptions at the Caller Level** – Although ServiceStarter captures and logs errors internally, it re‑throws domain‑specific exceptions.  Callers such as Trajectory should catch these exceptions to decide whether to abort the pipeline or attempt alternative recovery strategies.
-
-4. **Use `restart()` for Hot Swaps** – When a service needs to be refreshed (e.g., configuration changes), call `restart()` rather than a manual stop/start sequence.  The method ensures that the retry policy is reapplied and that the service’s internal state is cleanly reset.
-
-5. **Do Not Modify Retry Parameters Lightly** – The exponential‑backoff parameters inside `startServiceWithRetry` are tuned for the overall system robustness (as evidenced by their reuse in SpecstoryAdapter).  Adjusting them should be done with performance testing and an understanding of how it may affect sibling components that rely on the same logic.
+1. **Register Services Explicitly** – When constructing ServiceStarter, provide a clear list or map of services to start.  This makes the unified interface deterministic and aids readability.  
+2. **Configure Retry Policies per Service** – Leverage the flexible configuration highlighted in observation 5.  Critical services may use a higher `maxAttempts` and longer back‑off, while optional services can use a shorter policy to avoid long start‑up times.  
+3. **Respect Graceful Degradation** – Do not treat a failed optional service as a fatal error.  Allow ServiceStarter to log the failure and continue bootstrapping the rest of the system, as designed.  
+4. **Monitor Logs** – Since ServiceStarter emits detailed logs on each failure and retry attempt, set up log aggregation (e.g., Docker logs, ELK) to surface these messages early during development and production debugging.  
+5. **Avoid Blocking the Event Loop** – Ensure that the retry implementation uses asynchronous delays (e.g., `setTimeout`/`await`) rather than synchronous sleeps, preserving Node.js’s non‑blocking nature.  
 
 ---
 
 ### 1. Architectural patterns identified  
-
-* **Service‑Lifecycle Management façade** – Centralizes start/stop/restart operations behind a simple API.  
-* **Retry with Exponential Backoff** – Implemented in `startServiceWithRetry`, providing resilience against transient failures.  
-* **Dependency Injection** – ServiceStarter receives a concrete service implementation, keeping it agnostic to the service’s internal details.
+- **Retry‑With‑Backoff** (implemented via the child component `RetryWithBackoff`)  
+- **Facade / Unified Interface** (ServiceStarter provides a single entry point for starting services)  
+- **Modular Design** (separation of orchestration and retry logic into distinct modules)  
 
 ### 2. Design decisions and trade‑offs  
-
-* **Single‑point retry logic** – By sharing `startServiceWithRetry` across ServiceStarter and SpecstoryAdapter, the codebase gains consistency and reduces duplication, but it couples the retry policy of disparate services, limiting per‑service customization.  
-* **Lightweight error handling** – Catch‑and‑rethrow keeps the component simple and makes failures observable, yet it relies on callers to implement higher‑level recovery, which can increase the burden on Trajectory.  
-* **Generic service interface** – Accepting any service implementation maximizes reuse, but it assumes that all services expose compatible start/stop semantics, which may not hold for more exotic resources.
+- **Bounded retries vs. endless loops** – By capping attempts, the system avoids hangs but may give up on services that could recover later.  
+- **Centralised start‑up logic** – Simplifies adding/removing services but creates a single point of failure if ServiceStarter itself contains bugs.  
+- **Configurable back‑off** – Provides flexibility but adds complexity in configuring appropriate policies for each service.  
 
 ### 3. System structure insights  
-
-ServiceStarter is a leaf sub‑component under **Trajectory**, acting as the bridge between the orchestration layer and the concrete services (e.g., SpecstoryAdapter).  Its sibling components each manage distinct concerns (graph storage, LLM initialization, concurrency), but they share the same lifecycle philosophy, leading to a uniform system startup sequence orchestrated by Trajectory.
+- ServiceStarter sits under the **DockerizedServices** parent, acting as the bridge between container orchestration and individual service readiness.  
+- Its sibling **LLMServiceManager** follows a similar façade pattern, indicating a consistent architectural style across the codebase.  
+- The **RetryWithBackoff** child abstracts resilience concerns, making the pattern reusable elsewhere.  
 
 ### 4. Scalability considerations  
-
-The exponential‑backoff retry mechanism helps the system scale under load spikes or temporary network partitions by preventing immediate, repeated connection attempts.  Because ServiceStarter is stateless aside from tracking its own lifecycle state, multiple instances can be created in parallel if the architecture ever requires running several identical services (e.g., multiple database connections).  However, the current design does not include pooling or concurrency controls, so scaling to a large number of services would require additional coordination logic outside ServiceStarter.
+- Because each service start is handled independently with its own retry policy, ServiceStarter can scale to many services without a combinatorial explosion of error handling code.  
+- The back‑off delays naturally throttle rapid retry storms, protecting shared resources (e.g., network, database) as the system scales out.  
 
 ### 5. Maintainability assessment  
-
-ServiceStarter’s narrow responsibility and clear API make it highly maintainable.  The reuse of `startServiceWithRetry` reduces code duplication, and the explicit error handling provides straightforward debugging paths.  The main maintenance risk lies in the shared retry implementation: any change to backoff parameters or error classification will affect all consumers (including SpecstoryAdapter).  Proper documentation of the retry contract and versioned testing will mitigate this risk.
+- **High** – The modular separation of concerns (orchestration vs. retry) and the unified interface reduce code duplication and make the component easy to understand.  
+- Detailed logging and configurable policies aid troubleshooting and future adjustments.  
+- The only maintenance risk lies in ensuring that the retry configuration stays in sync with service‑level SLAs; documentation of each service’s policy is essential.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js allows for flexible connection establishment with the Specstory extension via multiple protocols such as HTTP, IPC, or file watch. This is evident in the way the SpecstoryAdapter class is instantiated and used throughout the component, providing a unified interface for different connection methods. Furthermore, the retry logic with exponential backoff implemented in the startServiceWithRetry function in lib/service-starter.js ensures that connections are re-established in case of failures, enhancing the overall robustness of the component.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with multiple sub-components and services working together to enable efficient coding services. This is evident in the use of Docker for containerization, as seen in the lib/llm/llm-service.ts file, which acts as a high-level facade for all LLM operations. The LLMService class handles mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback, demonstrating a clear separation of concerns and a modular design approach. Furthermore, the ServiceStarter class in lib/service-starter.js implements a retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail, showcasing a robust and fault-tolerant design.
+
+### Children
+- [RetryWithBackoff](./RetryWithBackoff.md) -- Given the parent context, the retry-with-backoff pattern is likely implemented in a separate module or function within lib/service-starter.js to handle service startup failures.
 
 ### Siblings
-- [SpecstoryConnector](./SpecstoryConnector.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to establish connections to the Specstory extension.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager uses a graph database to store and retrieve data.
-- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer uses a constructor to initialize the LLM.
-- [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
-- [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
-- [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
+- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, demonstrating a clear separation of concerns.
 
 
 ---

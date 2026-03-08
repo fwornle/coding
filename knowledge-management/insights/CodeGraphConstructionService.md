@@ -2,80 +2,91 @@
 
 **Type:** SubComponent
 
-The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the CodeGraphConstructionService, such as a custom backoff strategy.
+CodeGraphConstructionService uses the LLMService to handle code graph-based decision-making, ensuring informed and data-driven decisions
 
 ## What It Is  
 
-The **CodeGraphConstructionService** is a sub‑component that lives inside the **DockerizedServices** container.  Its implementation is tied to the service‑startup infrastructure found in `lib/service-starter.js`, where the `startService` function (and the associated back‑off logic) is reused to bring the graph‑construction process up reliably.  Although the source tree does not expose a concrete file for the service itself, the observations make clear that the component is responsible for building, persisting, and exposing **code graphs** – data structures that represent the relationships between code entities (functions, classes, modules, etc.).  The service is expected to run inside its own Docker image, benefitting from the container‑level isolation and deployment model that the parent **DockerizedServices** component provides.
+`CodeGraphConstructionService` is a **sub‑component** that lives inside the `DockerizedServices` container.  Although the source tree does not expose a concrete file path for the implementation, the observations make it clear that the service is the core engine responsible for turning raw source‑code artifacts into structured **code graphs**.  It does so by orchestrating a graph‑construction algorithm, persisting the resulting topology through a `GraphDatabaseAdapter`, and enriching the process with the broader LLM capabilities exposed by the sibling `LLMService`.  The service is also wrapped by a `ServiceStarter`, which governs its lifecycle (initialisation, start, stop) within the Dockerised environment, and it offers a configurable framework that lets callers tune graph‑construction parameters to fit diverse analysis scenarios.
 
 ## Architecture and Design  
 
-The architecture around **CodeGraphConstructionService** follows a **service‑oriented** pattern within a Docker‑based deployment.  The most visible design pattern is the **retry‑with‑backoff** strategy that lives in `lib/service-starter.js`.  The `startService` function applies a configurable back‑off schedule whenever a service fails to initialise, preventing endless restart loops and giving dependent services (e.g., **SemanticAnalysisService**) a stable foundation.  This pattern is shared across sibling services such as **SemanticAnalysisService**, **ConstraintMonitoringService**, and **LLMService**, indicating a common startup contract enforced by the parent **DockerizedServices** component.
+The design of `CodeGraphConstructionService` follows a **modular, service‑oriented** approach.  The service itself is a thin coordinator that delegates distinct responsibilities to specialised collaborators:
 
-Interaction between components is achieved through **well‑defined APIs**.  The CodeGraphConstructionService exposes an interface that other sub‑components can call to retrieve graph data.  The observations specifically note that it may “interact with other sub‑components, such as the SemanticAnalysisService, to construct and manage code graphs,” suggesting a **collaborative workflow** where SemanticAnalysis produces semantic artefacts that are then woven into the graph by this service.  The service also appears to own its own **storage layer** (a separate database or persistence mechanism) to keep the graphs isolated from the rest of the system, which aligns with the principle of **separation of concerns**.
+* **Graph persistence** is abstracted behind `GraphDatabaseAdapter`.  This adapter isolates the service from the underlying graph store (e.g., Neo4j, JanusGraph) and enables efficient query and update operations without coupling the construction logic to a particular database technology.  
+* **Lifecycle management** is handled by `ServiceStarter`.  By externalising start‑up and shutdown concerns, the service can be launched, stopped, or restarted by the Docker orchestration layer without embedding lifecycle code inside the core algorithm.  
+* **LLM‑driven analysis** is injected via the sibling `LLMService`.  The service calls into `LLMService` for two distinct purposes: (1) to **interpret** the emerging code‑graph structure and surface higher‑level insights, and (2) to **drive decision‑making** during graph construction (e.g., choosing edge types or pruning strategies) based on language‑model reasoning.
+
+These collaborations suggest a **Facade pattern** (the service presents a unified API while delegating to adapters) and an **Adapter pattern** for the graph database.  The configuration capability indicates a **Strategy‑like** design: callers can supply custom construction parameters that alter the behaviour of the underlying algorithm without modifying the service code itself.
 
 ## Implementation Details  
 
-The core of the startup behaviour is the `startService` function in `lib/service-starter.js`.  This function likely accepts a service‑specific starter callback (e.g., a `runCodeGraphConstruction` routine) and wraps it with retry logic that increases the wait time after each failure according to a back‑off algorithm (exponential, linear, or custom – the observation mentions a “custom backoff strategy”).  When the CodeGraphConstructionService is launched, the starter module supplies the back‑off configuration, ensuring that transient failures (such as temporary database unavailability) do not crash the whole Docker stack.
+At the heart of `CodeGraphConstructionService` lies a **graph construction algorithm** that parses source code, extracts entities (classes, functions, modules) and relationships (calls, imports, inheritance), and incrementally builds a graph representation.  While the exact class and method names are not listed, the observations reference the following key collaborators:
 
-Inside the service itself (though the exact file is not listed), we can infer the presence of the following logical pieces:
+* **`GraphDatabaseAdapter`** – likely exposes methods such as `addNode`, `addEdge`, and `querySubgraph`.  The service uses this adapter to persist each discovered entity and relationship, ensuring that the graph remains queryable and consistent across construction runs.  
+* **`ServiceStarter`** – provides lifecycle hooks (`initialize()`, `start()`, `shutdown()`).  The service registers its construction routine with `ServiceStarter` so that graph building can be triggered automatically when the Docker container boots or on demand via an external request.  
+* **`LLMService`** – is consulted twice.  First, after a partial graph is assembled, the service sends a representation to `LLMService` to obtain **semantic insights** (e.g., detecting anti‑patterns, suggesting missing links).  Second, during construction, the service may ask the LLM to **resolve ambiguities** (such as dynamic import resolution) by providing contextual code snippets and receiving a decision back.  The integration points are likely method calls like `LLMService.analyzeGraph(graph)` and `LLMService.decideEdgeType(context)`.  
+* **Configurable framework** – the service accepts a configuration object that defines parameters such as depth of analysis, inclusion/exclusion filters, and weighting of LLM‑derived suggestions.  This configuration is probably passed at construction time or via a dedicated `configure()` method, enabling users to tailor the graph generation to specific domains (e.g., micro‑service architecture vs monolith).
 
-* **Graph Builder** – consumes inputs from the **SemanticAnalysisService**, traverses source code artefacts, and creates nodes/edges that model dependencies, call graphs, and inheritance hierarchies.  
-* **Persistence Layer** – abstracts a separate database (could be a graph DB like Neo4j or a document store) where the constructed graphs are stored.  This isolation enables independent scaling and backup strategies.  
-* **API Surface** – a set of HTTP/IPC endpoints (or perhaps a message‑queue interface) that other services call to fetch graph snapshots, query specific relationships, or listen for updates.  
-* **Logging & Error Handling** – the service integrates with the system‑wide logging framework (likely via a logger injected by the Docker environment) and records construction‑time errors, which are then surfaced through the back‑off‑aware starter to aid debugging.
+The service also implements a **validation mechanism** that checks the integrity of the constructed graph before it is persisted.  Validation may involve schema checks (ensuring required node properties exist), cycle detection, and consistency verification against the LLM‑provided insights.
 
 ## Integration Points  
 
-The **CodeGraphConstructionService** sits in a tightly coupled cluster of sub‑components under the **DockerizedServices** umbrella.  Its primary upstream dependency is the **SemanticAnalysisService**, which supplies the semantic tokens and AST fragments required for graph construction.  Downstream, any component that needs structural insight—such as a **ConstraintMonitoringService** that validates architectural rules, or the **LLMService** that may generate code suggestions based on graph context—will invoke the service’s API.  The service also depends on its dedicated storage system; configuration for connection strings, credentials, and schema migrations is expected to be provided via Docker environment variables, consistent with the parent component’s deployment model.
+`CodeGraphConstructionService` sits at the intersection of several system layers:
 
-Because the service uses the **retry‑with‑backoff** pattern from `lib/service-starter.js`, it inherits the same configuration keys (e.g., `MAX_RETRIES`, `INITIAL_BACKOFF_MS`) that are shared across siblings.  This uniformity simplifies operations: administrators can tune a single set of parameters to affect all services, including CodeGraphConstructionService, without having to edit multiple code bases.
+1. **Parent – `DockerizedServices`** – The Dockerised container provides the runtime environment, networking, and resource isolation.  Because the parent component already leverages `LLMService` (as described in the hierarchy context), the code‑graph service can directly reuse the same LLM client instance, ensuring consistent provider routing, caching, and circuit‑breaking behaviour across the whole suite.  
+2. **Sibling – `SemanticAnalysisService`** – Both services depend on `LLMService` for language‑model reasoning.  While `SemanticAnalysisService` focuses on high‑level semantic extraction, `CodeGraphConstructionService` uses the LLM to **inform graph topology**.  This shared dependency encourages a common contract for LLM interactions (e.g., `getLLMProvider`) and makes it possible to coordinate rate‑limiting or batching strategies at the parent level.  
+3. **Sibling – `ConstraintMonitoringService`** – After a graph is built, the monitoring service could consume the persisted graph via `GraphDatabaseAdapter` to enforce architectural constraints (e.g., forbidden dependencies).  The validation step inside the construction service provides a clean hand‑off point for downstream monitoring.  
+4. **Sibling – `LLMServiceProvider`** – This component manages the selection of the active LLM provider.  Because `CodeGraphConstructionService` relies on `LLMService`, any provider switch (e.g., from OpenAI to Anthropic) is transparently propagated without code changes in the construction logic.  
+
+External callers (e.g., CI pipelines, developer tools) interact with the service through the façade exposed by `ServiceStarter`.  They may invoke a REST endpoint or a message‑queue command that triggers the construction routine, passing in the desired configuration and the source‑code payload.
 
 ## Usage Guidelines  
 
-1. **Start via ServiceStarter** – Always launch the CodeGraphConstructionService through the `startService` function in `lib/service-starter.js`.  Supplying a custom back‑off configuration (if needed) should be done via the same configuration object used by sibling services to keep behaviour predictable.  
-2. **Provide Semantic Input** – Ensure that the **SemanticAnalysisService** has completed its analysis phase before invoking graph construction.  The API typically expects a versioned payload identifier; using stale or mismatched identifiers can cause graph inconsistencies.  
-3. **Persist Correctly** – When configuring the storage backend, follow the Docker‑environment conventions (e.g., `GRAPH_DB_URL`, `GRAPH_DB_USER`).  Do not embed credentials in code; rely on Docker secrets or environment injection.  
-4. **Monitor Logs** – The service emits structured logs for each construction cycle.  Integrate these logs with the central logging aggregator used by DockerizedServices to detect repeated back‑off events, which may indicate upstream data quality problems.  
-5. **Graceful Shutdown** – Because the service may be holding open database connections, implement a signal handler (e.g., for `SIGTERM`) that allows the current construction job to finish or abort cleanly before the container stops.  
+* **Initialize via `ServiceStarter`** – Always start the service through the provided starter to guarantee that the graph database connection and LLM client are correctly bootstrapped.  Direct instantiation bypasses lifecycle hooks and can lead to resource leaks.  
+* **Supply explicit configuration** – The construction framework is highly configurable; omit parameters only when the defaults are appropriate for the target codebase.  For large monoliths, consider limiting depth or disabling certain LLM‑driven decisions to keep runtime predictable.  
+* **Validate after construction** – Although the service performs an internal validation, downstream consumers should also run a sanity check, especially when custom validation rules are added by the `ConstraintMonitoringService`.  
+* **Leverage the shared LLM instance** – Because the parent component centralises LLM provider management, avoid creating separate LLM clients inside the construction service.  Use the injected `LLMService` to benefit from caching and circuit‑breaking.  
+* **Monitor resource usage** – Graph construction can be memory‑intensive, particularly when the LLM is queried repeatedly.  Align the Docker resource limits (CPU, memory) with expected workload size and consider throttling LLM calls via the `LLMServiceProvider` configuration.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Retry‑with‑backoff** (implemented in `lib/service-starter.js` and reused by CodeGraphConstructionService).  
-* **Docker‑based service isolation** (parent component DockerizedServices).  
-* **Separation of concerns / dedicated storage** (own database for code graphs).  
-* **API‑driven interaction** between sub‑components (service exposes an interface for peers).  
+### Architectural Patterns Identified
+1. **Facade** – `CodeGraphConstructionService` presents a simple API while delegating to adapters and external services.  
+2. **Adapter** – `GraphDatabaseAdapter` abstracts the underlying graph store.  
+3. **Strategy/Configuration** – Custom construction parameters allow runtime behaviour changes without code modification.  
+4. **Service‑Oriented Lifecycle** – `ServiceStarter` externalises start/stop concerns.
 
-### 2. Design decisions and trade‑offs  
-* **Shared startup logic** reduces duplication but couples all services to the same back‑off semantics; a change to the back‑off strategy impacts every sibling.  
-* **Dedicated graph storage** improves scalability and data integrity at the cost of additional operational overhead (extra DB to monitor, backup, and scale).  
-* **Docker containerization** provides easy deployment and isolation, yet introduces extra latency for inter‑service communication if not colocated on the same host.  
+### Design Decisions and Trade‑offs
+* **Separation of concerns** (graph persistence vs. construction vs. LLM reasoning) improves testability but introduces additional indirection layers.  
+* **LLM integration** provides powerful semantic guidance but adds latency and external‑service dependency; the design mitigates this via shared provider management.  
+* **Configurable framework** offers flexibility at the cost of increased configuration complexity for end‑users.
 
-### 3. System structure insights  
-* The system is organised as a **parent‑child hierarchy**: DockerizedServices → CodeGraphConstructionService (and siblings).  
-* Common utilities (service starter, logging) reside in shared modules (`lib/service-starter.js`), reinforcing a **horizontal reuse** across sibling services.  
-* Interaction flow: **SemanticAnalysisService → CodeGraphConstructionService → downstream consumers (ConstraintMonitoringService, LLMService)**.  
+### System Structure Insights
+* The sub‑component is nested inside `DockerizedServices`, inheriting the parent’s LLM infrastructure.  
+* It shares the LLM client with `SemanticAnalysisService` and `LLMServiceProvider`, promoting a unified LLM contract across siblings.  
+* Validation and persistence produce artifacts consumable by `ConstraintMonitoringService`, forming a downstream pipeline.
 
-### 4. Scalability considerations  
-* Because the graph data lives in a separate database, the service can be **scaled horizontally** by adding more instances behind a load balancer, provided the storage layer can handle concurrent writes/reads.  
-* The back‑off mechanism protects the system from cascading failures during scale‑up bursts, but the **max‑retry limit** should be tuned to avoid long start‑up times in large clusters.  
+### Scalability Considerations
+* **Horizontal scaling** can be achieved by running multiple Docker instances of the service, each with its own `GraphDatabaseAdapter` connection pool.  
+* **LLM request throttling** should be coordinated at the `LLMServiceProvider` level to avoid hitting provider rate limits when many instances construct graphs concurrently.  
+* **Graph partitioning** (e.g., per repository) can reduce memory pressure and improve query performance.
 
-### 5. Maintainability assessment  
-* Centralising the retry logic in `lib/service-starter.js` makes future changes straightforward, improving maintainability.  
-* However, the lack of visible source files for the service itself (no concrete symbols found) suggests that documentation and code discoverability could be a risk; developers should ensure that the service’s entry point and API contracts are well‑documented and versioned.  
-* Logging and error handling are explicitly mentioned, which aids observability and reduces mean‑time‑to‑resolution for graph‑construction issues.
+### Maintainability Assessment
+* The clear separation into adapters and a lifecycle starter makes the codebase **modular** and **easy to replace** (e.g., swapping Neo4j for another graph store).  
+* Centralising LLM interactions in `LLMService` reduces duplication and eases updates to provider routing or caching logic.  
+* The configurable nature means new graph‑construction strategies can be added without touching core service code, supporting **extensibility**.  
+* However, the reliance on external LLM responses introduces **runtime variability**; comprehensive unit tests should mock `LLMService` to ensure deterministic behaviour.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStarterModule (lib/service-starter.js). This pattern helps prevent endless loops and promotes system stability by introducing a delay between retries. For instance, the startService function in ServiceStarterModule utilizes a backoff strategy to retry failed service startups, ensuring that services are properly initialized before use. The use of Dockerization in this component further enhances deployment and management of services, making it easier to scale and maintain the system. The LLMService (lib/llm/llm-service.ts) also plays a crucial role in this component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component leverages the LLMService (lib/llm/llm-service.ts) to provide a high-level facade for all LLM operations. This service handles mode routing, caching, circuit breaking, and provider fallback, making it a crucial part of the component's architecture. The use of LLMService promotes maintainability and extensibility, as it allows for easy modification and extension of LLM operations without affecting other parts of the component. For example, the LLMService class has a method called 'getLLMProvider' which returns the current LLM provider, and this method is used throughout the component to interact with the LLM provider.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The startService function in ServiceStarterModule (lib/service-starter.js) utilizes a backoff strategy to retry failed service startups, ensuring that services like SemanticAnalysisService are properly initialized before use.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.
-- [LLMService](./LLMService.md) -- The LLMService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class, specifically the getLLMProvider method, to interact with the LLM provider in lib/llm/llm-service.ts
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses API Service Wrapper to interact with external APIs and monitor constraint violations
+- [LLMServiceProvider](./LLMServiceProvider.md) -- LLMServiceProvider uses the LLMService class to manage LLM providers and handle mode routing
 
 
 ---

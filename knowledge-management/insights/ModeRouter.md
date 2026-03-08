@@ -2,73 +2,81 @@
 
 **Type:** Detail
 
-The ModeRouter's functionality is likely crucial for the overall system, as it enables the routing of requests to different modes, which could be related to various aspects of the system, such as configuration or integration points.
+The LLMServiceManager sub-component uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, indicating a strong dependency on this class for routing functionality.
 
 ## What It Is  
 
-The **ModeRouter** lives inside the *DockerizedServices* component of the code‑base and is the focal point for directing incoming LLM‑related requests to the appropriate operational “mode”.  Its implementation is anchored in the repository at the path that brings it together with the LLM service implementation: `lib/llm/llm-service.ts` is imported and used by the router.  In practice, the router sits in a Docker container alongside the other services that make up *DockerizedServices*, giving it a clear boundary and runtime isolation while still being part of a larger modular system.  By separating the routing logic from the actual LLM service implementation, the design enforces a clean separation of concerns: the router decides *where* a request should go, while the LLM service decides *how* to fulfil the request once a mode has been selected.
+**ModeRouter** is a dedicated sub‑component that lives inside **LLMServiceManager**.  The manager imports the **LLMService** class from `lib/llm/llm-service.ts` and delegates all mode‑routing concerns to ModeRouter.  In practice, ModeRouter is the piece that decides which “mode” of an LLM (e.g., inference, fine‑tuning, evaluation) should be used for a given request and orchestrates the hand‑off to the appropriate service implementation.  Because ModeRouter is encapsulated within LLMServiceManager, its public surface is limited to the manager’s internal API, keeping the routing logic hidden from the rest of the code base.
 
 ## Architecture and Design  
 
-The observations point to a **modular, container‑based architecture**.  Each high‑level capability—such as the ModeRouter—is packaged as a distinct Docker image (or at least a distinct container within a compose or orchestration setup).  This modularity is reinforced by the explicit dependency on `lib/llm/llm-service.ts`, which shows a **layered design**: the routing layer (ModeRouter) sits above the service layer (LLM service).  The router does not embed any LLM logic; it merely forwards calls, which is a classic *separation‑of‑concerns* pattern.  
+The observations reveal a **modular, separation‑of‑concerns** architecture.  LLMServiceManager acts as a façade that aggregates lower‑level services, while ModeRouter is the specialized module responsible for routing decisions.  This mirrors a classic **Facade + Router** pattern: the façade simplifies external interaction, and the router isolates decision‑making logic.  
 
-Interaction between components follows a **request‑routing pattern**.  An external client (or another internal service) sends a request to the ModeRouter container.  The router inspects the request—likely examining headers, payload fields, or configuration flags—to determine the target mode.  Once the mode is resolved, the router delegates the call to the LLM service implementation found in `lib/llm/llm-service.ts`.  Because the router and the LLM service share the same codebase (both live under the same repository), the interface between them is a direct TypeScript import rather than a network call, which reduces latency while still preserving logical boundaries.
+The dependency chain is explicit: `LLMServiceManager → LLMService (lib/llm/llm-service.ts) → ModeRouter`.  By routing through ModeRouter, the manager avoids hard‑coding mode logic, which makes it straightforward to add or replace modes without touching the manager itself.  The mention of **DockerizedServices** suggests that ModeRouter may also coordinate with container‑based service instances, ensuring that the selected mode is backed by the correct Docker image or runtime environment.  This reinforces a **layered** design where each layer (manager, router, service implementation) has a single responsibility.
 
 ## Implementation Details  
 
-Even though the source snapshot contains no explicit symbols, the naming conventions give a clear picture of the implementation scaffolding:
+Although the source code is not directly visible, the observations give us the key structural pieces:
 
-1. **ModeRouter Component** – Resides within the *DockerizedServices* hierarchy and likely exports a class or function named `ModeRouter`.  Its primary responsibility is to expose an entry point (e.g., an HTTP endpoint or a message‑queue listener) that receives LLM requests.
+1. **LLMService class (`lib/llm/llm-service.ts`)** – Provides the core interface for interacting with LLM back‑ends.  It likely exposes methods such as `runInference`, `startFineTune`, etc., and contains the logic for launching or communicating with Dockerized containers.
 
-2. **LLM Service Dependency** – The router imports from `lib/llm/llm-service.ts`.  This file presumably defines a service class (e.g., `LlmService`) that encapsulates all interactions with the underlying language model, such as token handling, prompt construction, and API communication.  By pulling this service in as a module, the router can call methods like `processRequest(mode, payload)` without needing to know the internal mechanics of the LLM.
+2. **ModeRouter (child of LLMServiceManager)** – Encapsulated inside the manager, it receives a request context (e.g., a payload indicating the desired mode) and maps it to a concrete LLMService operation.  The router probably maintains a simple lookup table or strategy object that pairs mode identifiers with LLMService method calls.
 
-3. **Mode Determination Logic** – While not visible, the router must contain a decision matrix or strategy map that maps request attributes to concrete mode identifiers.  This could be implemented as a simple `switch` statement, a configuration‑driven lookup, or a strategy‑pattern registry that allows new modes to be added without touching the core router code.
+3. **LLMServiceManager** – Serves as the orchestrator.  When a client asks for an LLM operation, the manager forwards the request to ModeRouter, which then invokes the appropriate method on the LLMService instance.  Because ModeRouter is a child component, its lifecycle is managed by the manager (instantiation, configuration, and disposal).
 
-4. **Docker Integration** – Because ModeRouter is a sub‑component of *DockerizedServices*, its Dockerfile (or compose definition) will copy the relevant source files, install dependencies, and expose the necessary ports.  The containerization ensures that the router can be scaled independently and that its environment (e.g., environment variables for mode configuration) is isolated from other services.
+The tight coupling between ModeRouter and LLMService means that any change in the service’s public API will directly affect routing logic, but this coupling is intentional to keep routing decisions close to the service capabilities they govern.
 
 ## Integration Points  
 
-The ModeRouter’s primary integration point is the **LLM service** located at `lib/llm/llm-service.ts`.  This tight coupling via a TypeScript import means that any change to the service’s public API will directly affect the router, reinforcing the need for stable interfaces.  Beyond the LLM service, the router also interacts with the broader *DockerizedServices* ecosystem:
+- **LLMService (`lib/llm/llm-service.ts`)** – The primary dependency.  ModeRouter calls into this class to execute the selected mode.  The interface exposed by LLMService defines the contract ModeRouter must satisfy.
 
-* **External Clients** – Any consumer that needs to invoke LLM functionality must call the router’s exposed endpoint.  This could be a front‑end UI, an internal API gateway, or another micro‑service within the Docker network.  
-* **Configuration Sources** – Mode definitions may be loaded from environment variables, configuration files, or a shared configuration service that is also containerized.  The router reads these values at startup to build its mode‑lookup table.  
-* **Observability Stack** – Because the router is a critical traffic‑shaping component, it is a natural place to emit logs, metrics, and traces that downstream services (e.g., monitoring dashboards) can consume.
+- **DockerizedServices** – While not a concrete file, the observation that ModeRouter “likely interacts closely with … DockerizedServices” indicates that routing may involve selecting the correct Docker container (e.g., a container running a specific model version or hardware configuration).  The integration point is therefore the container orchestration layer, which LLMService probably abstracts.
+
+- **External callers** – Any component that uses LLMServiceManager (e.g., API endpoints, CLI tools) indirectly interacts with ModeRouter.  They do not call ModeRouter directly; instead, they supply a request that includes a mode identifier, and the manager handles the rest.
 
 ## Usage Guidelines  
 
-Developers who need to route LLM requests should always address the ModeRouter rather than invoking the LLM service directly.  The router expects requests to conform to the contract defined in `lib/llm/llm-service.ts`; typically this means providing a payload object that includes a `mode` identifier and any model‑specific parameters.  When extending the system with a new mode, the recommended approach is to add the mode definition to the router’s configuration (or strategy registry) and, if necessary, augment the LLM service with any mode‑specific handling—without altering the router’s core routing algorithm.  
+1. **Always go through LLMServiceManager** – ModeRouter is not intended to be instantiated or called directly.  Use the manager’s public methods; it will delegate to the router automatically.
 
-Because the router runs inside a Docker container, it is essential to keep the container image lightweight: only the router code, the LLM service module, and their runtime dependencies should be included.  Environment variables that control mode activation must be documented and version‑controlled to avoid drift between development, staging, and production environments.  Finally, any changes to the router’s public interface should be accompanied by integration tests that exercise each mode path, ensuring that the routing logic remains reliable as the system evolves.
+2. **Specify the mode explicitly** – When invoking an LLM operation, include a clear mode flag (e.g., `mode: "inference"`).  The manager will forward this to ModeRouter, which will select the correct LLMService path.
+
+3. **Keep mode identifiers stable** – Since ModeRouter maps identifiers to service calls, changing a string literal without updating the router will break routing.  Document any new modes in the router’s configuration.
+
+4. **Do not modify LLMService without updating ModeRouter** – Because the router tightly depends on LLMService’s API, any signature change requires a corresponding update in the routing logic.
+
+5. **Leverage DockerizedServices through the manager** – If a new Docker image is required for a mode, add the container definition to the DockerizedServices layer and expose the necessary method on LLMService; ModeRouter will then be able to route to it without further changes.
 
 ---
 
-### Architectural patterns identified  
-* **Modular containerization** – Each functional block (ModeRouter, other services) is packaged as a distinct Docker container.  
-* **Layered separation of concerns** – Routing logic is isolated from LLM processing logic.  
-* **Request‑routing / strategy pattern** – The router selects a mode based on request attributes and delegates to the appropriate handler.
+### Architectural Patterns Identified
+- **Facade Pattern** – LLMServiceManager presents a simplified interface to the rest of the system.
+- **Router / Strategy Pattern** – ModeRouter selects the appropriate LLMService operation based on a mode key.
+- **Layered Architecture** – Clear separation between manager (orchestration), router (decision), and service (execution).
 
-### Design decisions and trade‑offs  
-* **Direct module import vs. network call** – Importing `llm-service.ts` keeps latency low but introduces tighter compile‑time coupling; a network‑based call would improve isolation at the cost of performance.  
-* **Docker isolation** – Provides operational independence and scaling flexibility, but adds orchestration overhead and requires careful versioning of container images.  
-* **Configuration‑driven mode selection** – Enables adding new modes without code changes, yet places reliance on external configuration correctness.
+### Design Decisions and Trade‑offs
+- **Explicit Separation of Concerns** – Routing logic is isolated, improving readability and testability, but introduces a dependency on LLMService that must be kept in sync.
+- **Tight Coupling to LLMService** – Guarantees that routing decisions are always based on the latest service capabilities; however, it reduces the ability to swap out the service implementation without touching the router.
+- **Implicit Docker Integration** – By delegating container concerns to LLMService, ModeRouter stays lightweight, but any Docker‑related failure surfaces through the service layer, requiring robust error handling at the manager level.
 
-### System structure insights  
-The system is organized as a hierarchy where *DockerizedServices* is the top‑level container group, containing the **ModeRouter** sub‑component, which in turn incorporates the **LLM service** implementation.  This nesting reflects a clear ownership model: DockerizedServices owns the runtime environment, ModeRouter owns request dispatch, and the LLM service owns model interaction.
+### System Structure Insights
+- The hierarchy is **LLMServiceManager → ModeRouter → LLMService**.
+- ModeRouter acts as the sole child of the manager, implying a one‑to‑one relationship; there are no sibling routers observed.
+- DockerizedServices sit “laterally” to LLMService, providing runtime assets that the service consumes.
 
-### Scalability considerations  
-Because the router is containerized, it can be horizontally scaled behind a load balancer to handle increased request volume.  Scaling the LLM service independently (e.g., by deploying multiple instances of the `llm-service.ts` logic) is straightforward if the router were refactored to invoke it over the network; the current direct import model would require the router container itself to be scaled to increase LLM throughput.
+### Scalability Considerations
+- Adding new modes is straightforward: extend the router’s mapping and ensure LLMService implements the corresponding method.  This linear growth does not impact existing routes.
+- If the number of modes or the complexity of routing decisions grows substantially, the router may need to evolve into a more sophisticated strategy registry or plugin system to avoid a monolithic switch‑case.
 
-### Maintainability assessment  
-The explicit separation between routing and LLM logic improves maintainability: developers can modify routing rules or add new modes without touching the core LLM code.  However, the tight TypeScript import creates a compile‑time dependency that must be managed carefully—any breaking change in `llm-service.ts` will ripple to the router.  Maintaining clear interface contracts and comprehensive integration tests will mitigate this risk and keep the overall system maintainable as it grows.
+### Maintainability Assessment
+- **High maintainability** for the current scope because routing logic is isolated and clearly documented via the manager‑router relationship.
+- **Potential risk** lies in the tight coupling to LLMService; any breaking change in the service forces a coordinated update in the router.
+- The modular layout (separate files, distinct responsibilities) supports unit testing of each layer, further enhancing long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ModeRouter](./ModeRouter.md) -- ModeRouter utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.
-
-### Children
-- [ModeRouter](./ModeRouter.md) -- The ModeRouter sub-component is part of the DockerizedServices component, indicating a modular design with containerized services.
+- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, demonstrating a clear separation of concerns.
 
 
 ---

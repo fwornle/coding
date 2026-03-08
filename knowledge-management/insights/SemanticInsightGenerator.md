@@ -2,153 +2,110 @@
 
 **Type:** SubComponent
 
-MLModelExecutor executes the machine learning model to generate semantic insights using the MLModelExecutor class in semantic-insight-generator/ml-model-executor.ts
+The SemanticInsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/semantic-insight-generator.ts, responsible for generating semantic insights
 
 ## What It Is  
 
-**SemanticInsightGenerator** is a sub‑component that lives under the *SemanticAnalysis* component. Its implementation resides in the `semantic-insight-generator/` folder of the codebase. The core of the generator is orchestrated through three concrete classes:
+The **SemanticInsightGenerator** lives in the source tree at  
 
-* `semantic-insight-generator/nlp-processor.ts` – defines the **NLPProcessor** class that performs the initial natural‑language preprocessing.  
-* `semantic-insight-generator/ml-model-executor.ts` – defines the **MLModelExecutor** class that runs the trained machine‑learning model and produces raw semantic insights.  
-* `semantic-insight-generator/insight-post-processor.ts` – defines the **InsightPostProcessor** class that refines, filters, and formats the raw output into the final insight objects.
+```
+integrations/mcp-server-semantic-analysis/src/insights/semantic-insight-generator.ts
+```  
 
-The sub‑component is declared as a child of **SemanticAnalysis** (the parent component) and itself contains the **NlpProcessorIntegration** child, which is essentially a thin wrapper that wires the **NLPProcessor** into the generator’s workflow. In short, *SemanticInsightGenerator* is the pipeline that transforms free‑form text into structured, actionable semantic insights, ready for consumption by downstream agents such as the *Insights* component’s **InsightGenerator**.
+It is the concrete implementation that turns raw observations into *semantic insights* – higher‑level, meaning‑rich artefacts that can be visualized, cached, and explored through a user‑facing dashboard.  The generator leans on an LLM (large‑language‑model) backend to synthesize natural‑language explanations, while also calling the **CodeGraphAgent** (implemented in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) to obtain structural code‑graph representations that feed the LLM.  Once an insight is produced, it is classified against the system‑wide ontology via the **OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) and stored in an internal cache for fast repeat access.  The end‑user interacts with the results through a visualization framework and an interactive dashboard that are part of the same component.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **composition‑based architecture**: *SemanticInsightGenerator* “contains” *NlpProcessorIntegration*, and the parent *SemanticAnalysis* “contains” *SemanticInsightGenerator*. This reflects a clear **separation of concerns** where each stage of the insight‑generation pipeline is encapsulated in its own class.
+The design of the **SemanticInsightGenerator** follows a **modular, agent‑centric architecture** that is evident throughout the parent **SemanticAnalysis** component.  Each responsibility—code‑graph creation, ontology classification, insight generation, retry handling, and caching—is isolated in its own module (e.g., `code-graph-agent.ts`, `ontology-classification-agent.ts`, `retry-manager.ts`).  This separation of concerns enables independent evolution of each agent without cascading impact on the others, a decision that directly supports the maintainability goal highlighted in the parent component’s description.
 
-* **NLP preprocessing** – Handled exclusively by `NLPProcessor`. By isolating language‑specific tokenisation, lemmatisation, and entity extraction, the design enables swapping or extending the NLP stack without touching the model execution logic.  
-* **Model execution** – The `MLModelExecutor` abstracts away the details of loading a serialized model, feeding it the pre‑processed representation, and retrieving raw predictions. This class acts as a façade over whatever ML framework is used (TensorFlow, PyTorch, etc.), keeping the generator agnostic to the underlying inference engine.  
-* **Post‑processing** – `InsightPostProcessor` applies business‑level rules (e.g., confidence thresholds, deduplication) and formats the output to match the contract expected by the *Insights* sibling component.
+Interaction between agents is orchestrated by the **Pipeline** (DAG‑based execution model defined in `batch-analysis.yaml`).  The pipeline declares explicit `depends_on` edges, ensuring that the **CodeGraphAgent** runs before the **SemanticInsightGenerator**, which in turn must complete before the **OntologyClassificationAgent** can classify the insight.  The generator itself acts as a *facade* that aggregates the outputs of lower‑level agents, applies the LLM‑based synthesis, and then pushes the result into the caching layer.  The caching mechanism (observed but not explicitly located) follows a **cache‑aside pattern**: the generator first checks the cache, falls back to LLM processing when a miss occurs, and writes the fresh insight back to the cache.
 
-The overall flow mirrors a **pipeline pattern** (not a formal “pipeline framework”, but the logical sequence of stages). The parent *SemanticAnalysis* component employs a DAG‑based execution model with topological sorting (as described in the hierarchy context). Although the *SemanticInsightGenerator* itself does not expose a DAG, it fits naturally into that larger DAG: it is one node whose inputs are raw textual observations and whose outputs feed downstream agents like *InsightGenerator*.
-
-No explicit event‑driven or micro‑service patterns are mentioned, so the design stays within a **monolithic library** boundary, relying on direct class composition and method calls.
+The visualization framework and dashboard are built on top of the generated insight objects, exposing them through UI components.  Although the exact UI stack is not listed, the presence of a “dashboard for users to explore and interact with semantic insights” indicates a **presentation layer** that consumes the same data contracts produced by the generator, reinforcing a clean separation between business logic and UI.
 
 ---
 
 ## Implementation Details  
 
-1. **`semantic-insight-generator/nlp-processor.ts` – `NLPProcessor`**  
-   *Exposes* a public method (e.g., `process(text: string): ProcessedText`). It likely tokenises the input, normalises case, removes stop‑words, and extracts linguistic features required by the ML model. Because the class lives in its own file, it can be unit‑tested in isolation and potentially replaced with a different language model.
+At its core, `semantic-insight-generator.ts` defines a class (presumably `SemanticInsightGenerator`) that orchestrates three primary steps:
 
-2. **`semantic-insight-generator/ml-model-executor.ts` – `MLModelExecutor`**  
-   *Exposes* a method such as `execute(processed: ProcessedText): RawInsight[]`. Internally it loads a pre‑trained model (perhaps via a configuration file) and performs inference. The class abstracts the model lifecycle (initialisation, warm‑up, teardown) and shields the rest of the system from framework‑specific APIs.
+1. **Code‑graph acquisition** – it calls `CodeGraphAgent.generateGraph(observation)` to obtain a graph‑structured view of the source code relevant to the observation. This graph supplies structural context that the LLM can reason over.
 
-3. **`semantic-insight-generator/insight-post-processor.ts` – `InsightPostProcessor`**  
-   *Exposes* a method like `postProcess(raw: RawInsight[]): Insight[]`. Typical responsibilities include:  
-   * Filtering out low‑confidence predictions.  
-   * Merging duplicate insights.  
-   * Mapping raw model output fields to the domain‑specific `Insight` DTO used across the system.  
+2. **LLM‑driven insight synthesis** – the generator formats the code‑graph, raw observation text, and any ancillary metadata into a prompt that is sent to an LLM service (the exact client library is not mentioned). The LLM returns a natural‑language description, risk assessment, or recommendation, which becomes the raw semantic insight.
 
-4. **`NlpProcessorIntegration` (child component)**  
-   This integration layer simply injects an instance of `NLPProcessor` into the generator’s workflow, possibly via constructor injection or a factory method. Its existence signals an intentional decoupling: the generator does not instantiate the processor directly, allowing future dependency‑injection frameworks or mock implementations for testing.
+3. **Ontology classification & caching** – the raw insight is handed to `OntologyClassificationAgent.classify(insight)` to map it onto predefined ontology concepts. The classified insight is then stored in the cache (the implementation likely uses a key derived from the observation hash). Subsequent requests for the same observation hit the cache, bypassing the LLM call and reducing latency.
 
-5. **Overall orchestration**  
-   The *SemanticInsightGenerator* class (not listed in the observations but implied by the sub‑component name) likely coordinates the three stages in order:  
-   ```ts
-   const processed = nlpProcessor.process(rawText);
-   const rawInsights = mlModelExecutor.execute(processed);
-   const finalInsights = insightPostProcessor.postProcess(rawInsights);
-   return finalInsights;
-   ```  
-   This linear flow aligns with the parent component’s DAG execution model: the generator is a single node that consumes input and produces output for downstream nodes.
+The generator also exposes methods for the visualization framework (e.g., `getInsightForDashboard(id)`), which retrieve cached insights and package them into UI‑ready DTOs.  Error handling is delegated to the **RetryManager** (`retry-manager.ts`), ensuring that transient failures in LLM calls or graph generation are retried according to a configurable policy.
 
 ---
 
 ## Integration Points  
 
-* **Parent – SemanticAnalysis**: The parent component treats *SemanticInsightGenerator* as a black‑box node within its DAG. When the topological sort reaches the “semantic‑insight‑generation” step, it invokes the generator, feeding it the textual observations collected from earlier agents (e.g., git history parsing, LSL session extraction). The generator’s output becomes part of the enriched knowledge graph that the parent later passes to other agents.
+- **Parent Component – SemanticAnalysis**: The generator is a child of the `SemanticAnalysis` component, inheriting the overall modular orchestration strategy.  It relies on sibling agents (`CodeGraphAgent`, `OntologyClassificationAgent`) that are co‑located under the same `src/agents/` directory.
 
-* **Sibling – Insights**: The *Insights* sibling component’s **InsightGenerator** consumes the `Insight[]` objects produced by *SemanticInsightGenerator*. Because both share the same `Insight` DTO definition, they can interoperate without transformation layers.
+- **Pipeline (DAG)**: Execution order is enforced by the pipeline defined in `batch-analysis.yaml`.  The generator’s step declares a dependency on the `code-graph-agent` step and is a prerequisite for the `ontology-classification-agent` step.
 
-* **Sibling – Pipeline**: While *Pipeline* orchestrates broader batch jobs using a DAG defined in `batch-analysis.yaml`, the *SemanticInsightGenerator* is invoked as one of the pipeline steps. The pipeline’s `depends_on` edges ensure that any prerequisite data (e.g., code parsing results from *CodeGraphConstructor*) is ready before the generator runs.
+- **Cache Layer**: Although the cache implementation file is not listed, the generator interacts with it through a simple get/put API.  This layer is shared with other insight‑related components (e.g., the generic `InsightGenerator` in `insights/insight-generator.ts`), promoting reuse of cached artefacts.
 
-* **Sibling – Ontology**: The ontology subsystem (e.g., `OntologyConfigManager`) may provide classification schemas that the **InsightPostProcessor** uses to label or validate insights. Although not directly referenced, the shared ontology configuration suggests a contract where post‑processing aligns raw model predictions with the canonical ontology terms.
+- **Visualization & Dashboard**: The generator supplies data to the UI via a well‑defined contract.  The dashboard consumes these contracts to render charts, trees, and narrative text, enabling users to drill down from high‑level insights to underlying code‑graph details.
 
-* **Child – NlpProcessorIntegration**: This integration point isolates the concrete `NLPProcessor` implementation from the generator, enabling the parent or test harness to inject alternative processors (e.g., a lightweight rule‑based tokenizer for unit tests).
-
-All dependencies are expressed through explicit class imports (`import { NLPProcessor } from './nlp-processor'`, etc.), keeping the coupling transparent and compile‑time verifiable.
+- **RetryManager**: All external calls (LLM service, graph generation) are wrapped with retry logic from `utils/retry-manager.ts`, providing resilience across the integration surface.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via Dependency Injection** – Prefer constructing *SemanticInsightGenerator* with injected instances of `NLPProcessor`, `MLModelExecutor`, and `InsightPostProcessor`. This makes the component testable and allows swapping implementations (e.g., a mock `MLModelExecutor` for CI pipelines).
+1. **Always query the cache first** – before invoking the generator, callers should use the provided `fetchFromCache(observationId)` method.  This minimizes expensive LLM calls and respects the cache‑aside design.
 
-2. **Respect the processing order** – Call the generator’s public method (e.g., `generateInsights(text)`) only after the input text has been validated and normalised at the *SemanticAnalysis* level. Feeding malformed data can cause downstream post‑processing failures.
+2. **Pass well‑formed observations** – the generator expects observations that contain enough contextual metadata for the `CodeGraphAgent` to build a meaningful graph.  Incomplete observations may lead to generic or low‑quality insights.
 
-3. **Configure the ML model path centrally** – The `MLModelExecutor` expects a configuration file (often located alongside the component). Ensure that the model artifact is present in the expected directory before deployment; otherwise the executor will raise runtime errors.
+3. **Respect the pipeline ordering** – when extending the analysis workflow, add new steps after the `semantic-insight-generator` node in `batch-analysis.yaml` and declare any additional `depends_on` edges to preserve deterministic execution.
 
-4. **Tune post‑processing thresholds** – The `InsightPostProcessor` contains business rules such as confidence cut‑offs. Adjust these thresholds in the configuration file (if exposed) rather than modifying source code, to keep the component stable across releases.
+4. **Handle classification failures gracefully** – the `OntologyClassificationAgent` may return “unclassified” for novel concepts.  UI components should display a fallback label rather than breaking.
 
-5. **Unit‑test each stage in isolation** – Because the design isolates NLP, model execution, and post‑processing, write focused tests for each class. Use the `NlpProcessorIntegration` wrapper to inject test doubles when exercising the full pipeline.
-
-6. **Do not bypass the post‑processor** – Directly using the raw output from `MLModelExecutor` defeats the quality guarantees provided by `InsightPostProcessor`. All consumers (e.g., *InsightGenerator*) expect the cleaned `Insight[]` format.
+5. **Configure retry policies** – the `RetryManager` defaults can be overridden in environment configuration.  For high‑throughput environments, tune the max‑attempts and back‑off strategy to balance latency and reliability.
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural patterns identified  
+- **Modular / Agent‑based architecture** (distinct agents for code‑graph, ontology classification, retry handling)  
+- **Cache‑aside pattern** for storing generated insights  
+- **Facade pattern** (SemanticInsightGenerator as a single entry point that hides underlying agent complexity)  
+- **Pipeline / DAG execution model** (defined in `batch-analysis.yaml`)  
 
-* **Composition / Containment** – Parent *SemanticAnalysis* contains *SemanticInsightGenerator*; the generator contains *NlpProcessorIntegration*.  
-* **Pipeline (Linear Processing) Pattern** – Sequential stages: NLP preprocessing → ML model execution → post‑processing.  
-* **Facade (MLModelExecutor)** – Hides the complexity of the underlying ML framework behind a simple interface.  
-* **Dependency Injection (via NlpProcessorIntegration)** – Allows interchangeable implementations of the NLP processor.
+### Design decisions and trade‑offs  
+- **LLM reliance** provides rich natural‑language insights but introduces latency and cost; the cache mitigates this.  
+- **Agent isolation** improves maintainability but adds coordination overhead via the pipeline.  
+- **Ontology integration** enforces semantic consistency at the expense of requiring a well‑curated ontology.  
 
-### 2. Design decisions and trade‑offs  
+### System structure insights  
+- The `SemanticAnalysis` component acts as a container for multiple agents, each in its own file under `src/agents/`.  
+- Insight‑related generators (`semantic-insight-generator.ts`, `insight-generator.ts`) sit in `src/insights/`, sharing the same caching and visualization contracts.  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Separate classes for each processing stage | Clear separation of concerns; easier to test and replace individual stages | Slightly more boilerplate; requires careful orchestration in the generator |
-| Use composition rather than inheritance | Flexibility to mix and match different processors or executors | No built‑in polymorphic behaviour for shared base functionality (must rely on interfaces) |
-| Keep the component monolithic (no micro‑service boundary) | Simpler deployment, lower latency between stages | Limits horizontal scaling of individual stages; scaling must be done at process level |
-| Expose configuration for model paths and post‑processing thresholds | Enables runtime tuning without code changes | Requires disciplined configuration management to avoid mismatches between environments |
+### Scalability considerations  
+- **Horizontal scaling** of the LLM service and cache can accommodate larger codebases; the DAG pipeline can be parallelized for independent observations.  
+- The cache‑aside approach ensures that repeated analyses of the same observation are O(1) after the first run, reducing load on the LLM.  
 
-### 3. System structure insights  
-
-* The **SemanticInsightGenerator** sits at the intersection of text‑centric processing and the broader semantic analysis DAG.  
-* Its child **NlpProcessorIntegration** is the only direct link to the NLP library, making that library a replaceable plug‑in.  
-* The generator’s output feeds the *Insights* sibling, which in turn may enrich the **KnowledgeGraph** used by downstream agents.  
-* All sibling components share the same top‑level DAG orchestration, ensuring deterministic execution order and preventing circular dependencies.
-
-### 4. Scalability considerations  
-
-* **Vertical scaling** – Since the three stages run in the same process, scaling is achieved by allocating more CPU/memory to the host running *SemanticAnalysis*.  
-* **Horizontal scaling** – To scale out, the pipeline could be refactored so that each stage runs in its own worker process or container (e.g., a separate service for `MLModelExecutor`). The current composition design does not hinder such a refactor, because each stage already has a clean interface.  
-* **Model loading overhead** – `MLModelExecutor` likely loads a sizable model; caching the loaded model in a singleton or using a warm‑up step can mitigate latency spikes when the generator is invoked many times in a batch.  
-* **Batch vs. streaming** – The parent DAG can schedule the generator in batch mode (processing many observations at once) or in a streaming fashion; the linear pipeline design accommodates both, provided the underlying model supports batched inference.
-
-### 5. Maintainability assessment  
-
-* **High modularity** – Each stage is isolated in its own file, making the codebase easy to navigate and modify.  
-* **Clear naming and file structure** – Paths (`semantic-insight-generator/*.ts`) directly reflect responsibilities, aiding discoverability.  
-* **Testability** – Dependency injection via `NlpProcessorIntegration` and the façade nature of `MLModelExecutor` enable unit tests for each component without heavyweight ML dependencies.  
-* **Potential technical debt** – If future requirements demand parallel execution of stages or dynamic pipeline reconfiguration, the current linear orchestration may need refactoring. However, the existing composition pattern provides a solid foundation for such evolution.  
-
-Overall, *SemanticInsightGenerator* exhibits a clean, well‑encapsulated design that aligns with the broader DAG‑driven architecture of the *SemanticAnalysis* system while remaining straightforward to extend and maintain.
+### Maintainability assessment  
+- The clear separation of concerns, explicit file boundaries, and pipeline‑driven orchestration make the codebase easy to navigate and extend.  
+- Adding new insight types or swapping out the LLM provider only requires changes within `semantic-insight-generator.ts` and possibly the retry policy, leaving other agents untouched.  
+- The reliance on a shared ontology means that ontology evolution must be coordinated, but the dedicated `OntologyClassificationAgent` isolates that impact.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
-
-### Children
-- [NlpProcessorIntegration](./NlpProcessorIntegration.md) -- The SemanticInsightGenerator sub-component uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts, indicating a strong dependency on this class for its core functionality.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's architecture is designed to facilitate modular and concurrent processing, allowing for efficient analysis of large codebases. This is evident in the use of multiple agents, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, each with its own file and responsibilities. For instance, the OntologyClassificationAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, and is responsible for classifying observations against the ontology system. The use of a modular architecture facilitates maintainability and scalability, as each agent can be updated or modified independently without affecting the overall system.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
-- [Insights](./Insights.md) -- InsightGenerator generates insights from the processed observations using the InsightGenerator class in insights/generator.ts
-- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the ASTParser class in code-graph/parser.ts to parse the abstract syntax tree of the code
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMServiceFactory class in llm-service-manager/factory.ts to create LLM services
-- [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph uses the GraphDatabase class in knowledge-graph/database.ts to store the knowledge entities and their relationships
-- [OntologyRepository](./OntologyRepository.md) -- OntologyRepository uses the OntologyDatabase class in ontology-repository/database.ts to store the ontology definitions and their relationships
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, responsible for classifying observations against the ontology system
+- [Insights](./Insights.md) -- The InsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts, responsible for generating insights from processed data
+- [RetryManager](./RetryManager.md) -- The RetryManager is implemented in the file integrations/mcp-server-semantic-analysis/src/utils/retry-manager.ts, responsible for handling retry mechanisms
+- [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, responsible for generating code graphs
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

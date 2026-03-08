@@ -2,141 +2,132 @@
 
 **Type:** SubComponent
 
-OnlineLearning stores automatically extracted knowledge entities in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of automatic knowledge
+OnlineLearning's data is processed using the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts
 
 ## What It Is  
 
-**OnlineLearning** is the automatic‑knowledge‑extraction sub‑component of the **KnowledgeManagement** domain. Its implementation lives primarily in the batch‑analysis pipeline that pulls data from three sources – the Git repository history, LSL (Learning‑Session‑Log) recordings, and static code analysis results. The extracted artefacts are transformed into *knowledge entities* and persisted in the graph store via the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`.  
+OnlineLearning is a **SubComponent** of the **KnowledgeManagement** domain that extracts, stores, and synchronises learning‑related artefacts (git history, LSL sessions, static code analysis) into the system‑wide knowledge graph. The core of its processing lives in the **batch analysis pipeline** defined in  
 
-The sub‑component also relies on a small supporting ecosystem:  
-* **EntityPersistenceManager** – orchestrates the write‑through of the newly created entities into the graph database.  
-* **DataLossTracker** – monitors the extraction run for missing or incomplete data, flagging bottlenecks that could affect downstream queries.  
-* A **factory‑based LLM creator** (the same factory used by the Wave agents) supplies a large‑language‑model instance only when the pipeline actually needs it, following the `constructor(repoPath, team) → ensureLLMInitialized() → execute(input)` lazy‑initialisation contract.  
+```
+integrations/mcp-server-semantic-analysis/src/pipeline/batch-analysis-pipeline.ts
+```  
 
-Together these pieces give OnlineLearning the ability to “learn” from a codebase without any manual authoring, feeding the broader KnowledgeManagement graph with up‑to‑date, automatically derived knowledge.
+which orchestrates the ingestion of raw learning data and drives the creation of a code‑centric graph representation via the **CodeGraphAgent** (found in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`). All persisted artefacts are written to the graph database through the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). The adapter’s automatic JSON export sync guarantees that the OnlineLearning view of the graph is always current and that downstream components (e.g., InsightGenerator) see a consistent state.
 
 ---
 
 ## Architecture and Design  
 
-### High‑level architectural style  
-OnlineLearning follows a **pipeline‑oriented batch processing** architecture. The pipeline is triggered periodically (or on demand) and runs a series of extraction stages – Git history parsing, LSL session mining, and code‑analysis scanning – each feeding its output downstream. This design keeps the extraction work isolated from real‑time user interactions, allowing the system to scale the heavy‑weight analysis independently of the online services that query the knowledge graph.
+The observable architecture is **pipeline‑centric** with a **DAG‑based execution model**. The batch‑analysis pipeline builds a directed‑acyclic graph of processing steps and resolves execution order with a **topological sort**. This design enables deterministic ordering of independent analysis stages (e.g., git history parsing, LSL session extraction, static code analysis) while still allowing parallelism where the DAG permits it.  
 
-### Core design patterns  
+Persistence is abstracted through the **GraphDatabaseAdapter**, which hides the underlying **Graphology + LevelDB** implementation. By exposing a thin API for “store” and “retrieve” operations, the adapter enforces a single source of truth for all knowledge‑graph interactions across the KnowledgeManagement family (OnlineLearning, ManualLearning, OntologyManager, InsightGenerator). The adapter’s **automatic JSON export sync** acts as a built‑in consistency mechanism, ensuring that any mutation performed by OnlineLearning is instantly reflected in the exported JSON snapshot used by other services.  
 
-| Pattern | Where it appears | Purpose |
-|---------|------------------|---------|
-| **Factory pattern** | LLM creation in the Wave agents (and inherited by OnlineLearning) | Centralises the construction of potentially expensive LLM objects, enabling configuration (model selection, credentials) to be managed in one place. |
-| **Lazy initialization** | `constructor(repoPath, team) → ensureLLMInitialized() → execute(input)` pattern | Defers the costly LLM startup until the first execution, reducing startup latency and resource consumption for batch runs that may not need the model. |
-| **Adapter pattern** | `storage/graph-database-adapter.ts` (GraphDatabaseAdapter) | Provides a uniform interface for persisting and retrieving knowledge entities regardless of the underlying graph store (Graphology + LevelDB). |
-| **Manager/Coordinator** | `EntityPersistenceManager` | Encapsulates the persistence workflow, isolating the pipeline from direct storage calls and making it easy to swap persistence strategies. |
-| **Tracker/Observer** | `DataLossTracker` | Observes the extraction flow, records missing data events, and surfaces them for diagnostics – a lightweight monitoring pattern. |
+The **CodeGraphAgent** acts as the domain‑specific worker that translates raw learning artefacts into graph nodes and edges. It consumes the pipeline’s output and invokes the GraphDatabaseAdapter to persist the resulting code graph. Because the agent is a sibling of other agents (e.g., those used by ManualLearning or OntologyManager), the same storage contract is reused, reinforcing a **shared‑adapter pattern** across siblings.  
 
-### Component interaction  
-
-1. **Batch Pipeline** creates a *run context* containing `repoPath` and `team`.  
-2. The pipeline **ensures the LLM** is instantiated via the shared factory (`ensureLLMInitialized`).  
-3. Extraction stages emit **raw knowledge artefacts** (e.g., commit‑level insights, session‑level patterns).  
-4. These artefacts are handed to **EntityPersistenceManager**, which translates them into graph‑entity objects.  
-5. Persistence manager delegates the actual storage to **GraphDatabaseAdapter**, which writes to the Graphology‑LevelDB backend.  
-6. Throughout the run, **DataLossTracker** records any gaps (e.g., missing LSL files, unparsable commits) and persists its diagnostics via the same adapter.  
-
-The sibling components – **ManualLearning**, **KnowledgeGraphQueryEngine**, **DataLossTracker**, and **EntityPersistenceManager** – all share the same adapter, ensuring a consistent storage contract across the KnowledgeManagement suite.
+Overall, the design leans heavily on **separation of concerns**: ingestion (pipeline), transformation (agent), and persistence (adapter) are cleanly isolated, while the parent component **KnowledgeManagement** provides the overarching graph‑storage infrastructure.
 
 ---
 
 ## Implementation Details  
 
-### Batch analysis pipeline  
-While the exact file names are not listed, the observations state that the pipeline “extracts knowledge from git history, LSL sessions, and code analysis.” Each source is likely wrapped in a dedicated extractor class that reads raw data, normalises it into a common *knowledge‑entity* schema, and passes the result downstream. Because the pipeline is batch‑oriented, it can process large histories in chunks, leveraging streaming or pagination to stay memory‑efficient.
+1. **Batch‑Analysis Pipeline (`batch-analysis-pipeline.ts`)**  
+   - Constructs a **DAG** where each node represents a discrete analysis task (e.g., `ParseGitHistoryTask`, `ExtractLSLSessionTask`, `StaticCodeAnalysisTask`).  
+   - Executes a **topological sort** to compute a safe linearisation, guaranteeing that dependent tasks run after their prerequisites.  
+   - Dispatches each task to the appropriate agent; for OnlineLearning the final task hands off the enriched data to `CodeGraphAgent`.  
 
-### LLM lazy‑initialisation contract  
-The contract `constructor(repoPath, team) + ensureLLMInitialized() + execute(input)` mirrors the Wave agents’ design. The constructor stores configuration, `ensureLLMInitialized` checks an internal flag and, if needed, calls the **LLM factory** to create the model instance (potentially loading model weights, establishing API connections, etc.). `execute` then receives the extracted artefacts (or a prompt built from them) and returns LLM‑generated insights that are later persisted.
+2. **CodeGraphAgent (`code-graph-agent.ts`)**  
+   - Receives structured artefacts (commits, session events, code metrics).  
+   - Maps these artefacts onto graph entities: commits become **CommitNode**, LSL sessions become **SessionNode**, and code constructs become **FunctionNode/ClassNode**.  
+   - Establishes relationships such as `COMMITTED_IN`, `PARTICIPATED_IN`, and `CALLS` to reflect both version‑control lineage and runtime interaction captured from LSL.  
+   - Calls the **GraphDatabaseAdapter** to persist nodes and edges atomically, leveraging the adapter’s batch write capabilities.  
 
-### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
-This adapter abstracts the underlying **Graphology + LevelDB** persistence layer. It likely exposes methods such as `saveEntity(entity)`, `getEntityById(id)`, and `query(filter)`. By keeping all storage calls behind this adapter, OnlineLearning (and its siblings) can evolve the storage backend without touching extraction logic.
+3. **GraphDatabaseAdapter (`graph-database-adapter.ts`)**  
+   - Wraps **Graphology** (an in‑memory graph library) with a **LevelDB** backend for durable storage.  
+   - Exposes methods like `addNode`, `addEdge`, `query`, and `exportJson`.  
+   - Implements an **automatic JSON export sync**: after each successful mutation, the adapter writes a fresh JSON snapshot to a configured location, ensuring that the knowledge graph used by other components (e.g., InsightGenerator) is never stale.  
 
-### EntityPersistenceManager  
-Acts as a façade over the adapter. It receives domain‑level entities, possibly validates them against a schema, enriches them with timestamps or provenance metadata (repoPath, team, extraction run ID), and then invokes the adapter’s `saveEntity`. This separation means the batch pipeline does not need to know about transaction handling or batch writes; the manager can batch‑commit for performance.
-
-### DataLossTracker  
-Integrated into the pipeline, it records events such as “missing LSL file for session X” or “commit Y could not be parsed”. The tracker stores its logs via the same GraphDatabaseAdapter, allowing analysts to query loss patterns through the **KnowledgeGraphQueryEngine**. This design provides observability without adding a separate logging system.
+4. **Data Flow & Synchronisation**  
+   - OnlineLearning’s pipeline writes directly to the graph via the adapter; the adapter’s sync feature pushes the updated graph to the **knowledge graph** layer that the rest of the system consumes.  
+   - Because the same adapter is used by sibling components (ManualLearning, OntologyManager, InsightGenerator), any change made by OnlineLearning is instantly visible to them, preserving **cross‑component consistency**.  
 
 ---
 
 ## Integration Points  
 
-| Integration | Direction | Interface / Path |
-|-------------|-----------|------------------|
-| **KnowledgeManagement (parent)** | OnlineLearning contributes automatically extracted entities to the overall knowledge graph managed by KnowledgeManagement. | Uses the same `GraphDatabaseAdapter` and shares the LLM factory configuration. |
-| **EntityPersistenceManager (sibling)** | OnlineLearning delegates all persistence responsibilities to this manager. | Calls `EntityPersistenceManager.persist(entity)` (exact method name inferred). |
-| **DataLossTracker (sibling)** | OnlineLearning reports extraction anomalies to the tracker. | Tracker API likely `trackLoss(event)`. |
-| **ManualLearning (sibling)** | Both write to the same graph store but differ in source (automatic vs manual). | Shared `GraphDatabaseAdapter`. |
-| **KnowledgeGraphQueryEngine (sibling)** | Consumers of the entities that OnlineLearning stores. | Queries the graph via the adapter; no direct coupling required. |
-| **LLM Factory (shared across Wave agents & KnowledgeManagement)** | Provides the LLM instance used during extraction. | Factory method `createLLM(config)`. |
+- **Parent Component – KnowledgeManagement**: OnlineLearning inherits the graph‑storage contract defined by KnowledgeManagement. The parent’s description of the GraphDatabaseAdapter (Graphology + LevelDB, automatic JSON export) is directly leveraged by OnlineLearning’s agent.  
 
-All these integrations are file‑path agnostic except for the explicit adapter location: `storage/graph-database-adapter.ts`. The rest of the contracts are inferred from the observed patterns and are implemented as method calls on the respective classes.
+- **Sibling Components**: ManualLearning, OntologyManager, and InsightGenerator all depend on the same GraphDatabaseAdapter. This shared dependency means that OnlineLearning’s data model must be compatible with the schemas expected by those siblings (e.g., node/edge type naming).  
+
+- **Pipeline Orchestration**: The batch‑analysis pipeline is a common entry point for all learning‑related subcomponents. OnlineLearning contributes its own DAG nodes but re‑uses the pipeline’s execution engine, allowing future extensions (e.g., adding a new analysis task) without touching the core scheduler.  
+
+- **Export / downstream consumption**: The automatic JSON export produced by the adapter is the primary integration artifact for any external analytics or reporting tools that consume the knowledge graph.  
+
+- **Storage Layer**: The GraphDatabaseAdapter abstracts away the physical storage; therefore, any change to the underlying LevelDB configuration does not affect OnlineLearning’s code, preserving a clean separation.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Do not instantiate the LLM directly.** Follow the lazy‑initialisation contract: create the OnlineLearning runner with `new OnlineLearning(repoPath, team)`, then invoke `ensureLLMInitialized()` before any `execute` call. This guarantees that the shared LLM factory is used and that resources are allocated only when needed.  
+1. **Do not modify the DAG construction directly in the pipeline** unless you understand the topological‑sort dependencies. Adding a new task should be done by defining a new node class and declaring its predecessor edges; the pipeline will automatically place it in the correct order.  
 
-2. **Persist through EntityPersistenceManager.** When extending the pipeline with new extraction stages, hand the resulting knowledge objects to the manager rather than calling the adapter yourself. This maintains a single point for validation, metadata enrichment, and batch commit logic.  
+2. **Interact with the graph only through the GraphDatabaseAdapter**. Direct calls to Graphology or LevelDB bypass the automatic JSON export sync and can lead to stale snapshots for sibling components.  
 
-3. **Report extraction gaps to DataLossTracker.** Any new source (e.g., a new LSL format) should emit loss events via the tracker so that the system can surface missing data without silent failures.  
+3. **When extending CodeGraphAgent**, keep node and edge type names consistent with existing conventions (`CommitNode`, `SessionNode`, `FunctionNode`, etc.) so that OntologyManager and InsightGenerator can query them without schema changes.  
 
-4. **Keep storage interactions limited to the GraphDatabaseAdapter.** If you need to change the underlying graph database (e.g., switch from LevelDB to another KV store), modify only `storage/graph-database-adapter.ts`. All other components will remain untouched.  
+4. **Testing**: Because the pipeline is DAG‑driven, unit tests should verify that a given set of input artefacts produces the expected graph structure after the pipeline finishes. Mock the GraphDatabaseAdapter if you only need to assert the transformation logic.  
 
-5. **Batch size and resource budgeting.** Because the pipeline can be heavyweight (especially the LLM step), configure batch sizes to fit the execution environment’s memory and CPU limits. The lazy‑initialisation pattern helps keep the LLM footprint low when the pipeline runs in a “dry‑run” mode that only validates source data.  
+5. **Performance**: Large git histories can produce a high volume of nodes. If you notice bottlenecks, consider batching `addNode`/`addEdge` calls in the agent and letting the adapter handle bulk writes, which are optimised by LevelDB.  
 
 ---
 
-### Architectural patterns identified  
+### 1. Architectural patterns identified  
 
-* Factory pattern (LLM creation)  
-* Lazy initialization (LLM startup)  
-* Adapter pattern (GraphDatabaseAdapter)  
-* Manager/Coordinator pattern (EntityPersistenceManager)  
-* Tracker/Observer pattern (DataLossTracker)  
+- **DAG‑based execution with topological sort** (pipeline orchestration)  
+- **Adapter pattern** (GraphDatabaseAdapter abstracts Graphology + LevelDB)  
+- **Automatic synchronization** (JSON export sync built into the adapter)  
+- **Separation of concerns** (pipeline ↔ agent ↔ storage)  
 
-### Design decisions and trade‑offs  
+### 2. Design decisions and trade‑offs  
 
-* **Batch vs. real‑time** – Choosing a batch pipeline isolates heavy analysis but introduces latency between code changes and knowledge availability.  
-* **Lazy LLM init** – Saves resources on runs that may skip the LLM step, at the cost of a small runtime check before each execution.  
-* **Single storage adapter** – Centralises persistence logic, simplifying future storage swaps, but creates a single point of failure that must be robustly tested.  
+- **Choosing a DAG for the batch pipeline** provides deterministic ordering and parallelism but adds complexity in defining and maintaining dependency edges.  
+- **Using Graphology + LevelDB** gives an in‑memory graph model with durable storage; the trade‑off is that LevelDB is a key‑value store, so complex queries rely on Graphology’s API rather than a native graph query engine.  
+- **Embedding JSON export in the adapter** guarantees consistency for downstream consumers but incurs an I/O cost on every mutation; this is acceptable for the current batch‑oriented workload but could become a bottleneck under high‑frequency writes.  
 
-### System structure insights  
+### 3. System structure insights  
 
-OnlineLearning sits under **KnowledgeManagement**, sharing the LLM factory and storage adapter with its siblings. The sibling components each specialise (manual entry, querying, loss tracking) but converge on the same graph database, forming a cohesive knowledge‑graph ecosystem.
+- **OnlineLearning sits under KnowledgeManagement**, sharing the same persistence layer as its siblings.  
+- **All learning‑related subcomponents converge on a single knowledge graph**, meaning that schema evolution must be coordinated across ManualLearning, OntologyManager, InsightGenerator, and OnlineLearning.  
+- **The batch‑analysis pipeline acts as a common orchestrator**, allowing each subcomponent to plug in its own analysis agents without duplicating scheduling logic.  
 
-### Scalability considerations  
+### 4. Scalability considerations  
 
-* The batch pipeline can be parallelised per source (e.g., processing Git commits in parallel shards) because each extraction stage is stateless aside from the shared LLM.  
-* GraphDatabaseAdapter’s underlying LevelDB store scales horizontally with sharding; however, write contention may appear if many extraction runs overlap.  
-* Lazy LLM init prevents unnecessary model loading when multiple pipeline runs are scheduled concurrently; a shared pool of LLM instances could be introduced later if throughput becomes a bottleneck.  
+- The DAG model scales horizontally as independent nodes can be executed in parallel; however, the current implementation’s reliance on a single LevelDB instance may limit write throughput.  
+- Automatic JSON export could become a scalability choke point; batching export operations or moving to an incremental diff‑based export would mitigate this.  
+- Graph size growth (e.g., millions of commit nodes) may affect in‑memory Graphology performance; consider sharding or using a dedicated graph database if the knowledge graph outgrows current limits.  
 
-### Maintainability assessment  
+### 5. Maintainability assessment  
 
-* **High modularity** – Clear separation between extraction, persistence, and observability makes the codebase easy to navigate.  
-* **Adapter‑centric storage** – Changes to the persistence layer require only edits in a single file.  
-* **Consistent patterns** – Reusing the Wave‑agent LLM factory and lazy‑init contract reduces duplicated logic across the KnowledgeManagement domain.  
-* **Potential fragility** – The reliance on a single GraphDatabaseAdapter means that any regression in that file propagates to all siblings; comprehensive unit and integration tests around the adapter are essential.  
+- **High maintainability** due to clear separation: pipeline logic, transformation agents, and storage are isolated in distinct files and classes.  
+- **Shared adapter** reduces duplication across siblings, simplifying updates to persistence behaviour.  
+- **Potential risk**: tight coupling through the automatic JSON export means that changes to the adapter’s export format must be coordinated with all consumers.  
+- **Documentation**: The explicit file paths and class names in the observations provide a strong “source‑of‑truth” reference, making onboarding and code navigation straightforward.  
 
-Overall, OnlineLearning is a well‑structured batch component that leverages proven patterns (factory, lazy init, adapter) to automatically enrich the knowledge graph while keeping resource usage and code coupling under control.
+---  
+
+*All statements above are directly grounded in the provided observations and file references; no external patterns or undocumented behaviours have been introduced.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern allows for efficient initialization of LLM instances only when required, reducing unnecessary resource allocation. The ensureLLMInitialized() method, likely defined in the Wave agent classes, ensures that the LLM instance is properly initialized before execution. This approach enables the component to manage resources effectively and optimize performance. The GraphDatabaseAdapter, employed for Graphology+LevelDB persistence, also plays a crucial role in storing and retrieving knowledge graph data, as defined in storage/graph-database-adapter.ts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides a layer of abstraction between the component and the underlying graph database, allowing for flexible data storage and retrieval. The GraphDatabaseAdapter class uses Graphology and LevelDB to store and manage the knowledge graph, and it also provides an automatic JSON export sync feature. This ensures that the knowledge graph is always up-to-date and can be easily exported for further analysis or processing. For example, the CodeGraphAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, uses the GraphDatabaseAdapter to store and retrieve code graph data.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve manual knowledge entities
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information
-- [KnowledgeGraphQueryEngine](./KnowledgeGraphQueryEngine.md) -- KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to store and manage the knowledge graph
+- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 
 ---

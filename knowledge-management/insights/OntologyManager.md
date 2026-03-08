@@ -1,104 +1,115 @@
 # OntologyManager
 
-**Type:** GraphDatabase
+**Type:** SubComponent
 
-OntologyManager is responsible for handling ontology classification, including loading ontology definitions and performing entity classification, as described in the KnowledgeManagement component's description.
+OntologyManager uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 ## What It Is  
 
-**OntologyManager** is the core logic component that lives inside the *KnowledgeManagement* domain.  The most plausible implementation file, based on the observations, is **`ontology-manager.ts`** (the naming follows the convention used by sibling components such as `entity-persistence.ts` and `graph-database-manager.ts`).  Its responsibility is to load ontology definitions, keep them in sync with the underlying graph store, and perform entity‑classification operations against those ontologies.  To achieve this, OntologyManager does **not** talk to the storage layer directly; instead it re‑uses the **`GraphDatabaseAdapter`** located at **`storage/graph-database-adapter.ts`**.  The adapter supplies the low‑level Graphology + LevelDB interaction and the automatic JSON‑export synchronization that the whole KnowledgeManagement suite relies on.
-
-The component therefore sits at the intersection of *knowledge representation* (the ontology definitions) and *graph persistence* (the graph database).  It is a child of the **KnowledgeManagement** component and works alongside siblings such as **EntityPersistence**, **GraphDatabaseManager**, **ManualLearning**, and **OnlineLearning**, all of which also depend on the same `GraphDatabaseAdapter` for storage concerns.
+**OntologyManager** is a sub‑component that lives inside the **KnowledgeManagement** domain. Its source code resides in  
+`integrations/mcp-server-semantic-analysis/src/ontology/ontology-manager.ts`. The class is responsible for managing the system’s ontology – the formal representation of concepts, relationships, and classifications that drive inference across the platform. To persist and retrieve ontology data it delegates all storage concerns to the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). In addition to basic CRUD operations, OntologyManager guarantees that the ontology is continuously synchronized with the broader knowledge graph and that a JSON representation of the ontology is automatically exported whenever the underlying data changes. The component also exposes a unified inference engine that other parts of the system (e.g., ManualLearning, InsightGenerator, OnlineLearning) can invoke to obtain ontology‑based classifications.
 
 ---
 
 ## Architecture and Design  
 
-The design that emerges from the observations is a **layered, adapter‑centric architecture**.  The lowest layer is the **graph‑storage stack** – Graphology (the in‑memory graph library) backed by LevelDB for durability.  The **`GraphDatabaseAdapter`** (in `storage/graph-database-adapter.ts`) is the sole gateway to that stack.  It encapsulates the details of opening the LevelDB instance, wiring Graphology, and exposing a **JSON‑export sync** capability.  The adapter also implements an **`initialize`** method that performs *intelligent routing*: when a VKB (Virtual Knowledge Base) API endpoint is reachable it proxies calls through that service; otherwise it falls back to direct local access.  This routing logic is a concrete example of the **Adapter pattern** combined with a **Strategy‑like routing decision**.
+The overall architecture follows a **layered abstraction** in which the OntologyManager sits in the business‑logic layer while the GraphDatabaseAdapter provides a **storage‑abstraction layer**. The adapter pattern is evident: GraphDatabaseAdapter encapsulates the concrete graph database implementation (Graphology + LevelDB) and presents a clean, domain‑specific API to OntologyManager. This decouples ontology logic from the particulars of how the graph is stored, making it possible to swap the underlying database without touching the manager.
 
-Ontologically‑focused logic lives in **OntologyManager**.  Rather than embed database calls, OntologyManager **delegates** all persistence concerns to the adapter (or, optionally, to the higher‑level **EntityPersistence** sub‑component).  This delegation creates a **Facade** for the rest of the KnowledgeManagement domain: callers of OntologyManager need only request “load ontology” or “classify entity” without caring whether the underlying data comes from a remote VKB service or a local LevelDB file.  The component also shares the **initialization contract** of the adapter, meaning it can be started in the same bootstrap sequence as its siblings (ManualLearning, OnlineLearning, etc.).
+Because OntologyManager relies on an **automatic JSON export sync feature**, the design implicitly uses an **observer‑like synchronization** mechanism – changes made through the manager trigger a side‑effect that writes a fresh JSON snapshot. The same sync capability is described for the GraphDatabaseAdapter, indicating that both the knowledge graph and the ontology share a common “export‑on‑change” strategy. This creates a **consistent data‑flow contract** across siblings such as ManualLearning, InsightGenerator, and CodeGraphAgent, all of which also consume the GraphDatabaseAdapter.
 
-The sibling components (ManualLearning, OnlineLearning, CodeKnowledgeGraphBuilder, DataImporter, QueryEngine) all **reuse the same adapter**, which guarantees consistent data format, transaction semantics, and JSON export behavior across the entire KnowledgeManagement subsystem.  This uniformity is a deliberate architectural decision to avoid “multiple ways of talking to the graph” and to keep the system’s data‑flow predictable.
+The component hierarchy is straightforward:
+
+- **Parent** – KnowledgeManagement (orchestrates the overall knowledge graph and provides the GraphDatabaseAdapter).  
+- **Sibling** – ManualLearning, OnlineLearning, InsightGenerator, GraphDatabaseAdapter, CodeGraphAgent (all share the same storage adapter).  
+- **Child** – None directly observed; however, OntologyManager’s inference engine may internally instantiate helper classes (not listed) to perform classification.
+
+The design emphasizes **single responsibility** (OntologyManager handles ontology concerns) and **dependency inversion** (higher‑level modules depend on the abstraction GraphDatabaseAdapter rather than a concrete DB).
 
 ---
 
 ## Implementation Details  
 
-1. **`storage/graph-database-adapter.ts`** – The adapter class exposes at least two public members that OntologyManager relies on:  
-   * **`initialize()`** – Called during system start‑up; it detects the presence of a VKB API and decides whether to route queries through that service or to use the local LevelDB instance directly.  The method also sets up the automatic JSON export synchronization, which periodically writes the in‑memory Graphology graph to a JSON file for backup or external consumption.  
-   * **Graphology‑LevelDB bindings** – Internally the adapter creates a Graphology instance, registers LevelDB as the persistence backend, and provides CRUD‑style methods (e.g., `addNode`, `addEdge`, `findNode`) that higher‑level components call.
+The core class, `OntologyManager`, is defined in `integrations/mcp-server-semantic-analysis/src/ontology/ontology-manager.ts`. Its constructor receives an instance of `GraphDatabaseAdapter`, establishing the primary communication channel to the persistent graph. All ontology‑related operations—adding concepts, defining relationships, updating classifications—are translated into calls on the adapter, which in turn uses **Graphology** (an in‑memory graph library) to manipulate the graph structure and **LevelDB** as the durable backing store.
 
-2. **`ontology-manager.ts`** (presumed location) – This file contains the concrete class **`OntologyManager`**.  Its key responsibilities are:  
-   * **Ontology loading** – Reads ontology definition files (likely JSON or Turtle) and inserts the concepts, relationships, and classification rules into the graph via the adapter’s node/edge APIs.  
-   * **Entity classification** – When an entity is presented (perhaps from the **EntityPersistence** layer), OntologyManager traverses the graph to locate matching ontology nodes, applying the classification logic defined in the ontology schema.  The traversal is performed using Graphology’s query utilities, which the adapter exposes.  
-   * **Synchronization hooks** – Because the adapter already runs a JSON export, OntologyManager may register listeners to trigger a re‑export whenever the ontology graph changes (e.g., after a new ontology version is loaded).
+Two notable implementation aspects are:
 
-3. **Interaction with **EntityPersistence** and **GraphDatabaseManager** –  
-   * **EntityPersistence** provides higher‑level CRUD for domain entities (e.g., source‑code symbols, learning artifacts).  OntologyManager may request persisted entities from this sub‑component, classify them, and then write back classification results.  
-   * **GraphDatabaseManager** is a sibling that orchestrates broader database lifecycle concerns (e.g., backup/restore, connection pooling).  OntologyManager can invoke its public methods when it needs to ensure the graph is in a consistent state before performing a bulk classification run.
+1. **Automatic JSON Export Sync** – Both OntologyManager and GraphDatabaseAdapter expose a “sync” capability that writes the current graph state to a JSON file whenever a mutation occurs. This ensures that any external consumer (e.g., a visualization tool or downstream analytics pipeline) can always retrieve an up‑to‑date representation without additional polling.
 
-All of these interactions are mediated through **method calls**; no direct file‑system or network code appears in OntologyManager itself, keeping its responsibilities narrowly focused on knowledge logic.
+2. **Unified Inference Engine** – OntologyManager bundles an inference engine that consumes the stored ontology to produce classifications. While the concrete inference algorithm is not listed, the observation that it provides a “unified inference engine” suggests a central service that other components invoke rather than each component implementing its own reasoning logic.
+
+Because the adapter uses Graphology, the graph is first built in memory, enabling fast traversals for inference, and then persisted to LevelDB for durability. The level of indirection also allows the same JSON export logic to be reused by sibling components that also depend on the adapter.
 
 ---
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement** – OntologyManager is instantiated by the KnowledgeManagement bootstrap routine.  During that phase the `GraphDatabaseAdapter.initialize()` method is called first, establishing the routing decision (VKB vs. local).  Once the adapter is ready, OntologyManager is constructed with a reference to the adapter (or to EntityPersistence, which already holds the adapter).  
+- **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`): The sole storage interface for OntologyManager. All persistence, retrieval, and export responsibilities are delegated here. The adapter’s use of Graphology and LevelDB is shared across siblings (ManualLearning, InsightGenerator, CodeGraphAgent), establishing a common data‑access contract.
 
-* **Siblings – EntityPersistence, GraphDatabaseManager** – OntologyManager consumes the **entity‑persistence API** to fetch raw entities that need classification.  It may also invoke **GraphDatabaseManager** methods for tasks such as flushing pending writes before a bulk classification job or triggering a manual JSON export.  
+- **KnowledgeManagement** (parent): OntologyManager is a child of this domain. KnowledgeManagement coordinates the overall knowledge graph, and OntologyManager contributes the ontology layer that enriches the graph with semantic meaning.
 
-* **External – VKB API** – When the VKB service is reachable, the `initialize` routing logic in the adapter transparently forwards all graph operations (including those originated by OntologyManager) to the remote API.  This means OntologyManager does not need to contain any conditional network code; the adapter abstracts that away.  
+- **Sibling Components**: ManualLearning, InsightGenerator, and CodeGraphAgent also depend on GraphDatabaseAdapter. This means that any change to the adapter’s API or storage strategy has ripple effects across all these components, reinforcing the need for a stable abstraction.
 
-* **Data Flow** – The typical flow is:  
-  1. **Load ontology** → OntologyManager parses definition → calls adapter to create graph nodes/edges.  
-  2. **Classify entity** → OntologyManager requests entity from EntityPersistence → traverses graph via adapter → writes classification result back via EntityPersistence.  
-  3. **Export** → Adapter’s automatic JSON sync writes the updated graph to disk; optionally OntologyManager can trigger an immediate export after a major ontology update.
-
-These integration points ensure that OntologyManager remains a thin knowledge‑logic layer while leveraging the robust storage and routing capabilities already provided by the rest of the KnowledgeManagement subsystem.
+- **Export Consumers**: The automatic JSON export is likely consumed by external services (e.g., dashboards, reporting tools) that require a static snapshot of the ontology or knowledge graph. Because the export is synchronized automatically, these consumers can rely on eventual consistency without implementing their own polling mechanisms.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate after adapter initialization** – Always create or activate OntologyManager **after** `GraphDatabaseAdapter.initialize()` has completed.  This guarantees that the routing (VKB vs. local) is settled and that the JSON export thread is running.  
+1. **Instantiate via Dependency Injection** – Always create OntologyManager by passing a pre‑configured instance of GraphDatabaseAdapter. This preserves the abstraction boundary and ensures that the automatic sync behavior is correctly wired.
 
-2. **Prefer the adapter’s API over direct graph manipulation** – Even though OntologyManager could technically import Graphology directly, doing so would bypass the routing logic and the automatic export mechanism.  All node/edge creation, deletion, or queries should go through the adapter (or through EntityPersistence, which itself delegates to the adapter).  
+2. **Prefer Adapter Methods for Direct Graph Access** – If a use‑case requires low‑level graph manipulation (e.g., bulk imports), interact with GraphDatabaseAdapter directly rather than reaching into OntologyManager’s internal structures. This keeps ontology‑specific logic isolated.
 
-3. **Version ontology definitions carefully** – Loading a new ontology overwrites or augments the existing graph structure.  Because the adapter continuously syncs the graph to JSON, any breaking change will be reflected in the exported file.  Follow a “load‑then‑validate‑then‑activate” pattern: load the ontology, run a quick sanity‑check (e.g., ensure required root concepts exist), and only then mark the ontology as active for classification.  
+3. **Leverage the JSON Export for External Integration** – Consumers that need a snapshot of the ontology should read the exported JSON file rather than querying the LevelDB store. The export is kept up‑to‑date by the sync feature, guaranteeing freshness.
 
-4. **Leverage the automatic JSON export** – The JSON export is not just a backup; downstream tools (e.g., visualization dashboards, external analytics pipelines) may consume it.  Do not disable the export unless you have a compelling reason, and be aware that frequent ontology updates will generate more export activity, which could affect I/O performance on constrained environments.  
+4. **Treat the Inference Engine as a Service** – When performing classification, call the public inference API exposed by OntologyManager rather than re‑implementing reasoning logic. This ensures that all components use the same unified inference rules.
 
-5. **Handle VKB unavailability gracefully** – The routing logic inside `initialize` already falls back to local LevelDB when the VKB API is unreachable.  However, developers should still be prepared for transient network failures during runtime; catching adapter‑level errors and possibly retrying or switching to a local fallback is advisable.  
+5. **Avoid Direct LevelDB Access** – Direct reads/writes to LevelDB bypass the Graphology layer and the sync mechanism, leading to potential inconsistencies. All persistence should go through GraphDatabaseAdapter.
 
 ---
 
-### Summary of Architectural Insights  
+### Architectural patterns identified  
 
-| Aspect | Insight (grounded in observations) |
-|--------|-------------------------------------|
-| **Architectural pattern** | Adapter pattern (GraphDatabaseAdapter) + Facade (OntologyManager) + Strategy‑like routing in `initialize`. |
-| **Design decisions** | Centralize all graph storage behind a single adapter to guarantee consistent JSON export and routing; keep ontology logic separate from persistence; reuse EntityPersistence for entity CRUD. |
-| **Trade‑offs** | Tight coupling to Graphology + LevelDB limits swapping the storage engine; reliance on VKB API introduces a network dependency but is mitigated by fallback. |
-| **System structure** | KnowledgeManagement → OntologyManager (child) ↔ GraphDatabaseAdapter (shared) ↔ EntityPersistence / GraphDatabaseManager (siblings). |
-| **Scalability** | Graphology + LevelDB scales well for moderate‑size knowledge graphs; automatic JSON export may become a bottleneck for very large graphs; routing allows off‑loading to a remote VKB service when needed. |
-| **Maintainability** | Clear separation of concerns (ontology logic vs. storage) and a single adapter reduce duplicated code; however, any change to the adapter’s contract propagates to all siblings, so versioning must be managed carefully. |
+- **Adapter pattern** – GraphDatabaseAdapter abstracts the concrete graph database (Graphology + LevelDB).  
+- **Observer‑style synchronization** – Automatic JSON export sync reacts to data changes.  
+- **Layered architecture** – Separation between business logic (OntologyManager) and storage abstraction (GraphDatabaseAdapter).  
 
-These observations paint a picture of a deliberately modular knowledge‑management subsystem where **OntologyManager** serves as the specialist that applies ontological rules, while all storage, routing, and export responsibilities are centralized in the **GraphDatabaseAdapter** and shared sibling components.
+### Design decisions and trade‑offs  
+
+- **Choice of Graphology + LevelDB** provides fast in‑memory graph operations with simple key‑value persistence, but limits complex query capabilities compared to a full‑featured graph DB.  
+- **Automatic JSON export** simplifies external consumption but introduces I/O overhead on every mutation; this is a trade‑off between immediacy and performance.  
+- **Centralized inference engine** ensures consistency across the system but creates a single point of failure and may become a bottleneck as the ontology grows.  
+
+### System structure insights  
+
+- OntologyManager is a leaf component under KnowledgeManagement, tightly coupled to the GraphDatabaseAdapter, which is a shared service for multiple sibling components.  
+- The hierarchy promotes reuse of storage logic while keeping domain‑specific reasoning isolated.  
+
+### Scalability considerations  
+
+- **LevelDB** scales well for write‑heavy workloads on a single node but does not natively support horizontal sharding; scaling beyond a single process may require re‑architecting the storage layer.  
+- The JSON export sync could become a bottleneck under high mutation rates; batching or throttling the export may be required for large‑scale deployments.  
+- In‑memory Graphology structures grow with the size of the ontology; careful memory management or graph partitioning may be needed for very large ontologies.  
+
+### Maintainability assessment  
+
+- The clear separation via GraphDatabaseAdapter makes the storage implementation replaceable, aiding long‑term maintainability.  
+- Shared use of the adapter across many siblings means that changes to the adapter’s contract must be coordinated, increasing the impact of modifications.  
+- Automatic sync reduces the need for manual export logic, decreasing the surface area for bugs, but it also introduces hidden side‑effects that developers need to be aware of when performing bulk updates.  
+
+Overall, OntologyManager exhibits a well‑structured, abstraction‑driven design that aligns with the broader KnowledgeManagement ecosystem while providing a solid foundation for ontology‑centric features.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter in storage/graph-database-adapter.ts enables seamless interaction with the Graphology+LevelDB database, facilitating automatic JSON export synchronization. This design choice allows for efficient data storage and retrieval, as evidenced by the adapter's initialize method, which implements intelligent routing for database access. By leveraging the VKB API when available and direct access otherwise, the component optimizes database interactions, as seen in the GraphDatabaseAdapter's initialize method.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides a layer of abstraction between the component and the underlying graph database, allowing for flexible data storage and retrieval. The GraphDatabaseAdapter class uses Graphology and LevelDB to store and manage the knowledge graph, and it also provides an automatic JSON export sync feature. This ensures that the knowledge graph is always up-to-date and can be easily exported for further analysis or processing. For example, the CodeGraphAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, uses the GraphDatabaseAdapter to store and retrieve code graph data.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis, as described in the KnowledgeManagement component's description.
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-- [CodeKnowledgeGraphBuilder](./CodeKnowledgeGraphBuilder.md) -- CodeKnowledgeGraphBuilder uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-- [DataImporter](./DataImporter.md) -- DataImporter uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-- [QueryEngine](./QueryEngine.md) -- QueryEngine uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to store and manage the knowledge graph
+- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 
 ---

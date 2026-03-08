@@ -2,115 +2,95 @@
 
 **Type:** SubComponent
 
-The formatting process involves data validation and sanitization to ensure compatibility with the Specstory extension.
+DataFormatter uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to format data according to Specstory's requirements
 
 ## What It Is  
 
-`DataFormatter` is a **sub‑component** that lives inside the **Trajectory** component.  Its sole responsibility is to take arbitrary input data, validate and sanitise it, and then render the result into one of a set of **pre‑defined formatting templates** that are accepted by the **Specstory** extension.  The formatter is deliberately **format‑agnostic** – it can emit either **JSON** or **XML** (and can be extended to other serialisations) depending on the template that is selected for a particular submission.  All of the behaviour described in the observations is encapsulated within the `DataFormatter` code base; no other files or symbols were enumerated in the source snapshot, which means the implementation details are confined to the module that Trajectory imports.
+**DataFormatter** is a dedicated sub‑component that lives inside the **Trajectory** module.  Its implementation resides in the same logical layer as the other Trajectory children and is wired to the **SpecstoryAdapter** class found at `lib/integrations/specstory-adapter.js`.  The primary responsibility of DataFormatter is to take raw payloads generated elsewhere in the system and transform them so that they conform to the data contract expected by the Specstory extension.  By centralising this transformation logic, the component provides a single source of truth for all Specstory‑bound data, which is then handed off to the **ConnectionManager** for transmission.
 
-The component is built to be **configurable**: developers can supply custom template definitions or adjust existing ones without touching the core formatting engine.  When a formatting operation finishes, `DataFormatter` invokes a **callback** supplied by the caller, reporting either a success (with the formatted payload) or a detailed error (e.g., validation failure, sanitisation issue).  This callback contract makes the formatter easy to integrate into asynchronous workflows that the rest of the Trajectory stack relies on.
-
-Because Trajectory itself is designed for **flexibility and fault tolerance**—as shown by its ability to connect to Specstory via HTTP, IPC, or file‑watch—`DataFormatter` follows the same philosophy.  It does not assume any particular shape of the incoming data structure; instead, it works against a **decoupled abstraction** that lets the same formatting logic be reused across different data sources that Trajectory may handle.
-
----
+The component is built as a class‑based object, enabling encapsulation and reuse across the codebase.  It is invoked by sibling components such as **ConversationLogger**, which delegates its own logging payloads to DataFormatter before they are sent downstream.  Because DataFormatter is a child of **Trajectory**, it inherits the same modular design philosophy that the parent component exhibits – namely, the use of well‑defined adapters, asynchronous initialization, and promise‑based flow control.
 
 ## Architecture and Design  
 
-The observations point to a **modular architecture** at the heart of `DataFormatter`.  The module is organised around three loosely coupled concerns:
+The architecture around DataFormatter follows a **modular component pattern** reinforced by the **Adapter pattern**.  The `SpecstoryAdapter` acts as the concrete adapter that knows the exact shape of Specstory’s API; DataFormatter composes this adapter rather than embedding Specstory‑specific logic directly.  This composition keeps the formatting code agnostic of transport concerns and isolates any future changes to the Specstory contract within a single file (`lib/integrations/specstory-adapter.js`).  
 
-1. **Template Management** – a registry of formatting templates (JSON, XML, etc.) that can be added or removed at runtime.  This mirrors the **Strategy** pattern: each template encapsulates a concrete formatting algorithm, and the formatter selects the appropriate strategy based on configuration or caller input.  
+Interaction between components is orchestrated through **promise‑based asynchronous programming**.  When DataFormatter receives a formatting request, it returns a promise that resolves with the formatted payload.  This non‑blocking approach mirrors the pattern used in the parent **Trajectory** component’s `initialize` method, where promises ensure that initialization does not stall other system activity.  Errors that arise during formatting are not handled locally; instead, they are delegated to the **ErrorManager** sub‑component, establishing a clear **separation‑of‑concerns** boundary between data transformation and error reporting.  
 
-2. **Validation & Sanitisation Layer** – a pre‑processing step that checks incoming data for required fields, type correctness, and removes or escapes unsafe characters.  By placing this layer before the strategy execution, the design enforces **separation of concerns** and ensures that all templates receive clean, well‑defined input.  
-
-3. **Callback Notification Mechanism** – the formatter does not return values directly; instead, it uses a **callback (observer‑like)** interface supplied by the caller.  This design keeps the formatter synchronous‑agnostic and lets the surrounding Trajectory logic decide whether to handle results via promises, events, or traditional callbacks.
-
-Interaction with sibling components is minimal but conceptually aligned.  While **SpecstoryAdapter**, **ConnectionManager**, **FallbackHandler**, and **HttpRequestHelper** focus on *transport* and *connection resilience*, `DataFormatter` concentrates on *payload preparation*.  All of them share the same **configuration‑driven** mindset: just as `SpecstoryAdapter` can switch between HTTP, IPC, or file‑watch adapters, `DataFormatter` can switch between JSON, XML, or future templates without code changes.
-
-The modularity also supports **extensibility**: adding a new template only requires registering the template definition; no changes to the core formatter or to Trajectory are needed.  This aligns with the **Open/Closed Principle** – the component is open for extension (new templates) but closed for modification (core logic stays untouched).
-
----
+Finally, the **ConnectionManager** sub‑component is consulted to determine the appropriate channel (e.g., WebSocket, HTTP, or native extension) for sending the formatted data.  By abstracting the transport layer, DataFormatter remains focused on its core duty—formatting—while still participating in the overall data‑flow pipeline that includes **SpecstoryConnector**, **ConversationLogger**, and other siblings.
 
 ## Implementation Details  
 
-Although the source snapshot did not expose concrete file names, the observations describe the internal mechanics that any implementation of `DataFormatter` would contain:
+At its core, DataFormatter is a class that exposes one or more public methods such as `format(payload)` (the exact method name is not enumerated in the observations but is implied by its purpose).  Inside this method the component performs the following steps:
 
-* **Template Registry** – likely a plain JavaScript object or Map keyed by a template identifier (e.g., `'json'`, `'xml'`).  Each entry holds a formatter function that receives a sanitized data object and returns a string or buffer ready for submission to Specstory.
+1. **Adapter Invocation** – It calls into `SpecstoryAdapter` (imported from `lib/integrations/specstory-adapter.js`) to apply the Specstory‑specific schema.  The adapter encapsulates field renaming, type coercion, and any required nesting, ensuring that the output matches the extension’s contract.  
 
-* **Validation Engine** – a set of rules (perhaps expressed as JSON‑schema fragments or custom predicate functions) that are applied to the incoming data.  Errors generated here are propagated to the caller through the callback, allowing the parent Trajectory component to decide on fallback actions.
+2. **Asynchronous Execution** – The call to the adapter, as well as any subsequent I/O (e.g., reading configuration or fetching auxiliary data), is wrapped in a promise.  This design lets callers `await` the result without blocking the event loop, a pattern also visible in the parent Trajectory’s asynchronous initialization flow.  
 
-* **Sanitisation Pipeline** – a series of transforms that strip disallowed characters, escape XML entities, or normalise JSON values.  Because the formatter is **decoupled from the underlying data structure**, these transforms operate on a generic key/value representation rather than on domain‑specific objects.
+3. **Error Propagation** – Should the adapter throw or a promise reject, DataFormatter catches the exception and forwards it to **ErrorManager**.  This hand‑off is likely performed via a method such as `ErrorManager.handle(error)`, keeping the formatting logic clean and allowing a centralized error‑logging strategy.  
 
-* **Callback Interface** – the formatter’s public API probably resembles `format(data, templateId, callback)`.  The callback signature might be `(err, formattedPayload) => { … }`.  Successful formatting passes `null` for `err` and the rendered payload; validation or sanitisation failures pass an error object describing the problem.
+4. **Connection Coordination** – Once the payload is successfully formatted, DataFormatter does not send it directly.  Instead, it delegates the transmission decision to **ConnectionManager**, which determines the active connection method (e.g., a WebSocket opened by **SpecstoryConnector**).  This delegation is performed through an interface like `ConnectionManager.send(formattedPayload)`.  
 
-* **Configuration Loading** – templates are described as *configurable*.  This suggests that `DataFormatter` reads a configuration file (e.g., `data-formatter-config.json`) at startup or on demand, allowing developers to tweak template placeholders, default values, or even inject custom formatter functions.  Because the configuration is external, the component can be re‑used across environments (development, staging, production) without code changes.
-
-* **Integration with Trajectory** – Trajectory likely invokes `DataFormatter` right before it hands a payload to `SpecstoryAdapter`.  The parent component may first obtain raw telemetry from other sub‑components, pass it to `DataFormatter` for preparation, and then forward the result to the adapter for transmission.
-
-Overall, the implementation favours **stateless processing**: each call to the formatter works on the supplied data and returns a new payload, leaving no mutable internal state that could cause race conditions in concurrent scenarios.
-
----
+Because DataFormatter is used by **ConversationLogger**, any logging routine that needs to persist conversation data will first invoke DataFormatter, guaranteeing that all logged entries share the same Specstory‑compatible shape.
 
 ## Integration Points  
 
-`DataFormatter` sits in the **data‑preparation layer** of the Trajectory ecosystem.  Its primary integration points are:
+DataFormatter sits at the intersection of three major subsystems:
 
-1. **Trajectory (Parent)** – Trajectory orchestrates the end‑to‑end flow: data collection → formatting (`DataFormatter`) → transport (`SpecstoryAdapter`).  The parent supplies the raw data object and a callback that receives the formatted result.  Because Trajectory also manages connection retries and fallback strategies, any formatting error reported via the callback can trigger a fallback path (e.g., store the payload locally for later retry).
+* **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`) – Provides the concrete transformation rules.  Any change to the Specstory API will be reflected here, and DataFormatter will automatically adopt the new schema without code changes.  
 
-2. **SpecstoryAdapter (Sibling)** – Once `DataFormatter` produces a compliant JSON or XML payload, the adapter consumes it and handles the actual transmission to the Specstory extension.  The adapter’s flexibility (HTTP, IPC, file‑watch) is orthogonal to the formatter; the only contract is that the payload matches the template expectations.
+* **ErrorManager** – Acts as the error‑handling sink.  DataFormatter forwards any formatting‑related exceptions, ensuring that failures are captured consistently across the system.  
 
-3. **Configuration Sources** – The formatter reads its template definitions from configuration files that may be shared with other components (e.g., `HttpRequestHelper` also uses configurable request templates).  This shared approach encourages a **centralised configuration strategy** across the Trajectory suite.
+* **ConnectionManager** – Supplies the transport abstraction.  By invoking ConnectionManager’s send routine, DataFormatter remains agnostic of whether the data travels over a native extension, HTTP endpoint, or any other channel established by sibling components like **SpecstoryConnector**.  
 
-4. **Error‑Handling Siblings** – `FallbackHandler` and `ConnectionManager` do not directly call the formatter, but they react to the callback outcomes.  For instance, if `DataFormatter` signals a validation error, `FallbackHandler` might decide to discard the payload or invoke an alternative processing pipeline.
-
-5. **External Consumers** – Though not listed, any other component that needs to produce Specstory‑compatible payloads could import `DataFormatter` directly, benefitting from the same validation, sanitisation, and templating logic.
-
-All integration surfaces are **interface‑driven**: the formatter exposes a simple function signature and relies on configuration files, while its siblings expose adapters and connection helpers that accept the formatted payload as input.
-
----
+Additionally, the **Trajectory** parent component orchestrates the lifecycle of DataFormatter.  When Trajectory is instantiated, it likely creates a DataFormatter instance and injects the required adapter, error manager, and connection manager references.  This wiring mirrors the pattern used by other siblings (e.g., **TrajectoryInitializer** also relies on `SpecstoryAdapter`), reinforcing a consistent dependency graph throughout the module.
 
 ## Usage Guidelines  
 
-* **Select the Correct Template** – Always pass the identifier of a template that matches the downstream Specstory expectations (e.g., `'json'` for JSON‑based extensions).  Adding a new template requires updating the configuration and ensuring the downstream adapter can parse the output.
+Developers should treat DataFormatter as a **pure formatting service**—its only responsibility is to accept raw data and return a Specstory‑ready object.  When invoking the component, always handle the returned promise and propagate any errors to **ErrorManager** rather than swallowing them.  For example:
 
-* **Validate Input Early** – Although `DataFormatter` performs its own validation, providing data that already conforms to the expected schema reduces the likelihood of callback‑reported errors and improves overall throughput.
+```js
+await dataFormatter.format(rawPayload)
+  .then(formatted => connectionManager.send(formatted))
+  .catch(err => errorManager.handle(err));
+```
 
-* **Handle the Callback Properly** – The callback must check for an error argument first.  On error, log the validation or sanitisation details and decide whether to invoke `FallbackHandler` or to retry after correcting the data.  On success, forward the formatted payload immediately to `SpecstoryAdapter`.
-
-* **Keep Templates Stateless** – When defining custom templates, avoid embedding mutable state (e.g., counters) inside the formatter functions.  Stateless templates guarantee that concurrent formatting calls do not interfere with each other.
-
-* **Leverage Configuration for Customisation** – Use the external configuration file to adjust template placeholders, default values, or to switch between JSON and XML without code changes.  This aligns with the broader Trajectory philosophy of **configuration‑driven flexibility**.
-
-* **Test Against All Supported Formats** – Since the component supports both JSON and XML, unit tests should cover each format’s edge cases (special characters, deep nesting, schema violations) to ensure the sanitisation layer behaves consistently.
-
-* **Do Not Couple to Internal Data Structures** – The formatter expects a generic data object; avoid passing domain‑specific classes that expose methods or private fields.  If necessary, transform them to plain objects before invoking the formatter.
-
-Following these practices will keep the formatting pipeline reliable, maintainable, and aligned with the fault‑tolerant design of the surrounding Trajectory system.
+Do not embed Specstory‑specific field mappings inside calling code; rely on the adapter‑driven implementation to keep those details centralized.  When extending the system (e.g., adding a new logging sibling), simply inject the existing DataFormatter instance rather than duplicating formatting logic.  Finally, because DataFormatter is asynchronous, avoid blocking the event loop with long‑running synchronous operations inside the `format` method; any heavy computation should be off‑loaded to worker threads or broken into smaller promise‑chained steps.
 
 ---
 
-### Summary of Architectural Insights  
+### Architectural Patterns Identified
+1. **Adapter Pattern** – `SpecstoryAdapter` isolates external Specstory schema details.  
+2. **Modular Component Architecture** – DataFormatter is a self‑contained sub‑component under Trajectory with clear boundaries.  
+3. **Asynchronous / Promise‑Based Concurrency** – Non‑blocking formatting and integration with other async components.  
+4. **Separation of Concerns** – Error handling delegated to ErrorManager; transport delegated to ConnectionManager.
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns identified** | Modular architecture, Strategy pattern for interchangeable templates, Callback/Observer mechanism for result notification, Separation of concerns (validation ↔ formatting ↔ transport). |
-| **Design decisions & trade‑offs** | *Decoupling* from data structures yields high reusability but requires a generic validation layer; *configurable templates* enable extensibility at the cost of runtime configuration parsing; *callback* keeps the API simple but places responsibility on callers to manage async flow. |
-| **System structure insights** | `DataFormatter` is a leaf sub‑component of **Trajectory**, feeding formatted payloads to **SpecstoryAdapter**; it shares the configuration‑driven ethos with siblings like `HttpRequestHelper`. |
-| **Scalability considerations** | Stateless processing and template‑based strategy allow the formatter to be invoked concurrently across many threads or processes without contention; adding new formats scales horizontally by registering additional templates. |
-| **Maintainability assessment** | High maintainability: core logic is small, template registry is externalised, and validation rules are isolated.  The main risk is configuration drift—ensuring template definitions stay in sync with Specstory’s expectations is essential. |
+### Design Decisions & Trade‑offs  
+* **Centralised Formatting** improves consistency but introduces a single point of failure; mitigated by ErrorManager.  
+* **Adapter Isolation** keeps Specstory changes localized, at the cost of an extra indirection layer.  
+* **Promise‑Based API** enables concurrency and scalability, yet requires careful error handling to avoid unhandled rejections.  
+* **Delegating Transport** to ConnectionManager decouples formatting from networking, but adds runtime dependency on the connection state.
 
-These insights are derived directly from the provided observations and the known surrounding components of the Trajectory system.
+### System Structure Insights  
+The system is organized around a **parent‑child hierarchy** where Trajectory coordinates several specialized siblings.  Each sibling (SpecstoryConnector, ConversationLogger, etc.) shares common infrastructure—SpecstoryAdapter, ConnectionManager, ErrorManager—promoting reuse.  DataFormatter acts as a bridge between raw domain data and the Specstory‑oriented downstream pipeline.
+
+### Scalability Considerations  
+Because formatting is asynchronous and promise‑driven, the component can handle many concurrent requests without blocking the event loop.  Scaling horizontally (e.g., spawning multiple Node.js worker processes) would be straightforward as long as the underlying `SpecstoryAdapter` and `ConnectionManager` are stateless or correctly synchronized.  Potential bottlenecks include the connection bandwidth managed by ConnectionManager and any synchronous CPU‑heavy transformations inside the adapter.
+
+### Maintainability Assessment  
+Encapsulation via classes and clear delegation to adapter, error, and connection managers yields high maintainability.  Changes to the Specstory contract are isolated to `lib/integrations/specstory-adapter.js`.  The promise‑based API enforces a uniform error‑handling contract across the codebase.  The main maintenance risk lies in the implicit coupling to the adapter’s interface; thorough unit tests around DataFormatter’s `format` method and the adapter’s schema mapping are essential to guard against regression as Specstory evolves.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed with flexibility and fault tolerance in mind, as evident from its ability to adapt to different connection methods such as HTTP, IPC, and file watch. This is achieved through the use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which provides a unified interface for connecting to the Specstory extension. The connectViaHTTP function in specstory-adapter.js demonstrates this flexibility by implementing a connection retry mechanism to handle transient connection issues.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's modular design pattern is evident in its use of classes and objects, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which enables encapsulation and reuse of code. This modularity is further enhanced by the component's asynchronous programming model, which allows for efficient and concurrent execution of tasks. For instance, the initialize method in the Trajectory class utilizes asynchronous programming to initialize the component without blocking other tasks. The use of promises in this method, as seen in the return statement, ensures that the component's initialization is non-blocking and efficient.
 
 ### Siblings
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension via HTTP, IPC, or file watch.
-- [FallbackHandler](./FallbackHandler.md) -- FallbackHandler uses a set of predefined fallback strategies to handle connection failures, including retrying the connection or switching to a different connection method.
-- [HttpRequestHelper](./HttpRequestHelper.md) -- HttpRequestHelper uses a set of predefined HTTP request templates to simplify the request process.
-- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a set of predefined adapters to connect to the Specstory extension via different methods.
+- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
+- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the DataFormatter sub-component to format data according to Specstory's requirements
+- [ErrorManager](./ErrorManager.md) -- ErrorManager uses the ConnectionManager sub-component to oversee the connection methods used to log errors
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
+- [TrajectoryInitializer](./TrajectoryInitializer.md) -- TrajectoryInitializer uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to initialize the Trajectory component
 
 
 ---
