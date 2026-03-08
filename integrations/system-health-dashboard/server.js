@@ -1857,7 +1857,7 @@ class SystemHealthAPIServer {
             const steps = [];
 
             for (const section of stepSections) {
-                const headerMatch = section.match(/### (\d+)\. (\w+)\n\n\*\*Agent:\*\*\s*(\w+)\n\*\*Action:\*\*\s*(\w+)\n\*\*Status:\*\*\s*.*?(success|failed|skipped)\n\*\*Duration:\*\*\s*(.+)/i);
+                const headerMatch = section.match(/### (\d+)\. (.+?)\n\n\*\*Agent:\*\*\s*(.+?)\n\*\*Action:\*\*\s*(.+?)\n\*\*Status:\*\*\s*.*?(success|failed|skipped)\n\*\*Duration:\*\*\s*(.+)/i);
                 if (headerMatch) {
                     // Extract errors if present
                     const errorsMatch = section.match(/#### Errors\n\n([\s\S]*?)(?=\n---|\n###|$)/);
@@ -1890,14 +1890,15 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // Load batch checkpoints for accumulated totals
+            // Load batch checkpoints for accumulated totals (only for batch-analysis workflows)
             const projectDir = dirname(dirname(filePath)); // Go from workflow-reports to .data to project
             const checkpointsPath = join(projectDir, 'batch-checkpoints.json');
             let accumulatedStats = null;
             let batchSummary = null;
             let persistedKnowledge = null;
+            const isBatchWorkflow = (workflowMatch?.[1]?.trim() || '').includes('batch');
 
-            if (existsSync(checkpointsPath)) {
+            if (isBatchWorkflow && existsSync(checkpointsPath)) {
                 try {
                     const checkpointsData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
                     accumulatedStats = checkpointsData.accumulatedStats || null;
