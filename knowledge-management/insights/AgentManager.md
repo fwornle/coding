@@ -2,119 +2,101 @@
 
 **Type:** SubComponent
 
-The AgentManagerAgent manages the agents within the SemanticAnalysis component, utilizing the calculateConfidence method from the BaseAgent class to determine confidence scores
+The AgentManager uses the agent life cycle management algorithm from agent-life-cycle-management.ts to manage agent life cycle
 
 ## What It Is  
 
-The **AgentManager** (implemented as the `AgentManagerAgent` class) lives inside the **SemanticAnalysis** component of the code‑base.  It is the orchestrator that creates, runs, and tears‑down the various agents that participate in a semantic analysis run.  The observations show that it draws on core services defined in the `BaseAgent` abstract class (e.g., the `calculateConfidence` helper and the standard response‑envelope creation routine) and coordinates specialised agents such as `KGOperatorAgent`, `PatternCatalogExtractor`, and `KnowledgeReportAuthorAgent`.  In short, AgentManager is the lifecycle manager and work‑distribution hub for the agents that together produce a knowledge‑graph‑enriched insight report.
-
-## Architecture and Design  
-
-The design of **AgentManager** follows a **coordinator‑worker** style that is already visible in sibling agents (e.g., the `OntologyClassificationAgent` extends `BaseAgent` and re‑uses its response‑envelope logic).  AgentManager inherits the same base behaviour, which gives the whole family of agents a uniform contract for confidence calculation and response formatting.  
-
-A key architectural element is **work‑stealing**, realised through a shared `nextIndex` counter.  Idle workers query this counter and immediately pull the next unit of work, which eliminates idle time and keeps the pipeline saturated.  This pattern is a lightweight, lock‑free scheduling mechanism that fits the batch‑oriented, DAG‑driven execution model used by the sibling **Pipeline** component.  
-
-AgentManager also embraces **composition over inheritance** for domain‑specific tasks: it delegates knowledge‑graph mutations to `KGOperatorAgent`, pattern extraction to `PatternCatalogExtractor`, and report authoring to `KnowledgeReportAuthorAgent`.  By wiring these specialised agents together, AgentManager builds a **pipeline of responsibilities** while keeping each agent focused on a single concern.  
-
-Finally, the integration with the **ontology system** (validation rules and definitions) indicates a **domain‑driven design** where the ontology acts as a shared model that all agents must respect.  This ensures semantic consistency across the entire SemanticAnalysis component.
-
-## Implementation Details  
-
-* **BaseAgent inheritance** – AgentManager leverages the `calculateConfidence` method defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`.  This method standardises how confidence scores are derived from raw analysis results, and the same method is reused by `GitHistoryAnalyzerAgent` and other siblings, guaranteeing comparable scoring across the system.  
-
-* **Response envelope creation** – The “standard response envelope” pattern from `BaseAgent` is also employed by AgentManager.  Every agent’s output is wrapped in a uniform envelope (status, payload, confidence), which downstream components (e.g., `InsightGeneratorAgent` or the final report consumer) can parse without bespoke handling.  
-
-* **Work‑stealing scheduler** – A shared integer `nextIndex` is stored in a thread‑safe location (likely an atomic variable or a mutex‑protected field).  Workers repeatedly execute:  
-  ```ts
-  const idx = atomicAddAndFetch(nextIndex, 1);
-  if (idx < totalTasks) { processTask(idx); }
-  ```  
-  This design eliminates a central task queue bottleneck and enables dynamic load balancing when the number of agents exceeds the number of CPU cores.  
-
-* **KGOperatorAgent collaboration** – When an analysis step produces data that must be persisted or enriched in the knowledge graph, AgentManager invokes `KGOperatorAgent`.  The latter encapsulates all graph‑mutation logic, shielding AgentManager from the low‑level graph API and keeping the manager’s responsibilities focused on orchestration.  
-
-* **Ontology validation** – Before an agent’s result is accepted, AgentManager checks the output against the ontology system’s definitions and validation rules.  This step guarantees that generated entities, relationships, and classifications conform to the canonical schema, preventing downstream semantic drift.  
-
-* **Pattern extraction and reporting** – After the core analysis finishes, AgentManager calls `PatternCatalogExtractor` to discover recurring structures in the data, and then hands the findings to `KnowledgeReportAuthorAgent`, which synthesises a concise summary for the end user.  This two‑stage post‑processing reflects a clear separation between **analysis** (raw data handling) and **communication** (human‑readable reporting).  
-
-* **Lifecycle management** – AgentManager tracks each agent’s state (created → executing → terminated).  It likely holds a registry or map of active agents, cleans up resources (e.g., thread pools, temporary files) on termination, and ensures that any failure in a child agent propagates a controlled shutdown sequence, preserving system stability.
-
-## Integration Points  
-
-* **Parent – SemanticAnalysis** – AgentManager is a child of the `SemanticAnalysis` component, which itself is designed to host a suite of agents (e.g., `OntologyClassificationAgent`, `GitHistoryAnalyzerAgent`).  The parent component supplies configuration (e.g., which agents to enable) and aggregates the final response envelopes into a unified analysis result.  
-
-* **Sibling – Pipeline** – The Pipeline’s DAG‑based execution model defines the order in which agents are invoked.  AgentManager respects the topological sort produced by `batch-analysis.yaml` and registers its work‑stealing workers as nodes that can run in parallel where the DAG permits.  
-
-* **Sibling – Ontology** – The ontology system provides the schema and validation rules that AgentManager consults before accepting an agent’s output.  This tight coupling ensures that all agents, including `OntologyClassificationAgent`, produce ontology‑compliant artifacts.  
-
-* **Sibling – Insights / SemanticInsightGenerator** – After AgentManager finishes its orchestration, the `InsightGeneratorAgent` and `SemanticInsightGeneratorAgent` consume the enriched knowledge‑graph payloads to produce higher‑level insights.  The uniform response envelope makes this hand‑off straightforward.  
-
-* **External – KGOperatorAgent** – This agent acts as the gateway to the underlying knowledge graph store (e.g., Neo4j, JanusGraph).  AgentManager calls its public API to persist entities, relationships, and validation results.  
-
-* **External – PatternCatalogExtractor & KnowledgeReportAuthorAgent** – These agents are invoked sequentially at the end of the workflow to extract patterns and author the final report.  Their inputs are the confidence‑scored, ontology‑validated data produced earlier by AgentManager.
-
-## Usage Guidelines  
-
-1. **Instantiate via the SemanticAnalysis entry point** – Developers should not create `AgentManagerAgent` directly; instead, they should request a semantic analysis run through the `SemanticAnalysis` façade, which will configure and launch AgentManager with the appropriate agent set.  
-
-2. **Respect the shared `nextIndex` contract** – When extending the manager with custom workers, always use the atomic increment pattern shown above.  Direct manipulation of the counter without atomicity can break the work‑stealing balance and cause race conditions.  
-
-3. **Leverage the base response envelope** – Any custom agent added under AgentManager must return its result wrapped in the envelope format (`{ status, payload, confidence }`).  This guarantees compatibility with downstream Insight generators.  
-
-4. **Validate against the ontology** – Before emitting a new entity type or relationship, invoke the ontology validation utilities provided by the Ontology sub‑component.  Skipping this step may cause downstream agents (e.g., `KGOperatorAgent`) to reject the data.  
-
-5. **Handle termination gracefully** – If an agent encounters a fatal error, propagate the error up to AgentManager so it can trigger a coordinated shutdown of all workers.  This avoids orphaned threads and ensures the knowledge graph remains in a consistent state.  
-
-6. **Do not bypass KGOperatorAgent** – All graph mutations must go through `KGOperatorAgent`.  Direct graph access bypasses validation and logging layers, increasing the risk of schema violations.  
+The **AgentManager** lives inside the *SemanticAnalysis* component of the multi‑agent system (see `integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts` – the exact file name is not listed in the observations but the manager is referenced from that directory). It is a **SubComponent** whose responsibility is to orchestrate the lifecycle of the various agents that the SemanticAnalysis pipeline employs, most notably the **OntologyClassificationAgent**. By re‑using the **BaseAgent** contract (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) and the **AgentFactory** (`integrations/mcp-server-semantic-analysis/src/agents/agent-factory.ts`), the manager guarantees that every spawned agent conforms to a common request/response envelope and that agents are created only when needed. The manager also pre‑populates immutable metadata fields for each agent, holds a shared `nextIndex` counter that enables idle workers to pull work immediately, and relies on the **agent‑life‑cycle‑management** algorithm (`integrations/mcp-server-semantic-analysis/src/agents/agent‑life‑cycle‑management.ts`) to transition agents through creation, execution, and termination phases.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Coordinator‑Worker (or Master‑Slave) pattern** – AgentManager acts as the coordinator; workers pull tasks via work‑stealing.  
-* **Work‑stealing load‑balancing** – Shared `nextIndex` counter enables dynamic task distribution.  
-* **Template Method (via BaseAgent)** – Common methods (`calculateConfidence`, envelope creation) are defined in `BaseAgent` and reused by AgentManager and its siblings.  
-* **Composition over inheritance** – AgentManager composes specialised agents (`KGOperatorAgent`, `PatternCatalogExtractor`, etc.) rather than inheriting their behaviour.  
-* **Domain‑Driven Design (ontology‑centric validation)** – The ontology system provides the ubiquitous language and validation rules that all agents must obey.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Reuse of BaseAgent** – Guarantees consistency but ties every agent to the same confidence‑scoring algorithm; changing the algorithm requires careful coordination across all agents.  
-* **Work‑stealing vs. static task queue** – Work‑stealing improves CPU utilisation for irregular workloads but introduces subtle concurrency bugs if the atomic counter is not correctly handled.  
-* **Delegating graph operations to KGOperatorAgent** – Centralises graph logic, simplifying maintenance, yet creates a single point of failure; high‑throughput scenarios may need KGOperatorAgent to be horizontally scaled.  
-* **Separate pattern extraction and report authoring** – Improves modularity and testability, but adds an extra step in the pipeline, increasing overall latency.
+The architecture around **AgentManager** is deliberately **modular and pattern‑driven**. The core design pattern is the **BaseAgent pattern**: every concrete agent (e.g., `ontology-classification-agent.ts`) extends the abstract behavior defined in `base-agent.ts`. This pattern enforces a uniform interface for handling inputs, producing a response envelope, and exposing lifecycle hooks. By centralising that contract, the manager can treat all agents as interchangeable workers, which simplifies scheduling and monitoring logic.
 
-### 3. System structure insights  
-* The **SemanticAnalysis** component is a thin orchestration layer that houses multiple agents, each responsible for a distinct semantic task.  
-* **AgentManager** sits at the centre, managing the lifecycle of its child agents and ensuring they interact through well‑defined contracts (response envelope, ontology validation).  
-* Sibling components (Pipeline, Ontology, Insights, etc.) provide orthogonal concerns: execution ordering, schema definition, and downstream consumption, respectively.  
-* The overall system resembles a **directed acyclic graph** of agents where AgentManager supplies the dynamic parallel execution nodes.
+Agent creation is delegated to the **AgentFactory** (`agent-factory.ts`). This is a classic **Factory** pattern that abstracts the instantiation details (including dependency injection of the ontology system, LLM services, etc.) from the manager. The manager therefore does not need to know the concrete class names or constructor signatures; it merely asks the factory for an agent of a given type.
 
-### 4. Scalability considerations  
-* **Work‑stealing** allows the system to scale with the number of CPU cores, as idle workers automatically acquire more work.  
-* The shared `nextIndex` must remain lock‑free; if contention grows, a sharded counter or work‑batching strategy could be introduced.  
-* `KGOperatorAgent` may become a bottleneck if many agents attempt graph writes simultaneously; horizontal scaling of the underlying graph service or batching writes can mitigate this.  
-* Confidence calculation and envelope creation are lightweight, but the pattern extraction step (`PatternCatalogExtractor`) could be CPU‑intensive; parallelising that stage or caching intermediate results would improve throughput.
+The **agent‑life‑cycle‑management** module supplies a deterministic algorithm for moving agents through states such as *initialized*, *idle*, *working*, and *terminated*. The manager invokes this algorithm whenever it updates the `nextIndex` counter or when it pre‑populates metadata, ensuring that state transitions are consistent across the whole system.
 
-### 5. Maintainability assessment  
-* **High cohesion** – Each agent focuses on a single responsibility, making unit testing straightforward.  
-* **Low coupling** – Interaction occurs via well‑defined interfaces (response envelope, ontology validator, KGOperatorAgent), which eases replacement or extension of individual agents.  
-* **Centralised base functionality** – Changes to `BaseAgent` propagate automatically, reducing duplicated code but requiring thorough regression testing.  
-* **Clear lifecycle management** – Explicit creation, execution, and termination phases simplify debugging and resource cleanup.  
-* **Potential risk area** – Concurrency around `nextIndex` and the coordination of shutdown sequences demand disciplined coding standards and comprehensive integration tests.  
+Finally, the **shared `nextIndex` counter** acts as a lightweight coordination primitive. Rather than a heavyweight message queue, idle workers read the counter to discover the next task index, allowing them to “pull” work immediately. This design mirrors a **pull‑based work distribution** model and avoids the need for explicit push notifications.
 
-Overall, the **AgentManager** embodies a pragmatic, composition‑driven architecture that leverages shared base functionality while providing a flexible, parallel execution model suitable for large‑scale semantic analysis workloads.
+---
+
+## Implementation Details  
+
+1. **BaseAgent Integration** – All agents, including the manager’s workers, inherit from the abstract class in `base-agent.ts`. This base class defines methods such as `prepareResponseEnvelope()`, `handleInput()`, and `finalize()`. The manager relies on these methods to wrap raw agent outputs into a standard envelope before they are consumed by downstream components (e.g., the **SemanticInsightGenerator**).
+
+2. **Metadata Pre‑population** – Before an agent is handed to the factory, the manager fills out immutable fields (e.g., `agentId`, `creationTimestamp`, `ontologyVersion`). By doing this once, the system avoids redundant writes and guarantees that every agent carries the same provenance information, which is crucial for debugging and audit trails.
+
+3. **Shared `nextIndex` Counter** – Implemented as a simple numeric variable (likely stored in a shared in‑memory object or a lightweight Redis key), the counter is incremented atomically each time a new task is queued. Workers poll this counter, compare it with their own local index, and start processing as soon as they see a higher value. This eliminates the need for a separate task queue and reduces latency.
+
+4. **AgentFactory Usage** – The manager calls a method such as `AgentFactory.createAgent(type, metadata)` to obtain a fully‑wired agent instance. The factory encapsulates the import of `ontology-classification-agent.ts`, wiring of the ontology system, and any LLM client configuration. This separation keeps the manager’s code focused on orchestration rather than construction details.
+
+5. **Lifecycle Management** – The algorithm from `agent‑life‑cycle‑management.ts` is invoked at key points: after creation (to move the agent to *idle*), when a worker pulls a task (transition to *working*), and on completion or error (transition to *terminated*). The manager records these state changes, possibly updating a central registry that other components (e.g., **Insights** or **Pipeline**) can query.
+
+---
+
+## Integration Points  
+
+* **Parent – SemanticAnalysis** – The manager is a child of the `SemanticAnalysis` component, which defines the overall multi‑agent workflow. `SemanticAnalysis` delegates the classification of observations to the **OntologyClassificationAgent**, which the manager creates and schedules. Consequently, any change in the manager’s scheduling logic directly influences the throughput of the entire semantic analysis pipeline.
+
+* **Sibling – OntologyClassificationAgent** – This agent lives in `ontology-classification-agent.ts` and follows the same BaseAgent contract. Because both the manager and the OntologyClassificationAgent share the BaseAgent pattern, they can be swapped or extended without breaking the orchestration layer.
+
+* **Sibling – Pipeline** – The `Pipeline` component uses a DAG‑based execution model (see `batch-analysis.yaml`). While the pipeline schedules high‑level steps, the AgentManager handles the fine‑grained parallelism within a step, pulling tasks via the shared `nextIndex`. The two layers complement each other: the pipeline decides *what* should run, the manager decides *how* individual observations are processed concurrently.
+
+* **Sibling – Insights & SemanticInsightGenerator** – Once agents finish their work, the response envelopes are consumed by the `SemanticInsightGenerator`, which uses LLMs and the code‑graph context to produce higher‑level insights. The manager’s responsibility is to ensure that the envelopes are correctly formed and delivered in a timely fashion.
+
+* **External – Ontology System** – The manager indirectly uses the ontology classification logic provided by `ontology-classification-agent.ts`. The ontology system itself is likely a separate service or module that the agent queries; the manager does not interact with it directly but must ensure agents have the correct configuration (e.g., ontology version) through the pre‑populated metadata.
+
+---
+
+## Usage Guidelines  
+
+1. **Always obtain agents through AgentFactory** – Direct instantiation of agents bypasses the metadata pre‑population step and can lead to inconsistent envelopes. Developers should call `AgentFactory.createAgent()` and pass the metadata that the manager expects.
+
+2. **Do not modify the shared `nextIndex` directly** – The counter is the coordination point for all idle workers. Any manual adjustment risks race conditions and lost tasks. Use the manager’s public methods (`incrementTaskIndex()`, `getCurrentIndex()`) if they exist.
+
+3. **Respect the BaseAgent contract** – When extending the system with new agents, inherit from `base-agent.ts` and implement the required lifecycle hooks. This ensures the manager can schedule the new agent without additional code changes.
+
+4. **Keep metadata immutable after creation** – The manager pre‑populates fields such as `agentId` and `ontologyVersion`. Changing these after the agent has been handed to the factory can break audit trails and downstream debugging tools.
+
+5. **Handle lifecycle events** – If an agent encounters an error, invoke the lifecycle management API to transition the agent to a *terminated* state. This guarantees that the manager’s internal registry stays accurate and that idle workers can continue pulling new tasks.
+
+---
+
+### Architectural Patterns Identified  
+* **BaseAgent pattern** – a shared abstract class defining a uniform agent interface.  
+* **Factory pattern** – `AgentFactory` abstracts concrete agent construction.  
+* **Pull‑based work distribution** – the shared `nextIndex` counter enables workers to self‑schedule.  
+* **Lifecycle management algorithm** – deterministic state‑transition logic from `agent‑life‑cycle‑management.ts`.
+
+### Design Decisions & Trade‑offs  
+* **Uniform contract vs. flexibility** – Enforcing the BaseAgent interface simplifies orchestration but can limit agents that need radically different APIs.  
+* **Factory abstraction vs. runtime overhead** – Centralising creation adds a thin indirection layer; the cost is negligible compared with the benefit of consistent metadata handling.  
+* **Shared counter vs. message queue** – The counter is lightweight and low‑latency but lacks built‑in durability; a crash could lose pending tasks, whereas a queue would persist them.
+
+### System Structure Insights  
+AgentManager sits at the heart of the *SemanticAnalysis* sub‑system, bridging the high‑level DAG execution of the `Pipeline` with the concrete classification work performed by agents. Its reliance on shared utilities (`base-agent.ts`, `agent-factory.ts`, `agent-life-cycle-management.ts`) creates a tightly‑coupled but well‑encapsulated module that can be reasoned about in isolation.
+
+### Scalability Considerations  
+Because work distribution is driven by a simple atomic counter, scaling to many concurrent workers is straightforward—each worker only needs read access to the counter and can proceed independently. However, the counter becomes a contention point under extreme load; moving it to a distributed atomic store (e.g., Redis with `INCR`) would mitigate bottlenecks. The BaseAgent pattern also allows horizontal scaling: adding more agent instances does not require changes to the manager.
+
+### Maintainability Assessment  
+The use of explicit patterns (BaseAgent, Factory, lifecycle algorithm) yields high maintainability. New agents can be added by extending the base class and registering them with the factory, without touching the manager’s orchestration code. The pre‑populated metadata approach centralises provenance data, aiding debugging. The only maintenance risk is the shared `nextIndex` counter; developers must ensure its atomicity and monitor for race conditions as the system grows. Overall, the design promotes clear separation of concerns and predictable behavior, making future extensions and bug fixes relatively low‑effort.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's architecture is designed to facilitate the integration of multiple agents, with each agent responsible for a specific task, such as the OntologyClassificationAgent for classifying observations against the ontology system. This is evident in the code, where the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) extends the BaseAgent abstract class (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts), allowing it to inherit common functionality and follow a standard response envelope creation pattern. The calculateConfidence method in the BaseAgent class is a key aspect of this, as it enables the calculation of confidence scores for the classified observations.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, which allows for the integration of various agents, each with its own specific responsibilities. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying observations against the ontology system. This agent follows the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) pattern, which standardizes agent behavior and response envelope creation. The use of this pattern ensures consistency across all agents, making it easier for new developers to understand and contribute to the codebase.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline coordinator utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent class extends the BaseAgent abstract class, allowing it to inherit common functionality and follow a standard response envelope creation pattern
-- [Insights](./Insights.md) -- The InsightGeneratorAgent generates insights from the analyzed data, utilizing the results from the Pipeline and Ontology sub-components
-- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGeneratorAgent generates semantic insights from the analyzed git and vibe data, utilizing the results from the Pipeline and Ontology sub-components
-- [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- The GitHistoryAnalyzerAgent analyzes git history to extract relevant information, utilizing the calculateConfidence method from the BaseAgent class to determine confidence scores
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the BaseAgent pattern from base-agent.ts to standardize agent behavior and response envelope creation
+- [Insights](./Insights.md) -- The SemanticInsightGenerator uses the LLM and code graph context to generate semantic insights
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator uses the LLM and code graph context to generate semantic insights
+- [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- The GitHistoryAnalyzer uses the GitHistory class from git-history.ts to analyze git history
+- [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph uses the GraphDatabase class from graph-database.ts to store and manage knowledge graph data
 
 
 ---

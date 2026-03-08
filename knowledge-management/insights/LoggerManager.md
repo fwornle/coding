@@ -2,131 +2,130 @@
 
 **Type:** SubComponent
 
-The LoggerManager sub-component is responsible for error reporting and debugging, ensuring that the Trajectory component can effectively handle errors and debug its activities.
+LoggerManager uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
 
 ## What It Is  
 
-**LoggerManager** is a sub‑component that lives inside the **Trajectory** component and is implemented in the same repository as the rest of the system.  All of its concrete interactions are routed through the **SpecstoryAdapter** class found at  
+`LoggerManager` is a **SubComponent** that lives inside the **Trajectory** component.  Its implementation is centred around the **`logging/Logger.js`** module – every logger instance that `LoggerManager` creates is obtained by calling the exported **`createLogger`** function from that file.  By delegating logger creation and configuration to this shared module, `LoggerManager` supplies a **standardised, configurable logging mechanism** for the rest of the system (e.g., `SpecstoryConnector`, `LoggingGateway`, `ConversationFormatter`, and any other component that needs to emit diagnostic information).
 
-```
-lib/integrations/specstory-adapter.js
-```  
+The primary responsibilities of `LoggerManager` are:
 
-LoggerManager’s primary responsibilities are *error reporting*, *debugging* and *conversation‑entry logging* for the **Trajectory** component.  It does not contain its own low‑level transport code; instead it delegates to the SpecstoryAdapter’s `connectViaFileWatch` method to watch a designated log file (or directory) and emit log events whenever the file changes.  By doing so, LoggerManager supplies a fault‑tolerant, file‑watch‑driven logging pipeline that the parent **Trajectory** component can rely on for both operational insight and post‑mortem analysis.
+* invoking `createLogger` to obtain a logger object,  
+* configuring that logger (log level, output destinations such as console or file), and  
+* exposing the configured logger to downstream components that require logging services.
+
+Because `LoggerManager` is a child of **Trajectory**, it inherits the broader logging strategy that the parent component adopts – the same `createLogger` factory is referenced by the parent’s own code and by several sibling sub‑components, ensuring a **unified logging approach** across the whole feature set.
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture revolves around a **central adapter** (`SpecstoryAdapter`) that abstracts the details of how the system talks to the external **Specstory** extension.  This is a classic **Adapter pattern**: the adapter presents a uniform API (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) while encapsulating protocol‑specific implementation.  
+The observations reveal a **modular architecture** built around a shared logging library:
 
-LoggerManager consumes this adapter in a **Strategy‑like** manner.  Rather than hard‑coding a single transport, it selects the `connectViaFileWatch` strategy because logging is file‑watch‑centric.  The same adapter is shared by sibling sub‑components—**SpecstoryIntegration**, **ConnectionHandler**, **ProtocolManager**, and **EnvironmentManager**—which each pick the strategy that best fits their use case (HTTP, IPC, or file watch).  This sharing yields a **modular and reusable** design: the transport logic lives in one place, while each consumer focuses on its domain concern (logging, connection handling, protocol management, environment configuration).
+1. **Factory Pattern** – `logging/Logger.js` exports a `createLogger` function that encapsulates the construction of logger objects.  `LoggerManager` calls this factory rather than instantiating loggers directly, guaranteeing that every logger conforms to the same interface and default configuration.
+
+2. **Singleton Pattern** – The same `logging/Logger.js` module is described as implementing a Singleton, meaning that the underlying logger implementation maintains a single, globally‑accessible instance.  This design ensures that configuration changes (e.g., adjusting the log level) propagate consistently throughout the process, eliminating divergent logger states.
+
+3. **Modular / Shared‑Component Design** – `LoggerManager` does not embed logging logic itself; it **uses** the external `logging/Logger.js` module.  This separation of concerns makes the logging capability a reusable building block for all siblings (`LoggingGateway`, `ConversationFormatter`, etc.) and for the parent `Trajectory`.
 
 Interaction flow:
 
-1. **Trajectory** creates an instance of **LoggerManager**.  
-2. LoggerManager constructs or receives a `SpecstoryAdapter` instance.  
-3. LoggerManager calls `adapter.connectViaFileWatch(logFilePath)`.  
-4. The adapter sets up a file‑system watcher (e.g., `fs.watch` or a platform‑specific watcher) and emits events back to LoggerManager whenever the log file is appended.  
-5. LoggerManager processes those events—adding timestamps, categorising them as *conversation entries* or *errors*, and forwarding them to any downstream consumers (e.g., a UI console or persistent store).
+* A component (e.g., `SpecstoryConnector`) requests a logger from `LoggerManager`.  
+* `LoggerManager` calls `createLogger` (from `logging/Logger.js`).  
+* The factory either returns the existing singleton logger or creates a new one if the singleton has not yet been instantiated.  
+* `LoggerManager` applies configuration (log level, destination) and returns the ready‑to‑use logger to the caller.
 
-Because the adapter also supports HTTP and IPC, the overall system can **swap protocols** without touching LoggerManager’s core logic, evidencing a **flexible, protocol‑agnostic** architecture.
+Because the singleton lives inside `logging/Logger.js`, any component that directly imports `createLogger` (such as `LoggingGateway`) will receive the same underlying logger instance, reinforcing a **shared logging approach** across the subsystem.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes / Functions  
-* **SpecstoryAdapter** – located in `lib/integrations/specstory-adapter.js`. It encapsulates three connection methods:  
-  * `connectViaHTTP(endpoint)` – establishes an HTTP client to the Specstory extension.  
-  * `connectViaIPC(pipeName)` – opens an Inter‑Process Communication channel.  
-  * `connectViaFileWatch(filePath)` – registers a file‑system watcher on `filePath` and emits change events.  
+### Core Functions  
 
-* **LoggerManager** – a sub‑component under **Trajectory** (no explicit file path was listed, but its implementation resides alongside other Trajectory sub‑components). Its public surface includes:  
-  * `logConversation(entry)` – formats and writes a conversation entry to the watched log file.  
-  * `reportError(errorObj)` – enriches an error payload and writes it to the same file, ensuring the watcher picks it up.  
-  * `initialize()` – internally creates a `SpecstoryAdapter` instance and calls `connectViaFileWatch` with the configured log location.  
+* **`logging/Logger.js → createLogger`** – This is the sole entry point for logger creation.  The function encapsulates the construction of a logger object, applying default formatting rules and wiring output transports.  Internally it checks whether a logger instance already exists; if so, it returns that instance (Singleton behaviour), otherwise it creates and stores a new one (Factory behaviour).
 
-### Technical Mechanics  
-When `connectViaFileWatch` is invoked, the adapter typically uses Node.js’s `fs.watch` (or a higher‑level library such as `chokidar`) to listen for `change` events on the target file.  Each event triggers a callback that reads the newly appended lines, parses them (often JSON‑encoded), and forwards the structured data back to LoggerManager via an event emitter or a promise‑based listener.  LoggerManager then decides whether the payload represents a normal conversation entry or an error, tags it with the appropriate severity, and may forward it to a downstream diagnostics service.
+### `LoggerManager` Behaviour  
 
-The **error‑reporting** path is deliberately separate from the normal logging path: errors are wrapped with stack traces and a unique error ID before being written, facilitating later correlation with user‑reported issues.  The **debugging** capability is achieved by exposing the same event stream to developer tools; because the underlying file watch is asynchronous and non‑blocking, LoggerManager does not impede the main execution flow of Trajectory.
+* **Invocation of the factory** – `LoggerManager` imports `createLogger` and calls it each time a logger is needed.  Because `createLogger` returns the singleton, repeated calls do not create duplicate resources.  
+* **Configuration handling** – After obtaining the logger, `LoggerManager` sets **log levels** (e.g., `debug`, `info`, `warn`, `error`) and **output destinations** (console, file, or potentially remote sinks).  These settings are derived from configuration objects passed to `LoggerManager` or from environment variables, although the exact source is not detailed in the observations.  
+* **Exposure to callers** – The configured logger is either returned directly from a `getLogger()`‑style method or injected into other components during their construction.  This pattern allows sibling components such as `SpecstoryConnector` and `ConversationFormatter` to log without needing to know the details of logger creation.
+
+### Relationship to Parent and Siblings  
+
+* **Parent (`Trajectory`)** – The parent component also references `createLogger` (as noted in the hierarchy context).  This indicates that `Trajectory` either delegates logger creation to `LoggerManager` or uses the same factory independently, reinforcing a **consistent logging contract** across the parent‑child boundary.  
+* **Siblings** – `LoggingGateway` directly uses `createLogger`, while `ConversationFormatter` relies on a **standardized logging format** that `LoggerManager` helps enforce.  The shared use of the same logger instance means that log entries from different siblings appear in a uniform structure and are routed to the same destinations.
 
 ---
 
 ## Integration Points  
 
-* **Parent – Trajectory**: LoggerManager is instantiated by Trajectory, which supplies configuration such as the log file location and any required adapter options (e.g., protocol preferences).  Trajectory depends on LoggerManager for all its internal diagnostics, meaning any failure in LoggerManager propagates upward as a loss of observability.
+1. **`logging/Logger.js` (Factory / Singleton)** – The sole external dependency of `LoggerManager`.  All configuration and output plumbing is defined inside this module.  
 
-* **Sibling – SpecstoryIntegration, ConnectionHandler, ProtocolManager, EnvironmentManager**: All siblings also import `SpecstoryAdapter` from `lib/integrations/specstory-adapter.js`.  They each call the adapter’s protocol‑specific methods that best match their responsibilities (HTTP for SpecstoryIntegration, IPC for ConnectionHandler, etc.).  This shared dependency creates a **common integration contract**: changes to the adapter’s API affect all siblings, encouraging coordinated versioning.
+2. **Parent Component – `Trajectory`** – `Trajectory` may instantiate `LoggerManager` or call its API to obtain a logger for its own internal operations.  The parent’s reliance on the same `createLogger` function guarantees that logs emitted from the parent and its children are co‑located.  
 
-* **External – Specstory Extension**: The adapter’s three connection strategies are the only outward‑facing interfaces.  For LoggerManager, the file‑watch strategy is the external contract; the Specstory extension is expected to append log lines to the watched file, or the system itself writes to that file and the extension reads it.  No direct network or IPC calls are made by LoggerManager, keeping its external surface minimal.
+3. **Sibling Sub‑components** –  
+   * **`LoggingGateway`**: Calls `createLogger` directly, receiving the same singleton logger.  
+   * **`ConversationFormatter`**: Consumes the *standardized logging format* that `LoggerManager` helps enforce, ensuring conversation‑related logs are consistent.  
+   * **`SpecstoryConnector`, `RetryPolicyManager`, `ConnectionMonitor`**: All obtain a logger via `LoggerManager` (or indirectly through the shared factory) to record connection attempts, retry events, and monitoring data.  
 
-* **Configuration / Environment**: The **EnvironmentManager** sub‑component also uses the adapter to decide which protocol to enable based on runtime conditions (e.g., development vs. production).  LoggerManager inherits the chosen strategy indirectly because Trajectory passes the appropriate adapter instance during initialization.
+4. **Configuration Sources** – While not explicitly listed, the observations mention “setting log levels and output destinations”.  This suggests that `LoggerManager` reads configuration from a central settings object, environment variables, or a configuration file, and then applies those values to the logger returned by `createLogger`.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize Early** – Call `LoggerManager.initialize()` as part of Trajectory’s startup sequence before any other component begins emitting logs.  This guarantees the file watcher is active and no log entries are missed.
-
-2. **Prefer Structured Entries** – Use `logConversation(entryObject)` where `entryObject` is a plain‑JSON object containing at least `timestamp`, `message`, and `conversationId`.  Structured logs simplify downstream parsing by the file‑watch callback.
-
-3. **Error Reporting Discipline** – When invoking `reportError(error)`, always include a unique error identifier (`errorId`) and a full stack trace.  This practice enables deterministic correlation between logs and bug reports.
-
-4. **Do Not Bypass the Adapter** – All file‑system interactions for logging must go through the `SpecstoryAdapter.connectViaFileWatch` pathway.  Directly writing to the log file without the watcher may lead to missed events if the watcher’s internal buffer is not flushed.
-
-5. **Handle Watcher Errors** – The file‑watch API can emit `error` events (e.g., when the file is deleted).  LoggerManager should subscribe to those events and either recreate the watcher or surface a fatal error to Trajectory, ensuring the system remains aware of a loss of logging capability.
-
-6. **Testing Considerations** – In unit tests, replace the real `SpecstoryAdapter` with a mock that provides a stubbed `connectViaFileWatch` method returning an event emitter.  This isolates LoggerManager’s logic from the OS file‑watch implementation.
+* **Always obtain a logger through `LoggerManager`** (or the `createLogger` factory) rather than constructing a logger manually.  This guarantees that the singleton instance and the agreed‑upon format are used.  
+* **Configure log level early** – Set the desired log level as soon as `LoggerManager` is instantiated.  Because the logger is a singleton, changing the level later will affect all components that share the same instance.  
+* **Prefer the shared logger for cross‑component diagnostics** – If a component needs to correlate its logs with those of other siblings (e.g., tracing a request through `SpecstoryConnector` → `ConnectionMonitor`), use the logger supplied by `LoggerManager` to keep the output unified.  
+* **Do not duplicate output destinations** – Adding extra transports (file, remote) inside a component that already receives the shared logger can lead to duplicated log entries.  Instead, configure destinations centrally via `LoggerManager`.  
+* **Respect the standardized format** – When emitting structured logs (JSON payloads, timestamps, component identifiers), follow the format defined in `logging/Logger.js`.  This ensures that downstream log aggregators or the `ConversationFormatter` can parse entries correctly.
 
 ---
 
 ### Architectural patterns identified  
 
-1. **Adapter Pattern** – `SpecstoryAdapter` abstracts multiple transport mechanisms (HTTP, IPC, file watch) behind a unified interface.  
-2. **Strategy‑like Selection** – LoggerManager selects the `connectViaFileWatch` strategy at runtime, allowing interchangeable protocols without code changes.  
-3. **Event‑Driven Interaction** – The file‑watch callback emits log events that LoggerManager consumes, forming a lightweight event‑driven pipeline.
+* **Factory Pattern** – `createLogger` abstracts logger construction.  
+* **Singleton Pattern** – `logging/Logger.js` maintains a single logger instance across the process.  
+* **Modular Architecture** – Logging concerns are isolated in a dedicated module (`logging/Logger.js`) and consumed by multiple components.
 
 ### Design decisions and trade‑offs  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Centralize logging in LoggerManager | Single source of truth for error reporting & debugging within Trajectory | Introduces a single point of failure for observability |
-| Use file‑watch (`connectViaFileWatch`) for logging | Leverages OS‑level notifications; simple to implement; works in environments without network connectivity | May miss rapid bursts of writes; platform‑specific quirks; less real‑time than IPC |
-| Share `SpecstoryAdapter` across siblings | Reduces code duplication, enforces consistent protocol handling | Tightens coupling; changes to the adapter affect many components, requiring coordinated releases |
+* **Centralised singleton logger** simplifies configuration propagation but couples all components to a single logging instance, which can limit per‑component customisation.  
+* **Factory abstraction** provides a clean entry point and allows future replacement of the underlying logging library without touching each consumer.  
+* **Modular separation** keeps logging logic out of business components, enhancing testability, but introduces an additional import dependency that must be kept in sync across the codebase.
 
 ### System structure insights  
 
-* **Hierarchical** – LoggerManager is a child of Trajectory, while sibling components share the same parent and a common integration library.  
-* **Modular** – Each concern (logging, connection handling, protocol management, environment configuration) lives in its own sub‑component, all of which depend on the same adapter module.  
-* **Separation of Concerns** – LoggerManager focuses solely on logging semantics; transport details are delegated to the adapter, enabling clear responsibility boundaries.
+* `LoggerManager` sits as a leaf under `Trajectory`, acting as the **gateway** to the shared logging facility.  
+* Sibling components either call `LoggerManager` or the factory directly, forming a **star‑topology** around the singleton logger.  
+* The hierarchy demonstrates a **single source of truth** for logging configuration, reducing duplication across the subsystem.
 
 ### Scalability considerations  
 
-* **Throughput** – File‑watch based logging can become a bottleneck if the log volume grows dramatically; the underlying OS may coalesce events, causing latency.  
-* **Extensibility** – Adding a new protocol (e.g., WebSocket) would only require extending `SpecstoryAdapter` with a new `connectViaWebSocket` method; LoggerManager could then switch strategies without code changes.  
-* **Horizontal Scaling** – Because LoggerManager writes to a single file, scaling out multiple Trajectory instances would require a shared storage mechanism or per‑instance log files to avoid contention.
+* Because the logger is a singleton, scaling the process horizontally (multiple Node.js instances) will result in **independent logger instances per process**; any cross‑process aggregation must rely on external log collectors rather than the in‑process singleton.  
+* Adding new destinations (e.g., a remote log aggregation service) can be done centrally in `logging/Logger.js` without modifying each consumer, supporting **vertical scalability** of log volume.  
 
 ### Maintainability assessment  
 
-* **Positive** – Centralizing error and debug handling in LoggerManager simplifies debugging and reduces duplication across the codebase.  The adapter’s unified API makes protocol changes localized.  
-* **Risk** – Heavy reliance on the adapter means any regression in `SpecstoryAdapter` propagates to all consumers, increasing the impact radius of bugs.  The file‑watch approach ties LoggerManager to OS‑specific behavior, which may require platform‑specific maintenance.  
-* **Mitigation** – Comprehensive unit tests that mock the adapter, plus integration tests that verify the file‑watch pipeline on each supported platform, will keep the maintenance burden manageable.
+* The clear separation of concerns (factory + singleton in `logging/Logger.js`, configuration in `LoggerManager`) makes the logging subsystem **easy to maintain**; changes to format or transport affect only one file.  
+* However, the heavy reliance on a global singleton means that **unintended side effects** (e.g., a component changing the log level globally) can impact unrelated parts of the system, requiring disciplined usage guidelines.  
+* Overall, the design balances **reusability** and **simplicity**, yielding a maintainable logging foundation for the `Trajectory` component and its siblings.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's utilization of the SpecstoryAdapter class, located in lib/integrations/specstory-adapter.js, enables seamless connections to the Specstory extension via multiple protocols, including HTTP, IPC, and file watch. This adaptability is crucial for a robust and fault-tolerant system, as it allows the component to adjust its connection strategy based on the environment and requirements. For instance, the connectViaHTTP method in specstory-adapter.js facilitates HTTP-based connections, while the connectViaIPC method enables Inter-Process Communication. Furthermore, the connectViaFileWatch method allows the component to monitor file changes, demonstrating a flexible and modular design.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js demonstrates a modular architecture, allowing for the management of connections and logging in a flexible and adaptable manner. This class implements a retry mechanism for connection establishment, showcasing a RetryPolicy pattern. The connectViaHTTP method in this class attempts to connect to the Specstory extension via HTTP on multiple ports, highlighting a flexible connection establishment approach. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance, providing a standardized logging mechanism.
 
 ### Siblings
-- [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryIntegration uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to the Specstory extension.
-- [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to external services.
-- [ProtocolManager](./ProtocolManager.md) -- ProtocolManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to manage the different protocols used by the Trajectory component.
-- [EnvironmentManager](./EnvironmentManager.md) -- EnvironmentManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to manage the environment and requirements for the Trajectory component.
+- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the connectViaHTTP method in SpecstoryAdapter to attempt connections to the Specstory extension on multiple ports, demonstrating a flexible connection establishment approach.
+- [RetryPolicyManager](./RetryPolicyManager.md) -- RetryPolicyManager implements a retry mechanism with limited retries, demonstrating a fault-tolerant approach to handling failures and retries.
+- [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
+- [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
+- [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

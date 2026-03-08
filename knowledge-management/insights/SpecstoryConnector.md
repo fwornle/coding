@@ -1,85 +1,131 @@
 # SpecstoryConnector
 
-**Type:** Detail
+**Type:** SubComponent
 
-Given the lack of source files, it can be inferred that the SpecstoryConnector is a crucial component in the SpecstoryIntegration sub-component, likely responsible for managing the connection lifecycle and handling any errors that may occur during the connection process.
+SpecstoryConnector uses the connectViaHTTP method in SpecstoryAdapter to attempt connections to the Specstory extension on multiple ports, demonstrating a flexible connection establishment approach.
 
 ## What It Is  
 
-The **SpecstoryConnector** lives inside the **SpecstoryIntegration** sub‑component and is the core piece that orchestrates the link between the host application and the Specstory browser extension. Although the concrete source file for the connector itself is not listed, the surrounding evidence points to its implementation being tightly coupled with the `connectViaHTTP` method found in **`specstory-adapter.js`**. That method is explicitly described as the mechanism that “facilitates HTTP‑based connections to the Specstory extension,” which tells us that the connector’s primary responsibility is to open, maintain, and gracefully close an HTTP channel to the extension while surfacing any connection‑level errors to the rest of the system.
-
-Because the connector is referenced as a “crucial component” of **SpecstoryIntegration**, we can infer that it is the entry point for any Specstory‑related activity. All higher‑level features that need to talk to the extension—such as test‑case retrieval, result reporting, or configuration sync—must first obtain a live connection from the SpecstoryConnector. In short, the connector is the *gateway* that abstracts the raw HTTP plumbing into a reusable, error‑aware service for the rest of the code base.
+**SpecstoryConnector** is a sub‑component that lives inside the **Trajectory** component (see the parent‑component description). Its concrete implementation is found in the integration layer under `lib/integrations/specstory-adapter.js`. The connector’s primary responsibility is to establish and maintain a link between the host application and the **Specstory** extension. It does this by delegating the low‑level connection work to the **SpecstoryAdapter** class, which offers a `connectViaHTTP` method capable of probing several HTTP ports, as well as support for IPC and file‑watch based protocols. Logging for all connection‑related events is provided through the shared `createLogger` factory from `logging/Logger.js`. The connector also exposes a child component, **ConnectionEstablisher**, which encapsulates the HTTP‑first strategy indicated by the parent context.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **modular design** centered on separation of concerns. By extracting the connection logic into a dedicated **SpecstoryConnector**, the architecture isolates the communication protocol (HTTP) from the business logic that consumes Specstory data. This modularity is evident from the statement that “the use of a separate connector … suggests a modular design approach, allowing for potential future expansion to support connections via other protocols or extensions.”  
+The observed code reveals a **modular architecture** centred on clear separation of concerns. The **SpecstoryConnector** itself acts as a façade that coordinates three distinct responsibilities:
 
-The only concrete interaction described is the call from **SpecstoryIntegration** to the `connectViaHTTP` function in **`specstory-adapter.js`**. This establishes a **client‑adapter pattern**: the connector acts as a client that delegates the low‑level HTTP handshake to an adapter module. The adapter encapsulates the details of forming HTTP requests, handling responses, and translating network errors into a form the connector can manage.  
+1. **Connection establishment** – delegated to **SpecstoryAdapter** (via `connectViaHTTP`, IPC, file‑watch).  
+2. **Fault tolerance** – realized through an explicit **RetryPolicy** implementation inside **SpecstoryAdapter**, limiting the number of retries and thereby preventing endless loops.  
+3. **Observability** – achieved by injecting a logger created with `createLogger` from `logging/Logger.js`.
 
-Because the connector is positioned as the manager of the “connection lifecycle,” the design implicitly follows a **lifecycle management pattern**—initialization (opening the HTTP session), steady‑state operation (maintaining the session), and termination (closing the session or recovering from errors). No other patterns such as event‑driven or micro‑service architectures are mentioned, so we stay strictly within the observed modular, client‑adapter, and lifecycle‑management concepts.
+These responsibilities map directly onto the sibling components described in the hierarchy: **LoggerManager** and **LoggingGateway** also use `createLogger`, indicating a shared logging infrastructure; **RetryPolicyManager** mirrors the retry logic found in **SpecstoryAdapter**, suggesting a system‑wide reuse of a retry policy abstraction. The connector’s design therefore follows a **composition‑over‑inheritance** style: it composes existing services (logger, retry policy) rather than embedding their logic.
+
+Interaction flow can be summarised as follows: **Trajectory** invokes **SpecstoryConnector**, which calls **SpecstoryAdapter.connectViaHTTP** (or the alternative IPC/file‑watch paths). The adapter attempts a connection on a list of ports, applying the retry policy after each failure. Each attempt and outcome is logged through the injected logger. Meanwhile, **ConnectionMonitor** (a sibling) can observe the adapter’s state to provide real‑time feedback, and **ConversationFormatter** can later format any logged connection events for downstream consumption.
 
 ---
 
 ## Implementation Details  
 
-The only concrete code artifact mentioned is the **`connectViaHTTP` method** inside **`specstory-adapter.js`**. While the full implementation is not provided, its purpose is clear: it creates an HTTP channel to the Specstory extension. The connector likely invokes this method during its **initialization phase**, capturing the returned handle (e.g., a promise, a socket, or a request object) and storing it in an internal state variable.  
+- **SpecstoryAdapter (lib/integrations/specstory-adapter.js)** – This class houses the core connection logic. Its `connectViaHTTP` method iterates over a predefined set of ports, trying to open an HTTP channel to the Specstory extension. If a port fails, the adapter consults its internal retry counter (limited by the **RetryPolicy**) before moving to the next candidate. The same class also implements alternative protocols (IPC, file‑watch), exposing a uniform API to the connector.  
 
-Error handling is explicitly called out: the connector “handles any errors that may occur during the connection process.” This suggests that `connectViaHTTP` either throws exceptions or returns error objects that the connector catches, logs, and possibly retries. The connector may expose a small public API such as `connect()`, `disconnect()`, and `isConnected()`, each of which internally calls the adapter’s method and updates internal status flags.  
+- **RetryPolicy** – Although not a separate file in the observations, the repeated mention of “limited retries” and “RetryPolicy pattern” indicates that the adapter maintains state such as `maxAttempts` and `currentAttempt`. When the limit is reached, the adapter surfaces a failure to the caller, allowing higher‑level components (e.g., **Trajectory**) to decide on fallback actions.  
 
-Because the connector is a “crucial component,” it probably implements **defensive programming**—validating configuration (e.g., target URL, timeout values) before invoking the adapter, and shielding downstream consumers from raw network failures. The lack of additional symbols means the connector’s internal class or function names are not known, but the design intent is to keep the HTTP specifics hidden behind a clean, reusable interface.
+- **Logging** – All adapters obtain a logger via `createLogger` from `logging/Logger.js`. This function returns a logger instance that follows a standardized format, ensuring that connection attempts, successes, retries, and final failures are consistently recorded. The logger is shared across **SpecstoryConnector**, **LoggerManager**, **LoggingGateway**, and **ConversationFormatter**, reinforcing a single source of truth for log output.  
+
+- **ConnectionEstablisher (child component)** – While the source does not provide its file location, the hierarchy notes that it “indicates a preference for HTTP‑based connections”. It likely wraps the `connectViaHTTP` call, providing a higher‑level API (e.g., `establish()`), and may encapsulate configuration such as the list of ports to probe.  
+
+- **Sibling Collaboration** – **ConnectionMonitor** watches the adapter’s state (perhaps via events or a shared status object) to report live connection health. **RetryPolicyManager** may expose configuration (max retries, back‑off intervals) that **SpecstoryAdapter** reads at runtime, enabling system‑wide policy adjustments without code changes.
 
 ---
 
 ## Integration Points  
 
-The **SpecstoryConnector** sits directly under the **SpecstoryIntegration** parent. The parent component invokes the connector’s functionality via the `connectViaHTTP` call in **`specstory-adapter.js`**, meaning that **SpecstoryIntegration** is the primary consumer of the connector’s services. Any sibling modules within the integration layer (e.g., a potential `SpecstoryReporter` or `SpecstoryConfigManager`) would obtain a ready‑made connection from the connector rather than dealing with HTTP themselves, ensuring a single source of truth for network state.
+1. **Parent – Trajectory**  
+   - Calls into **SpecstoryConnector** to initiate a connection to the Specstory extension.  
+   - Relies on the connector’s outcome (success or failure) to continue its own workflow.  
 
-From a dependency perspective, the connector relies on the **specstory-adapter.js** module for the actual HTTP implementation, and it may also depend on generic utilities such as a logger or a promise library, although those are not explicitly mentioned. Its public interface (presumed methods like `connect`, `disconnect`, `sendMessage`) becomes the contract that other parts of the system use to interact with the Specstory extension. Because the connector abstracts the protocol, future modules could be added that request a different transport (e.g., WebSocket) without changing the consumer code.
+2. **Logger Infrastructure**  
+   - `createLogger` from `logging/Logger.js` is the sole entry point for logging. All logging‑related siblings (LoggerManager, LoggingGateway, ConversationFormatter) also use this factory, ensuring uniform log handling across the system.  
+
+3. **Retry Policy**  
+   - The retry behaviour is encapsulated within **SpecstoryAdapter** but aligns with the system‑wide **RetryPolicyManager**. Adjustments to retry limits can be propagated by configuring the manager, which the adapter reads at construction time.  
+
+4. **Connection Monitoring**  
+   - **ConnectionMonitor** subscribes to status updates from **SpecstoryAdapter** (likely via events or a shared state object) to provide real‑time visibility.  
+
+5. **Child – ConnectionEstablisher**  
+   - Provides a simplified façade for callers that need only “establish a connection”. It internally invokes the adapter’s HTTP path, respecting the same retry and logging contracts.  
+
+No additional external libraries or services are mentioned, so the connector’s external footprint is limited to the Specstory extension itself (accessed via HTTP, IPC, or file watch).
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always acquire a connection through the connector** – Do not call `connectViaHTTP` directly from business logic; let the SpecstoryConnector handle the call so that lifecycle and error handling remain centralized.  
-2. **Check connection state before issuing requests** – Use the connector’s `isConnected()` (or equivalent) to verify that the HTTP session is alive; if not, invoke `connect()` to re‑establish it.  
-3. **Handle errors at the connector level** – The connector is responsible for translating low‑level HTTP failures into domain‑specific exceptions. Consumers should catch only the higher‑level errors the connector propagates.  
-4. **Do not modify `specstory-adapter.js` unless extending the protocol** – Since the adapter is the low‑level HTTP shim, changes there could affect all callers. Any protocol expansion should be implemented as a new adapter (e.g., `specstory-websocket-adapter.js`) and wired into a new connector variant.  
-5. **Dispose of the connection when the integration is torn down** – Call the connector’s `disconnect()` (or equivalent) during application shutdown or when the Specstory extension is no longer needed to free network resources.
+- **Prefer the HTTP pathway**: When invoking the connector, use the `ConnectionEstablisher` (or directly call `SpecstoryAdapter.connectViaHTTP`) unless the environment explicitly requires IPC or file‑watch. The parent context highlights HTTP as the default, and the retry policy is tuned for that path.  
+
+- **Do not override the logger**: Always obtain a logger through `createLogger`. This ensures that all connection events are captured in the same format used by LoggerManager, LoggingGateway, and ConversationFormatter.  
+
+- **Respect the retry limits**: The built‑in RetryPolicy caps attempts to avoid indefinite blocking. If an application needs a different tolerance, adjust the configuration in **RetryPolicyManager** rather than modifying the adapter’s internal counters.  
+
+- **Monitor connection health**: Integrate with **ConnectionMonitor** to receive timely updates about the connection state. Relying solely on the connector’s return value may miss transient failures that the monitor can surface.  
+
+- **Handle failure gracefully**: After the retry limit is exhausted, the adapter propagates an error. Callers (including **Trajectory**) should catch this error and decide whether to fallback, alert the user, or retry with an alternative protocol (IPC or file‑watch).  
 
 ---
 
-### Architectural patterns identified  
-- **Modular design / separation of concerns** – distinct connector component.  
-- **Client‑adapter pattern** – connector (client) delegates HTTP details to `specstory-adapter.js`.  
-- **Lifecycle management** – explicit handling of connection start, sustain, and teardown phases.  
+### Summary of Architectural Patterns Identified  
 
-### Design decisions and trade‑offs  
-- **HTTP as the primary protocol** simplifies implementation and leverages existing web infrastructure, but may limit low‑latency or bidirectional communication that other protocols could provide.  
-- **Dedicated connector** isolates protocol logic, improving maintainability and enabling future protocol extensions, at the cost of an extra abstraction layer and slightly more code to maintain.  
+| Pattern | Evidence |
+|---------|----------|
+| **Modular Architecture / Composition** | Separate classes for connection (SpecstoryAdapter), logging (createLogger), retry (RetryPolicy), monitoring (ConnectionMonitor). |
+| **RetryPolicy** | Explicit limited‑retry mechanism in SpecstoryAdapter; sibling RetryPolicyManager mirrors this. |
+| **Facade** | SpecstoryConnector acts as a façade over SpecstoryAdapter and ConnectionEstablisher. |
+| **Shared Logging Facility** | All logging via `createLogger` from `logging/Logger.js`. |
+| **Observer‑like Monitoring** | ConnectionMonitor watches adapter state for real‑time feedback. |
 
-### System structure insights  
-- **SpecstoryIntegration** → **SpecstoryConnector** → **specstory-adapter.js** → HTTP channel → Specstory extension.  
-- The connector is the sole gateway; all downstream Specstory features inherit its connection state.  
+### Design Decisions and Trade‑offs  
 
-### Scalability considerations  
-- Because the connector currently relies on a single HTTP connection, scaling to many simultaneous consumers would require either connection pooling inside the connector or multiple connector instances. The modular design makes it feasible to introduce such pooling without touching consumer code.  
+- **Flexibility vs. Complexity** – Supporting three protocols (HTTP, IPC, file‑watch) makes the connector adaptable to varied environments but adds branching logic inside SpecstoryAdapter. The trade‑off is justified by the need to operate across different deployment scenarios.  
+- **Limited Retries** – Capping retries prevents resource exhaustion but may abort connections that could succeed with longer back‑off. The system mitigates this by exposing a retry configuration through RetryPolicyManager.  
+- **Centralised Logging** – Using a single logger factory ensures consistency, yet it creates a single point of failure if the logger implementation misbehaves.  
 
-### Maintainability assessment  
-- High maintainability: the clear separation between connector and adapter means protocol changes are localized.  
-- The lack of visible source symbols for the connector itself is a minor risk; documentation must keep the public API stable.  
-- Error handling centralized in the connector reduces duplication and simplifies debugging.  
+### System Structure Insights  
 
-Overall, the **SpecstoryConnector** embodies a clean, modular approach that centralizes HTTP communication with the Specstory extension, providing a solid foundation for future growth while keeping the current system simple and maintainable.
+The overall system is layered: **Trajectory** (high‑level orchestrator) → **SpecstoryConnector** (facade) → **SpecstoryAdapter** (low‑level connection) → **Logger / RetryPolicy** (cross‑cutting concerns). Sibling components share these cross‑cutting services, illustrating a horizontal reuse strategy. Child **ConnectionEstablisher** encapsulates the most common usage pattern (HTTP first), reinforcing the “default‑to‑HTTP” design bias.
+
+### Scalability Considerations  
+
+- **Connection Scalability** – Because the adapter sequentially probes ports, adding many ports could increase latency. However, the limited retry count bounds the worst‑case time.  
+- **Logging Throughput** – Centralised logging via `createLogger` can become a bottleneck if connection attempts are frequent; developers should monitor logger performance and consider asynchronous logging if needed.  
+- **Monitoring Overhead** – ConnectionMonitor’s real‑time checks should be lightweight; the design appears to rely on event‑driven updates rather than polling, supporting better scalability.
+
+### Maintainability Assessment  
+
+The component exhibits high maintainability due to:  
+- **Clear separation of concerns** (connection, retry, logging).  
+- **Reuse of shared services** (logger, retry policy) across siblings, reducing duplication.  
+- **Explicit, limited‑scope classes** (SpecstoryAdapter, ConnectionEstablisher) that are small enough to understand in isolation.  
+
+Potential maintenance risks include the need to keep the three protocol implementations in sync and ensuring that any changes to the shared logger or retry policy do not unintentionally affect the connector’s behaviour. Regular integration tests covering all protocol paths and retry scenarios will mitigate these risks.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryIntegration uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to the Specstory extension.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js demonstrates a modular architecture, allowing for the management of connections and logging in a flexible and adaptable manner. This class implements a retry mechanism for connection establishment, showcasing a RetryPolicy pattern. The connectViaHTTP method in this class attempts to connect to the Specstory extension via HTTP on multiple ports, highlighting a flexible connection establishment approach. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance, providing a standardized logging mechanism.
+
+### Children
+- [ConnectionEstablisher](./ConnectionEstablisher.md) -- The parent context suggests the use of the connectViaHTTP method in SpecstoryAdapter, indicating a preference for HTTP-based connections.
+
+### Siblings
+- [LoggerManager](./LoggerManager.md) -- LoggerManager uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
+- [RetryPolicyManager](./RetryPolicyManager.md) -- RetryPolicyManager implements a retry mechanism with limited retries, demonstrating a fault-tolerant approach to handling failures and retries.
+- [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
+- [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
+- [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
