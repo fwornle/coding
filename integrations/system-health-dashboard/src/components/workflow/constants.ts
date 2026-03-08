@@ -409,10 +409,13 @@ export const STEP_TO_AGENT: Record<string, string> = {
   // Wave-analysis sub-steps (map to existing agents for graph visualization)
   'wave1_init': 'batch_scheduler',
   'wave1_analyze': 'semantic_analysis',
+  'wave1_classify': 'ontology_classification',
   'wave1_persist': 'persistence',
   'wave2_analyze': 'semantic_analysis',
+  'wave2_classify': 'ontology_classification',
   'wave2_persist': 'persistence',
   'wave3_analyze': 'semantic_analysis',
+  'wave3_classify': 'ontology_classification',
   'wave3_persist': 'persistence',
   'wave4_insights': 'insight_generation',
   // Complete/incremental workflow steps
@@ -473,7 +476,14 @@ export const STEP_TO_SUBSTEP: Record<string, string> = {
   'onto_data_prep': 'match',
   'onto_llm_classify': 'validate',
   'onto_apply_results': 'extend',
-  // persistence agent - no substeps to map (single-step agent)
+  // persistence agent sub-steps (wave-based persist operations)
+  'wave1_persist': 'w1',
+  'wave2_persist': 'w2',
+  'wave3_persist': 'w3',
+  // ontology classification sub-steps (wave-based classify operations)
+  'wave1_classify': 'match',
+  'wave2_classify': 'match',
+  'wave3_classify': 'match',
 }
 
 // Multi-agent system edges
@@ -821,5 +831,22 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       inputs: ['Code graph', 'Analysis type'],
       outputs: ['Analysis results', 'Insights'],
       llmUsage: 'standard', techNote: 'LLM-powered code analysis' },
+  ],
+  'persistence': [
+    { id: 'w1', name: 'Wave 1 Persist', shortName: 'W1',
+      description: 'Persist L0 Project + L1 Component entities to knowledge graph',
+      inputs: ['Wave 1 entities', 'Relationships'],
+      outputs: ['Stored entities', 'Graph updated'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage' },
+    { id: 'w2', name: 'Wave 2 Persist', shortName: 'W2',
+      description: 'Persist L2 SubComponent entities to knowledge graph',
+      inputs: ['Wave 2 entities', 'Relationships'],
+      outputs: ['Stored entities', 'Graph updated'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage' },
+    { id: 'w3', name: 'Wave 3 Persist', shortName: 'W3',
+      description: 'Persist L3 Detail entities and operator-refined entities to knowledge graph',
+      inputs: ['Wave 3 entities', 'Operator-enriched fields'],
+      outputs: ['Stored entities', 'Embeddings written'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage + direct attribute merge' },
   ],
 }

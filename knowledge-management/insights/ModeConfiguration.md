@@ -2,100 +2,63 @@
 
 **Type:** Detail
 
-The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
+The LLMModeResolver sub-component, as part of the LLMAbstraction component, is expected to utilize the ModeConfiguration to analyze the context and load the appropriate configuration.
 
 ## What It Is  
 
-`ModeConfiguration` is the component that owns the lifecycle of the **providers.json** configuration file.  It is responsible for **loading** the JSON document from the classpath (or a configurable location), **parsing** its contents, and exposing the resulting data structures so that the rest of the system can decide which operating mode to use for a given LLM provider.  The component lives alongside its parent **ModeResolver** and sibling components **ProviderRegistry** and **ModeResolverStrategy**; together they form the mode‑selection subsystem.  The only concrete source file mentioned for this responsibility is the **providers.json** file (the JSON payload) and the Java class that consumes it – `ModeConfiguration` – which is referenced from `ModeResolverStrategy.java` when the strategy needs to inspect provider‑specific mode settings.
-
----
+`ModeConfiguration` is the concrete representation of the configuration data that drives the **LLMModeResolver**. The observations tell us that the resolver “uses configuration files to determine the current LLM mode,” and that *ModeConfiguration* “is likely to be implemented based on the parent context.” In practice this means that somewhere in the code‑base there is a configuration artifact—most probably a JSON, YAML, or INI file—whose contents are materialised into a `ModeConfiguration` object. The resolver then consumes this object to decide which LLM mode (e.g., *chat*, *completion*, *embedding*, etc.) should be activated for a given request. No explicit file paths or class definitions were discovered in the source snapshot, so the exact location of the configuration files (e.g., `config/llm_mode.yaml`) cannot be listed, but the logical placement is within the same module or package that houses **LLMModeResolver**.
 
 ## Architecture and Design  
 
-The observations reveal a **Strategy pattern** at the heart of the mode‑selection flow.  `ModeResolverStrategy.java` implements the strategy interface that decides which operating mode should be active for a request.  The strategy **delegates** to `ModeConfiguration` to obtain the provider‑specific configuration that drives its decision‑making.  This separation keeps the *algorithm* (how to pick a mode) isolated from the *data source* (the JSON configuration), allowing different strategies to be swapped or extended without touching the configuration loader.
-
-`ModeConfiguration` itself follows a **configuration‑loader** design: it treats the JSON file as the single source of truth for provider modes, parses it once (typically at startup), and caches the result for fast read‑only access.  The component is a child of **ModeResolver**, which orchestrates the overall resolution process, and a sibling to **ProviderRegistry** (which manages provider registration) and **ModeResolverStrategy** (which implements the actual resolution logic).  This hierarchy indicates a clear **separation of concerns**:
-
-* **ProviderRegistry** – registration and lifecycle of provider objects.  
-* **ModeConfiguration** – static configuration of modes per provider.  
-* **ModeResolverStrategy** – dynamic algorithm that chooses a mode using the static data.
-
-Because the strategy is pluggable, the architecture can support multiple resolution policies (e.g., “default‑first”, “fallback‑on‑error”, “user‑override”) without modifying the configuration loader.
-
----
+The design that emerges from the observations is a **configuration‑driven selection** pattern. The system separates *what* the LLM should do (the mode) from *how* that decision is made. `ModeConfiguration` acts as a passive data holder, while **LLMModeResolver** is the active component that interprets the data. This aligns with the **Strategy** concept—different mode behaviours can be swapped by changing the configuration without touching resolver code. Because the resolver “utilizes the ModeConfiguration to analyze the context and load the appropriate configuration,” the interaction is likely a simple read‑only dependency: the resolver reads the configuration at start‑up or on‑demand, then branches to the concrete mode implementation. No evidence suggests a more complex pattern such as event‑driven or micro‑service orchestration; the architecture stays within a single process boundary.
 
 ## Implementation Details  
 
-* **File: `providers.json`** – a JSON document that enumerates each LLM provider together with the supported operating modes (e.g., “chat”, “completion”, “embedding”).  The exact schema is not disclosed, but the file is the authoritative source for mode definitions.  
+Although no concrete symbols were found, the observations give us a clear functional contract:
 
-* **Class: `ModeConfiguration`** – loads `providers.json` on construction (or via a static initializer).  The loading routine likely uses a JSON parser (e.g., Jackson or Gson) to deserialize the file into a map keyed by provider identifier, each entry containing a list or object describing available modes.  After parsing, the data is stored in an immutable structure (e.g., `Map<String, ProviderModeInfo>`) to guarantee thread‑safety for concurrent reads by the resolver.  
+1. **Configuration File** – A file (e.g., `llm_mode.json` or `llm_mode.yaml`) stores key‑value pairs that describe each possible mode (name, parameters, maybe a selector expression).  
+2. **ModeConfiguration Class / Struct** – This entity reads the file, parses it, and exposes the data through properties or accessor methods (e.g., `GetMode(string name)`). The parsing logic would be encapsulated here, shielding the rest of the system from file‑format concerns.  
+3. **LLMModeResolver** – Holds a reference to a `ModeConfiguration` instance. When a request arrives, the resolver examines the request context (perhaps request metadata, user preferences, or runtime flags) and queries `ModeConfiguration` for the matching mode definition. It then instantiates or selects the concrete LLM mode component that implements the required behaviour.
 
-* **Interaction with `ModeResolverStrategy`** – the strategy class calls a public method on `ModeConfiguration` such as `getModesForProvider(String providerId)` or `isModeSupported(String providerId, String mode)`.  The strategy then applies its algorithm (e.g., pick the first enabled mode, respect a user‑specified override) and returns the chosen mode to the caller.  
-
-* **Parent–Child Relationship** – `ModeResolver` holds a reference to a `ModeConfiguration` instance and injects it into the selected `ModeResolverStrategy`.  This wiring is typically performed during application bootstrap (e.g., via a dependency‑injection container or a manual factory).  
-
-* **Sibling Coordination** – `ProviderRegistry` may also need to consult `ModeConfiguration` to validate that a newly registered provider declares only supported modes.  Conversely, `ModeResolverStrategy` may ask `ProviderRegistry` for the active provider instance before consulting `ModeConfiguration` for its mode list.
-
-Because the observations do not list specific method signatures, the description stays at the level of “loading”, “parsing”, and “exposing” the configuration data.
-
----
+Because the resolver “loads the appropriate configuration,” it is plausible that the loading occurs lazily (on first use) or eagerly at application start‑up, depending on performance requirements. The lack of explicit code means we cannot confirm caching strategies, but a typical implementation would cache the parsed configuration to avoid repeated I/O.
 
 ## Integration Points  
 
-1. **ModeResolver (Parent)** – `ModeResolver` creates and owns the `ModeConfiguration` object.  It passes the configuration to the selected `ModeResolverStrategy` and uses the strategy’s result to drive downstream processing (e.g., constructing LLM request payloads).  
-
-2. **ProviderRegistry (Sibling)** – When a provider is registered, `ProviderRegistry` can query `ModeConfiguration` to ensure the provider’s declared modes match those defined in `providers.json`.  This creates a validation loop that prevents mismatched configurations.  
-
-3. **ModeResolverStrategy (Sibling)** – The strategy is the only consumer of `ModeConfiguration`’s public API.  It reads the mode data to apply its resolution algorithm.  Because the strategy is pluggable, any new strategy must conform to the same interface and rely on the same configuration source.  
-
-4. **External Configuration Sources** – Although not explicitly mentioned, the system may allow the location of `providers.json` to be overridden via a system property or environment variable, enabling different deployments (e.g., test vs. production) to supply distinct mode sets.  This would be handled inside `ModeConfiguration`’s loader logic.  
-
-5. **LLM Client Layer** – The final selected mode is typically fed into the LLM client implementation (outside the scope of the observations) so that the correct API endpoint or request format is used.
-
----
+`ModeConfiguration` sits directly under **LLMModeResolver** in the component hierarchy, making it a child dependency of the resolver. Any other component that needs to understand the active LLM mode (for logging, telemetry, or UI display) would likely query the resolver rather than the configuration object itself, preserving encapsulation. Conversely, if the system supports dynamic reloading (e.g., hot‑swap of mode definitions), a higher‑level configuration manager could push updated `ModeConfiguration` instances into the resolver, implying a possible observer‑like contract. No sibling components are identified in the observations, so we cannot enumerate parallel configurations, but the pattern suggests that any future sibling (e.g., `PromptConfiguration`) would follow the same read‑only, file‑backed approach.
 
 ## Usage Guidelines  
 
-* **Do not modify `providers.json` at runtime.**  `ModeConfiguration` is designed as a read‑only, startup‑time loader; changing the file after the application has started will not be reflected unless the component is explicitly re‑initialized, which is not part of the documented contract.  
-
-* **Register providers through `ProviderRegistry` only.**  This ensures that any mode declared by a provider is cross‑checked against the static configuration in `ModeConfiguration`, preventing accidental mismatches.  
-
-* **Select a resolution strategy deliberately.**  Because `ModeResolverStrategy` implements the Strategy pattern, developers should choose the strategy that matches their business rules (e.g., “prefer‑chat‑mode”, “fallback‑to‑completion”).  Swapping strategies does not require changes to `ModeConfiguration`.  
-
-* **Keep `providers.json` schema stable.**  Since the configuration loader parses the JSON into a fixed internal model, any schema change must be accompanied by a corresponding update to `ModeConfiguration`’s parsing logic.  Coordinate schema evolution with the team responsible for the loader.  
-
-* **Leverage dependency injection if available.**  Inject the same `ModeConfiguration` instance into both `ModeResolver` and any custom `ModeResolverStrategy` implementations to avoid duplicate parsing and to guarantee consistency across the system.  
+1. **Keep Configuration Files Source‑Controlled** – Since the resolver’s behaviour hinges entirely on the configuration file, any change to LLM mode semantics must be versioned alongside the code.  
+2. **Do Not Mutate `ModeConfiguration` at Runtime** – The object is intended as a read‑only view of static configuration. If dynamic updates are required, replace the whole instance through the resolver’s public API rather than mutating fields.  
+3. **Validate Configuration Early** – Implement schema validation (JSON Schema, YAML schema, etc.) as part of the loading routine to surface errors before the resolver attempts to use malformed data.  
+4. **Prefer Declarative Mode Definitions** – Encode all mode‑specific parameters (temperature, max tokens, etc.) in the configuration file; avoid hard‑coding values in the resolver to preserve the configuration‑driven intent.  
+5. **Document Mode Selection Logic** – Because the resolver “analyzes the context” to pick a mode, developers should clearly document which request attributes influence the decision, making the mapping traceable.
 
 ---
 
-### Architectural Patterns Identified  
-1. **Strategy Pattern** – Implemented by `ModeResolverStrategy.java` to encapsulate different mode‑resolution algorithms.  
-2. **Configuration‑Loader / Immutable Configuration** – `ModeConfiguration` loads a static JSON file once and exposes immutable data for read‑only consumption.
+### 1. Architectural patterns identified  
+* Configuration‑driven selection (a lightweight Strategy pattern).  
 
-### Design Decisions and Trade‑offs  
-* **Static JSON vs. Dynamic Source** – Using a static `providers.json` file simplifies deployment and guarantees deterministic mode definitions, but it prevents on‑the‑fly updates without a restart.  
-* **Strategy Isolation** – Decoupling the resolution algorithm from the configuration data enables easy addition of new strategies, at the cost of an extra indirection layer that developers must understand.  
-* **Single Source of Truth** – Centralising mode definitions in `ModeConfiguration` reduces duplication, but places the entire mode‑management burden on a single component, making its correctness critical.
+### 2. Design decisions and trade‑offs  
+* **Decision:** Separate mode data (`ModeConfiguration`) from decision logic (`LLMModeResolver`).  
+* **Trade‑off:** Simplicity and flexibility vs. the need for runtime validation and potential cache invalidation when configs change.  
 
-### System Structure Insights  
-The mode‑selection subsystem is organized as a small hierarchy: `ModeResolver` (orchestrator) → `ModeConfiguration` (data provider) + `ProviderRegistry` (provider lifecycle) → `ModeResolverStrategy` (algorithm).  This clear vertical layering promotes readability and testability: configuration can be unit‑tested in isolation, strategies can be mocked with stubbed configurations, and the resolver can be exercised end‑to‑end with real data.
+### 3. System structure insights  
+* `ModeConfiguration` is a child of **LLMModeResolver**, forming a clear parent‑child dependency. No sibling or child components are currently observable.  
 
-### Scalability Considerations  
-* **Read‑Only Cache** – Because `ModeConfiguration` caches the parsed JSON in memory, the lookup cost for mode information is O(1) and scales to a large number of providers without performance degradation.  
-* **File Size** – The only scalability limit is the size of `providers.json`.  Extremely large provider catalogs could increase startup latency and memory footprint; in such a scenario, a streaming parser or a database‑backed configuration could be considered, but that would be a design change beyond the current implementation.  
+### 4. Scalability considerations  
+* Adding new LLM modes only requires updating the configuration file; the resolver does not need code changes, supporting horizontal growth of supported modes.  
+* If the configuration file grows large, lazy loading or incremental parsing may be needed to keep resolver latency low.  
 
-### Maintainability Assessment  
-The separation of concerns (configuration loading vs. resolution logic) yields high maintainability: changes to the JSON schema affect only `ModeConfiguration`, while new business rules affect only new `ModeResolverStrategy` implementations.  The reliance on a static file simplifies version control and auditability of mode definitions.  However, because the observations do not mention automated reload or hot‑swap capabilities, any required configuration change forces a redeploy, which may be a maintenance inconvenience in environments demanding rapid configuration turnover.
+### 5. Maintainability assessment  
+* High maintainability: the configuration‑centric approach isolates mode changes to data files, reducing code churn.  
+* Maintainability hinges on disciplined schema validation and clear documentation of the context‑to‑mode mapping, preventing hidden coupling between request attributes and mode selection.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ModeResolver](./ModeResolver.md) -- ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
-
-### Siblings
-- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.
-- [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
+- [LLMModeResolver](./LLMModeResolver.md) -- The LLMModeResolver uses configuration files to determine the current LLM mode.
 
 
 ---

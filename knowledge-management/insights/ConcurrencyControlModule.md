@@ -2,108 +2,144 @@
 
 **Type:** SubComponent
 
-ConcurrencyControlModule provides a monitoring mechanism to track concurrency-related metrics and performance indicators, supporting data-driven decision-making and process improvement
+ConcurrencyControlModule uses a locking mechanism, such as acquireLock() in locking-mechanism.ts, to prevent data inconsistencies when multiple components are accessing the knowledge graph simultaneously.
 
 ## What It Is  
 
-The **ConcurrencyControlModule** is a dedicated sub‑component that lives inside the **ConstraintSystem** package.  Although the source repository does not expose concrete file paths in the current observation set, the module is clearly defined by the class `ConcurrencyControlModule` together with three child classes – `WorkStealingConcurrencyManager`, `ConcurrencyMonitor`, and `LockingMechanism`.  Its primary responsibility is to regulate concurrent access to shared resources that are used throughout the constraint‑evaluation pipeline.  It does this by exposing a standardized concurrency‑control interface (as noted in observation 2) and by combining three complementary techniques: a work‑stealing scheduler, explicit lock‑based protection, and a runtime monitoring/notification subsystem.  The module is also capable of reacting to changing load conditions, dynamically tuning its behaviour to keep overall system performance optimal (observation 4).
+The **ConcurrencyControlModule** lives inside the *KnowledgeManagement* component and is responsible for guaranteeing safe, concurrent access to the shared knowledge graph.  Its concrete implementation can be seen in a set of TypeScript files that together provide a lock‑based coordination layer:
+
+* `locking‑mechanism.ts` – defines the core lock primitives (`acquireLock()` and the counterpart `releaseLock()`).
+* `deadlock‑detection.ts` – supplies a `detectDeadlock()` routine that scans held locks and resolves contention.
+* `timeout‑mechanism.ts` – offers a `setTimeout()`‑based guard that forces lock release after a configurable period.
+* `logging.ts` – implements `logConcurrencyControl()` to record lock activity for audit and debugging.
+
+The module is declared as a **SubComponent** of *KnowledgeManagement* and itself contains the child component **LockingMechanism**.  It works closely with sibling modules such as **PersistenceModule**, **GraphDatabaseModule**, **ManualLearning**, **OnlineLearning**, **CodeGraphModule**, and **OntologyModule**, all of which ultimately rely on the same underlying graph database via the `GraphDatabaseAdapter` (see `storage/graph-database-adapter.ts`).  By mediating access, the ConcurrencyControlModule prevents the data inconsistencies that could arise when those siblings issue overlapping write or read‑modify‑write operations.
 
 ---
 
 ## Architecture and Design  
 
-The design of **ConcurrencyControlModule** follows a **modular, layered architecture** that separates concerns into three well‑defined child components.  
+The architecture follows a **centralized lock manager** pattern.  All components that need to read or mutate the knowledge graph must first invoke `acquireLock()` (found in `locking‑mechanism.ts`).  The lock manager tracks which component holds which lock, and the lock is released explicitly via `releaseLock()` once the operation completes.  This simple acquire/release contract enforces **mutual exclusion** without requiring each caller to implement its own synchronization logic.
 
-1. **Strategy‑like interface** – The module implements a concurrency‑control interface, allowing the rest of the system (e.g., the constraint‑evaluation engine in `ConstraintSystem`) to invoke concurrency services without coupling to a particular algorithm.  This interface‑based approach mirrors the *Strategy* pattern, enabling the substitution of the work‑stealing manager or other future strategies with minimal impact.  
+To guard against the classic pitfalls of lock‑based designs, the module augments the lock manager with two complementary mechanisms:
 
-2. **Work‑Stealing Scheduler** – The `WorkStealingConcurrencyManager` embodies a *work‑stealing* algorithm, a proven technique for balancing load across a pool of worker threads.  By allowing idle threads to “steal” tasks from busier peers, the manager reduces contention and improves throughput, especially under highly variable workloads (observations 1 and hierarchy context).  
+1. **Deadlock detection** – `detectDeadlock()` (in `deadlock‑detection.ts`) periodically examines the lock‑ownership graph for cycles.  When a cycle is found, the routine can break the deadlock by aborting one of the waiting requests and forcing its lock release.  This keeps the system from stalling indefinitely.
 
-3. **Locking Mechanism** – The `LockingMechanism` provides fine‑grained mutual exclusion for critical sections that cannot be safely handled by the scheduler alone.  This classic lock‑based synchronization (observation 3) guarantees data consistency when multiple threads attempt to modify the same shared resource.  
+2. **Timeout enforcement** – `setTimeout()` (in `timeout‑mechanism.ts`) attaches a maximum hold time to each lock acquisition.  If a component exceeds this window, the timeout handler automatically releases the lock, ensuring that stray or crashed processes do not monopolise resources.
 
-4. **Monitoring & Notification** – `ConcurrencyMonitor` continuously gathers metrics such as task execution times, thread utilization, and queue lengths (observation 5).  Coupled with a built‑in notification subsystem (observation 6), it follows an *Observer*‑style relationship: the monitor publishes events that alert administrators or automated remediation components when thresholds are breached.  
+Both mechanisms are **orthogonal** to the core lock manager: they observe the same lock state but do not alter the basic acquire/release API.  This separation makes the design easier to reason about and test.  
 
-Interaction between these pieces is straightforward: the `ConcurrencyControlModule` receives a request for concurrent work, forwards it to the `WorkStealingConcurrencyManager`, which may acquire locks via the `LockingMechanism` when necessary.  After each task completes, the `ConcurrencyMonitor` records performance data and, if anomalies are detected, triggers the notification mechanism.  This tight yet decoupled collaboration enables the module to adapt dynamically (observation 4) while preserving a clear separation of responsibilities.
+The module also integrates a **logging concern** (`logConcurrencyControl()` in `logging.ts`).  Every lock acquisition, release, timeout, and deadlock resolution is recorded, providing an audit trail that is valuable for debugging concurrent failures and for compliance reporting.
 
-Because the module resides under **ConstraintSystem**, it shares the broader system’s emphasis on high‑throughput, low‑latency processing.  Its sibling components—`GraphDatabaseManager`, `ContentValidationAgent`, and `ViolationCaptureService`—each handle distinct concerns (graph storage, validation, and violation persistence).  The concurrency module complements them by ensuring that their concurrent interactions do not lead to race conditions or degraded performance.
+Because the ConcurrencyControlModule sits directly under *KnowledgeManagement*, it shares the same **graph‑database‑centric** orientation as its siblings.  The lock manager does not embed any knowledge‑graph‑specific logic; instead, it treats the graph as an opaque resource that must be protected, allowing the same concurrency controls to be reused by **PersistenceModule**, **OnlineLearning**, **ManualLearning**, **CodeGraphModule**, and **OntologyModule**.
 
 ---
 
 ## Implementation Details  
 
-Even though the current artifact list does not expose concrete file locations, the observations give a precise picture of the internal structure:
+### Locking Mechanism (`locking‑mechanism.ts`)  
+* **`acquireLock(resourceId: string, ownerId: string): Promise<boolean>`** – attempts to obtain an exclusive lock on a named resource (e.g., a sub‑graph or entity collection).  The function returns a promise that resolves to `true` when the lock is granted, otherwise it blocks (or rejects) until the lock becomes available.  
+* **`releaseLock(resourceId: string, ownerId: string): void`** – removes the lock entry, making the resource available for other owners.  The implementation records the release event via `logConcurrencyControl()`.
 
-| Class / Component | Core Responsibility | Key Mechanisms |
-|-------------------|---------------------|----------------|
-| **ConcurrencyControlModule** | Public façade exposing concurrency services; implements a standard interface. | Delegates to `WorkStealingConcurrencyManager`, `LockingMechanism`, and `ConcurrencyMonitor`. |
-| **WorkStealingConcurrencyManager** | Schedules and balances tasks across worker threads using a work‑stealing algorithm. | Maintains a deque per worker; idle workers pop tasks from neighbours’ deques. |
-| **LockingMechanism** | Provides mutual exclusion for critical sections. | Likely wraps `java.util.concurrent.locks.ReentrantLock` (or equivalent) to protect shared data structures. |
-| **ConcurrencyMonitor** | Collects runtime metrics and raises alerts. | Instruments task start/end timestamps, thread pool statistics, and feeds a notification channel. |
+Internally, the file maintains an in‑memory map (`Map<string, LockInfo>`) where each key is a `resourceId` and the value records the current `ownerId`, a timestamp, and any waiting queue.  This map is the single source of truth for lock state.
 
-The module’s **dynamic adaptation** (observation 4) is realized by the monitor feeding feedback into the manager: if the monitor detects sustained high queue depth or thread starvation, the manager can adjust the number of worker threads or modify stealing aggressiveness.  The **notification mechanism** (observation 6) is probably implemented as a lightweight event bus or callback interface that downstream administrators or automated remediation services subscribe to.
+### Deadlock Detection (`deadlock‑detection.ts`)  
+* **`detectDeadlock(): void`** – runs on a timer (e.g., every few seconds).  It builds a wait‑for graph from the lock map, then applies a cycle‑detection algorithm (depth‑first search).  Upon finding a cycle, the routine selects a victim (typically the youngest lock holder) and forces its release, again logging the event.  
 
-Because the module implements a concurrency‑control **interface**, external callers interact with it through methods such as `execute(Runnable task)` or `submit(Callable<T> job)`.  Internally, these calls are wrapped in try‑finally blocks that acquire the appropriate lock (via `LockingMechanism`) before handing the job to the work‑stealing pool.  Upon completion, `ConcurrencyMonitor` records the elapsed time and updates aggregate statistics.
+The deadlock detector is deliberately **passive**: it does not interfere with normal lock acquisition unless a cycle is detected, thereby minimizing performance impact.
+
+### Timeout Mechanism (`timeout‑mechanism.ts`)  
+* **`setTimeout(resourceId: string, ownerId: string, durationMs: number): void`** – registers a timer when a lock is granted.  If the timer expires before `releaseLock()` is called, the timeout handler automatically invokes `releaseLock()` and logs a timeout‑forced release.  
+
+Timeout values are configurable per‑resource, allowing fine‑grained control (e.g., longer timeouts for bulk import jobs, shorter ones for quick look‑ups).
+
+### Logging (`logging.ts`)  
+* **`logConcurrencyControl(event: ConcurrencyEvent): void`** – serialises lock events (acquire, release, timeout, deadlock resolution) to the system logger.  The event payload includes timestamps, `resourceId`, `ownerId`, and the reason for the event, facilitating post‑mortem analysis.
+
+### Interaction with Persistence and Graph Modules  
+When **PersistenceModule** or any sibling component needs to persist an entity, it first calls `acquireLock(entityId, componentName)`.  After the write operation completes via the `GraphDatabaseAdapter`, the component calls `releaseLock(entityId, componentName)`.  The lock manager therefore acts as a thin façade that isolates the graph‑database code from concurrency concerns, keeping the persistence logic simple and deterministic.
 
 ---
 
 ## Integration Points  
 
-`ConcurrencyControlModule` is tightly coupled to its **parent** `ConstraintSystem`.  The parent relies on the module to safely execute constraint checks, rule evaluations, and any other CPU‑intensive operations that may be performed in parallel.  The module’s **interface** is the contract through which the parent (and potentially other components) request concurrency services.
+1. **Parent – KnowledgeManagement**  
+   The ConcurrencyControlModule is declared inside *KnowledgeManagement*, meaning its lifecycle is managed together with the other knowledge‑graph‑related sub‑components.  Any initialization code for the parent (e.g., configuration loading) can propagate timeout thresholds or deadlock‑detection intervals to the module.
 
-**Sibling interactions** are indirect but important:  
+2. **Sibling Modules**  
+   *PersistenceModule*, *OnlineLearning*, *ManualLearning*, *CodeGraphModule*, and *OntologyModule* all rely on the same `GraphDatabaseAdapter`.  By routing their write paths through the ConcurrencyControlModule, they share a uniform concurrency contract, reducing the risk of divergent lock handling strategies.
 
-* `GraphDatabaseManager` may issue concurrent read/write queries to the underlying Neo4j store; the concurrency module can be used to serialize or schedule those accesses when they target shared graph resources.  
-* `ContentValidationAgent` runs validation logic that can be parallelized; it can submit validation jobs to the concurrency module to benefit from work‑stealing load balancing.  
-* `ViolationCaptureService` may persist violation records concurrently; again, the module can protect the underlying storage writes with its locking mechanism.
+3. **Child – LockingMechanism**  
+   The child component encapsulated as **LockingMechanism** is essentially the code in `locking‑mechanism.ts`.  It is the only place where lock state is mutated, ensuring a single point of truth.  Other children (e.g., potential future “ReadOnlyLock” or “VersionedLock”) could be added without disturbing the existing API.
 
-**Child components** expose their own APIs:  
+4. **External Observability**  
+   The logging hook (`logConcurrencyControl()`) can be wired to external monitoring systems (e.g., Prometheus, ELK) to surface lock contention metrics, timeout rates, and deadlock incidents.  This integration is implicit in the design: every lock‑related event is emitted through a single logging façade.
 
-* `WorkStealingConcurrencyManager` likely offers configuration methods (`setStealThreshold`, `setWorkerCount`) that the parent or an admin UI can adjust at runtime.  
-* `ConcurrencyMonitor` provides read‑only accessors (`getThreadUtilization()`, `getAvgTaskLatency()`) for dashboards or alerting pipelines.  
-* `LockingMechanism` may expose diagnostic hooks (`getLockHoldCount()`) useful for troubleshooting deadlocks.
-
-The **notification subsystem** integrates with the system’s operational tooling (e.g., logging frameworks, alerting services).  When a concurrency anomaly is detected, a structured event containing metric snapshots and context is emitted, enabling administrators to act quickly.
+5. **Configuration Interfaces**  
+   While the observations do not expose a concrete configuration file, the presence of timeout and deadlock detection suggests that the module reads runtime parameters (e.g., default lock TTL, detection interval) from the parent component’s configuration store.  Developers should therefore ensure those settings are supplied during deployment.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer the public façade** – All client code should interact exclusively with `ConcurrencyControlModule` through its defined interface.  Direct use of `WorkStealingConcurrencyManager` or `LockingMechanism` bypasses the monitoring and dynamic‑adaptation feedback loop and is discouraged.  
+* **Always acquire before you act** – Any component that intends to modify or read‑modify‑write data in the knowledge graph must call `acquireLock(resourceId, ownerId)` first.  Skipping this step defeats the consistency guarantees provided by the module.  
 
-2. **Scope lock usage carefully** – When a task requires exclusive access to a shared resource, wrap only the minimal critical section with the `LockingMechanism`.  Over‑locking can nullify the benefits of work‑stealing and increase contention.  
+* **Release promptly** – After the protected operation finishes, invoke `releaseLock(resourceId, ownerId)` as soon as possible.  Holding a lock longer than necessary increases the likelihood of contention and may trigger timeout‑forced releases.  
 
-3. **Leverage the monitor for performance tuning** – Developers should consult `ConcurrencyMonitor` metrics during load testing to identify bottlenecks.  If average task latency spikes or thread utilization drops below a threshold, consider adjusting the worker pool size via the manager’s configuration API.  
+* **Respect timeout policies** – Design your component’s work‑flow to complete within the configured timeout window.  If a long‑running task is unavoidable, consider breaking it into smaller transactional steps or requesting an extended lock duration via a dedicated API (if added later).  
 
-4. **Handle notifications proactively** – The notification mechanism is intended for operational awareness.  Production deployments should route these alerts to a monitoring platform (e.g., Prometheus + Alertmanager) and define remediation playbooks for common scenarios such as thread starvation or lock contention.  
+* **Handle lock acquisition failures** – `acquireLock` may reject or block if the resource is already locked.  Implement retry logic with exponential back‑off and be prepared to abort gracefully if a deadlock is reported by `detectDeadlock()`.  
 
-5. **Respect dynamic adaptation** – The module may automatically scale its worker pool based on observed load.  Manual overrides should be applied sparingly and only after confirming that the auto‑tuning logic is insufficient for a specific workload pattern.  
+* **Leverage logging for diagnostics** – The `logConcurrencyControl` output is the primary source for troubleshooting concurrency issues.  Include the `ownerId` that uniquely identifies your component (e.g., “OnlineLearning”) to make log entries easy to filter.  
 
-6. **Testing considerations** – Unit tests that involve concurrency should use deterministic task sets and verify that `ConcurrencyMonitor` records expected metrics.  Stress tests should simulate high contention to ensure that the locking mechanism correctly serializes access without deadlocking.  
+* **Do not embed graph‑specific logic in the lock manager** – Keep all graph‑database calls separate from lock handling.  This separation preserves the modularity of the ConcurrencyControlModule and allows future replacement of the underlying database without touching concurrency code.
 
 ---
 
-### Summary of Requested Items  
+### Architectural patterns identified  
 
-1. **Architectural patterns identified** – Interface‑based *Strategy* for concurrency control, *Work‑Stealing* scheduling algorithm, classic *Lock* (mutual exclusion), *Observer*‑style monitoring/notification.  
-2. **Design decisions and trade‑offs** – Combining work‑stealing (high throughput, low latency) with explicit locking (data safety) balances performance against complexity; monitoring adds overhead but enables self‑tuning and observability.  
-3. **System structure insights** – `ConcurrencyControlModule` sits under `ConstraintSystem`, exposing a façade to siblings while delegating to three child components, each handling a distinct aspect of concurrency (scheduling, protection, observability).  
-4. **Scalability considerations** – Work‑stealing naturally scales with CPU core count; dynamic worker‑pool adjustment allows the module to respond to load spikes.  Lock contention remains the primary scalability limiter; careful granularity of locks mitigates this.  
-5. **Maintainability assessment** – Clear separation of concerns (scheduler, lock, monitor) and an interface‑driven contract make the module easy to extend or replace.  The absence of tightly coupled code paths and the presence of runtime metrics further aid debugging and future evolution.
+* **Centralized Lock Manager** – a single authority (`locking‑mechanism.ts`) that serialises access to shared resources.  
+* **Deadlock Detection (wait‑for graph analysis)** – proactive cycle detection via `detectDeadlock()`.  
+* **Timeout Guard** – safety net that forces lock release after a configurable period (`setTimeout()` in `timeout‑mechanism.ts`).  
+* **Logging/Audit Trail** – cross‑cutting concern implemented by `logConcurrencyControl()`.
+
+### Design decisions and trade‑offs  
+
+* **Explicit acquire/release API** – simple to understand and enforce, but introduces the risk of forgotten releases (mitigated by timeouts).  
+* **In‑memory lock state** – fast lookup and minimal latency; however, it limits scalability across multiple process instances unless a distributed store is later introduced.  
+* **Passive deadlock detection** – low overhead during normal operation, but detection latency depends on the polling interval.  
+* **Uniform logging** – provides observability at the cost of additional I/O; developers should configure log levels appropriately.
+
+### System structure insights  
+
+The ConcurrencyControlModule sits at the heart of *KnowledgeManagement*, acting as the gatekeeper for all graph‑database interactions.  Its child **LockingMechanism** encapsulates the only mutable state, while sibling modules share the same graph‑access façade, ensuring a cohesive concurrency model across the entire knowledge‑graph ecosystem.
+
+### Scalability considerations  
+
+* **Horizontal scaling** – Because lock state is kept in memory, scaling the system horizontally (multiple Node.js processes) would require a shared lock store (e.g., Redis) to maintain correctness.  Until such a store is introduced, the module scales well vertically (more CPU within a single process).  
+* **Lock granularity** – Using fine‑grained `resourceId`s (e.g., per‑entity) reduces contention but increases the size of the lock map.  Coarser granularity simplifies the map but may become a bottleneck under heavy parallel writes.  
+* **Deadlock detection frequency** – Tuning the detection interval can balance CPU usage against responsiveness to deadlocks.
+
+### Maintainability assessment  
+
+The module’s responsibilities are well‑encapsulated: lock acquisition/release, deadlock detection, timeout handling, and logging are each isolated in their own files.  This separation of concerns makes the codebase easy to navigate and test.  The primary maintenance risk lies in the in‑memory lock store; any change to process lifecycle (e.g., graceful shutdown, hot reload) must ensure that all held locks are released to avoid stale entries.  Adding a persistent lock backend or extending the API for read‑only/shared locks would be straightforward given the current modular layout.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- Key patterns in the ConstraintSystem component include the use of a graph database for storing and querying constraints, the implementation of a content validation agent for validating code actions, and the use of a violation capture service for capturing and storing violations. The system also employs concurrency control mechanisms, such as work-stealing concurrency, to ensure efficient execution and prevent conflicts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's architecture is designed to support multiple workflows and use cases, including code graph analysis, entity persistence, and ontology classification, through a set of APIs and interfaces for interacting with the knowledge graph. This is evident in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which provides a unified interface for graph database operations, making it easy to integrate with other components and tools. The use of a dynamic import mechanism in GraphDatabaseAdapter to load the VkbApiClient module allows for flexibility in the component's dependencies.
 
 ### Children
-- [WorkStealingConcurrencyManager](./WorkStealingConcurrencyManager.md) -- The ConcurrencyControlModule utilizes a work-stealing concurrency mechanism, as seen in the parent component analysis, to manage concurrent access to shared resources.
-- [ConcurrencyMonitor](./ConcurrencyMonitor.md) -- The ConcurrencyMonitor would be responsible for collecting metrics on task execution times, thread utilization, and other concurrency-related performance indicators.
-- [LockingMechanism](./LockingMechanism.md) -- The LockingMechanism would be used to protect shared resources from concurrent access, ensuring that only one thread can modify the resource at a time.
+- [LockingMechanism](./LockingMechanism.md) -- The ConcurrencyControlModule uses a locking mechanism, such as acquireLock() in locking-mechanism.ts, to prevent data inconsistencies when multiple components are accessing the knowledge graph simultaneously.
 
 ### Siblings
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a graph database like Neo4j to store constraints, allowing for efficient querying and retrieval of constraint data
-- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses a validation framework like Apache Commons Validator to validate code actions against the defined constraints
-- [ViolationCaptureService](./ViolationCaptureService.md) -- ViolationCaptureService uses a data storage mechanism like a relational database or NoSQL database to store violations
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities in the knowledge graph.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store automatically extracted knowledge in the knowledge graph.
+- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store extracted insights in the knowledge graph.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store entities in the knowledge graph.
+- [OntologyModule](./OntologyModule.md) -- OntologyModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store ontology information in the knowledge graph.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses a dynamic import mechanism in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to load the VkbApiClient module, allowing for flexibility in the component's dependencies.
 
 
 ---

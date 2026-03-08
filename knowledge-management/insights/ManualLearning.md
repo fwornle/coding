@@ -2,135 +2,130 @@
 
 **Type:** SubComponent
 
-The CodeKnowledgeGraph sub-component is used by ManualLearning for constructing and managing the code knowledge graph, enabling semantic code search and analysis.
+ManualLearning relies on the GraphDatabaseAdapter to store and retrieve manually curated knowledge, utilizing Graphology+LevelDB persistence with automatic JSON export sync
 
 ## What It Is  
 
-**ManualLearning** is a sub‑component that lives inside the **KnowledgeManagement** component. Its implementation is spread across the code‑base but the key interactions are anchored in three concrete files that appear in the observations:  
+**ManualLearning** is a sub‑component of the **KnowledgeManagement** domain that enables human‑curated knowledge to be injected, classified, and persisted in the system’s graph store. The core implementation lives in the same repository as the other knowledge‑management agents, most notably in `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` (where the **PersistenceAgent** lives) and `storage/graph-database-adapter.ts` (the **GraphDatabaseAdapter** used by ManualLearning).  
 
-* `storage/graph-database-adapter.ts` – the low‑level storage adapter that all knowledge‑graph‑related components, including ManualLearning, rely on for persisting entities and relationships.  
-* `agents/persistence-agent.ts` – the `PersistenceAgent` class whose `execute()` method is the entry point for persisting manual‑learning data through the GraphDatabaseAdapter.  
-* The sibling sub‑components (`EntityManagement`, `OntologyClassification`, `CodeKnowledgeGraph`, `PersistenceService`) that ManualLearning composes to provide a full manual‑knowledge‑capture workflow.
+ManualLearning’s primary responsibilities are:  
 
-In practice, ManualLearning enables users or external tools to **create entities and relationships by hand**, classify those entities using the ontology layer, and inject them into the **code knowledge graph** so that downstream features (semantic code search, analysis, etc.) can immediately benefit from the newly added knowledge.
+1. **Ingesting manually curated entities** – developers or domain experts supply entities that are then mapped to the shared‑memory ontology via `PersistenceAgent.mapEntityToSharedMemory()`.  
+2. **Classifying those entities** – the **OntologyClassifier** is invoked to assign ontology classes and to compute relationships between entities.  
+3. **Persisting the curated knowledge** – the **GraphDatabaseAdapter** stores the resulting graph in a **Graphology + LevelDB** backend, while automatically synchronising a JSON export for downstream consumers.  
+
+Because it sits under **KnowledgeManagement**, ManualLearning shares the same lock‑free, work‑stealing concurrency model that the parent component uses to keep LevelDB access contention low while scaling to large data sets.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **layered, composition‑based design** centred on a **shared GraphDatabaseAdapter**. The adapter lives in `storage/graph-database-adapter.ts` and abstracts the underlying Graphology + LevelDB persistence mechanism. All sibling sub‑components—including ManualLearning—depend on this single adapter, which enforces a **single source of truth for graph storage** and guarantees that every component writes to the same physical store.
+The architecture of ManualLearning is deliberately **modular and lock‑free**. The following design choices are evident from the observations:
 
-ManualLearning does not implement its own persistence logic; instead it **delegates** to the **PersistenceAgent** (`agents/persistence-agent.ts`). The `execute()` function of the agent orchestrates the flow: it receives the manual‑learning payload, calls into the GraphDatabaseAdapter to create or update nodes/edges, and then hands off the data to higher‑level services (e.g., `PersistenceService`) for any post‑processing or transaction management. This separation of concerns mirrors a **service‑oriented internal layer** where the agent acts as a façade for persistence operations.
+| Observation | Architectural Implication |
+|-------------|---------------------------|
+| *PersistenceAgent.mapEntityToSharedMemory() pre‑populates ontology metadata fields* | **Metadata pre‑population** avoids costly round‑trips to the LLM for re‑classification, embodying an **optimistic caching** pattern. |
+| *Dynamic import mechanism in GraphDatabaseAdapter* | **Dynamic module loading** sidesteps TypeScript compilation constraints and yields a **plug‑in style modularity** – each storage client (e.g., `VkbApiClient`) can be swapped without recompiling the whole code base. |
+| *Lock‑free architecture to prevent LevelDB lock conflicts* | The system relies on **lock‑free data structures** (atomic counters, work‑stealing queues) to guarantee high concurrency with LevelDB, a design that mirrors the parent component’s strategy. |
+| *Work‑stealing concurrency in PersistenceAgent* | **Work‑stealing scheduler** provides load balancing across worker threads, ensuring idle workers can pull pending persistence tasks immediately. |
+| *Graphology + LevelDB persistence with automatic JSON export sync* | This is a **dual‑store persistence pattern** – a fast key‑value store for runtime queries and a JSON snapshot for offline analysis or backup. |
 
-The component also **composes** three functional siblings:
+The **interaction flow** is as follows:
 
-1. **EntityManagement** – supplies CRUD‑style APIs for manual entities, again backed by the GraphDatabaseAdapter.  
-2. **OntologyClassification** – classifies newly created entities into types/categories, using the same storage backend to persist classification results.  
-3. **CodeKnowledgeGraph** – integrates the manually created entities into the broader code‑knowledge graph, making them available for semantic queries.
+1. **ManualLearning** receives a manually curated entity (e.g., via an API or UI).  
+2. The **PersistenceAgent** immediately calls `mapEntityToSharedMemory()`, inserting `entityType` and `metadata.ontologyClass` into the shared memory cache.  
+3. The **OntologyClassifier** consumes the enriched entity, resolves its ontology class, and adds relationship edges.  
+4. The **CodeKnowledgeGraphConstructor** (when the entity represents code) may run an AST‑based analysis to enrich the graph further.  
+5. All resulting nodes/edges are handed to **GraphDatabaseAdapter**, which dynamically imports the required storage client and writes to **Graphology** (in‑memory graph) and **LevelDB** (persistent store).  
+6. A background synchroniser emits a JSON export, keeping external tools in sync.
 
-By re‑using these siblings, ManualLearning follows a **composition over inheritance** approach, allowing each concern (entity handling, classification, graph integration) to evolve independently while still participating in the manual‑learning workflow.
+The component therefore follows a **pipeline architecture** (ingest → enrich → persist) with **clear separation of concerns**: ingestion (PersistenceAgent), classification (OntologyClassifier), graph construction (CodeKnowledgeGraphConstructor), and storage (GraphDatabaseAdapter).
 
 ---
 
 ## Implementation Details  
 
+### PersistenceAgent (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`)  
+- **`mapEntityToSharedMemory(entity)`** – extracts the essential ontology fields (`entityType`, `metadata.ontologyClass`) and writes them into a shared‑memory cache. This cache is consulted by downstream classifiers to skip redundant LLM calls.  
+- **Work‑stealing scheduler** – the agent maintains a pool of worker threads. Each worker has a local deque; when its deque is empty it *steals* tasks from a neighbour’s deque, guaranteeing high utilisation without global locks.  
+
 ### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
-The adapter encapsulates Graphology’s in‑memory graph model together with LevelDB’s durable storage. Its public API likely includes methods such as `addNode`, `addEdge`, `updateNode`, and `query`. Because every sub‑component (EntityManagement, OntologyClassification, CodeKnowledgeGraph, PersistenceService, and ManualLearning) uses this adapter, it serves as the **canonical gateway** to the knowledge graph.
+- **Dynamic imports** – e.g., `const { VkbApiClient } = await import('path/to/vkb-client')`. This pattern avoids static TypeScript imports that could cause circular dependencies or compilation failures, and it keeps the adapter loosely coupled to any particular backend client.  
+- **Graphology + LevelDB** – Graphology provides an in‑memory graph API (nodes, edges, traversal). Persistence to LevelDB occurs via a thin wrapper that serialises graph mutations as JSON blobs. The adapter also triggers an **automatic JSON export sync**, writing a snapshot file after each transaction batch.  
 
-### PersistenceAgent (`agents/persistence-agent.ts`) – `execute()`  
-The `execute()` method is the operational heart of ManualLearning’s persistence. The observed flow is:
+### OntologyClassifier (sibling)  
+- Consumes the enriched entity from shared memory, performs ontology lookup (likely via a pre‑loaded taxonomy), and writes back the definitive `metadata.ontologyClass`. Because the fields are already pre‑populated, the classifier can focus on relationship inference rather than class discovery.  
 
-1. **Input validation** – the agent receives a payload describing manual entities and relationships.  
-2. **Adapter interaction** – it calls the GraphDatabaseAdapter to materialise those entities in the graph.  
-3. **Trigger downstream services** – after successful writes, it invokes the `PersistenceService` to finalize the transaction (e.g., commit, emit events, or trigger JSON export sync).  
-4. **Error handling** – any failure bubbles back to the caller, ensuring that manual learning does not corrupt the graph.
+### CodeKnowledgeGraphConstructor (sibling)  
+- When the curated entity references source code, this component parses the repository with an AST parser, extracts symbols, and adds them as nodes/edges in the Graphology graph. This step is optional for non‑code entities but integrates tightly with ManualLearning’s overall graph‑building pipeline.  
 
-Because `execute()` is a single, well‑named entry point, developers can invoke ManualLearning persistence in a **consistent, testable** manner without needing to know the internal storage details.
-
-### EntityManagement, OntologyClassification, CodeKnowledgeGraph  
-These siblings expose their own APIs (e.g., `EntityManagement.createEntity`, `OntologyClassification.classify`, `CodeKnowledgeGraph.addToGraph`). ManualLearning orchestrates calls to them in the order required for a complete manual‑learning cycle: first create the raw entity, then classify it, and finally embed it into the code knowledge graph. The fact that each sibling also depends on the same GraphDatabaseAdapter eliminates the need for data‑translation layers between them.
-
-### PersistenceService  
-While not described in depth, the `PersistenceService` is mentioned as the component that “manages the persistence of manually created entities and relationships in the knowledge graph.” It likely provides higher‑level transaction semantics (e.g., batch commits, rollback) and may expose hooks for other components that need to react to persistence events.
+### Concurrency & Lock‑Free Guarantees  
+- Both **PersistenceAgent** and **GraphDatabaseAdapter** use **atomic index counters** and **lock‑free queues** to coordinate access to LevelDB. This eliminates the classic “database is locked” errors that would otherwise appear when many workers try to write concurrently.  
 
 ---
 
 ## Integration Points  
 
-ManualLearning sits at the intersection of several key system pieces:
+1. **Parent – KnowledgeManagement**  
+   - ManualLearning inherits the parent’s lock‑free, work‑stealing concurrency model. The same atomic counters used in `PersistenceAgent` are defined at the KnowledgeManagement level and are shared across sibling components.  
 
-* **Parent – KnowledgeManagement**: All manual‑learning artifacts become part of the overall knowledge base managed by KnowledgeManagement. The parent component’s design (automatic JSON export sync, Graphology + LevelDB persistence) directly benefits ManualLearning because any entity persisted through ManualLearning is automatically available for export and downstream consumption.
+2. **Siblings**  
+   - **OnlineLearning**, **GraphDatabaseManager**, **OntologyClassifier**, **CodeKnowledgeGraphConstructor**, and **PersistenceAgent** all depend on the **GraphDatabaseAdapter** for persistence. This creates a **common storage contract**: any component that needs to read or write graph data simply calls the adapter’s `saveNode`, `saveEdge`, or `query` methods.  
+   - The **OntologyClassifier** is a direct downstream consumer of the metadata pre‑populated by `PersistenceAgent.mapEntityToSharedMemory()`.  
 
-* **Sibling – EntityManagement, OntologyClassification, CodeKnowledgeGraph, PersistenceService, GraphDatabaseAdapter, PersistenceAgent**: ManualLearning re‑uses the storage contract defined by GraphDatabaseAdapter, leverages the CRUD utilities of EntityManagement, obtains type information from OntologyClassification, and inserts the final graph structures via CodeKnowledgeGraph. The PersistenceAgent’s `execute()` method acts as the glue that ties these siblings together in a single transaction.
+3. **External Clients**  
+   - The automatic JSON export generated by **GraphDatabaseAdapter** serves external analytics pipelines, backup services, or UI dashboards that consume a static snapshot of the knowledge graph.  
 
-* **External Consumers**: Features such as semantic code search, LSL session analysis, or any component that queries the code knowledge graph will see manual entities instantly because they are persisted to the same graph store used by the rest of the system.
+4. **Dynamic Import Hooks**  
+   - Because the adapter loads storage clients at runtime, developers can plug in alternative back‑ends (e.g., a remote graph service) without touching ManualLearning’s core code.  
 
-The only explicit **interface** visible from the observations is the `execute()` method of `PersistenceAgent`. All other interactions are inferred from the shared adapter usage and the naming of sibling APIs.
+5. **Shared Memory Cache**  
+   - The cache is a lightweight in‑process store (likely a `Map` or `WeakMap`) that lives in the same Node.js process as ManualLearning. All sibling components read from it, guaranteeing consistent ontology metadata across the pipeline.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always route manual‑learning persistence through `PersistenceAgent.execute()`** – this guarantees that the GraphDatabaseAdapter, PersistenceService, and any classification steps are applied consistently. Direct calls to the adapter bypass important orchestration logic and may lead to orphaned nodes or missing classifications.
+1. **Always invoke `PersistenceAgent.mapEntityToSharedMemory()` first** when adding a new manual entity. Skipping this step forces the OntologyClassifier to repeat LLM classification, which defeats the performance optimisation.  
 
-2. **Create entities via EntityManagement first** – supply the minimal required attributes (e.g., identifier, raw metadata). This ensures that the entity exists in the graph before classification.
+2. **Do not manually write to LevelDB** outside of `GraphDatabaseAdapter`. Direct LevelDB writes bypass the lock‑free queue and can re‑introduce lock contention.  
 
-3. **Run OntologyClassification immediately after creation** – classification enriches the entity with type information that downstream graph queries rely on. The classification step should be idempotent; re‑classifying an already‑classified entity must not create duplicate edges.
+3. **When extending the pipeline**, add new processing steps **before** the persistence stage if they need to enrich the shared‑memory entity. For example, a custom validation step should run after `mapEntityToSharedMemory` but before the OntologyClassifier.  
 
-4. **Add the entity to the CodeKnowledgeGraph** – use the APIs provided by the CodeKnowledgeGraph sibling to link the new entity to existing code‑level nodes (functions, modules, etc.). This step is essential for enabling semantic search across both automatically extracted and manually added knowledge.
+4. **If you need a new storage client**, place it in a dedicated module and import it dynamically inside `GraphDatabaseAdapter`. Follow the existing pattern (`await import('…')`) to keep the compilation surface clean.  
 
-5. **Handle errors at the agent level** – if `execute()` throws, roll back any partial writes via the PersistenceService. Do not attempt manual clean‑up of the graph; let the service manage consistency.
+5. **Monitor the work‑stealing queue length** in production. An unusually long queue may indicate a downstream bottleneck (e.g., a slow classifier) and can be mitigated by scaling the worker pool or profiling the classifier’s latency.  
 
-6. **Respect the automatic JSON export sync** – because KnowledgeManagement automatically exports the graph to JSON after each successful persistence, avoid mutating the graph directly after `execute()` returns; any additional changes should be performed through the same agent pathway to keep the export in sync.
+6. **Version the JSON export** – the automatic export does not embed schema versioning. If downstream consumers evolve, add a version field to the exported JSON in a post‑processing step to avoid breaking changes.  
 
 ---
 
-### Architectural Patterns Identified  
+### Summarised Deliverables  
 
-* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the concrete storage (Graphology + LevelDB) behind a uniform API used by all components.  
-* **Facade / Service Layer** – `PersistenceAgent.execute()` provides a single façade for the complex series of persistence, classification, and graph‑integration steps.  
-* **Composition over Inheritance** – ManualLearning composes functionality from sibling sub‑components (EntityManagement, OntologyClassification, CodeKnowledgeGraph) rather than extending a base class.  
-* **Layered Architecture** – A clear separation exists between the storage layer (adapter), the business‑logic layer (entity management, classification, graph construction), and the orchestration layer (persistence agent).
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Lock‑free concurrency (atomic counters, work‑stealing queues), dynamic import plug‑in pattern, dual‑store persistence (Graphology + LevelDB with JSON export), pipeline processing (ingest → enrich → persist). |
+| **Design decisions and trade‑offs** | *Pre‑populating ontology metadata* reduces LLM calls (performance gain) at the cost of maintaining cache consistency. *Dynamic imports* improve modularity but add a small runtime overhead. *Lock‑free LevelDB access* boosts scalability but requires careful atomic design; bugs in the work‑stealing scheduler could lead to starvation. |
+| **System structure insights** | ManualLearning is a leaf node under KnowledgeManagement, sharing concurrency infrastructure with its siblings. All graph‑related components converge on `GraphDatabaseAdapter`, making it the de‑facto storage contract. |
+| **Scalability considerations** | The lock‑free, work‑stealing model allows many workers to persist large batches without DB contention, suitable for high‑throughput manual curation campaigns. Bottlenecks are likely to appear in the OntologyClassifier or AST analysis steps; scaling those services horizontally will preserve overall throughput. |
+| **Maintainability assessment** | High maintainability thanks to clear separation of concerns and a single persistence façade. The dynamic import approach reduces compile‑time coupling, making it easy to replace storage back‑ends. However, the shared‑memory cache is an implicit contract; any change to its shape must be coordinated across all siblings, suggesting a need for a typed interface or schema validation layer to avoid silent mismatches. |
 
-### Design Decisions and Trade‑offs  
-
-* **Single Shared Adapter** – Guarantees data consistency and reduces duplication, but couples all sub‑components to the same storage technology, limiting the ability to swap out LevelDB without affecting the whole system.  
-* **Centralised Persistence Agent** – Simplifies the call‑site for developers and ensures transactional integrity; however, it creates a single point of failure and may become a bottleneck if the manual‑learning workload scales dramatically.  
-* **Explicit Classification Step** – Improves semantic richness of manual entities, yet introduces extra latency and a dependency on the ontology service being available at persistence time.  
-* **Automatic JSON Export Sync** – Enables easy integration with external tools, but adds I/O overhead on every write operation, which could affect performance under heavy manual‑learning activity.
-
-### System Structure Insights  
-
-The system is organised as a **tree of components**: `KnowledgeManagement` at the root, with several peer sub‑components that each specialise in a particular aspect of knowledge handling. ManualLearning is a leaf node that **orchestrates** its peers to achieve its goal. All leaf components share the same persistence backbone, reinforcing a **cohesive data model** across the entire knowledge‑management domain.
-
-### Scalability Considerations  
-
-* **GraphDatabaseAdapter scalability** hinges on LevelDB’s write throughput and Graphology’s in‑memory representation. As the number of manual entities grows, memory consumption may become a limiting factor; sharding or partitioning the graph could be required.  
-* **PersistenceAgent bottleneck** – Because all manual‑learning writes funnel through a single `execute()` method, concurrent writes will be serialized unless the agent internally batches or queues operations. Introducing async batching or a worker‑pool could improve throughput.  
-* **Classification overhead** – OntologyClassification may involve rule evaluation or ML inference; scaling this service (e.g., via caching or background processing) will be necessary if manual‑learning volume spikes.
-
-### Maintainability Assessment  
-
-The **clear separation of concerns** (adapter, agent, specialised siblings) makes the codebase approachable: changes to storage details stay within `graph-database-adapter.ts`, while business‑logic updates reside in the respective sub‑components. The heavy reliance on a **single adapter** simplifies debugging because all graph mutations trace back to a common implementation. However, the tight coupling also means that a change in the adapter’s API propagates to every sibling, demanding careful versioning and comprehensive integration tests. The **facade‑style `execute()` method** centralises error handling and transaction logic, which aids maintainability but also requires diligent testing to avoid hidden side‑effects.
-
-Overall, ManualLearning’s design is **well‑structured for extensibility** (new manual‑learning features can be added by extending the orchestration in `PersistenceAgent` or by plugging in additional classification rules) while retaining **high cohesion** with the rest of the KnowledgeManagement ecosystem.
+*All statements above are directly grounded in the supplied observations and the concrete file paths/classes referenced therein.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence allows for automatic JSON export sync, ensuring data consistency across the system. This design decision enables efficient data storage and retrieval, leveraging the strengths of both Graphology and LevelDB. The automatic JSON export sync feature, in particular, facilitates seamless integration with other components, as seen in the execute() function of the PersistenceAgent (agents/persistence-agent.ts), which relies on the GraphDatabaseAdapter for entity persistence and ontology classification.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component employs a lock-free architecture to prevent LevelDB lock conflicts, as seen in the use of shared atomic index counters in the work-stealing concurrency mechanism. This design decision is crucial in ensuring efficient and scalable processing of large datasets, and is implemented in the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts). The GraphDatabaseAdapter (storage/graph-database-adapter.ts) also plays a key role in this architecture, providing Graphology+LevelDB persistence with automatic JSON export sync. Furthermore, the dynamic import mechanism used in the GraphDatabaseAdapter, such as the import of VkbApiClient, helps to avoid TypeScript compilation issues and ensures a modular design pattern.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline for extracting knowledge from git history, LSL sessions, and code analysis.
-- [EntityManagement](./EntityManagement.md) -- EntityManagement relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving entity data.
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving classification data.
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving code knowledge graph data.
-- [PersistenceService](./PersistenceService.md) -- PersistenceService relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter relies on the LevelDB database (storage/leveldb.ts) for storing and retrieving graph data.
-- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the GraphDatabaseAdapter to store and retrieve extracted knowledge, utilizing Graphology+LevelDB persistence with automatic JSON export sync
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter to provide Graphology+LevelDB persistence with automatic JSON export sync
+- [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseAdapter to store and retrieve classified entities, utilizing Graphology+LevelDB persistence with automatic JSON export sync
+- [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor uses the GraphDatabaseAdapter to store and retrieve constructed knowledge graphs, utilizing Graphology+LevelDB persistence with automatic JSON export sync
+- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent uses the GraphDatabaseAdapter to store and retrieve entities, utilizing Graphology+LevelDB persistence with automatic JSON export sync
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

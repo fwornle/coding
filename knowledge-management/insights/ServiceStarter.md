@@ -1,112 +1,100 @@
 # ServiceStarter
 
-**Type:** SubComponent
+**Type:** Detail
 
-The isPortListening function in lib/service-starter.js performs health verification checks to confirm that services are responding correctly, adding an extra layer of reliability to the startup process.
+The implementation of ServiceStarter in a separate file (lib/service-starter.js) implies a modular design, allowing for easier maintenance and reuse of this functionality.
 
-**## What It Is**  
-ServiceStarter is a **sub‑component** that lives under the `DockerizedServices` parent and is responsible for guaranteeing that external services (e.g., Memgraph, Redis) are fully up and reachable before the main application proceeds. The core logic resides in **`lib/service-starter.js`**, where two public‑facing helpers are defined:
+## What It Is  
 
-* `startServiceWithRetry` – launches a container‑based service and, on failure, retries the start operation using a **retry‑with‑back‑off** strategy.  
-* `isPortListening` – probes the service’s TCP port to confirm that the process is listening, providing a health‑verification step.
+**ServiceStarter** is the concrete implementation that powers the service‑launch workflow for the **ServiceOrchestrator** component. The code lives in the file `lib/service‑starter.js`. Whenever the orchestrator needs to bring a dependent service online it delegates that responsibility to ServiceStarter. The module encapsulates the start‑up sequence, including a built‑in retry mechanism with exponential back‑off, so that transient launch failures are automatically mitigated without requiring the orchestrator to duplicate this logic.
 
-Together these functions form a deterministic bootstrap sequence: start → wait → verify → continue. Because ServiceStarter is embedded in DockerizedServices, every Docker‑orchestrated service benefits from the same start‑up guardrails. Its sibling, **ServiceMonitor**, re‑uses `isPortListening` to perform ongoing health checks, while the child component **RetryMechanism** encapsulates the back‑off logic used by `startServiceWithRetry`.
+Because ServiceStarter resides in its own file, it is a distinct, reusable building block. The orchestrator treats it as a child component (“ServiceOrchestrator contains ServiceStarter”), invoking its public API to start each service it manages. This separation of concerns makes the start‑up logic explicit, testable, and replaceable without touching the higher‑level orchestration code.
 
 ---
 
-**## Architecture and Design**  
-The observable architecture follows a **layered bootstrap pattern**. The top‑level `DockerizedServices` component delegates the low‑level start‑up responsibilities to ServiceStarter, which in turn delegates the retry algorithm to its child **RetryMechanism**. This separation keeps the orchestration logic (Docker container launch) distinct from the resilience logic (retry/back‑off) and from the health‑check logic (port probing).
+## Architecture and Design  
 
-* **Retry‑with‑Back‑off** – Implemented inside `startServiceWithRetry`, this pattern mitigates rapid, repeated start attempts that could overwhelm the host or the service itself. By increasing the delay between attempts, the system gives transient failures (e.g., network hiccups, resource contention) a chance to resolve.  
-* **Health‑Check Verification** – `isPortListening` embodies a simple **probe‑until‑ready** design. After each start attempt, the function repeatedly attempts to open a TCP connection to the service’s advertised port, only returning success when the socket is accepted. This adds a concrete readiness signal beyond merely “container started”.  
+The observations reveal a **modular design** in which the start‑up responsibilities are extracted from the orchestrator into a dedicated library (`lib/service‑starter.js`). This reflects a classic **separation‑of‑concerns** pattern: the orchestrator focuses on *what* services need to run and *when*, while ServiceStarter focuses on *how* to start a service reliably.
 
-Interaction flow: `DockerizedServices` → `ServiceStarter.startServiceWithRetry` → (on failure) `RetryMechanism` backs off → after each attempt, `ServiceStarter.isPortListening` validates readiness → on success, control returns to the parent to continue application initialization. The sibling **ServiceMonitor** taps the same health‑check routine, demonstrating **code reuse** across start‑up and runtime monitoring concerns.
+A second, explicit design pattern is the **retry with exponential back‑off** strategy. The presence of “retry logic and exponential back‑off in service startup” shows that the system anticipates transient failures (e.g., network hiccups, temporary resource contention) and proactively retries with increasing delays. This pattern is implemented inside ServiceStarter, shielding the orchestrator from the complexity of handling such failures.
 
----
+Interaction flow:  
+1. **ServiceOrchestrator** decides that a particular service should be started.  
+2. It calls into **ServiceStarter** (via the exported function(s) in `lib/service‑starter.js`).  
+3. ServiceStarter attempts the start, catches any recoverable error, and, if needed, retries using an exponential back‑off schedule.  
+4. On success, control returns to the orchestrator; on permanent failure, ServiceStarter propagates an error that the orchestrator can log or act upon.
 
-**## Implementation Details**  
-All implementation details are confined to **`lib/service-starter.js`**:
-
-1. **`startServiceWithRetry(serviceConfig)`**  
-   * Accepts a configuration object that identifies the Docker image, container name, and the port to monitor.  
-   * Initiates the container launch (likely via a Docker CLI wrapper or SDK call).  
-   * Enters a retry loop where each iteration invokes `isPortListening`. If the probe fails, the loop sleeps for an exponentially increasing interval (the back‑off). The maximum number of attempts and base delay are configurable, enabling the child **RetryMechanism** to be tuned without touching the start logic.  
-
-2. **`isPortListening(host, port)`**  
-   * Opens a TCP socket to `host:port`.  
-   * Returns a boolean indicating whether the connection succeeded, typically wrapped in a promise for async handling.  
-   * May include a short timeout to avoid hanging on unresponsive services, ensuring the retry loop proceeds promptly.  
-
-3. **RetryMechanism (child component)**  
-   * Not a separate file but a logical encapsulation inside `startServiceWithRetry`. It calculates the back‑off delay (e.g., `delay = base * 2^attempt`) and handles jitter if implemented. This design isolates the timing policy from the Docker launch code, making it easier to adjust or replace in the future.
-
-Because there are **no explicit classes or symbols** reported, the functions are likely exported as plain module functions, keeping the API surface minimal and straightforward.
+Because ServiceStarter is a leaf component (no children observed) and is directly owned by ServiceOrchestrator, the hierarchy remains shallow, simplifying both the call graph and error‑propagation paths.
 
 ---
 
-**## Integration Points**  
-ServiceStarter is tightly coupled to the **DockerizedServices** parent, which orchestrates the overall container lifecycle. The parent invokes `startServiceWithRetry` for each required service during its initialization phase. The sibling **ServiceMonitor** imports `isPortListening` from the same module to continuously poll service health after the initial start, providing a unified health‑check implementation across start‑up and runtime.
+## Implementation Details  
 
-External dependencies include:
+Although the source code is not listed, the observations let us infer the key implementation elements inside `lib/service‑starter.js`:
 
-* **Docker runtime** – The start routine assumes Docker is available and that the service can be launched via Docker commands or API calls.  
-* **Network stack** – `isPortListening` relies on the host’s ability to open TCP sockets; any firewall or port‑mapping misconfiguration will surface as a start‑up failure.  
+* **Exported API** – ServiceStarter likely exports a function such as `startService(serviceConfig)` that the orchestrator invokes. The function signature probably accepts a configuration object describing the target service (e.g., command line, environment, timeout).
 
-Interfaces exposed by ServiceStarter are the two functions (`startServiceWithRetry`, `isPortListening`). Consumers only need to supply service‑specific configuration (image name, ports) and can rely on the built‑in retry and verification logic. Because the module does not expose internal retry parameters directly, any tuning must be done via configuration objects passed to `startServiceWithRetry`.
+* **Retry Loop** – Inside the exported function, a loop (or recursive call) implements the retry policy. The loop tracks the current attempt count and calculates the next delay using an exponential formula, e.g., `delay = baseDelay * 2 ** attempt`. A maximum‑retry ceiling or total timeout is also expected to avoid infinite loops.
 
----
+* **Error Handling** – The start attempt is wrapped in a `try / catch`. Recoverable errors (network timeouts, temporary resource unavailability) trigger the back‑off and retry; non‑recoverable errors (invalid configuration) are re‑thrown immediately.
 
-**## Usage Guidelines**  
-1. **Provide complete service configuration** – When calling `startServiceWithRetry`, include the Docker image tag, container name, and the exact port that the service will listen on. Missing or mismatched ports will cause `isPortListening` to time out and trigger unnecessary retries.  
-2. **Respect the retry limits** – The default back‑off parameters are chosen to balance speed and stability. If a service is expected to take longer to become ready (e.g., large data imports), increase the maximum attempts or the base delay via the configuration object rather than modifying the source.  
-3. **Do not duplicate health checks** – Since `ServiceMonitor` already re‑uses `isPortListening` for runtime monitoring, avoid implementing separate port probes in your own code; this prevents inconsistent readiness definitions.  
-4. **Handle failure gracefully** – If `startServiceWithRetry` exhausts its attempts, it should propagate an error that the parent `DockerizedServices` can catch. The application startup should then either abort or fall back to a degraded mode, depending on business requirements.  
-5. **Keep Docker environment stable** – The retry‑with‑back‑off strategy assumes transient failures. Persistent Docker daemon issues (e.g., out‑of‑disk space) will cause repeated retries without benefit, so monitor Docker health separately.
+* **Logging / Instrumentation** – To make the back‑off observable, ServiceStarter probably logs each attempt, the delay applied, and the final outcome. This information is valuable for debugging and for the orchestrator’s monitoring dashboards.
+
+* **Modularity** – By isolating this logic in `lib/service‑starter.js`, the code can be unit‑tested in isolation, and alternative start‑up strategies (e.g., container orchestration, direct process spawn) could be swapped by replacing the module without altering the orchestrator.
 
 ---
 
-### Summary Deliverables  
+## Integration Points  
 
-1. **Architectural patterns identified**  
-   * Retry‑with‑Back‑off (implemented in `startServiceWithRetry`).  
-   * Probe‑until‑Ready health check (`isPortListening`).  
-   * Layered bootstrap with parent → sub‑component → child (DockerizedServices → ServiceStarter → RetryMechanism).  
+The only explicit integration point described is the **parent‑child relationship**: **ServiceOrchestrator → ServiceStarter**. ServiceOrchestrator imports the module from `lib/service‑starter.js` and calls its API whenever a service launch is required. This import creates a **compile‑time dependency** on the exact file path, guaranteeing that any change to the module’s public interface must be reflected in the orchestrator.
 
-2. **Design decisions and trade‑offs**  
-   * **Decision:** Centralize start‑up and health‑check logic in a single module.  
-     **Trade‑off:** Simplicity vs. flexibility; any change to the start logic impacts all services.  
-   * **Decision:** Use exponential back‑off rather than fixed intervals.  
-     **Trade‑off:** Faster recovery for short‑lived failures but longer wait times for genuinely slow services.  
-   * **Decision:** Expose only two functions, keeping the public API minimal.  
-     **Trade‑off:** Limits extensibility (e.g., custom back‑off strategies) without modifying the module.  
+No sibling components are mentioned, but because ServiceStarter is a generic start‑up utility, other orchestrators or higher‑level managers could theoretically reuse it, provided they adhere to the same API contract. The module’s exposure is limited to its exported functions; internal helpers (e.g., back‑off calculators) remain private, preserving encapsulation.
 
-3. **System structure insights**  
-   * ServiceStarter sits under DockerizedServices, acting as the resilience layer for container start‑up.  
-   * Its child, RetryMechanism, encapsulates timing policy, while the sibling ServiceMonitor re‑uses the health‑check function, illustrating purposeful code sharing.  
-   * The overall system forms a clear hierarchy: DockerizedServices → ServiceStarter → (RetryMechanism) and parallel ServiceMonitor → (isPortListening).  
+External dependencies (e.g., a process‑spawning library, a network client) are implied by the need to start services and detect failures, but the observations do not name them. Consequently, any change to those underlying libraries would be confined to `lib/service‑starter.js`, leaving ServiceOrchestrator untouched.
 
-4. **Scalability considerations**  
-   * The back‑off algorithm scales well with a growing number of services because each service’s retry loop runs independently; however, simultaneous retries could increase load on the Docker daemon and the host network.  
-   * `isPortListening` performs lightweight TCP probes, so adding more services does not dramatically increase CPU or memory usage, but network socket limits should be monitored.  
-   * If the number of services becomes large, consider batching start attempts or introducing a concurrency limiter to avoid overwhelming resources.  
+---
 
-5. **Maintainability assessment**  
-   * High maintainability: a small, well‑named module (`lib/service-starter.js`) with only two exported functions keeps the codebase easy to understand and test.  
-   * Encapsulation of the back‑off logic in a child component (RetryMechanism) allows future adjustments (e.g., adding jitter) without touching the start‑up flow.  
-   * The reliance on explicit configuration objects makes the module adaptable to new services without code changes, supporting extensibility.  
-   * Potential risk: Tight coupling to Docker means any shift to a different container runtime would require refactoring the start logic, but the health‑check portion remains reusable.
+## Usage Guidelines  
+
+1. **Invoke Through ServiceOrchestrator** – Direct calls to ServiceStarter should be avoided; always let ServiceOrchestrator request a start. This ensures the orchestrator’s state machine stays consistent with the actual service status.
+
+2. **Provide Complete Service Descriptors** – The configuration object passed to ServiceStarter must contain all required fields (command, arguments, environment). Missing data will cause immediate failure, bypassing the retry mechanism.
+
+3. **Respect Retry Limits** – Do not attempt to override the built‑in back‑off parameters from outside the module. If a different retry policy is needed, modify `lib/service‑starter.js` centrally so that all callers benefit from the change.
+
+4. **Handle Propagated Errors** – ServiceOrchestrator should be prepared to catch errors that survive all retry attempts. Typical handling includes logging, alerting, and possibly marking the service as permanently unavailable.
+
+5. **Do Not Embed Additional Retry Logic** – Since ServiceStarter already implements exponential back‑off, adding another layer of retries in the orchestrator would lead to compounded delays and unpredictable timing.
+
+---
+
+### Architectural patterns identified
+* **Modular separation of concerns** – ServiceStarter lives in its own file (`lib/service‑starter.js`) and is consumed by ServiceOrchestrator.  
+* **Retry with exponential back‑off** – Built‑in logic to handle transient start‑up failures.
+
+### Design decisions and trade‑offs
+* **Explicit retry handling** improves reliability but adds latency for services that repeatedly fail.  
+* **Isolating start‑up logic** enhances maintainability and testability but introduces a runtime dependency on a specific file path.
+
+### System structure insights
+* The hierarchy is shallow: ServiceOrchestrator (parent) → ServiceStarter (child).  
+* No sibling or further child components are observed, indicating a focused responsibility for ServiceStarter.
+
+### Scalability considerations
+* Because the retry mechanism is local to each start attempt, scaling to many services simply means each service gets its own independent back‑off schedule; there is no central bottleneck.  
+* If the number of concurrent start‑ups grows dramatically, the orchestrator must ensure that invoking ServiceStarter in parallel does not exhaust system resources (e.g., file descriptors, process limits).
+
+### Maintainability assessment
+* **High** – The modular placement of ServiceStarter in `lib/service‑starter.js` means changes to start‑up behavior are localized.  
+* **Medium** – The retry logic introduces state (attempt count, delay calculation) that must be kept in sync with any policy changes; however, this state is confined to a single module, limiting ripple effects.  
+
+Overall, ServiceStarter exemplifies a well‑encapsulated, reliability‑focused component that cleanly supports the broader orchestration workflow.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a robust service startup mechanism through the startServiceWithRetry function in lib/service-starter.js, which utilizes a retry-with-backoff pattern to handle service startup failures. This approach ensures that services are given multiple opportunities to start successfully, with increasing time delays between attempts, thereby preventing rapid sequential failures. The isPortListening function within the same file performs health verification checks to confirm that services are responding correctly, adding an extra layer of reliability to the startup process. For instance, when starting Memgraph or Redis services, this mechanism ensures they are properly initialized and ready to accept requests before proceeding with the application startup.
-
-### Children
-- [RetryMechanism](./RetryMechanism.md) -- The startServiceWithRetry function in lib/service-starter.js implements the retry-with-backoff pattern, which is a key architectural decision to handle service startup failures.
-
-### Siblings
-- [ServiceMonitor](./ServiceMonitor.md) -- The ServiceMonitor sub-component uses the isPortListening function in lib/service-starter.js to continuously check the services' status.
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the lib/service-starter.js file to start services with retry logic and exponential backoff
 
 
 ---

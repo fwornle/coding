@@ -2,131 +2,102 @@
 
 **Type:** SubComponent
 
-LLMModeResolver utilizes a caching mechanism in lib/llm/llm-cache.ts to improve performance by reducing the number of requests made to the LLM providers.
+The use of dependency injection makes it easy to test the LLMModeResolver in isolation, using mock implementations of the configuration and context to simulate different scenarios.
 
 ## What It Is  
 
-`LLMModeResolver` is a **sub‑component** that lives in the `lib/llm` package of the code‑base. Its primary source files are  
-
-* `lib/llm/llm-mode-config.ts` – defines the **global LLM mode** configuration that applies when no overrides are present.  
-* `lib/llm/llm-mode-resolver.ts` – the concrete `LLMModeResolver` class that performs mode resolution for a given agent.  
-* `lib/llm/llm-legacy‑flags.ts` – implements handling of **legacy flag** values that may still be supplied by older callers.  
-* `lib/llm/llm‑agent‑config.ts` – supplies per‑agent configuration data that the resolver consults when an override is required.  
-* `lib/llm/llm‑cache.ts` – provides a **caching layer** used by the resolver to avoid unnecessary LLM provider calls.  
-* `lib/llm/llm‑logging.ts` – offers a **logging facility** for tracing mode‑resolution events.  
-
-Together, these files give `LLMModeResolver` the responsibility of determining which LLM “mode” (e.g., `standard`, `fast`, `high‑quality`, etc.) should be used for a particular request, respecting a hierarchy of defaults, per‑agent overrides, and legacy flag compatibility, while also optimizing performance through caching and observability via logging.
-
----
+The **LLMModeResolver** is a sub‑component that lives inside the **LLMAbstraction** package and is responsible for determining which “mode” an LLM should operate in at any point in time.  Its implementation is spread across the configuration layer (configuration files that describe each mode) and the runtime layer that evaluates the current *context*—the surrounding usage scenario, request metadata, or any other signals that the application supplies.  The resolver is invoked by the **LLMService** class located at `lib/llm/llm-service.ts`; the service asks the resolver for the active mode and then configures the underlying LLM provider accordingly.  In addition to simply reading a static setting, the resolver also handles *mode transitions*, ensuring that the LLM is re‑configured safely when the required mode changes during the life‑cycle of a request or session.  Because it is a child of **LLMAbstraction**, it can expose a `ModeConfiguration` object that encapsulates the concrete settings for each mode, allowing developers to add custom modes simply by extending the configuration files.
 
 ## Architecture and Design  
 
-The design of `LLMModeResolver` follows a **layered, composition‑based architecture** anchored in the broader `LLMAbstraction` component. The resolver does not stand alone; it is a child of `LLMAbstraction`, which itself is built around the `LLMService` façade (`lib/llm/llm-service.ts`). `LLMService` orchestrates **mode routing**, **caching**, **circuit breaking**, **budget checks**, and **provider fallback**, exposing a single entry point for all LLM interactions.  
+The design of **LLMModeResolver** follows a **decoupled, configuration‑driven** architecture.  Rather than hard‑coding any provider‑specific logic, the resolver reads from external configuration files (as noted in Observation 1) and interprets the *context* supplied by callers (Observation 2).  This separation of concerns enables the resolver to remain agnostic of the concrete LLM providers, a decision explicitly called out in Observation 7.  The surrounding system leverages **dependency injection (DI)**—the same DI pattern that powers `LLMService` (see Observation 6 and the parent component description).  By injecting a configuration source and a context provider, the resolver can be unit‑tested in isolation with mock objects, reinforcing testability as a core architectural goal.
 
-`LLMModeResolver` adopts a **configuration‑driven strategy**: a global mode (`llm-mode-config.ts`) supplies the default, while `llm-agent-config.ts` allows agents to declare explicit overrides. The resolver therefore implements a **strategy selection pattern** where the effective mode is chosen based on the most specific configuration available.  
+Interaction between components is orchestrated through a **registry‑mediated** approach.  The sibling component **LLMProviderManager** maintains a dynamic provider registry (`lib/llm/provider-registry.js`) that can add or remove providers at runtime.  When the resolver determines that a mode change is required, it signals the **LLMService**, which in turn consults the provider registry to obtain the appropriate provider instance for the newly resolved mode.  This pattern resembles a **Mediator** where the resolver mediates between configuration, context, and the provider manager without directly coupling to any concrete provider class such as `dmr-provider.ts` or `anthropic-provider.ts`.  
 
-Legacy compatibility is handled through a dedicated module (`llm-legacy-flags.ts`). By isolating legacy flag translation, the resolver keeps the main resolution logic clean and future‑proofs the component against deprecation.  
-
-Performance and observability are injected via **decorator‑style composition**: the resolver calls into `llm-cache.ts` before performing any expensive computation or remote request, and it records each decision through `llm-logging.ts`. This mirrors the responsibilities of the sibling components—`LLMCachingMechanism` and `LLMLoggingMechanism`—which also rely on the same cache and logging libraries, ensuring a consistent cross‑cutting concern implementation across the `LLMAbstraction` family.  
-
-Overall, the architecture emphasizes **separation of concerns**, **configurability**, and **reuse of shared infrastructure** (caching, logging) without introducing unnecessary coupling.
-
----
+The resolver’s extensibility is achieved through the **ModeConfiguration** child component.  Because the resolver “contains” a `ModeConfiguration` object, new modes can be introduced simply by adding entries to the configuration files and, if needed, extending the `ModeConfiguration` schema.  This design choice trades a small amount of runtime indirection for a high degree of flexibility—developers can plug in novel modes without touching the resolver’s core logic.
 
 ## Implementation Details  
 
-The core class, `LLMModeResolver` (found in `lib/llm/llm-mode-resolver.ts`), exposes a public method—typically something like `resolveMode(agentId: string): LLMMode`. The method follows these steps:
+Even though the source repository does not expose explicit symbols for the resolver, the observations give a clear picture of its internal mechanics:
 
-1. **Legacy Flag Normalization** – It first checks `llm-legacy-flags.ts` for any legacy flag values attached to the request. If present, those flags are mapped to the modern mode identifiers, ensuring backward compatibility.  
+1. **Configuration Loading** – The resolver reads one or more configuration files (likely JSON, YAML, or similar) that map mode identifiers to concrete settings (e.g., temperature, max tokens, provider selection).  These files live alongside the rest of the LLM abstraction assets and are parsed at startup or on‑demand, allowing the resolver to refresh its view of available modes without a redeploy.
 
-2. **Cache Lookup** – Before computing the mode, the resolver queries `llm-cache.ts`. The cache key is derived from the agent identifier and any relevant request metadata. A cache hit short‑circuits the resolution path, returning the stored mode instantly.  
+2. **Context Evaluation** – A *context* object is supplied to the resolver (either via method parameters or through an injected service).  The resolver examines fields such as request type, user role, or system state to decide which mode best matches the current situation.  This logic is encapsulated within the resolver itself, keeping the decision‑making centralized.
 
-3. **Agent‑Specific Override** – If the cache misses, the resolver reads the agent’s configuration from `llm-agent-config.ts`. This file contains a map of agent identifiers to explicit mode settings. When an entry exists, it takes precedence over the global default.  
+3. **Mode Transition Handling** – When the evaluated context indicates a different mode than the one currently active, the resolver initiates a transition sequence.  This typically involves:
+   - Validating that the target mode’s configuration is complete.
+   - Notifying `LLMService` (via a callback or promise) that a re‑initialization is required.
+   - Allowing `LLMService` to retrieve the appropriate provider from the provider registry and re‑configure the LLM instance with the new `ModeConfiguration`.
 
-4. **Global Default Fallback** – Absent an agent override, the resolver falls back to the global configuration defined in `llm-mode-config.ts`. This file typically exports a constant or a simple getter that supplies the system‑wide default mode.  
+4. **Dependency Injection** – The resolver’s constructor (or factory) receives abstractions for the configuration source and the context provider.  In tests, developers can inject mock implementations that return predetermined mode data or simulated contexts, fulfilling Observation 6’s claim about testability.
 
-5. **Logging** – Regardless of the source (legacy flag, cache, agent config, or global default), the resolver logs the resolution event via `llm-logging.ts`. The log entry includes the agent ID, the resolved mode, and the resolution path (e.g., “cache hit”, “agent override”, “global default”).  
-
-6. **Cache Population** – After a successful resolution (when the result was not retrieved from cache), the resolver stores the computed mode back into `llm-cache.ts` for future requests.  
-
-Because `LLMModeResolver` is a child of `LLMAbstraction`, it is instantiated and injected by the `LLMService` façade. `LLMService` may pass in shared instances of the cache and logger, enabling **dependency injection** and allowing the resolver to be swapped or mocked in tests without altering its internal logic.
-
----
+5. **Extensibility Hooks** – Because the resolver is designed to be *flexible and extensible* (Observation 5), it likely exposes an interface such as `resolveMode(context): ModeConfiguration` that callers can implement or decorate.  Adding a custom mode therefore only requires adding a new configuration entry and, if necessary, a small plug‑in that enriches the context evaluation logic.
 
 ## Integration Points  
 
-`LLMModeResolver` sits at the intersection of several system concerns:
+The **LLMModeResolver** sits at the nexus of three major subsystems:
 
-* **Parent Integration** – It is invoked by `LLMService` (`lib/llm/llm-service.ts`), which acts as the high‑level façade for all LLM operations. `LLMService` delegates mode‑routing decisions to the resolver, then proceeds with provider selection, circuit‑breaker checks, and budget enforcement.  
+* **LLMService (`lib/llm/llm-service.ts`)** – The primary consumer.  `LLMService` calls the resolver to obtain the active `ModeConfiguration` before constructing or re‑configuring an LLM client.  This tight coupling is intentional: the service delegates all mode‑related decisions to the resolver, keeping its own responsibilities limited to provider orchestration.
 
-* **Sibling Collaboration** – Both `LLMCachingMechanism` and `LLMLoggingMechanism` expose the same caching (`llm-cache.ts`) and logging (`llm-logging.ts`) libraries that the resolver consumes. This shared usage guarantees that cache invalidation policies and log formatting remain consistent across the entire LLM stack.  
+* **LLMProviderManager & Provider Registry (`lib/llm/provider-registry.js`)** – The resolver does not directly manage providers.  Instead, once a mode is resolved, it passes the mode identifier to the service, which queries the provider registry to fetch the concrete provider implementation (e.g., `dmr-provider.ts` or `anthropic-provider.ts`).  This separation allows new providers to be registered without modifying the resolver.
 
-* **Provider Manager** – `LLMProviderManager` (a sibling component) relies on the mode resolved by `LLMModeResolver` to decide which provider implementation (Anthropic, OpenAI, Groq, etc.) should handle the request. The resolved mode can influence provider‑specific parameters such as temperature or token limits.  
+* **Configuration & Context Sources** – The resolver depends on external configuration files (mode definitions) and a context provider (which could be another DI‑injected service that extracts request metadata).  Both are injected, making the resolver agnostic to where the data originates—whether from a file system, environment variables, or a remote config service.
 
-* **Configuration Sources** – The resolver reads from two configuration files: the global mode config (`llm-mode-config.ts`) and the per‑agent config (`llm-agent-config.ts`). These files are typically generated or updated by deployment scripts or admin UI tools, meaning that the resolver’s behavior can be altered without code changes.  
-
-* **Legacy Compatibility Layer** – Calls that still pass old flag names are automatically translated by `llm-legacy-flags.ts`, allowing legacy clients to continue operating while newer code uses the modern mode API.  
-
-Through these integration points, `LLMModeResolver` acts as a **thin, deterministic decision engine** that feeds higher‑level orchestration components with the correct operational mode while staying insulated from provider‑specific logic.
-
----
+Because the resolver is a child of **LLMAbstraction**, any higher‑level component that consumes the abstraction (for example, a chat‑bot orchestrator) indirectly benefits from the resolver’s capabilities without needing to understand its inner workings.
 
 ## Usage Guidelines  
 
-1. **Prefer Agent‑Level Overrides** – When a specific agent requires a non‑default mode (e.g., a research‑heavy bot needing `high‑quality`), define the override in `llm-agent-config.ts`. The resolver will automatically prioritize this over the global setting.  
+1. **Inject, Don’t Instantiate Directly** – When wiring the LLM stack, always obtain the `LLMModeResolver` through the DI container used by the application (the same container that provides `LLMService`).  This ensures that the resolver receives the correct configuration source and context provider.
 
-2. **Do Not Bypass Caching** – The resolver’s internal cache dramatically reduces repeated mode lookups for the same agent. Custom code should rely on the resolver’s public API rather than re‑implementing mode selection, to keep cache semantics intact.  
+2. **Keep Configuration Declarative** – Define new modes by adding entries to the mode configuration files rather than modifying resolver code.  Each entry should include all required provider settings and any mode‑specific flags.  This practice aligns with the design decision to keep the resolver decoupled from provider specifics.
 
-3. **Maintain Legacy Flag Compatibility** – If you must support older callers, continue to supply legacy flags; the resolver will map them appropriately. However, plan to migrate to the modern mode API to avoid future deprecation.  
+3. **Validate Mode Transitions** – If a component manually triggers a mode change (e.g., after a user upgrades their subscription), verify that the target mode’s configuration is complete before invoking the resolver.  Incomplete configurations can cause the resolver to raise errors during its transition handling.
 
-4. **Log Interpretation** – The logs emitted by `llm-logging.ts` include the resolution path. Use these logs for troubleshooting mode‑selection issues; a “cache miss” followed by “global default” indicates that no agent‑specific configuration exists.  
+4. **Test with Mocks** – Leverage the DI‑friendly design by providing mock configuration and context objects in unit tests.  Simulate different contexts (e.g., “high‑latency”, “creative”, “safe”) to confirm that the resolver returns the expected `ModeConfiguration` and that `LLMService` reacts appropriately.
 
-5. **Dependency Injection** – When testing components that depend on `LLMModeResolver`, inject mock implementations of the cache and logger. This keeps unit tests fast and deterministic while still exercising the resolution logic.  
-
-6. **Configuration Updates** – Changes to `llm-mode-config.ts` or `llm-agent-config.ts` take effect on the next resolver invocation; no service restart is required. Ensure that configuration files are version‑controlled and validated before deployment to avoid inconsistent mode states.
+5. **Avoid Provider‑Specific Logic in the Resolver** – All provider‑specific decisions should be encapsulated in the provider implementations (`dmr-provider.ts`, `anthropic-provider.ts`) or the provider registry.  The resolver’s responsibility is limited to mode resolution; mixing provider logic would break the decoupling guarantee described in Observation 7.
 
 ---
 
-### Architectural patterns identified
-* **Configuration‑driven strategy selection** – global defaults + per‑agent overrides.  
-* **Decorator‑style composition** – caching and logging are layered around the core resolution logic.  
-* **Legacy‑flag adaptation** – a façade that translates older inputs to the current model.  
-* **Dependency injection** – `LLMService` injects shared cache and logger instances into the resolver.  
+### Architectural Patterns Identified
+* **Dependency Injection** – Central to testability and flexibility (Observations 6, parent hierarchy).
+* **Configuration‑Driven Design** – Mode selection is driven by external files (Observations 1, 5).
+* **Mediator / Decoupling** – Resolver mediates between configuration, context, and provider manager without direct provider coupling (Observations 7, sibling interactions).
 
-### Design decisions and trade‑offs
-* **Explicit override hierarchy** provides clear precedence but adds a small lookup cost (agent config → global config).  
-* **Separate legacy flag module** isolates backward‑compatibility concerns, at the expense of an extra translation step.  
-* **In‑process caching** improves latency but requires careful cache invalidation policies; the design assumes mode decisions are relatively static per agent.  
-* **Centralized logging** aids observability but can generate high log volume in high‑throughput environments; log levels should be configurable.  
+### Design Decisions and Trade‑offs
+* **Decoupling from Providers** improves extensibility but adds an indirection layer that can slightly increase latency during mode switches.
+* **Configuration Files** make adding new modes trivial but require careful versioning and validation to avoid runtime misconfiguration.
+* **DI‑Based Testing** yields high test coverage at the cost of a more complex bootstrapping process for the application.
 
-### System structure insights
-* `LLMModeResolver` is a child of `LLMAbstraction` and is invoked by the façade `LLMService`.  
-* It shares cross‑cutting concerns (cache, logging) with sibling components `LLMCachingMechanism` and `LLMLoggingMechanism`.  
-* The resolver’s output directly influences `LLMProviderManager`, tying mode decisions to provider selection.  
+### System Structure Insights
+* **LLMAbstraction** is the parent container; it aggregates the resolver and its child `ModeConfiguration`.
+* **LLMService** is the primary consumer, while **LLMProviderManager** and the provider registry supply the concrete LLM implementations.
+* The resolver’s position as a child component enables a clean separation: configuration/context → mode resolution → provider selection.
 
-### Scalability considerations
-* The cache (`llm-cache.ts`) is the primary scalability lever; a well‑tuned cache can keep mode‑resolution latency sub‑millisecond even under heavy load.  
-* Because resolution is read‑only and stateless beyond the cache, the resolver can be instantiated in multiple service instances without coordination, supporting horizontal scaling.  
-* Legacy flag handling adds negligible overhead; however, if legacy usage spikes, the translation step could become a minor bottleneck, suggesting the need for deprecation.  
+### Scalability Considerations
+* Adding new modes or providers does not affect the resolver’s core logic, supporting horizontal scaling of capabilities.
+* Mode transition handling must be efficient; caching resolved modes per request can reduce repeated configuration parsing.
+* Because the resolver is stateless (aside from cached configurations), it can be instantiated per request or shared across threads without contention.
 
-### Maintainability assessment
-* **High maintainability** – clear separation of concerns (config, legacy handling, caching, logging) makes each piece testable and replaceable.  
-* **Configuration‑centric** – most behavior changes are driven by data files, reducing the need for code changes.  
-* **Shared infrastructure** – reliance on common cache and logging libraries ensures consistent behavior but also means changes to those libraries affect all siblings, requiring coordinated updates.  
-* **Documentation focus** – because the resolver’s logic is spread across several small modules, comprehensive documentation of the precedence rules and cache key schema is essential to avoid misuse.
+### Maintainability Assessment
+* The strong reliance on DI and external configuration makes the component highly maintainable: changes to modes or contexts rarely require code changes.
+* Clear boundaries (resolver vs. provider manager) simplify ownership; teams can evolve providers independently of mode‑resolution logic.
+* The main maintenance risk lies in configuration drift—ensuring that configuration files stay in sync with provider capabilities is essential, and automated validation scripts are recommended.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed with flexibility and maintainability in mind, utilizing dependency injection to manage the various Large Language Model (LLM) providers, including Anthropic, OpenAI, and Groq. This is evident in the LLMService class, located in lib/llm/llm-service.ts, which acts as a high-level facade for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The use of dependency injection allows for easy swapping of providers, making it simpler to add or remove providers as needed. Furthermore, the LLMService class provides a single public entry point for all LLM operations, making it easier for developers to interact with the component.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's use of dependency injection, as seen in the LLMService class (lib/llm/llm-service.ts), allows for a high degree of flexibility and testability. This is particularly evident in the way that different providers, such as the DMRProvider (lib/llm/providers/dmr-provider.ts) and AnthropicProvider (lib/llm/providers/anthropic-provider.ts), can be easily registered and swapped out as needed. For example, the provider registry (lib/llm/provider-registry.js) enables dynamic addition and removal of providers, making it simple to add support for new LLM services or remove support for outdated ones. Furthermore, the use of dependency injection makes it easy to test the component in isolation, using mock implementations of the providers to simulate different scenarios.
+
+### Children
+- [ModeConfiguration](./ModeConfiguration.md) -- The ModeConfiguration is likely to be implemented based on the parent context, which suggests the use of configuration files to determine the LLM mode.
 
 ### Siblings
-- [LLMProviderManager](./LLMProviderManager.md) -- LLMProviderManager uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback.
-- [LLMCachingMechanism](./LLMCachingMechanism.md) -- LLMCachingMechanism uses a caching library in lib/llm/llm-cache.ts to store and retrieve cached responses.
-- [LLMLoggingMechanism](./LLMLoggingMechanism.md) -- LLMLoggingMechanism uses a logging library in lib/llm/llm-logging.ts to log events and errors.
+- [LLMProviderManager](./LLMProviderManager.md) -- The LLMProviderManager uses the provider registry (lib/llm/provider-registry.js) to enable dynamic addition and removal of providers.
+- [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) utilizes dependency injection to allow for flexible and testable provider management.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

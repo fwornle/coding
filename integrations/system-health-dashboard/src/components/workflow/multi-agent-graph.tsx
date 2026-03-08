@@ -257,6 +257,23 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       outputs: ['Analysis results', 'Insights'],
       llmUsage: 'standard', techNote: 'LLM-powered code analysis' },
   ],
+  'persistence': [
+    { id: 'w1', name: 'Wave 1 Persist', shortName: 'W1',
+      description: 'Persist L0 Project + L1 Component entities to knowledge graph',
+      inputs: ['Wave 1 entities', 'Relationships'],
+      outputs: ['Stored entities', 'Graph updated'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage' },
+    { id: 'w2', name: 'Wave 2 Persist', shortName: 'W2',
+      description: 'Persist L2 SubComponent entities to knowledge graph',
+      inputs: ['Wave 2 entities', 'Relationships'],
+      outputs: ['Stored entities', 'Graph updated'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage' },
+    { id: 'w3', name: 'Wave 3 Persist', shortName: 'W3',
+      description: 'Persist L3 Detail entities and operator-refined entities to knowledge graph',
+      inputs: ['Wave 3 entities', 'Operator-enriched fields'],
+      outputs: ['Stored entities', 'Embeddings written'],
+      llmUsage: 'none', techNote: 'GraphDB + LevelDB storage + direct attribute merge' },
+  ],
 }
 
 export function MultiAgentGraph({
