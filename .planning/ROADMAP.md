@@ -70,13 +70,14 @@ Plans:
   2. Running the pipeline twice on the same codebase does not create duplicate entities -- dedup operator with fuzzy name matching merges them
   3. The merge operator preserves parentId during entity merging (no null-coalesce overwrites that break hierarchy)
   4. Aggregation and prediction operators produce derived metadata (e.g., importance scores, relationship predictions) visible on entities
-**Plans:** 4/4 plans complete
+**Plans:** 5 plans
 
 Plans:
 - [ ] 10-01-PLAN.md -- Embedding infrastructure: Python script, batch generateEmbeddings(), mergeEntities hierarchy fix
 - [ ] 10-02-PLAN.md -- Operator logic fixes: hierarchy-aware dedup, cross-branch edge prediction, conv adaptation
 - [ ] 10-03-PLAN.md -- Wave-controller integration: wire all 6 operators, Dockerfile update, end-to-end verification
 - [ ] 10-04-PLAN.md -- Gap closure: persist operator-enriched fields, preserve ontology metadata, SSE progress flush
+- [ ] 10-05-PLAN.md -- Gap closure: propagate operator-enriched fields through persistence-agent to GraphDB
 
 #### Phase 11: Content Quality Gate
 **Goal**: Every agent output passes through content validation and QA review before persistence, with the coordinator able to reject and retry outputs that fail quality checks
@@ -107,6 +108,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. Agent Pipeline Integration | v2.1 | 0/3 | Planning complete | - |
-| 10. KG Operations Restoration | 4/4 | Complete   | 2026-03-08 | - |
+| 10. KG Operations Restoration | 4/5 | Gap closure   | 2026-03-08 | - |
 | 11. Content Quality Gate | v2.1 | 0/? | Not started | - |
 | 12. Pipeline Observability | v2.1 | 0/? | Not started | - |
