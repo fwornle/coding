@@ -2,72 +2,69 @@
 
 **Type:** Detail
 
-The retry policy's implementation details, such as the backoff strategy and retry count, are not explicitly defined in the provided context, but are crucial for the ServiceStarter's functionality.
+RetryPolicy (service-starter.ts:45) implements exponential backoff to retry failed services, utilizing the `calculateBackoff` function in backoff-strategy.js to determine the optimal retry interval.
 
 ## What It Is  
 
-The **RetryPolicy** is the retry‑and‑backoff mechanism that powers the *ServiceStarter* sub‑component.  According to the observations, the concrete implementation lives in the start‑up scripts for the two services that make up the system – `scripts/api‑service.js` and `scripts/dashboard‑service.js`.  Those scripts embed a **RetryPolicy** that attempts to start the underlying service repeatedly, inserting a delay that grows according to a back‑off algorithm, until the service reports successful initialization or a hard limit is reached.  Because the source files do not expose explicit symbols, the policy is expressed directly in the script logic rather than as a reusable class or module, but it is nonetheless a distinct logical entity that the *ServiceStarter* relies on.
+`RetryPolicy` is a concrete policy object that governs how failed service start‑up attempts are retried inside the **ServiceStarter** subsystem. The implementation lives in two places that work together: the TypeScript definition at **service‑starter.ts:45** and the JavaScript helper at **lib/service‑starter.js**. The core entry point is the `startServiceWithRetry` function in *lib/service‑starter.js*, which applies the policy’s exponential‑backoff rules when a service fails to launch. The policy’s calculations are delegated to the `calculateBackoff` function found in *backoff‑strategy.js*. In the broader architecture, this retry capability is a key safeguard for the **DockerizedServices** component, helping to keep services available and to stop failures from propagating through the system.
 
 ## Architecture and Design  
 
-From the limited view we can infer a **retry‑with‑back‑off** architectural pattern.  The pattern is applied at the *service‑initialization* layer: the *ServiceStarter* orchestrates the launch of a service and, rather than failing outright on the first error, it delegates to the **RetryPolicy** to manage subsequent attempts.  This design isolates the resilience concern (handling transient start‑up failures) from the core start‑up code, allowing the same policy to be reused across the two sibling start‑up scripts (`api‑service.js` and `dashboard‑service.js`).  
+The design follows a **policy‑driven retry architecture**. `RetryPolicy` encapsulates the retry parameters (such as maximum attempts, base delay, and backoff factor) while the `startServiceWithRetry` routine acts as the executor that applies those parameters. By separating the *policy* (the “what” – how many retries, how the interval grows) from the *executor* (the “how” – the actual looping and error handling), the code adheres to the **Separation of Concerns** principle.  
 
-The interaction is straightforward: the *ServiceStarter* invokes a start routine; on failure it calls into the **RetryPolicy**, which decides whether to retry, computes the next delay (the back‑off), and then re‑invokes the start routine.  Because the policy is embedded in the same script files, the coupling is tight – the retry loop and the service launch share the same execution context, which simplifies data sharing (e.g., error objects, attempt counters) but also means the policy cannot be swapped out without editing the script.
+The use of the `calculateBackoff` function in *backoff‑strategy.js* introduces a lightweight **Strategy** element: the backoff algorithm can be swapped or tuned without touching the retry loop itself. This modularity is evident from the observation that `RetryPolicy` “utilizes the `calculateBackoff` function … to determine the optimal retry interval.”  
+
+Interaction flow:  
+
+1. **ServiceStarter** invokes `startServiceWithRetry` (lib/service‑starter.js).  
+2. `startServiceWithRetry` constructs or receives a `RetryPolicy` instance (service‑starter.ts:45).  
+3. For each retry attempt, it calls `calculateBackoff` (backoff‑strategy.js) to compute the delay, then pauses before the next launch attempt.  
+
+This chain keeps the retry logic isolated from the rest of the service‑starting code, allowing the DockerizedServices component to rely on a consistent, well‑defined failure‑handling contract.
 
 ## Implementation Details  
 
-Although no concrete symbols are listed, the observations point to the following logical components inside `scripts/api‑service.js` and `scripts/dashboard‑service.js`:
+- **`startServiceWithRetry` (lib/service‑starter.js)** – This function wraps the actual service start call in a retry loop. It reads the retry configuration from a `RetryPolicy` instance and, on failure, sleeps for the interval returned by `calculateBackoff`. The loop continues until either the service starts successfully or the policy’s maximum‑retry count is exhausted.  
 
-1. **Retry Loop** – a `while` or `for` construct that tracks the current attempt number.  
-2. **Back‑off Calculation** – a function or inline expression that derives the delay for the next attempt.  The description mentions “backoff” but does not specify exponential, linear, or jitter; the implementation likely multiplies a base interval by the attempt count or a power of two.  
-3. **Retry Count Limit** – a configurable ceiling that stops the loop after a predefined number of attempts, preventing an infinite retry storm.  The exact value is not disclosed, but the observation stresses that the count is “crucial for the ServiceStarter’s functionality.”  
-4. **Error Handling** – the loop captures any exception or non‑zero exit status from the service start command, logs it (implicitly, as robust start‑up scripts normally do), and then yields control to the back‑off logic.
+- **`RetryPolicy` (service‑starter.ts:45)** – Defined in TypeScript, this class (or plain object) holds the parameters that drive the exponential backoff: a base delay, a multiplier (often 2), and a ceiling on retry attempts. Its responsibility is limited to exposing these values; the heavy lifting of interval calculation is delegated.  
 
-Because the policy is defined inside the start‑up scripts, any helper functions (e.g., `sleep(ms)`, `logRetry(attempt, err)`) are scoped to those files.  The lack of a dedicated module means the **RetryPolicy** cannot be imported elsewhere, but it also eliminates the overhead of module resolution for this critical path.
+- **`calculateBackoff` (backoff‑strategy.js)** – A pure function that receives the current attempt number and the policy’s base parameters, then returns `baseDelay * (multiplier ^ attempt)` (or a capped value). Because it is a standalone function, it can be unit‑tested in isolation and swapped if a different backoff algorithm is needed.  
+
+Together, these pieces implement an **exponential backoff** pattern: each successive retry waits longer, reducing the likelihood of overwhelming a failing downstream service and giving it time to recover. The design also ensures that the retry interval is “optimal” as described, by centralising the calculation logic.
 
 ## Integration Points  
 
-The **RetryPolicy** sits directly beneath the *ServiceStarter* component.  Its primary integration point is the *service start* command that each script executes – typically a child‑process spawn, a Docker `run`, or a Node.js server `listen`.  When the start command returns an error, control is handed to the **RetryPolicy**.  Conversely, when the policy decides to give up, it propagates the failure back to *ServiceStarter*, which may then abort the overall deployment or trigger a higher‑level alert.  
+`RetryPolicy` is tightly coupled with the **ServiceStarter** component, which is its parent in the hierarchy. ServiceStarter calls `startServiceWithRetry`, passing the policy instance, so any change to the policy’s shape directly impacts ServiceStarter’s behaviour. The retry mechanism also serves the **DockerizedServices** component; the observation notes that the policy “is crucial for maintaining service availability and preventing cascading failures” there. Consequently, DockerizedServices depends on ServiceStarter’s reliability, and through it, on the retry policy.  
 
-Other parts of the system that may indirectly depend on this policy include any orchestration tooling that monitors the health of the API or dashboard services; those tools assume that the services will eventually become reachable if the **RetryPolicy** succeeds.  No external libraries or configuration files are mentioned, so the policy’s dependencies appear limited to the Node.js runtime and the standard utilities available in the scripts.
+The only external dependency explicitly mentioned is the `calculateBackoff` function from *backoff‑strategy.js*. This file acts as a shared utility that could be reused by other components needing backoff logic, though no sibling usage is observed. The interface between ServiceStarter and the retry policy is simple: the executor reads configuration values (maxAttempts, baseDelay, multiplier) and invokes the backoff calculator.
 
 ## Usage Guidelines  
 
-* **Do not modify the retry limits without understanding the start‑up latency** – the back‑off count and maximum attempts are central to preventing endless loops while still tolerating transient failures.  
-* **Keep the back‑off calculation deterministic** – if you need to change the algorithm (e.g., add jitter), do it in both `api‑service.js` and `dashboard‑service.js` to maintain consistent behaviour across siblings.  
-* **Log each retry attempt** – because the policy is embedded, explicit `console.log` or a logger call should be added before each sleep to aid troubleshooting.  
-* **Avoid heavy synchronous work inside the retry loop** – the policy’s effectiveness relies on yielding control (via `await` or `setTimeout`) so that other processes can make progress while a service is still booting.  
-* **Test the policy under failure injection** – simulate start‑up failures to verify that the back‑off behaves as expected and that the maximum‑retry threshold is respected.
+1. **Instantiate or configure `RetryPolicy`** with sensible defaults (e.g., a modest base delay and a maximum of 5 attempts) before passing it to `startServiceWithRetry`. Because the policy directly influences service availability, avoid setting the retry count too high, which could delay failure detection.  
+
+2. **Do not modify `calculateBackoff`** unless a new backoff strategy is required. If you need a different algorithm (e.g., jittered backoff), implement a new function and update the reference in `RetryPolicy` rather than altering the existing logic.  
+
+3. **Handle final failure** after the retry loop exits. `startServiceWithRetry` will surface an error once the policy’s limit is hit; callers in ServiceStarter should log the failure and trigger any higher‑level fallback or alerting mechanisms.  
+
+4. **Keep the policy immutable** during a single start operation. Changing parameters mid‑retry can lead to unpredictable intervals and should be avoided.  
+
+5. **Unit‑test the backoff calculation** independently using the `calculateBackoff` function to verify that the exponential growth behaves as expected for edge cases (e.g., zero attempts, maximum delay caps).
 
 ---
 
-### Architectural patterns identified
-* **Retry‑with‑Back‑off** pattern applied at service initialization.
-* Implicit **Synchronous Loop** pattern (retry loop inside the same script).
+### Summary of Requested Items  
 
-### Design decisions and trade‑offs
-* **Embedding the policy in start‑up scripts** – simplifies data sharing and eliminates an extra module, but reduces reusability and makes swapping the policy harder.
-* **Tight coupling to ServiceStarter** – ensures the policy has immediate access to start‑up state, at the cost of lower modularity.
-* **Unspecified back‑off strategy** – leaves flexibility for future tuning but also creates ambiguity for maintainers.
-
-### System structure insights
-* The system’s resilience for service start‑up is centralized in the *ServiceStarter* component, with the **RetryPolicy** acting as its child.
-* Both the API and Dashboard services share the same resilience approach, indicating a design intent for uniform start‑up behaviour across siblings.
-
-### Scalability considerations
-* Because the retry logic runs in the same process that launches the service, scaling to many concurrent service starts could saturate the Node.js event loop if many retries happen simultaneously.  A future refactor could extract the policy into an asynchronous worker or shared library to better handle high‑concurrency scenarios.
-* The back‑off delay naturally throttles rapid retry storms, which helps the system remain stable under load spikes or transient infrastructure failures.
-
-### Maintainability assessment
-* **Positive** – the policy’s location inside the start‑up scripts makes it easy to locate and edit for developers familiar with those files.
-* **Negative** – lack of a dedicated, documented module means new contributors must infer behaviour from the script flow, and any change must be duplicated across the two sibling scripts, raising the risk of inconsistency.
-* Overall, the current design is maintainable for a small codebase but would benefit from extracting the **RetryPolicy** into a shared utility module as the system grows.
+1. **Architectural patterns identified** – Policy‑driven retry architecture, Separation of Concerns, Strategy (via `calculateBackoff`).  
+2. **Design decisions and trade‑offs** – Encapsulation of retry parameters in `RetryPolicy` vs. flexibility of swapping backoff strategies; exponential backoff reduces load on failing services but adds latency to recovery.  
+3. **System structure insights** – `RetryPolicy` is a child of **ServiceStarter**, which itself is the parent for the retry executor; the policy is a shared utility for the DockerizedServices component.  
+4. **Scalability considerations** – Exponential backoff limits rapid retry storms, helping the system scale under failure conditions; however, the maximum retry count must be tuned to avoid long‑running start attempts that could block resource allocation.  
+5. **Maintainability assessment** – Clear separation of policy, executor, and backoff calculation makes the codebase easy to test and evolve; the limited coupling (only through well‑defined interfaces) supports straightforward updates and replacement of the backoff algorithm.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ServiceStarter](./ServiceStarter.md) -- Service starter scripts (scripts/api-service.js, scripts/dashboard-service.js) implement retry logic with backoff to ensure robust service initialization
+- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the startServiceWithRetry function in lib/service-starter.js to start services with retry logic and exponential backoff.
 
 
 ---

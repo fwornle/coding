@@ -1,120 +1,75 @@
 # ModeResolver
 
-**Type:** SubComponent
+**Type:** Detail
 
-ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
+Given the dependency injection approach, the ModeResolver would be expected to be a key component in the LLMService, enabling different modes to be easily integrated or tested.
 
 ## What It Is  
 
-ModeResolver is a **sub‑component** that lives inside the **LLMAbstraction** façade.  Its concrete implementation is spread across three core source files that appear in the code base:
-
-* `ModeResolverStrategy.java` – encapsulates the **strategy** used to decide which operating mode a provider should run in, based on the JSON configuration found in `providers.json`.  
-* `ModeResolverSingleton.java` – guarantees that the whole application works with a **single, globally‑available** instance of ModeResolver.  
-* `ProviderRegistry.java` – supplies ModeResolver with the current catalogue of registered LLM providers and the mode each provider advertises.
-
-Together these files give ModeResolver the responsibility of translating static provider configuration into a runtime‑ready “mode” (e.g., *mock*, *live*, *tier‑based*).  The component is a child of **LLMAbstraction**, shares the same layer as sibling components **ProviderRegistry** and **CompletionRequestHandler**, and owns three child entities: **ModeConfiguration**, **ProviderRegistry**, and **ModeResolverStrategy**.
-
----
+**ModeResolver** is the logical component responsible for determining which *LLM mode* the system should operate in at any given moment. Although the concrete source files are not listed in the observations, the documentation makes it clear that **ModeResolver** lives inside the **LLMService** package – the parent component that orchestrates all interactions with the underlying language‑model infrastructure. Its primary role is to expose a function (or set of functions) that can be injected into **LLMService** so that the service can query the current mode without hard‑coding any decision logic. By externalising the mode‑resolution logic, the system gains the ability to swap implementations, mock the resolver in tests, or extend it with new modes without touching the core **LLMService** code.
 
 ## Architecture and Design  
 
-The observations reveal a deliberately layered architecture built around well‑known **design patterns**:
+The only explicit architectural cue comes from the observation that **LLMService** *uses dependency injection* to set the functions that resolve the current LLM mode. This indicates a **Dependency Injection (DI)** pattern, where **ModeResolver** is treated as a pluggable dependency rather than a static internal module. The DI approach decouples **LLMService** from the concrete algorithm used to pick a mode, allowing multiple resolver strategies (e.g., configuration‑based, request‑context‑based, or feature‑flag‑driven) to be supplied at runtime.  
 
-1. **Strategy Pattern** – `ModeResolverStrategy.java` implements the algorithmic variation for mode resolution.  By isolating the decision logic in a strategy class, the system can swap or extend resolution algorithms (e.g., a rule‑based strategy vs. a machine‑learning‑driven one) without touching the surrounding code.  
-
-2. **Singleton Pattern** – `ModeResolverSingleton.java` enforces a single instance of ModeResolver throughout the application lifecycle.  This guarantees a consistent view of provider modes and eliminates the overhead of repeatedly constructing the resolver.  
-
-3. **Dependency on ProviderRegistry** – ModeResolver does not own the provider catalogue itself; it delegates that responsibility to `ProviderRegistry.java`.  This separation of concerns mirrors the **factory** approach used by the sibling **ProviderRegistry** component (via `ProviderFactory.java`) and keeps registration logic distinct from mode‑resolution logic.
-
-The component therefore follows a **modular, composition‑over‑inheritance** style: the parent **LLMAbstraction** orchestrates high‑level LLM interactions, while ModeResolver focuses exclusively on mode determination.  Interaction with siblings is minimal – ModeResolver only calls into ProviderRegistry to retrieve the latest provider list, whereas CompletionRequestHandler consumes the resolved mode when routing a request through its pipeline (`CompletionRequestPipeline.java`).
-
----
+Because **ModeResolver** is a *key component* within **LLMService**, the design follows a **composition** model: **LLMService** composes its behavior from smaller, interchangeable parts—one of which is the mode‑resolution function. This composition enhances **testability** (the resolver can be replaced with a stub) and **extensibility** (new modes can be added by providing a new resolver implementation). No other design patterns (such as micro‑services or event‑driven messaging) are mentioned, so the analysis stays strictly within the DI and composition boundaries that are explicitly observed.
 
 ## Implementation Details  
 
-### Core Classes  
+While the source code for **ModeResolver** is not present, the observations give us enough to infer its shape:
 
-| File | Class | Role |
-|------|-------|------|
-| `ModeResolverStrategy.java` | `ModeResolverStrategy` | Implements the **strategy** interface for mode resolution. It reads the provider entry from `providers.json`, extracts the configured mode, and returns a concrete `ModeConfiguration` object. |
-| `ModeResolverSingleton.java` | `ModeResolverSingleton` | Holds a **static** reference to the sole `ModeResolver` instance. The `getInstance()` method lazily constructs the resolver on first call, ensuring thread‑safe, lazy initialization (the observation does not specify synchronization, but typical singleton implementations include it). |
-| `ProviderRegistry.java` | `ProviderRegistry` | Exposes `getRegisteredProviders()` (or a similarly named method) that returns a collection of provider descriptors, each containing a mode field. ModeResolver invokes this to obtain the data required by the strategy. |
+1. **Interface contract** – **LLMService** expects a callable (function or method) that returns the current mode. The contract is likely a simple signature such as `resolveMode(): LLMMode` or `getCurrentMode(): string`.  
+2. **Injection point** – During the construction or configuration phase of **LLMService**, a setter or constructor parameter receives the resolver function. This could look like `new LLMService({ resolveMode: myResolver })` or `llmService.setModeResolver(myResolver)`.  
+3. **Resolver responsibilities** – The resolver encapsulates any logic needed to decide the mode: reading from a configuration file, inspecting request metadata, consulting a feature‑flag service, or applying business rules. Because the resolver is injected, the implementation can be as simple as returning a constant (useful for tests) or as complex as aggregating several data sources.
 
-### Flow  
-
-1. **Initialisation** – When the application starts, `ModeResolverSingleton.getInstance()` is called (often from the LLMAbstraction bootstrap). The singleton creates a `ModeResolver` object that internally holds a reference to `ModeResolverStrategy` and `ProviderRegistry`.  
-
-2. **Resolution Request** – A caller (e.g., `CompletionRequestHandler`) asks the resolver for the mode of a specific provider. The resolver forwards the request to `ModeResolverStrategy`, passing the provider identifier.  
-
-3. **Strategy Execution** – `ModeResolverStrategy` looks up the provider in the list supplied by `ProviderRegistry`. It reads the mode value from the JSON configuration (`providers.json`) and constructs a `ModeConfiguration` instance that encapsulates the resolved mode (including any auxiliary flags such as “mock‑only”).  
-
-4. **Result Propagation** – The resolved `ModeConfiguration` is returned to the caller, which can then decide how to route the request (e.g., through a mock adapter or a live API client).
-
-Because the strategy is a separate class, adding a new resolution algorithm (for example, a dynamic mode based on runtime load) only requires creating a new strategy implementation and wiring it into the singleton – no changes to the surrounding infrastructure are needed.
-
----
+The lack of concrete symbols means we cannot name specific classes or files, but the pattern is clear: **ModeResolver** is a thin abstraction layer whose sole purpose is to supply a mode value to **LLMService** on demand.
 
 ## Integration Points  
 
-* **Parent – LLMAbstraction**: LLMAbstraction treats ModeResolver as a black‑box service for “mode lookup”.  During its façade initialisation it obtains the singleton instance and injects it wherever mode information is required (e.g., request routing, provider health checks).  
+- **LLMService (parent)** – Directly consumes the resolver via DI. Any change to the resolver’s signature or return type would require a corresponding update in **LLMService**’s injection contract.  
+- **Configuration subsystem** – If the resolver reads from configuration, it will depend on whatever configuration loader the system provides (e.g., a JSON/YAML parser or environment‑variable accessor).  
+- **Testing harnesses** – Test suites can inject mock resolvers that return predetermined modes, enabling isolated verification of **LLMService** behavior under different mode conditions.  
+- **Potential siblings** – Other components that also need mode awareness (e.g., request routers or logging utilities) could reuse the same resolver instance, promoting consistency across the codebase.
 
-* **Sibling – ProviderRegistry**: ModeResolver directly depends on ProviderRegistry to fetch the current set of providers and their static configurations.  Any change to provider registration (addition, removal, or mode update) propagates automatically to ModeResolver because the registry is consulted at each resolution call.  
-
-* **Sibling – CompletionRequestHandler**: The handler’s pipeline (`CompletionRequestPipeline.java`) consumes the `ModeConfiguration` produced by ModeResolver to decide which concrete completion client to invoke (mock vs. live).  This creates a clear contract: the pipeline only needs the mode, not the underlying provider details.  
-
-* **Children – ModeConfiguration & ModeResolverStrategy**: `ModeConfiguration` is the data carrier produced by the strategy.  The strategy itself is the extensibility point for future resolution logic.  Both are encapsulated within ModeResolver, keeping the public API minimal (typically a `resolveMode(providerId)` method).  
-
-* **External Configuration – providers.json**: The JSON file is the single source of truth for provider‑specific mode settings.  Because the strategy reads directly from this file (via ProviderRegistry), the system remains configuration‑driven and does not require code changes to adjust modes.
-
----
+No child entities are described, so **ModeResolver** appears to be a leaf component that provides a single service to its parent.
 
 ## Usage Guidelines  
 
-1. **Always obtain ModeResolver through the singleton** – Call `ModeResolverSingleton.getInstance()` rather than constructing a new resolver.  This ensures a consistent view of provider modes and avoids accidental duplication of state.  
-
-2. **Do not modify `providers.json` at runtime** – The design assumes a static configuration that is read each time a mode is resolved.  If dynamic updates are required, the ProviderRegistry must be refreshed first; otherwise the resolver may return stale mode data.  
-
-3. **Extend resolution logic via a new strategy** – When a new mode‑determination rule is needed (e.g., feature‑flag driven), implement a new class that adheres to the same interface as `ModeResolverStrategy` and replace the existing strategy in the singleton’s construction block.  No other component needs to change.  
-
-4. **Treat `ModeConfiguration` as immutable** – The object returned by the strategy should not be altered after creation.  If downstream code needs to adapt the configuration, create a new instance rather than mutating the original.  
-
-5. **Coordinate with ProviderRegistry for registration changes** – If a provider’s mode is altered, ensure the ProviderRegistry reloads the updated `providers.json` before any subsequent mode resolution calls.  This prevents mismatches between the registry’s view and the resolver’s output.  
-
-6. **Thread safety** – Although the observations do not detail synchronization, the singleton pattern typically requires thread‑safe lazy initialization.  Verify that `ModeResolverSingleton` uses a synchronized block or the “initialization‑on‑demand holder” idiom to avoid race conditions in a multi‑threaded environment.
+1. **Inject, don’t instantiate** – Always supply a resolver to **LLMService** through its DI interface rather than letting the service create its own resolver. This preserves the intended flexibility and testability.  
+2. **Keep the resolver pure and side‑effect free** – Because the resolver may be called frequently, it should avoid expensive I/O or mutable state. If external data is needed, cache it or perform the lookup upstream.  
+3. **Return a well‑defined mode enum/value** – The resolver should conform to the mode type expected by **LLMService** (e.g., a string constant or an `LLMMode` enum). Inconsistent return values will cause runtime errors.  
+4. **Leverage mocks in tests** – When writing unit tests for **LLMService**, provide a stub resolver that returns a fixed mode to isolate the service’s logic from mode‑resolution concerns.  
+5. **Document resolver behavior** – Since the resolver can be swapped, its decision criteria should be clearly documented (e.g., “reads `LLM_MODE` env var, falls back to `default`”) so that future maintainers understand the impact of changing the implementation.
 
 ---
 
-### Summary of Architectural Insights  
+### 1. Architectural patterns identified  
+- **Dependency Injection (DI)** – ModeResolver is injected into LLMService, decoupling the two.  
+- **Composition** – LLMService composes its behavior from interchangeable functions, including the mode‑resolution function.
 
-| Architectural pattern | Where it appears | Rationale / trade‑off |
-|-----------------------|------------------|-----------------------|
-| **Strategy** | `ModeResolverStrategy.java` | Enables pluggable mode‑resolution algorithms; adds a level of indirection but keeps the resolver flexible. |
-| **Singleton** | `ModeResolverSingleton.java` | Guarantees a single source of truth for mode data; simplifies consumption but introduces global state that must be carefully managed for testability. |
-| **Dependency on ProviderRegistry** | `ProviderRegistry.java` (used by ModeResolver) | Centralises provider data, avoiding duplication; however, any latency in ProviderRegistry lookup propagates to mode resolution. |
-| **Configuration‑driven design** | `providers.json` | Allows non‑code changes to affect runtime behaviour; requires disciplined configuration management. |
+### 2. Design decisions and trade‑offs  
+- **Flexibility vs. simplicity** – By externalising mode resolution, the system gains extensibility and testability at the cost of an extra indirection layer.  
+- **Testability** – DI enables easy mocking of ModeResolver, reducing the need for heavyweight integration tests.  
+- **Potential runtime overhead** – If the resolver performs heavy computation on each call, it could affect performance; designers must balance richness of logic with efficiency.
 
-**Design decisions** focus on separation of concerns (resolution vs. registration), configurability, and ease of extension.  The main trade‑off is the reliance on a global singleton, which can hinder unit testing unless the design provides a way to inject a mock resolver.  
+### 3. System structure insights  
+- **ModeResolver** sits as a leaf component under **LLMService**, acting as a provider of a single piece of contextual data (the current LLM mode).  
+- The parent **LLMService** likely contains other injected collaborators (e.g., model providers, request handlers), forming a modular, plug‑in‑friendly architecture.
 
-**System structure insights** show a clear hierarchy: LLMAbstraction → ModeResolver (singleton + strategy) → ProviderRegistry → providers.json.  Siblings operate independently but converge on the same provider data, promoting a cohesive yet loosely coupled ecosystem.  
+### 4. Scalability considerations  
+- Because the resolver is a pure function, scaling the system horizontally does not require special coordination; each service instance can resolve its mode independently.  
+- If mode resolution depends on shared external state (e.g., a distributed feature‑flag store), the resolver must be designed to handle latency and consistency at scale.
 
-**Scalability considerations** – Because mode resolution is a lightweight lookup (JSON read + map lookup) and the singleton caches no heavy state, the component scales horizontally with minimal overhead.  If the provider catalogue grows dramatically, the only scalability impact would be the time to read and parse `providers.json`, which can be mitigated by caching the parsed representation inside ProviderRegistry.  
-
-**Maintainability assessment** – The use of well‑known patterns (strategy, singleton) and a clear separation between configuration, registration, and resolution makes the codebase easy to understand and modify.  Adding new modes or resolution rules does not ripple through other components.  The primary maintenance risk lies in the global singleton; introducing a dependency‑injection façade around the singleton would improve testability and future‑proof the design.
+### 5. Maintainability assessment  
+- **High maintainability** – The clear separation of concerns means changes to mode‑selection logic are isolated to the resolver implementation, leaving **LLMService** untouched.  
+- **Documentation importance** – Since the resolver’s internal logic is not visible to the service, thorough documentation of its decision rules is essential to avoid hidden coupling.  
+- **Ease of testing** – The DI pattern simplifies unit testing, further supporting long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. Its architecture involves a combination of interfaces, classes, and modules that work together to manage LLM operations, including mode resolution, provider registration, and completion requests. The component utilizes design patterns like dependency injection, singleton, and factory to ensure flexibility, scalability, and maintainability.
-
-### Children
-- [ModeConfiguration](./ModeConfiguration.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
-- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.
-- [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
-
-### Siblings
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a factory pattern in ProviderFactory.java to create instances of different provider classes based on their configurations in providers.json
-- [CompletionRequestHandler](./CompletionRequestHandler.md) -- CompletionRequestHandler uses a pipeline pattern in CompletionRequestPipeline.java to process completion requests, including validation, routing, and response handling
+- [LLMService](./LLMService.md) -- LLMService uses dependency injection to set functions that resolve the current LLM mode, allowing for flexibility and testability.
 
 
 ---

@@ -529,27 +529,13 @@ export const MULTI_AGENT_EDGES: EdgeDefinition[] = [
   { from: 'deduplication', to: 'orchestrator', type: 'retry', label: 'feedback' },
   { from: 'content_validation', to: 'orchestrator', type: 'retry', label: 'feedback' },
 
-  // === DATA FLOW EDGES (typical processing sequence) ===
-  // These show the TYPICAL flow, but orchestrators can override
-  // BATCH PHASE: Extraction → Analysis → Observations → Classification → Operators
-  { from: 'batch_scheduler', to: 'git_history', type: 'dataflow' },
-  { from: 'git_history', to: 'vibe_history', type: 'dataflow' },  // vibe needs git commit dates
-  { from: 'git_history', to: 'semantic_analysis', type: 'dataflow' },
-  { from: 'vibe_history', to: 'semantic_analysis', type: 'dataflow' },
-  { from: 'semantic_analysis', to: 'observation_generation', type: 'dataflow' },  // semantic → observations
-  { from: 'observation_generation', to: 'ontology_classification', type: 'dataflow' },  // observations → classification
-  { from: 'ontology_classification', to: 'kg_operators', type: 'dataflow' },
-  { from: 'kg_operators', to: 'quality_assurance', type: 'dataflow' },
-  { from: 'quality_assurance', to: 'batch_checkpoint_manager', type: 'dataflow' },
-  // FINALIZATION PHASE: Code Graph + Doc Linker → Persistence → Insights → Web → Dedup → Validate
-  { from: 'batch_checkpoint_manager', to: 'code_graph', type: 'dataflow' },
-  { from: 'batch_checkpoint_manager', to: 'documentation_linker', type: 'dataflow' },  // NEW: parallel to code_graph
-  { from: 'documentation_linker', to: 'code_graph', type: 'dataflow', label: 'doc links' },  // docs feed into code_graph
-  { from: 'code_graph', to: 'persistence', type: 'dataflow' },
-  { from: 'persistence', to: 'insight_generation', type: 'dataflow' },
-  { from: 'insight_generation', to: 'web_search', type: 'dataflow' },  // NEW: insights → web search
-  { from: 'web_search', to: 'deduplication', type: 'dataflow' },  // web search → dedup
-  { from: 'deduplication', to: 'content_validation', type: 'dataflow' },
+  // === DATA FLOW EDGES (wave-analysis processing sequence) ===
+  // Wave-analysis flow: Init → Analyze → Classify → Persist (repeat per wave) → KG-Ops → Insights
+  { from: 'batch_scheduler', to: 'semantic_analysis', type: 'dataflow' },         // (1) init → analyze
+  { from: 'semantic_analysis', to: 'ontology_classification', type: 'dataflow' }, // (2) analyze → classify
+  { from: 'ontology_classification', to: 'persistence', type: 'dataflow' },       // (3) classify → persist
+  { from: 'persistence', to: 'kg_operators', type: 'dataflow' },                  // (4) persist → KG operators
+  { from: 'kg_operators', to: 'insight_generation', type: 'dataflow' },           // (5) operators → insights
 ]
 
 // Linear workflow edges (for when API provides DAG-style workflow)

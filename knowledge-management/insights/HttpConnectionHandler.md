@@ -2,67 +2,94 @@
 
 **Type:** Detail
 
-Given the context, the HTTPConnectionHandler is likely responsible for managing the lifecycle of HTTP connections, including setup and teardown, although specific code artifacts are not available for further analysis.
+The connectViaHTTP method in lib/integrations/specstory-adapter.js:134 is used to establish HTTP connections.
 
 ## What It Is  
 
-`HTTPConnectionHandler` is the concrete sub‑component that implements the HTTP‑specific side of the broader **ConnectionHandler** contract. The only concrete touch‑point we can observe is the call site in **`lib/integrations/specstory-adapter.js:45`**, where the parent `ConnectionHandler` invokes the method **`connectViaHTTP`**. This method is the entry point through which `HTTPConnectionHandler` is engaged, indicating that the handler lives under the `lib/integrations/` directory tree (the same location as the adapter that triggers it). Although the source file that declares `HTTPConnectionHandler` is not listed, the surrounding context makes it clear that the class is a child of `ConnectionHandler` and is dedicated to the lifecycle management of HTTP connections – establishing, maintaining, and tearing them down.
-
-## Architecture and Design  
-
-The observations reveal a **separation‑of‑concerns** architecture: `ConnectionHandler` acts as a façade or orchestrator that delegates to specialized handlers based on the transport protocol. The existence of a dedicated `connectViaHTTP` method signals an **explicit protocol‑branching** design. While the documentation does not name a formal pattern, the structure aligns closely with the **Strategy** concept – the parent selects a concrete strategy (`HTTPConnectionHandler`) at runtime depending on the connection type.  
-
-Interaction is straightforward: `ConnectionHandler` calls `connectViaHTTP` (lib/integrations/specstory-adapter.js:45); that method is implemented inside `HTTPConnectionHandler`, which then encapsulates all HTTP‑specific logic. Because the parent and child share the same namespace (`ConnectionHandler` → `HTTPConnectionHandler`), they can rely on shared interfaces or base‑class contracts without needing additional adapters. This design keeps the HTTP path isolated from other possible connection strategies (e.g., WebSocket, gRPC) and makes the codebase easier to extend with new protocols.
-
-## Implementation Details  
-
-* **Entry point:** `connectViaHTTP` is defined at line 45 of `lib/integrations/specstory-adapter.js`. The method is called by the higher‑level `ConnectionHandler` whenever an HTTP transport is required.  
-* **Responsibility of `HTTPConnectionHandler`:** Although the source file is not listed, we can infer that it implements the full HTTP lifecycle – opening a socket or HTTP client, handling request/response cycles, managing retries, and performing graceful teardown.  
-* **Encapsulation:** All HTTP‑specific configuration (headers, timeout values, authentication tokens) is expected to be housed inside `HTTPConnectionHandler`. Because the parent only knows about the abstract `connectViaHTTP` contract, any changes to the HTTP implementation do not ripple outward.  
-* **Error handling:** The dedicated handler likely centralises HTTP error translation (e.g., network failures, non‑2xx status codes) so that the parent `ConnectionHandler` receives a uniform error object regardless of the underlying transport.
-
-## Integration Points  
-
-* **Parent – `ConnectionHandler`:** The only direct integration point is the method call `connectViaHTTP`. The parent supplies any generic connection parameters (e.g., endpoint URL) and receives back a handle or promise that represents the active HTTP connection.  
-* **Sibling handlers (if any):** While not listed, other protocol handlers would be invoked via analogous methods such as `connectViaWebSocket` or `connectViaGrpc`. The shared parent ensures a common interface for the rest of the system.  
-* **External libraries:** Because the handler lives under `lib/integrations/`, it is reasonable to assume it wraps a third‑party HTTP client (e.g., `axios`, `node-fetch`). The integration is hidden behind the handler’s public API, allowing the rest of the codebase to remain agnostic of the specific HTTP library.  
-* **Consumers:** Any component that needs to communicate with the SpecStory service (or similar) will request a connection through `ConnectionHandler`; the handler will internally delegate to `HTTPConnectionHandler` when the protocol is HTTP.
-
-## Usage Guidelines  
-
-1. **Always go through `ConnectionHandler`** – Directly instantiating or calling methods on `HTTPConnectionHandler` bypasses the intended abstraction and may cause inconsistencies with other connection types.  
-2. **Pass only protocol‑agnostic parameters** to the parent; let `HTTPConnectionHandler` resolve HTTP‑specific details (headers, auth). This keeps calling code clean and future‑proof.  
-3. **Handle the returned promise or connection object** according to the parent’s contract. Do not assume the underlying HTTP client’s API; instead rely on the standardized success/failure signals emitted by the handler.  
-4. **Do not modify `connectViaHTTP`** unless you also update the corresponding implementation inside `HTTPConnectionHandler`. Because the method is the sole bridge, mismatched signatures will break the delegation chain.  
-5. **When extending the system** (e.g., adding a new transport), follow the existing pattern: add a new method on `ConnectionHandler` (e.g., `connectViaWebSocket`) and implement a sibling handler that encapsulates that protocol’s lifecycle.
+`HTTPConnectionHandler` lives inside the **ConnectionManager** component and is the concrete piece that orchestrates HTTP‑based communication with the Specstory extension. The only concrete implementation detail we have is that the handler ultimately relies on the `connectViaHTTP` method defined in **`lib/integrations/specstory-adapter.js` at line 134**. The `SpecstoryAdapter` class is the integration façade that knows how to speak the Specstory HTTP protocol, and `ConnectionManager` injects that adapter into its internal `HTTPConnectionHandler`. In short, `HTTPConnectionHandler` is the “glue” that lets the higher‑level connection management logic issue HTTP calls without having to embed protocol specifics directly.
 
 ---
 
-### Architectural patterns identified  
-* **Separation of Concerns** – distinct handler per transport type.  
-* **Strategy‑like delegation** – parent selects concrete handler (`HTTPConnectionHandler`) via `connectViaHTTP`.
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Explicit protocol branching** simplifies reasoning about each transport but adds a method per protocol, which can increase the surface area of `ConnectionHandler`.  
-* **Encapsulation of HTTP logic** improves maintainability; however, if many protocols share similar code, duplication could arise without a shared utility layer.
+The observable architecture follows a **layered delegation** approach. At the top level, `ConnectionManager` presents a unified API for establishing connections. Beneath it, `HTTPConnectionHandler` acts as a dedicated handler for the HTTP transport, delegating the actual request construction and transmission to the **`SpecstoryAdapter`**. This delegation mirrors the classic **Adapter pattern**: `SpecstoryAdapter` adapts the generic connection‑management contract of `ConnectionManager` to the concrete HTTP contract required by the Specstory extension.  
 
-### System structure insights  
-* `ConnectionHandler` is the orchestrator; `HTTPConnectionHandler` is a leaf node in the hierarchy.  
-* All integration code resides under `lib/integrations/`, indicating a clear boundary between core business logic and external communication adapters.
+Because `connectViaHTTP` is the sole entry point for HTTP communication (as seen in `lib/integrations/specstory-adapter.js:134`), the design isolates all HTTP details—URL formation, headers, payload handling—inside the adapter. `HTTPConnectionHandler` therefore remains thin, focusing on routing calls, handling retries, and exposing a stable interface to the rest of the system. This separation of concerns reduces coupling: changes to the Specstory HTTP API only affect `SpecstoryAdapter` and the handler’s delegation logic, leaving `ConnectionManager` untouched.
 
-### Scalability considerations  
-* Adding new protocols scales linearly: each new protocol gets its own handler and a corresponding method on the parent.  
-* Because HTTP handling is isolated, performance optimisations (connection pooling, keep‑alive) can be applied within `HTTPConnectionHandler` without affecting other parts of the system.
+---
 
-### Maintainability assessment  
-* The clear parent‑child contract (`connectViaHTTP`) makes the codebase easy to navigate and test.  
-* Lack of a shared base class for common connection concerns could lead to duplicated boiler‑plate across handlers; introducing a minimal abstract base could improve reuse while preserving the current separation.
+## Implementation Details  
+
+* **`lib/integrations/specstory-adapter.js`** – The file houses the `SpecstoryAdapter` class. Its `connectViaHTTP` method (line 134) is the concrete implementation that opens an HTTP connection to the Specstory extension. While the source code is not displayed, the method name implies it encapsulates the full request lifecycle: building the request, sending it, and returning the response or error.  
+
+* **`ConnectionManager`** – This component aggregates several sub‑components, one of which is `HTTPConnectionHandler`. The manager likely exposes higher‑level methods such as `establishConnection` or `resetConnection`, internally routing HTTP‑specific calls through the handler.  
+
+* **`HTTPConnectionHandler`** – As a child of `ConnectionManager`, the handler’s responsibility is to receive connection requests from the manager and forward them to `SpecstoryAdapter.connectViaHTTP`. It may also perform lightweight pre‑processing (e.g., validation of input parameters) and post‑processing (e.g., translating HTTP errors into the manager’s error model). Because no additional symbols were discovered, the handler is probably a thin wrapper rather than a full‑blown class with extensive logic.
+
+The overall flow can be visualised as:  
+
+`ConnectionManager → HTTPConnectionHandler → SpecstoryAdapter.connectViaHTTP → Specstory extension (HTTP)`  
+
+Each arrow represents a method call or delegation step, keeping the HTTP protocol knowledge confined to a single module.
+
+---
+
+## Integration Points  
+
+1. **Specstory Extension** – The ultimate external system. All HTTP traffic generated by `connectViaHTTP` is directed here. The adapter abstracts any versioning or endpoint changes, so the rest of the codebase remains insulated.  
+
+2. **ConnectionManager** – The parent component that owns `HTTPConnectionHandler`. Any consumer of the connection API interacts with the manager, not the handler directly. This relationship enforces a clear boundary: the manager decides *when* to use HTTP, while the handler decides *how* to invoke the adapter.  
+
+3. **Potential Sibling Handlers** – Although not listed, the naming (“HTTPConnectionHandler”) suggests that other transport handlers (e.g., `WebSocketConnectionHandler` or `IPCConnectionHandler`) could exist alongside it, each delegating to a different adapter. This would give `ConnectionManager` a polymorphic way to select the appropriate transport based on configuration.  
+
+4. **Internal Utilities** – While not explicitly observed, the adapter may rely on lower‑level HTTP utilities (node’s `http`/`https` modules or a library like `axios`). Those utilities are hidden behind the `connectViaHTTP` method, preserving the adapter’s encapsulation.
+
+---
+
+## Usage Guidelines  
+
+* **Always go through `ConnectionManager`** – Directly invoking `HTTPConnectionHandler` or `SpecstoryAdapter` bypasses the manager’s lifecycle controls (e.g., connection pooling, retry policies). The recommended entry point is the manager’s public API.  
+
+* **Treat `connectViaHTTP` as a black box** – The method signature and return type are defined inside `SpecstoryAdapter`. Consumers should rely on the manager’s documented contract rather than assuming specific HTTP semantics (status codes, headers).  
+
+* **Handle asynchronous results** – Given that HTTP communication is inherently asynchronous, callers should use `await`/Promise patterns when interacting with the manager’s connection methods.  
+
+* **Do not modify the adapter** – Since `SpecstoryAdapter` encapsulates the external Specstory protocol, any change to its implementation should be coordinated with the Specstory team. Local modifications risk breaking the contract for all consumers.  
+
+* **Configuration centralisation** – If the HTTP endpoint, authentication token, or timeout values need to change, they should be supplied to `ConnectionManager` (or a configuration service) rather than hard‑coded inside the handler or adapter. This keeps the system flexible and testable.
+
+---
+
+### Architectural Patterns Identified  
+
+* **Adapter Pattern** – `SpecstoryAdapter` adapts the generic connection interface of `ConnectionManager` to the concrete HTTP protocol required by Specstory.  
+* **Delegation / Thin Wrapper** – `HTTPConnectionHandler` delegates the heavy lifting to the adapter, acting as a thin façade.  
+* **Layered Architecture** – Separation into manager (business logic), handler (transport routing), and adapter (protocol implementation).
+
+### Design Decisions and Trade‑offs  
+
+* **Separation of Concerns** – By isolating HTTP specifics in `SpecstoryAdapter`, the system gains modularity and easier maintenance, at the cost of an extra indirection layer.  
+* **Potential Handler Proliferation** – Naming suggests a family of handlers for different transports; this adds flexibility but may increase the surface area for testing.  
+* **Single Point of HTTP Logic** – Centralising all HTTP calls in one method (`connectViaHTTP`) simplifies updates but could become a bottleneck if the method is not designed for concurrency.
+
+### System Structure Insights  
+
+The hierarchy is clear: `ConnectionManager` (parent) → `HTTPConnectionHandler` (child) → `SpecstoryAdapter` (leaf). This vertical stack enforces a top‑down flow of connection requests, with each layer adding a specific responsibility (orchestration, routing, protocol handling).
+
+### Scalability Considerations  
+
+* **Concurrency** – If many simultaneous HTTP connections are required, `connectViaHTTP` must support parallel requests (e.g., non‑blocking I/O, connection pooling). The current design does not expose how concurrency is managed, so developers should verify that the adapter uses asynchronous primitives.  
+* **Extensibility** – Adding new transport handlers (e.g., WebSocket) would be straightforward given the existing handler‑adapter pattern, supporting future scaling of communication channels.
+
+### Maintainability Assessment  
+
+The clear division between manager, handler, and adapter yields high maintainability: changes to the Specstory HTTP API are confined to `SpecstoryAdapter`; changes to connection orchestration stay within `ConnectionManager`. The thinness of `HTTPConnectionHandler` reduces code churn. However, the lack of visible test hooks or explicit error‑translation logic in the observations suggests that additional documentation and unit tests would further improve maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connections via HTTP.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to provide methods such as connectViaHTTP (lib/integrations/specstory-adapter.js:134) for establishing HTTP connections.
 
 
 ---

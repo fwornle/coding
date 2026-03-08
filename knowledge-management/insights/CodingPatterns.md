@@ -2,161 +2,190 @@
 
 **Type:** Component
 
-The CodingPatterns component's implementation of the InsightGenerator, which generates insights using the output from the pipeline and ontology sub-components, is a notable aspect of its design. The InsightGenerator uses the output from these sub-components to generate insights, which are then stored in the GraphDatabaseAdapter. The InsightGenerator's implementation can be found in the insight-generator.ts file, and it demonstrates the component's ability to integrate with other sub-components and generate meaningful insights. The InsightGenerator also uses the GraphDatabaseAdapter to store and manage insights, demonstrating the component's consistent use of the GraphDatabaseAdapter for storing and managing entities.
+The component employs the BaseAgent class (integrations/mcp-server-semantic-analysis/src/agents/BaseAgent.ts) as a foundation for all agents. This class provides a standard interface for agents, ensuring consistency and simplifying the development of new agents. The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology/OntologyClassificationAgent.ts) is a specific example of an agent built on top of the BaseAgent class, and is responsible for providing classified observations from the Ontology system. By leveraging the BaseAgent class, the OntologyClassificationAgent can focus on its specific task without worrying about the underlying implementation details.
 
 ## What It Is  
 
-The **CodingPatterns** component lives under the `Coding` knowledge‑hierarchy and is realised through a set of TypeScript modules that centre on the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  This adapter is the single source of truth for persisting coding‑related entities – coding conventions, design patterns, best‑practice records, validation rules and generated insights.  Key sub‑modules include  
+The **CodingPatterns** component lives under the `Coding` knowledge‑management hierarchy and is implemented primarily in the source tree at  
 
-* `content-validation-agent.ts` – a constructor‑injected agent that validates content against stored patterns.  
-* `logger.ts` – a modular logger that registers and deregisters log handlers at runtime while persisting log messages via the same adapter.  
-* `insight-generator.ts` – a pipeline‑stage that consumes the output of the **pipeline** and **ontology** sub‑components, creates insight entities and stores them with the adapter.  
+* `storage/graph-database-adapter.ts` – the GraphDatabaseAdapter that all sub‑modules use for persisting and retrieving knowledge entities.  
+* `integrations/mcp-server-semantic-analysis/src/agents/BaseAgent.ts` – the abstract BaseAgent that supplies a common contract for every agent that the component creates.  
+* `integrations/mcp-server-semantic-analysis/src/agents/ontology/OntologyClassificationAgent.ts` – a concrete agent that demonstrates the BaseAgent contract.  
+* `wave-controller.ts:489` – the `runWithConcurrency()` routine that drives work‑stealing execution.  
+* `hook-registry.ts` – the modular hook registration system.  
+* `leveldb-database.ts` – the LevelDB‑backed store that underpins the graph database.
 
-Service start‑up logic lives in `service-starter.ts`, which wraps the initialisation of the component in a **retry‑with‑backoff** loop.  The overall batch execution plan is declared in `batch-analysis.yaml`, where a **DAG‑based topological sort** defines the order of pipeline tasks that drive CodingPatterns‑related analysis.
+In short, **CodingPatterns** is the part of the overall *Coding* system that orchestrates the ingestion, classification, and storage of coding‑related knowledge patterns. It does so by coupling a high‑performance LevelDB‑based graph store (via the GraphDatabaseAdapter) with a set of lightweight agents (built on BaseAgent) that lazily initialise large language models (LLMs) only when required, and it executes heavy‑weight workloads using a work‑stealing concurrency model. Hook registration gives the component a pluggable extension point for additional processing stages.
 
 ---
 
 ## Architecture and Design  
 
-### Centralised Graph Persistence  
-All persistent entities flow through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  The adapter implements CRUD methods (`createEntity`, `readEntity`, `updateEntity`, `deleteEntity`) and is deliberately shared across siblings such as **LiveLoggingSystem**, **ConstraintSystem**, and **KnowledgeManagement**.  This creates a *single‑source‑of‑truth* graph layer that enables flexible schema evolution and performant relationship queries – a design choice that aligns the component with the rest of the code‑base without introducing duplicate storage abstractions.
+### Adapter‑Centric Persistence  
+The component adopts an **Adapter pattern** through `storage/graph-database-adapter.ts`. This class hides the details of the underlying LevelDB implementation (`leveldb-database.ts`) and presents a uniform API (`getGraph`, `saveGraph`, etc.) to all child modules – *OntologyIntegration*, *GraphDatabaseManagement* and *DataIngestion*. By delegating to LevelDB the component gains fast key‑value access while remaining agnostic to the concrete storage engine; the same adapter is also used by sibling components such as *KnowledgeManagement* and *ConstraintSystem*, reinforcing a shared persistence contract across the code base.
 
-### Constructor‑Based Agent Initialisation  
-Agents such as `ContentValidationAgent` follow a **constructor‑based pattern**.  The adapter is injected at construction time, guaranteeing that the agent is fully wired before any validation method is called.  This pattern is repeated in other agents throughout the system (e.g., the agents in **SemanticAnalysis**), providing a uniform initialisation contract and simplifying unit‑testing via mock adapters.
+### Agent‑Based Extensibility  
+All agents inherit from `integrations/mcp-server-semantic-analysis/src/agents/BaseAgent.ts`. This establishes a **Template/Strategy**‑like contract: each derived class (e.g., `OntologyClassificationAgent.ts`) only needs to implement its domain‑specific logic while the BaseAgent supplies lifecycle hooks, error handling, and a predictable interface. The pattern reduces duplication and guarantees that any new agent introduced under the *CodingPatterns* umbrella will behave consistently with the rest of the system, mirroring the approach used by the *LiveLoggingSystem* sibling that also consumes the OntologyClassificationAgent.
 
-### Retry‑With‑Backoff Service Starter  
-`service-starter.ts` wraps the component’s bootstrapping in a **retry library** combined with a custom backoff strategy.  The backoff mitigates transient failures (e.g., temporary DB unavailability) while the retry loop is coordinated with a **locking mechanism** to avoid race conditions during concurrent start‑up attempts.  This mirrors the approach used in the **DockerizedServices** sibling, reinforcing a consistent resilience model across the product.
+### Lazy LLM Initialization  
+Wave‑style agents follow a three‑step sequence:  
 
-### DAG‑Based Pipeline Coordination  
-The batch pipeline is described in `batch-analysis.yaml`.  Tasks are expressed as nodes in a **directed acyclic graph (DAG)** and are ordered using a **topological sort** before execution.  This guarantees that downstream stages (e.g., the `InsightGenerator`) only run after upstream stages such as the **pipeline** and **ontology** have produced their outputs.  The same DAG concept appears in the **Trajectory** component for its multi‑step integration flows, indicating a shared architectural language for complex orchestration.
+1. **Constructor** – receives `(repoPath, team)` but does **not** instantiate the LLM.  
+2. **ensureLLMInitialized()** – checks an internal flag and, if necessary, creates the LLM instance.  
+3. **execute(input)** – runs the model once it is guaranteed to exist.
 
-### Modular Runtime Extensibility  
-`logger.ts` demonstrates **dynamic import** of log‑handler modules.  Handlers can be loaded, registered, and later removed without a restart, leveraging the GraphDatabaseAdapter to persist handler metadata and log entries.  This modularity mirrors the plugin‑style design seen in **LiveLoggingSystem** (dynamic log exporters) and **LLMAbstraction** (provider registry), fostering a plug‑and‑play ecosystem.
+This is a classic **Lazy Initialization** pattern that minimizes memory‑pressure and start‑up latency, especially important when many agents may be instantiated but only a subset actually need an LLM. The pattern is explicitly mentioned in the observations and is shared with the *LLMAbstraction* sibling, which also relies on dependency‑injected LLM services.
+
+### Work‑Stealing Concurrency  
+The `runWithConcurrency()` function in `wave-controller.ts` (line 489) implements a **Work‑Stealing** model using a single shared atomic index counter. Workers atomically fetch the next task index, execute the associated work, and continue until the counter exceeds the task list size. This eliminates the need for heavyweight locks, scales efficiently across CPU cores, and provides deterministic progress tracking. The same concurrency primitive is leveraged by other high‑throughput components (e.g., *Trajectory* when handling multiple integration streams), demonstrating a system‑wide preference for lock‑free parallelism.
+
+### Hook Registration (Publish‑Subscribe)  
+`hook-registry.ts` supplies a **Publish‑Subscribe**‑style registry. Modules can **register** a hook with a unique identifier, and the core controller later **dispatches** events to all registered callbacks. Because the registry is modular, new hooks can be added without touching the core execution loop, supporting extensibility for future pattern‑analysis pipelines. This design mirrors the modularity seen in the *DockerizedServices* sibling, where services are discovered and started via a registry‑like mechanism.
 
 ---
 
 ## Implementation Details  
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)**  
-   * Provides `createEntity(entity)`, `readEntity(id)`, `updateEntity(id, patch)`, `deleteEntity(id)`.  
-   * Internally uses Graphology + LevelDB (as noted in sibling **KnowledgeManagement**) to store nodes and edges.  
-   * Exposes a thin API that other modules import directly, avoiding any higher‑level service façade – a deliberate decision to keep latency low and the codebase simple.
+### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
+* Provides methods such as `getGraph()` and `saveGraph()` that either route to a remote VKB API or fall back to the local LevelDB instance (`leveldb-database.ts`).  
+* Handles **automatic JSON export sync**, ensuring that any mutation to the graph is mirrored to a JSON representation used by downstream components (e.g., for UI rendering or export).  
+* The adapter is a singleton per process, guaranteeing a single point of coordination for all graph operations across *OntologyIntegration*, *GraphDatabaseManagement*, and *DataIngestion*.
 
-2. **ContentValidationAgent (`content-validation-agent.ts`)**  
-   * Constructor signature: `constructor(private db: GraphDatabaseAdapter)`.  
-   * Validation method pulls pattern entities via `db.readEntity(patternId)` and runs rule checks on supplied content.  
-   * Extensible by subclassing – new agents can override `validate()` while re‑using the injected adapter.
+### LevelDB Backend (`leveldb-database.ts`)  
+* Wraps the native LevelDB library with a thin promise‑based API.  
+* Stores graph nodes and edges as serialized JSON blobs keyed by their identifiers, enabling rapid point‑lookup and range scans.  
+* Designed for **fault tolerance**: on error it attempts automatic recovery and logs the failure, a behavior inherited by the adapter’s error‑handling path.
 
-3. **Logger (`logger.ts`)**  
-   * Maintains a registry of handler instances.  
-   * `registerHandler(name: string, modulePath: string)` uses `import(modulePath)` at runtime, then stores the handler reference in the adapter.  
-   * `removeHandler(name)` deregisters and optionally deletes handler metadata from the graph.  
-   * Log messages themselves are persisted via `db.createEntity({type: 'LogMessage', ...})`.
+### BaseAgent (`integrations/mcp-server-semantic-analysis/src/agents/BaseAgent.ts`)  
+* Defines abstract methods `initialize()`, `process(input)`, and `shutdown()`.  
+* Supplies a **state machine** that tracks whether the agent is idle, initializing, or active, which is consulted by `ensureLLMInitialized()`.  
+* Implements generic logging and telemetry hooks that are automatically wired into the hook registry, so any derived agent (e.g., `OntologyClassificationAgent.ts`) benefits from consistent observability.
 
-4. **InsightGenerator (`insight-generator.ts`)**  
-   * Consumes the results of the **pipeline** and **ontology** sub‑components (passed as plain objects).  
-   * Generates insight nodes (`type: 'Insight'`) and writes them with `db.createEntity(insight)`.  
-   * Because the adapter is shared, insights can later be traversed in relation to the patterns they reference, enabling graph‑based queries such as “which patterns contributed to this insight?”.
+### OntologyClassificationAgent (`.../ontology/OntologyClassificationAgent.ts`)  
+* Extends BaseAgent and overrides `process(input)` to call the ontology service, map raw observations to ontology concepts, and return classified results.  
+* Relies on the GraphDatabaseAdapter to persist classification outcomes, thereby keeping the knowledge graph up‑to‑date.
 
-5. **ServiceStarter (`service-starter.ts`)**  
-   * Uses the `retry` npm package: `retry.operation({ retries: 5, factor: 2, minTimeout: 1000 })`.  
-   * Custom backoff function calculates exponential delay and logs each attempt via the `Logger`.  
-   * Before each retry it acquires a **distributed lock** (implemented elsewhere) to guarantee a single initializer runs at a time.
+### Lazy LLM Flow  
+* The constructor stores `repoPath` and `team` but leaves the LLM reference `null`.  
+* `ensureLLMInitialized()` checks a boolean flag; if false, it resolves the appropriate LLM mode via the `LLMService` (found in the *LLMAbstraction* sibling) and creates the model instance.  
+* Subsequent calls to `execute(input)` bypass the check, delivering low‑latency inference after the first warm‑up.
 
-6. **Batch Analysis DAG (`batch-analysis.yaml`)**  
-   * Defines tasks like `extractPatterns`, `runValidation`, `generateInsights`.  
-   * Each task lists `dependsOn` entries; the executor reads the YAML, builds an in‑memory graph, runs a topological sort, and then executes tasks in order, passing the shared GraphDatabaseAdapter instance to each stage.
+### Work‑Stealing (`wave-controller.ts:runWithConcurrency`)  
+```ts
+let atomicIdx = new AtomicInteger(0);
+await Promise.all(workers.map(async () => {
+  while (true) {
+    const i = atomicIdx.getAndIncrement();
+    if (i >= tasks.length) break;
+    await tasks[i]();
+  }
+}));
+```
+* The `AtomicInteger` abstraction is provided by the runtime (Node.js worker threads or a custom shim).  
+* This loop guarantees that each worker always has work until the task list is exhausted, achieving near‑optimal CPU utilisation without explicit mutexes.
+
+### Hook Registry (`hook-registry.ts`)  
+* Exposes `registerHook(name: string, fn: HookFn)` and `triggerHook(name: string, payload)`.  
+* Internally stores hooks in a `Map<string, Set<HookFn>>`, allowing multiple listeners per event.  
+* The registry is imported by both the concurrency controller (to fire `onTaskStart`/`onTaskComplete`) and by agents (to fire `onClassificationDone`).
 
 ---
 
 ## Integration Points  
 
-* **Parent – Coding**: CodingPatterns contributes the “design‑pattern” knowledge graph that the parent component aggregates alongside other knowledge domains (LiveLoggingSystem, ConstraintSystem, etc.).  The parent may query the graph for cross‑domain insights (e.g., linking a constraint violation to a coding pattern).  
+1. **Graph Persistence** – All child modules (*OntologyIntegration*, *GraphDatabaseManagement*, *DataIngestion*) call into `GraphDatabaseAdapter`. The same adapter is also used by the sibling *KnowledgeManagement* component, creating a shared persistence layer across the *Coding* family.  
 
-* **Siblings – LiveLoggingSystem & KnowledgeManagement**: All siblings share the same `GraphDatabaseAdapter`.  This enables cross‑component queries such as “retrieve all log messages linked to a particular coding pattern” or “enumerate best‑practice entities that were updated during a recent knowledge‑sync”.  
+2. **Ontology Service** – `OntologyClassificationAgent` reaches out to the central Ontology system (via the OntologyClassificationAgent path) and stores results back through the adapter. This mirrors the usage in *LiveLoggingSystem*, which also depends on the same OntologyClassificationAgent for observation classification.  
 
-* **Children – BestPractices, ContentValidationAgent, Logger**: Each child registers its own entity type in the graph (e.g., `BestPractice`, `ValidationRule`, `LogHandler`).  Because they all use the same adapter, the parent component can treat them uniformly when performing bulk migrations or analytics.  
+3. **LLM Service** – Lazy LLM initialisation defers to the `LLMService` class found in the *LLMAbstraction* sibling. The component therefore respects the dependency‑injection contract defined there (e.g., mock service, budget tracker).  
 
-* **Pipeline & Ontology Sub‑components**: The `InsightGenerator` receives structured output from these sub‑components.  The contract is a plain JSON payload that the generator enriches with graph relationships before persisting.  This decouples the generation logic from the specifics of how the pipeline produces its data.  
+4. **Concurrency Engine** – `runWithConcurrency()` is invoked by any wave‑style agent that needs to process large batches (e.g., bulk pattern extraction). The work‑stealing approach is compatible with the thread‑pool implementation used by *Trajectory* for handling parallel HTTP/IPC/file‑watch streams.  
 
-* **Retry & Locking Infrastructure**: `service-starter.ts` relies on a lock service (provided by the **DockerizedServices** component) to avoid concurrent initialisation.  The backoff strategy is also reused by the **Trajectory** component’s HTTP connector, illustrating a shared resilience library.
+5. **Hook System** – External modules can register custom processing steps (e.g., a metrics collector or a post‑processing transformer) via `hook-registry.ts`. This extensibility point is also consumed by the *DockerizedServices* starter script, which registers health‑check hooks for each container.  
+
+6. **Parent‑Child Relationship** – As a child of the root *Coding* component, CodingPatterns inherits global configuration (e.g., repository root, team identifiers) that are passed through the constructors of agents. Its siblings share the same configuration source, ensuring consistent environment handling across the entire knowledge‑management suite.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always inject the GraphDatabaseAdapter** – Do not instantiate the adapter inside a module; rely on constructor injection (as shown in `ContentValidationAgent` and `InsightGenerator`).  This guarantees a single adapter instance per process and preserves graph consistency.  
+* **Persist via the Adapter** – Always read or write graph data through `GraphDatabaseAdapter`. Direct access to `leveldb-database.ts` bypasses the JSON export sync and may lead to inconsistency.  
 
-2. **Register log handlers dynamically** – Use `Logger.registerHandler(name, modulePath)` rather than hard‑coding imports.  This keeps the logger lightweight and enables hot‑swap of handlers in production.  
+* **Follow the Lazy‑LLM Contract** – When creating a new wave‑style agent, implement the three‑step pattern (`constructor(repoPath, team) → ensureLLMInitialized() → execute(input)`). Do not instantiate the LLM in the constructor; let `ensureLLMInitialized()` handle mode resolution via the injected `LLMService`.  
 
-3. **Follow the DAG contract for batch jobs** – When adding a new pipeline stage, update `batch-analysis.yaml` with the correct `dependsOn` list and ensure the stage accepts the shared adapter as its first argument.  The topological sort will automatically place the new task in the correct execution order.  
+* **Register Hooks Early** – If a module needs to react to classification or concurrency events, call `registerHook()` during module initialization (before any tasks are scheduled). Hooks are invoked synchronously, so keep callbacks short or off‑load heavy work to the work‑stealing pool.  
 
-4. **Respect the retry policy** – If a new service needs start‑up logic, wrap it with the same `retry`‑with‑backoff pattern used in `service-starter.ts`.  Align the retry count and backoff factor with the existing configuration to maintain uniform behaviour across the system.  
+* **Prefer Work‑Stealing for Bulk Work** – For any batch operation (e.g., ingesting a large set of code snippets), call `runWithConcurrency()` and supply an array of async task functions. Do not manually spawn additional worker threads; the atomic index counter already provides optimal load balancing.  
 
-5. **Prefer subclassing for new agents** – To create a new validation or analysis agent, extend the base class used by `ContentValidationAgent`.  Override only the domain‑specific methods; the base class already handles adapter wiring and error handling.  
+* **Error Handling** – Propagate errors from the adapter or LLM through the BaseAgent’s `shutdown()` method. The BaseAgent automatically logs the failure and triggers the `onAgentError` hook, giving downstream observers a chance to react.  
 
-6. **Avoid direct LevelDB manipulation** – All persistence must go through the GraphDatabaseAdapter.  Direct LevelDB access, as avoided in **KnowledgeManagement**, would bypass the graph layer and break cross‑entity queries.
+* **Testing** – Use the mock LLM service injected by *LLMAbstraction* to unit‑test agents without incurring real model load. The mock also respects the lazy‑initialisation contract, allowing tests to verify that `ensureLLMInitialized()` is called exactly once per agent lifecycle.  
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural patterns identified  
 
-* **Centralised Graph Persistence** – a shared GraphDatabaseAdapter used by multiple components.  
-* **Constructor‑Based Dependency Injection** – agents receive the adapter (and other services) via their constructors.  
-* **Retry‑With‑Exponential Backoff** – service start‑up resilience pattern in `service-starter.ts`.  
-* **DAG‑Based Execution with Topological Sort** – batch pipeline coordination defined in `batch-analysis.yaml`.  
-* **Dynamic Import / Plugin Architecture** – runtime registration of log handlers in `logger.ts`.  
+1. **Adapter pattern** – `GraphDatabaseAdapter` abstracts LevelDB and remote VKB API.  
+2. **Template/Strategy pattern** – `BaseAgent` defines a reusable agent lifecycle.  
+3. **Lazy Initialization** – LLMs are created on‑demand via `ensureLLMInitialized()`.  
+4. **Work‑Stealing concurrency** – Shared atomic index in `runWithConcurrency()`.  
+5. **Publish‑Subscribe (Observer)** – `hook-registry.ts` enables modular hook registration.
 
-### 2. Design decisions and trade‑offs  
+### Design decisions and trade‑offs  
 
-* **Single Adapter vs. Multiple Repositories** – Using one adapter simplifies data consistency but couples components tightly to the graph schema.  
-* **Constructor Injection vs. Service Locator** – Constructor injection provides explicit dependencies and easier testing, at the cost of more verbose constructors.  
-* **Retry + Locking vs. Simple Init** – Adds robustness for transient failures but introduces complexity around lock acquisition and potential dead‑locks if mis‑configured.  
-* **DAG Execution vs. Linear Scripts** – Enables parallelism and correct ordering for complex pipelines, but requires careful maintenance of the YAML graph to avoid cycles.  
-* **Dynamic Imports vs. Static Bundling** – Allows hot‑swappable handlers, but can increase start‑up latency and complicate static analysis.  
+| Decision | Benefit | Trade‑off |
+|----------|---------|-----------|
+| Use LevelDB via an adapter | High‑speed local storage, simple key‑value ops, automatic JSON sync | Embedded DB limits distributed deployment; requires careful backup strategy |
+| BaseAgent inheritance | Guarantees uniform agent API, reduces duplication | Tight coupling to BaseAgent may make radical redesign harder |
+| Lazy LLM init | Saves memory and start‑up time when many agents exist | First inference incurs warm‑up latency; must guard against race conditions |
+| Work‑stealing with atomic counter | Near‑optimal CPU utilisation, no explicit locks | Relies on atomic primitives that may not be available on all runtimes; debugging parallel progress can be harder |
+| Hook registry | Extensible, decouples core logic from optional features | Indirect call paths can obscure flow; excessive hooks may affect performance |
 
-### 3. System structure insights  
+### System structure insights  
 
-* The **CodingPatterns** component sits as a leaf under the **Coding** parent, yet its graph layer is a shared backbone for many siblings.  
-* Children (BestPractices, ContentValidationAgent, Logger) each contribute distinct node types, forming a rich sub‑graph that other components can traverse.  
-* Service start‑up, pipeline execution, and logging all converge on the same adapter, creating a tightly knit but well‑encapsulated subsystem.  
+* **Vertical layering** – Persistence (LevelDB) → Adapter → Domain services (agents) → Concurrency controller → Hook system.  
+* **Shared foundations** – The same GraphDatabaseAdapter and concurrency primitives are reused by siblings (*KnowledgeManagement*, *ConstraintSystem*, *Trajectory*), indicating a deliberate effort to avoid duplication across the *Coding* family.  
+* **Child‑module responsibilities** – *OntologyIntegration*, *GraphDatabaseManagement*, and *DataIngestion* each focus on a specific aspect of knowledge handling but all delegate storage to the central adapter, reinforcing a clear separation of concerns.
 
-### 4. Scalability considerations  
+### Scalability considerations  
 
-* **Graphology + LevelDB** scales horizontally for read‑heavy workloads; write throughput is limited by LevelDB’s single‑writer model, mitigated by batching in the retry‑backoff logic.  
-* The DAG executor can parallelise independent tasks once the topological sort is complete, allowing the pipeline to scale with additional CPU cores.  
-* Dynamic handler registration means logging can be sharded across multiple handler instances without restarting the service, supporting high‑volume log ingestion.  
+* **Storage** – LevelDB scales well on a single machine and can handle millions of nodes/edges; however, horizontal scaling would require sharding or moving to a distributed graph store.  
+* **Concurrency** – Work‑stealing allows the component to saturate multi‑core CPUs; adding more workers linearly improves throughput until I/O (LevelDB reads/writes) becomes the bottleneck.  
+* **LLM usage** – Lazy init prevents unnecessary model loads, but the system’s overall scalability will depend on the LLM provider’s rate limits and latency; injecting a pooled LLM service could improve throughput for high‑frequency agents.  
+* **Hook system** – Because hooks run in the same event loop, a misbehaving hook can stall the pipeline; developers should keep hooks lightweight or dispatch heavy work to the work‑stealing pool.
 
-### 5. Maintainability assessment  
+### Maintainability assessment  
 
-* **High cohesion** – each file has a single responsibility (adapter, agent, logger, starter, generator).  
-* **Low coupling** – dependencies are injected, and the shared adapter isolates persistence concerns.  
-* **Clear conventions** – the retry‑backoff pattern, DAG YAML format, and dynamic import style are documented in sibling components, providing a reusable mental model.  
-* **Potential debt** – the central adapter is a single point of change; schema migrations must be coordinated across all consumers.  Adding new entity types requires updating the graph schema and possibly the query utilities used by siblings.  
+The component exhibits **high maintainability** due to:
 
-Overall, the **CodingPatterns** component demonstrates a disciplined, graph‑centric architecture that balances robustness (retry/backoff), extensibility (dynamic imports, constructor injection), and orchestrated execution (DAG pipeline).  Its design aligns closely with sibling components, fostering a coherent ecosystem while still allowing each child (BestPractices, ContentValidationAgent, Logger) to evolve independently.
+* **Clear abstraction boundaries** (adapter, base agent, hook registry) that isolate changes.  
+* **Re‑use of proven patterns** (lazy init, work‑stealing) that are well‑understood and documented in the codebase.  
+* **Modular hook registration** that lets new functionality be added without touching core logic.  
+* **Consistent naming and file organization** – all related files live under `storage/` and `integrations/.../agents/`, making discovery straightforward.  
+
+Potential maintenance risks include the reliance on a single‑process LevelDB instance (harder to upgrade to a distributed store) and the complexity of debugging concurrent work‑stealing tasks. Proper test coverage (using the mock LLM service) and observability hooks mitigate these concerns.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persisting log data in a graph database, whi; LLMAbstraction: The LLMAbstraction component's use of dependency injection, as seen in the LLMService class (lib/llm/llm-service.ts), allows for a high degree of flex; DockerizedServices: The DockerizedServices component employs a modular design, with each sub-component having its own specific responsibilities, to facilitate scalability; Trajectory: The Trajectory component's use of modular design is exemplified in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js), where separate ; KnowledgeManagement: The KnowledgeManagement component employs a lock-free architecture to prevent LevelDB lock conflicts, as seen in the use of shared atomic index counte; CodingPatterns: The CodingPatterns component's utilization of the GraphDatabaseAdapter for storing and managing coding conventions, design patterns, and other related; ConstraintSystem: The ConstraintSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing constraint metadata. Thi; SemanticAnalysis: The SemanticAnalysis component employs a modular architecture, with each agent having its own specific responsibilities and interfaces. For instance, .
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component uses dependency injection to set functions that resolve the current LLM mode, mock service, repository path, budget track; DockerizedServices: The DockerizedServices component utilizes a microservices architecture, with each service having its own container and communication happening through; Trajectory: The Trajectory component's architecture is designed to handle multiple integration methods, including HTTP, IPC, and file watch, as seen in the Specst; KnowledgeManagement: The KnowledgeManagement component utilizes a GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle graph database persistence, which is a; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving knowledge entities. This; ConstraintSystem: The ConstraintSystem component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, for storing and retrieving graph data.; SemanticAnalysis: The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgen.
 
 ### Children
-- [BestPractices](./BestPractices.md) -- BestPractices utilizes the GraphDatabaseAdapter for storing and managing best practice entities, as seen in the storage/graph-database-adapter.ts file.
-- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent utilizes the GraphDatabaseAdapter for validation purposes, as seen in the validation/content-validation-agent.ts file.
-- [Logger](./Logger.md) -- Logger utilizes the GraphDatabaseAdapter for log persistence and retrieval, as seen in the logging/logger.ts file.
+- [OntologyIntegration](./OntologyIntegration.md) -- OntologyIntegration uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve knowledge entities, providing a standardized interface for interacting with the graph database.
+- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to provide a standardized interface for interacting with the graph database.
+- [DataIngestion](./DataIngestion.md) -- DataIngestion uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve knowledge entities, providing a standardized interface for interacting with the graph database.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persisting log data in a graph database, which enables efficient querying and retrieval of log information. This design decision allows for the automatic export of log data in JSON format, facilitating seamless integration with other components. The use of a graph database adapter also enables the LiveLoggingSystem to leverage the benefits of graph databases, such as flexible schema design and high-performance querying. Furthermore, the GraphDatabaseAdapter is designed to handle large volumes of log data, making it an ideal choice for the LiveLoggingSystem component.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's use of dependency injection, as seen in the LLMService class (lib/llm/llm-service.ts), allows for a high degree of flexibility and testability. This is particularly evident in the way that different providers, such as the DMRProvider (lib/llm/providers/dmr-provider.ts) and AnthropicProvider (lib/llm/providers/anthropic-provider.ts), can be easily registered and swapped out as needed. For example, the provider registry (lib/llm/provider-registry.js) enables dynamic addition and removal of providers, making it simple to add support for new LLM services or remove support for outdated ones. Furthermore, the use of dependency injection makes it easy to test the component in isolation, using mock implementations of the providers to simulate different scenarios.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a modular design, with each sub-component having its own specific responsibilities, to facilitate scalability and maintainability. For instance, the LLMService (lib/llm/llm-service.ts) handles mode routing, caching, and circuit breaking, while the ServiceStarter (lib/service-starter.js) is responsible for robust service startup with retry logic and exponential backoff. This separation of concerns enables developers to modify or replace individual components without affecting the entire system. Furthermore, the use of dependency injection in LLMService (lib/llm/llm-service.ts) provides a flexible and modular design, allowing for easy integration of new language models or services.
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of modular design is exemplified in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js), where separate methods are implemented for connecting via HTTP, IPC, and file watch. For instance, the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) is designed to handle the specifics of HTTP connections, including a retry mechanism with backoff for robust service initialization. This modular approach allows for easier maintenance and updates, as each connection method can be modified or extended independently without affecting the others. Furthermore, the dynamic import mechanism utilized in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js:10) enables flexible module loading, which can be beneficial for adapting to different integration scenarios.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component employs a lock-free architecture to prevent LevelDB lock conflicts, as seen in the use of shared atomic index counters in the work-stealing concurrency mechanism. This design decision is crucial in ensuring efficient and scalable processing of large datasets, and is implemented in the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts). The GraphDatabaseAdapter (storage/graph-database-adapter.ts) also plays a key role in this architecture, providing Graphology+LevelDB persistence with automatic JSON export sync. Furthermore, the dynamic import mechanism used in the GraphDatabaseAdapter, such as the import of VkbApiClient, helps to avoid TypeScript compilation issues and ensures a modular design pattern.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing constraint metadata. This allows for efficient persistence and retrieval of constraint data, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that the data remains consistent and up-to-date. Furthermore, the GraphDatabaseAdapter provides a flexible and scalable solution for handling large amounts of constraint metadata, making it an ideal choice for the ConstraintSystem.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent having its own specific responsibilities and interfaces. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the BaseAgent class, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, as its abstract base class, providing common functionality and a standard response envelope. The use of this base class allows for a consistent interface across all agents, making it easier to develop and maintain new agents. Furthermore, the OntologyClassificationAgent follows a pattern of constructor initialization and execute method invocation, as seen in the SemanticAnalysisAgent and other agents, which helps to simplify the process of creating and executing new agents.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent plays a crucial role in the system's architecture, enabling the classification of observations based on predefined ontologies. The classification process involves the agent analyzing the observations and mapping them to specific concepts within the ontology system. This mapping is essential for providing a structured representation of the observations, facilitating their storage, retrieval, and analysis. The OntologyClassificationAgent's functionality is critical to the overall operation of the LiveLoggingSystem, as it enables the system to organize and make sense of the vast amounts of data generated during live sessions.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component uses dependency injection to set functions that resolve the current LLM mode, mock service, repository path, budget tracker, sensitivity classifier, and quota tracker in the LLMService class (lib/llm/llm-service.ts). This design decision allows for flexibility and testability, as different implementations can be easily swapped in. The resolveMode method in LLMService, which determines the LLM mode based on the agent ID and other factors, is a good example of this. The method takes into account various parameters, such as the agent ID, to decide which LLM mode to use, and returns the corresponding mode. This approach enables the component to adapt to different scenarios and requirements.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service having its own container and communication happening through APIs or message queues, as seen in the lib/service-starter.js file which employs the startServiceWithRetry function to start services with retry logic and exponential backoff. This design decision allows for easy addition or removal of services as needed, making the system highly scalable and flexible. The use of APIs or message queues for communication between services is a common pattern in microservices architecture, enabling loose coupling and fault tolerance. The startServiceWithRetry function in lib/service-starter.js ensures robust startup and prevents endless loops, making the system more reliable.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed to handle multiple integration methods, including HTTP, IPC, and file watch, as seen in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js). This adapter class provides methods such as connectViaHTTP (lib/integrations/specstory-adapter.js:134), connectViaIPC (lib/integrations/specstory-adapter.js:193), and connectViaFileWatch (lib/integrations/specstory-adapter.js:241) to establish connections with the Specstory extension. The use of these multiple integration methods allows the Trajectory component to adapt to different environments and connection scenarios.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle graph database persistence, which is a crucial aspect of the system's architecture. This adapter enables the use of Graphology and LevelDB for data storage, with automatic JSON export synchronization. The intelligent routing mechanism within the GraphDatabaseAdapter allows the system to switch between the VKB API and direct database access seamlessly, which is essential for maintaining a high level of performance and scalability. For instance, the 'getGraph' function in the GraphDatabaseAdapter class demonstrates how the system can retrieve the graph database, either from the VKB API or the local LevelDB storage, depending on the configuration. Furthermore, the 'saveGraph' function showcases the adapter's ability to persist the graph database to the local storage and synchronize it with the VKB API.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, for storing and retrieving graph data. This adapter provides a standardized interface for interacting with the graph database, allowing the ConstraintSystem to focus on its core logic without worrying about the underlying database implementation. By using this adapter, the system can easily switch between different graph databases if needed, making it more modular and flexible. For example, the GraphDatabaseAdapter's query method can be used to retrieve specific nodes or edges from the graph, as seen in the ContentValidationAgent's constructor, where it is used to fetch entity content for validation.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. This agent utilizes a confidence calculation mechanism, as defined in the BaseAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, to determine the accuracy of its classifications. Furthermore, the OntologyClassificationAgent follows a standard response envelope creation pattern, ensuring consistency in its output.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

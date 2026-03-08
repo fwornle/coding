@@ -2,146 +2,142 @@
 
 **Type:** SubComponent
 
-The validation logic in ContentValidator is modularized into separate modules for each entity type, allowing for easy extension and customization.
+The ContentValidationAgent, found in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file, uses a combination of rules and machine learning algorithms to validate entity content.
 
 ## What It Is  
 
-**ContentValidator** is a sub‑component that lives inside the **ConstraintSystem** hierarchy. Its implementation is spread across a handful of focused files, the most notable being `storage/graph-database-adapter.ts` (the adapter used for persisting validation metadata) and `cache-validation.ts` (the module that houses the validation‑caching logic). The public entry point for the validator is the `validateEntityContent` function, which prepares entity‑level metadata before the actual validation runs. In addition to the core validation routine, ContentValidator contains a **staleObservationDetector** that applies a heuristic to flag out‑of‑date observations, and it collaborates with the **HookManager** so that registered hooks fire automatically whenever entity content is updated. The validation logic itself is split into separate modules per entity type, making the system extensible without touching the core validator. Finally, ContentValidator owns a child component – **ValidationCacheManager** – that encapsulates the cache‑related responsibilities.
+**ContentValidator** is an agent‑level sub‑component of the **SemanticAnalysis** module that lives in the source tree at  
+
+```
+integrations/mcp-server-semantic-analysis/src/agents/content-validator.ts
+```  
+
+Its sole responsibility is to receive raw **entity content** from the **pipeline coordinator** and hand that payload to a dedicated **ContentValidationAgent** (found at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`). The validator then produces a **standard response envelope** – a uniform wrapper that the rest of the system expects from every agent – containing the validation outcome, any error details, and meta‑information such as timestamps or correlation IDs.  
+
+The validator is not a monolith; it composes two internal parts: the **EntityContentFetcher** child component that abstracts the retrieval of entity data from the graph database, and the **ContentValidationAgent** which encapsulates the actual rule‑based and machine‑learning‑driven validation logic. It sits under the **ConstraintSystem** (which owns the validator) and works alongside sibling agents such as **OntologyClassificationAgent**, **InsightGenerationAgent**, and **KnowledgeGraphConstructor**, all orchestrated by the **Pipeline**’s coordinator agent.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of ContentValidator is **modular and layered**. At the lowest layer, the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) provides a generic persistence façade that both the parent **ConstraintSystem** and ContentValidator reuse for storing validation‑specific metadata. This reuse signals a **shared‑adapter pattern**: a single adapter implementation is injected wherever graph‑based storage is required, avoiding duplicate persistence code across siblings such as **ViolationDetector** and **GraphDatabaseManager**.
+The overall design follows a **modular agent‑based architecture** that is explicitly described for the parent **SemanticAnalysis** component. Each agent, including **ContentValidator**, implements a single, well‑defined task and is wired together by a **coordinator agent** (see `integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts`). This yields a clear separation of concerns: the validator focuses on content quality, while other agents handle classification, insight generation, or graph construction.  
 
-Above the storage layer sits a **caching subsystem** (`cache-validation.ts`). The presence of a dedicated cache file and the child component **ValidationCacheManager** indicate a **cache‑aside** strategy: validation results (or intermediate metadata) are written to the cache after a successful run and consulted before re‑validating the same entity. This design reduces redundant work, especially when `validateEntityContent` pre‑populates entity metadata to short‑circuit repeated checks.
+Two design patterns emerge from the observations:
 
-The **validation logic** is organized by entity type, each living in its own module. This reflects a **strategy pattern** where the validator selects the appropriate “validation strategy” based on the entity’s type at runtime. Because the strategies are isolated, adding a new entity type simply means dropping a new module into the validation package—no changes to the core validator are required.
+1. **Strategy / Composite for Validation** – `ContentValidationAgent` “supports multiple validation rules” and mixes rule‑based checks with machine‑learning algorithms. The agent likely holds a collection of rule objects (Strategy) that can be executed in sequence or combined (Composite) to produce a final verdict. This makes the validation pipeline extensible without modifying the validator itself.  
 
-Interaction with **HookManager** shows a **publisher‑subscriber** style integration: ContentValidator publishes validation events (e.g., “entity‑content‑updated”) and HookManager’s registry (`hook-registry.ts`) notifies any subscribed hooks. This decouples validation from side‑effects such as logging, auditing, or external notifications.
+2. **Response Envelope (DTO) Pattern** – The “standard response envelope creation pattern” ensures that every agent returns a consistent data‑transfer object. This pattern reduces coupling between agents and downstream consumers because the envelope abstracts away internal implementation details.  
 
-Finally, the **staleObservationDetector** implements a **heuristic‑based detection** mechanism. While the exact heuristic is not detailed, the function’s placement inside ContentValidator suggests that stale‑data detection is considered part of the validation pipeline rather than a separate service, reinforcing the component’s responsibility for data‑quality enforcement.
+Interaction flow: the **Pipeline coordinator** pushes an entity payload to **ContentValidator**; the validator invokes **EntityContentFetcher** to pull the latest content from the **GraphDatabaseAdapter** (exposed via the fetcher’s constructor). The fetched content is then handed to **ContentValidationAgent**, which runs its rule set and ML models, finally wrapping the result in the envelope and sending it back to the coordinator. This chain demonstrates **dependency injection** (the fetcher and validation agent are supplied to the validator) and **loose coupling** between data access, business logic, and orchestration.
 
 ---
 
 ## Implementation Details  
 
-1. **Persistence via GraphDatabaseAdapter** – Both ContentValidator and its parent ConstraintSystem import the adapter from `storage/graph-database-adapter.ts`. The adapter abstracts Graphology‑LevelDB interactions, exposing methods such as `saveMetadata`, `loadMetadata`, and query helpers. ContentValidator uses these methods to persist *validation metadata* (e.g., timestamps of last successful validation, rule‑application results). Because the same adapter is used by siblings like **ViolationDetector**, the underlying graph schema is shared, allowing cross‑component queries if needed.
+* **ContentValidator (content-validator.ts)** – Acts as a façade. Its public method (e.g., `validate(entityId: string)`) receives an identifier from the coordinator, constructs an **EntityContentFetcher**, and calls `fetch()` to obtain the raw content. It then delegates to an instance of **ContentValidationAgent**, captures the validation result, and builds the response envelope (likely using a helper like `createResponseEnvelope`).  
 
-2. **validateEntityContent** – This is the primary public function of ContentValidator. Before invoking any type‑specific validation module, it **pre‑populates** fields on the entity’s metadata object (e.g., `lastValidatedAt`, `validationVersion`). This pre‑population enables the caching layer to quickly determine whether the entity’s content has changed since the last validation run, thereby avoiding unnecessary recomputation.
+* **ContentValidationAgent (content-validation-agent.ts)** – Contains the core validation engine. Internally it maintains:
+  * A **rule registry** – a set of deterministic checks (e.g., schema conformity, required fields) that can be toggled on or off.
+  * One or more **ML models** – lightweight classifiers or anomaly detectors that assess content quality beyond static rules.
+  * A **validation orchestrator** – a method that iterates over the rule registry, executes each rule, aggregates any violations, then runs the ML models and merges their scores into a final `ValidationResult`.  
 
-3. **Cache‑Validation Layer** – Implemented in `cache-validation.ts`, the caching mechanism stores validation outcomes keyed by entity identifiers. The **ValidationCacheManager** child component encapsulates cache reads/writes, exposing methods like `getCachedResult(entityId)` and `storeResult(entityId, result)`. The cache is consulted early in `validateEntityContent`; if a fresh cached result exists, the validator returns it immediately.
+* **EntityContentFetcher** – Although not listed as a separate file, the observation notes that it “uses the GraphDatabaseAdapter’s query method” inside the **ContentValidationAgent** constructor. This implies that the fetcher encapsulates a single responsibility: translating an entity identifier into a graph query, executing it via `GraphDatabaseAdapter.query()`, and returning a domain‑specific `EntityContent` object.  
 
-4. **Stale Observation Detection** – The `staleObservationDetector` function runs a heuristic (e.g., comparing observation timestamps against a configurable freshness window). When it flags an observation as stale, the validator can either reject the content outright or trigger a re‑validation path. This heuristic is embedded directly in the validation flow, ensuring that stale data never slips through unnoticed.
+* **Standard Response Envelope** – The envelope likely includes fields such as `status`, `payload`, `errors`, `timestamp`, and `correlationId`. By reusing the same envelope across agents (as the OntologyClassificationAgent does), downstream pipelines can uniformly handle success and failure cases without needing agent‑specific parsing logic.  
 
-5. **Hook Integration** – ContentValidator calls into the **HookManager** (via its public API) after a successful validation. HookManager’s modular registry (`hook-registry.ts`) allows other parts of the system to register callbacks for events like `onValidationSuccess` or `onValidationFailure`. Because HookManager is a sibling component, the integration remains loose‑coupled: ContentValidator does not need to know the specifics of each hook, only that the manager will invoke them.
-
-6. **Entity‑Type Specific Modules** – Each entity type (e.g., `User`, `Device`, `Policy`) has its own validation module, typically exposing a single `validate(entity)` function. ContentValidator dynamically loads the appropriate module based on the entity’s `type` property, applying the **strategy pattern**. This modularization enables straightforward extension: developers add a new file under the validation package, implement the `validate` contract, and register the type in a simple lookup map.
+* **Pipeline Coordination** – The validator does not poll for work; instead, the **CoordinatorAgent** pushes work items. This push‑based model reduces idle CPU cycles and aligns with the overall “coordinator‑driven execution” described for sibling agents.
 
 ---
 
 ## Integration Points  
 
-ContentValidator sits at the intersection of several system concerns:
+* **Pipeline Coordinator** – The entry point for validation requests. The validator registers a handler with the coordinator, which invokes the validator whenever an entity reaches the “content‑validation” stage of the processing pipeline.  
 
-* **Parent – ConstraintSystem** – The parent component also relies on the same `GraphDatabaseAdapter`. This shared dependency means that any schema evolution in the graph database must be coordinated across both ConstraintSystem and ContentValidator to avoid breaking queries. ConstraintSystem may invoke ContentValidator indirectly when constraints are evaluated against entity content.
+* **GraphDatabaseAdapter** – Accessed indirectly through **EntityContentFetcher**. The fetcher’s constructor receives a reference to the adapter, allowing the validator to remain agnostic of the underlying graph implementation (Neo4j, JanusGraph, etc.).  
 
-* **Siblings** –  
-  * **HookManager** provides the event‑driven hook execution path; ContentValidator publishes validation events that HookManager distributes.  
-  * **ViolationDetector** also uses the GraphDatabaseAdapter for violation metadata; there is a natural data‑flow where ContentValidator’s validation results could feed into ViolationDetector’s violation‑recording logic.  
-  * **GraphDatabaseManager**, **ConstraintMetadataManager**, and **AgentManager** each maintain their own repositories via the same LevelDB‑backed graph store, implying that ContentValidator’s cache keys must be namespaced to avoid collisions with other components’ caches.
+* **ConstraintSystem** – Hosts the validator as part of a broader set of constraints applied to entities. Other constraint agents may consume the validation envelope to decide whether an entity can proceed to subsequent stages (e.g., ontology classification).  
 
-* **Child – ValidationCacheManager** – This component abstracts cache operations for ContentValidator. Other components do not directly interact with the cache; they rely on ContentValidator’s public API to retrieve validation status. This encapsulation protects the cache implementation from external churn.
+* **Sibling Agents** – While they do not directly call the validator, they share the same response envelope contract and coordinator‑driven lifecycle. For example, **InsightGenerationAgent** may use the validation status to filter out low‑quality content before generating insights.  
 
-* **External Interfaces** – While not explicitly listed, the presence of a caching layer and hook system suggests that ContentValidator exposes at least two public interfaces: a synchronous `validateEntityContent(entity)` call and an asynchronous event stream (`validationCompleted`, `validationFailed`) consumed by HookManager subscribers.
+* **ML Model Registry** – The ML components inside **ContentValidationAgent** likely reference a model repository or configuration service. Although not explicitly mentioned, the presence of “machine learning algorithms” suggests a dependency on model files or a model‑serving endpoint.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Never bypass `validateEntityContent`** – All entity content should be validated through this entry point because it handles metadata pre‑population, cache checks, and hook triggering. Directly invoking type‑specific validators will skip these essential steps and can lead to inconsistent cache state.
+1. **Invoke via the Coordinator** – Developers should never call `ContentValidator` directly. Instead, submit a validation job to the **Pipeline coordinator** with the appropriate entity identifier and correlation metadata.  
 
-2. **Register Hooks Early** – When extending the system, add your validation‑related hooks to the **HookManager** during application bootstrap. Because HookManager uses a modular registration system (`hook-registry.ts`), hooks will automatically fire for every validation event without further changes to ContentValidator.
+2. **Extend Validation Rules Carefully** – To add a new deterministic rule, implement the rule interface expected by `ContentValidationAgent` and register it in the agent’s rule registry (typically a configuration array). Because the agent already supports multiple rules, the new rule will be automatically executed in the next validation cycle.  
 
-3. **Respect Cache Semantics** – The **ValidationCacheManager** caches results based on entity identifiers and metadata version. If you modify an entity’s validation‑relevant fields outside of the normal update flow, manually invalidate the cache (e.g., `ValidationCacheManager.invalidate(entityId)`) to avoid stale results.
+3. **Maintain ML Model Compatibility** – When updating or retraining the ML models used by the validator, ensure that the input schema of `EntityContent` remains unchanged. The validator’s envelope format will not be affected, but a mismatch in feature expectations can cause runtime errors.  
 
-4. **Add New Entity Types via Strategy Modules** – To support a new entity type, create a new validation module that exports a `validate(entity)` function and add the type to the validator’s lookup map. Do not edit the core `validateEntityContent` logic; the modular design ensures future extensions remain isolated.
+4. **Respect the Response Envelope** – Consumers of the validation result must parse the envelope rather than the raw `ValidationResult`. This guarantees forward compatibility if additional metadata (e.g., audit fields) is added later.  
 
-5. **Configure Stale Detection Parameters** – The heuristic inside `staleObservationDetector` may expose configurable thresholds (e.g., maximum age). Adjust these settings in the component’s configuration file rather than hard‑coding values, so that the detection logic can be tuned without recompiling the validator.
-
----
-
-## Architectural Patterns Identified  
-
-| Pattern | Evidence from Observations |
-|---------|----------------------------|
-| **Shared Adapter** (GraphDatabaseAdapter) | Both ContentValidator and ConstraintSystem use `storage/graph-database-adapter.ts` for persistence. |
-| **Cache‑Aside** | `cache-validation.ts` and the child **ValidationCacheManager** store and retrieve validation results outside the primary validation flow. |
-| **Strategy** (entity‑type validation) | Validation logic is modularized per entity type, allowing easy extension. |
-| **Publisher‑Subscriber** (Hook integration) | ContentValidator triggers validation hooks via **HookManager**, which manages subscriptions in `hook-registry.ts`. |
-| **Heuristic Detection** | `staleObservationDetector` applies a heuristic to identify stale observations. |
+5. **Monitor Through the Coordinator** – Since the validator is orchestrated, health checks and metrics (validation latency, rule‑failure rates) should be collected at the coordinator level. This centralizes observability and aligns with the pattern used by sibling agents.  
 
 ---
 
-## Design Decisions and Trade‑offs  
+### 1. Architectural patterns identified  
 
-* **Centralized Graph Adapter vs. Multiple Stores** – Using a single `GraphDatabaseAdapter` simplifies data consistency and reduces code duplication, but it couples all sibling components to the same underlying graph schema. Any schema change must be coordinated across the entire subsystem, potentially slowing independent evolution.
+* **Modular Agent‑Based Architecture** – each functional piece is an independent agent.  
+* **Strategy / Composite Pattern** – multiple validation rules and ML algorithms are interchangeable and composable inside `ContentValidationAgent`.  
+* **Response Envelope (DTO) Pattern** – uniform envelope for all agent outputs.  
+* **Dependency Injection** – `EntityContentFetcher` and `GraphDatabaseAdapter` are injected into the validation agent.  
+* **Coordinator‑Driven Orchestration** – the pipeline’s coordinator agent pushes work to agents rather than polling.
 
-* **Cache‑Aside Placement** – Placing the cache in a separate file (`cache-validation.ts`) and encapsulating it in **ValidationCacheManager** isolates caching concerns, improving maintainability. However, cache coherence relies on correct metadata pre‑population; a bug in `validateEntityContent` could cause stale cache hits.
+### 2. Design decisions and trade‑offs  
 
-* **Modular Validation Strategies** – Splitting validation per entity type yields high extensibility and clear separation of concerns. The trade‑off is a slight runtime overhead for dynamic module resolution, though this is mitigated by the cache.
+| Decision | Benefit | Trade‑off |
+|----------|---------|-----------|
+| Separate **EntityContentFetcher** from validation logic | Isolates data‑access concerns; easier to mock in tests | Adds an extra indirection layer; slight latency for the extra call |
+| Combine **rule‑based** and **ML‑based** validation | Deterministic checks guarantee baseline quality; ML adds flexibility for nuanced issues | Increases complexity; requires model lifecycle management and monitoring |
+| Use a **standard response envelope** across agents | Consistent consumer experience; simplifies downstream processing | Envelope may become bloated if all agents try to embed unrelated metadata |
+| **Coordinator‑driven** execution model | Centralized scheduling, avoids agents running idle loops | Coordinator becomes a single point of failure; must be highly available |
 
-* **Heuristic Stale Detection** – A heuristic approach is lightweight and fast, suitable for real‑time validation pipelines. The downside is that false positives/negatives can occur if the heuristic parameters are not well‑tuned.
+### 3. System structure insights  
 
-* **Hook‑Based Extensibility** – Leveraging HookManager decouples side‑effects from core validation, allowing plugins without altering validator code. The trade‑off is that the order of hook execution and potential side‑effect errors must be managed by the HookManager.
+* **SemanticAnalysis** is the parent module that groups all analysis‑related agents.  
+* **ContentValidator** sits alongside other agents (OntologyClassificationAgent, InsightGenerationAgent, etc.) and shares the same orchestration mechanism.  
+* **ConstraintSystem** owns the validator, indicating that content validation is one of several constraints applied before an entity proceeds further.  
+* The child **EntityContentFetcher** bridges the validator to the **GraphDatabaseAdapter**, reinforcing a clear data‑access boundary.  
 
----
+### 4. Scalability considerations  
 
-## System Structure Insights  
+* **Horizontal scaling** – Because each validation request is stateless (apart from model loading), multiple instances of `ContentValidator` can run behind the coordinator, enabling load‑balanced parallel validation.  
+* **Rule extensibility** – Adding new rules does not require redeploying the whole service; rules can be loaded from configuration, allowing runtime scaling of validation complexity.  
+* **ML model serving** – If models become heavyweight, they can be off‑loaded to a dedicated model‑serving microservice, reducing per‑instance memory pressure.  
+* **Back‑pressure handling** – The coordinator can throttle submissions to the validator if validation latency spikes, protecting downstream components.
 
-The overall system forms a **tree‑like hierarchy**: `ConstraintSystem` (parent) → `ContentValidator` (sub‑component) → `ValidationCacheManager` (child). Sibling components share the same storage adapter and LevelDB‑backed graph database, indicating a **common data‑layer foundation**. The modular design (entity‑type strategies, hook registry) suggests the system was built with future growth in mind, allowing new validation rules, observation types, or external integrations to be added with minimal friction.
+### 5. Maintainability assessment  
 
----
+The validator’s design is **highly maintainable**:
 
-## Scalability Considerations  
+* **Clear separation** of fetching, rule execution, and envelope creation makes each piece independently testable.  
+* **Standardized envelope** reduces the need to update multiple consumers when the output format changes.  
+* **Modular rule set** means new business requirements can be accommodated by adding or disabling rules without touching core logic.  
+* **Dependency injection** of the graph adapter and fetcher eases mocking and future replacement of the underlying database.  
 
-* **Horizontal Scaling of Validation** – Because validation results are cached, scaling out the validator (e.g., running multiple instances) requires a **distributed cache** or a cache‑coherency mechanism. The current file‑based `cache-validation.ts` is likely in‑process; moving to a shared cache (Redis, etc.) would be necessary for true horizontal scaling.
-
-* **Graph Database Load** – All validation metadata passes through the same `GraphDatabaseAdapter`. As the volume of validation records grows, LevelDB’s performance characteristics (log‑structured merge tree) will handle write‑heavy workloads, but read latency may increase. Partitioning the graph by namespace (e.g., per entity type) could mitigate contention.
-
-* **Heuristic Detection Cost** – The stale observation heuristic runs per validation pass; its complexity should remain O(1) or O(log N) to avoid bottlenecks. If the heuristic becomes more sophisticated (e.g., statistical analysis), it may need to be off‑loaded to a background worker.
-
----
-
-## Maintainability Assessment  
-
-The component scores **high** on maintainability:
-
-* **Clear Separation of Concerns** – Persistence, caching, validation logic, stale detection, and hook integration are each isolated in dedicated files or modules.
-* **Extensible Strategy Modules** – Adding new entity types does not touch existing code, reducing regression risk.
-* **Explicit Interfaces** – The use of `validateEntityContent`, the cache manager API, and HookManager’s registration contract provide well‑defined entry points.
-* **Shared Adapter Consistency** – Reusing `GraphDatabaseAdapter` across siblings reduces duplicated code but introduces a single point of failure; thorough unit tests for the adapter are essential.
-* **Documentation Footprint** – The observations already enumerate the key files and interactions, making onboarding easier.
-
-Potential maintenance pain points include the need to keep cache invalidation logic in sync with any direct metadata mutations and ensuring that heuristic parameters for stale detection remain appropriate as data patterns evolve. Regular review of the shared graph schema and cache strategy will help keep the system robust as it scales.
+Potential maintenance challenges include keeping the ML models in sync with evolving data schemas and ensuring the coordinator’s health monitoring remains robust as the number of agents grows. Regular integration tests that exercise the full coordinator‑validator‑fetcher pipeline will mitigate regression risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing constraint metadata. This allows for efficient persistence and retrieval of constraint data, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that the data remains consistent and up-to-date. Furthermore, the GraphDatabaseAdapter provides a flexible and scalable solution for handling large amounts of constraint metadata, making it an ideal choice for the ConstraintSystem.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. This agent utilizes a confidence calculation mechanism, as defined in the BaseAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, to determine the accuracy of its classifications. Furthermore, the OntologyClassificationAgent follows a standard response envelope creation pattern, ensuring consistency in its output.
 
 ### Children
-- [ValidationCacheManager](./ValidationCacheManager.md) -- The GraphDatabaseAdapter in storage/graph-database-adapter.ts is utilized by ContentValidator for storing and retrieving validation metadata, indicating a caching mechanism.
+- [EntityContentFetcher](./EntityContentFetcher.md) -- The ContentValidator sub-component uses the GraphDatabaseAdapter's query method to fetch entity content, as seen in the ContentValidationAgent's constructor, implying a strong connection between EntityContentFetcher and the GraphDatabaseAdapter.
 
 ### Siblings
-- [HookManager](./HookManager.md) -- HookManager uses a modular hook registration system in hook-registry.ts to manage hook subscriptions.
-- [ViolationDetector](./ViolationDetector.md) -- ViolationDetector uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve violation metadata.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LevelDB database in leveldb-database.ts to store graph data.
-- [ConstraintMetadataManager](./ConstraintMetadataManager.md) -- ConstraintMetadataManager uses a metadata repository in metadata-repository.ts to store constraint configuration and registration data.
-- [AgentManager](./AgentManager.md) -- AgentManager uses an agent repository in agent-repository.ts to store agent configuration and registration data.
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a coordinator agent, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts file, to manage the execution of other agents.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, uses a confidence calculation mechanism to determine the accuracy of its classifications.
+- [Insights](./Insights.md) -- The InsightGenerationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
+- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor, located in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file, uses the GraphDatabaseAdapter to interact with the graph database.
+- [ObservationClassifier](./ObservationClassifier.md) -- The ObservationClassifier, located in the integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts file, uses the OntologyClassificationAgent to classify observations.
+- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer, located in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file, uses the SemanticAnalysisAgent to analyze code files.
+- [GraphDatabase](./GraphDatabase.md) -- The GraphDatabase, located in the integrations/mcp-server-semantic-analysis/src/adapters/graph-database-adapter.ts file, uses a graph-based data structure to store and manage the knowledge graph.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*
