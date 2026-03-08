@@ -94,45 +94,82 @@ export function TraceModal({
 
   // Convert steps to trace events with timing
   const { events, totalDuration, stats } = useMemo(() => {
-    let offset = 0
     const traceEvents: TraceEventUI[] = []
     let totalTokens = 0
     let llmCalls = 0
     let completedCount = 0
     let failedCount = 0
 
+    // Determine workflow start time from props or first step's startTime
+    const workflowStart = startTime
+      ? new Date(startTime).getTime()
+      : steps.reduce((earliest, s) => {
+          if (s.startTime) {
+            const t = new Date(s.startTime).getTime()
+            return t < earliest ? t : earliest
+          }
+          return earliest
+        }, Infinity)
+
+    // Calculate duration from startTime/endTime when explicit duration is missing
+    const computeDuration = (step: typeof steps[0]): number | undefined => {
+      if (step.duration) return step.duration
+      if (step.startTime && step.endTime) {
+        return new Date(step.endTime).getTime() - new Date(step.startTime).getTime()
+      }
+      return undefined
+    }
+
+    // Calculate startOffset from step's startTime relative to workflow start
+    const computeOffset = (step: typeof steps[0], fallbackOffset: number): number => {
+      if (step.startTime && workflowStart < Infinity) {
+        return Math.max(0, new Date(step.startTime).getTime() - workflowStart)
+      }
+      return fallbackOffset
+    }
+
+    let cumulativeOffset = 0
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i]
+      const duration = computeDuration(step)
+      const startOffset = computeOffset(step, cumulativeOffset)
+
       const event: TraceEventUI = {
-        id: `${i}-${step.name}`, // Unique ID combining index and name to handle batch duplicates
+        id: `${i}-${step.name}`,
         name: step.name.replace(/_/g, ' '),
         status: step.status,
-        duration: step.duration,
+        duration,
         tokensUsed: step.tokensUsed,
         llmProvider: step.llmProvider,
         llmCalls: step.llmCalls,
         outputs: step.outputs,
         error: step.error,
-        startOffset: offset,
+        startOffset,
         llmTier: resolveStepTier(step.name),
       }
       traceEvents.push(event)
 
-      if (step.duration) {
-        offset += step.duration
+      if (duration) {
+        cumulativeOffset = startOffset + duration
       }
       if (step.tokensUsed) {
         totalTokens += step.tokensUsed
-        // Use actual LLM call count from backend if available, otherwise count step as 1 call
         llmCalls += step.llmCalls || 1
       }
       if (step.status === 'completed') completedCount++
       if (step.status === 'failed') failedCount++
     }
 
+    // Total duration: either max(offset+duration) or last endTime - first startTime
+    const maxEnd = traceEvents.reduce((max, e) => {
+      const end = e.startOffset + (e.duration || 0)
+      return end > max ? end : max
+    }, 0)
+
     return {
       events: traceEvents,
-      totalDuration: offset,
+      totalDuration: maxEnd,
       stats: {
         totalTokens,
         llmCalls,
@@ -141,7 +178,7 @@ export function TraceModal({
         totalSteps: steps.length,
       },
     }
-  }, [steps])
+  }, [steps, startTime])
 
   const toggleExpand = (id: string) => {
     const newSet = new Set(expandedIds)

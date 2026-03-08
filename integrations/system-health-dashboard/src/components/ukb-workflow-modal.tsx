@@ -2035,7 +2035,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             {/* Right side: Buttons */}
             <div className="flex items-center gap-2">
               {/* View Trace button - show when there are steps to trace */}
-              {(currentProcess?.steps?.length || historicalWorkflowDetail?.steps?.length) && (
+              {((currentProcess?.steps?.length ?? 0) > 0 || activeTab === 'history') && (
                 <Button
                   variant="outline"
                   size="sm"

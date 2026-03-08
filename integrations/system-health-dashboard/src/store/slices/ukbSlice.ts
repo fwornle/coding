@@ -104,6 +104,8 @@ export interface StepInfo {
   name: string
   status: StepStatus
   duration?: number
+  startTime?: string         // ISO timestamp when step started
+  endTime?: string           // ISO timestamp when step completed
   tokensUsed?: number
   llmProvider?: string       // Formatted model@provider (e.g. "sonnet@claude-code")
   llmModel?: string          // Raw model name (e.g. "claude-sonnet-4-5")
