@@ -1,8 +1,8 @@
 ---
 phase: 10-kg-operations-restoration
 verified: 2026-03-07T16:00:00Z
-status: human_needed
-score: 4/4 must-haves verified
+status: gaps_found
+score: 1/4 must-haves verified at runtime
 human_verification:
   - test: "Run ukb full and verify entities have 384-dim embeddings"
     expected: "Most entities have embedding arrays of length 384 (not zeros or random)"
@@ -106,9 +106,22 @@ No TODOs, FIXMEs, placeholders, mock embeddings, or stub implementations found i
 
 ### Gaps Summary
 
-No code-level gaps found. All 6 KG operators are implemented with substantive logic (not stubs), wired into the wave-controller pipeline, and connected to their dependencies. The Dockerfile includes the embedding model infrastructure.
+**3 runtime gaps found during human verification (2026-03-08):**
 
-The only remaining verification is end-to-end runtime testing, which requires Docker rebuild and live pipeline execution -- this cannot be verified through static code analysis alone.
+#### Gap 1: persistEntities() strips operator-enriched fields (CRITICAL)
+- **Location:** `wave-controller.ts:599-611` — `persistEntities()` call maps entities to `{name, entityType, observations, significance, metadata, parentId, level}` only
+- **Impact:** `embedding`, `role`, `enrichedContext` from operators are ALL dropped during re-persist
+- **Fix:** Add `embedding`, `role`, `enrichedContext` to the persist mapping, or use a direct KG update path that preserves these fields
+
+#### Gap 2: Ontology classification lost on operator-refined entities (MEDIUM)
+- **Location:** `wave-controller.ts:298` — re-persist calls `persistWaveResult` which runs `mapEntityToSharedMemory` looking for `_ontologyMetadata`
+- **Impact:** Operator-refined entities are new objects; `_ontologyMetadata` attached during per-wave classification is lost. VKB shows no ontology classifications.
+- **Fix:** Carry `_ontologyMetadata` through operator processing, or re-classify after operators
+
+#### Gap 3: Dashboard operator progress too fast for some steps (LOW)
+- **Location:** SSE broadcast interval vs operator execution speed
+- **Impact:** Conv, aggr, dedup, pred complete so fast they never get an SSE broadcast tick — dashboard shows jump. Embed and merge are slow enough to appear.
+- **Fix:** Either force an SSE flush after each updateProgress() call, or accept this as cosmetic
 
 ---
 
