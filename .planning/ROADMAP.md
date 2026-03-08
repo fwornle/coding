@@ -90,7 +90,12 @@ Plans:
   2. The QA agent reviews every agent output (not just a final pipeline stage) -- visible in logs as QA validation entries after each agent step
   3. When QA rejects an agent output, the coordinator retries the agent with feedback -- visible in logs as retry attempts with QA feedback included in the prompt
   4. L3 detail nodes are capped per parent, code-evidence filtering is active, and prompts include hardened anti-hallucination instructions
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Content validation gate in persistWaveResult + QA agent wired after each wave analyze step
+- [ ] 11-02-PLAN.md -- Coordinator retry-with-feedback loop when QA rejects wave output
+- [ ] 11-03-PLAN.md -- Anti-hallucination hardening: L3 caps, code-evidence filter, prompt strengthening
 
 #### Phase 12: Pipeline Observability
 **Goal**: The trace modal provides full visibility into pipeline execution -- how many LLM calls each agent made, how long each wave and agent took, which model was used, and what data flowed between agents
@@ -133,7 +138,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
-| 11. Content Quality Gate | v2.1 | 0/? | Not started | - |
+| 11. Content Quality Gate | v2.1 | 0/3 | Planned | - |
 | 12. Pipeline Observability | v2.1 | 0/? | Not started | - |
 | 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
