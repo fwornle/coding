@@ -1088,7 +1088,11 @@ export class GraphDatabaseService extends EventEmitter {
           parentEntityName: attributes.parentEntityName || null,
           hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
           isScaffoldNode: attributes.isScaffoldNode || false,
-          childEntityNames: attributes.childEntityNames || []
+          childEntityNames: attributes.childEntityNames || [],
+          // Operator-enriched fields
+          ...(attributes.embedding ? { embedding: attributes.embedding } : {}),
+          ...(attributes.role ? { role: attributes.role } : {}),
+          ...(attributes.enrichedContext ? { enrichedContext: attributes.enrichedContext } : {})
         });
         return;
       }
@@ -1135,7 +1139,11 @@ export class GraphDatabaseService extends EventEmitter {
         parentEntityName: attributes.parentEntityName || null,
         hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
         isScaffoldNode: attributes.isScaffoldNode || false,
-        childEntityNames: attributes.childEntityNames || []
+        childEntityNames: attributes.childEntityNames || [],
+        // Operator-enriched fields
+        ...(attributes.embedding ? { embedding: attributes.embedding } : {}),
+        ...(attributes.role ? { role: attributes.role } : {}),
+        ...(attributes.enrichedContext ? { enrichedContext: attributes.enrichedContext } : {})
       });
     });
 
@@ -1187,7 +1195,11 @@ export class GraphDatabaseService extends EventEmitter {
         parentEntityName: attributes.parentEntityName || null,
         hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
         isScaffoldNode: attributes.isScaffoldNode || false,
-        childEntityNames: attributes.childEntityNames || []
+        childEntityNames: attributes.childEntityNames || [],
+        // Operator-enriched fields
+        ...(attributes.embedding ? { embedding: attributes.embedding } : {}),
+        ...(attributes.role ? { role: attributes.role } : {}),
+        ...(attributes.enrichedContext ? { enrichedContext: attributes.enrichedContext } : {})
       });
     });
 
