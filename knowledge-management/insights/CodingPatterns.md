@@ -2,149 +2,179 @@
 
 **Type:** Component
 
-The modular design of the CodingPatterns component is a key architectural aspect that promotes maintainability and scalability. The project is composed of several components, such as the `ModeRouter` and `DockerizedServices`, which are designed to be independent and self-contained. The `ModeRouter` class (mode-router.ts:300) is responsible for managing the different modes of operation, while the `DockerizedServices` class (dockerized-services.ts:400) is responsible for managing the Dockerized services. This design decision enables the project to adapt to changing requirements and facilitates the integration of new components. Furthermore, the use of a modular design reduces the complexity of the codebase and improves its overall maintainability. The `WaveController` class (wave-controller.ts:500) is another example of a component that benefits from the modular design, as it can be easily integrated with other components and tested independently.
+The CodingPatterns component leverages the OntologyConfigManager to load ontology configurations from specific files (integrations/mcp-server-semantic-analysis/config/ontology-config.yaml), which ensures consistent ontology management. The OntologyConfigManager is responsible for loading and managing the ontology configurations, which define the relationships between different coding concepts and patterns. For instance, the `loadConfig` method in the OntologyConfigManager class (integrations/mcp-server-semantic-analysis/config/ontology-config-manager.ts) is used to load the ontology configurations from the specified file, while the `getConfig` method is used to retrieve the loaded configurations. The use of this manager ensures that the ontology configurations are handled consistently throughout the component, which is essential for maintaining the integrity of the coding patterns and practices.
 
 ## What It Is  
 
-The **CodingPatterns** component lives at the heart of the `Coding` parent component and is realized through a collection of TypeScript/JavaScript modules that together define how the project enforces coding conventions, manages graph‑based persistence, and wires together Large Language Model (LLM) providers.  The most visible artefacts are:  
+The **CodingPatterns** component lives under the `coding-patterns/` hierarchy of the project and is realised through a set of concrete TypeScript modules. Its core responsibilities are to **store, retrieve, and analyse coding‑related patterns** (design patterns, conventions, best‑practices, anti‑patterns and code‑analysis results) and to turn the raw observations into actionable insights.  
 
-* `storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** that synchronises the in‑memory graph with a persistent store and exports a JSON snapshot.  
-* `.eslintrc.json` – the ESLint configuration that codifies the project’s linting rules (e.g., `indent`, `no-console`).  
-* `llm-service-module.ts` – the **LLMServiceModule** that supplies the current LLM provider via a dependency‑injection container.  
-* `provider-registry-module.ts` – the **ProviderRegistryModule** that creates concrete LLM provider instances through a factory method.  
-* `jest.config.js` together with test files such as `mode-router.ts` – the Jest‑based test harness that validates the behaviour of core classes like `ModeRouter`.  
-* Several modular runtime classes – `mode-router.ts`, `dockerized-services.ts`, `wave-controller.ts` – each encapsulated in its own file and designed to be independently testable.
+Key implementation files that anchor the component are:  
 
-In short, **CodingPatterns** is the “how‑we‑code” layer: it defines the standards (ESLint), the persistence contract (GraphDatabaseAdapter), the extensibility model for LLMs (DI + factory), and the quality‑gate (Jest) that together keep the codebase coherent, testable, and easy to evolve.
+* **`storage/graph-database-adapter.ts`** – the low‑level persistence gateway that talks to the graph database.  
+* **`insights/generator.ts`** – the `InsightGenerator` class that consumes processed observations and emits insight objects.  
+* **`integrations/mcp-server-semantic-analysis/config/ontology-config-manager.ts`** – the `OntologyConfigManager` that loads the ontology definition from `ontology-config.yaml`.  
+* **`factory.ts`** – a lightweight factory that creates concrete pattern‑related domain objects (`createPattern`, `createPractice`).  
+* **`file-system-watcher.ts`** – a wrapper around **chokidar** that watches source files for changes (`watchFiles`, `onFileChanged`).  
+* **`pipeline-executor.ts`** – the DAG‑based pipeline runner that orders batch‑analysis steps with a topological sort (`executePipeline`, `sortSteps`).  
+* **`retry-manager.ts`** – the `RetryManager` that guarantees reliable service start‑up (`retryStartService`, `onServiceStarted`).  
+
+Together these modules give the component the ability to persist complex relationship graphs, react to file‑system events, run ordered analysis pipelines, and surface high‑level recommendations to developers. The component sits under the **Coding** root node, shares the factory and retry patterns with its siblings (e.g., *KnowledgeManagement* and *DockerizedServices*), and exposes its stored artefacts to child sub‑components such as **DesignPatterns**, **CodingConventions**, **BestPractices**, **AntiPatterns**, and **CodeAnalysis**.
 
 ---
 
 ## Architecture and Design  
 
-The component follows a **modular architecture** in which each logical concern is isolated into its own module.  This is evident from the separation of the graph persistence logic (`storage/graph-database-adapter.ts`), the linting configuration (`.eslintrc.json`), the LLM service wiring (`llm-service-module.ts` and `provider-registry-module.ts`), and the runtime routers (`mode-router.ts`).  Modularity reduces coupling and makes it straightforward to replace or extend any piece without rippling changes through unrelated code.
+### Architectural style  
 
-Two classic **design patterns** are explicitly employed:
+The observations reveal a **modular, layered architecture** built around clear separation of concerns:
 
-1. **Dependency Injection (DI)** – The `LLMServiceModule` class (see `llm-service-module.ts:50`) acts as a container that resolves the currently configured LLM provider.  Its public method `getLLMProvider` (line 100) returns the concrete implementation, allowing callers to depend on the abstraction rather than a hard‑coded class.  This promotes loose coupling, simplifies unit testing (providers can be mocked), and enables runtime swapping of providers.
+1. **Persistence Layer** – `GraphDatabaseAdapter` abstracts all graph‑DB operations, exposing `storePattern` and `retrievePatterns`.  
+2. **Configuration Layer** – `OntologyConfigManager` loads the ontology definition from a YAML file, providing a single source of truth for concept relationships.  
+3. **Domain‑Object Creation** – The `Factory` class follows the **Factory Method** pattern, decoupling the creation of pattern‑related objects (`Pattern`, `Practice`) from their concrete classes.  
+4. **Event‑driven File Monitoring** – `FileSystemWatcher` leverages **chokidar** to emit file‑system events, enabling reactive updates without tightly coupling to the rest of the system.  
+5. **Pipeline Execution** – `PipelineExecutor` implements a **Directed Acyclic Graph (DAG)** execution model with a topological sort, ensuring that batch‑analysis steps defined in `batch-analysis.yaml` run in a deterministic order.  
+6. **Reliability Layer** – `RetryManager` provides a **retry‑with‑backoff** mechanism for service start‑up, mirroring the pattern used by the sibling *DockerizedServices* component.  
+7. **Insight Generation** – `InsightGenerator` consumes the processed observations and applies data‑analysis heuristics to produce actionable insights.
 
-2. **Factory Pattern** – The `ProviderRegistryModule` (see `provider-registry-module.ts:200`) maintains a registry of available LLM providers and exposes `createLLMProvider` (line 250) to instantiate the requested provider.  By centralising creation logic, the system can add new providers simply by registering them; the rest of the codebase remains unchanged.
+These layers interact through well‑defined interfaces (e.g., the adapter exposes `storePattern`, the factory returns domain objects, the watcher calls back into the pipeline). The design deliberately avoids deep coupling: the persistence implementation can be swapped, the ontology can be re‑loaded without touching the insight engine, and the pipeline can be extended by adding new steps to the YAML file.
 
-The **GraphDatabaseAdapter** embodies a **separation‑of‑concerns** principle: it owns all persistence‑related responsibilities (synchronisation via `syncData` at line 123 and JSON export via `exportJSON` at line 150) while the rest of the component works with in‑memory representations.  This clear boundary makes the graph layer replaceable (e.g., swapping Graphology+LevelDB for another store) without affecting higher‑level logic.
+### Interaction diagram (textual)  
 
-Finally, **testability** is baked in through **Jest**.  The `jest.config.js` (line 10) defines the environment, and classes such as `ModeRouter` (`mode-router.ts:300`) have dedicated test suites that exercise both happy‑path and edge‑case scenarios.  This testing strategy reinforces the modular design and ensures that each isolated piece behaves as intended before integration.
+* **File change** → `FileSystemWatcher.watchFiles` detects → calls `PipelineExecutor.executePipeline` (the changed file becomes an input node).  
+* **Pipeline step** → `PipelineExecutor.sortSteps` orders steps → each step may call `GraphDatabaseAdapter.storePattern` or `retrievePatterns`.  
+* **Ontology lookup** → any step needing semantic context calls `OntologyConfigManager.getConfig`.  
+* **Pattern creation** → steps use `Factory.createPattern` / `createPractice` to materialise domain objects before persisting.  
+* **Insight phase** → after pipeline finishes, `InsightGenerator.generateInsights` receives the processed observations and emits insight objects consumed by downstream UI or reporting services.  
+* **Service start‑up** → at component bootstrap, `RetryManager.retryStartService` ensures dependent services (e.g., the graph DB) are available before any of the above can run.
 
 ---
 
 ## Implementation Details  
 
 ### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
-* **`syncData` (line 123)** – Pulls changes from the in‑memory graph and writes them to the underlying LevelDB store.  It is invoked automatically whenever the component mutates the graph, guaranteeing eventual consistency.  
-* **`exportJSON` (line 150)** – Serialises the current graph state into a JSON document that can be version‑controlled or consumed by external tools.  The export is triggered after each successful `syncData`, providing an audit trail of the knowledge base.
+The adapter encapsulates all CRUD operations against the underlying graph store (likely Neo4j or a similar technology).  
+* **`storePattern(pattern: Pattern): Promise<void>`** – serialises a `Pattern` node and its relationships, then writes it to the graph.  
+* **`retrievePatterns(): Promise<Pattern[]>`** – runs a query that returns all pattern vertices, reconstructing them into domain objects.  
+All child components (DesignPatterns, CodingConventions, etc.) invoke `storePattern` directly, ensuring a uniform persistence contract.
 
-### ESLint Configuration (`.eslintrc.json`)  
-The file defines the linting contract for the entire codebase.  Notable rules include:  
-* **`indent`** (line 20) – Enforces a consistent indentation style, reducing diffs caused by formatting.  
-* **`no-console`** (line 30) – Disallows stray `console.log` statements in production code, encouraging the use of the project’s logging abstraction.  
+### OntologyConfigManager (`integrations/mcp-server-semantic-analysis/config/ontology-config-manager.ts`)  
+* **`loadConfig(filePath: string): void`** reads `ontology-config.yaml` and builds an in‑memory map of concept relationships (e.g., “DesignPattern → belongsTo → ArchitecturalStyle”).  
+* **`getConfig(): OntologyConfig`** returns the parsed configuration, used by the insight engine to contextualise patterns.
 
-Because the configuration lives at the repository root, every developer and CI pipeline automatically inherits the same standards, which simplifies onboarding and reduces style‑related bugs.
+### Factory (`factory.ts`)  
+Implements a simple **Factory Method**:  
+* **`createPattern(data: RawPatternData): Pattern`** – validates input, selects the appropriate concrete subclass (e.g., `DesignPattern`, `AntiPattern`).  
+* **`createPractice(data: RawPracticeData): Practice`** – similar logic for practice objects.  
+Because the factory lives in a shared module, any new pattern type can be added without touching the persistence or pipeline code.
 
-### LLM Service Wiring (`llm-service-module.ts`)  
-* **`LLMServiceModule` class (line 50)** – Registers provider implementations with the DI container during application bootstrap.  
-* **`getLLMProvider` (line 100)** – Returns the concrete provider instance that matches the current configuration (e.g., OpenAI, Anthropic).  The method abstracts away provider‑specific initialization details, allowing downstream code to treat all providers uniformly.
+### FileSystemWatcher (`file-system-watcher.ts`)  
+Wraps **chokidar**:  
+* **`watchFiles(globPattern: string, handler: (event: FileEvent) => void): FSWatcher`** – registers a watcher on the supplied glob.  
+* **`onFileChanged(event: FileEvent)`** – normalises the raw chokidar event and forwards it to the pipeline executor.  
+This enables **event‑driven** updates: when a developer adds a new coding‑pattern file, the system automatically re‑processes it.
 
-### Provider Registry (`provider-registry-module.ts`)  
-* **`ProviderRegistryModule` class (line 200)** – Holds a map of provider identifiers to factory functions.  
-* **`createLLMProvider` (line 250)** – Given a provider key, it invokes the associated factory to produce a ready‑to‑use instance.  Adding a new provider merely requires registering a new factory; no changes to callers are needed.
+### PipelineExecutor (`pipeline-executor.ts`)  
+* **`executePipeline(pipelineSpec: PipelineSpec): Promise<void>`** – loads the YAML definition, builds a DAG of steps, then runs them respecting dependencies.  
+* **`sortSteps(steps: Step[]): Step[]`** – performs a topological sort, guaranteeing that a step only runs after all its predecessors have succeeded.  
+The DAG model gives deterministic ordering while allowing parallel execution of independent steps (future scalability improvement).
 
-### Runtime Modules (`mode-router.ts`, `dockerized-services.ts`, `wave-controller.ts`)  
-Each of these classes follows the same pattern: they expose a small public API, rely on injected dependencies (e.g., the LLM provider from `LLMServiceModule`), and have isolated Jest test suites.  For example, `ModeRouter` (line 300) decides which LLM mode to invoke based on request metadata, while `DockerizedServices` (line 400) abstracts the lifecycle of containerised services, and `WaveController` (line 500) orchestrates higher‑level workflows.  Their independence is a direct result of the modular design described earlier.
+### InsightGenerator (`insights/generator.ts`)  
+* **`generateInsights(observations: Observation[]): Insight[]`** – iterates over the processed observations, applies statistical or heuristic rules (e.g., frequency of anti‑patterns, co‑occurrence of practices), and produces a list of `Insight` objects.  
+These insights are the primary output consumed by UI dashboards or CI‑integrations to suggest refactorings or training needs.
+
+### RetryManager (`retry-manager.ts`)  
+* **`retryStartService(service: Service, attempts: number = 5, backoffMs: number = 200): Promise<void>`** – attempts to start a service, waiting `backoffMs` between tries, and aborts after the configured number of attempts.  
+* **`onServiceStarted(service: Service): void`** – callback invoked on success, used to trigger the next bootstrap phase.  
+The pattern mirrors the **retry‑with‑backoff** used in the sibling *DockerizedServices* component, reinforcing a consistent reliability strategy across the codebase.
 
 ---
 
 ## Integration Points  
 
-* **Parent – Coding**:  CodingPatterns supplies the coding‑style and persistence foundation that the broader `Coding` component relies on.  Other sibling components (e.g., **KnowledgeManagement**) also consume the `GraphDatabaseAdapter`, ensuring a unified graph persistence strategy across the system.  
-
-* **Sibling – LLMAbstraction**:  Both components share the same DI and factory mechanisms for LLM providers.  The `LLMServiceModule` in CodingPatterns mirrors the DI usage in `LLMAbstraction/lib/llm/llm-service.ts`, enabling seamless provider swapping across the entire codebase.  
-
-* **Sibling – DockerizedServices**:  The `DockerizedServices` class (line 400) may launch containers that host the graph database or LLM inference services.  Because the graph adapter exports JSON (`exportJSON`), Dockerised services can mount the exported file for quick bootstrapping.  
-
-* **Testing – Jest**:  The `jest.config.js` (line 10) is referenced by all sibling components; test suites for `ModeRouter`, `WaveController`, and even the `GraphDatabaseAdapter` are executed together, providing a single source of truth for code health.  
-
-* **ESLint**:  The linting configuration is a project‑wide contract; any new module added under any sibling component automatically inherits the same rules, guaranteeing stylistic consistency.
+1. **Parent – Coding**: As a child of the *Coding* root, CodingPatterns inherits the project‑wide logging and telemetry hooks. The component’s insights are aggregated at the parent level for cross‑component reporting.  
+2. **Siblings** – *KnowledgeManagement* also uses the `GraphDatabaseAdapter` (shared persistence) and a factory for LLM instances, demonstrating a **shared‑service** approach. *DockerizedServices* supplies the retry‑with‑backoff logic that `RetryManager` re‑uses. *LiveLoggingSystem* provides classification agents that could enrich the observations fed to `InsightGenerator`.  
+3. **Children** – Each child (DesignPatterns, CodingConventions, BestPractices, AntiPatterns, CodeAnalysis) calls `GraphDatabaseAdapter.storePattern` to persist its specific artefacts. They may also invoke the factory to create typed objects before storage.  
+4. **External services** – The graph database itself (e.g., Neo4j) is an external dependency accessed via `GraphDatabaseAdapter`. The ontology YAML file is a configuration artifact loaded by `OntologyConfigManager`.  
+5. **Pipeline definition** – `batch-analysis.yaml` (referenced by `PipelineExecutor`) lives in the component’s `config/` folder and can be edited to add new analysis steps, making the component extensible without code changes.  
+6. **File‑system events** – The watcher watches source directories that contain pattern definition files; any addition or modification automatically triggers a pipeline run, keeping the graph in sync with the source of truth.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Persisting Graph Data** – When mutating the knowledge graph, always invoke the high‑level API exposed by `GraphDatabaseAdapter`.  The adapter will internally call `syncData` to persist changes and `exportJSON` to keep the JSON snapshot up‑to‑date.  Direct writes to LevelDB are discouraged to avoid bypassing the synchronization logic.  
-
-2. **Adding a New LLM Provider** – Register the provider’s factory in `ProviderRegistryModule` (e.g., `registry.register('myProvider', () => new MyProvider())`).  Then, update the configuration that `LLMServiceModule` reads so that `getLLMProvider` returns the new instance.  Because DI is used, existing consumers need not be altered.  
-
-3. **Extending the Modular Runtime** – New operational modes should be added as separate classes (e.g., `NewModeRouter`) that implement the same interface expected by `ModeRouter`.  Wire them through the DI container and provide Jest test suites mirroring the pattern used for `ModeRouter`.  
-
-4. **Linting Discipline** – Run `npm run lint` (or the equivalent CI step) before committing.  Respect the `indent` and `no-console` rules; if a rule must be relaxed for a specific file, add an inline ESLint comment rather than editing the global config.  
-
-5. **Testing** – All new modules must include unit tests under the `__tests__` directory and be referenced in `jest.config.js`.  Aim for high coverage on edge cases, especially when dealing with asynchronous provider calls or graph synchronisation.  
-
-6. **Docker Integration** – When a new service requires a persistent graph, mount the JSON export location defined by `GraphDatabaseAdapter.exportJSON` into the container.  This allows the container to initialise its in‑memory graph quickly without re‑syncing the whole LevelDB store.
+* **Persist via the adapter** – Always create or update pattern data through `Factory.createPattern` (or `createPractice`) and then call `GraphDatabaseAdapter.storePattern`. Direct DB calls bypass validation and should be avoided.  
+* **Keep the ontology current** – When new coding concepts are introduced, update `ontology-config.yaml` and run `OntologyConfigManager.loadConfig` (typically at startup) so that downstream insight calculations understand the new relationships.  
+* **Leverage the file watcher** – Place new pattern definition files under the watched glob (e.g., `src/patterns/**/*.json`). The watcher will automatically enqueue a pipeline run; manual pipeline triggers are only needed for bulk operations.  
+* **Extend the analysis pipeline** – To add a new batch step, edit `batch-analysis.yaml` with the new node and its dependencies, then implement the step logic as a class exposing a `run(observations): Observation[]` method. The DAG executor will handle ordering.  
+* **Handle service start‑up failures** – If a dependent service (graph DB, ontology loader) is unavailable, rely on `RetryManager.retryStartService` rather than writing custom loops. The built‑in backoff prevents resource exhaustion.  
+* **Consume insights responsibly** – `InsightGenerator.generateInsights` may produce a large number of suggestions; downstream consumers should filter by severity or relevance to avoid overwhelming developers.  
+* **Testing** – Unit‑test each factory method, adapter CRUD operation, and pipeline step in isolation. Integration tests should spin up an in‑memory graph DB instance and verify that a file change triggers the full pipeline and persists the expected nodes.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
 
-* Dependency Injection (via `LLMServiceModule`)  
-* Factory Pattern (via `ProviderRegistryModule.createLLMProvider`)  
-* Modular Design / Separation of Concerns (distinct files for persistence, linting, routing, Docker services)  
-* Test‑Driven Structure (Jest integration)  
+1. **Factory Method** – `Factory` creates `Pattern` and `Practice` objects.  
+2. **Adapter** – `GraphDatabaseAdapter` abstracts the graph database.  
+3. **Configuration Manager** – `OntologyConfigManager` loads external YAML configuration.  
+4. **Event‑driven file watching** – `FileSystemWatcher` uses **chokidar** to emit events.  
+5. **DAG‑based pipeline execution** – `PipelineExecutor` orders steps via topological sort.  
+6. **Retry‑with‑backoff** – `RetryManager` ensures reliable service startup.  
+7. **Insight generation (analysis)** – `InsightGenerator` applies data‑analysis heuristics (not a formal pattern but a clear separation of concerns).
 
-### Design Decisions and Trade‑offs  
+### Design decisions and trade‑offs  
 
-* **DI vs. Service Locator** – Choosing DI makes the codebase more testable but adds a small runtime container overhead.  
-* **Factory Registry** – Centralising provider creation simplifies extension but introduces a single point of failure if the registry is mis‑configured.  
-* **Automatic JSON Export** – Guarantees an up‑to‑date snapshot for external tooling; however, frequent exports can increase I/O load on large graphs.  
-* **Strict ESLint Rules** – Improves code quality and onboarding speed, yet may require occasional rule overrides for legacy code.  
+| Decision | Rationale | Trade‑off |
+|----------|-----------|-----------|
+| Use a **graph database** for pattern storage | Captures complex relationships (e.g., “pattern A refines pattern B”) naturally. | Requires a separate service and introduces latency compared to a simple relational store. |
+| Separate **ontology config** into a YAML file | Allows domain experts to edit relationships without code changes. | Runtime must reload or restart to pick up changes; potential version‑skew if multiple services read the file concurrently. |
+| Implement **DAG pipeline** via YAML | Enables non‑developers to reorder or add analysis steps. | Validation of the DAG is required at load time; malformed YAML could break the pipeline. |
+| Adopt **chokidar** for FS watching | Provides cross‑platform, efficient event handling. | File‑system events can be noisy; debouncing logic may be needed for large repos. |
+| Centralise **retry logic** in `RetryManager` | Consistent error‑handling across components (mirrors DockerizedServices). | Adds an extra abstraction layer; developers must understand the backoff parameters to tune them. |
 
-### System Structure Insights  
+### System structure insights  
 
-The component sits as a **foundational layer** within the `Coding` hierarchy, exposing services that are consumed by siblings such as **KnowledgeManagement** (graph persistence) and **LLMAbstraction** (LLM provider resolution).  Its child, **GraphDatabaseAdapter**, encapsulates all low‑level persistence concerns, while sibling modules each focus on a single responsibility, reflecting a clean, vertical slice architecture.
+* The component follows a **clean‑architecture** style: UI‑agnostic core (adapter, factory, pipeline) is independent of external concerns (file system, service lifecycle).  
+* Persistence, configuration, and analysis are each isolated into their own modules, making the codebase **highly modular** and encouraging reuse across siblings (e.g., KnowledgeManagement).  
+* The **DAG pipeline** provides a natural extension point; new analytical capabilities can be added without touching existing step implementations.  
 
-### Scalability Considerations  
+### Scalability considerations  
 
-* **Graph Persistence** – The use of Graphology + LevelDB scales well for read‑heavy workloads; however, write‑heavy bursts may need batching or background sync to avoid blocking `syncData`.  
-* **Provider Registry** – Adding many providers does not affect runtime performance because factories are invoked lazily.  The DI container can be extended to support scoped lifetimes if provider initialization becomes costly.  
-* **Modular Services** – Dockerized services can be horizontally scaled independently; the JSON export provides a lightweight state‑share mechanism for new container instances.  
+* **Horizontal scaling of the graph DB** (sharding, clustering) will allow the component to handle millions of pattern nodes as the codebase grows.  
+* The DAG executor can be enhanced to run independent steps in parallel, leveraging multi‑core machines and reducing batch‑analysis latency.  
+* The file‑watcher may become a bottleneck in extremely large repositories; batching events or using OS‑level debouncing can mitigate this.  
+* Retry backoff parameters should be configurable to avoid overwhelming downstream services during large‑scale restarts.  
 
-### Maintainability Assessment  
+### Maintainability assessment  
 
-Overall maintainability is high:
-
-* **Clear separation** between concerns (persistence, linting, LLM wiring) reduces cognitive load.  
-* **Standardised tooling** (ESLint, Jest) enforces consistent style and regression safety.  
-* **DI and factories** enable painless swapping or mocking of external dependencies, which is essential for long‑term evolution.  
-* The only potential maintenance hotspot is the **GraphDatabaseAdapter**’s synchronous export path; monitoring its performance and possibly making export asynchronous would further improve resilience.
-
-By adhering to the guidelines above, developers can safely extend the **CodingPatterns** component while preserving the architectural integrity that the rest of the `Coding` ecosystem depends upon.
+* **High** – Clear separation of concerns, well‑named classes, and explicit factory methods make the codebase approachable.  
+* **Medium** – The reliance on external YAML files (ontology, pipeline) introduces configuration drift risk; a validation suite for these files is essential.  
+* **Low** – Direct usage of `GraphDatabaseAdapter` by many child modules could lead to duplicated query logic; introducing a repository layer would further decouple domain objects from persistence.  
+* Overall, the component’s adherence to common patterns (factory, adapter, retry) and its alignment with sibling components (shared retry, shared factory) promote **consistent maintenance practices** across the entire *Coding* hierarchy.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classifi; LLMAbstraction: The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific respon; DockerizedServices: The DockerizedServices component implements a modular design, with each service being a separate Docker container. This is evident in the use of Docke; Trajectory: The Trajectory component's use of dependency injection is evident in the SpecstoryAdapter class, where it utilizes a factory pattern to create instanc; KnowledgeManagement: The KnowledgeManagement component's utilization of a Graphology+LevelDB database for persistence, as seen in the GraphDatabaseAdapter (storage/graph-d; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to manage graph data persistence. This adapter is r; ConstraintSystem: The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integr; SemanticAnalysis: The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and L.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects ; DockerizedServices: The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStar; Trajectory: The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file w; KnowledgeManagement: The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repo; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flex; ConstraintSystem: The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (li; SemanticAnalysis: The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, res.
 
 ### Children
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the `syncData` function (storage/graph-database-adapter.ts:123) to synchronize data with the graph database
+- [DesignPatterns](./DesignPatterns.md) -- DesignPatterns uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database
+- [CodingConventions](./CodingConventions.md) -- CodingConventions uses the GraphDatabaseAdapter's storePattern method to store new coding conventions in the graph database
+- [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter's storePattern method to store new best practices in the graph database
+- [AntiPatterns](./AntiPatterns.md) -- AntiPatterns uses the GraphDatabaseAdapter's storePattern method to store new anti-patterns in the graph database
+- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the GraphDatabaseAdapter's storePattern method to store new code analysis results in the graph database
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This classification process is crucial for providing meaningful insights into the conversations captured by the system. The OntologyClassificationAgent class is designed to work in conjunction with the modular design of the LiveLoggingSystem, allowing for easy extension and maintenance of the classification layers. For instance, the classifyObservation method in the OntologyClassificationAgent class takes in an observation object and returns a classified observation object, which is then used by the LiveLoggingSystem to capture and log the conversation.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific responsibilities and functions. For instance, the LLMService (lib/llm/llm-service.ts) serves as the primary entry point for all LLM operations, handling mode routing, caching, and circuit breaking. This modular design promotes code reusability and maintainability, as seen in the use of design patterns such as dependency injection and factory patterns. The dependency injection in LLMService (lib/llm/llm-service.ts) enables the resolution of the current LLM provider and supports various LLM modes, making it easier to switch between different providers or modes without affecting the rest of the codebase.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component implements a modular design, with each service being a separate Docker container. This is evident in the use of Docker Compose files, which define the services and their dependencies. For example, the docker-compose.yml file in the root directory defines the services and their dependencies. The LLMService class, located in lib/llm/llm-service.ts, is a high-level facade that handles mode routing, caching, and circuit breaking for all LLM operations. This modular design allows for easy addition or removal of services, making the system highly scalable and maintainable.
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of dependency injection is evident in the SpecstoryAdapter class, where it utilizes a factory pattern to create instances of different connection methods. This is seen in the lib/integrations/specstory-adapter.js file, where the constructor() function is used to initialize the adapter with the required dependencies. The initialize() function is then used to set up the connection, and the logConversation() function is used to log any errors or warnings that occur during the connection process. This pattern allows for loose coupling between the adapter and the connection methods, making it easier to switch between different connection methods or add new ones.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of a Graphology+LevelDB database for persistence, as seen in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), allows for efficient storage and querying of knowledge graphs. This choice of database is particularly noteworthy due to its ability to handle large amounts of data and provide a robust foundation for the component's intelligent routing mechanism. The intelligent routing, which switches between VKB API and direct database access, enables the component to optimize its interactions with the knowledge graph, thus improving overall performance. For instance, when an agent needs to store an entity, it can use the storeEntity method in GraphDatabaseAdapter, which ultimately relies on the Graphology+LevelDB database for persistence.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent employs heuristic classification and LLM integration, enabling the system to accurately categorize user interactions. The OntologyClassificationAgent's classifyObservation method takes in a set of observations and returns a list of classified results, which are then used to inform the logging process. Furthermore, the agent's use of heuristic classification allows it to adapt to changing user behavior and improve its accuracy over time.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects of its functionality. For instance, the LLMService class (lib/llm/llm-service.ts) serves as a high-level facade for all LLM operations, handling tasks such as mode routing, caching, and provider fallback. This modularity enables easier maintenance, updates, and extensions of the component. Furthermore, the use of interfaces like LLMCompletionRequest and LLMCompletionResult (lib/llm/llm-service.ts) facilitates communication between different parts of the component, ensuring consistency in data exchange.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStarterModule (lib/service-starter.js). This pattern helps prevent endless loops and promotes system stability by introducing a delay between retries. For instance, the startService function in ServiceStarterModule utilizes a backoff strategy to retry failed service startups, ensuring that services are properly initialized before use. The use of Dockerization in this component further enhances deployment and management of services, making it easier to scale and maintain the system. The LLMService (lib/llm/llm-service.ts) also plays a crucial role in this component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods in specstory-adapter.js. This flexibility allows the component to provide a fallback option when necessary, ensuring reliable connectivity. The SpecstoryAdapter class plays a crucial role in this design, as it encapsulates the logic for connecting to the Specstory extension via various methods. The initialize method in SpecstoryAdapter implements a retry mechanism to handle connection failures, demonstrating a focus on robustness.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern allows for efficient initialization of LLM instances only when required, reducing unnecessary resource allocation. The ensureLLMInitialized() method, likely defined in the Wave agent classes, ensures that the LLM instance is properly initialized before execution. This approach enables the component to manage resources effectively and optimize performance. The GraphDatabaseAdapter, employed for Graphology+LevelDB persistence, also plays a crucial role in storing and retrieving knowledge graph data, as defined in storage/graph-database-adapter.ts.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, responsible for a specific task. This modularity is reflected in the code organization, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent class, defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

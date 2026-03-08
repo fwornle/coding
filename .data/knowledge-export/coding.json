@@ -23,13 +23,13 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classifi; LLMAbstraction: The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific respon; DockerizedServices: The DockerizedServices component implements a modular design, with each service being a separate Docker container. This is evident in the use of Docke; Trajectory: The Trajectory component's use of dependency injection is evident in the SpecstoryAdapter class, where it utilizes a factory pattern to create instanc; KnowledgeManagement: The KnowledgeManagement component's utilization of a Graphology+LevelDB database for persistence, as seen in the GraphDatabaseAdapter (storage/graph-d; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to manage graph data persistence. This adapter is r; ConstraintSystem: The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integr; SemanticAnalysis: The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and L.",
+        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects ; DockerizedServices: The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStar; Trajectory: The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file w; KnowledgeManagement: The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repo; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flex; ConstraintSystem: The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (li; SemanticAnalysis: The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, res.",
         "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.270Z",
-        "last_updated": "2026-03-08T13:27:42.108Z"
+        "last_updated": "2026-03-08T13:57:33.507Z"
       },
       "id": "mc4flkgxgvxje"
     },
@@ -37,17 +37,17 @@
       "name": "LiveLoggingSystem",
       "entityType": "Component",
       "observations": [
-        "The LiveLoggingSystem component utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This classification process is crucial for providing meaningful insights into the conversations captured by the system. The OntologyClassificationAgent class is designed to work in conjunction with the modular design of the LiveLoggingSystem, allowing for easy extension and maintenance of the classification layers. For instance, the classifyObservation method in the OntologyClassificationAgent class takes in an observation object and returns a classified observation object, which is then used by the LiveLoggingSystem to capture and log the conversation.",
-        "The LSLConfigValidator class (scripts/validate-lsl-config.js) plays a vital role in ensuring the comprehensive validation, repair, and optimization of the LSL system configuration. This class is responsible for checking the configuration files for any inconsistencies or errors, and providing feedback to the developers to rectify these issues. The validateConfig method in the LSLConfigValidator class is a key function that performs this validation, and it is called at the initialization of the LiveLoggingSystem to ensure that the configuration is correct before proceeding with the logging process. The use of this class demonstrates the emphasis on robustness and reliability in the design of the LiveLoggingSystem.",
-        "The TranscriptAdapter abstract base class (lib/agent-api/transcript-api.js) provides a unified abstraction for reading and converting transcripts from different agent formats. This abstraction is essential for handling the diverse range of agent formats that the LiveLoggingSystem needs to support. The TranscriptAdapter class defines a set of methods, such as readTranscript and convertTranscript, which are implemented by concrete transcript adapter classes to provide the actual functionality. For example, the LSLConverter class (lib/agent-api/transcripts/lsl-converter.js) implements the TranscriptAdapter interface to convert between agent-specific transcript formats and the unified LSL format. This design pattern allows for easy addition of support for new agent formats, making the LiveLoggingSystem highly extensible.",
-        "The logging module (integrations/mcp-server-semantic-analysis/src/logging.ts) implements async log buffering and flushing to prevent event loop blocking. This is a critical design decision, as it ensures that the logging process does not interfere with the normal functioning of the LiveLoggingSystem. The logBuffer method in the logging module is responsible for buffering the logs, and the flushLogs method is used to write the buffered logs to the file system. The use of async/await syntax in these methods allows for non-blocking I/O operations, which is essential for maintaining the performance of the system. The logging module also provides a set of configuration options to control the buffering and flushing behavior, such as the buffer size and the flush interval.",
-        "The LiveLoggingSystem follows a specific pattern for handling transcript sessions, including reading, converting, and caching transcript data. This pattern is implemented through a combination of classes and methods, such as the TranscriptSession class (lib/agent-api/transcript-session.js) and the cacheTranscript method in the TranscriptAdapter class. The TranscriptSession class represents a transcript session and provides methods for reading and converting the transcript data. The cacheTranscript method is used to cache the converted transcript data, which improves the performance of the system by reducing the number of times the transcript data needs to be converted. The use of this pattern demonstrates the emphasis on performance and efficiency in the design of the LiveLoggingSystem.",
-        "The modular design of the LiveLoggingSystem, with separate modules for logging, transcript handling, and ontology classification, facilitates easy maintenance and extension of the system. Each module is designed to be independent and self-contained, with well-defined interfaces and dependencies. This allows developers to work on individual modules without affecting the rest of the system. For example, the logging module can be modified or replaced without affecting the transcript handling or ontology classification modules. The use of this modular design pattern also makes it easier to add new features or modules to the system, as it provides a clear and structured way of integrating new functionality."
+        "The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent employs heuristic classification and LLM integration, enabling the system to accurately categorize user interactions. The OntologyClassificationAgent's classifyObservation method takes in a set of observations and returns a list of classified results, which are then used to inform the logging process. Furthermore, the agent's use of heuristic classification allows it to adapt to changing user behavior and improve its accuracy over time.",
+        "The LSLConfigValidator, found in scripts/validate-lsl-config.js, plays a crucial role in ensuring the correctness and optimality of the LSL system configuration. This validator checks for environment, directory structure, and configuration files, providing a comprehensive validation mechanism. The validateConfig method in LSLConfigValidator.js iterates over a set of predefined checks, raising errors or warnings as necessary. By using this validator, the LiveLoggingSystem can guarantee that its configuration is valid and optimized, preventing potential issues downstream. Additionally, the validator's ability to repair and optimize the configuration enables the system to self-correct and improve its performance.",
+        "The TranscriptAdapter, defined in lib/agent-api/transcript-api.js, serves as an abstract base class for providing agent-specific transcript functionality. This adapter supports features such as reading transcripts, converting to LSL format, and watching for new transcript entries. The TranscriptAdapter's readTranscript method, for example, takes in a transcript ID and returns the corresponding transcript data. The watchForNewTranscripts method, on the other hand, sets up a watch mechanism to monitor new transcript entries, allowing the system to process session logs in real-time. By leveraging the TranscriptAdapter, the LiveLoggingSystem can seamlessly interact with various agent formats and provide a unified logging experience.",
+        "The logging module, located in integrations/mcp-server-semantic-analysis/src/logging.ts, implements async log buffering to prevent event loop blocking. This non-blocking file I/O approach enables the system to write logs to files without interrupting the main thread. The logBuffer method in logging.ts uses a shared atomic index counter to manage the log buffer, ensuring that logs are written in the correct order. By using async log buffering, the LiveLoggingSystem can maintain high performance and responsiveness, even under heavy logging workloads. Moreover, the use of a shared atomic index counter allows the system to handle concurrent log writes efficiently and safely.",
+        "The LSLConverter, found in lib/agent-api/transcripts/lsl-converter.js, is responsible for converting between agent-specific transcript formats and the unified LSL format. This converter supports conversions to markdown or JSON-Lines formats, facilitating efficient and standardized data exchange. The toJSONL method in LSLConverter.js, for instance, takes in a transcript object and returns the corresponding JSON-Lines representation. The fromJSONL method, on the other hand, converts a JSON-Lines string back into a transcript object. By using the LSLConverter, the LiveLoggingSystem can easily integrate with various agent formats and provide a unified logging experience. Additionally, the converter's support for JSON-Lines format enables the system to store and exchange transcript data in a compact and efficient manner.",
+        "The use of JSON-Lines format in the LiveLoggingSystem, as seen in the LSLConverter's toJSONL and fromJSONL methods, facilitates efficient and standardized data exchange. The toJSONL method in LSLConverter.js, for example, takes in a transcript object and returns the corresponding JSON-Lines representation. This format allows for compact and efficient storage of transcript data, making it ideal for large-scale logging applications. Furthermore, the use of JSON-Lines format enables the system to easily integrate with other components and systems that support this format, promoting interoperability and flexibility. By leveraging JSON-Lines format, the LiveLoggingSystem can provide a scalable and efficient logging solution that meets the needs of various use cases and applications."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.276Z",
-        "last_updated": "2026-03-08T13:27:41.579Z"
+        "last_updated": "2026-03-08T13:57:34.123Z"
       },
       "id": "mc4flkgp5ipmm"
     },
@@ -55,17 +55,16 @@
       "name": "KnowledgeManagement",
       "entityType": "Component",
       "observations": [
-        "The KnowledgeManagement component's utilization of a Graphology+LevelDB database for persistence, as seen in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), allows for efficient storage and querying of knowledge graphs. This choice of database is particularly noteworthy due to its ability to handle large amounts of data and provide a robust foundation for the component's intelligent routing mechanism. The intelligent routing, which switches between VKB API and direct database access, enables the component to optimize its interactions with the knowledge graph, thus improving overall performance. For instance, when an agent needs to store an entity, it can use the storeEntity method in GraphDatabaseAdapter, which ultimately relies on the Graphology+LevelDB database for persistence.",
-        "The implementation of work-stealing concurrency via a shared atomic index counter in the WaveController is a significant design decision that enables the KnowledgeManagement component to efficiently manage concurrent access to the knowledge graph. This pattern, combined with the use of Wave agents that follow a specific constructor pattern (repoPath, team) + ensureLLMInitialized() + execute(input), allows for lazy LLM initialization and facilitates the execution of tasks in a concurrent manner. The code in the WaveController, which is responsible for managing the shared atomic index counter, demonstrates a clear understanding of concurrent programming principles and their application in a real-world scenario. Furthermore, the use of automatic JSON export sync in the GraphDatabaseAdapter ensures that the knowledge graph remains up-to-date and consistent across all agents interacting with it.",
-        "The KnowledgeManagement component's type-safe interface, which provides methods such as storeEntity and storeRelationship in the GraphDatabaseAdapter, allows agents to interact with the central knowledge graph in a safe and controlled manner. This interface is crucial in preventing data inconsistencies and ensuring that all interactions with the knowledge graph are properly validated and authorized. The code in the GraphDatabaseAdapter, particularly in the storeEntity and storeRelationship methods, demonstrates a clear focus on data integrity and consistency, which is essential for maintaining a reliable and trustworthy knowledge graph. Additionally, the use of intelligent routing in the GraphDatabaseAdapter enables the component to adapt to changing conditions and optimize its interactions with the knowledge graph.",
-        "The lock-free architecture of the KnowledgeManagement component, which relies on intelligent routing to switch between VKB API and direct database access, is a key design decision that enables the component to achieve high performance and scalability. By avoiding the use of locks, the component can handle a large number of concurrent requests without experiencing significant performance degradation. The code in the GraphDatabaseAdapter, which implements the intelligent routing mechanism, demonstrates a deep understanding of the trade-offs involved in designing a lock-free system and the benefits that can be achieved through careful optimization. Furthermore, the use of Wave agents and work-stealing concurrency helps to distribute the workload efficiently and minimize the impact of concurrent access on the knowledge graph.",
-        "The KnowledgeManagement component's use of automatic JSON export sync, as seen in the GraphDatabaseAdapter, ensures that the knowledge graph remains consistent and up-to-date across all agents interacting with it. This feature is particularly important in a distributed system, where multiple agents may be accessing and modifying the knowledge graph concurrently. The code in the GraphDatabaseAdapter, which implements the automatic JSON export sync, demonstrates a clear focus on data consistency and integrity, and helps to prevent data inconsistencies that could arise due to concurrent modifications. Additionally, the use of intelligent routing and work-stealing concurrency helps to optimize the component's interactions with the knowledge graph, reducing the overhead associated with synchronizing data across multiple agents.",
-        "The Wave agents used in the KnowledgeManagement component, which follow a specific constructor pattern (repoPath, team) + ensureLLMInitialized() + execute(input), play a crucial role in interacting with the central knowledge graph. These agents are responsible for executing tasks and storing entities and relationships in the knowledge graph using the storeEntity and storeRelationship methods in the GraphDatabaseAdapter. The code in the Wave agents, particularly in the ensureLLMInitialized and execute methods, demonstrates a clear understanding of the component's architecture and the importance of lazy LLM initialization in optimizing performance. Furthermore, the use of work-stealing concurrency and intelligent routing helps to distribute the workload efficiently and minimize the impact of concurrent access on the knowledge graph."
+        "The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern allows for efficient initialization of LLM instances only when required, reducing unnecessary resource allocation. The ensureLLMInitialized() method, likely defined in the Wave agent classes, ensures that the LLM instance is properly initialized before execution. This approach enables the component to manage resources effectively and optimize performance. The GraphDatabaseAdapter, employed for Graphology+LevelDB persistence, also plays a crucial role in storing and retrieving knowledge graph data, as defined in storage/graph-database-adapter.ts.",
+        "The retry mechanism implemented in the ServiceStarterModule is a notable design decision, as it ensures that services are properly started, even in the face of failures or exceptions. This mechanism, likely implemented using a combination of try-catch blocks and recursive function calls, allows the component to recover from errors and maintain a stable state. The CodeGraphAgent, responsible for AST-based code knowledge graph construction and semantic code search capabilities, relies on the successful initialization of services to function correctly, as defined in code-graph-agent.ts. By incorporating a retry mechanism, the component can guarantee that services are available when needed, enhancing overall reliability and robustness.",
+        "The caching mechanism employed in the ClassificationCacheEntry is a significant optimization technique, as it reduces redundant LLM calls and minimizes the computational overhead associated with repeated classifications. By storing the results of previous classifications in a cache, the component can quickly retrieve and return the cached result when the same input is encountered again, rather than re-executing the expensive LLM operation. The PersistenceAgent, responsible for entity persistence, ontology classification, and content validation, likely interacts with the ClassificationCacheEntry to store and retrieve cached classification results, as defined in persistence-agent.ts. This caching approach enables the component to achieve improved performance and responsiveness.",
+        "The data loss tracking mechanism implemented in the DataLossTracking component is a valuable feature, as it allows the system to monitor data flow and identify potential issues or discrepancies. By tracking data loss, the component can detect anomalies or errors that may occur during data processing, storage, or transmission, and take corrective action to mitigate their impact. The GraphDatabaseAdapter, which provides Graphology+LevelDB persistence with automatic JSON export sync, likely plays a role in storing and retrieving data loss tracking information, as defined in storage/graph-database-adapter.ts. The CodeGraphAgent and PersistenceAgent may also interact with the DataLossTracking component to report and track data loss events, ensuring that the system remains aware of potential data integrity issues.",
+        "The use of a constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern in the Wave agents enables lazy LLM initialization, which is a key design decision in the KnowledgeManagement component. This pattern allows the component to delay the initialization of LLM instances until they are actually needed, reducing unnecessary resource allocation and improving overall system efficiency. The ensureLLMInitialized() method, likely defined in the Wave agent classes, serves as a crucial gatekeeper, ensuring that the LLM instance is properly initialized before execution. By following this pattern, the component can optimize resource utilization and minimize the overhead associated with LLM initialization, resulting in improved performance and responsiveness. The ClassificationCacheEntry and PersistenceAgent likely interact with the Wave agents to store and retrieve cached classification results and entity persistence information, respectively."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.279Z",
-        "last_updated": "2026-03-08T13:27:56.531Z"
+        "last_updated": "2026-03-08T13:57:49.071Z"
       },
       "id": "mc4flkg17znsjl"
     },
@@ -73,17 +72,18 @@
       "name": "CodingPatterns",
       "entityType": "Component",
       "observations": [
-        "The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to manage graph data persistence. This adapter is responsible for automatic JSON export synchronization, ensuring that data remains consistent across the project. The adapter's functionality is crucial in maintaining data integrity and facilitating efficient data retrieval. For instance, the GraphDatabaseAdapter's `syncData` function (storage/graph-database-adapter.ts:123) is used to synchronize data with the graph database, while the `exportJSON` function (storage/graph-database-adapter.ts:150) exports the data in JSON format. This design decision allows for a standardized approach to data management and provides a clear separation of concerns between data storage and retrieval.",
-        "The CodingPatterns component employs the ESLint library (.eslintrc.json) to enforce coding conventions across the project. This ensures that the codebase adheres to a set of predefined rules, promoting consistency and maintainability. The ESLint configuration file (.eslintrc.json:10) specifies the rules and settings for the linter, such as the `indent` rule (enforced in .eslintrc.json:20) and the `no-console` rule (enforced in .eslintrc.json:30). By using ESLint, the project maintains a high level of code quality and reduces the likelihood of errors due to inconsistent coding practices. Furthermore, the use of ESLint facilitates the onboarding process for new developers, as they can easily understand the project's coding conventions and adhere to them.",
-        "The dependency injection mechanism in the LLMServiceModule is a key design pattern in the CodingPatterns component. This mechanism allows for the resolution of current LLM providers, promoting loose coupling and testability. The `LLMServiceModule` class (llm-service-module.ts:50) is responsible for managing the dependencies and providing instances of LLM providers. The `getLLMProvider` function (llm-service-module.ts:100) returns an instance of the currently configured LLM provider, which can be easily swapped or mocked for testing purposes. This design decision enables the project to adapt to changing requirements and facilitates the integration of new LLM providers. Moreover, the use of dependency injection reduces the complexity of the codebase and improves its overall maintainability.",
-        "The factory pattern in the ProviderRegistryModule is another notable design pattern in the CodingPatterns component. This pattern allows for the creation of instances of different LLM providers, promoting flexibility and extensibility. The `ProviderRegistryModule` class (provider-registry-module.ts:200) is responsible for managing the registry of LLM providers and providing instances of them. The `createLLMProvider` function (provider-registry-module.ts:250) returns an instance of the specified LLM provider, which can be easily added or removed from the registry. This design decision enables the project to support a wide range of LLM providers and facilitates the integration of new providers. Furthermore, the use of the factory pattern reduces the complexity of the codebase and improves its overall maintainability.",
-        "The integration of the Jest testing framework is a crucial aspect of the CodingPatterns component. Jest provides a comprehensive set of tools for unit testing, ensuring that the codebase is thoroughly tested and validated. The `jest.config.js` file (jest.config.js:10) specifies the configuration for Jest, including the test environment and the test files to be executed. The `ModeRouter` class (mode-router.ts:300) is an example of a component that is thoroughly tested using Jest, with test cases covering its functionality and edge cases. The use of Jest facilitates the development of high-quality code and reduces the likelihood of errors due to untested code. Moreover, the integration of Jest enables the project to maintain a high level of code coverage and ensures that the codebase remains stable and reliable.",
-        "The modular design of the CodingPatterns component is a key architectural aspect that promotes maintainability and scalability. The project is composed of several components, such as the `ModeRouter` and `DockerizedServices`, which are designed to be independent and self-contained. The `ModeRouter` class (mode-router.ts:300) is responsible for managing the different modes of operation, while the `DockerizedServices` class (dockerized-services.ts:400) is responsible for managing the Dockerized services. This design decision enables the project to adapt to changing requirements and facilitates the integration of new components. Furthermore, the use of a modular design reduces the complexity of the codebase and improves its overall maintainability. The `WaveController` class (wave-controller.ts:500) is another example of a component that benefits from the modular design, as it can be easily integrated with other components and tested independently."
+        "The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flexible data storage and retrieval. This adapter is crucial for the component's functioning, as it allows for the storage and retrieval of complex relationships between coding patterns and practices. For instance, the `storePattern` method in the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) is used to store a new pattern in the graph database, while the `retrievePatterns` method is used to retrieve all patterns from the database. The use of this adapter simplifies the process of managing complex data relationships, making it easier to analyze and understand the coding patterns and practices employed throughout the project.",
+        "The CodingPatterns component employs the InsightGenerator class (insights/generator.ts) to generate insights from processed observations, which is a key aspect of the component's architecture. The InsightGenerator class uses data analysis to identify trends and patterns in the coding practices and standards employed throughout the project. For example, the `generateInsights` method in the InsightGenerator class (insights/generator.ts) takes in a set of processed observations and returns a set of insights that can be used to improve the coding standards and practices. The use of this class enables the component to provide actionable recommendations for improving the coding practices and standards employed throughout the project.",
+        "The CodingPatterns component leverages the OntologyConfigManager to load ontology configurations from specific files (integrations/mcp-server-semantic-analysis/config/ontology-config.yaml), which ensures consistent ontology management. The OntologyConfigManager is responsible for loading and managing the ontology configurations, which define the relationships between different coding concepts and patterns. For instance, the `loadConfig` method in the OntologyConfigManager class (integrations/mcp-server-semantic-analysis/config/ontology-config-manager.ts) is used to load the ontology configurations from the specified file, while the `getConfig` method is used to retrieve the loaded configurations. The use of this manager ensures that the ontology configurations are handled consistently throughout the component, which is essential for maintaining the integrity of the coding patterns and practices.",
+        "The CodingPatterns component follows a factory pattern, as suggested by the parent component analysis, to facilitate the creation of objects without specifying the exact class of object that will be created. This pattern is implemented through the use of the Factory class (factory.ts), which provides a set of methods for creating objects. For example, the `createPattern` method in the Factory class (factory.ts) is used to create a new pattern object, while the `createPractice` method is used to create a new practice object. The use of this pattern enables the component to decouple the creation of objects from the specific classes of objects, making it easier to add new types of objects in the future.",
+        "The CodingPatterns component incorporates the use of a library like chokidar for watching file system events, as hinted at by the parent component analysis, to monitor and respond to file system changes. This library is used to watch for changes to files and directories, and to trigger actions in response to these changes. For instance, the `watchFiles` method in the FileSystemWatcher class (file-system-watcher.ts) is used to watch for changes to files and directories, while the `onFileChanged` method is used to handle changes to files. The use of this library enables the component to respond to changes in the file system, which is essential for maintaining the integrity of the coding patterns and practices.",
+        "The CodingPatterns component utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps for pipeline agent execution, which ensures efficient and ordered processing of tasks. This model is implemented through the use of the PipelineExecutor class (pipeline-executor.ts), which is responsible for executing the pipeline steps. For example, the `executePipeline` method in the PipelineExecutor class (pipeline-executor.ts) is used to execute the pipeline steps, while the `sortSteps` method is used to sort the steps in topological order. The use of this model enables the component to process tasks in a efficient and ordered manner, which is essential for maintaining the integrity of the coding patterns and practices.",
+        "The CodingPatterns component employs a retry mechanism in the ServiceStarterModule to ensure that services are properly started, as seen in the service starter logic. This mechanism is implemented through the use of the RetryManager class (retry-manager.ts), which provides a set of methods for retrying failed operations. For instance, the `retryStartService` method in the RetryManager class (retry-manager.ts) is used to retry starting a service, while the `onServiceStarted` method is used to handle the successful start of a service. The use of this mechanism ensures that services are started reliably, even in the presence of failures or errors."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.281Z",
-        "last_updated": "2026-03-08T13:28:01.538Z"
+        "last_updated": "2026-03-08T13:57:53.584Z"
       },
       "id": "mc4flkg30u7wy5"
     },
@@ -91,17 +91,17 @@
       "name": "ConstraintSystem",
       "entityType": "Component",
       "observations": [
-        "The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.",
-        "The HookConfigLoader, located in the file lib/agent-api/hooks/hook-config.js, plays a crucial role in loading and merging hook configurations from multiple sources. This allows the ConstraintSystem to seamlessly integrate with various development tools and workflows, making it highly scalable and flexible. The HookConfigLoader's mergeConfig method combines configurations from different sources, resolving any potential conflicts and ensuring a unified configuration for the ConstraintSystem. The UnifiedHookManager, defined in lib/agent-api/hooks/hook-manager.js, then uses this merged configuration to centrally manage hook events and registered handlers.",
-        "The ViolationCaptureService, implemented in the file scripts/violation-capture-service.js, is responsible for capturing and persisting constraint violations during live coding sessions. The service employs a work-stealing concurrency model via shared atomic index counters, enabling efficient violation processing and minimizing potential bottlenecks. The ViolationCaptureService's captureViolation method takes a violation object as input and persists it to the graph database using the GraphDatabaseAdapter, defined in storage/graph-database-adapter.ts. This adapter provides a standardized interface for graph data storage and retrieval, allowing the ConstraintSystem to interact with the graph database in a decoupled manner.",
-        "The ConstraintSystem's use of the GraphDatabaseAdapter for graph data storage and retrieval allows for efficient and scalable data management. The GraphDatabaseAdapter, defined in storage/graph-database-adapter.ts, provides methods for creating, reading, updating, and deleting graph data, making it a crucial component of the ConstraintSystem's architecture. The adapter's createNode method, for example, creates a new node in the graph database with the given properties, while the readNode method retrieves a node by its ID. This standardized interface enables the ConstraintSystem to interact with the graph database in a decoupled manner, making it easier to switch to a different database implementation if needed.",
-        "The ConstraintSystem's implementation of the work-stealing concurrency model in the ViolationCaptureService is a key design decision that enables efficient violation processing. By using shared atomic index counters, the service can efficiently distribute work among multiple threads, minimizing potential bottlenecks and ensuring that violations are processed in a timely manner. The ViolationCaptureService's use of atomic index counters also ensures that the service is thread-safe, preventing potential concurrency issues that could arise from multiple threads accessing shared resources. The work-stealing concurrency model is a well-established pattern in concurrent programming, and its implementation in the ViolationCaptureService is a testament to the ConstraintSystem's focus on scalability and performance.",
-        "The ConstraintSystem's modular architecture and use of standardized interfaces, such as the GraphDatabaseAdapter, make it highly maintainable and adaptable to changing requirements. The system's components, such as the ContentValidationAgent and the HookConfigLoader, are designed to be loosely coupled, making it easier to modify or replace individual components without affecting the overall system. The ConstraintSystem's use of standardized interfaces also enables developers to easily integrate new components or services, further enhancing the system's flexibility and scalability. The GraphDatabaseAdapter, for example, provides a standardized interface for graph data storage and retrieval, making it easy to switch to a different database implementation if needed."
+        "The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.",
+        "The use of a modular design pattern in the ConstraintSystem component is noteworthy, with separate modules for different functional areas such as content validation, hook management, and violation capture. This is reflected in the organization of the codebase, where files like hook-config.js and hook-manager.js are contained within the lib/agent-api/hooks directory, while content-validation-agent.ts is located in integrations/mcp-server-semantic-analysis/src/agents. The ViolationCaptureService (scripts/violation-capture-service.js) is another example of this modularity, as it is responsible for capturing and persisting constraint violations during live sessions.",
+        "The ConstraintSystem component's reliance on data storage solutions like graph databases and JSON files is a key aspect of its architecture. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) provides a interface for interacting with the graph database, allowing the component to store and retrieve data in a structured and efficient manner. Additionally, the use of JSON files for storing hook configurations and other data is evident in files like hook-config.js, which loads and merges configurations from multiple sources. This hybrid approach to data storage enables the component to balance the need for structured data with the flexibility of JSON-based configuration.",
+        "The choice to use a combination of JavaScript and TypeScript for development is an interesting design decision in the ConstraintSystem component. The use of TypeScript for core components like the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) and the GraphDatabaseAdapter (storage/graph-database-adapter.ts) provides a level of type safety and maintainability, while the use of JavaScript for scripting and utility functions like the ViolationCaptureService (scripts/violation-capture-service.js) allows for greater flexibility and rapid development. This approach enables the component to leverage the strengths of both languages, resulting in a more robust and efficient system.",
+        "The event-driven hook management implemented by the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) is a critical aspect of the ConstraintSystem component's architecture. This approach allows the component to respond to various events and triggers, such as changes to hook configurations or content validation results, and orchestrate the necessary actions and notifications. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) plays a key role in this process, as it loads and merges hook configurations from multiple sources, enabling the component to adapt to changing requirements and constraints. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is another example of this event-driven approach, as it validates entity content and detects staleness in response to changes and updates.",
+        "The ConstraintSystem component's use of the ViolationCaptureService (scripts/violation-capture-service.js) to capture and persist constraint violations during live sessions is a notable feature of its architecture. This service is responsible for monitoring the system for constraint violations and storing them in a persistent manner, allowing the component to track and analyze violations over time. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) is used to store and retrieve violation data, providing a structured and efficient means of managing this critical information. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) and the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) also play important roles in this process, as they provide the necessary validation and orchestration capabilities to support the ViolationCaptureService."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.285Z",
-        "last_updated": "2026-03-08T13:28:03.597Z"
+        "last_updated": "2026-03-08T13:57:56.642Z"
       },
       "id": "mc4flkg12nbo98"
     },
@@ -109,16 +109,17 @@
       "name": "SemanticAnalysis",
       "entityType": "Component",
       "observations": [
-        "The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.",
-        "The SemanticAnalysisAgent's implementation of the execute(input) pattern and its use of the LLMService for semantic classification demonstrate a clear separation of concerns and adherence to the single responsibility principle. The ensureLLMInitialized() method in the SemanticAnalysisAgent class, as defined in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, ensures that the LLM is initialized only when necessary, promoting lazy loading and reducing unnecessary computational overhead. This design decision contributes to the overall efficiency and scalability of the SemanticAnalysis component.",
-        "The CodeGraphAgent's integration with the code-graph-rag MCP server and its use of Tree-sitter AST parsing to index repositories showcase the component's ability to handle complex code analysis tasks. The agent's interaction with the Memgraph knowledge graph to query code entities, as seen in the integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts file, highlights the component's capacity to provide valuable insights into the codebase. The CodeGraphAgent's design demonstrates a clear understanding of the importance of code analysis in the context of semantic analysis and knowledge entity extraction.",
-        "The ContentValidationAgent's role in validating entity content, including observations, insights, and PlantUML diagrams, ensures that the extracted knowledge entities are accurate and consistent with the current codebase. The agent's implementation, as defined in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, demonstrates a thorough understanding of the importance of data validation in maintaining the integrity of the extracted knowledge. The ContentValidationAgent's design contributes to the overall reliability and trustworthiness of the SemanticAnalysis component.",
-        "The BaseAgent class, as defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standardized constructor pattern for all agents, taking repositoryPath and team as parameters. This design decision promotes consistency across the system and simplifies the development process for new agents. The BaseAgent class also offers standard response envelope creation, confidence calculation, issue detection, and routing suggestion generation, further streamlining the agent development process and reducing code duplication. The use of a base class for all agents demonstrates a clear understanding of the importance of code reuse and modularity in software design."
+        "The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, responsible for a specific task. This modularity is reflected in the code organization, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent class, defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.",
+        "The OntologyClassificationAgent utilizes the NLPProcessor class for ontology-based observation classification. This is evident in the code, where the agent imports and uses the NLPProcessor class to perform classification tasks. The NLPProcessor class is likely responsible for the natural language processing aspects of the agent, such as tokenization, entity recognition, and intent identification. The specific implementation details can be found in the ontology-classification-agent.ts file.",
+        "The SemanticAnalysisAgent follows a specific pattern for semantic analysis, which involves ensuring the LLM is initialized and then analyzing Git and Vibe data. This pattern is reflected in the ensureLLMInitialized() and analyzeGitAndVibeData() functions, which are called in sequence to perform the analysis. The LLMService, defined in lib/llm/dist/index.js, is used to provide language model-based semantic insights generation. The use of this service allows the agent to leverage pre-trained language models for tasks such as text classification, sentiment analysis, and entity recognition.",
+        "The CodeGraphAgent is responsible for integrating with the code-graph-rag MCP server for AST-based code knowledge graph construction. This integration is facilitated by the checkMemgraphConnection() method, which checks the availability of the Memgraph connection. The agent uses this connection to construct a knowledge graph representing the codebase, which can be used for tasks such as code search, code completion, and code analysis. The specific implementation details can be found in the code-graph-agent.ts file.",
+        "The ContentValidationAgent uses the GitHistoryAgent and VibeHistoryAgent to detect entity staleness and validate content. This is evident in the code, where the agent imports and uses these two agents to perform validation tasks. The GitHistoryAgent is likely responsible for analyzing the Git history to detect changes to entities, while the VibeHistoryAgent analyzes the Vibe history to detect changes to entities. The ContentValidationAgent then uses this information to validate the content and detect any staleness. The specific implementation details can be found in the content-validation-agent.ts file.",
+        "The use of a standard response envelope creation and confidence calculation, provided by the BaseAgent class, allows for consistency across all agents. This consistency is important for ensuring that the output of each agent is in a standard format, making it easier to integrate the output of multiple agents. The BaseAgent class provides a set of functions, such as createResponseEnvelope() and calculateConfidence(), which can be used by all agents to create response envelopes and calculate confidence levels. This consistency is reflected in the code, where each agent imports and uses the BaseAgent class to create response envelopes and calculate confidence levels."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.288Z",
-        "last_updated": "2026-03-08T13:28:09.858Z"
+        "last_updated": "2026-03-08T13:58:00.610Z"
       },
       "id": "mc4flkg1jyy23i"
     },
@@ -126,17 +127,17 @@
       "name": "LLMAbstraction",
       "entityType": "Component",
       "observations": [
-        "The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific responsibilities and functions. For instance, the LLMService (lib/llm/llm-service.ts) serves as the primary entry point for all LLM operations, handling mode routing, caching, and circuit breaking. This modular design promotes code reusability and maintainability, as seen in the use of design patterns such as dependency injection and factory patterns. The dependency injection in LLMService (lib/llm/llm-service.ts) enables the resolution of the current LLM provider and supports various LLM modes, making it easier to switch between different providers or modes without affecting the rest of the codebase.",
-        "The DMRProvider (lib/llm/providers/dmr-provider.ts) is used for local LLM inference via Docker Desktop's Model Runner, supporting per-agent model overrides. This allows for more flexibility and customization in the LLM operations, as developers can override the default models for specific agents. The AnthropicProvider (lib/llm/providers/anthropic-provider.ts), on the other hand, is used for interactions with the Anthropic API, which has a different API shape and separate content extraction. The use of different providers for different APIs or modes enables the LLMAbstraction component to support a wide range of LLM operations and providers, making it more versatile and adaptable to different use cases.",
-        "The MockLLMService (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) is used to provide mock LLM responses, enabling the testing of frontend logic without actual API calls. This is particularly useful during development and testing phases, as it allows developers to test the LLMAbstraction component's functionality without relying on external APIs or services. The MockLLMService also helps to improve the overall testing efficiency and coverage, as it enables developers to test different scenarios and edge cases without incurring the overhead of actual API calls.",
-        "The LLMAbstraction component supports tier-based routing and provider fallback in LLMService (lib/llm/llm-service.ts), ensuring flexibility and scalability in LLM operations. This means that the component can route requests to different providers or modes based on specific conditions or criteria, such as the type of request, the priority of the request, or the availability of the providers. The provider fallback mechanism also ensures that the component can recover from failures or errors, by automatically switching to a different provider or mode. This enhances the overall reliability and resilience of the LLMAbstraction component, making it more suitable for production environments.",
-        "The ProviderRegistry (lib/llm/provider-registry.js) uses a factory pattern to create instances of different LLM providers, promoting code reusability and maintainability. The factory pattern enables the ProviderRegistry to create providers without specifying the exact class of provider that will be created, making it easier to add or remove providers without affecting the rest of the codebase. This also enables the LLMAbstraction component to support a wide range of providers, without having to modify the underlying code. The use of a factory pattern also improves the overall scalability and flexibility of the component, as it allows developers to easily add or remove providers as needed.",
-        "The LLMAbstraction component's use of dependency injection in LLMService (lib/llm/llm-service.ts) enables the resolution of the current LLM provider and supports various LLM modes. This makes it easier to switch between different providers or modes without affecting the rest of the codebase, as the dependency injection mechanism takes care of resolving the correct provider or mode. The dependency injection also promotes loose coupling between the components, making it easier to modify or replace individual components without affecting the rest of the system. This enhances the overall maintainability and flexibility of the LLMAbstraction component, making it more suitable for large-scale and complex systems."
+        "The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects of its functionality. For instance, the LLMService class (lib/llm/llm-service.ts) serves as a high-level facade for all LLM operations, handling tasks such as mode routing, caching, and provider fallback. This modularity enables easier maintenance, updates, and extensions of the component. Furthermore, the use of interfaces like LLMCompletionRequest and LLMCompletionResult (lib/llm/llm-service.ts) facilitates communication between different parts of the component, ensuring consistency in data exchange.",
+        "The incorporation of the DMRProvider class (lib/llm/providers/dmr-provider.ts) allows for local LLM inference via Docker Desktop's Model Runner. This class supports per-agent model overrides from DMR config, providing flexibility in model selection. The DMRProvider class demonstrates the component's ability to adapt to different providers and deployment scenarios. Additionally, the ProviderRegistry class (lib/llm/provider-registry.js) manages providers, facilitating the registration and initialization of various LLM providers. This registry enables the component to seamlessly integrate with different providers, such as the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts).",
+        "The LLMAbstraction component's use of caching is optimized through the LLMCache class (lib/llm/cache.js). This class reduces the number of redundant requests, resulting in improved performance. The caching mechanism is particularly useful when dealing with expensive operations, such as LLM inference. The CircuitBreaker class (lib/llm/circuit-breaker.js) is also employed to handle circuit breaking, preventing cascading failures in the component. This ensures that the component remains resilient and stable, even in the face of provider failures or network issues.",
+        "The mock service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) is a valuable asset for testing purposes, generating plausible data to maintain workflow continuity. This mock service enables developers to test the component's functionality without relying on actual LLM providers, reducing the complexity and cost associated with testing. The mock service demonstrates the component's ability to adapt to different testing scenarios, providing a flexible and maintainable solution. Moreover, the use of mock services facilitates the isolation of individual components, allowing developers to focus on specific aspects of the system.",
+        "The AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) is an example of the component's ability to interact with different LLM providers. This class demonstrates the component's flexibility and adaptability, as it can seamlessly integrate with various providers. The AnthropicProvider class showcases the component's ability to handle provider-specific logic, such as authentication and request formatting. The use of provider-specific classes, such as the AnthropicProvider, enables the component to accommodate different provider requirements, resulting in a more robust and flexible solution.",
+        "The LLMAbstraction component's error handling mechanism is designed to prevent cascading failures, ensuring that the component remains stable and resilient. The CircuitBreaker class (lib/llm/circuit-breaker.js) plays a crucial role in this mechanism, detecting and preventing cascading failures. The component's use of try-catch blocks and error logging (lib/llm/llm-service.ts) also contributes to its robustness, providing valuable insights into error causes and facilitating debugging. The combination of these error handling mechanisms enables the component to maintain its stability, even in the face of provider failures or network issues."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.293Z",
-        "last_updated": "2026-03-08T13:27:49.681Z"
+        "last_updated": "2026-03-08T13:57:41.182Z"
       },
       "id": "mc4flkgs99eop"
     },
@@ -144,17 +145,17 @@
       "name": "DockerizedServices",
       "entityType": "Component",
       "observations": [
-        "The DockerizedServices component implements a modular design, with each service being a separate Docker container. This is evident in the use of Docker Compose files, which define the services and their dependencies. For example, the docker-compose.yml file in the root directory defines the services and their dependencies. The LLMService class, located in lib/llm/llm-service.ts, is a high-level facade that handles mode routing, caching, and circuit breaking for all LLM operations. This modular design allows for easy addition or removal of services, making the system highly scalable and maintainable.",
-        "The use of dependency injection in the LLMService class, as seen in lib/llm/llm-service.ts, allows for flexible and modular service configuration. This is achieved through the constructor, where the dependencies are injected. For instance, the GraphDatabaseAdapter is injected into the LLMService class, enabling it to interact with the graph database. This design decision enables easy testing and maintenance of the services, as dependencies can be easily swapped out or mocked.",
-        "The GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, provides a layer of abstraction between the services and the graph database. This allows for easy switching between different graph database implementations, if needed. The adapter provides methods for storing and retrieving data, which are used by the LLMService class to manage data. The use of this adapter enables efficient data management and reduces the complexity of the services.",
-        "The WaveController, located in wave-controller.ts, implements work-stealing concurrency using shared atomic index counters. This allows for efficient task execution, as tasks can be stolen from other threads when they are idle. The WaveController uses the atomic index counters to keep track of the tasks and their status, ensuring that tasks are executed correctly and efficiently. This design decision enables the system to handle a large number of tasks concurrently, making it highly scalable.",
-        "The ModeRouter sub-component, used in the LLMService class, manages different operation modes, such as mock, local, and public. This is achieved through the use of an enum, which defines the different modes. The ModeRouter uses a switch statement to determine the current mode and execute the corresponding logic. For example, in mock mode, the LLMService class returns mock data, while in local mode, it interacts with the local graph database. This design decision enables easy addition of new modes or modification of existing ones, making the system highly flexible.",
-        "The ServiceStarter class, located in lib/service-starter.js, provides robust service startup with retry logic and health verification. This ensures that services are started correctly and are healthy before they are used. The ServiceStarter class uses a retry mechanism to restart services that fail to start, and it verifies the health of the services before considering them started. This design decision enables reliable service initialization, making the system highly available and fault-tolerant."
+        "The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStarterModule (lib/service-starter.js). This pattern helps prevent endless loops and promotes system stability by introducing a delay between retries. For instance, the startService function in ServiceStarterModule utilizes a backoff strategy to retry failed service startups, ensuring that services are properly initialized before use. The use of Dockerization in this component further enhances deployment and management of services, making it easier to scale and maintain the system. The LLMService (lib/llm/llm-service.ts) also plays a crucial role in this component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.",
+        "The application of health verification and circuit breaking in the LLMService (lib/llm/llm-service.ts) is a key design decision that prevents cascading failures and ensures system reliability. This is achieved through the use of circuit breakers, which detect when a service is not responding and prevent further requests from being sent to it until it becomes available again. The health verification mechanism is also essential, as it periodically checks the health of services and updates the circuit breaker state accordingly. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) is another important aspect of this component, as it facilitates efficient data storage and retrieval using Graphology+LevelDB persistence.",
+        "The HookManager, which utilizes an event-driven architecture, is a vital component of the DockerizedServices. It employs hook events and handlers to enable flexible and modular service interactions. The HookManager allows services to register handlers for specific events, making it easier to manage complex interactions between services. This design decision enhances maintainability and scalability, as new services can be easily integrated into the system without affecting existing functionality. The retry-with-backoff pattern in the ServiceStarterModule (lib/service-starter.js) also complements the HookManager, ensuring that services are properly initialized before they start interacting with each other.",
+        "Dependency injection is another crucial aspect of the LLMService (lib/llm/llm-service.ts), as it enables loose coupling between components and services. This design decision enhances maintainability and scalability, as it allows for easy substitution of different implementations without affecting the overall system. The LLMService uses dependency injection to manage its dependencies, such as the GraphDatabaseAdapter (storage/graph-database-adapter.ts) and the HookManager. This approach makes it easier to test and maintain the system, as individual components can be developed and tested independently. The use of Dockerization in this component further facilitates loose coupling, as services can be easily deployed and managed independently.",
+        "The GraphDatabaseAdapter (storage/graph-database-adapter.ts) plays a critical role in the DockerizedServices component, as it facilitates efficient data storage and retrieval using Graphology+LevelDB persistence. This adapter provides a layer of abstraction between the LLMService and the underlying storage system, making it easier to manage complex data relationships. The GraphDatabaseAdapter is also responsible for handling data serialization and deserialization, ensuring that data is stored and retrieved correctly. The use of Graphology+LevelDB persistence in this adapter provides a robust and scalable storage solution, making it well-suited for large-scale systems. The LLMService (lib/llm/llm-service.ts) relies heavily on the GraphDatabaseAdapter, using it to store and retrieve data for its high-level LLM operations.",
+        "The DockerizedServices component exhibits a high degree of modularity, thanks to its use of Dockerization and event-driven architecture. This modularity makes it easier to develop, test, and maintain individual services, as they can be managed independently without affecting the overall system. The HookManager, with its event-driven architecture, is a key enabler of this modularity, as it allows services to interact with each other in a flexible and decoupled manner. The use of retry-with-backoff pattern in the ServiceStarterModule (lib/service-starter.js) further enhances modularity, as it ensures that services are properly initialized before they start interacting with each other. The LLMService (lib/llm/llm-service.ts) and the GraphDatabaseAdapter (storage/graph-database-adapter.ts) also contribute to this modularity, providing a layer of abstraction between services and the underlying storage system."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.298Z",
-        "last_updated": "2026-03-08T13:27:49.677Z"
+        "last_updated": "2026-03-08T13:57:40.697Z"
       },
       "id": "mc4flkg22cvl1q"
     },
@@ -162,17 +163,17 @@
       "name": "Trajectory",
       "entityType": "Component",
       "observations": [
-        "The Trajectory component's use of dependency injection is evident in the SpecstoryAdapter class, where it utilizes a factory pattern to create instances of different connection methods. This is seen in the lib/integrations/specstory-adapter.js file, where the constructor() function is used to initialize the adapter with the required dependencies. The initialize() function is then used to set up the connection, and the logConversation() function is used to log any errors or warnings that occur during the connection process. This pattern allows for loose coupling between the adapter and the connection methods, making it easier to switch between different connection methods or add new ones.",
-        "The connection retry mechanism implemented in the connectViaHTTP() function in lib/integrations/specstory-adapter.js is a key aspect of the Trajectory component's robustness. This mechanism allows the adapter to retry the connection a specified number of times before giving up, which helps to handle temporary connection failures. The logger, implemented in lib/logging/Logger.js, is used to log any errors or warnings that occur during the connection process, providing valuable debugging information. The use of a retry mechanism and logging helps to ensure that the component is reliable and can recover from temporary failures.",
-        "The SpecstoryAdapter class follows a specific pattern, where the constructor() function is used for initialization, the initialize() function is used to set up the connection, and the logConversation() function is used to log any errors or warnings. This pattern is seen in lib/integrations/specstory-adapter.js, starting from line 50. The use of this pattern allows for lazy initialization, where the adapter is only fully initialized when it is actually needed. This helps to improve performance by avoiding unnecessary initialization. The logging of conversations also helps to provide valuable debugging information, making it easier to diagnose and fix issues.",
-        "The Trajectory component's use of modular design is evident in the way it handles errors and exceptions. In the connectViaIPC() function in lib/integrations/specstory-adapter.js, starting from line 200, and the connectViaFileWatch() function, starting from line 250, the component handles errors and exceptions in a robust way. The use of try-catch blocks and error logging helps to ensure that the component can recover from errors and provide valuable debugging information. The modular design of the component, where each function or method has a specific responsibility, makes it easier to handle errors and exceptions in a robust way.",
-        "The Trajectory component's use of fs/promises in the connectViaFileWatch() function in lib/integrations/specstory-adapter.js is a key aspect of its ability to interact with the file system. The use of promises allows the component to handle asynchronous file system operations in a robust way, avoiding the need for callbacks or other complex asynchronous programming patterns. The fs/promises module provides a simple and intuitive way to interact with the file system, making it easier to implement the file watch connection method. The use of fs/promises also helps to improve the performance of the component, by avoiding the need for blocking file system operations.",
-        "The Trajectory component's design is scalable and flexible, allowing for easy integration with other components and systems. The use of dependency injection and factory patterns makes it easy to switch between different connection methods or add new ones. The modular design of the component, where each function or method has a specific responsibility, makes it easier to modify or extend the component without affecting other parts of the system. The use of logging and error handling also helps to ensure that the component is reliable and can recover from temporary failures, making it easier to integrate with other components and systems."
+        "The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods in specstory-adapter.js. This flexibility allows the component to provide a fallback option when necessary, ensuring reliable connectivity. The SpecstoryAdapter class plays a crucial role in this design, as it encapsulates the logic for connecting to the Specstory extension via various methods. The initialize method in SpecstoryAdapter implements a retry mechanism to handle connection failures, demonstrating a focus on robustness.",
+        "The use of a factory-like pattern in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods is notable, as it enables the creation of different connection types in a modular and extensible manner. This design decision allows for easy addition of new connection methods in the future, making the component more adaptable to changing requirements. The createLogger function from logging/Logger.js is used to handle errors and warnings, providing a centralized logging mechanism that facilitates debugging and monitoring.",
+        "The Trajectory component leverages various Node.js modules, including fs, path, os, net, and http, to interact with the file system, manipulate paths, and establish network connections. The fs module is used in the connectViaFileWatch method to watch a directory for changes, enabling the fallback connection method. The path module is utilized to construct file paths, while the os module provides information about the operating system. The net and http modules are used for network communication, facilitating the establishment of connections to the Specstory extension.",
+        "The logConversation method in SpecstoryAdapter is responsible for formatting conversation entries for Specstory, demonstrating a focus on data consistency and integrity. This method ensures that conversation entries are properly structured and formatted, allowing for seamless integration with the Specstory extension. The SpecstoryAdapter class also implements a mechanism for logging conversation entries, providing a record of interactions with the Specstory extension. The logging mechanism is implemented using the createLogger function from logging/Logger.js, which provides a standardized way of logging events and errors.",
+        "The connectViaFileWatch method in specstory-adapter.js implements a fallback connection method using a watched directory, providing an alternative means of connecting to the Specstory extension when other methods fail. This approach ensures that the component can still function even when primary connection methods are unavailable, demonstrating a focus on reliability and fault tolerance. The use of a watched directory allows the component to detect changes to files in the directory, enabling it to establish a connection to the Specstory extension when necessary. The fs module is used to watch the directory, and the path module is used to construct file paths.",
+        "The Trajectory component's design emphasizes flexibility and reliability, as evidenced by the use of multiple connection methods and a retry mechanism in the SpecstoryAdapter class. The component's architecture is modular and extensible, allowing for easy addition of new connection methods and features. The use of a factory-like pattern and a centralized logging mechanism further contributes to the component's maintainability and scalability. The SpecstoryAdapter class plays a critical role in the component's design, as it encapsulates the logic for connecting to the Specstory extension and provides a standardized way of logging events and errors."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.302Z",
-        "last_updated": "2026-03-08T13:27:55.408Z"
+        "last_updated": "2026-03-08T13:57:46.001Z"
       },
       "id": "mc4flkga1xqjr"
     },
@@ -367,18 +368,18 @@
       "name": "SemanticAnalysisService",
       "entityType": "SubComponent",
       "observations": [
-        "SemanticAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route semantic analysis requests to different modes, such as training or inference, based on input parameters.",
-        "The caching mechanism in LLMService ensures that frequently accessed semantic analysis data is stored in memory, reducing the latency of subsequent requests.",
-        "SemanticAnalysisService uses the circuit breaking feature in LLMService to prevent cascading failures by detecting and preventing requests to faulty services.",
-        "The implementation of semantic analysis in SemanticAnalysisService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.",
-        "SemanticAnalysisService utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.",
-        "The SemanticAnalysisService class in lib/llm/semantic-analysis-service.ts handles the semantic analysis of coding services, including API server and dashboard.",
-        "The lib/llm/semantic-analysis-service.ts file contains the implementation of the semantic analysis functionality, including the use of LLMService for mode routing and caching."
+        "The startService function in ServiceStarterModule (lib/service-starter.js) utilizes a backoff strategy to retry failed service startups, ensuring that services like SemanticAnalysisService are properly initialized before use.",
+        "SemanticAnalysisService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.",
+        "The LLMService (lib/llm/llm-service.ts) may play a crucial role in this sub-component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.",
+        "The use of Dockerization in this sub-component further enhances deployment and management of services, making it easier to scale and maintain the system.",
+        "The SemanticAnalysisService may interact with the LLMService to perform tasks such as entity recognition, sentiment analysis, and topic modeling.",
+        "The lib/llm/llm-service.ts file may contain key classes or interfaces that define the behavior of the SemanticAnalysisService, such as the LLMService class.",
+        "The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the SemanticAnalysisService, such as a custom backoff strategy."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:24.994Z",
-        "last_updated": "2026-03-08T10:27:26.361Z"
+        "last_updated": "2026-03-08T13:58:21.838Z"
       },
       "id": "mc4flkg3v1dot"
     },
@@ -386,18 +387,18 @@
       "name": "ConstraintMonitoringService",
       "entityType": "SubComponent",
       "observations": [
-        "ConstraintMonitoringService leverages the LLMService class in lib/llm/llm-service.ts to route constraint monitoring requests to different modes, such as training or inference, based on input parameters.",
-        "The caching mechanism in LLMService ensures that frequently accessed constraint monitoring data is stored in memory, reducing the latency of subsequent requests.",
-        "ConstraintMonitoringService uses the circuit breaking feature in LLMService to prevent cascading failures by detecting and preventing requests to faulty services.",
-        "The implementation of constraint monitoring in ConstraintMonitoringService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.",
-        "ConstraintMonitoringService utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.",
-        "The ConstraintMonitoringService class in lib/llm/constraint-monitoring-service.ts handles the constraint monitoring of coding services, including API server and dashboard.",
-        "The lib/llm/constraint-monitoring-service.ts file contains the implementation of the constraint monitoring functionality, including the use of LLMService for mode routing and caching."
+        "The ConstraintMonitoringService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.",
+        "The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the ConstraintMonitoringService, such as a custom backoff strategy.",
+        "The ConstraintMonitoringService may interact with other sub-components, such as the CodeGraphConstructionService, to monitor and enforce constraints on code graphs.",
+        "The lib/service-starter.js file may contain key functions or classes that define the behavior of the ConstraintMonitoringService, such as the startService function.",
+        "The ConstraintMonitoringService may use a separate database or storage system to store and manage constraint rules and monitoring data.",
+        "The ConstraintMonitoringService may have a specific API or interface that allows other sub-components to interact with it and retrieve constraint monitoring data.",
+        "The ConstraintMonitoringService may utilize logging and error handling mechanisms to track and report constraint monitoring issues and errors."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:24.998Z",
-        "last_updated": "2026-03-08T10:27:30.441Z"
+        "last_updated": "2026-03-08T13:58:22.862Z"
       },
       "id": "mc4flkg3och1rk"
     },
@@ -593,18 +594,18 @@
       "name": "ManualLearning",
       "entityType": "SubComponent",
       "observations": [
-        "ManualLearning likely utilizes the storeEntity method in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to persist manually created entities.",
-        "The ManualLearning sub-component may leverage the intelligent routing mechanism in the KnowledgeManagement component to optimize interactions with the knowledge graph.",
-        "ManualLearning probably employs the Graphology+LevelDB database for storing and querying manually created knowledge graphs, as seen in the GraphDatabaseAdapter.",
-        "This sub-component might use the VKB API for certain knowledge graph operations, as suggested by the intelligent routing mechanism in the KnowledgeManagement component.",
-        "ManualLearning could involve custom observation handling, possibly through a method similar to the storeEntity method in GraphDatabaseAdapter.",
-        "The sub-component may include functionality for direct edits, potentially using a method like updateEntity in GraphDatabaseAdapter.",
-        "ManualLearning may incorporate hand-crafted observation handling, possibly leveraging the Graphology+LevelDB database for storage and querying."
+        "ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve manual knowledge entities",
+        "ManualLearning employs the EntityPersistenceManager to manage the persistence of manually created entities in the graph database",
+        "ManualLearning uses the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before manual entity creation or editing",
+        "ManualLearning follows the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization, as seen in the Wave agents",
+        "ManualLearning relies on the DataLossTracker to track data loss during manual entity creation or editing, identifying potential issues and bottlenecks",
+        "ManualLearning uses the factory pattern for creating LLM instances, as seen in the Wave agents, to efficiently initialize LLM instances only when required",
+        "ManualLearning stores manual knowledge entities in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of manual knowledge"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.043Z",
-        "last_updated": "2026-03-08T13:28:44.608Z"
+        "last_updated": "2026-03-08T13:58:42.323Z"
       },
       "id": "mc4flkg3msrows"
     },
@@ -612,18 +613,18 @@
       "name": "OnlineLearning",
       "entityType": "SubComponent",
       "observations": [
-        "OnlineLearning probably utilizes a batch analysis pipeline, similar to the one described in batch-analysis.yaml, to extract knowledge from git history and other sources.",
-        "The OnlineLearning sub-component may employ the Graphology+LevelDB database for storing and querying automatically extracted knowledge graphs.",
-        "This sub-component likely involves data processing and analysis, potentially using libraries or frameworks for natural language processing or machine learning.",
-        "OnlineLearning might use the VKB API for certain knowledge graph operations, as suggested by the intelligent routing mechanism in the KnowledgeManagement component.",
-        "The sub-component could involve custom data import handling, possibly through a method similar to the storeEntity method in GraphDatabaseAdapter.",
-        "OnlineLearning may include functionality for automated observation handling, potentially leveraging the Graphology+LevelDB database for storage and querying.",
-        "This sub-component may utilize concurrency mechanisms, such as work-stealing, to improve performance during batch analysis."
+        "OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis",
+        "OnlineLearning employs the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve automatically extracted knowledge entities",
+        "OnlineLearning uses the EntityPersistenceManager to manage the persistence of automatically extracted entities in the graph database",
+        "OnlineLearning follows the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization, as seen in the Wave agents",
+        "OnlineLearning relies on the DataLossTracker to track data loss during automatic knowledge extraction, identifying potential issues and bottlenecks",
+        "OnlineLearning uses the factory pattern for creating LLM instances, as seen in the Wave agents, to efficiently initialize LLM instances only when required",
+        "OnlineLearning stores automatically extracted knowledge entities in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of automatic knowledge"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.045Z",
-        "last_updated": "2026-03-08T13:28:45.168Z"
+        "last_updated": "2026-03-08T13:58:45.282Z"
       },
       "id": "mc4flkg1aeu1jj"
     },
@@ -761,18 +762,18 @@
       "name": "AntiPatterns",
       "entityType": "SubComponent",
       "observations": [
-        "GraphDatabaseAdapter.createEntity() method stores anti-patterns as entities in the graph database, with relationships defined using the createRelationship method",
-        "Anti-patterns are retrieved using the GraphDatabaseAdapter.getEntity() method, allowing for efficient querying of related anti-patterns",
-        "The PersistenceAgent in src/agents/persistence-agent.ts uses the GraphDatabaseAdapter to store and update anti-patterns, ensuring data consistency across the project",
-        "The GraphDatabaseAdapter class implements a repository pattern, abstracting the underlying graph database storage and retrieval of anti-patterns",
-        "Anti-patterns are stored in the graph database using a node-based data structure, with each node representing an anti-pattern and edges representing relationships between patterns",
-        "The GraphDatabaseAdapter class provides a transactional interface for storing and retrieving anti-patterns, ensuring data integrity and consistency",
-        "The PersistenceAgent class uses a notification mechanism to inform other components when anti-patterns are updated or modified"
+        "AntiPatterns uses the GraphDatabaseAdapter's storePattern method to store new anti-patterns in the graph database",
+        "The AntiPatterns sub-component relies on the GraphDatabaseAdapter's retrievePatterns method to retrieve all anti-patterns from the database",
+        "The AntiPatterns sub-component follows the Adapter pattern to convert the interface of a class into another interface that clients expect",
+        "The AntiPatterns sub-component uses the Facade pattern to provide a simplified interface to a complex system",
+        "The AntiPatterns sub-component utilizes the Bridge pattern to separate an object's abstraction from its implementation",
+        "The AntiPatterns sub-component follows the Law of Demeter (LoD) to minimize coupling between objects",
+        "The AntiPatterns sub-component uses the Don't Repeat Yourself (DRY) principle to avoid duplicated code"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.109Z",
-        "last_updated": "2026-03-07T14:31:33.690Z"
+        "last_updated": "2026-03-08T13:59:02.797Z"
       },
       "id": "mc4flkg1go9yth"
     },
@@ -873,17 +874,18 @@
       "name": "Pipeline",
       "entityType": "SubComponent",
       "observations": [
-        "PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges",
-        "CoordinatorAgent initializes the pipeline by reading the batch-analysis.yaml configuration file and setting up the execution graph",
-        "ObservationGenerationAgent generates observations from git history and LSL sessions using the ObservationGenerator class in observations/generator.ts",
-        "KGOperatorsAgent applies knowledge graph operators to the observations using the KGOperator class in kg/operators.ts",
-        "DeduplicationAgent removes duplicate observations using the DeduplicationStrategy class in deduplication/strategy.ts",
-        "PersistenceAgent persists the processed observations to a database using the PersistenceManager class in persistence/manager.ts"
+        "The batch processing pipeline uses a modular architecture, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.",
+        "The BaseAgent class, defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.",
+        "The coordinator agent is responsible for orchestrating the pipeline, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts file.",
+        "The observation generation agent uses the integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts file to generate observations.",
+        "The KG operators agent utilizes the integrations/mcp-server-semantic-analysis/src/agents/kg-operators-agent.ts file to perform knowledge graph operations.",
+        "The deduplication agent removes duplicates using the integrations/mcp-server-semantic-analysis/src/agents/deduplication-agent.ts file.",
+        "The persistence agent persists data using the integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.134Z",
-        "last_updated": "2026-03-08T13:29:12.413Z"
+        "last_updated": "2026-03-08T13:59:14.981Z"
       },
       "id": "mc4flkg53173y"
     },
@@ -891,17 +893,18 @@
       "name": "Ontology",
       "entityType": "SubComponent",
       "observations": [
-        "OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory",
-        "OntologyManager uses the OntologyConfigManager to initialize the ontology system and provide entity type resolution and validation",
-        "OntologyValidator validates the observations against the ontology system using the OntologyValidator class in ontology/validator.ts",
-        "EntityTypeResolver resolves the entity types of observations using the EntityTypeResolver class in ontology/entity-type-resolver.ts",
-        "UpperOntology defines the upper-level ontology concepts and relationships using the UpperOntology class in ontology/upper-ontology.ts",
-        "LowerOntology defines the lower-level ontology concepts and relationships using the LowerOntology class in ontology/lower-ontology.ts"
+        "The OntologyClassificationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file to classify ontologies.",
+        "The upper ontology definition is stored in the integrations/mcp-server-semantic-analysis/src/ontology/upper-ontology.ts file.",
+        "The lower ontology definition is stored in the integrations/mcp-server-semantic-analysis/src/ontology/lower-ontology.ts file.",
+        "The entity type resolution is performed using the integrations/mcp-server-semantic-analysis/src/ontology/entity-type-resolution.ts file.",
+        "The validation is done using the integrations/mcp-server-semantic-analysis/src/ontology/validation.ts file.",
+        "The OntologyClassificationAgent uses the BaseAgent class to create response envelopes and calculate confidence levels.",
+        "The ontology classification system uses a modular architecture, with each component having its own file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.146Z",
-        "last_updated": "2026-03-08T13:29:13.634Z"
+        "last_updated": "2026-03-08T13:59:19.794Z"
       },
       "id": "mc4flkgti3r81"
     },
@@ -909,16 +912,18 @@
       "name": "Insights",
       "entityType": "SubComponent",
       "observations": [
-        "InsightGenerator generates insights from the processed observations using the InsightGenerator class in insights/generator.ts",
-        "PatternCatalogExtractor extracts patterns from the observations using the PatternCatalogExtractor class in insights/pattern-catalog-extractor.ts",
-        "KnowledgeReportAuthor authors knowledge reports based on the generated insights using the KnowledgeReportAuthor class in insights/knowledge-report-author.ts",
-        "InsightRanker ranks the generated insights based on their relevance and importance using the InsightRanker class in insights/insight-ranker.ts",
-        "InsightFilter filters the generated insights based on the user's preferences and settings using the InsightFilter class in insights/insight-filter.ts"
+        "The InsightGenerationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file to generate insights.",
+        "The PatternCatalogExtractionAgent extracts pattern catalogs using the integrations/mcp-server-semantic-analysis/src/agents/pattern-catalog-extraction-agent.ts file.",
+        "The KnowledgeReportAuthoringAgent authors knowledge reports using the integrations/mcp-server-semantic-analysis/src/agents/knowledge-report-authoring-agent.ts file.",
+        "The insights generation uses a modular architecture, with each agent having its own file.",
+        "The BaseAgent class is used to create response envelopes and calculate confidence levels.",
+        "The insights sub-component uses the integrations/mcp-server-semantic-analysis/src/insights directory.",
+        "The insight generation agent utilizes the integrations/mcp-server-semantic-analysis/src/insights/insight-generation.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.148Z",
-        "last_updated": "2026-03-08T13:29:18.266Z"
+        "last_updated": "2026-03-08T13:59:21.023Z"
       },
       "id": "mc4flkg1oy27et"
     },
@@ -958,18 +963,18 @@
       "name": "LLMService",
       "entityType": "SubComponent",
       "observations": [
-        "LLMService uses a modular design in lib/llm/llm-service.ts to handle LLM operations, including mode routing, caching, and circuit breaking.",
-        "The LLMService class in lib/llm/llm-service.ts implements a dependency injection mechanism to resolve the current LLM provider, supporting various LLM providers and making it easier to switch between different providers.",
-        "In lib/llm/llm-service.ts, the LLMService utilizes a configuration-based approach to handle LLM operations, allowing for flexible and dynamic operation handling.",
-        "The lib/llm/llm-service.ts file contains a set of predefined modes, including mock, local, and public, which are used by the LLMService to handle LLM operations.",
-        "The LLMService class in lib/llm/llm-service.ts provides a set of interfaces for different LLM operations, allowing for a standardized and consistent operation handling process.",
-        "In lib/llm/llm-service.ts, the LLMService uses a caching mechanism to store the results of LLM operations, improving performance and reducing the overhead of repeated operations.",
-        "The LLMService in lib/llm/llm-service.ts supports a pluggable architecture, allowing new LLM operations to be added or removed without affecting the existing codebase."
+        "The LLMService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.",
+        "The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the LLMService, such as a custom backoff strategy.",
+        "The LLMService may interact with other sub-components, such as the SemanticAnalysisService, to provide high-level LLM operations.",
+        "The lib/llm/llm-service.ts file may contain key classes or interfaces that define the behavior of the LLMService, such as the LLMService class.",
+        "The LLMService may use a separate database or storage system to store and manage LLM data.",
+        "The LLMService may have a specific API or interface that allows other sub-components to interact with it and retrieve LLM data.",
+        "The LLMService may utilize logging and error handling mechanisms to track and report LLM issues and errors."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.153Z",
-        "last_updated": "2026-03-08T13:28:24.395Z"
+        "last_updated": "2026-03-08T13:58:28.398Z"
       },
       "id": "mc4flkgpzlvbs"
     },
@@ -1142,18 +1147,14 @@
       "name": "OntologyClassificationAgent",
       "entityType": "SubComponent",
       "observations": [
-        "OntologyClassificationAgent uses the classifyObservation method in ontology-classification-agent.ts to classify observations against the ontology system",
-        "The OntologyClassificationAgent class in ontology-classification-agent.ts extends the BaseAgent class to inherit common agent functionality",
-        "OntologyClassificationAgent uses the ontology.ts file to access and manage ontology data",
-        "The OntologyClassificationAgent instance is created using the createOntologyClassificationAgent function in ontology-classification-agent.ts",
-        "OntologyClassificationAgent uses the classification-cache.ts file to store and retrieve cached classification results",
-        "The classifyObservation method in ontology-classification-agent.ts returns a classified observation object",
-        "OntologyClassificationAgent uses the logger.ts file to log classification-related events and errors"
+        "OntologyClassificationAgent's classifyObservation method takes in a set of observations and returns a list of classified results, which are then used to inform the logging process in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts",
+        "The agent's use of heuristic classification allows it to adapt to changing user behavior and improve its accuracy over time, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file",
+        "The OntologyClassificationAgent sub-component utilizes the heuristic classification and LLM integration logic defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file to classify observations against the ontology system."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:38.634Z",
-        "last_updated": "2026-03-08T13:28:15.691Z"
+        "last_updated": "2026-03-08T13:58:00.542Z"
       },
       "id": "mc4flkgkdumz4"
     },
@@ -1231,18 +1232,18 @@
       "name": "LLMProviderManager",
       "entityType": "SubComponent",
       "observations": [
-        "The LLMProviderManager uses the provider registry (lib/llm/provider-registry.js) to enable dynamic addition and removal of providers.",
-        "The DMRProvider (lib/llm/providers/dmr-provider.ts) and AnthropicProvider (lib/llm/providers/anthropic-provider.ts) are examples of providers that can be registered and swapped out as needed.",
-        "The LLMService class (lib/llm/llm-service.ts) utilizes dependency injection to allow for flexible and testable provider management.",
-        "The provider registry enables providers to be registered and unregistered at runtime, making it simple to add support for new LLM services or remove support for outdated ones.",
-        "The use of dependency injection makes it easy to test the LLMProviderManager in isolation, using mock implementations of the providers to simulate different scenarios.",
-        "The LLMProviderManager is responsible for initializing and operating the registered providers, ensuring that they are properly configured and ready for use.",
-        "The provider registry is designed to be extensible, allowing new providers to be added without modifying the existing codebase."
+        "LLMProviderManager utilizes the lib/llm/llm-provider.ts file to define the LLMProvider interface, which outlines the contract for all LLM providers.",
+        "The LLMProviderManager class (lib/llm/llm-provider-manager.ts) implements a factory pattern to create instances of different LLM providers based on the configuration.",
+        "The lib/llm/llm-provider-manager.ts file contains a function called registerProvider(), which allows new LLM providers to be registered with the LLMProviderManager.",
+        "The LLMProviderManager uses a priority-based approach to manage provider fallback, as seen in the lib/llm/llm-provider-manager.ts file.",
+        "The LLMProviderManager class has a method called getProvider(), which returns the most suitable LLM provider based on the current context and configuration.",
+        "The lib/llm/llm-provider-manager.ts file imports the LLMProvider interface from lib/llm/llm-provider.ts, ensuring consistency in provider implementation.",
+        "The LLMProviderManager utilizes a caching mechanism to store information about registered providers, as seen in the lib/llm/llm-provider-manager.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.333Z",
-        "last_updated": "2026-03-08T08:18:05.589Z"
+        "last_updated": "2026-03-08T13:58:05.151Z"
       },
       "id": "mc4flkg365g8vj"
     },
@@ -1250,18 +1251,18 @@
       "name": "LLMModeResolver",
       "entityType": "SubComponent",
       "observations": [
-        "LLMModeResolver uses a modular design in lib/llm/llm-mode-resolver.ts to determine the current LLM mode, handling different modes such as mock, local, or public.",
-        "The LLMModeResolver class in lib/llm/llm-mode-resolver.ts implements a factory pattern to create instances of different LLM modes based on the provided configuration.",
-        "In lib/llm/llm-mode-resolver.ts, the LLMModeResolver uses dependency injection to resolve the current LLM provider, supporting various LLM modes and making it easier to switch between different providers or modes.",
-        "The LLMModeResolver in lib/llm/llm-mode-resolver.ts utilizes a configuration-based approach to determine the current LLM mode, allowing for flexible and dynamic mode resolution.",
-        "The lib/llm/llm-mode-resolver.ts file contains a set of predefined modes, including mock, local, and public, which are used by the LLMModeResolver to determine the current mode.",
-        "The LLMModeResolver class in lib/llm/llm-mode-resolver.ts provides a set of interfaces for different LLM modes, allowing for a standardized and consistent mode resolution process.",
-        "In lib/llm/llm-mode-resolver.ts, the LLMModeResolver uses a caching mechanism to store the resolved LLM mode, improving performance and reducing the overhead of repeated mode resolution."
+        "The LLMModeResolver class (lib/llm/llm-mode-resolver.ts) uses a context-based approach to determine the LLM mode, considering factors such as environment variables and configuration settings.",
+        "The lib/llm/llm-mode-resolver.ts file contains a function called resolveMode(), which returns the most suitable LLM mode based on the current context.",
+        "The LLMModeResolver class has a method called getMode(), which returns the current LLM mode, as seen in the lib/llm/llm-mode-resolver.ts file.",
+        "The LLMModeResolver utilizes a configuration-based approach to determine the LLM mode, as seen in the lib/llm/llm-mode-resolver.ts file.",
+        "The lib/llm/llm-mode-resolver.ts file imports the LLMMode interface from lib/llm/llm-mode.ts, ensuring consistency in mode implementation.",
+        "The LLMModeResolver class has a method called updateMode(), which updates the current LLM mode based on changes in the context or configuration.",
+        "The LLMModeResolver uses a caching mechanism to store information about the current LLM mode, as seen in the lib/llm/llm-mode-resolver.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.335Z",
-        "last_updated": "2026-03-08T13:28:20.895Z"
+        "last_updated": "2026-03-08T13:58:06.168Z"
       },
       "id": "mc4flkg1ktv5ca"
     },
@@ -1269,17 +1270,18 @@
       "name": "LLMCachingMechanism",
       "entityType": "SubComponent",
       "observations": [
-        "LLMCachingMechanism uses a caching library in lib/llm/llm-cache.ts to store and retrieve cached responses.",
-        "The LLMCachingMechanism class in lib/llm/llm-caching-mechanism.ts provides a way to configure the caching behavior.",
-        "LLMCachingMechanism implements a cache invalidation mechanism in lib/llm/llm-cache-invalidation.ts to handle cases where the cache needs to be updated.",
-        "The LLMCachingMechanism class provides a way to monitor cache performance using metrics in lib/llm/llm-metrics.ts.",
-        "LLMCachingMechanism utilizes a distributed caching mechanism in lib/llm/llm-distributed-cache.ts to handle large volumes of requests.",
-        "The LLMCachingMechanism class provides a logging mechanism in lib/llm/llm-logging.ts to log caching events."
+        "The LLMCachingMechanism class (lib/llm/llm-caching-mechanism.ts) utilizes a cache-based approach to store frequently accessed data, reducing the number of requests to LLM providers.",
+        "The lib/llm/llm-caching-mechanism.ts file contains a function called cacheRequest(), which caches the result of an LLM provider request.",
+        "The LLMCachingMechanism class has a method called getCachedResponse(), which returns the cached response for a given request, as seen in the lib/llm/llm-caching-mechanism.ts file.",
+        "The LLMCachingMechanism utilizes a time-to-live (TTL) approach to manage cache expiration, as seen in the lib/llm/llm-caching-mechanism.ts file.",
+        "The lib/llm/llm-caching-mechanism.ts file imports the Cache interface from lib/llm/cache.ts, ensuring consistency in cache implementation.",
+        "The LLMCachingMechanism class has a method called invalidateCache(), which invalidates the cache for a given request, as seen in the lib/llm/llm-caching-mechanism.ts file.",
+        "The LLMCachingMechanism uses a caching library to manage cache storage and retrieval, as seen in the lib/llm/llm-caching-mechanism.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.339Z",
-        "last_updated": "2026-03-07T14:25:17.339Z"
+        "last_updated": "2026-03-08T13:58:11.491Z"
       },
       "id": "mc4flkg2bd1npj"
     },
@@ -1899,17 +1901,18 @@
       "name": "DesignPatterns",
       "entityType": "SubComponent",
       "observations": [
-        "DesignPatterns utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for graph database interactions, enabling flexible data persistence and retrieval.",
-        "The createNode method in GraphDatabaseAdapter allows for efficient data storage, promoting a scalable and maintainable architecture.",
-        "DesignPatterns applies the Singleton pattern to ensure a single instance of the GraphDatabaseAdapter, as seen in the getInstance method of the GraphDatabaseAdapter class.",
-        "The query method in GraphDatabaseAdapter enables the retrieval of data from the graph database, supporting various query parameters and return types.",
-        "DesignPatterns leverages the Factory pattern to create nodes and relationships in the graph database, as implemented in the createNode and createRelationship methods of the GraphDatabaseAdapter class.",
-        "The GraphDatabaseAdapter class in storage/graph-database-adapter.ts provides a layer of abstraction between the DesignPatterns sub-component and the graph database, promoting loose coupling and testability."
+        "DesignPatterns uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database",
+        "The DesignPatterns sub-component relies on the GraphDatabaseAdapter's retrievePatterns method to retrieve all design patterns from the database",
+        "The DesignPatterns sub-component follows the Model-View-Controller (MVC) pattern, separating concerns into model, view, and controller components",
+        "The DesignPatterns sub-component uses the Observer pattern to notify observers of changes to design patterns",
+        "The DesignPatterns sub-component utilizes the Factory pattern to create instances of design patterns",
+        "The DesignPatterns sub-component uses the Command pattern to encapsulate requests to store and retrieve design patterns",
+        "The DesignPatterns sub-component follows the Single Responsibility Principle (SRP) to ensure each design pattern has a single reason to change"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.338Z",
-        "last_updated": "2026-03-08T10:28:14.152Z"
+        "last_updated": "2026-03-08T13:58:55.691Z"
       },
       "id": "mc4flkg5gxjj3"
     },
@@ -1917,17 +1920,18 @@
       "name": "CodingConventions",
       "entityType": "SubComponent",
       "observations": [
-        "CodingConventions utilizes the ESLint library in the .eslintrc.json configuration file to enforce coding standards and detect potential errors.",
-        "The .prettierignore file specifies files and directories to be excluded from Prettier formatting, ensuring that certain files are not modified unnecessarily.",
-        "CodingConventions applies the DRY (Don't Repeat Yourself) principle to avoid duplicated code and improve maintainability, as seen in the use of utility functions and constants.",
-        "The project's code style is consistent with the Airbnb JavaScript Style Guide, as configured in the .eslintrc.json file.",
-        "CodingConventions uses the Husky library to integrate Git hooks and automate tasks, such as running linters and formatters before commits.",
-        "The commitlint library is used to enforce conventional commit messages, as specified in the commitlint.config.js configuration file."
+        "CodingConventions uses the GraphDatabaseAdapter's storePattern method to store new coding conventions in the graph database",
+        "The CodingConventions sub-component relies on the GraphDatabaseAdapter's retrievePatterns method to retrieve all coding conventions from the database",
+        "The CodingConventions sub-component follows the Template Method pattern to provide a way to define the skeleton of an algorithm",
+        "The CodingConventions sub-component uses the Strategy pattern to define a family of algorithms",
+        "The CodingConventions sub-component utilizes the Decorator pattern to dynamically add additional responsibilities to objects",
+        "The CodingConventions sub-component follows the Open-Closed Principle (OCP) to ensure that coding conventions are open for extension but closed for modification",
+        "The CodingConventions sub-component uses the Liskov Substitution Principle (LSP) to ensure that subtypes are substitutable for their base types"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.340Z",
-        "last_updated": "2026-03-08T10:28:16.815Z"
+        "last_updated": "2026-03-08T13:58:58.640Z"
       },
       "id": "mc4flkg39bj1s8"
     },
@@ -1973,18 +1977,18 @@
       "name": "CodeAnalysis",
       "entityType": "SubComponent",
       "observations": [
-        "The CodeAnalysis sub-component uses the GraphDatabaseAdapter class to store and retrieve code analysis results, allowing for efficient querying and retrieval",
-        "Code analysis is performed using a combination of static and dynamic analysis tools, such as linters and profilers",
-        "The CodeAnalysis sub-component implements a pipeline-based architecture, allowing for easy extension and modification of the analysis workflow",
-        "Code analysis results are stored in the graph database using a property-based data structure, with each property representing a metric or result",
-        "The CodeAnalysis sub-component uses a caching mechanism to improve performance, reducing the number of database queries and analysis runs",
-        "Code analysis is triggered by various events, such as code changes and deployments, ensuring that the analysis results are up-to-date and relevant",
-        "The CodeAnalysis sub-component provides a dashboard and reporting interface, allowing developers to visualize and explore the analysis results"
+        "CodeAnalysis uses the GraphDatabaseAdapter's storePattern method to store new code analysis results in the graph database",
+        "The CodeAnalysis sub-component relies on the GraphDatabaseAdapter's retrievePatterns method to retrieve all code analysis results from the database",
+        "The CodeAnalysis sub-component follows the Visitor pattern to separate the algorithm from the object structure",
+        "The CodeAnalysis sub-component uses the Interpreter pattern to evaluate the code and provide recommendations",
+        "The CodeAnalysis sub-component utilizes the State pattern to manage the state of the code analysis process",
+        "The CodeAnalysis sub-component follows the Principle of Least Astonishment (PoLA) to ensure that the code analysis results are easy to understand",
+        "The CodeAnalysis sub-component uses the KISS principle (Keep it Simple, Stupid) to avoid over-complicating the code analysis process"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.347Z",
-        "last_updated": "2026-03-07T14:29:36.347Z"
+        "last_updated": "2026-03-08T13:59:05.440Z"
       },
       "id": "mc4flkg2i7oavd"
     },
@@ -1992,18 +1996,17 @@
       "name": "ContentValidationModule",
       "entityType": "SubComponent",
       "observations": [
-        "The ContentValidationAgent class in the ContentValidationModule uses the GraphDatabaseAdapter class to perform comprehensive validation of code actions, as seen in the storage/graph-database-adapter.ts file.",
-        "The validateEntityContent method in the ContentValidationAgent class checks entity content against configured rules and constraints, with support for default configurations and validation.",
-        "The ContentValidationModule uses a graph database for persistence and query operations, allowing for efficient storage and retrieval of complex relationships between code entities.",
-        "The validateEntityRelationships method in the ContentValidationAgent class verifies relationships between entities, utilizing the GraphDatabaseAdapter class to query the graph database.",
-        "The ContentValidationModule implements a hook-based event handling mechanism, where the UnifiedHookManager class loads and merges hook configurations from multiple sources.",
-        "The loadHookConfigurations method in the HookConfigLoader class loads hook configurations from user and project levels, with support for default configurations and validation, as used in the ContentValidationModule.",
-        "The ContentValidationModule captures and stores constraint violations from tool interactions, utilizing the ViolationTrackingModule for features like session tracking and statistics calculation."
+        "ContentValidationModule utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, providing a robust content validation mechanism.",
+        "It interacts with the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to retrieve and update entity content, ensuring that data remains consistent across the system.",
+        "The sub-component employs a request-response pattern to handle validation requests, providing a clear and defined interface for interacting with the validation mechanism.",
+        "ContentValidationModule's design allows for easy integration with constraint enforcers, enabling them to enforce constraints based on validated content.",
+        "The sub-component's use of the GraphDatabaseAdapter enables efficient data synchronization, ensuring that data remains consistent across the system.",
+        "ContentValidationModule provides a notification mechanism to inform constraint enforcers of validation results, enabling them to take appropriate actions."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.350Z",
-        "last_updated": "2026-03-07T14:29:36.350Z"
+        "last_updated": "2026-03-08T13:59:14.267Z"
       },
       "id": "mc4flkgvwmn5q"
     },
@@ -2136,17 +2139,18 @@
       "name": "SpecstoryConnector",
       "entityType": "SubComponent",
       "observations": [
-        "The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to establish connections to the Specstory extension.",
-        "The startServiceWithRetry function in lib/service-starter.js implements retry logic with exponential backoff to re-establish connections in case of failures.",
-        "The SpecstoryConnector uses the SpecstoryAdapter class to provide a unified interface for different connection methods.",
-        "The connection establishment process is flexible and can be configured to use different protocols.",
-        "The SpecstoryConnector handles connection failures and retries the connection establishment process as needed.",
-        "The SpecstoryAdapter class is instantiated and used throughout the SpecstoryConnector to provide a unified interface for different connection methods."
+        "SpecstoryConnector utilizes the SpecstoryAdapter class in specstory-adapter.js to encapsulate connection logic",
+        "The connectViaHTTP method in specstory-adapter.js implements HTTP-based connections to the Specstory extension",
+        "The connectViaIPC method in specstory-adapter.js enables IPC-based connections for efficient communication",
+        "The connectViaFileWatch method in specstory-adapter.js provides a fallback option for file-based connections",
+        "SpecstoryConnector implements a retry mechanism through the initialize method in SpecstoryAdapter for robust connection handling",
+        "The SpecstoryAdapter class manages different connection methods, ensuring seamless transitions between them",
+        "SpecstoryConnector relies on the SpecstoryAdapter's connection methods to handle various connection scenarios"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:47.968Z",
-        "last_updated": "2026-03-08T10:27:40.770Z"
+        "last_updated": "2026-03-08T13:58:30.538Z"
       },
       "id": "mc4flkg1gl2ovn"
     },
@@ -2599,17 +2603,17 @@
       "name": "HookConfigurationManager",
       "entityType": "SubComponent",
       "observations": [
-        "HookConfigurationManager uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to load and merge hook configurations.",
-        "The HookConfigurationManager likely implements a configuration loading mechanism, such as a config loader module, to load hook configurations from files or databases.",
-        "HookConfigurationManager may utilize a validation mechanism, such as a validation module, to validate hook configurations against a set of rules or schemas.",
-        "The HookConfigurationManager may use a caching mechanism, such as a cache module, to store loaded and validated hook configurations for efficient retrieval.",
-        "HookConfigurationManager may have a configuration file, such as hook-config.yaml, to define the hook configuration settings.",
-        "The HookConfigurationManager may use a logging mechanism, such as a logger module, to record configuration loading and validation events."
+        "HookConfigurationManager utilizes the HookConfigLoader (lib/agent-api/hooks/hook-config.js) to load hook configurations from multiple sources, providing a unified and comprehensive configuration management mechanism.",
+        "It employs a merge strategy to combine configurations from different sources, ensuring that the resulting configuration is consistent and accurate.",
+        "The sub-component stores loaded configurations in a centralized repository, facilitating easy access and management of hook configurations.",
+        "HookConfigurationManager provides an interface for constraint enforcers to retrieve and utilize hook configurations, enabling them to enforce constraints effectively.",
+        "The sub-component's design allows for easy extension and modification of hook configurations, making it adaptable to changing system requirements.",
+        "HookConfigurationManager interacts with the UnifiedHookManager to manage the lifecycle of hook configurations, ensuring that configurations are properly initialized and cleaned up."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T06:28:40.445Z",
-        "last_updated": "2026-03-08T06:28:40.445Z"
+        "last_updated": "2026-03-08T13:59:10.269Z"
       },
       "id": "mc4flkg7f9e72e"
     },
@@ -2769,17 +2773,18 @@
       "name": "ConversationLogger",
       "entityType": "SubComponent",
       "observations": [
-        "ConversationLogger uses the Specstory extension (lib/integrations/specstory-adapter.js) to log conversation entries with detailed metadata.",
-        "The ConversationLogger sub-component provides a way to log conversation entries, allowing for easy tracking and analysis of conversations.",
-        "The SpecstoryAdapter class (lib/integrations/specstory-adapter.js) utilizes the ConversationLogger sub-component for logging conversation entries, ensuring that conversation data is accurately captured.",
-        "The ConversationLogger sub-component is designed to be modular, allowing for easy modification or extension of the logging logic without affecting other components.",
-        "The ConversationLogger sub-component provides a robust way to handle conversation logging, ensuring that conversation data is accurately captured and stored.",
-        "The logging mechanism is implemented using a asynchronous approach, allowing for easy handling of logging errors."
+        "ConversationLogger utilizes a logging framework to format and log conversation entries",
+        "The logConversation method in conversation-logger.js handles the actual logging of conversation entries",
+        "ConversationLogger relies on the SpecstoryAdapter to obtain conversation data for logging purposes",
+        "The formatConversationEntry method in conversation-logger.js formats conversation entries according to Specstory requirements",
+        "ConversationLogger implements logging level control through a configurable logging mechanism",
+        "ConversationLogger ensures thread-safety through synchronized logging operations",
+        "ConversationLogger provides a logging API for other components to log conversation-related data"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T06:28:51.281Z",
-        "last_updated": "2026-03-08T08:18:24.998Z"
+        "last_updated": "2026-03-08T13:58:34.431Z"
       },
       "id": "mc4flkg3hneej7"
     },
@@ -3557,18 +3562,18 @@
       "name": "BestPractices",
       "entityType": "SubComponent",
       "observations": [
-        "BestPractices utilizes the GraphDatabaseAdapter for storing and managing best practice entities, as seen in the storage/graph-database-adapter.ts file.",
-        "The createEntity() method in the GraphDatabaseAdapter is used to store and manage best practice entities, demonstrating a modular design.",
-        "BestPractices may leverage the Logger to register and remove log handlers, showcasing a modular design pattern.",
-        "The ContentValidationAgent may use BestPractices for validation purposes, highlighting the constructor-based pattern for initializing agents.",
-        "BestPractices may follow a similar architectural pattern as the CodingPatterns component, utilizing the GraphDatabaseAdapter for data management.",
-        "The GraphDatabaseAdapter's createEntity() method is used to store and manage best practice entities, allowing for efficient data retrieval and persistence.",
-        "BestPractices may be initialized using a constructor-based pattern, similar to the ContentValidationAgent."
+        "BestPractices uses the GraphDatabaseAdapter's storePattern method to store new best practices in the graph database",
+        "The BestPractices sub-component relies on the GraphDatabaseAdapter's retrievePatterns method to retrieve all best practices from the database",
+        "The BestPractices sub-component follows the Singleton pattern to ensure that only one instance of a best practice is created",
+        "The BestPractices sub-component uses the Prototype pattern to create new instances of best practices",
+        "The BestPractices sub-component utilizes the Builder pattern to separate the construction of complex objects from their representation",
+        "The BestPractices sub-component follows the Interface Segregation Principle (ISP) to ensure that clients are not forced to depend on interfaces they do not use",
+        "The BestPractices sub-component uses the Dependency Inversion Principle (DIP) to decouple high-level modules from low-level modules"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T08:16:51.351Z",
-        "last_updated": "2026-03-08T08:16:51.351Z"
+        "last_updated": "2026-03-08T13:59:00.596Z"
       },
       "id": "mc4flkg14pg0ek"
     },
@@ -4536,17 +4541,18 @@
       "name": "ConnectionRetryManager",
       "entityType": "SubComponent",
       "observations": [
-        "ConnectionRetryManager utilizes a factory pattern in lib/integrations/specstory-adapter.js to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.",
-        "The initialize() function in the SpecstoryAdapter class sets up the connection, and the logConversation() function logs any errors or warnings that occur during the connection process.",
-        "ConnectionRetryManager likely uses a retry policy defined in a configuration file, such as config.json, to determine the number of retries and the backoff strategy.",
-        "The ConnectionRetryManager may use a library like async-retry to implement the retry logic, providing a standardized way of handling retries.",
-        "The SpecstoryAdapter class, which is part of the ConnectionRetryManager, implements the IConnectionAdapter interface, ensuring consistency across different connection methods.",
-        "The ConnectionRetryManager may also use a logging library like winston or log4js to log errors and warnings, providing a centralized logging mechanism."
+        "ConnectionRetryManager utilizes a retry policy to determine the number of retries for failed connections",
+        "The retryConnection method in connection-retry-manager.js handles the actual retry logic for failed connections",
+        "ConnectionRetryManager relies on the SpecstoryAdapter to obtain connection status and retry connections",
+        "The calculateRetryDelay method in connection-retry-manager.js calculates the delay between retries based on the retry policy",
+        "ConnectionRetryManager implements exponential backoff for retry delays to prevent overwhelming the Specstory extension",
+        "ConnectionRetryManager provides a retry API for other components to handle connection retries",
+        "ConnectionRetryManager ensures that retries are performed in a thread-safe manner"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T13:27:08.429Z",
-        "last_updated": "2026-03-08T13:27:08.429Z"
+        "last_updated": "2026-03-08T13:58:35.453Z"
       },
       "id": "mc4flkg2s7vg1v"
     },
@@ -4645,20 +4651,16 @@
     },
     {
       "name": "ServiceStarterModule",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        "The ServiceStarterModule uses a retry mechanism to ensure that services are properly started, as seen in the implementation of the ServiceStarter class.",
-        "The ServiceStarterModule implements health verification to ensure that services are running correctly, as defined in the docker-compose.yml file.",
-        "The docker-compose.yml file specifies the services and their dependencies, making it easy to manage the startup of services.",
-        "The ServiceStarterModule utilizes the modular design of DockerizedServices to enable easy scalability and maintainability.",
-        "The ServiceStarter class provides a robust interface for starting services, as seen in the implementation of the ServiceStarter class.",
-        "The ServiceStarterModule uses Docker Compose files to manage the startup of services, ensuring a modular design.",
-        "The docker-compose.yml file defines the services and their dependencies, making it easy to manage the startup of services."
+        "The ServiceStarterModule utilizes the retry-with-backoff pattern to prevent endless loops and promote system stability in the LLMService, as mentioned in the parent context.",
+        "The implementation of the retry-with-backoff pattern in the ServiceStarterModule is crucial for the LLMService to handle failures and maintain its functionality, although the exact code details are not provided.",
+        "The ServiceStarterModule in service-starter-module.ts implements the retry-with-backoff pattern using the exponentialBackoff function to prevent endless loops and promote system stability in the LLMService."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T13:27:08.472Z",
-        "last_updated": "2026-03-08T13:27:08.472Z"
+        "last_updated": "2026-03-08T13:59:28.601Z"
       },
       "id": "mc4flkgrbjl4q"
     },
@@ -4748,30 +4750,9 @@
       "name": "NlpProcessorIntegration",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The SemanticInsightGenerator sub-component uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts, indicating a strong dependency on this class for its core functionality.",
-          "date": "2026-03-08T13:27:18.629Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Given the context, the NLPProcessor class is expected to handle tasks such as tokenization, entity recognition, and possibly sentiment analysis, which are common in natural language processing tasks.",
-          "date": "2026-03-08T13:27:18.629Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The integration of NLPProcessor suggests that the SemanticInsightGenerator follows a design pattern where specific tasks are modularized, in this case, natural language processing, allowing for easier maintenance and updates.",
-          "date": "2026-03-08T13:27:18.629Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The SemanticInsightGenerator sub-component uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts, indicating a strong dependency on this class for its core functionality.",
+        "Given the context, the NLPProcessor class is expected to handle tasks such as tokenization, entity recognition, and possibly sentiment analysis, which are common in natural language processing tasks.",
+        "The integration of NLPProcessor suggests that the SemanticInsightGenerator follows a design pattern where specific tasks are modularized, in this case, natural language processing, allowing for easier maintenance and updates."
       ],
       "source": "manual",
       "metadata": {
@@ -4899,6 +4880,221 @@
         "last_updated": "2026-03-08T13:27:18.694Z"
       },
       "id": "mc4flkgjolq2l"
+    },
+    {
+      "name": "CodeGraphConstructionService",
+      "entityType": "SubComponent",
+      "observations": [
+        "The CodeGraphConstructionService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.",
+        "The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the CodeGraphConstructionService, such as a custom backoff strategy.",
+        "The CodeGraphConstructionService may interact with other sub-components, such as the SemanticAnalysisService, to construct and manage code graphs.",
+        "The lib/service-starter.js file may contain key functions or classes that define the behavior of the CodeGraphConstructionService, such as the startService function.",
+        "The CodeGraphConstructionService may use a separate database or storage system to store and manage code graphs.",
+        "The CodeGraphConstructionService may have a specific API or interface that allows other sub-components to interact with it and retrieve code graph data.",
+        "The CodeGraphConstructionService may utilize logging and error handling mechanisms to track and report code graph construction issues and errors."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.038Z",
+        "last_updated": "2026-03-08T13:57:02.038Z"
+      },
+      "id": "mc4flkg21dkxib"
+    },
+    {
+      "name": "SpecstoryAdapterInitializer",
+      "entityType": "SubComponent",
+      "observations": [
+        "SpecstoryAdapterInitializer utilizes a configuration mechanism to load SpecstoryAdapter settings",
+        "The initialize method in specstory-adapter-initializer.js initializes the SpecstoryAdapter with the loaded configuration",
+        "SpecstoryAdapterInitializer relies on a dependency injection mechanism to provide dependencies to the SpecstoryAdapter",
+        "SpecstoryAdapterInitializer implements a lazy initialization mechanism to delay initialization until necessary",
+        "SpecstoryAdapterInitializer provides an initialization API for other components to initialize the SpecstoryAdapter",
+        "SpecstoryAdapterInitializer ensures that the SpecstoryAdapter is initialized in a thread-safe manner",
+        "SpecstoryAdapterInitializer handles initialization errors through a robust error handling mechanism"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.071Z",
+        "last_updated": "2026-03-08T13:57:02.071Z"
+      },
+      "id": "mc4flkg1ooz3cd"
+    },
+    {
+      "name": "EntityPersistenceManager",
+      "entityType": "SubComponent",
+      "observations": [
+        "EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database",
+        "EntityPersistenceManager employs the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before entity persistence",
+        "EntityPersistenceManager follows the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization, as seen in the Wave agents",
+        "EntityPersistenceManager relies on the DataLossTracker to track data loss during entity persistence, identifying potential issues and bottlenecks",
+        "EntityPersistenceManager uses the factory pattern for creating LLM instances, as seen in the Wave agents, to efficiently initialize LLM instances only when required",
+        "EntityPersistenceManager stores entities in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of entities",
+        "EntityPersistenceManager uses the GraphDatabaseAdapter to manage the persistence of entities in the graph database, including creating, updating, and deleting entities"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.077Z",
+        "last_updated": "2026-03-08T13:57:02.077Z"
+      },
+      "id": "mc4flkg227qjqp"
+    },
+    {
+      "name": "DataLossTracker",
+      "entityType": "SubComponent",
+      "observations": [
+        "DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information",
+        "DataLossTracker employs the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before data loss tracking",
+        "DataLossTracker follows the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization, as seen in the Wave agents",
+        "DataLossTracker relies on the EntityPersistenceManager to manage the persistence of data loss information in the graph database",
+        "DataLossTracker uses the factory pattern for creating LLM instances, as seen in the Wave agents, to efficiently initialize LLM instances only when required",
+        "DataLossTracker stores data loss information in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of data loss information",
+        "DataLossTracker uses the GraphDatabaseAdapter to manage the persistence of data loss information in the graph database, including creating, updating, and deleting data loss records"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.104Z",
+        "last_updated": "2026-03-08T13:57:02.104Z"
+      },
+      "id": "mc4flkg20wp7rp"
+    },
+    {
+      "name": "KnowledgeGraphQueryEngine",
+      "entityType": "SubComponent",
+      "observations": [
+        "KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database",
+        "KnowledgeGraphQueryEngine employs the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before querying",
+        "KnowledgeGraphQueryEngine follows the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization, as seen in the Wave agents",
+        "KnowledgeGraphQueryEngine relies on the EntityPersistenceManager to manage the persistence of knowledge entities in the graph database",
+        "KnowledgeGraphQueryEngine uses the factory pattern for creating LLM instances, as seen in the Wave agents, to efficiently initialize LLM instances only when required",
+        "KnowledgeGraphQueryEngine stores query results in the graph database using the GraphDatabaseAdapter, allowing for efficient retrieval and querying of knowledge entities",
+        "KnowledgeGraphQueryEngine uses the GraphDatabaseAdapter to manage the persistence of query results in the graph database, including creating, updating, and deleting query results"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.111Z",
+        "last_updated": "2026-03-08T13:57:02.111Z"
+      },
+      "id": "mc4flkgl1iika"
+    },
+    {
+      "name": "LLMErrorHandling",
+      "entityType": "SubComponent",
+      "observations": [
+        "The LLMErrorHandling class (lib/llm/llm-error-handling.ts) utilizes a try-catch approach to catch and handle errors that occur during LLM provider interactions.",
+        "The lib/llm/llm-error-handling.ts file contains a function called handleError(), which handles errors and exceptions that occur during LLM provider interactions.",
+        "The LLMErrorHandling class has a method called getErrorMessage(), which returns a user-friendly error message for a given error, as seen in the lib/llm/llm-error-handling.ts file.",
+        "The LLMErrorHandling utilizes a logging mechanism to log errors and exceptions, as seen in the lib/llm/llm-error-handling.ts file.",
+        "The lib/llm/llm-error-handling.ts file imports the Error interface from lib/llm/error.ts, ensuring consistency in error implementation.",
+        "The LLMErrorHandling class has a method called retryRequest(), which retries a failed LLM provider request, as seen in the lib/llm/llm-error-handling.ts file.",
+        "The LLMErrorHandling uses a error classification system to categorize and handle different types of errors, as seen in the lib/llm/llm-error-handling.ts file."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.113Z",
+        "last_updated": "2026-03-08T13:57:02.113Z"
+      },
+      "id": "mc4flkgvfladc"
+    },
+    {
+      "name": "LLMConfigurationManager",
+      "entityType": "SubComponent",
+      "observations": [
+        "The LLMConfigurationManager class (lib/llm/llm-configuration-manager.ts) utilizes a configuration-based approach to manage the behavior of the LLMAbstraction component.",
+        "The lib/llm/llm-configuration-manager.ts file contains a function called loadConfiguration(), which loads and parses configuration files to determine the behavior of the LLMAbstraction component.",
+        "The LLMConfigurationManager class has a method called getConfiguration(), which returns the current configuration of the LLMAbstraction component, as seen in the lib/llm/llm-configuration-manager.ts file.",
+        "The LLMConfigurationManager utilizes a validation mechanism to validate configuration settings, as seen in the lib/llm/llm-configuration-manager.ts file.",
+        "The lib/llm/llm-configuration-manager.ts file imports the Configuration interface from lib/llm/configuration.ts, ensuring consistency in configuration implementation.",
+        "The LLMConfigurationManager class has a method called updateConfiguration(), which updates the configuration of the LLMAbstraction component, as seen in the lib/llm/llm-configuration-manager.ts file.",
+        "The LLMConfigurationManager uses a caching mechanism to store configuration settings, as seen in the lib/llm/llm-configuration-manager.ts file."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.119Z",
+        "last_updated": "2026-03-08T13:57:02.119Z"
+      },
+      "id": "mc4flkg399rk58"
+    },
+    {
+      "name": "ConstraintEnforcer",
+      "entityType": "SubComponent",
+      "observations": [
+        "ConstraintEnforcer utilizes the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to manage hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), enabling flexible constraint enforcement.",
+        "The ConstraintEnforcer collaborates with the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, ensuring data freshness and accuracy.",
+        "It interacts with the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database operations, facilitating data storage and retrieval in a structured manner.",
+        "ConstraintEnforcer employs a request-response pattern to handle file operations, providing a clear and defined interface for interacting with the file system.",
+        "The sub-component's event-driven architecture allows it to respond to changes in the system, such as updates to hook configurations or entity content, ensuring that constraints are enforced in real-time.",
+        "ConstraintEnforcer's integration with the HookConfigLoader enables it to merge configurations from multiple sources, providing a unified and comprehensive constraint enforcement mechanism.",
+        "The sub-component's use of the GraphDatabaseAdapter enables efficient data synchronization, ensuring that data remains consistent across the system."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.275Z",
+        "last_updated": "2026-03-08T13:57:02.275Z"
+      },
+      "id": "mc4flkgbhlekz"
+    },
+    {
+      "name": "Agents",
+      "entityType": "SubComponent",
+      "observations": [
+        "The BaseAgent class is defined in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The BaseAgent class provides a standard way for all agents to create response envelopes and calculate confidence levels.",
+        "Each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.",
+        "The BaseAgent class is used by all agents, including the OntologyClassificationAgent and InsightGenerationAgent.",
+        "The agents directory contains all the agent files, including the BaseAgent class.",
+        "The BaseAgent class provides a calculateConfidenceLevel method."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:02.286Z",
+        "last_updated": "2026-03-08T13:57:02.286Z"
+      },
+      "id": "mc4flkgwef2um"
+    },
+    {
+      "name": "ErrorHandler",
+      "entityType": "Detail",
+      "observations": [
+        "The ErrorHandler is implemented in the LLMErrorHandling class, which is located in the lib/llm/llm-error-handling.ts file.",
+        "The try-catch approach is used to catch and handle errors that occur during LLM provider interactions, ensuring that the system remains stable and functional.",
+        "The ErrorHandler is a crucial component of the LLMAbstraction, as it enables the system to handle and recover from errors in a robust and reliable manner."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:11.437Z",
+        "last_updated": "2026-03-08T13:57:11.437Z"
+      },
+      "id": "mc4flkg2hb9cua"
+    },
+    {
+      "name": "DesignPatternCategorizer",
+      "entityType": "Detail",
+      "observations": [
+        "Based on the parent context, the DesignPatterns sub-component uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database, which implies a categorization mechanism.",
+        "The suggested detail nodes from the parent analysis, such as CreationalPatterns, StructuralPatterns, and BehavioralPatterns, indicate a categorization system, but without source code, this is inferred from the parent context.",
+        "Given the lack of source files, it's reasonable to assume that the DesignPatternCategorizer would be responsible for categorizing design patterns, but the exact implementation details are unknown."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:11.441Z",
+        "last_updated": "2026-03-08T13:57:11.441Z"
+      },
+      "id": "mc4flkg1bo7lc7"
+    },
+    {
+      "name": "ContentValidationAgentIntegration",
+      "entityType": "Detail",
+      "observations": [
+        "The ContentValidationModule utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content, indicating a clear separation of concerns between content validation and the module's core functionality.",
+        "The integration of the ContentValidationAgent suggests a modular design approach, allowing for potential swaps or upgrades of the validation agent without affecting the rest of the ContentValidationModule.",
+        "The ContentValidationModule's reliance on the ContentValidationAgent implies a dependency on the agent's functionality, highlighting the importance of the agent's implementation and maintenance in ensuring the overall effectiveness of the ContentValidationModule."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-08T13:57:11.446Z",
+        "last_updated": "2026-03-08T13:57:11.446Z"
+      },
+      "id": "mc4flkg2b4y1cx"
     }
   ],
   "relations": [
@@ -7217,14 +7413,116 @@
       "to": "DataSynchronizer",
       "relationType": "related_to",
       "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMErrorHandling",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMConfigurationManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "CodeGraphConstructionService",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Trajectory",
+      "to": "SpecstoryAdapterInitializer",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "EntityPersistenceManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "DataLossTracker",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "KnowledgeGraphQueryEngine",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ConstraintEnforcer",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "Agents",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMErrorHandling",
+      "to": "ErrorHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMService",
+      "to": "ServiceStarterModule",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DesignPatterns",
+      "to": "DesignPatternCategorizer",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ContentValidationModule",
+      "to": "ContentValidationAgentIntegration",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OntologyClassificationAgent",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "ServiceStarterModule",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "LLMConfigurationManager",
+      "to": "LLMService",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "LLMService",
+      "to": "SemanticAnalysisService",
+      "relationType": "related_to",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-08T13:29:54.502Z",
-    "total_entities": 281,
-    "total_relations": 386,
+    "exported_at": "2026-03-08T13:59:36.910Z",
+    "total_entities": 293,
+    "total_relations": 403,
     "description": "Coding project infrastructure and patterns"
   }
 }

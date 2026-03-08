@@ -2,110 +2,97 @@
 
 **Type:** SubComponent
 
-The startServiceWithRetry function in lib/service-starter.js implements retry logic with exponential backoff to re-establish connections in case of failures.
+SpecstoryConnector implements a retry mechanism through the initialize method in SpecstoryAdapter for robust connection handling
 
 ## What It Is  
 
-The **SpecstoryConnector** is a sub‑component that lives inside the **Trajectory** component. Its concrete implementation can be found in the source tree under the integration layer – the class **`SpecstoryAdapter`** is defined in `lib/integrations/specstory-adapter.js`. The connector does not contain its own low‑level networking code; instead it **instantiates** the `SpecstoryAdapter` and delegates all connection work to that adapter. Connection establishment is driven by the retry helper **`startServiceWithRetry`** located in `lib/service-starter.js`, which supplies exponential‑backoff logic for re‑trying failed connection attempts. In practice, the SpecstoryConnector presents a **unified, protocol‑agnostic interface** to the rest of the system, allowing callers to request a connection without needing to know whether the underlying transport is HTTP, IPC, a file‑watcher, or any other supported protocol.
+**SpecstoryConnector** is a sub‑component that lives inside the *Trajectory* component and is responsible for establishing a communication link with the external **Specstory** extension. All of the connection logic is delegated to the **SpecstoryAdapter** class, which resides in the file **`specstory-adapter.js`**. The connector does not implement any low‑level transport code itself; instead it invokes the adapter’s public methods—`connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`—to select the most appropriate channel at runtime. When a connection attempt fails, the adapter’s `initialize` method drives a built‑in retry mechanism, ensuring that the connector can recover from transient errors without additional orchestration from the caller.
 
 ## Architecture and Design  
 
-The design that emerges from the observations is a **layered adapter‑centric architecture**. The `SpecstoryAdapter` acts as the **Adapter** (in the classic GoF sense) that translates the generic operations required by the connector into concrete protocol‑specific calls. The connector itself is a thin façade that aggregates the adapter’s capabilities and adds resilience. Resilience is supplied by the **Retry with Exponential Backoff** pattern, encapsulated in the `startServiceWithRetry` function.  
+The design of **SpecstoryConnector** follows a clear *adapter‑oriented* approach. The **SpecstoryAdapter** acts as a thin façade that hides the details of three distinct transport mechanisms (HTTP, IPC, file‑watch) behind a uniform API. This separation mirrors the **Strategy** pattern: each transport method is encapsulated in its own function (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`), and the adapter can switch between them dynamically based on environment capabilities or fallback requirements.  
 
-Interaction flow:  
-1. **Trajectory** (the parent component) creates an instance of **SpecstoryConnector**.  
-2. The connector **instantiates** `SpecstoryAdapter` (from `lib/integrations/specstory-adapter.js`).  
-3. When a connection is requested, the connector invokes the adapter’s connection method.  
-4. If the attempt fails, the connector hands control to `startServiceWithRetry` (from `lib/service-starter.js`). This helper repeatedly calls the adapter’s connect routine, applying an exponential delay between attempts until success or a configured limit is reached.  
+The **initialize** method implements a *retry* strategy that is conceptually similar to the **Retry** pattern. It centralises error‑handling and reconnection logic, preventing duplicated retry code across the system. By housing the retry policy inside the adapter, **SpecstoryConnector** remains lightweight and focused on “what” connection to request rather than “how” to recover from failures.  
 
-Because the adapter is used **throughout** the connector, any change to the adapter’s protocol handling automatically propagates to all callers, supporting the “flexible protocol” requirement noted in the observations. The connector therefore shares a common resilience strategy with its sibling **ServiceStarter**, which also relies on `startServiceWithRetry`. This reuse of a retry utility demonstrates a **cross‑cutting concern** approach rather than each component re‑implementing its own retry logic.
+Within the broader **Trajectory** hierarchy, **SpecstoryConnector** is one of several sibling sub‑components—*ConversationLogger*, *ConnectionRetryManager*, and *SpecstoryAdapterInitializer*. All of these share the common goal of robust, observable communication with external services, and they likely collaborate through shared configuration or logging facilities, though the observations do not detail the exact integration points.
 
 ## Implementation Details  
 
-- **`lib/integrations/specstory-adapter.js` – `SpecstoryAdapter`**  
-  The adapter class encapsulates the low‑level details needed to talk to the Specstory extension. Although the exact methods are not listed, the observations confirm that it can be instantiated multiple times and supports **different connection protocols** (e.g., HTTP, IPC, file‑watch). Its public surface is designed to be **protocol‑agnostic**, exposing a single “connect” style method that the connector calls.  
+The core implementation lives in **`specstory-adapter.js`** and is centred on the **SpecstoryAdapter** class. The class exposes three public connection methods:
 
-- **`lib/service-starter.js` – `startServiceWithRetry`**  
-  This function implements **exponential backoff**: after each failed attempt it waits for a period that grows (typically 2ⁿ × baseDelay) before retrying. The function is generic enough to be used by other services (e.g., the sibling **ServiceStarter** component), indicating that it receives a callable representing the service start logic (in this case the adapter’s connection routine).  
+* **`connectViaHTTP`** – establishes an HTTP client (likely using a standard request library) and negotiates a session with the Specstory extension over a network endpoint.  
+* **`connectViaIPC`** – creates an inter‑process communication channel (e.g., a Unix domain socket or named pipe) for low‑latency, same‑machine interactions.  
+* **`connectViaFileWatch`** – falls back to a file‑system based protocol, where the connector watches a designated directory for request/response files, enabling operation in highly restricted environments.
 
-- **SpecstoryConnector** (no explicit file path given, but logically resides alongside the other sub‑components of **Trajectory**)  
-  The connector’s constructor creates a `new SpecstoryAdapter()` and stores the instance. All public methods forward to the adapter, wrapping calls with `startServiceWithRetry` when a failure is detected. Because the connector “handles connection failures and retries the connection establishment process as needed,” it likely catches exceptions or error codes from the adapter and triggers the retry helper.  
+The **`initialize`** method orchestrates the connection lifecycle. It attempts a primary connection (the preferred method is not specified, but the existence of a fallback suggests a prioritized order: HTTP → IPC → FileWatch). If the attempt fails, `initialize` invokes a retry loop whose parameters (max attempts, back‑off) are presumably supplied by the sibling **ConnectionRetryManager** or by configuration loaded via **SpecstoryAdapterInitializer**. Successful connection results in the adapter exposing an active channel object that **SpecstoryConnector** can use for subsequent message exchange.
 
-- **Relationship to Siblings**  
-  - **GraphDatabaseManager**, **LLMInitializer**, **ConcurrencyController**, **PipelineCoordinator**, **ServiceStarter**, and **SpecstoryAdapterFactory** are all peers under the same parent (**Trajectory**). The connector shares the **retry utility** with **ServiceStarter**, and it may obtain its adapter instances from **SpecstoryAdapterFactory** (though the observations do not explicitly confirm this, the presence of a factory sibling suggests a possible creation point).  
+Because **SpecstoryConnector** merely forwards calls to the adapter, its own codebase is minimal—likely a thin wrapper that injects the adapter instance, triggers `initialize`, and provides a simple façade for the rest of the *Trajectory* component to call.
 
 ## Integration Points  
 
-1. **Parent – Trajectory**  
-   Trajectory orchestrates the lifecycle of SpecstoryConnector, likely injecting configuration (e.g., chosen protocol, retry limits). The parent benefits from the connector’s unified interface, treating all Specstory connections uniformly regardless of underlying transport.  
+* **Parent – Trajectory**: *Trajectory* aggregates **SpecstoryConnector** alongside other communication‑related sub‑components. It likely orchestrates which connector to use based on runtime context and may pass configuration objects down to the adapter via the **SpecstoryAdapterInitializer** sibling.  
 
-2. **Sibling – ServiceStarter**  
-   Both components rely on the same `startServiceWithRetry` function, indicating a shared library for service resilience. Any change to the retry policy (e.g., max attempts, backoff factor) will affect both, ensuring consistent behavior across the system.  
+* **Sibling – ConnectionRetryManager**: Provides the retry policy (number of attempts, delay strategy) that the adapter’s `initialize` method consumes. This separation allows retry behaviour to be tuned centrally without modifying the adapter.  
 
-3. **Sibling – SpecstoryAdapterFactory** (potential)  
-   If a factory exists, it would centralize creation of `SpecstoryAdapter` instances, allowing the connector to request adapters pre‑configured for a particular protocol. This would further decouple the connector from concrete adapter constructors.  
+* **Sibling – SpecstoryAdapterInitializer**: Loads configuration (e.g., endpoint URLs, IPC socket paths, file‑watch directories) and injects those settings into the **SpecstoryAdapter** before connection attempts begin.  
 
-4. **External – Specstory Extension**  
-   The ultimate target of the connector is the Specstory extension, which may expose HTTP endpoints, IPC sockets, or file‑watch interfaces. The adapter abstracts these details, so the connector’s only external dependency is the adapter’s contract.  
+* **Sibling – ConversationLogger**: Receives logs from the adapter (connection attempts, errors, fallback switches) and records them in a structured format, supporting observability and debugging.  
+
+* **External – Specstory extension**: The ultimate target of the connection, reachable via HTTP, IPC, or file‑watch. The adapter abstracts the specifics of each protocol, presenting a uniform interface to the rest of the system.
 
 ## Usage Guidelines  
 
-- **Instantiate via Trajectory**: Developers should let the Trajectory component create the SpecstoryConnector rather than constructing it directly, ensuring that configuration (protocol choice, retry settings) is applied consistently.  
-- **Prefer the Unified Interface**: Call the connector’s high‑level methods (e.g., `connect()`) instead of interacting with the adapter directly. This guarantees that retry logic is automatically applied.  
-- **Configure Retry Parameters Thoughtfully**: The exponential backoff parameters are defined in `startServiceWithRetry`. Adjust the base delay and maximum attempts only after profiling the expected latency and failure modes of the chosen protocol.  
-- **Do Not Bypass the Adapter**: Directly using `SpecstoryAdapter` outside the connector defeats the unified abstraction and may lead to duplicated retry code. If a special protocol nuance is required, extend the adapter rather than modifying the connector.  
-- **Monitor Connection Health**: Since the connector handles reconnection automatically, logging hooks in `startServiceWithRetry` should be used to surface retry events for observability.  
+1. **Prefer the high‑level connector** – Developers should interact with **SpecstoryConnector** rather than calling the adapter methods directly. This guarantees that the retry logic encapsulated in `initialize` is always applied.  
+
+2. **Configure through the initializer** – All transport‑specific parameters (HTTP base URL, IPC socket name, watch directory) must be supplied via **SpecstoryAdapterInitializer**. Changing these values at runtime should be avoided; instead, restart the *Trajectory* component after configuration updates.  
+
+3. **Leverage the retry manager** – If a project has special latency or reliability requirements, adjust the policy in **ConnectionRetryManager** rather than modifying the adapter’s internal loop.  
+
+4. **Monitor connection state** – Use **ConversationLogger** to capture connection events. Logs will indicate which transport method succeeded and whether any fallback occurred, aiding in troubleshooting.  
+
+5. **Do not bypass fallback** – Even if the primary transport (e.g., HTTP) is known to be available, allow the adapter to attempt the fallback chain. This preserves the robustness built into the design and avoids hard‑coding environment assumptions.  
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified
+* **Adapter / Facade** – `SpecstoryAdapter` hides multiple transport implementations behind a single interface.  
+* **Strategy** – Separate methods (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) encapsulate interchangeable connection strategies.  
+* **Retry** – `initialize` implements a retry loop for resilient connection establishment.  
 
-1. **Adapter Pattern** – `SpecstoryAdapter` provides a uniform interface over multiple protocols.  
-2. **Retry with Exponential Backoff** – Implemented by `startServiceWithRetry`.  
-3. **Facade (Connector) Pattern** – `SpecstoryConnector` offers a simplified, high‑level API that hides adapter and retry complexities.  
-4. **Cross‑Cutting Concern (Shared Utility)** – The retry helper is reused by sibling components (e.g., ServiceStarter).  
+### Design decisions and trade‑offs
+* **Centralised connection logic** reduces duplication but creates a single point of failure; the retry mechanism mitigates this.  
+* **Multiple transport options** increase flexibility and allow operation in constrained environments, at the cost of added complexity in the adapter.  
+* **Separate retry manager** decouples policy from implementation, enabling easier tuning but requiring coordination between components.  
 
-### Design Decisions and Trade‑offs  
+### System structure insights
+* *Trajectory* is the parent orchestrator, aggregating communication‑related sub‑components.  
+* **SpecstoryConnector** is a thin wrapper that delegates all heavy lifting to **SpecstoryAdapter**.  
+* Sibling components provide cross‑cutting concerns (logging, retry policy, configuration) that are reused by the connector.  
 
-- **Unified Adapter vs. Multiple Specialized Clients** – Choosing a single adapter class simplifies the public API but requires the adapter to contain protocol‑specific branching logic, which can increase its internal complexity.  
-- **Centralized Retry Logic** – Placing exponential backoff in a shared function avoids duplication and ensures consistent resilience, but it couples all services to the same retry policy, limiting per‑service tuning unless the helper is made configurable.  
-- **Connector Thinness** – By delegating most work to the adapter and retry utility, the connector remains easy to test and maintain, at the cost of relying heavily on the correctness of those lower‑level components.  
+### Scalability considerations
+* Adding additional transport mechanisms (e.g., WebSocket) would fit naturally into the existing Strategy layout without altering the connector’s public contract.  
+* The retry loop must be bounded to avoid resource exhaustion under massive failure bursts; this is managed by **ConnectionRetryManager**.  
+* Because the adapter abstracts the transport, scaling the underlying communication (e.g., load‑balancing HTTP endpoints) can be performed independently of the connector.  
 
-### System Structure Insights  
+### Maintainability assessment
+* The clear separation of concerns—adapter for transport, initializer for config, retry manager for policy, logger for observability—makes the codebase modular and testable.  
+* The lack of duplicated connection code reduces maintenance overhead.  
+* However, the reliance on external configuration files and the need to keep the fallback order consistent across environments demand disciplined documentation and automated validation.  
 
-- The system follows a **modular hierarchy**: Trajectory (parent) → Sub‑components (Connector, Adapter, ServiceStarter, etc.).  
-- **Shared libraries** (`lib/service-starter.js`) provide cross‑component utilities, reinforcing a **horizontal reuse** strategy.  
-- The presence of a **SpecstoryAdapterFactory** sibling suggests an intention to decouple construction details from usage, hinting at a possible future **Factory** pattern adoption.  
-
-### Scalability Considerations  
-
-- Because connection establishment is protocol‑agnostic and handled via a reusable adapter, scaling to additional transport mechanisms (e.g., WebSockets) can be achieved by extending the adapter without touching the connector.  
-- Exponential backoff ensures that in high‑failure scenarios the system does not overwhelm the Specstory extension with rapid reconnection attempts, supporting graceful degradation under load.  
-- However, the single‑instance nature of the connector (as implied) could become a bottleneck if many concurrent consumers request connections; a pool of adapters or a connection manager might be required for high‑throughput scenarios.  
-
-### Maintainability Assessment  
-
-- **High cohesion**: Each class has a clear responsibility – the adapter handles protocol specifics, the connector manages orchestration and resilience, the retry utility handles backoff.  
-- **Low coupling**: The connector interacts with the adapter through a well‑defined interface, and retry logic is externalized, making each piece replaceable with minimal ripple effects.  
-- **Extensibility**: Adding new protocols only requires changes inside `SpecstoryAdapter` (or a new subclass) and possibly updates to a factory, preserving the connector’s contract.  
-- **Potential risk**: The adapter may become a “god class” if protocol branching grows unchecked; extracting protocol‑specific strategies into separate classes could mitigate this.  
-- Overall, the design promotes easy testing (mock the adapter, inject a fake retry function) and straightforward future enhancements, indicating good maintainability.
+Overall, **SpecstoryConnector** demonstrates a well‑encapsulated, strategy‑driven design that balances flexibility with robustness, fitting cleanly into the *Trajectory* component’s architecture.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js allows for flexible connection establishment with the Specstory extension via multiple protocols such as HTTP, IPC, or file watch. This is evident in the way the SpecstoryAdapter class is instantiated and used throughout the component, providing a unified interface for different connection methods. Furthermore, the retry logic with exponential backoff implemented in the startServiceWithRetry function in lib/service-starter.js ensures that connections are re-established in case of failures, enhancing the overall robustness of the component.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods in specstory-adapter.js. This flexibility allows the component to provide a fallback option when necessary, ensuring reliable connectivity. The SpecstoryAdapter class plays a crucial role in this design, as it encapsulates the logic for connecting to the Specstory extension via various methods. The initialize method in SpecstoryAdapter implements a retry mechanism to handle connection failures, demonstrating a focus on robustness.
 
 ### Siblings
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager uses a graph database to store and retrieve data.
-- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer uses a constructor to initialize the LLM.
-- [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
-- [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
-- [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
-- [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
+- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes a logging framework to format and log conversation entries
+- [ConnectionRetryManager](./ConnectionRetryManager.md) -- ConnectionRetryManager utilizes a retry policy to determine the number of retries for failed connections
+- [SpecstoryAdapterInitializer](./SpecstoryAdapterInitializer.md) -- SpecstoryAdapterInitializer utilizes a configuration mechanism to load SpecstoryAdapter settings
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*
