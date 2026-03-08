@@ -716,7 +716,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       const isActiveStatus = p.status === 'running' || p.status === 'starting' || p.status === 'cancelling'
       // For non-inline processes, also check isAlive flag
       const isAlive = p.isAlive && p.status !== 'completed' && p.status !== 'failed' && p.status !== 'cancelled'
-      return isActiveStatus || isAlive
+      // ALSO keep recently completed/failed processes so the trace doesn't go blank
+      // when a workflow finishes while the user is watching
+      const isTerminalWithSteps = (p.status === 'completed' || p.status === 'failed') &&
+        p.steps && p.steps.length > 0
+      return isActiveStatus || isAlive || isTerminalWithSteps
     })
     // Include processesSignature to ensure recalculation when any process data changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2297,13 +2301,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   // 3. Add post-batch steps last (finalization: persistence, dedup, validation)
                   allSteps.push(...postBatchSteps)
                 } else {
-                  // STANDARD WORKFLOW: Show steps in their natural execution order
-                  // No reordering needed - persistence runs after its dependencies complete
+                  // STANDARD WORKFLOW (wave-analysis): Pass raw step names so TraceModal
+                  // can use STEP_DISPLAY_NAMES for proper labeling (e.g., operator_conv → "context convolution")
                   if (activeCurrentProcess?.steps && activeCurrentProcess.steps.length > 0) {
                     for (const step of activeCurrentProcess.steps) {
                       allSteps.push({
                         ...step,
-                        name: stepToAgent[step.name] || step.name,
+                        // Keep raw step name — TraceModal handles display name mapping
                       })
                     }
                   }
@@ -2316,7 +2320,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 const allSteps: StepInfo[] = []
 
                 // Check if this historical workflow has completed batches data
-                const hasCompletedBatches = historicalWorkflowDetail?.completedBatches &&
+                // Wave-analysis workflows have their own step format — skip batch grouping for them
+                const isWaveWorkflow = historicalWorkflowDetail?.workflowName?.includes('wave')
+                const hasCompletedBatches = !isWaveWorkflow &&
+                                           historicalWorkflowDetail?.completedBatches &&
                                            historicalWorkflowDetail.completedBatches.length > 0
 
                 if (hasCompletedBatches && historicalWorkflowDetail?.steps) {
@@ -2447,10 +2454,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   // 3. Add post-batch steps last
                   allSteps.push(...postBatchSteps)
                 } else {
-                  // No batch data - show flat list (fallback)
+                  // No batch data - show flat list (wave-analysis or other non-batch workflows)
+                  // Keep raw step names so TraceModal can use STEP_DISPLAY_NAMES
                   for (const step of historicalWorkflowDetail?.steps || []) {
                     allSteps.push({
-                      name: step.agent || step.name,
+                      name: step.name,  // Raw step name — TraceModal handles display mapping
                       status: step.status === 'success' ? 'completed' : step.status as any,
                       duration: step.duration ? parseFloat(String(step.duration).replace(/s$/i, '')) * 1000 : undefined,
                       llmProvider: (step as any).llmProvider,

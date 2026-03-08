@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { StepInfo } from '@/store/slices/ukbSlice'
 import { Logger, LogCategories } from '@/utils/logging'
-import { TIER_COLORS, TIER_MODELS, AGENT_SUBSTEPS, STEP_TO_AGENT, shortenModel } from './constants'
+import { TIER_COLORS, TIER_MODELS, AGENT_SUBSTEPS, STEP_TO_AGENT, STEP_DISPLAY_NAMES, shortenModel } from './constants'
 
 interface TraceModalProps {
   open: boolean
@@ -135,9 +135,11 @@ export function TraceModal({
       const duration = computeDuration(step)
       const startOffset = computeOffset(step, cumulativeOffset)
 
+      // Use display name mapping for wave-analysis steps, fall back to replacing underscores
+      const displayName = STEP_DISPLAY_NAMES[step.name] || step.name.replace(/_/g, ' ')
       const event: TraceEventUI = {
         id: `${i}-${step.name}`,
-        name: step.name.replace(/_/g, ' '),
+        name: displayName,
         status: step.status,
         duration,
         tokensUsed: step.tokensUsed,
@@ -368,13 +370,9 @@ export function TraceModal({
                                 : '0%',
                             }}
                           />
-                          {/* Duration bar: use tier color for completed steps, status color otherwise */}
+                          {/* Duration bar: green for all completed, status color otherwise */}
                           <div
-                            className={`h-4 rounded opacity-80 ${
-                              event.status === 'completed' && event.llmTier
-                                ? (TIER_COLORS[event.llmTier]?.bar || 'bg-green-500')
-                                : getStatusColor(event.status)
-                            }`}
+                            className={`h-4 rounded opacity-80 ${getStatusColor(event.status)}`}
                             style={{ width: `${barWidth}%`, minWidth: '4px' }}
                             title={event.llmTier ? `${event.llmTier} tier` : undefined}
                           />
@@ -385,24 +383,18 @@ export function TraceModal({
                           {formatDuration(event.duration)}
                         </div>
 
-                        {/* LLM indicator - show specific model name with fallback warning */}
+                        {/* LLM indicator - show actual model when available, hide for non-LLM steps */}
                         <div className="w-24 text-right">
-                          {(event.llmProvider || event.llmTier) && (
+                          {event.llmProvider && event.llmProvider !== 'none' && event.llmProvider !== 'pending' && (
                             <Badge
                               variant="outline"
                               className={`text-[10px] h-5 truncate max-w-[90px] ${
                                 (event as any).llmModeFallback ? 'border-orange-400 text-orange-600' : ''
                               }`}
-                              title={
-                                (event as any).llmModeFallback
-                                  ? `Fallback: intended ${(event as any).llmIntendedMode}, actual ${(event as any).llmActualMode} (${event.llmProvider})`
-                                  : event.llmProvider || (event.llmTier ? `${event.llmTier} tier` : '')
-                              }
+                              title={event.llmProvider}
                             >
-                              {(event as any).llmModeFallback && '⚠️ '}
-                              {event.llmProvider
-                                ? formatModelName(event.llmProvider)
-                                : TIER_MODELS[event.llmTier || ''] || event.llmTier}
+                              {(event as any).llmModeFallback && '!! '}
+                              {formatModelName(event.llmProvider)}
                             </Badge>
                           )}
                         </div>
@@ -483,7 +475,7 @@ export function TraceModal({
                 </div>
 
                 {/* LLM Metrics */}
-                {selectedEvent.llmProvider && (
+                {selectedEvent.llmProvider && selectedEvent.llmProvider !== 'none' && selectedEvent.llmProvider !== 'pending' && (
                   <>
                     <Separator />
                     <div className="space-y-2">
@@ -494,7 +486,13 @@ export function TraceModal({
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="text-muted-foreground">Provider</div>
                         <div>{selectedEvent.llmProvider}</div>
-                        {selectedEvent.tokensUsed && (
+                        {selectedEvent.llmCalls != null && selectedEvent.llmCalls > 0 && (
+                          <>
+                            <div className="text-muted-foreground">LLM Calls</div>
+                            <div>{selectedEvent.llmCalls}</div>
+                          </>
+                        )}
+                        {selectedEvent.tokensUsed != null && selectedEvent.tokensUsed > 0 && (
                           <>
                             <div className="text-muted-foreground">Tokens Used</div>
                             <div>{selectedEvent.tokensUsed.toLocaleString()}</div>

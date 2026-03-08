@@ -395,6 +395,8 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'operator_dedup': 'kg_operators',
   'operator_pred': 'kg_operators',
   'operator_merge': 'kg_operators',
+  // NOTE: For agent graph, all operators map to kg_operators.
+  // For tracer display names, use OPERATOR_DISPLAY_NAMES below.
   'batch_qa': 'quality_assurance',
   'save_batch_checkpoint': 'batch_checkpoint_manager',
   'index_codebase': 'code_graph',
@@ -835,4 +837,28 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       outputs: ['Stored entities', 'Embeddings written'],
       llmUsage: 'none', techNote: 'GraphDB + LevelDB storage + direct attribute merge' },
   ],
+}
+
+/**
+ * Human-readable display names for wave-analysis steps in the tracer.
+ * Maps internal step names to descriptive labels.
+ */
+export const STEP_DISPLAY_NAMES: Record<string, string> = {
+  'wave1_init': 'batch scheduler',
+  'wave1_analyze': 'semantic analysis',
+  'wave1_classify': 'ontology classification',
+  'wave1_persist': 'persistence',
+  'wave2_analyze': 'semantic analysis',
+  'wave2_classify': 'ontology classification',
+  'wave2_persist': 'persistence',
+  'wave3_analyze': 'semantic analysis',
+  'wave3_classify': 'ontology classification',
+  'wave3_persist': 'persistence',
+  'operator_conv': 'context convolution',
+  'operator_aggr': 'entity aggregation',
+  'operator_embed': 'node embedding',
+  'operator_dedup': 'deduplication',
+  'operator_pred': 'edge prediction',
+  'operator_merge': 'structure fusion',
+  'wave4_insights': 'insight generation',
 }
