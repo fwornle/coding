@@ -2,93 +2,83 @@
 
 **Type:** SubComponent
 
-The ServiceStarterModule (lib/service-starter.js) may have a specific configuration or setting that applies to the LLMService, such as a custom backoff strategy.
+The LLMService class is responsible for managing the interaction between different providers and the application logic, promoting a loose coupling between the component's dependencies
 
 ## What It Is  
 
-The **LLMService** is a sub‑component that lives in the source tree at **`lib/llm/llm-service.ts`**.  The file defines the primary `LLMService` class (and accompanying interfaces) that expose a high‑level API for working with large language models.  Within the broader **DockerizedServices** component, the LLMService is instantiated and started through the **ServiceStarterModule** (`lib/service-starter.js`).  This startup module supplies a retry‑with‑backoff strategy that protects the LLMService (and its sibling services) from endless start‑up loops, ensuring a stable Docker‑based deployment.  In practice the LLMService offers capabilities such as mode routing, result caching, and circuit‑breaking, while also providing a well‑defined interface for other sub‑components—most notably the **SemanticAnalysisService**—to request LLM‑driven operations.
+The **LLMService** is the high‑level façade that drives every Large‑Language‑Model (LLM) operation inside the *LLMAbstraction* sub‑component.  Its concrete implementation lives in **`lib/llm/llm-service.ts`**.  The class does not contain model‑specific logic; instead it forwards calls to concrete provider implementations such as **`DMRProvider`** (found in **`lib/llm/providers/dmr-provider.ts`**) and, by extension, to any future provider (e.g., Anthropic).  Because LLMService sits directly under the parent component **LLMAbstraction** and owns a **ProviderManager** child, it acts as the single entry point through which the rest of the application interacts with LLM capabilities, while keeping the underlying provider details hidden.
 
 ## Architecture and Design  
 
-The observable architecture revolves around a **service‑oriented** layout where each functional area (LLM, semantic analysis, constraint monitoring, code‑graph construction) is packaged as an independent sub‑component under the umbrella of **DockerizedServices**.  The dominant design pattern explicitly mentioned is the **retry‑with‑backoff** pattern, implemented in `lib/service-starter.js`.  This module is a child of LLMService and is responsible for orchestrating service start‑up, applying a configurable backoff algorithm that gradually increases the delay between retries when a start attempt fails.  By centralising this logic, the system avoids duplicated retry code across LLMService, SemanticAnalysisService, and other siblings.
+The dominant architectural style is a **facade pattern**.  LLMService presents a simple, provider‑agnostic API (e.g., “generate”, “chat”, “healthCheck”) while delegating the actual work to specialized provider classes.  This façade lives at **`lib/llm/llm-service.ts`** and shields the broader system from the heterogeneity of providers.  
 
-Beyond the start‑up pattern, the parent‑level description highlights **circuit‑breaking**, **caching**, and **mode routing** as additional patterns employed inside the LLMService.  These mechanisms are typical of resilient, high‑throughput LLM workloads: circuit‑breakers guard downstream model endpoints from cascading failures; caching reduces latency for repeat prompts; and mode routing directs requests to the appropriate model variant (e.g., “chat”, “completion”, “embedding”).  Although the exact implementation details are not enumerated, their presence is inferred from the parent context and therefore forms part of the architectural picture.
+Inside the façade, a **ProviderManager** (the child component) functions as a registry and selector.  When a request arrives, ProviderManager consults configuration—such as per‑agent model overrides—to choose the appropriate provider instance.  The selected provider (e.g., an instance of **DMRProvider**) then executes the operation.  Because each provider implements a common interface, LLMService can remain completely decoupled from the specifics of Docker Model Runner, Anthropic’s API, or any future service.  
 
-Interaction between components is achieved through well‑defined **service APIs**.  The LLMService exposes methods that other sub‑components—particularly the **SemanticAnalysisService**—invoke to obtain processed language model outputs.  This API‑driven coupling keeps the services loosely bound while still enabling rich, collaborative functionality.
+The design also embeds **health‑check responsibilities** within providers.  DMRProvider, for instance, implements per‑agent health checks, allowing LLMService to surface availability information without needing to know the mechanics of Docker Desktop’s Model Runner.  This further reinforces loose coupling: the façade merely aggregates health results rather than performing low‑level diagnostics itself.
 
 ## Implementation Details  
 
-The core of the LLMService resides in **`lib/llm/llm-service.ts`**.  The file defines a `LLMService` class that likely implements an interface exposing operations such as `generateText`, `embed`, and `routeMode`.  Internally, the class is expected to:
+* **LLMService (`lib/llm/llm-service.ts`)** – Exposes high‑level methods such as `invokeModel`, `getHealth`, and `setAgentOverrides`.  Each method internally calls the corresponding method on ProviderManager.  
 
-1. **Initialize a backoff‑aware start‑up** by delegating to `ServiceStarterModule.startService(this)`.  The starter module reads a custom backoff configuration (as hinted by Observation 2) and repeatedly attempts to bring the LLMService online, pausing with an exponential or jitter‑based delay after each failure.  
-2. **Configure logging and error handling** – Observation 7 notes that the service employs logging mechanisms to capture LLM‑related issues.  This is typically achieved via a logger instance (e.g., Winston or Bunyan) injected into the class, with structured error objects that propagate up to the starter module for retry decisions.  
-3. **Connect to a dedicated storage layer** – Observation 5 suggests the service uses its own database or storage system.  The implementation probably includes a data‑access object (DAO) that abstracts reads/writes of model prompts, cached responses, and circuit‑breaker state.  The storage may be a relational DB, a key‑value store, or a file‑based cache, but the exact technology is not disclosed.  
-4. **Expose a public API** – Observation 6 indicates a specific interface for other sub‑components.  The `LLMService` likely registers its API on an internal message bus or HTTP/gRPC server, allowing callers such as `SemanticAnalysisService` to invoke methods like `processDocument` or `extractEntities`.  
-5. **Apply resilience patterns** – While not directly observable in code, the parent context’s mention of “circuit breaking” implies that the service wraps outbound model calls with a circuit‑breaker library (e.g., `opossum`).  When the model endpoint becomes unhealthy, the breaker trips, and the service returns a fallback or error quickly, preventing resource exhaustion.
+* **ProviderManager** – Maintains a map of provider identifiers to concrete provider instances (e.g., `{ dmr: new DMRProvider(), anthropic: new AnthropicProvider() }`).  It resolves which provider to use based on the calling agent’s configuration, supporting the “per‑agent model overrides” mentioned in the observations.  
 
-The **ServiceStarterModule** (`lib/service-starter.js`) contains the `startService` function referenced throughout the hierarchy.  It reads a configuration object (potentially supplied by the LLMService) that defines the backoff strategy—such as initial delay, multiplier, and maximum attempts.  The module then attempts to invoke the service’s internal `initialize` method, catching any thrown errors, logging them, and scheduling the next retry according to the backoff policy.
+* **DMRProvider (`lib/llm/providers/dmr-provider.ts`)** – Implements the provider interface required by ProviderManager.  Its responsibilities include launching Docker Desktop’s Model Runner containers, formatting request payloads, parsing responses, and exposing a `healthCheck` method that verifies the container’s readiness.  Because DMRProvider is a sibling of any other provider classes, it shares the same contract but differs in its local‑inference implementation.  
+
+* **Interaction Flow** – A typical request follows this path: an application component calls `LLMService.invokeModel(agentId, prompt)`.  LLMService forwards the call to ProviderManager, which looks up the agent’s override (if any) and selects the appropriate provider instance.  The provider (e.g., DMRProvider) performs the inference, returns the result to ProviderManager, which then bubbles it back to LLMService and finally to the caller.  Health checks follow the same delegation chain, allowing the façade to present a unified health status across heterogeneous back‑ends.
 
 ## Integration Points  
 
-LLMService sits at the nexus of several integration pathways:
+LLMService is embedded within the **LLMAbstraction** component, making it the primary integration surface for any part of the system that needs LLM capabilities.  Other components import **`lib/llm/llm-service.ts`** and interact exclusively with the façade, never touching provider classes directly.  The **ProviderManager** child acts as the internal glue, exposing a registration API that can be invoked during application startup to plug in new providers (e.g., an AnthropicProvider).  
 
-* **Parent – DockerizedServices**: The Docker orchestration layer relies on ServiceStarterModule to guarantee that the LLMService container is healthy before exposing it to the rest of the system.  Docker health‑check scripts may query an LLMService health endpoint that is only reachable after successful start‑up.  
-* **Sibling – SemanticAnalysisService**: The SemanticAnalysisService directly calls the LLMService API to obtain language model outputs needed for semantic parsing.  Because both services share the same retry‑with‑backoff starter, they exhibit consistent start‑up behaviour and error‑handling semantics.  
-* **Sibling – ConstraintMonitoringService & CodeGraphConstructionService**: Although not explicitly calling LLMService, these services also benefit from the same starter module, indicating a shared operational foundation.  
-* **Child – ServiceStarterModule**: The LLMService delegates its lifecycle management to this child module, which encapsulates the backoff logic and any custom configuration (Observation 2).  Any change to the backoff parameters propagates automatically to all services that depend on the starter.  
-* **External Storage**: The dedicated database/storage referenced in Observation 5 is an integration point with persistence layers (e.g., PostgreSQL, Redis).  The service likely uses a configuration file or environment variables to locate the storage endpoint, keeping the connection details decoupled from business logic.  
-* **Logging Infrastructure**: By adhering to a common logging schema (Observation 7), the LLMService integrates with the system‑wide observability stack (e.g., ELK or Loki), enabling centralized monitoring and alerting.
+Because providers may have external dependencies—DMRProvider relies on Docker Desktop’s Model Runner, AnthropicProvider would depend on Anthropic’s cloud API—LLMService abstracts those dependencies away.  The only contracts that other parts of the system need to respect are the façade’s method signatures and the configuration schema that governs per‑agent overrides.  This makes the integration point stable even as providers evolve.
 
 ## Usage Guidelines  
 
-1. **Start‑up via ServiceStarterModule** – Developers should never invoke `LLMService.initialize()` directly.  Instead, they must register the service with `ServiceStarterModule.startService(LLMServiceInstance)` so that the retry‑with‑backoff policy is applied.  Custom backoff settings can be supplied through the starter’s configuration object, respecting the pattern used across DockerizedServices.  
-2. **Respect the public API contract** – Interaction with the LLMService should be limited to the documented methods (e.g., `generateText`, `embed`, `routeMode`).  Passing raw model tokens or bypassing the service’s validation layer can lead to inconsistent state and break circuit‑breaker expectations.  
-3. **Handle errors gracefully** – Because the service employs circuit‑breaking and may return fallback responses, callers must check for error codes or fallback flags rather than assuming successful results.  Logging the error context using the shared logger aids observability.  
-4. **Leverage caching where appropriate** – When the same prompt is issued repeatedly, the LLMService’s internal cache (mentioned in the parent context) will serve cached results.  Clients should include a cache‑control header or flag if they explicitly require a fresh inference.  
-5. **Configure storage connections via environment** – The database or storage endpoint should be supplied through environment variables or a configuration file, keeping the service portable across Docker environments.  Do not hard‑code connection strings inside the service code.  
-6. **Monitor health endpoints** – The Docker health‑check scripts rely on a health endpoint exposed by LLMService after successful initialization.  Ensure this endpoint remains responsive; otherwise, the retry‑with‑backoff loop may repeatedly attempt restarts, consuming resources.
+1. **Always route LLM calls through LLMService.**  Directly instantiating a provider (e.g., `new DMRProvider()`) bypasses the façade’s loose‑coupling guarantees and can lead to configuration drift.  
+
+2. **Configure per‑agent overrides via ProviderManager.**  When an agent requires a specific model or provider, update the ProviderManager’s override map before the first request; the façade will automatically honor the setting.  
+
+3. **Rely on the health‑check API.**  Before issuing inference requests, invoke `LLMService.getHealth()` to ensure the selected provider (Docker container, external API, etc.) is operational.  This is especially important for locally‑run providers like DMRProvider, whose containers may restart.  
+
+4. **Add new providers by implementing the shared provider interface.**  Register the new class with ProviderManager during bootstrapping; no changes to LLMService are required thanks to the façade abstraction.  
+
+5. **Avoid embedding provider‑specific logic in callers.**  If a caller needs to know whether a request was served by DMR or Anthropic, query the health or metadata APIs exposed by LLMService rather than inspecting provider internals.
 
 ---
 
-### Architectural patterns identified
-* Retry‑with‑backoff (implemented in `lib/service-starter.js`)  
-* Circuit‑breaking (mentioned in parent context)  
-* Caching (parent context)  
-* Mode routing (parent context)  
-* Service‑oriented componentization under DockerizedServices  
+### 1. Architectural patterns identified  
+* **Facade pattern** – Centralised, provider‑agnostic entry point (`LLMService`).  
+* **Registry/Factory (via ProviderManager)** – Dynamic selection of concrete provider implementations based on configuration.  
 
-### Design decisions and trade‑offs
-* Centralising start‑up logic in ServiceStarterModule reduces code duplication but couples all services to a single backoff implementation.  
-* Using a dedicated storage layer isolates LLM state from other services, improving scalability at the cost of added operational complexity.  
-* Exposing a thin API keeps inter‑service coupling low, yet requires careful versioning to avoid breaking siblings like SemanticAnalysisService.  
+### 2. Design decisions and trade‑offs  
+* **Loose coupling vs. indirection overhead** – By inserting a façade and a manager, the system gains extensibility (easy to add new providers) at the cost of an extra delegation layer.  
+* **Per‑agent overrides** – Increases flexibility for multi‑tenant scenarios but adds complexity to ProviderManager’s lookup logic.  
+* **Provider‑specific health checks** – Consolidates health visibility but requires each provider to implement a consistent health contract.  
 
-### System structure insights
-* LLMService is a leaf node that contains ServiceStarterModule as its child, while being contained by higher‑level components LLMAbstraction and DockerizedServices.  
-* Sibling services share the same startup resilience pattern, indicating a consistent reliability strategy across the platform.  
+### 3. System structure insights  
+* **Parent‑child hierarchy:** `LLMAbstraction → LLMService → ProviderManager`.  
+* **Sibling relationship:** `DMRProvider` (and any future providers) sit alongside each other under the ProviderManager’s registry, sharing a common interface while delivering distinct inference mechanisms.  
+* **Centralisation:** All LLM‑related traffic funnels through a single façade, simplifying dependency management for the rest of the codebase.  
 
-### Scalability considerations
-* The backoff strategy prevents cascade failures during massive start‑up spikes, supporting horizontal scaling of Docker containers.  
-* Caching and circuit‑breaking reduce load on external LLM endpoints, allowing the service to handle higher request volumes without saturating the model provider.  
-* A separate storage backend enables independent scaling of persistence resources (e.g., scaling Redis for cache or a DB cluster for prompt history).  
+### 4. Scalability considerations  
+* **Horizontal scaling of providers** – Because providers are independent, additional instances (e.g., more Docker Model Runner containers) can be added without modifying LLMService.  
+* **ProviderManager lookup cost** – Currently a simple map; scaling to thousands of agents remains O(1) but may require caching strategies if overrides become complex.  
+* **Facade bottleneck** – If LLMService becomes a hot path, it can be replicated behind a load balancer; the façade is stateless aside from ProviderManager’s configuration, making replication straightforward.  
 
-### Maintainability assessment
-* The clear separation of concerns—startup logic in ServiceStarterModule, business logic in `llm-service.ts`, and storage/logging abstractions—facilitates isolated changes.  
-* Reliance on well‑known patterns (retry‑with‑backoff, circuit‑breaker) means developers can apply familiar libraries and tooling.  
-* However, the implicit nature of some capabilities (e.g., caching, mode routing) that are only described in higher‑level context may require additional documentation to avoid misunderstand‑ings during future extensions.
+### 5. Maintainability assessment  
+The façade‑centric design isolates provider‑specific changes to their own classes, reducing ripple effects across the system.  Adding, removing, or updating a provider only touches the provider implementation and the registration code in ProviderManager.  The clear separation of concerns—LLMService for orchestration, ProviderManager for selection, providers for execution—facilitates unit testing and future refactoring.  The main maintenance focus is keeping the provider interface stable; as long as that contract remains unchanged, the rest of the architecture remains robust.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStarterModule (lib/service-starter.js). This pattern helps prevent endless loops and promotes system stability by introducing a delay between retries. For instance, the startService function in ServiceStarterModule utilizes a backoff strategy to retry failed service startups, ensuring that services are properly initialized before use. The use of Dockerization in this component further enhances deployment and management of services, making it easier to scale and maintain the system. The LLMService (lib/llm/llm-service.ts) also plays a crucial role in this component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed with a high-level facade, specifically the LLMService class (lib/llm/llm-service.ts), which serves as the central entry point for all LLM operations. This design allows for provider-agnostic model calls, enabling the component to interact with different providers, such as Anthropic and Docker Model Runner (DMR), through specific provider classes. For instance, the DMRProvider class (lib/llm/providers/dmr-provider.ts) utilizes Docker Desktop's Model Runner for local LLM inference, supporting per-agent model overrides and health checks. The use of a facade pattern in the LLMService class enables the component to manage the interaction between different providers and the application logic, promoting a loose coupling between the component's dependencies.
 
 ### Children
-- [ServiceStarterModule](./ServiceStarterModule.md) -- The ServiceStarterModule utilizes the retry-with-backoff pattern to prevent endless loops and promote system stability in the LLMService, as mentioned in the parent context.
+- [ProviderManager](./ProviderManager.md) -- The LLMService class utilizes a facade pattern to enable provider-agnostic model calls, as seen in the parent context of LLMAbstraction
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The startService function in ServiceStarterModule (lib/service-starter.js) utilizes a backoff strategy to retry failed service startups, ensuring that services like SemanticAnalysisService are properly initialized before use.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.
-- [CodeGraphConstructionService](./CodeGraphConstructionService.md) -- The CodeGraphConstructionService may utilize the retry-with-backoff pattern implemented in the ServiceStarterModule to prevent endless loops and promote system stability.
+- [DMRProvider](./DMRProvider.md) -- The DMRProvider class utilizes Docker Desktop's Model Runner for local LLM inference, as implemented in lib/llm/providers/dmr-provider.ts
 
 
 ---

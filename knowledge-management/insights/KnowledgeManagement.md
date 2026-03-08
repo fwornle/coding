@@ -2,252 +2,158 @@
 
 **Type:** Component
 
-The use of a constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern in the Wave agents enables lazy LLM initialization, which is a key design decision in the KnowledgeManagement component. This pattern allows the component to delay the initialization of LLM instances until they are actually needed, reducing unnecessary resource allocation and improving overall system efficiency. The ensureLLMInitialized() method, likely defined in the Wave agent classes, serves as a crucial gatekeeper, ensuring that the LLM instance is properly initialized before execution. By following this pattern, the component can optimize resource utilization and minimize the overhead associated with LLM initialization, resulting in improved performance and responsiveness. The ClassificationCacheEntry and PersistenceAgent likely interact with the Wave agents to store and retrieve cached classification results and entity persistence information, respectively.
+The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides a layer of abstraction between the component and the underlying graph database, allowing for flexible data storage and retrieval. The GraphDatabaseAdapter class uses Graphology and LevelDB to store and manage the knowledge graph, and it also provides an automatic JSON export sync feature. This ensures that the knowledge graph is always up-to-date and can be easily exported for further analysis or processing. For example, the CodeGraphAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, uses the GraphDatabaseAdapter to store and retrieve code graph data.
 
 ## What It Is  
 
-The **KnowledgeManagement** component lives under the top‑level *Coding* hierarchy and is realized through a collection of tightly‑coupled agents and adapters that together build, persist, query, and protect a knowledge graph of code‑related entities.  The core source files that reveal its implementation are:
+The **KnowledgeManagement** component lives under the **Coding** parent component and is implemented primarily in the **`integrations/mcp-server-semantic-analysis`** folder. Its core persistence layer is the **`GraphDatabaseAdapter`** class found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter abstracts a Graphology‑backed knowledge graph stored in LevelDB and adds an automatic JSON‑export sync capability.  
 
-* `storage/graph-database-adapter.ts` – the GraphDatabaseAdapter that mediates Graphology + LevelDB persistence and automatic JSON export sync.  
-* `code-graph-agent.ts` – the **CodeGraphAgent** that constructs an AST‑based code knowledge graph and provides semantic search capabilities.  
-* `persistence-agent.ts` – the **PersistenceAgent** that handles entity persistence, ontology classification, and content validation, and interacts with the **ClassificationCacheEntry** cache.  
-* `lib/service-starter.js` – the **ServiceStarterModule** that supplies a retry‑with‑back‑off start‑up routine used by several agents, including the CodeGraphAgent.  
+Agents such as **`CodeGraphAgent`** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) and **`PersistenceAgent`** are orchestrated by a DAG‑based **Pipeline** that guarantees correct ordering and parallel execution where possible. The pipeline relies on **`RetryManager`** (`integrations/mcp-server-semantic-analysis/src/utils/retry-manager.ts`) to make agent execution resilient to transient failures.  
 
-Together these files enable the component to ingest source‑code artefacts (via the Wave‑style agents that follow the `constructor(repoPath, team) → ensureLLMInitialized() → execute(input)` lazy‑initialisation pattern), transform them into a structured graph, cache expensive LLM‑driven classifications, and track any data‑loss events that may arise during processing.  Child sub‑components – **ManualLearning**, **OnlineLearning**, **EntityPersistenceManager**, **DataLossTracker**, and **KnowledgeGraphQueryEngine** – each build on the same GraphDatabaseAdapter and share the same resource‑management conventions, while sibling components such as **LLMAbstraction**, **DockerizedServices**, and **CodingPatterns** expose the same retry and caching utilities, reinforcing a consistent architectural language across the whole *Coding* project.
+The component also houses a lightweight ontology engine (**`OntologySystem`** in `integrations/mcp-server-semantic-analysis/src/ontology/index.js`) and a **`CheckpointManager`** (`integrations/mcp-server-semantic-analysis/src/utils/checkpoint-manager.ts`) that records analysis progress. The public contract for natural‑language query results is the **`NaturalLanguageQueryResult`** interface, defined in the same file as `CodeGraphAgent`.  
+
+Together these pieces enable the child modules **ManualLearning**, **OnlineLearning**, **OntologyManager**, **InsightGenerator**, **GraphDatabaseAdapter**, and **CodeGraphAgent** to store, reason about, and retrieve knowledge about code bases, while sharing the same underlying graph store and ontology services.
 
 ---
 
 ## Architecture and Design  
 
-### Primary patterns  
+The **KnowledgeManagement** component follows a **modular, layered architecture**. At the lowest layer sits the **GraphDatabaseAdapter**, an **Adapter pattern** that decouples the component from the concrete Graphology + LevelDB implementation. This abstraction makes it trivial to swap the storage backend or to add alternative serializers without touching the agents that consume it.  
 
-| Pattern | Where it appears | What it solves |
-|---------|------------------|----------------|
-| **Factory pattern for LLM creation** | Wave agents (e.g., any class that follows `constructor(repoPath, team) + ensureLLMInitialized() + execute(input)`) | Centralises LLM instantiation, allowing different providers or configurations to be swapped without touching the agents themselves. |
-| **Lazy initialization** | `ensureLLMInitialized()` method inside Wave agents, invoked just before `execute` | Defers heavyweight LLM startup until the first request, reducing memory/CPU pressure for idle agents. |
-| **Retry‑with‑back‑off** | `lib/service-starter.js` (ServiceStarterModule) | Guarantees that dependent services (graph store, external LLM endpoints) are up before agents run, improving resilience. |
-| **Cache‑aside (ClassificationCacheEntry)** | `ClassificationCacheEntry` used by `PersistenceAgent` | Stores results of expensive LLM classifications, preventing duplicate calls and cutting latency. |
-| **Adapter pattern for persistence** | `storage/graph-database-adapter.ts` (GraphDatabaseAdapter) | Wraps Graphology + LevelDB behind a simple API (`storePattern`, `retrievePatterns`, `storeEntity`, `retrieveEntity`, etc.), isolating the rest of the component from storage‑engine details. |
-| **Data‑loss tracking** | `DataLossTracking` component (not a separate file but referenced throughout) | Monitors the flow of data through the graph pipeline, emitting diagnostics when inserts/updates are dropped. |
+On top of the storage layer, the system adopts a **Directed Acyclic Graph (DAG) execution model** for its analysis pipeline. The DAG is materialised by the **Pipeline** class (implicitly referenced in the observations) and governs the order of agent execution. Each **agent** (e.g., `CodeGraphAgent`, `PersistenceAgent`) declares its dependencies, allowing the pipeline to schedule independent agents in parallel. This design yields high concurrency while preserving deterministic ordering, a pattern often seen in data‑flow or build‑system architectures.  
 
-### Interaction flow  
+Error handling is encapsulated in the **`RetryManager`**, which implements a **retry‑with‑backoff** strategy. By centralising retry logic, agents remain focused on their domain responsibilities, and the system gains robustness without scattering retry code throughout the codebase.  
 
-1. **Agent construction** – A Wave‑style agent (e.g., a subclass of `WaveAgent`) is instantiated with a repository path and a team identifier. The constructor does *not* create an LLM; it merely records configuration.  
-2. **Service start‑up** – Before any agent can run, the `ServiceStarterModule` is invoked (often indirectly via the agent’s `ensureLLMInitialized`). The module attempts to bring up required services (LLM endpoint, LevelDB instance) using a recursive try‑catch with exponential back‑off.  
-3. **LLM creation** – When `ensureLLMInitialized` finally succeeds, it calls the LLM factory (found in the LLMAbstraction sibling) to obtain a concrete LLM client. This client is cached inside the agent instance for the remainder of its lifecycle.  
-4. **Graph construction** – The `CodeGraphAgent` parses the repository’s AST, enriches nodes with semantic tags via the LLM, and writes the resulting entities to the graph through `GraphDatabaseAdapter`.  
-5. **Classification & caching** – The `PersistenceAgent` receives newly‑created entities, asks the LLM to classify them, and first checks `ClassificationCacheEntry`. If a cached result exists, it is returned; otherwise the LLM is called and the result is stored for future reuse.  
-6. **Data‑loss reporting** – Any failure to write to the graph (e.g., LevelDB write error) is captured by the DataLossTracking logic, which records the incident in the same graph store for later analysis.  
+The **OntologySystem** provides a **Facade**‑like interface to a unified inference engine. Agents call into the ontology system to classify code snippets or infer relationships, keeping ontology concerns isolated from the rest of the pipeline.  
 
-The component therefore follows a **pipeline‑oriented architecture**: input → lazy‑initialized LLM → graph adapter → optional cache → persistence → monitoring.  All steps are loosely coupled through well‑defined interfaces (factory, adapter, cache), which mirrors the design of sibling components such as **DockerizedServices** (service‑startup) and **CodingPatterns** (graph storage).
+Finally, the **CheckpointManager** introduces a **Memento‑style checkpointing** mechanism. By persisting intermediate states, long‑running analyses can be resumed after interruption, which is essential when processing large repositories.  
+
+All of these patterns coexist without conflict, reflecting a deliberate decision to keep concerns orthogonal: storage, execution flow, fault tolerance, reasoning, and state persistence each have a dedicated, well‑encapsulated module.
 
 ---
 
 ## Implementation Details  
 
-### Wave‑style agents and lazy LLM init  
+### GraphDatabaseAdapter (`graph-database-adapter.ts`)  
+The adapter constructs a Graphology instance backed by LevelDB. It exposes CRUD‑style methods (`addNode`, `addEdge`, `getNode`, `query`) that hide the underlying storage details. After each mutation, the adapter triggers an **automatic JSON export sync**, writing a serialized snapshot of the graph to a configurable location. This export is used by downstream tools for offline analysis or visualization.  
 
-Every Wave agent implements three core members:
+### CodeGraphAgent (`code-graph-agent.ts`)  
+The agent’s constructor follows a **parameterised initialization pattern**: it receives a `repoPath` and an `options` object that can include the path to the graph data and specific `GraphDatabaseAdapter` options. During execution, the agent parses source files, builds a code‑level graph (functions, classes, imports), and persists it via the adapter. Query results are returned using the **`NaturalLanguageQueryResult`** interface, which standardises fields such as `entities`, `snippets`, and `confidence`.  
 
-```ts
-class SomeWaveAgent {
-  constructor(private repoPath: string, private team: string) { /* store only */ }
+### Pipeline & DAG Execution  
+Although the concrete Pipeline class is not listed, the observations describe its behaviour: agents declare dependencies, the pipeline builds a DAG, and then walks the graph, launching agents whose predecessors have completed. Parallelism is achieved by dispatching independent branches to the event loop or worker pool.  
 
-  private llm?: LLMClient;   // undefined until first use
+### RetryManager (`retry-manager.ts`)  
+`RetryManager` wraps any async operation with configurable retry count, delay, and exponential back‑off. Agents register their critical sections with the manager, which retries on transient errors (e.g., temporary DB lock). This isolates retry policy from business logic.  
 
-  private async ensureLLMInitialized(): Promise<void> {
-    if (this.llm) return;
-    // ServiceStarterModule guarantees the LLM endpoint is reachable
-    await ServiceStarterModule.startService('LLM');
-    this.llm = LLMFactory.create({ repoPath: this.repoPath, team: this.team });
-  }
+### OntologySystem (`ontology/index.js`)  
+The system loads ontology definitions (likely JSON or Turtle files) and provides methods such as `classify(entity)` and `inferRelationships(entityA, entityB)`. It acts as a **unified inference engine**, enabling agents like `CodeGraphAgent` to enrich the graph with semantic classifications (e.g., “function”, “class”, “utility”).  
 
-  async execute(input: string): Promise<AgentResult> {
-    await this.ensureLLMInitialized();
-    // now safe to call the LLM
-    return this.llm!.process(input);
-  }
-}
-```
+### CheckpointManager (`checkpoint-manager.ts`)  
+Checkpoint data is stored in a flexible key‑value store (potentially LevelDB again). The manager offers `saveCheckpoint(stage, payload)` and `loadCheckpoint(stage)` APIs. Agents invoke it at logical boundaries (e.g., after processing a batch of files) so that a crashed analysis can resume without re‑processing already‑handled artifacts.  
 
-The `ensureLLMInitialized` method lives in a shared abstract base (likely `WaveAgentBase`) and is reused across **CodeGraphAgent**, **PersistenceAgent**, and any future agents that need LLM support.
-
-### ServiceStarterModule (retry‑with‑back‑off)
-
-`lib/service-starter.js` contains a function roughly equivalent to:
-
-```js
-async function startService(name, attempt = 0) {
-  try {
-    await services[name].start();   // may throw
-  } catch (e) {
-    if (attempt >= MAX_RETRIES) throw e;
-    const delay = Math.min(BASE_DELAY * 2 ** attempt, MAX_DELAY);
-    await new Promise(r => setTimeout(r, delay));
-    return startService(name, attempt + 1);
-  }
-}
-```
-
-The module is deliberately generic; agents simply request `startService('LLM')` or `startService('GraphDB')`.  This design isolates retry logic from business code and makes the policy (max retries, back‑off curve) easy to tune centrally.
-
-### GraphDatabaseAdapter
-
-Located at `storage/graph-database-adapter.ts`, the adapter wraps Graphology and LevelDB:
-
-```ts
-export class GraphDatabaseAdapter {
-  private graph = new Graphology();   // in‑memory graph
-  private db = levelup(leveldown('./graph-db'));
-
-  async storeEntity(id: string, payload: any): Promise<void> {
-    this.graph.addNode(id, payload);
-    await this.db.put(id, JSON.stringify(payload));
-  }
-
-  async retrieveEntity(id: string): Promise<any> {
-    const raw = await this.db.get(id);
-    return JSON.parse(raw);
-  }
-
-  // Automatic JSON export sync is triggered on each write
-  private async syncExport(): Promise<void> { /* writes JSON file */ }
-}
-```
-
-All child components—**ManualLearning**, **EntityPersistenceManager**, **DataLossTracker**, **KnowledgeGraphQueryEngine**—receive a singleton instance of this adapter via dependency injection (often through a simple `new GraphDatabaseAdapter()` in their constructors).
-
-### ClassificationCacheEntry
-
-The cache is a lightweight in‑memory map persisted to the graph for durability:
-
-```ts
-export class ClassificationCacheEntry {
-  private static cache = new Map<string, string>(); // key = hash(input)
-
-  static async get(input: string): Promise<string | undefined> {
-    const key = hash(input);
-    return this.cache.get(key) ?? await GraphDatabaseAdapter.retrieveEntity(`cache:${key}`);
-  }
-
-  static async set(input: string, classification: string): Promise<void> {
-    const key = hash(input);
-    this.cache.set(key, classification);
-    await GraphDatabaseAdapter.storeEntity(`cache:${key}`, { classification });
-  }
-}
-```
-
-`PersistenceAgent` checks this cache before invoking the LLM, dramatically reducing repeated classification calls.
-
-### DataLossTracking
-
-Although not tied to a single file, the DataLossTracking logic is invoked wherever a write to the graph fails:
-
-```ts
-async function safeStore(...args) {
-  try {
-    await graphAdapter.storeEntity(...args);
-  } catch (e) {
-    await DataLossTracker.record({
-      entityId: args[0],
-      error: e.message,
-      timestamp: Date.now(),
-    });
-    throw e; // propagate after recording
-  }
-}
-```
-
-`DataLossTracker` itself uses the same `GraphDatabaseAdapter` to persist loss events, enabling later audits via the **KnowledgeGraphQueryEngine**.
+All of these classes are wired together through dependency injection in the component’s bootstrap code (not explicitly listed), ensuring that each child module receives the same adapter, ontology system, and checkpoint manager instances.
 
 ---
 
 ## Integration Points  
 
-1. **LLMAbstraction sibling** – The LLM factory (`LLMFactory.create`) lives in `lib/llm/llm-service.ts`.  KnowledgeManagement agents depend on this service for all LLM calls, inheriting its built‑in routing, caching, and circuit‑breaker logic.  
-2. **DockerizedServices** – The `ServiceStarterModule` is shared across the entire codebase.  Its retry‑with‑back‑off strategy is also employed by the **Trajectory** component when establishing Specstory connections, ensuring a uniform start‑up contract.  
-3. **CodingPatterns** – Both KnowledgeManagement and CodingPatterns use the same `GraphDatabaseAdapter`.  This creates a single source of truth for graph persistence, allowing pattern‑related queries and knowledge‑graph queries to intermix seamlessly.  
-4. **SemanticAnalysis** – The **OntologyClassificationAgent** (found in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) performs heuristic classification that complements the LLM‑based classification cached by `ClassificationCacheEntry`.  In practice, the PersistenceAgent may first attempt a heuristic classification and fall back to the LLM only on cache miss.  
-5. **Child components** –  
-   * **ManualLearning** and **OnlineLearning** feed entities into the graph via the same adapter, but differ in source (manual entry vs. batch analysis pipeline).  
-   * **EntityPersistenceManager** provides higher‑level CRUD operations built on top of the adapter, exposing a clean API to external services.  
-   * **DataLossTracker** and **KnowledgeGraphQueryEngine** both read from the graph; the former writes loss‑event nodes, the latter supplies read‑only query capabilities to UI layers or downstream analytics.  
+1. **Sibling Components** – The **CodingPatterns** component also uses a graph database (via its own `GraphDatabaseAdapter`), indicating a shared persistence strategy across siblings. The **LiveLoggingSystem** relies on an `OntologyClassificationAgent` that likely re‑uses the same `OntologySystem` library, reinforcing a common reasoning layer.  
 
-All these integration points rely on **type‑stable interfaces** (e.g., `GraphAdapter`, `LLMClient`, `CacheEntry`) that are explicitly defined in the observed files, ensuring compile‑time safety and easy substitution in tests.
+2. **Parent – Coding** – As a child of the **Coding** root, KnowledgeManagement contributes the “knowledge graph” that other top‑level services (e.g., **LLMAbstraction** for prompting, **DockerizedServices** for container orchestration) can query. The JSON export from the adapter can be consumed by the LLM service as a knowledge source.  
+
+3. **Child Modules** –  
+   * **ManualLearning**, **OnlineLearning**, **OntologyManager**, and **InsightGenerator** all import the `GraphDatabaseAdapter` to read/write the knowledge graph, ensuring a single source of truth.  
+   * **CodeGraphAgent** is the primary producer of graph data, feeding the other children.  
+
+4. **External Interfaces** – The `NaturalLanguageQueryResult` interface defines the contract for any consumer that performs NL queries against the graph (potentially the LLM service or a UI layer). The `RetryManager` and `CheckpointManager` expose generic APIs that other components (e.g., the **ConstraintSystem**’s observer pattern) could reuse for their own long‑running jobs.  
+
+5. **Configuration Files** – The component likely reads a `graph-database-config.json` (mentioned under CodingPatterns) to locate the LevelDB directory and JSON export path, making configuration centrally manageable.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate agents with repository context only** – Pass `repoPath` and `team` to the constructor; never manually call the LLM factory.  The lazy `ensureLLMInitialized` call will handle service start‑up and LLM creation.  
-* **Respect the retry contract** – When writing custom startup logic, invoke `ServiceStarterModule.startService` rather than rolling your own retries; this guarantees back‑off consistency across the system.  
-* **Leverage the cache** – Before performing an LLM‑driven classification, always query `ClassificationCacheEntry.get`.  If a hit occurs, skip the LLM call; otherwise, after classification, store the result with `ClassificationCacheEntry.set`.  
-* **Handle persistence errors through DataLossTracking** – Wrap any call to `GraphDatabaseAdapter.storeEntity` in a `try/catch` that forwards the error to `DataLossTracker.record`.  This ensures that loss events are not silently dropped.  
-* **Query through KnowledgeGraphQueryEngine** – Direct graph reads should go through the query engine rather than accessing the adapter directly; this isolates query optimisations (e.g., index usage) from the rest of the code.  
-* **Do not modify the GraphDatabaseAdapter internals** – The adapter abstracts away Graphology/LevelDB specifics; any change to storage format should be confined to this file to avoid breaking child components.  
+* **Instantiate agents via the constructor pattern** – always pass the repository root and an options object that includes the `graphDatabaseAdapter` instance. This guarantees that all agents share the same storage backend and export configuration.  
 
-Following these conventions keeps resource usage predictable, preserves the resilience guarantees baked into the retry mechanism, and maximises the benefits of caching and data‑loss monitoring.
+* **Leverage the Pipeline for ordering** – declare explicit dependencies between agents (e.g., `CodeGraphAgent` → `PersistenceAgent`). The pipeline will handle parallelisation; avoid manual threading inside agents.  
+
+* **Handle failures with `RetryManager`** – wrap any I/O‑heavy or network‑bound call inside `RetryManager.execute(fn)`. Do not implement ad‑hoc retries; centralising the policy prevents inconsistent back‑off behaviour.  
+
+* **Persist progress with `CheckpointManager`** – after processing a logical batch (e.g., a git commit or a directory), call `checkpointManager.saveCheckpoint(stage, state)`. On restart, load the checkpoint before re‑entering the pipeline.  
+
+* **Query results should conform to `NaturalLanguageQueryResult`** – when exposing NL query endpoints, return objects that match this interface (entities, snippets, confidence). This keeps downstream consumers (LLMAbstraction, UI dashboards) stable.  
+
+* **Do not bypass the `GraphDatabaseAdapter`** – direct access to Graphology or LevelDB is discouraged; it would break the automatic JSON sync and could lead to divergent graph states.  
+
+* **Ontology extensions** – add new classification rules to the ontology files consumed by `OntologySystem`. After updating, restart the component so the system can reload the ontology cache.  
+
+* **Testing** – unit‑test agents by injecting a mock `GraphDatabaseAdapter` that records calls rather than touching the real LevelDB. Use the `CheckpointManager` mock to simulate resume scenarios.
 
 ---
 
-### Summary of Requested Deliverables  
+### Architectural patterns identified  
 
-1. **Architectural patterns identified**  
-   * Factory (LLM creation)  
-   * Lazy initialization (`ensureLLMInitialized`)  
-   * Retry‑with‑back‑off (ServiceStarterModule)  
-   * Cache‑aside (ClassificationCacheEntry)  
-   * Adapter (GraphDatabaseAdapter)  
-   * Data‑loss tracking (explicit monitoring component)  
+1. **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
+2. **DAG (data‑flow) execution model** – Pipeline orchestrates agents based on dependencies.  
+3. **Retry‑with‑backoff (policy) pattern** – `RetryManager` centralises fault tolerance.  
+4. **Facade pattern** – `OntologySystem` offers a unified inference API.  
+5. **Memento / Checkpoint pattern** – `CheckpointManager` captures and restores analysis state.  
+6. **Constructor/Dependency‑Injection pattern** – agents receive configuration and shared services via their constructors.
 
-2. **Design decisions and trade‑offs**  
-   * *Lazy LLM init* saves memory but adds a small latency on first request.  
-   * *Factory + adapter* decouple business logic from concrete LLM providers and storage engines, at the cost of an extra indirection layer.  
-   * *Retry‑with‑back‑off* improves robustness but can delay start‑up in flaky environments; the max‑retry limit is a tunable safety valve.  
-   * *In‑memory cache* accelerates repeated classifications, yet cache warm‑up time may be noticeable after a restart; persistence of cache entries mitigates this.  
-   * *Data‑loss tracking* adds overhead on every write but provides essential observability for integrity‑critical pipelines.  
+### Design decisions and trade‑offs  
 
-3. **System structure insights**  
-   * The component is a **pipeline** that starts with source‑code ingestion, enriches data via LLM, persists through a unified graph adapter, and finishes with monitoring.  
-   * All child modules share the same storage backbone, enabling cross‑module queries (e.g., pattern‑related knowledge can be fetched alongside manually entered entities).  
-   * Sibling components expose the same utility modules (LLMAbstraction, ServiceStarter, GraphDatabaseAdapter), creating a cohesive ecosystem under the *Coding* parent.  
+* **Abstraction vs. performance** – The adapter adds a thin indirection; the cost is negligible compared with the benefit of interchangeable storage backends and automatic export.  
+* **DAG parallelism** – Allows maximal concurrency but requires careful dependency specification; overly dense graphs can lead to contention on the shared graph store.  
+* **Centralised retry logic** – Improves reliability but introduces a single point where retry policies must be tuned for all agents; a mis‑configured policy could cause long delays.  
+* **JSON export sync** – Provides easy downstream consumption but may generate large files for big graphs; incremental export could be a future optimisation.  
+* **Checkpoint granularity** – Storing checkpoints after each batch balances resume speed with storage overhead; finer granularity would increase checkpoint size.
 
-4. **Scalability considerations**  
-   * **Horizontal scaling** of LLM calls can be achieved by configuring the LLM factory to return pooled clients; the lazy init pattern ensures each agent only holds one client, preventing explosion of connections.  
-   * **Graph storage** can be sharded by using multiple LevelDB instances or migrating the adapter to a distributed graph store; because the adapter isolates the storage engine, such a migration is localized to `graph-database-adapter.ts`.  
-   * **Cache distribution** – the current in‑memory cache works per process; for multi‑process deployments a shared cache (e.g., Redis) could be introduced without changing the cache‑aside API.  
+### System structure insights  
 
-5. **Maintainability assessment**  
-   * **High cohesion, low coupling** – each concern (LLM creation, retry, persistence, caching, loss tracking) lives in its own module with clear interfaces, making unit testing straightforward.  
-   * **Single source of truth for graph operations** (GraphDatabaseAdapter) reduces duplication and eases future migrations.  
-   * **Explicit retry and caching policies** are centralized, so adjustments affect the whole system uniformly.  
-   * Potential maintenance burden arises from the **shared retry module**; any change to its signature propagates to all agents, so versioning and thorough integration tests are essential.  
-   * Overall, the design is well‑structured for incremental evolution, provided that developers respect the documented entry points and avoid bypassing the adapters or cache layers.
+The component is a **knowledge‑graph‑centric subsystem** that sits alongside other coding‑infrastructure components. Its children (ManualLearning, OnlineLearning, etc.) are thin wrappers that specialise on different ingestion or reasoning strategies but all converge on the same graph store and ontology engine. Sibling components reuse similar patterns (graph adapters, ontology agents), indicating a **consistent architectural language** across the entire **Coding** parent.  
+
+### Scalability considerations  
+
+* **Horizontal scaling of the graph store** – LevelDB is a single‑process key‑value store; scaling beyond a single node would require swapping the adapter for a distributed graph database (e.g., Neo4j, JanusGraph). The adapter pattern eases this migration.  
+* **Pipeline parallelism** – The DAG model can exploit multi‑core CPUs; however, concurrent writes to LevelDB must be serialized, which could become a bottleneck under heavy ingestion. Introducing a write‑queue or batching layer would mitigate contention.  
+* **JSON export size** – For very large graphs, incremental or streaming export would reduce memory pressure.  
+
+### Maintainability assessment  
+
+The component scores **high** on maintainability:
+
+* **Clear separation of concerns** – storage, execution, fault tolerance, reasoning, and state management are each encapsulated in dedicated modules.  
+* **Explicit interfaces** – `NaturalLanguageQueryResult` and the adapter’s public methods provide stable contracts.  
+* **Reusability** – The same `GraphDatabaseAdapter` and `OntologySystem` are shared across many child and sibling components, reducing code duplication.  
+* **Testability** – Constructor‑based dependency injection enables straightforward mocking of storage and utilities.  
+
+Potential maintenance risks lie in the **tight coupling to LevelDB**; a future need for distributed persistence will require careful migration of the adapter implementation, but the existing pattern already anticipates that change. Overall, the design promotes extensibility while keeping the codebase approachable for new contributors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects ; DockerizedServices: The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStar; Trajectory: The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file w; KnowledgeManagement: The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repo; CodingPatterns: The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flex; ConstraintSystem: The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (li; SemanticAnalysis: The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, res.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent class from integrations/mcp-server-semantic-analysis/src/agents/ontology-clas; LLMAbstraction: The LLMAbstraction component's architecture is designed with a high-level facade, specifically the LLMService class (lib/llm/llm-service.ts), which se; DockerizedServices: The DockerizedServices component utilizes a microservices architecture, with multiple sub-components and services working together to enable efficient; Trajectory: The Trajectory component's modular design pattern is evident in its use of classes and objects, such as the SpecstoryAdapter class in lib/integrations; KnowledgeManagement: The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-a; CodingPatterns: The CodingPatterns component utilizes the GraphDatabase class for persistence, as indicated by the presence of graph-database-config.json in the confi; ConstraintSystem: The ConstraintSystem component's utilization of the observer pattern for event handling is a key architectural aspect that enables efficient managemen; SemanticAnalysis: The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic.
 
 ### Children
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve manual knowledge entities
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information
-- [KnowledgeGraphQueryEngine](./KnowledgeGraphQueryEngine.md) -- KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
+- [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to store and manage the knowledge graph
+- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent employs heuristic classification and LLM integration, enabling the system to accurately categorize user interactions. The OntologyClassificationAgent's classifyObservation method takes in a set of observations and returns a list of classified results, which are then used to inform the logging process. Furthermore, the agent's use of heuristic classification allows it to adapt to changing user behavior and improve its accuracy over time.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's modular design is evident in its separation of concerns, with distinct files and classes dedicated to specific aspects of its functionality. For instance, the LLMService class (lib/llm/llm-service.ts) serves as a high-level facade for all LLM operations, handling tasks such as mode routing, caching, and provider fallback. This modularity enables easier maintenance, updates, and extensions of the component. Furthermore, the use of interfaces like LLMCompletionRequest and LLMCompletionResult (lib/llm/llm-service.ts) facilitates communication between different parts of the component, ensuring consistency in data exchange.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component exhibits robust service startup capabilities, thanks to the retry-with-backoff pattern implemented in the ServiceStarterModule (lib/service-starter.js). This pattern helps prevent endless loops and promotes system stability by introducing a delay between retries. For instance, the startService function in ServiceStarterModule utilizes a backoff strategy to retry failed service startups, ensuring that services are properly initialized before use. The use of Dockerization in this component further enhances deployment and management of services, making it easier to scale and maintain the system. The LLMService (lib/llm/llm-service.ts) also plays a crucial role in this component, providing high-level LLM operations such as mode routing, caching, and circuit breaking.
-- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed to handle different connection methods to the Specstory extension, including HTTP, IPC, and file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods in specstory-adapter.js. This flexibility allows the component to provide a fallback option when necessary, ensuring reliable connectivity. The SpecstoryAdapter class plays a crucial role in this design, as it encapsulates the logic for connecting to the Specstory extension via various methods. The initialize method in SpecstoryAdapter implements a retry mechanism to handle connection failures, demonstrating a focus on robustness.
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flexible data storage and retrieval. This adapter is crucial for the component's functioning, as it allows for the storage and retrieval of complex relationships between coding patterns and practices. For instance, the `storePattern` method in the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) is used to store a new pattern in the graph database, while the `retrievePatterns` method is used to retrieve all patterns from the database. The use of this adapter simplifies the process of managing complex data relationships, making it easier to analyze and understand the coding patterns and practices employed throughout the project.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, responsible for a specific task. This modularity is reflected in the code organization, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent class, defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent class from integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts for classifying observations against an ontology system. This agent is crucial for the system's ability to categorize and make sense of the data it processes. The use of this agent is a prime example of how the system's design incorporates external services to enhance its functionality. Furthermore, the integration of this agent demonstrates the system's ability to leverage external expertise and capabilities to improve its performance. The OntologyClassificationAgent class is a key component in the system's architecture, and its implementation has a significant impact on the overall behavior of the LiveLoggingSystem.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's architecture is designed with a high-level facade, specifically the LLMService class (lib/llm/llm-service.ts), which serves as the central entry point for all LLM operations. This design allows for provider-agnostic model calls, enabling the component to interact with different providers, such as Anthropic and Docker Model Runner (DMR), through specific provider classes. For instance, the DMRProvider class (lib/llm/providers/dmr-provider.ts) utilizes Docker Desktop's Model Runner for local LLM inference, supporting per-agent model overrides and health checks. The use of a facade pattern in the LLMService class enables the component to manage the interaction between different providers and the application logic, promoting a loose coupling between the component's dependencies.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with multiple sub-components and services working together to enable efficient coding services. This is evident in the use of Docker for containerization, as seen in the lib/llm/llm-service.ts file, which acts as a high-level facade for all LLM operations. The LLMService class handles mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback, demonstrating a clear separation of concerns and a modular design approach. Furthermore, the ServiceStarter class in lib/service-starter.js implements a retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail, showcasing a robust and fault-tolerant design.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's modular design pattern is evident in its use of classes and objects, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which enables encapsulation and reuse of code. This modularity is further enhanced by the component's asynchronous programming model, which allows for efficient and concurrent execution of tasks. For instance, the initialize method in the Trajectory class utilizes asynchronous programming to initialize the component without blocking other tasks. The use of promises in this method, as seen in the return statement, ensures that the component's initialization is non-blocking and efficient.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabase class for persistence, as indicated by the presence of graph-database-config.json in the config directory. This configuration file suggests that the component is designed to work with a graph database, which is ideal for storing complex relationships between coding patterns and entities. The GraphDatabaseAdapter, used by the PatternStorage sub-component, provides a layer of abstraction between the component and the graph database, allowing for easier switching between different database implementations if needed. This design decision is evident in the lib/llm/llm-service.ts file, where the LLMService class interacts with the GraphDatabaseAdapter to store and retrieve coding patterns.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's utilization of the observer pattern for event handling is a key architectural aspect that enables efficient management of complex constraint relationships. This is evident in the use of hook configurations and the unified hook manager, as seen in the lib/agent-api/hooks/hook-manager.js file. The hook manager acts as a central orchestrator for hook events, allowing for customizable event handling and enabling the component to respond to various scenarios that may arise during code sessions. For instance, the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts employs the hook manager to handle content validation events, demonstrating the component's ability to adapt to different scenarios. Furthermore, the use of design patterns such as the observer pattern facilitates the component's modular design, allowing for separate modules to handle different aspects of constraint monitoring and enforcement.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic. For instance, the OntologyClassificationAgent has its own configuration file (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) that defines its behavior and dependencies. This modular approach allows for easier maintenance and extension of the agents, as each agent can be developed and tested independently. The execute method in the base-agent.ts file (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serves as the entry point for each agent's execution, providing a standardized interface for agent interactions.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

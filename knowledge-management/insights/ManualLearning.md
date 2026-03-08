@@ -2,155 +2,96 @@
 
 **Type:** SubComponent
 
-ManualLearning uses the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before manual entity creation or editing
+ManualLearning uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 ## What It Is  
 
-ManualLearning is a **SubComponent** of the larger **KnowledgeManagement** module. Its implementation lives alongside the graph‑persistence layer found in `storage/graph-database-adapter.ts`. Within this file the `GraphDatabaseAdapter` class provides the low‑level API that ManualLearning calls to **store and retrieve manual knowledge entities**. The sub‑component does not introduce its own storage implementation; instead it delegates all graph‑database interactions to the shared adapter used by its siblings (e.g., `EntityPersistenceManager`, `DataLossTracker`, `KnowledgeGraphQueryEngine`).  
-
-In practice, ManualLearning is the runtime façade that lets users create, edit, and persist **manually authored knowledge objects** (e.g., documentation snippets, design decisions, or ad‑hoc annotations). Before any operation that touches the graph, ManualLearning invokes the same **LLM‑initialisation contract** that the Wave agents use: a three‑step flow of `constructor(repoPath, team) → ensureLLMInitialized() → execute(input)`. This guarantees that the large language model (LLM) backing the knowledge‑creation UI is ready, while also keeping the cost of LLM startup lazy and on‑demand.
-
----
+**ManualLearning** is a sub‑component of the **KnowledgeManagement** domain that lives in the file  
+`integrations/mcp-server-semantic-analysis/src/storage/manual-learning.ts`. Its primary responsibility is to manage the portion of the knowledge graph that is generated from manual (human‑curated) learning activities. The component stores its data in the same graph database used by the rest of the system and keeps that data in lock‑step with the global knowledge graph through an automatic JSON‑export synchronization step. Because it is a child of **KnowledgeManagement**, ManualLearning inherits the persistence strategy defined by the parent – namely the use of the **GraphDatabaseAdapter** abstraction.
 
 ## Architecture and Design  
 
-### Design Patterns Evident  
+The architecture that emerges from the observations is a **layered abstraction** built around a single graph‑persistence service. The `GraphDatabaseAdapter` class (found in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) implements an **Adapter pattern**: it hides the concrete storage technology—Graphology together with LevelDB—from all higher‑level components. ManualLearning, the **CodeGraphAgent**, **OntologyManager**, **InsightGenerator**, and **OnlineLearning** all depend on this adapter rather than on Graphology or LevelDB directly.  
 
-1. **Factory Pattern for LLM Instances** – ManualLearning relies on the same LLM factory employed by the Wave agents. The factory abstracts the concrete LLM class (e.g., OpenAI, Anthropic) and creates an instance only when `ensureLLMInitialized()` is called. This avoids eager allocation of heavyweight model resources.  
+ManualLearning’s design therefore follows a **dependency‑inversion** principle: the component declares a dependency on the abstract `GraphDatabaseAdapter` interface, and the concrete adapter supplies the actual storage implementation. This yields a clean separation between *domain logic* (the manual‑learning rules) and *infrastructure concerns* (graph storage, serialization).  
 
-2. **Lazy Initialization (Constructor + ensureLLMInitialized + execute)** – The sub‑component follows the “constructor‑then‑ensure‑initialized‑then‑execute” pattern that the Wave agents expose. The constructor only records contextual data (`repoPath`, `team`) and defers any heavy work until the first call that actually needs the LLM.  
-
-3. **Data‑Access Object (DAO) via GraphDatabaseAdapter** – All persistence actions are funneled through `GraphDatabaseAdapter` (located in `storage/graph-database-adapter.ts`). This adapter acts as a DAO, shielding ManualLearning from the specifics of LevelDB‑backed graph storage and providing a uniform CRUD interface.  
-
-4. **Cross‑Cutting Concern – DataLossTracker** – ManualLearning wires in the `DataLossTracker` (a sibling component) to monitor any gaps between intended manual edits and what actually lands in the graph. This is an example of an observability concern that is injected rather than baked into the core logic.  
-
-### Component Interaction  
-
-- **ManualLearning → EntityPersistenceManager** – When a manual entity is created or edited, ManualLearning forwards the entity object to `EntityPersistenceManager`, which in turn uses `GraphDatabaseAdapter` to write the node/edge payload into the graph.  
-- **ManualLearning → DataLossTracker** – After each persistence operation, ManualLearning reports success/failure to `DataLossTracker`. The tracker records the event in the same graph store, enabling downstream analytics (e.g., “how many manual edits were lost due to concurrency”).  
-- **ManualLearning ↔ KnowledgeManagement (Parent)** – KnowledgeManagement orchestrates the overall lifecycle of knowledge assets. ManualLearning contributes the “human‑in‑the‑loop” path, complementing the automated pipelines of its sibling `OnlineLearning`. Both share the same LLM factory and graph‑storage backbone, ensuring a consistent data model across manual and automated knowledge ingestion.  
-
----
+The “automatic JSON export sync” mentioned in the observations is a **synchronization mechanism** that runs whenever ManualLearning mutates the graph. By exporting the current graph state to JSON immediately after a change, the system guarantees that any downstream consumer that reads the exported file (e.g., for analytics or visualization) sees a view that is always consistent with the internal graph. This mechanism is shared across the whole KnowledgeManagement stack because the same adapter provides the export capability.
 
 ## Implementation Details  
 
-### Core Classes & Functions  
+- **File location:** `integrations/mcp-server-semantic-analysis/src/storage/manual-learning.ts` houses the ManualLearning class (or module). Although the source symbols are not listed, the file is the sole implementation artifact for this sub‑component.  
 
-- **`GraphDatabaseAdapter` (storage/graph-database-adapter.ts)** – Exposes methods such as `saveEntity(entity)`, `fetchEntity(id)`, and `queryGraph(criteria)`. ManualLearning never touches LevelDB directly; it calls these high‑level adapters.  
+- **Persistence layer:** ManualLearning does not interact with LevelDB or Graphology directly. Instead, it calls into the `GraphDatabaseAdapter` (found in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). The adapter internally creates a Graphology graph instance backed by LevelDB, giving ManualLearning a flexible in‑memory graph view that is persisted to disk.  
 
-- **`EntityPersistenceManager`** – Acts as a service layer that validates manual entities, enriches them with metadata (e.g., timestamps, author IDs), and then delegates to `GraphDatabaseAdapter.saveEntity`.  
+- **Data flow:** When a manual learning event occurs (e.g., a user adds a new concept or relationship), ManualLearning writes the corresponding node/edge to the adapter via methods such as `addNode`, `addEdge`, or generic `executeTransaction`. After the write, the adapter triggers its **automatic JSON export sync** routine, which serializes the full graph to a JSON file and writes it to a known location. This ensures that the exported representation is always “up‑to‑date.”  
 
-- **`DataLossTracker`** – Provides `recordLoss(event)` and `queryLosses(filter)` APIs. ManualLearning invokes `recordLoss` after each persistence attempt, passing context like `entityId`, `operationType`, and any error payload.  
+- **Interaction with other agents:** The `CodeGraphAgent` (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) also uses the same `GraphDatabaseAdapter` to store and retrieve code‑graph data. Because both agents share the same adapter instance (or at least the same implementation), their data lives in a single unified graph, enabling cross‑entity queries (e.g., linking manually added concepts to automatically extracted code entities).  
 
-- **LLM Initialisation Flow** – The sub‑component’s constructor stores `repoPath` and `team`. The first call to `execute(input)` triggers `ensureLLMInitialized()`, which internally calls the shared LLM factory (`LLMFactory.create(repoPath, team)`). The resulting LLM instance is cached for the lifetime of the ManualLearning instance, enabling subsequent calls to reuse the model without re‑initialisation.  
-
-### Execution Path  
-
-1. **User Input** – A developer or knowledge‑worker submits a manual entry via UI or CLI.  
-2. **ManualLearning.execute(input)** – The input is parsed, and the LLM (if needed for augmentation or validation) is guaranteed to be ready via `ensureLLMInitialized()`.  
-3. **Entity Construction** – ManualLearning builds a domain entity object (e.g., `{ id, type, content, author, timestamps }`).  
-4. **Persistence** – The entity is handed to `EntityPersistenceManager.persist(entity)`, which validates and then calls `GraphDatabaseAdapter.saveEntity`.  
-5. **Loss Tracking** – Upon success or failure, ManualLearning notifies `DataLossTracker.recordLoss` with the operation outcome.  
-
-Because the observations do not list any concrete method signatures beyond the high‑level pattern, the above flow is derived directly from the described interactions and the known responsibilities of each sibling component.
-
----
+- **Parent‑child relationship:** The parent component **KnowledgeManagement** orchestrates the overall knowledge graph. ManualLearning contributes a distinct sub‑graph that is merged into the global graph managed by the adapter. The parent does not need to know the internal details of ManualLearning; it only relies on the adapter’s contract for persistence and export.
 
 ## Integration Points  
 
-- **Graph Storage Layer** – The sole external dependency is `storage/graph-database-adapter.ts`. Any change to the underlying LevelDB schema or query language must be reflected in the adapter’s contract; ManualLearning will automatically benefit because it never bypasses the adapter.  
+1. **GraphDatabaseAdapter** – The sole persistence contract. All reads and writes from ManualLearning flow through the adapter’s API. The adapter’s use of Graphology + LevelDB is an implementation detail hidden from ManualLearning.  
 
-- **LLM Factory (Wave agents)** – ManualLearning re‑uses the LLM factory defined for the Wave agents. This means that configuration files governing model selection, API keys, and rate‑limit handling are shared across the entire KnowledgeManagement subsystem.  
+2. **CodeGraphAgent** – Consumes the same graph database via the adapter. ManualLearning’s nodes can be referenced by the code‑graph data, enabling richer insights (e.g., mapping manual concepts to code structures).  
 
-- **EntityPersistenceManager & DataLossTracker** – Both are injected services (likely via constructor or a simple service locator). Their public APIs are the only integration surface ManualLearning touches; they encapsulate validation, metadata enrichment, and observability respectively.  
+3. **OntologyManager & InsightGenerator** – Sibling components that also rely on the adapter. Because they share the same storage backend, any ontology changes or generated insights can directly reference manual learning entities without additional translation layers.  
 
-- **Parent KnowledgeManagement** – At a higher level, KnowledgeManagement may orchestrate batch imports (via `OnlineLearning`) and manual edits (via ManualLearning). The parent component likely provides the `repoPath` and `team` context that ManualLearning’s constructor expects, ensuring consistent scoping across all knowledge ingestion paths.  
+4. **Automatic JSON Export** – The export file is a public artifact that other subsystems (e.g., reporting tools, external analytics pipelines) may read. ManualLearning’s guarantee that this export is always current makes it a reliable integration point for downstream consumers.  
 
----
+5. **KnowledgeManagement (parent)** – Provides the overall orchestration and may expose higher‑level services (e.g., a unified query API) that internally delegate to the adapter. ManualLearning’s compliance with the adapter contract ensures seamless inclusion in the parent’s workflows.
 
 ## Usage Guidelines  
 
-1. **Instantiate with Context** – Always create a ManualLearning instance using the pattern `new ManualLearning(repoPath, team)`. The `repoPath` should point to the repository root that the knowledge graph represents, and `team` must be a valid identifier recognized by the LLM factory.  
+- **Always go through the GraphDatabaseAdapter.** Direct manipulation of Graphology or LevelDB from ManualLearning (or any sibling) would break the abstraction and could bypass the automatic JSON sync, leading to stale exports.  
 
-2. **Let Lazy Init Do Its Work** – Do not manually call the LLM factory; rely on `ensureLLMInitialized()` being invoked automatically the first time `execute` runs. This prevents unnecessary model loading and respects the resource‑conscious design of the Wave agents.  
+- **Treat the exported JSON as read‑only.** It is generated automatically after each mutation; manual edits will be overwritten on the next sync.  
 
-3. **Validate Before Persisting** – While `EntityPersistenceManager` performs validation, callers should still perform basic sanity checks (e.g., non‑empty content, correct entity type) to avoid unnecessary round‑trips to the graph store.  
+- **Prefer batch updates when adding many manual nodes/edges.** The adapter’s transaction semantics allow grouping multiple writes into a single sync operation, reducing the number of JSON exports and improving performance.  
 
-4. **Handle Data‑Loss Signals** – After each `execute` call, inspect the response from `DataLossTracker`. If a loss is reported, surface it to the user or trigger a retry. This aligns with the system’s emphasis on tracking manual‑edit fidelity.  
+- **Respect the shared graph namespace.** Since ManualLearning, CodeGraphAgent, OntologyManager, and InsightGenerator all populate the same graph, coordinate naming conventions for node identifiers to avoid collisions.  
 
-5. **Do Not Bypass the Adapter** – Direct interaction with LevelDB or the underlying graph engine is discouraged. All reads and writes must go through `GraphDatabaseAdapter` (via the persistence manager) to guarantee schema consistency and future compatibility.  
-
----
-
-## Architectural Patterns Identified  
-
-| Pattern | Where It Appears | Rationale |
-|---------|------------------|-----------|
-| Factory (LLM creation) | Wave agents, reused by ManualLearning | Centralises model selection and configuration, enables lazy instantiation |
-| Lazy Initialization (constructor → ensureLLMInitialized → execute) | ManualLearning, Wave agents | Defers heavyweight LLM startup until truly needed, saving memory and CPU |
-| Data‑Access Object (GraphDatabaseAdapter) | `storage/graph-database-adapter.ts` | Provides a single, stable API for all graph operations across siblings |
-| Cross‑cutting Observability (DataLossTracker) | ManualLearning ↔ DataLossTracker | Separates loss‑monitoring concerns from core business logic |
-| Service Layer (EntityPersistenceManager) | ManualLearning → EntityPersistenceManager | Encapsulates validation and enrichment before persisting entities |
+- **Leverage the parent KnowledgeManagement services for queries.** Rather than querying the adapter directly, use any higher‑level query APIs exposed by KnowledgeManagement; this keeps ManualLearning decoupled from the rest of the system’s query logic.  
 
 ---
 
-## Design Decisions and Trade‑offs  
+### Architectural patterns identified  
+1. **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
+2. **Dependency inversion** – ManualLearning depends on the adapter interface, not on concrete storage.  
+3. **Synchronization/Export pattern** – Automatic JSON export after each mutation ensures consistency across components.
 
-* **Shared LLM Factory vs. Independent Instances** – Reusing the same factory reduces duplication and guarantees that all agents (Wave, ManualLearning, OnlineLearning) operate against the same model version. The trade‑off is a tighter coupling: a change in the factory’s configuration impacts every consumer.  
+### Design decisions and trade‑offs  
+- **Single graph store** simplifies cross‑component queries but couples all sub‑components to the same persistence technology.  
+- **Automatic JSON export** guarantees up‑to‑date external views but adds I/O overhead on every write; batch updates mitigate this.  
+- **Adapter abstraction** provides flexibility to swap the underlying DB, at the cost of an extra indirection layer.
 
-* **Lazy LLM Initialization** – Saves resources in environments where manual edits are infrequent, but introduces a small latency on the first manual operation (model load time). This is acceptable because manual edits are typically user‑driven and can tolerate a one‑time delay.  
+### System structure insights  
+- The system is organized around a **knowledge‑graph core** (managed by the adapter) with multiple domain‑specific sub‑components (ManualLearning, OnlineLearning, OntologyManager, InsightGenerator, CodeGraphAgent) that all read/write to the same graph.  
+- **ManualLearning** sits as a child of **KnowledgeManagement**, contributing a manually curated sub‑graph while relying on the parent’s persistence strategy.
 
-* **Single GraphDatabaseAdapter** – Centralising persistence logic simplifies schema evolution and testing. However, it creates a single point of failure; any performance bottleneck in the adapter propagates to all knowledge‑ingestion paths.  
+### Scalability considerations  
+- Graphology + LevelDB can handle large graph datasets, but the **automatic JSON export** may become a bottleneck as the graph grows; consider throttling or incremental export strategies.  
+- Because all components share a single adapter instance, concurrent write contention could arise; the adapter should implement proper locking or transaction isolation to maintain consistency.  
 
-* **Explicit DataLoss Tracking** – By surfacing potential loss events, the system gains transparency at the cost of additional write traffic (each edit generates a loss‑tracking record). In practice, the overhead is modest compared to the value of auditability.  
+### Maintainability assessment  
+- The clear separation of concerns (domain logic in ManualLearning, storage logic in GraphDatabaseAdapter) enhances maintainability; changes to storage technology are isolated to the adapter.  
+- Shared reliance on a single adapter means that bugs in the adapter affect all siblings, so the adapter must be well‑tested and versioned.  
+- The explicit file‑level organization (`manual-learning.ts`, `graph-database-adapter.ts`, `code-graph-agent.ts`) makes navigation straightforward for developers.  
 
----
-
-## System Structure Insights  
-
-The KnowledgeManagement hierarchy follows a **vertical layering**: a parent component (`KnowledgeManagement`) defines the overall knowledge‑graph contract and common services (LLM factory, graph adapter). Beneath it sit **parallel ingestion pipelines** – `OnlineLearning` (automated batch extraction) and `ManualLearning` (human‑driven entry). Both pipelines share the same persistence and observability services (`EntityPersistenceManager`, `DataLossTracker`, `GraphDatabaseAdapter`). This design yields a **coherent data model** while allowing each pipeline to evolve its own business rules.  
-
-Because all siblings depend on the same adapter, any new entity type introduced by ManualLearning can be immediately queried by `KnowledgeGraphQueryEngine` without additional glue code. Conversely, improvements to the adapter (e.g., index creation) benefit the entire knowledge ecosystem.
-
----
-
-## Scalability Considerations  
-
-* **Graph Store Scaling** – The underlying graph database (LevelDB‑based) is the primary scalability bottleneck. Since ManualLearning only writes individual entities, write contention is low, but a surge of simultaneous manual edits could stress the adapter’s transaction handling. Horizontal scaling would require sharding or moving to a more distributed graph store.  
-
-* **LLM Instance Contention** – The lazy‑initialized LLM is cached per `ManualLearning` instance. In a multi‑process deployment (e.g., many CLI workers), each process will load its own model, potentially exhausting GPU/CPU resources. A shared LLM service (e.g., via RPC) could mitigate this but would break the current factory‑based lazy pattern.  
-
-* **DataLossTracker Overhead** – Recording loss events for every edit adds write amplification. If the volume of manual edits grows dramatically, consider batching loss records or moving them to a lightweight time‑series store.  
-
-Overall, the current architecture is well‑suited for moderate manual‑editing workloads typical of developer tooling; scaling beyond that would require re‑architecting the persistence layer and LLM hosting model.
-
----
-
-## Maintainability Assessment  
-
-* **High Cohesion, Low Coupling** – ManualLearning’s responsibilities (LLM‑assisted manual entry, delegating persistence, reporting loss) are clearly delineated. It depends only on three well‑defined services, making the codebase easy to reason about.  
-
-* **Centralised Persistence Logic** – By funnelling all graph interactions through `GraphDatabaseAdapter`, changes to storage (schema migrations, index additions) are isolated to a single file, reducing the maintenance surface.  
-
-* **Pattern Consistency Across Siblings** – The reuse of the constructor → ensureLLMInitialized → execute flow across Wave agents, OnlineLearning, and ManualLearning ensures that developers only need to learn one initialization idiom.  
-
-* **Potential Technical Debt** – The reliance on lazy LLM creation means that debugging initialization failures can be non‑deterministic (they only surface on first use). Adding explicit health‑check hooks in the parent component could alleviate this.  
-
-* **Observability Integration** – `DataLossTracker` provides built‑in audit trails, which simplifies future compliance or debugging work, further enhancing maintainability.  
-
-In summary, ManualLearning exhibits a clean, pattern‑driven design that aligns with its siblings, leverages shared infrastructure, and isolates concerns effectively, positioning it for straightforward evolution and low maintenance overhead.
+Overall, ManualLearning is a well‑encapsulated sub‑component that leverages a common graph‑persistence abstraction, ensuring consistent data across the KnowledgeManagement ecosystem while providing a straightforward integration surface for developers.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern allows for efficient initialization of LLM instances only when required, reducing unnecessary resource allocation. The ensureLLMInitialized() method, likely defined in the Wave agent classes, ensures that the LLM instance is properly initialized before execution. This approach enables the component to manage resources effectively and optimize performance. The GraphDatabaseAdapter, employed for Graphology+LevelDB persistence, also plays a crucial role in storing and retrieving knowledge graph data, as defined in storage/graph-database-adapter.ts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides a layer of abstraction between the component and the underlying graph database, allowing for flexible data storage and retrieval. The GraphDatabaseAdapter class uses Graphology and LevelDB to store and manage the knowledge graph, and it also provides an automatic JSON export sync feature. This ensures that the knowledge graph is always up-to-date and can be easily exported for further analysis or processing. For example, the CodeGraphAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, uses the GraphDatabaseAdapter to store and retrieve code graph data.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information
-- [KnowledgeGraphQueryEngine](./KnowledgeGraphQueryEngine.md) -- KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
+- [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to store and manage the knowledge graph
+- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
 
 
 ---

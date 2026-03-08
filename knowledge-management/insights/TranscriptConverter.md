@@ -2,110 +2,63 @@
 
 **Type:** Detail
 
-The TranscriptConverter uses a mapping approach to convert transcripts from various formats to a unified format, ensuring consistency and compatibility across the system.
+The TranscriptManager sub-component uses the TranscriptAdapter class in lib/agent-api/transcript-api.js to convert between different transcript formats, indicating a design decision to leverage adapters for format compatibility.
 
 ## What It Is  
 
-The **TranscriptConverter** is the component responsible for turning raw transcript data—produced by a variety of agent‑specific readers—into a single, unified representation that the rest of the system can consume.  It lives inside the **TranscriptAdapter** package (the exact file path is not disclosed in the observations, but the component is referenced as a member of `TranscriptAdapter`).  Its core responsibility is to apply a **mapping table** that describes how fields from each source format correspond to the canonical transcript schema.  Because the mapping is data‑driven, adding support for a new source format does not require changes to the conversion algorithm itself; developers only need to supply a new set of mapping rules.
-
-The converter is invoked by the **TranscriptAdapterFactory** after a **TranscriptReader** has read a raw transcript.  The factory orchestrates the flow: it selects the appropriate reader for the incoming format, obtains the raw transcript, and then hands that payload to the `TranscriptConverter` so that the downstream pipeline receives a normalized object.
-
----
+`TranscriptConverter` lives inside the **TranscriptManager** sub‑component and its concrete work is delegated to the **TranscriptAdapter** class found at `lib/agent-api/transcript-api.js`.  The manager calls the adapter to translate a raw transcript into the internal representation required by the rest of the system, and likewise to emit a transcript in a format expected by external consumers.  By centralising the conversion logic in a dedicated adapter, the codebase isolates format‑specific concerns from the higher‑level business logic that lives in `TranscriptManager`.  The naming hierarchy—*TranscriptManager → TranscriptConverter → TranscriptAdapter*—makes it clear that the manager owns a converter, and the converter relies on an adapter that implements a well‑defined interface for format handling.
 
 ## Architecture and Design  
 
-The observations reveal two explicit architectural choices:
+The observations point directly to an **Adapter** architectural pattern.  `TranscriptAdapter` acts as a thin façade that presents a uniform API (the “adapter interface”) to `TranscriptConverter` while hiding the details of each transcript format (e.g., JSON, CSV, proprietary logs).  Because the adapter is defined as an **interface**, the system also embraces an **Interface‑Based Design** that standardises the contract for any future format‑specific implementation.  This combination enables a **Strategy‑like** approach: each concrete adapter encapsulates a distinct conversion algorithm, and swapping one for another does not ripple changes through the manager or other consumers.
 
-1. **Factory Pattern** – The `TranscriptAdapterFactory` encapsulates the creation of `TranscriptReader` instances and the subsequent hand‑off to `TranscriptConverter`.  By centralising object creation, the factory makes it straightforward to introduce new reader implementations (for new agent formats) without touching the conversion logic.  This aligns with the classic *Factory Method* pattern, where the factory decides which concrete reader to instantiate based on the input format.
-
-2. **Mapping‑Driven Conversion** – The `TranscriptConverter` itself follows a **configuration‑driven** or **data‑mapping** approach.  Rather than hard‑coding conversion code for each source format, it stores a set of *mapping rules* (likely key‑value pairs or a small DSL) that describe how source fields map onto the unified transcript model.  When a new format appears, developers add a new rule set; the conversion engine remains unchanged.  This design resembles a lightweight *Strategy* where each rule set can be seen as a strategy for a particular format, but the strategy is expressed declaratively rather than through separate classes.
-
-Interaction flow:
-
-```
-Client → TranscriptAdapterFactory
-          ├─ selects appropriate TranscriptReader
-          └─ reads raw transcript
-               ↓
-          TranscriptConverter.applyMapping(raw) → UnifiedTranscript
-               ↓
-          TranscriptAdapter (uses the unified transcript)
-```
-
-The `TranscriptAdapter` acts as the parent component that aggregates the converter (and, indirectly, the reader) to present a consistent API to callers.  The sibling components—`TranscriptAdapterFactory` and `TranscriptReader`—share the same overarching goal of format‑agnostic handling, but each occupies a distinct layer: factory for orchestration, reader for I/O, converter for data transformation.
-
----
+Interaction flow is straightforward: `TranscriptManager` invokes a method on its `TranscriptConverter`, which in turn delegates to the injected `TranscriptAdapter`.  The adapter returns a canonical transcript object that the manager can process further.  The design therefore separates concerns cleanly—*manager* handles orchestration, *converter* handles request routing, and *adapter* handles the nitty‑gritty of parsing and serialising.
 
 ## Implementation Details  
 
-Although no concrete code symbols were listed, the observations give us the essential building blocks:
-
-* **Mapping Repository** – The converter likely maintains a collection (e.g., a `Map<String, MappingRule>` or a JSON/YAML file) where each key identifies a source format and the value holds the field‑to‑field translation table.  This repository is the only place that must be extended when supporting a new format.
-
-* **Conversion Engine** – The `TranscriptConverter` exposes a method (conceptually `convert(rawTranscript, formatId)`) that looks up the appropriate rule set, iterates over the source fields, and populates a `UnifiedTranscript` object.  Because the algorithm is generic, it can handle any number of source fields as long as the mapping is defined.
-
-* **Error Handling** – When a mapping rule is missing or a required source field is absent, the converter probably raises a domain‑specific exception (e.g., `MappingNotFoundException` or `InvalidTranscriptException`).  This keeps the failure mode explicit for the calling `TranscriptAdapter`.
-
-* **Extensibility Hook** – Adding a new format does not involve subclassing `TranscriptConverter`; instead, a developer adds a new entry to the mapping repository (e.g., `agentXMapping.json`).  The factory does not need to be altered because it already delegates conversion to the same `TranscriptConverter` instance.
-
-* **Dependency Injection** – In a typical implementation, `TranscriptAdapterFactory` would receive the `TranscriptConverter` (and possibly the mapping repository) via constructor injection, allowing unit tests to replace them with mocks.
-
----
+- **File location:** All conversion‑related code resides in `lib/agent-api/transcript-api.js`.  The file exports the `TranscriptAdapter` class (or interface) that defines at least one method such as `convert(rawTranscript)` (the exact signature is not enumerated in the observations but is implied by the “methods for converting transcripts” comment).  
+- **Interface contract:** The adapter interface declares the operations any concrete format handler must provide.  This contract guarantees that `TranscriptConverter` can call the same method regardless of the underlying format.  
+- **Encapsulation:** By wrapping format‑specific parsing logic inside a concrete implementation of `TranscriptAdapter`, the system avoids scattering conditional branches (e.g., `if (type === 'json') …`) throughout `TranscriptManager`.  Adding a new format simply means creating a new class that implements the adapter interface and registering it with the converter.  
+- **Dependency direction:** `TranscriptManager` → `TranscriptConverter` → `TranscriptAdapter`.  The manager does not know the details of the adapter; it only knows that a converter exists.  The converter, in turn, holds a reference to an adapter instance that satisfies the interface.
 
 ## Integration Points  
 
-* **TranscriptAdapterFactory** – The factory is the primary consumer of `TranscriptConverter`.  After a `TranscriptReader` produces a raw transcript, the factory calls the converter to obtain the normalized object before returning it to the caller or passing it downstream.
-
-* **TranscriptReader** – Readers are format‑specific parsers that expose a common interface (e.g., `read(InputStream) → RawTranscript`).  The output of any reader is fed directly into the converter, meaning the converter must be tolerant of varying field names and data types as described by the mapping rules.
-
-* **TranscriptAdapter** – As the parent component, `TranscriptAdapter` holds a reference to the converter (and indirectly to the factory).  It provides the public API that other system parts use, abstracting away the details of reading and conversion.
-
-* **Configuration Layer** – The mapping rules themselves constitute an integration point with external configuration files or a database.  Changes to these files are the only required steps to extend format support, meaning the system can be re‑configured without recompilation.
-
-* **Error Propagation** – Exceptions raised by the converter propagate up through the factory to the adapter, allowing higher‑level error handling (logging, fallback mechanisms) to be centralised.
-
----
+`TranscriptConverter` is a child of **TranscriptManager**, so any component that interacts with the manager (e.g., the agent orchestration layer, logging services, or external APIs) indirectly depends on the conversion capability.  The adapter itself is the only outward‑facing contract for format handling; therefore, any external module that wishes to supply a new transcript format must implement the `TranscriptAdapter` interface and be injected into the converter.  Because the adapter lives in `lib/agent-api/transcript-api.js`, other agent‑API modules can import it without pulling in the full manager, facilitating reuse in contexts where only format translation is needed (e.g., batch processing scripts).
 
 ## Usage Guidelines  
 
-1. **Never modify the conversion algorithm** – When a new transcript format must be supported, create or update the appropriate mapping rule set rather than altering the `TranscriptConverter` code.  This preserves the stability of the conversion engine.
-
-2. **Keep mapping rules declarative and version‑controlled** – Store each format’s mapping in a separate, self‑contained file (e.g., `format‑X‑mapping.yaml`).  Commit these files to source control so that changes are auditable and can be rolled back if a mapping proves incorrect.
-
-3. **Validate mappings early** – Before deploying a new rule set, run unit tests that feed representative raw transcripts through the converter and assert that the resulting `UnifiedTranscript` matches expectations.  This guards against silent data loss due to missing or mis‑typed fields.
-
-4. **Leverage the factory for new readers** – If a completely new source format requires a custom parsing step, implement a new `TranscriptReader` subclass and register it with `TranscriptAdapterFactory`.  The factory will automatically route the raw output to the existing converter.
-
-5. **Handle conversion failures explicitly** – Catch the converter’s domain exceptions at the factory or adapter level and translate them into user‑friendly error messages or retry logic as appropriate.  Do not let unchecked exceptions leak into higher layers.
+1. **Prefer the manager’s public API** – callers should request transcript conversion through `TranscriptManager` rather than invoking the adapter directly.  This ensures that any future orchestration steps (validation, enrichment, audit logging) remain enforced.  
+2. **Implement the adapter interface for new formats** – when a new transcript source appears, create a class in `lib/agent-api/transcript-api.js` (or a sibling file) that implements the same method signatures defined by `TranscriptAdapter`.  Register the new class with `TranscriptConverter` so the manager can discover it automatically.  
+3. **Keep conversion logic pure** – adapters should avoid side effects such as network I/O or database writes; they should focus solely on translating data structures.  This makes them easier to test and swap.  
+4. **Version the adapter contract** – if the interface evolves (e.g., adding a `metadata` field), bump the version and provide backward‑compatible adapters to avoid breaking existing manager code.  
 
 ---
 
 ### Architectural Patterns Identified  
-* **Factory Method** – Implemented by `TranscriptAdapterFactory` to create appropriate `TranscriptReader` instances and coordinate conversion.  
-* **Configuration‑Driven Mapping** – The core of `TranscriptConverter` uses a data‑driven mapping table to achieve format‑agnostic transformation.  
+1. **Adapter Pattern** – `TranscriptAdapter` normalises disparate transcript formats.  
+2. **Interface‑Based Design** – a shared contract defines required conversion methods.  
+3. **Strategy‑Like Encapsulation** – each concrete adapter encapsulates a distinct conversion algorithm.
 
 ### Design Decisions and Trade‑offs  
-* **Pros:** Adding new formats is a low‑risk, code‑free activity (just a mapping file).  The conversion engine stays simple and testable.  
-* **Cons:** Complex transformations that cannot be expressed as simple field mappings may require additional logic or custom converters, potentially complicating the mapping files.  
+- **Decision:** Centralise format conversion behind an adapter.  
+  **Trade‑off:** Introduces an extra indirection layer, but greatly improves extensibility and isolates format‑specific bugs.  
+- **Decision:** Use an interface to enforce a uniform API.  
+  **Trade‑off:** Requires disciplined implementation of the contract; however, it prevents runtime errors caused by missing methods.  
 
 ### System Structure Insights  
-* The system is layered: **Reader → Converter → Adapter**, with the factory orchestrating the first two layers.  This separation enforces single responsibility and eases future extensions.  
+The hierarchy (`TranscriptManager → TranscriptConverter → TranscriptAdapter`) reflects a clean separation of orchestration, routing, and low‑level transformation responsibilities.  The adapter lives in a shared library (`lib/agent-api`) making it reusable across any component that needs transcript handling, while the manager remains the authoritative entry point for business‑level operations.
 
 ### Scalability Considerations  
-* Because the conversion work is driven by lightweight look‑ups, the component scales linearly with the number of transcripts processed.  If the mapping repository grows large, caching the parsed rule sets in memory will keep per‑conversion overhead minimal.  
+Because each format is handled by an independent adapter, scaling the system to support many formats does not increase the complexity of the manager or converter.  Adding a new format is a O(1) operation: implement the adapter and register it.  The design also lends itself to parallelisation—multiple adapters can run concurrently on separate transcript streams without contention, as they share no mutable state.
 
 ### Maintainability Assessment  
-* The declarative mapping approach dramatically reduces the maintenance surface: most changes are confined to configuration files.  The clear contract between `TranscriptReader`, `TranscriptConverter`, and `TranscriptAdapterFactory` further isolates concerns, making the overall subsystem easy to understand, test, and evolve.
+The adapter‑centric approach yields high maintainability.  Bugs are isolated to the specific adapter that handles a given format, and unit tests can target each adapter in isolation.  The explicit interface acts as living documentation, reducing the cognitive load for new developers.  The only maintenance overhead is ensuring that the adapter contract remains stable; versioning the interface mitigates breaking changes.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses a factory pattern to create transcript readers for different agent formats, as seen in the TranscriptAdapterFactory class
-
-### Siblings
-- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class uses a factory method to create transcript readers, allowing for easy addition of new formats without modifying existing code.
-- [TranscriptReader](./TranscriptReader.md) -- The TranscriptReader is designed to work with various agent formats, providing a common interface for reading transcripts regardless of the underlying format.
+- [TranscriptManager](./TranscriptManager.md) -- TranscriptManager uses the TranscriptAdapter class in lib/agent-api/transcript-api.js to convert between different transcript formats.
 
 
 ---

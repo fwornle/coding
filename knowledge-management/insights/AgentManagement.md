@@ -2,103 +2,105 @@
 
 **Type:** SubComponent
 
-The execution of agents in the AgentManagement sub-component is performed by the AgentExecutor class in the agent-executor.ts file, running the agents as needed.
+The AgentManager utilizes the WaveController.runWithConcurrency() function to implement work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 
 ## What It Is  
 
-The **AgentManagement** sub‑component lives inside the **SemanticAnalysis** module and is realized through a small set of focused TypeScript files. The core files are:
-
-* `integrations/mcp-server-semantic-analysis/src/agent-manager.ts` – orchestrates the overall lifecycle of agents.  
-* `integrations/mcp-server-semantic-analysis/src/agent-initializer.ts` – contains the logic that creates and prepares agents for execution.  
-* `integrations/mcp-server-semantic-analysis/src/agent-executor.ts` – defines the `AgentExecutor` class that runs agents on demand.  
-* `integrations/mcp-server-semantic-analysis/src/agent-terminator.ts` – defines the `AgentTerminator` class responsible for orderly shutdown and cleanup.
-
-Together these files give the system a dedicated “agent pipeline” that can **initialize**, **execute**, and **terminate** any number of agents that belong to the SemanticAnalysis domain (e.g., `OntologyClassificationAgent` and `SemanticAnalysisAgent`). The design explicitly calls out three non‑functional goals: **scalability** (easy addition of new agents), **performance** (efficient execution algorithms), and **configurability** (custom termination rules).
-
----
+The **AgentManagement** sub‑component lives inside the **SemanticAnalysis** module of the MCP server. Its core implementation is anchored in the file  
+`integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts`.  The `AgentManager` class defined there is responsible for orchestrating the lifecycle of individual agents (e.g., *OntologyClassificationAgent*, *InsightGenerationAgent*) that each have their own configuration files under the same `src/agents` folder.  The sub‑component supplies a single, well‑defined entry point – the `execute` method – that every concrete agent inherits from the base class located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`.  By pulling in ontology metadata that the `PersistenceAgent` pre‑populates, the manager can make informed decisions about which agents to run and in what order.
 
 ## Architecture and Design  
 
-AgentManagement follows a **modular, separation‑of‑concerns** architecture. Each phase of an agent’s lifecycle is isolated in its own module:
+AgentManagement follows a **modular, plug‑in architecture**.  Each agent is a self‑contained unit with its own configuration (e.g., `ontology-classification-agent.ts`, `insight-generation-agent.ts`).  This modularity is explicitly called out in observations 2 and 6 and is reinforced by the shared `execute` contract in the base‑agent class.  The design therefore encourages independent development, testing, and replacement of agents without touching the surrounding pipeline.
 
-* **Initialization** (`agent‑initializer.ts`) – prepares agents without coupling to execution logic.  
-* **Execution** (`agent‑executor.ts`) – encapsulated in the `AgentExecutor` class, which can be invoked by higher‑level orchestrators (e.g., the `AgentManager`).  
-* **Termination** (`agent‑terminator.ts`) – encapsulated in the `AgentTerminator` class, allowing termination policies to be swapped or extended.
+Two concrete architectural mechanisms are evident:
 
-The **AgentManager** acts as a thin façade that wires these phases together, exposing a simple API to the parent **SemanticAnalysis** component. Because the manager does not embed the concrete algorithms for initialization, execution, or termination, the sub‑component is effectively using the **Facade** pattern to hide internal complexity while keeping the underlying modules loosely coupled.
+1. **Work‑stealing concurrency** – The manager delegates actual work to the `WaveController.runWithConcurrency()` function.  The function uses a shared `nextIndex` counter so that idle workers can immediately “steal” the next pending task, reducing idle time and improving throughput.  This pattern is highlighted in observation 5.
 
-Scalability is achieved by designing the lifecycle modules to be **stateless** where possible, enabling the manager to instantiate and manage many agents concurrently. Performance optimisation is hinted at in the observations (“using efficient algorithms to manage agent execution”), suggesting that the `AgentExecutor` likely employs lightweight scheduling or batch processing internally, although the exact algorithm is not disclosed. The termination process is described as **configurable**, indicating that `AgentTerminator` probably accepts strategy objects or configuration files that dictate how and when an agent should be shut down.
+2. **DAG‑based scheduling** – The `BatchScheduler` provides a directed‑acyclic‑graph (DAG) execution model that orders agent execution based on dependencies.  Observation 7 notes that the manager leverages this model, ensuring that agents whose inputs depend on the output of others are run in a topologically sorted sequence.  The sibling component **Pipeline** also uses a DAG‑based batch analysis (`batch-analysis.yaml`), showing a consistent scheduling strategy across the broader system.
 
----
+Together, these mechanisms give AgentManagement a clear separation of concerns: the **modular agent layer** defines *what* to run, while the **concurrency controller** and **batch scheduler** dictate *how* and *when* to run them.
 
 ## Implementation Details  
 
-### AgentManager (`agent‑manager.ts`)  
-The manager imports the three lifecycle modules and provides high‑level methods such as `startAll()`, `stopAll()`, or `runAgent(agentId)`. It likely holds a registry of active agents, mapping identifiers to their runtime instances. By delegating to the initializer, executor, and terminator, the manager remains agnostic to the specifics of any particular agent implementation.
+The central class, `AgentManager`, resides in `integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts`.  Its public `execute` method is the canonical entry point for all agents.  Internally, `execute` performs the following steps:
 
-### AgentInitializer (`agent‑initializer.ts`)  
-This module contains functions (e.g., `initializeAgent(config)`) that construct agent instances, inject dependencies, and perform any required pre‑run configuration. Because the parent **SemanticAnalysis** component already contains concrete agents (`OntologyClassificationAgent`, `SemanticAnalysisAgent`), the initializer probably receives a reference to the agent class or a factory function, allowing new agents to be added without touching the initializer code.
+1. **Metadata ingestion** – It reads ontology metadata fields that the `PersistenceAgent` has already populated.  This metadata drives selection and configuration of downstream agents (observation 4).
 
-### AgentExecutor (`agent‑executor.ts`) – `AgentExecutor` class  
-`AgentExecutor` encapsulates the run‑time logic. It may expose a method like `execute(agentInstance, payload)` that triggers the agent’s core processing. The observation that execution is “optimized for performance” suggests that the executor could batch multiple agent runs, reuse worker threads, or employ async/await patterns to minimise blocking I/O. The class is the only explicit class mentioned, indicating it is the primary entry point for running agents.
+2. **Task graph construction** – Using the `BatchScheduler`, the manager builds a DAG that captures inter‑agent dependencies.  The DAG is later fed to the scheduler’s topological sort routine, guaranteeing that prerequisite agents finish before dependents start (observation 7).
 
-### AgentTerminator (`agent‑terminator.ts`) – `AgentTerminator` class  
-`AgentTerminator` provides a method such as `terminate(agentInstance, options)` that follows configurable termination rules. The configurability could be implemented via a JSON/YAML policy file or via dependency injection of a “termination strategy” object. This design allows developers to tailor cleanup (e.g., flushing buffers, releasing external resources) per agent type without modifying the core terminator logic.
+3. **Concurrent dispatch** – The manager hands the sorted task list to `WaveController.runWithConcurrency()`.  The WaveController maintains a shared `nextIndex` counter; each worker thread repeatedly reads and increments this counter to claim the next available task, achieving work‑stealing without a central queue (observation 5).
 
-Overall, the implementation is deliberately **layered**: the manager orchestrates, while each lifecycle class focuses on a single responsibility. This makes the codebase easier to extend—adding a new agent typically requires only a new class under `src/agents/` and possibly a small registration entry in the manager.
+4. **Agent execution** – For each claimed task, the worker invokes the concrete agent’s `execute` implementation (inherited from `base-agent.ts`).  Because every agent adheres to the same method signature, the manager can treat them uniformly, reinforcing the standardized interface noted in observation 3.
 
----
+The modularity is further emphasized by the presence of per‑agent configuration files such as `ontology-classification-agent.ts` and `insight-generation-agent.ts`.  These files declare each agent’s specific dependencies, allowing the manager to instantiate and wire them at runtime without hard‑coded references.
 
 ## Integration Points  
 
-AgentManagement is a child of the **SemanticAnalysis** component, which already houses concrete agents such as `OntologyClassificationAgent` and `SemanticAnalysisAgent`. Those agents are the payloads that flow through the lifecycle modules described above. When the SemanticAnalysis pipeline needs to run an analysis, it calls into `AgentManager`, which in turn uses the initializer to create the appropriate agent, the executor to run it, and the terminator to clean up afterward.
+AgentManagement sits directly under the **SemanticAnalysis** parent component, which itself adopts the same modular agent philosophy.  It consumes ontology metadata produced by the **PersistenceAgent** (a sibling within the same domain) and feeds its results downstream to other high‑level components such as **Pipeline**, **Ontology**, and **Insights**.  The **Pipeline** sibling also relies on a DAG‑based batch coordinator, meaning that both Pipeline and AgentManagement can share the same `BatchScheduler` implementation without duplication.
 
-Sibling components share a similar modular approach:
+External integration occurs through the following interfaces:
 
-* **Pipeline** defines processing steps in `batch-analysis.yaml`; it likely references the AgentManagement API to schedule agent runs as part of a larger batch workflow.  
-* **Ontology** provides ontology definitions (`upper-ontology.ts`, `lower-ontology.ts`) that are consumed by agents like `OntologyClassificationAgent`. These definitions are indirectly used during initialization.  
-* **Insights** generates higher‑level insights via `insight-generator.ts`; it may consume the results produced by agents managed by AgentManagement.  
-* **KnowledgeGraph** manipulates the graph through `knowledge-graph.ts`; agents can push data into the graph, meaning the executor must expose results in a format understood by KnowledgeGraph.
+| Integration | Path / Interface | Role |
+|-------------|------------------|------|
+| `PersistenceAgent` | Provides pre‑populated ontology metadata fields | Supplies input data for agent selection |
+| `WaveController` | `runWithConcurrency()` (invoked from `agent-manager.ts`) | Handles parallel execution and work‑stealing |
+| `BatchScheduler` | DAG construction & topological sort (used in `agent-manager.ts`) | Orders agent execution based on dependencies |
+| Individual agents | Config files (`ontology-classification-agent.ts`, `insight-generation-agent.ts`, etc.) | Define concrete behavior and dependencies |
 
-Because the lifecycle modules are self‑contained, integration is achieved through **well‑defined TypeScript interfaces** (e.g., an `IAgent` contract) and configuration objects. No cross‑component coupling is evident beyond the data contracts, preserving the independence of each sibling.
-
----
+These points illustrate a tightly‑coupled yet well‑abstracted ecosystem: each component knows only the contracts it needs (metadata, DAG, concurrency API) and does not depend on internal implementation details of its peers.
 
 ## Usage Guidelines  
 
-1. **Register New Agents** – Place the new agent class under `integrations/mcp-server-semantic-analysis/src/agents/`. Ensure it implements the expected agent interface (e.g., `IAgent`) so the `AgentInitializer` can instantiate it without code changes.  
-2. **Configure Initialization** – If the agent requires special dependencies (external services, configuration files), extend the initializer’s configuration schema rather than hard‑coding values. This keeps the initialization phase declarative and maintainable.  
-3. **Leverage the Executor** – Invoke agents through the `AgentExecutor.execute()` method rather than calling the agent directly. This guarantees that performance optimisations (batching, async handling) are applied uniformly.  
-4. **Define Termination Rules** – Use the configurable termination mechanism (e.g., a JSON policy passed to `AgentTerminator`) to specify timeouts, graceful shutdown steps, or resource release strategies. Avoid embedding termination logic inside the agent itself to keep cleanup concerns separate.  
-5. **Monitor Scalability** – When adding many agents, verify that the manager’s internal registry and any thread‑pool or async resources in `AgentExecutor` are sized appropriately. The design expects stateless lifecycle modules, so scaling out (e.g., running multiple manager instances) should be straightforward.  
+1. **Add a new agent** – Create a dedicated configuration file under `src/agents/` (mirroring the pattern used by `ontology-classification-agent.ts`).  Extend `BaseAgent` and implement the `execute` method.  Register the new class in the manager’s configuration so that the DAG builder can discover its dependencies.
 
-Following these conventions ensures that the AgentManagement sub‑component remains **easy to extend**, **highly performant**, and **cleanly integrated** with the broader SemanticAnalysis ecosystem.
+2. **Define dependencies** – Populate the agent’s configuration with explicit input‑output relationships.  The `BatchScheduler` will automatically incorporate these edges into the execution DAG, preserving correct ordering.
+
+3. **Leverage concurrency** – When an agent’s workload is CPU‑bound or I/O‑heavy, rely on the existing `WaveController.runWithConcurrency()` path rather than implementing custom threading.  The shared `nextIndex` work‑stealing mechanism ensures optimal utilization of worker threads.
+
+4. **Maintain metadata contracts** – Ensure that any changes to the ontology metadata schema (produced by `PersistenceAgent`) are reflected in the manager’s metadata ingestion logic.  Breaking this contract will cause incorrect agent selection or scheduling failures.
+
+5. **Testing** – Because each agent is isolated, unit‑test it against the `BaseAgent` contract.  Integration tests should verify that the DAG is constructed as expected and that concurrent execution does not introduce race conditions (the `nextIndex` counter is the sole shared mutable state).
 
 ---
 
-### Summary of Findings  
+### Architectural Patterns Identified  
 
-| Aspect | Insight |
-|--------|---------|
-| **Architectural patterns identified** | Modular separation of concerns, Facade (AgentManager), Single‑Responsibility (Initializer, Executor, Terminator) |
-| **Design decisions and trade‑offs** | Explicit lifecycle split improves maintainability but adds an extra orchestration layer; stateless modules aid scalability at the cost of possible duplication of context passing |
-| **System structure insights** | AgentManagement sits under SemanticAnalysis, providing a reusable lifecycle service for sibling components (Pipeline, Insights, KnowledgeGraph) that consume agent results |
-| **Scalability considerations** | Stateless lifecycle classes, configurable termination, and an executor optimized for performance allow easy addition of agents and concurrent execution |
-| **Maintainability assessment** | High – clear file boundaries, single‑purpose classes, and configurability reduce coupling; adding new agents requires only registration and optional config tweaks |
+* **Modular plug‑in architecture** – each agent is a self‑contained module with its own config.  
+* **Standardized interface pattern** – a common `execute` method defined in `BaseAgent`.  
+* **Work‑stealing concurrency** – implemented via `WaveController.runWithConcurrency()` and a shared `nextIndex`.  
+* **DAG‑based scheduling** – orchestrated by `BatchScheduler` to respect inter‑agent dependencies.
 
-All observations are directly drawn from the supplied file names, class names, and stated non‑functional goals, with no speculative patterns introduced.
+### Design Decisions & Trade‑offs  
+
+* **Modularity vs. runtime overhead** – The plug‑in model eases development and testing but introduces a configuration parsing step at start‑up.  
+* **Work‑stealing vs. centralized queue** – Work‑stealing reduces contention and improves load balance, at the cost of a single atomic counter that must be thread‑safe.  
+* **DAG scheduling vs. linear pipelines** – DAGs enable parallelism for independent agents but require careful dependency definition to avoid cycles.
+
+### System Structure Insights  
+
+AgentManagement is the orchestration layer for the agent ecosystem within **SemanticAnalysis**.  It bridges metadata providers (`PersistenceAgent`), scheduling infrastructure (`BatchScheduler`), and concurrency primitives (`WaveController`).  Its sibling components share the same DAG‑based execution model, indicating a system‑wide commitment to dependency‑driven parallelism.
+
+### Scalability Considerations  
+
+* **Horizontal scaling** – Adding more worker threads (or processes) automatically benefits from the work‑stealing algorithm, as idle workers can continue pulling tasks from the shared `nextIndex`.  
+* **Task graph size** – The DAG approach scales linearly with the number of agents; however, very large graphs may increase topological sort time, suggesting the need for incremental DAG updates if the agent set grows dramatically.  
+* **Metadata volume** – Since the manager relies on pre‑populated ontology metadata, the size of that metadata should remain bounded; otherwise, ingestion could become a bottleneck.
+
+### Maintainability Assessment  
+
+The modular configuration files and the unified `execute` contract make the codebase highly maintainable.  Adding, removing, or updating an agent does not require changes to the core manager logic, only to the agent’s own file and its dependency declarations.  The clear separation between concurrency (`WaveController`), scheduling (`BatchScheduler`), and business logic (individual agents) further isolates concerns, simplifying debugging and future refactoring.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's modular architecture is evident in its separation of concerns, with distinct modules for agents such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts). This design choice allows for easier maintenance and updates, as changes to one agent do not affect the others. For instance, the OntologyClassificationAgent's classification logic is isolated within its own module, making it simpler to modify or replace without impacting the overall system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic. For instance, the OntologyClassificationAgent has its own configuration file (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) that defines its behavior and dependencies. This modular approach allows for easier maintenance and extension of the agents, as each agent can be developed and tested independently. The execute method in the base-agent.ts file (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serves as the entry point for each agent's execution, providing a standardized interface for agent interactions.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a batch-analysis.yaml file to define the steps and dependencies for the batch processing pipeline.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the ontology definitions in the upper-ontology.ts and lower-ontology.ts files to classify entities.
-- [Insights](./Insights.md) -- The Insights sub-component uses the insight-generator.ts file to generate insights from the processed data.
-- [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph sub-component uses the knowledge-graph.ts file to manage the knowledge graph.
+- [Pipeline](./Pipeline.md) -- The Pipeline's batch processing is orchestrated by the coordinator agent, which utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to define its behavior and dependencies.
+- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
 
 
 ---

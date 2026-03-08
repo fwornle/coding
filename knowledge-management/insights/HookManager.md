@@ -2,115 +2,109 @@
 
 **Type:** SubComponent
 
-HookManager may leverage observer or listener patterns to notify registered handlers of hook events, as seen in other event-driven systems
+The HookManager sub-component interacts with other sub-components, such as the ContentValidator, to provide hook event handling and management capabilities, as implied by the presence of hook-related files in the integrations/mcp-server-semantic-analysis/src directory.
 
 ## What It Is  
 
-**HookManager** is the dedicated sub‑component inside the **ConstraintSystem** that centralises the registration, storage and dispatch of hook events.  The observations point to its implementation living in a file such as `integrations/mcp-server-semantic-analysis/src/hook-manager.ts` (or a similarly named `event‑handler.ts`).  Its public surface is a thin, purpose‑built API that lets other parts of the ConstraintSystem – for example the **ContentValidator**, **ViolationProcessor**, and **ConstraintEngine** – register callbacks (handlers) for named hook points and later trigger those hooks when the corresponding lifecycle moments occur.  By providing a single place where events are declared and listeners are managed, HookManager enables the rest of the constraint‑validation pipeline to stay loosely coupled while still reacting to rich, domain‑specific signals.
+The **HookManager** sub‑component lives in the source tree at `lib/agent-api/hooks/hook-manager.js`.  It is the central orchestrator for all hook‑related events inside the agent API layer.  The surrounding `lib/agent-api/hooks/` directory contains a collection of focused modules – for example, modules that deal with hook configuration, hook registration, and the actual dispatch of hook events.  Within the broader system, HookManager is a child of the **ConstraintSystem** component and works side‑by‑side with sibling sub‑components such as **ContentValidator**, **ConstraintEngine**, and **EventDispatcher**.  Its primary responsibility is to expose a unified API that other parts of the platform (e.g., the `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) can call to register, look up, and fire hooks in a consistent manner.
 
 ---
 
 ## Architecture and Design  
 
-The design of HookManager follows an **event‑driven architecture**.  At its core is a **registry (or mapping)** that associates a hook identifier (e.g., `"beforeValidate"`, `"afterViolation"`) with one or more handler functions.  This registry embodies the **Observer / Listener pattern**: a component (the *subject*) publishes an event, and all registered observers are notified in turn.  
+The design of HookManager is **modular** and **pattern‑driven**.  The observations repeatedly point to the **observer pattern** as the core mechanism for handling hook events: HookManager maintains a set of hook configurations (the “observers”) and notifies them when a relevant event occurs.  This pattern enables loose coupling – the code that emits an event does not need to know which concrete hook implementations will react, only that a hook identifier is being dispatched.
 
-Because HookManager sits directly under **ConstraintSystem**, it acts as the glue that lets sibling sub‑components share hook points without needing direct references to each other.  The **ConstraintSystem** therefore remains the single point of responsibility for orchestrating constraint evaluation, while the **ContentValidator**, **ViolationProcessor**, and **ConstraintEngine** each contribute their own handlers to the HookManager’s registry.  The interaction flow can be summarised as:
+Because the hook‑related code is split across several files in `lib/agent-api/hooks/`, the component follows a **separation‑of‑concerns** approach.  One module is likely responsible for **registry/repository** duties (storing hook definitions), another for **event dispatching** (walking the list of observers and invoking their callbacks), and a third for **configuration parsing** (reading hook metadata from configuration files or runtime inputs).  The presence of sibling components—**EventDispatcher** and **ConstraintEngine**—suggests that HookManager does not duplicate generic event‑routing logic but instead focuses on the *hook* domain while delegating generic event transport to the shared EventDispatcher service.
 
-1. **Registration** – a sibling component calls a method such as `registerHook(eventName, handler, options?)`.  The `options` may include *priority* or *filter* criteria, hinting at the observed features of handler prioritisation and event filtering.  
-2. **Triggering** – when the ConstraintSystem reaches a logical checkpoint (e.g., after a validation run), it invokes `emit(eventName, payload)`.  HookManager looks up the list of handlers, orders them by any defined priority, applies any filters, and then calls each handler in turn.  
-3. **Error handling** – the observations note that robust error handling is likely built‑in.  A typical implementation would catch exceptions from individual handlers, log them, and optionally continue dispatching to remaining listeners so that a single faulty handler does not break the entire pipeline.
-
-The design respects **loose coupling** (handlers only depend on the hook contract, not on the concrete emitter) and **single‑responsibility** (HookManager’s sole job is event registration and dispatch).  No broader architectural styles—such as micro‑services or message queues—are introduced, keeping the component lightweight and in‑process.
+Interaction with the parent **ConstraintSystem** is also pattern‑driven: ConstraintSystem uses the observer‑style hook infrastructure to react to constraint‑related state changes.  By funneling all hook activity through HookManager, ConstraintSystem gains a single point of control for extending or customizing behavior without having to modify the core constraint evaluation code.
 
 ---
 
 ## Implementation Details  
 
-Although the source code was not directly provided, the observations give a clear picture of the expected implementation skeleton:
+* **Entry point – `lib/agent-api/hooks/hook-manager.js`**  
+  This file defines the `HookManager` class.  The class likely exposes methods such as `registerHook`, `unregisterHook`, `getHookConfig`, and `emit` (or similarly named functions).  The internal state probably consists of a **registry map** keyed by hook name or identifier, each entry holding an array of observer callbacks and associated metadata.
 
-* **Registry Structure** – Internally HookManager likely maintains a `Map<string, HookEntry[]>`, where each `HookEntry` stores the handler reference, an optional priority number, and any filter predicate.  This map resides in the file `hook-manager.ts` (or `event‑handler.ts`).  
+* **Modular sub‑files**  
+  The surrounding `lib/agent-api/hooks/` directory houses the concrete modules referenced in the observations:  
+  - *Hook configuration module* – parses static or dynamic configuration (e.g., JSON/YAML) and populates the registry.  
+  - *Event dispatch module* – implements the observer notification loop, possibly iterating over observers in registration order and handling async execution.  
+  - *Utility helpers* – may provide validation of hook payloads, error handling, or logging.
 
-* **Public API** – The component probably exposes methods such as:  
-  * `register(eventName: string, handler: (payload: any) => void, options?: { priority?: number; filter?: (payload) => boolean }): void`  
-  * `unregister(eventName: string, handler: Function): void`  
-  * `emit(eventName: string, payload: any): void`  
+* **Observer pattern mechanics**  
+  When a consumer (e.g., `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) needs to trigger a hook, it calls `HookManager.emit('contentValidation', payload)`.  HookManager looks up the `contentValidation` entry in its registry and invokes each registered observer with the supplied payload.  Because the pattern is observer‑based, new observers can be added at runtime without altering existing emitters.
 
-* **Handler Prioritisation** – When `emit` is called, HookManager sorts the collected `HookEntry` objects for that event by the `priority` field (higher values first).  This guarantees deterministic execution order, a design decision that aids predictability for downstream components like **ViolationProcessor** which may need to run after **ContentValidator** has completed its work.  
+* **Registry / Repository**  
+  The “registry or repository for hook configurations” mentioned in the observations is realized as an in‑memory data structure (most likely a plain JavaScript object or `Map`).  This enables fast lookup and retrieval of hook definitions, supporting the “easy management and retrieval” claim.
 
-* **Event Filtering** – The optional `filter` predicate allows a handler to opt‑out of processing a particular payload, reducing unnecessary work and keeping each handler focused on its relevant subset of events.  
-
-* **Error Isolation** – A `try…catch` block around each handler invocation prevents a single exception from bubbling up and aborting the entire dispatch sequence.  The caught error can be logged via the system’s logging facility, and the dispatch loop continues with the next handler.  
-
-* **Lifecycle Integration** – Because HookManager is a child of **ConstraintSystem**, its lifecycle (construction, initialization, shutdown) is likely tied to the parent component’s own lifecycle methods.  The parent may instantiate HookManager in its constructor, call an `initialize()` method during its own `initialize()` phase, and clean up any resources when the ConstraintSystem is torn down.
+* **Event‑queue hints**  
+  The `package.json` lists event‑related dependencies, implying that HookManager may optionally enqueue hook notifications for asynchronous processing.  While the exact implementation is not visible, the presence of such dependencies suggests a design that can fall back to a simple synchronous loop or switch to a queued, possibly throttled, processing mode when higher throughput is required.
 
 ---
 
 ## Integration Points  
 
-HookManager is tightly coupled to the **ConstraintSystem** parent, acting as the central hub for all hook‑related communication.  The sibling components interact with it in the following ways:
+HookManager sits at the crossroads of several system layers:
 
-* **ContentValidator** – Registers hooks such as `"preValidate"` and `"postValidate"` to run custom preprocessing or post‑processing logic around the core validation routine.  
+1. **ConstraintSystem (parent)** – The parent component leverages HookManager to propagate constraint‑related notifications.  By using the same observer infrastructure, ConstraintSystem can add or remove constraint‑specific hooks without touching its core evaluation engine.
 
-* **ViolationProcessor** – Subscribes to `"violationDetected"` or `"afterViolation"` hooks so that it can transform, aggregate, or forward constraint violations to downstream systems.  
+2. **ContentValidator (sibling)** – The `ContentValidator` sub‑component directly invokes HookManager to handle content‑validation events.  The `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` is a concrete consumer that registers its own validation hooks and fires them when new content arrives.
 
-* **ConstraintEngine** – May emit higher‑level events like `"constraintEvaluationStart"` and `"constraintEvaluationEnd"` that other subsystems can listen to for telemetry or metrics collection.  
+3. **ConstraintEngine (sibling)** – While not explicitly calling HookManager in the observations, it is reasonable to assume that any constraint‑engine logic that needs to react to hook events would subscribe through HookManager, keeping the engine decoupled from the hook lifecycle.
 
-Because HookManager only deals with plain JavaScript/TypeScript functions and simple data payloads, it imposes minimal dependency overhead.  The only required interface is the contract of the event name and the shape of the payload, which is typically defined in shared type definitions within the ConstraintSystem module.  This lightweight contract makes it straightforward for new sub‑components to plug into the system without altering existing code.
+4. **EventDispatcher (sibling)** – Generic event routing is likely delegated to EventDispatcher.  HookManager may call into EventDispatcher for low‑level transport (e.g., broadcasting a hook event across process boundaries) while retaining responsibility for hook‑specific observer management.
+
+5. **External configuration / plugins** – Because HookManager maintains a registry of hook definitions, external modules can contribute new hook implementations simply by registering them via the public API.  This extensibility point is vital for integrating future agents or third‑party plugins.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Register Early, Unregister When Done** – Handlers should be added during the component’s `initialize()` phase and removed (if necessary) during its shutdown to avoid memory leaks.  
+* **Register before emit** – Any module that wishes to react to a hook must call the appropriate registration method (e.g., `HookManager.registerHook('hookName', callback)`) during its initialization phase.  Registering after the first emit may cause missed notifications.
 
-2. **Respect Priorities** – When order matters, explicitly set the `priority` option.  The default priority is usually `0`; higher numbers run earlier.  
+* **Keep callbacks lightweight** – Since HookManager may execute observers synchronously, heavy‑weight work should be off‑loaded to background jobs or async functions to avoid blocking the emitter.
 
-3. **Keep Handlers Small and Focused** – Because HookManager may invoke many handlers for a single event, each handler should perform a single, well‑defined task and return quickly.  Heavy work should be delegated to asynchronous services if possible.  
+* **Leverage configuration files** – When possible, define hook metadata in the dedicated configuration module under `lib/agent-api/hooks/`.  This keeps hook definitions declarative and allows the system to reload or validate them without code changes.
 
-4. **Handle Errors Gracefully** – Even though HookManager isolates handler errors, a handler should still catch its own predictable exceptions and surface meaningful logs.  Unexpected errors will be caught by the manager, but they may obscure the original cause if not logged.  
+* **Respect the observer contract** – Callbacks receive a payload defined by the hook’s specification.  Modifying the payload or throwing uncaught errors can disrupt the notification chain; therefore, observers should handle errors internally and, if needed, signal failure through a defined return value.
 
-5. **Leverage Filtering** – Use the `filter` option to limit handler execution to relevant payloads, reducing unnecessary processing and keeping the event flow efficient.  
-
-6. **Do Not Introduce Direct Coupling** – Avoid calling sibling components directly from a handler; instead, rely on the hook contract.  This preserves the loose‑coupling design and makes future refactoring easier.
+* **Avoid circular dependencies** – Because HookManager is a shared service, registering a hook that in turn triggers another hook can lead to recursive loops.  Design hook interactions carefully and, if recursion is required, implement guard logic (e.g., depth counters) within the observer.
 
 ---
 
 ### Architectural patterns identified  
-
-* Event‑driven architecture  
-* Observer / Listener pattern  
-* Registry (mapping) pattern for event‑to‑handler storage  
+1. **Observer pattern** – Core mechanism for hook registration and notification.  
+2. **Modular / Separation‑of‑Concerns** – Distinct modules for configuration, registry, and dispatch.  
+3. **Registry/Repository pattern** – Centralized store for hook definitions.  
 
 ### Design decisions and trade‑offs  
-
-* **Centralised registry** simplifies discovery and debugging of hooks but introduces a single point of contention if many events fire simultaneously.  
-* **Handler prioritisation** gives deterministic ordering at the cost of added complexity in the registration API.  
-* **Error isolation** improves robustness but may mask failures if handlers do not log adequately.  
+* **Centralized hook management** simplifies extension but creates a single point of failure; the design mitigates this by using a lightweight in‑memory registry and optional event queuing.  
+* **Observer pattern** provides loose coupling, at the cost of potential difficulty in tracing execution flow across many observers.  
+* **Modular file layout** eases maintainability and testing, though it introduces a small overhead in module loading and requires disciplined naming conventions.  
 
 ### System structure insights  
-
-HookManager sits as a child of **ConstraintSystem**, acting as the communication backbone for its sibling sub‑components.  The parent orchestrates the overall flow, while the siblings contribute domain‑specific logic via hooks, keeping each sub‑component focused on a single responsibility.  
+HookManager is a child of **ConstraintSystem**, acting as the hook‑specific façade while sharing generic event infrastructure with **EventDispatcher**.  Its siblings (**ContentValidator**, **ConstraintEngine**) each focus on a domain (validation, constraint evaluation) but rely on HookManager for hook‑driven extensibility.  The overall hierarchy promotes a clear vertical slice: high‑level constraint logic → HookManager (observer hub) → domain‑specific agents.  
 
 ### Scalability considerations  
-
-Because HookManager operates in‑process and uses simple data structures, it scales well for the typical load of constraint validation (tens to low hundreds of events per request).  If the volume of hooks grows dramatically, the registry could be sharded or moved to a more concurrent data structure, but the current design is appropriate for the observed usage patterns.  
+* The in‑memory registry scales well for a moderate number of hooks; for very large hook sets, a persistent store could be introduced without breaking the API.  
+* Optional event‑queue integration (hinted by package dependencies) allows the system to shift from synchronous to asynchronous processing under load, improving throughput and preventing emitter latency spikes.  
+* Because observers are invoked in registration order, adding many heavyweight observers could degrade performance; developers are encouraged to keep callbacks short or move work to background workers.  
 
 ### Maintainability assessment  
-
-The use of a clear, well‑documented API, explicit prioritisation, and error isolation makes HookManager highly maintainable.  New hook points can be added without touching existing handlers, and existing handlers can be reordered or filtered without code changes elsewhere.  The adherence to loose coupling and single‑responsibility principles further reduces the risk of ripple effects when modifying any part of the constraint‑validation pipeline.
+The modular organization and explicit use of the observer pattern make HookManager straightforward to understand and extend.  Adding a new hook type typically involves creating a small configuration file and a registration call, without touching existing logic.  The clear separation from generic event handling (delegated to EventDispatcher) reduces code churn in the core hook manager.  However, the reliance on runtime registration means that comprehensive unit tests are essential to verify that all expected observers are correctly wired, especially as the number of plugins grows.  Overall, the design balances extensibility with simplicity, supporting maintainable evolution of hook‑related features.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's utilization of the observer pattern for event handling is a key architectural aspect that enables efficient management of complex constraint relationships. This is evident in the use of hook configurations and the unified hook manager, as seen in the lib/agent-api/hooks/hook-manager.js file. The hook manager acts as a central orchestrator for hook events, allowing for customizable event handling and enabling the component to respond to various scenarios that may arise during code sessions. For instance, the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts employs the hook manager to handle content validation events, demonstrating the component's ability to adapt to different scenarios. Furthermore, the use of design patterns such as the observer pattern facilitates the component's modular design, allowing for separate modules to handle different aspects of constraint monitoring and enforcement.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator uses the constructor(config) + initialize() + execute(input) pattern in content-validation-agent.ts, allowing for lazy initialization and execution
-- [ViolationProcessor](./ViolationProcessor.md) -- ViolationProcessor likely interacts with the ContentValidator sub-component to receive and process constraint violations
-- [ConstraintEngine](./ConstraintEngine.md) -- ConstraintEngine likely interacts with the ContentValidator sub-component to receive and process constraint evaluations
+- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the hook manager in lib/agent-api/hooks/hook-manager.js to handle content validation events, allowing for customizable event handling and adaptability to different scenarios.
+- [ConstraintEngine](./ConstraintEngine.md) -- ConstraintEngine is likely implemented in a separate module or service, such as a constraint evaluation service or utility class, to maintain a clean and modular architecture, as suggested by the presence of constraint-related files in the lib/agent-api directory.
+- [EventDispatcher](./EventDispatcher.md) -- EventDispatcher is likely implemented in a separate module or service, such as an event dispatching service or utility class, to maintain a clean and modular architecture, as suggested by the presence of event-related files in the lib/agent-api directory.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

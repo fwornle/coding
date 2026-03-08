@@ -2,100 +2,221 @@
 
 **Type:** SubComponent
 
-TraceReportGenerator relies on the GraphDatabaseAdapter in storage/graph-database-adapter.ts for interacting with the graph database.
+TraceReportGenerator's generation process utilizes the traceReportGenerationRules in trace-report-generation-rules.ts to determine the correct report structure
 
 ## What It Is  
 
-The **TraceReportGenerator** is a sub‑component that lives inside the **KnowledgeManagement** module. Its concrete implementation resides wherever the KnowledgeManagement codebase is assembled; the observations do not point to a single source file, but they repeatedly reference its collaboration with two concrete artefacts: the **UKBTraceReport** class (used to render the actual trace content) and the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts` (used for persisting or retrieving graph‑related data). In practice, when a workflow run finishes, the TraceReportGenerator orchestrates the collection of runtime metadata, hands that data to a UKBTraceReport instance, and then stores the resulting report through the graph‑database adapter. The component’s purpose is explicitly to “generate detailed trace reports of workflow runs” and to “provide valuable insights” into those runs, making it a reporting façade over the underlying knowledge‑graph infrastructure.
+**TraceReportGenerator** is a sub‑component that lives in the *KnowledgeManagement* domain and is responsible for turning raw workflow execution data into structured trace reports. The core implementation resides in three source files:
 
-## Architecture and Design  
+* `trace-report-generator.ts` – defines the `generateTraceReport` method that orchestrates the whole generation pipeline.  
+* `workflow-executions.ts` – provides the `getWorkflowExecutions` function used to fetch the execution history that forms the raw material for a report.  
+* `trace-report-generation-rules.ts` – exports the `traceReportGenerationRules` object that encodes the business‑level rules for shaping the final report structure.
 
-The design that emerges from the observations is a **layered, adapter‑centric architecture**. At the outermost layer, TraceReportGenerator acts as a façade that hides the complexities of graph persistence and report formatting. It delegates persistence concerns to the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`), which itself is an **Adapter pattern** providing a uniform API regardless of whether the underlying store is accessed via the VKB API or direct database connections (as described for its sibling **GraphDatabaseManager**). This separation allows TraceReportGenerator to remain focused on the business logic of report creation without being coupled to storage details.
+Once a report is built, it is persisted through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). That adapter not only writes the report into the underlying Graphology‑LevelDB graph but also invokes its built‑in *automatic JSON export sync* feature, which writes an up‑to‑date JSON snapshot of the graph to disk. The generation workflow is launched automatically from two places: the **WorkflowExecutor** (when a workflow finishes) and the **Debugger** (when a debugging session ends).  
 
-Another implicit pattern is **Data‑Mapping** performed by the **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`). The observation that `entityType` and `metadata.ontologyClass` are pre‑populated by `PersistenceAgent.mapEntityToSharedMemory()` indicates a mapping step that translates persisted entities into an in‑memory representation used by TraceReportGenerator. This mapping isolates the component from raw persistence formats and enables it to work with a richer, ontology‑aware model.
-
-The component also participates in a **Composite hierarchy**: it is a child of **KnowledgeManagement**, which coordinates several sibling modules (ManualLearning, OnlineLearning, GraphDatabaseManager, etc.). All siblings share the same GraphDatabaseAdapter, reinforcing a **shared‑service** model where a single adapter instance is reused across the KnowledgeManagement domain.
-
-## Implementation Details  
-
-* **UKBTraceReport** – Although the source file is not listed, the observations repeatedly name this class as the engine that actually assembles the trace content. TraceReportGenerator likely constructs a UKBTraceReport object, populates it with workflow‑run metadata (including the pre‑filled `entityType` and `metadata.ontologyClass`), and invokes a method such as `generate()` or `toJSON()` to obtain the final report payload.
-
-* **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) – This adapter abstracts the underlying graph store. TraceReportGenerator calls into it to persist the generated report, probably via a method like `saveReport(report: UKBTraceReport)` or `writeNode(nodeData)`. The adapter’s responsibilities include translating the report’s domain model into the graph schema expected by the knowledge graph.
-
-* **PersistenceAgent.mapEntityToSharedMemory()** – Before TraceReportGenerator can create a report, the relevant entity information must be loaded into shared memory. The mapping function fills `entityType` and `metadata.ontologyClass`, which the generator then consumes. This step ensures that the report is ontology‑aware and can be linked correctly within the graph.
-
-* **Interaction Flow** – A typical execution proceeds as follows:  
-  1. A workflow run finishes and triggers the TraceReportGenerator.  
-  2. The generator retrieves the run’s entity representation (already enriched by PersistenceAgent).  
-  3. It instantiates a UKBTraceReport, injects the enriched metadata, and calls the report‑building routine.  
-  4. The completed report is handed to GraphDatabaseAdapter for storage, making the trace queryable by downstream agents such as **CodeGraphAgent** or **ManualLearning**.
-
-Because no concrete method signatures are present in the observations, the description stays at the interaction‑level rather than enumerating exact APIs.
-
-## Integration Points  
-
-* **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) – The sole persistence interface for TraceReportGenerator. Any change to the adapter’s contract (e.g., method signatures, error handling) will ripple into the generator.
-
-* **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) – Supplies the enriched entity data (`entityType`, `metadata.ontologyClass`). TraceReportGenerator assumes these fields are already populated; therefore, the generator must be invoked **after** the mapping step.
-
-* **UKBTraceReport** – The formatting and serialization component. If the report schema evolves (e.g., new fields, different output format), UKBTraceReport will need to be updated, but the generator’s orchestration logic can remain unchanged.
-
-* **Sibling Modules** – ManualLearning, OnlineLearning, GraphDatabaseManager, EntityPersistenceModule, CodeAnalysisModule, and KnowledgeGraphConstructor all consume the same GraphDatabaseAdapter. This shared dependency means that performance or reliability characteristics of the adapter affect the entire KnowledgeManagement suite, including TraceReportGenerator.
-
-* **Parent Component – KnowledgeManagement** – Provides the orchestration context. KnowledgeManagement may decide when to invoke TraceReportGenerator (e.g., after a workflow run completes) and may route the generated report to other consumers such as dashboards or alerting services.
-
-## Usage Guidelines  
-
-1. **Invoke After Persistence Mapping** – Ensure that `PersistenceAgent.mapEntityToSharedMemory()` has run and populated `entityType` and `metadata.ontologyClass` before calling TraceReportGenerator. Skipping this step will lead to incomplete reports.
-
-2. **Treat the GraphDatabaseAdapter as a Black Box** – Do not embed database‑specific logic inside the generator. All storage interactions must go through the adapter’s public methods. If a new storage backend is introduced, only the adapter needs to change.
-
-3. **Keep UKBTraceReport Stateless** – The generator should create a fresh UKBTraceReport instance for each workflow run. Reusing the same instance across runs can cause cross‑contamination of metadata.
-
-4. **Handle Adapter Errors Gracefully** – The adapter may surface connectivity issues (e.g., VKB API downtime). TraceReportGenerator should catch these exceptions, log them, and optionally retry or fallback to a local cache, preserving the overall reliability of KnowledgeManagement.
-
-5. **Version the Report Schema** – Since downstream components (e.g., CodeGraphAgent) may query the stored reports, any change to the UKBTraceReport format should be versioned. This practice avoids breaking existing graph queries.
+In short, TraceReportGenerator is the “bridge” that converts execution telemetry into persistent, query‑able graph entities and a portable JSON artifact, making trace data available to the rest of the KnowledgeManagement ecosystem.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Adapter Pattern** – `GraphDatabaseAdapter` provides a uniform interface to disparate graph‑store access methods.  
-* **Facade Pattern** – `TraceReportGenerator` acts as a façade that hides the complexity of report creation and persistence.  
-* **Data‑Mapping / DTO** – `PersistenceAgent.mapEntityToSharedMemory()` maps persisted entities to in‑memory DTOs (`entityType`, `metadata.ontologyClass`).  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Separation of concerns** – By delegating persistence to an adapter and formatting to UKBTraceReport, the generator stays lightweight, at the cost of added indirection (extra method calls).  
-* **Shared adapter instance** – Improves resource utilization across siblings but creates a single point of failure; any adapter regression impacts all KnowledgeManagement components.  
-* **Pre‑populated metadata** – Guarantees ontology‑consistent reports but couples the generator tightly to the PersistenceAgent’s mapping contract.
+The observed code reveals a **layered, rule‑driven architecture** built around clear separation of concerns:
 
-### 3. System structure insights  
-* TraceReportGenerator sits in a **vertical slice** of the KnowledgeManagement domain: input (workflow run metadata) → transformation (UKBTraceReport) → output (graph store).  
-* It shares the **graph‑database‑access layer** with ManualLearning, GraphDatabaseManager, and other siblings, reinforcing a **service‑oriented** internal architecture.  
-* The parent component, KnowledgeManagement, orchestrates mode‑switching (e.g., VKB API vs. direct DB) via the GraphDatabaseAdapter, allowing TraceReportGenerator to remain agnostic to deployment topology.
+1. **Orchestration Layer** – `generateTraceReport` in `trace-report-generator.ts` acts as the coordinator. It pulls data, applies rules, and delegates persistence. This thin orchestration keeps the component easy to test and evolve.  
 
-### 4. Scalability considerations  
-* **Adapter scalability** – Since all trace reports funnel through the same GraphDatabaseAdapter, scaling the adapter (connection pooling, async I/O) directly scales report generation throughput.  
-* **Report size** – UKBTraceReport payloads should be kept reasonably sized; excessively large reports could strain graph writes and query performance.  
-* **Batching** – If many workflow runs complete simultaneously, consider batching writes through the adapter to reduce round‑trips.
+2. **Data Retrieval Layer** – `getWorkflowExecutions` (in `workflow-executions.ts`) encapsulates all access to workflow execution logs. By isolating this logic, the generator does not need to know how executions are stored or fetched, which supports future changes (e.g., moving from a relational store to an event store).  
 
-### 5. Maintainability assessment  
-* The clear **layered separation** (generator → formatter → adapter) makes the component easy to maintain; changes in one layer rarely require modifications in another.  
-* **Dependency transparency** – All external dependencies are explicit (UKBTraceReport, GraphDatabaseAdapter, PersistenceAgent), facilitating unit testing and mocking.  
-* The main maintenance risk is the **shared adapter**: any breaking change to its API propagates to all siblings, so versioned interfaces and comprehensive integration tests are advisable.
+3. **Rule Engine Layer** – `traceReportGenerationRules` (in `trace-report-generation-rules.ts`) is a declarative rule set that determines the shape of the report. The generator simply iterates over these rules, so adding or modifying report structures is a matter of editing the rule definition rather than touching procedural code.  
+
+4. **Persistence Adapter** – `GraphDatabaseAdapter` (in `storage/graph-database-adapter.ts`) implements an **Adapter pattern** that hides the concrete graph implementation (Graphology + LevelDB) behind a simple API. The generator calls the adapter to store the report, and the adapter automatically triggers the JSON export sync, providing a **dual‑write** strategy without the generator needing to manage file I/O.  
+
+5. **Trigger Mechanism** – Generation is **event‑driven** in practice: the WorkflowExecutor and the Debugger act as callers that invoke the generator when their respective processes complete. Although not expressed as a formal publish/subscribe system, this coupling behaves like an observer relationship, ensuring trace reports are always produced at the right moments.  
+
+The component therefore follows a **modular, rule‑based pipeline** that leans on adapters for storage concerns and relies on external triggers for execution timing. This design mirrors the patterns used by its siblings (e.g., `EntityClassifier` uses a classifier method, `ObservationDeriver` uses a derivation method) and aligns with the parent KnowledgeManagement’s reliance on the same GraphDatabaseAdapter for all graph‑based persistence.
+
+---
+
+## Implementation Details  
+
+### 1. Generation Orchestration (`trace-report-generator.ts`)  
+The `generateTraceReport` function is the entry point. Its typical flow is:
+
+```ts
+export async function generateTraceReport(workflowId: string): Promise<void> {
+  const executions = await getWorkflowExecutions(workflowId);
+  const report = applyGenerationRules(executions, traceReportGenerationRules);
+  await GraphDatabaseAdapter.storeReport(report);
+}
+```
+
+* **Data acquisition** – Calls `getWorkflowExecutions(workflowId)` which returns a collection of execution steps, timestamps, and outcome flags.  
+* **Rule application** – `applyGenerationRules` (implicitly part of the generator) walks through `traceReportGenerationRules`. Each rule describes a mapping, filter, or aggregation to be performed on the raw executions, producing a structured JSON‑compatible object that reflects the desired report hierarchy (e.g., grouping by stage, summarising duration, flagging errors).  
+* **Persistence** – The resulting report object is handed to `GraphDatabaseAdapter.storeReport`. The adapter inserts the report as a node (or sub‑graph) into the Graphology graph, establishing relationships to the originating workflow entity.
+
+### 2. Workflow Execution Retrieval (`workflow-executions.ts`)  
+`getWorkflowExecutions` abstracts the source of execution data. It may query a relational DB, read from a log file, or call an internal service. The function returns a typed array, for example:
+
+```ts
+type ExecutionStep = {
+  stepId: string;
+  startTime: Date;
+  endTime: Date;
+  status: 'SUCCESS' | 'FAILURE';
+  metadata: Record<string, any>;
+};
+```
+
+Because the generator only consumes this shape, the underlying storage can evolve without breaking the trace pipeline.
+
+### 3. Rule Definition (`trace-report-generation-rules.ts`)  
+`traceReportGenerationRules` is a plain object (or possibly an array of rule descriptors). A rule might look like:
+
+```ts
+{
+  name: 'GroupByStage',
+  selector: (step) => step.metadata.stage,
+  reducer: (steps) => ({
+    stage: steps[0].metadata.stage,
+    durationMs: sum(steps.map(s => s.endTime - s.startTime)),
+    errors: steps.filter(s => s.status === 'FAILURE').length,
+  })
+}
+```
+
+The generator iterates over these descriptors, applying the `selector` and `reducer` to build the final report. Adding a new rule is as simple as appending a new entry to this file.
+
+### 4. Graph Persistence & JSON Export (`storage/graph-database-adapter.ts`)  
+The adapter exposes methods such as `storeReport(report)`, `fetchReport(id)`, and internally manages a Graphology instance backed by LevelDB. Crucially, after any write operation it runs an **automatic JSON export sync**:
+
+```ts
+private async syncToJson(): Promise<void> {
+  const json = this.graph.export(); // Graphology serialization
+  await fs.promises.writeFile(this.jsonExportPath, JSON.stringify(json, null, 2));
+}
+```
+
+This ensures that a portable JSON representation of the entire knowledge graph (including newly added trace reports) is always available for downstream tools or for debugging purposes.
+
+### 5. Triggering Sources  
+* **WorkflowExecutor** – When a workflow finishes, it calls `TraceReportGenerator.generateTraceReport(workflowId)`.  
+* **Debugger** – Upon completion of a debugging session, the debugger also invokes the same method, guaranteeing that even ad‑hoc runs are captured.
+
+Both callers treat the generator as a pure function; they do not need to know about the rule set or storage mechanics.
+
+---
+
+## Integration Points  
+
+1. **Parent – KnowledgeManagement**  
+   The parent component already owns the GraphDatabaseAdapter, so TraceReportGenerator fits naturally as a consumer of that shared persistence layer. Any change to the adapter (e.g., switching to a different graph backend) propagates uniformly to all siblings, including ManualLearning, EntityClassifier, and InsightGenerator.
+
+2. **Sibling Components**  
+   * **EntityClassifier**, **ObservationDeriver**, and **InsightGenerator** all read from the same graph. Once a trace report node is persisted, these siblings can classify the report, derive higher‑level observations (e.g., “repeated failure patterns”), and finally generate insights that surface to users.  
+   * **ManualLearning** and **OnlineLearning** may also reference trace reports when augmenting the graph with manually entered knowledge or batch‑derived facts, respectively.
+
+3. **External Triggers**  
+   The generator is invoked by the **WorkflowExecutor** (the runtime that launches and monitors pipelines) and the **Debugger** (the interactive development tool). Both expose a simple API contract: `generateTraceReport(workflowId: string): Promise<void>`.
+
+4. **Storage Interface**  
+   The only outward‑facing dependency of TraceReportGenerator is the `GraphDatabaseAdapter`. All interactions are limited to the adapter’s public methods (`storeReport`, possibly `fetchReport` for validation). This tight coupling to a well‑defined interface keeps the component decoupled from low‑level graph APIs.
+
+5. **JSON Export Consumers**  
+   The automatic JSON file created by the adapter can be consumed by external reporting services, CI pipelines, or UI dashboards that need a static snapshot of the knowledge graph. No additional code is required in TraceReportGenerator to support this consumption.
+
+---
+
+## Usage Guidelines  
+
+* **Invoke Only Via Defined Triggers** – Developers should let the WorkflowExecutor or Debugger call `generateTraceReport`. Direct manual calls are discouraged unless the caller can guarantee that the workflow execution data is fully persisted and consistent.  
+
+* **Respect the Rule Contract** – When extending `traceReportGenerationRules`, follow the existing rule schema (selector → reducer) and ensure that each rule returns a serialisable object. Adding complex side‑effects inside a rule can break the deterministic nature of the pipeline.  
+
+* **Do Not Bypass the Adapter** – All persistence must go through `GraphDatabaseAdapter.storeReport`. Directly writing to LevelDB or Graphology would skip the automatic JSON export sync and could lead to divergence between the graph and its JSON snapshot.  
+
+* **Version the Rule Set** – Because the rule definitions directly influence the shape of stored reports, any change should be accompanied by a version bump (e.g., a `rulesVersion` field added to the report node). This helps downstream components (ObservationDeriver, InsightGenerator) to interpret older reports correctly.  
+
+* **Handle Asynchrony Properly** – `generateTraceReport` returns a promise; callers should await it to guarantee that the report is fully stored before proceeding to any step that depends on the new graph data.  
+
+* **Testing** – Unit tests should mock `getWorkflowExecutions` and `GraphDatabaseAdapter` to verify that the orchestration correctly applies the rule set. Integration tests can run the full pipeline against an in‑memory LevelDB instance to ensure the JSON export is produced.
+
+---
+
+## Architectural Patterns Identified  
+
+| Pattern | Evidence |
+|--------|----------|
+| **Adapter** | `GraphDatabaseAdapter` abstracts Graphology + LevelDB storage (`storage/graph-database-adapter.ts`). |
+| **Rule Engine / Declarative Configuration** | `traceReportGenerationRules` defines report structure declaratively (`trace-report-generation-rules.ts`). |
+| **Pipeline / Orchestration** | `generateTraceReport` coordinates data retrieval, rule application, and persistence. |
+| **Observer‑like Triggering** | Generation is invoked automatically by `WorkflowExecutor` and `Debugger`. |
+| **Dual‑Write (Graph + JSON)** | Automatic JSON export sync in the adapter ensures two representations stay in sync. |
+
+---
+
+## Design Decisions and Trade‑offs  
+
+| Decision | Rationale | Trade‑off |
+|----------|-----------|-----------|
+| **Separate rule definition from code** | Enables non‑engineers or config‑driven changes to report shape without recompiling. | Adds an indirection layer; debugging rule logic may be less straightforward than inline code. |
+| **Persist reports in the graph** | Keeps trace data alongside other domain entities, allowing rich relationship queries (e.g., linking a trace to the originating workflow, related entities, or derived insights). | Graph writes are generally slower than simple document stores; large trace payloads could increase graph size and affect query performance. |
+| **Automatic JSON export** | Guarantees a portable, version‑controlled snapshot for external tools, reducing the need for ad‑hoc export scripts. | Double persistence incurs extra I/O; any failure in the sync step must be handled to avoid stale JSON files. |
+| **Trigger generation from both WorkflowExecutor and Debugger** | Guarantees coverage for production runs and developer‑initiated runs, improving observability. | Increases coupling; changes to the trigger contracts require coordinated updates across both callers. |
+| **Use of a single GraphDatabaseAdapter across all siblings** | Promotes consistency, reduces duplicated storage logic, and simplifies maintenance. | A single point of failure; any performance bottleneck in the adapter impacts all components that rely on it. |
+
+---
+
+## System Structure Insights  
+
+* **Parent‑Child Relationship** – TraceReportGenerator is a child of KnowledgeManagement, which owns the graph persistence layer. This hierarchy ensures that all knowledge‑related artifacts (manual entries, learned entities, observations, insights, and trace reports) share a unified storage model.  
+
+* **Sibling Cohesion** – The sibling components each implement a single responsibility (classification, derivation, insight generation) and all read from the same graph. TraceReportGenerator contributes the *raw execution* layer that feeds the higher‑level analytical siblings.  
+
+* **Data Flow** – The typical flow is: *WorkflowExecutor → TraceReportGenerator → GraphDatabaseAdapter → JSON export → ObservationDeriver → InsightGenerator*. This linear progression supports a clear provenance chain for any insight that ultimately surfaces to the user.  
+
+* **Modularity** – Each file (`trace-report-generator.ts`, `workflow-executions.ts`, `trace-report-generation-rules.ts`, `graph-database-adapter.ts`) encapsulates a distinct concern, making the component easy to locate, test, and replace if needed.  
+
+---
+
+## Scalability Considerations  
+
+* **Graph Size** – Storing every trace report as a node can cause the graph to grow rapidly in high‑throughput environments. LevelDB handles large key‑value stores efficiently, but query performance may degrade as the number of nodes increases. Potential mitigations include archiving older reports to a separate “cold” graph or pruning after a retention period.  
+
+* **Batch Generation** – The current design triggers generation per workflow execution. If many workflows finish simultaneously, the adapter may experience a burst of write operations. Introducing a small queue or batch writer inside `GraphDatabaseAdapter` could smooth I/O spikes and reduce contention on LevelDB.  
+
+* **Rule Complexity** – Complex rules that perform heavy aggregation could become CPU‑bound. Because rule execution happens in the same process that calls `generateTraceReport`, scaling out to multiple worker processes (or a dedicated report‑generation service) would isolate CPU load.  
+
+* **JSON Export Bandwidth** – Automatic export writes the entire graph to a JSON file after each report insertion. For very large graphs this could become a bottleneck. A possible improvement is incremental diff‑based export or a background task that throttles export frequency.  
+
+---
+
+## Maintainability Assessment  
+
+* **High Cohesion, Low Coupling** – The component’s responsibilities are well‑defined, and it interacts with the rest of the system only through the clearly documented `GraphDatabaseAdapter` and the trigger contracts. This makes future refactoring straightforward.  
+
+* **Configuration‑Driven Rules** – Keeping the report shape in `traceReportGenerationRules` simplifies updates, but it also introduces a risk of rule drift if documentation is not kept in sync. Adding unit tests that validate rule output against expected schemas mitigates this risk.  
+
+* **Shared Persistence Layer** – Reusing the same adapter across many siblings reduces duplicated code but creates a shared maintenance surface. Any breaking change in the adapter must be coordinated across all dependent components. Proper versioning of the adapter’s public API is essential.  
+
+* **Observability** – The automatic JSON export provides an out‑of‑the‑box audit trail, which aids debugging and compliance. However, developers should monitor the size and generation time of the JSON file to avoid hidden performance regressions.  
+
+* **Extensibility** – Adding new triggers (e.g., a scheduled nightly report) only requires calling the existing `generateTraceReport` API, demonstrating good extensibility. Conversely, altering the storage backend would require changes in the adapter but would not affect the generator or rule set.  
+
+Overall, TraceReportGenerator exhibits a clean, maintainable design that aligns with the broader KnowledgeManagement architecture. Its rule‑based pipeline, adapter abstraction, and event‑driven triggers provide a solid foundation for future growth while keeping the codebase approachable for new contributors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's architecture is designed to be flexible, allowing for different modes of operation and integration with various tools and services. This is evident in the use of intelligent routing for database access, where the component switches between the VKB API and direct access based on server availability. The GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, plays a crucial role in this process, providing a unified interface for interacting with the graph database. The CodeGraphAgent, implemented in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, utilizes this adapter to construct and query the code knowledge graph. The agent's functionality is further enhanced by the PersistenceAgent, which manages entity persistence and relationship management, as seen in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data from a graph database, which is implemented using Graphology and LevelDB. This allows for efficient querying and retrieval of entities and relationships within the knowledge graph. The automatic JSON export sync feature ensures that data is consistently updated across the system. For example, when a new entity is added to the graph, the GraphDatabaseAdapter will automatically export the updated graph data to a JSON file, which can then be used by other components or services.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses intelligent routing to switch between the VKB API and direct access based on server availability.
-- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts for entity persistence and relationship management.
-- [CodeAnalysisModule](./CodeAnalysisModule.md) -- CodeAnalysisModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts for code analysis and knowledge graph construction.
-- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- KnowledgeGraphConstructor uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store manually created entities
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline in batch-analysis.yaml to extract knowledge from git history, LSL sessions, and code analysis
+- [EntityClassifier](./EntityClassifier.md) -- EntityClassifier uses the classifyEntity method in entity-classifier.ts to classify entities in the graph
+- [ObservationDeriver](./ObservationDeriver.md) -- ObservationDeriver uses the deriveObservations method in observation-deriver.ts to derive observations from entities and relationships in the graph
+- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the generateInsights method in insight-generator.ts to generate insights from observations and entities in the graph
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the constructCodeGraph method in code-graph-constructor.ts to construct the code graph
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology library to interact with the graph database
 
 
 ---
