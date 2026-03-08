@@ -2,164 +2,113 @@
 
 **Type:** SubComponent
 
-The ConstraintMonitoringService exposes APIs for interacting with the monitoring results through the api/constraint-monitoring.js endpoint
+ConstraintMonitoringService leverages the LLMService class in lib/llm/llm-service.ts to route constraint monitoring requests to different modes, such as training or inference, based on input parameters.
 
 ## What It Is  
 
-**ConstraintMonitoringService** is a Docker‑containerized sub‑component that continuously evaluates business‑level constraints against live system data. The service lives in the codebase under the following concrete locations that appear in the observations:
+`ConstraintMonitoringService` is a **sub‑component** that lives in the file **`lib/llm/constraint-monitoring-service.ts`**.  Its primary responsibility is to monitor the constraints that apply to the coding services exposed by the API server and the dashboard.  To fulfil this role it does not implement low‑level LLM logic itself; instead it delegates every LLM‑related operation to the **`LLMService`** class found in **`lib/llm/llm-service.ts`**.  The service therefore acts as a thin, purpose‑specific façade that configures the underlying LLM infrastructure (mode routing, caching, circuit breaking) for the particular use‑case of constraint monitoring.
 
-* **`rules-engine.js`** – the core engine that applies constraint logic.  
-* **`constraint-monitoring.yaml`** – a declarative configuration file that defines the monitoring rules to be enforced.  
-* **`data-access.js`** – the data‑access layer that fetches the current state of the system for evaluation.  
-* **`notification-handler.js`** – the module responsible for sending alerts when a constraint is violated.  
-* **`api/constraint-monitoring.js`** – the public HTTP API that external callers use to query monitoring results or trigger re‑evaluations.  
-* **`cache.js`** – a lightweight caching layer that stores frequently accessed evaluation outcomes.  
-* **`error-handler.js`** – a centralized error‑handling utility that normalises exception handling across the service.
-
-The service is packaged together with its sibling micro‑services (e.g., **SemanticAnalysisService**, **APIService**, **LoggingService**) under the umbrella **DockerizedServices**, which orchestrates each sub‑component in its own container and supplies common startup logic (see `lib/service-starter.js`).  
+The component is part of the larger **`DockerizedServices`** hierarchy – a parent component that aggregates several LLM‑driven services (e.g., `SemanticAnalysisService`, `CodeGraphAnalysisService`).  Inside its own tree, `ConstraintMonitoringService` contains a child called **`LLMRouter`**, which again relies on `LLMService` to decide whether a request should be handled in training mode, inference mode, or any other mode defined by the system.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **modular, configuration‑driven architecture** built around clear separation of concerns:
+The observations reveal a **facade‑router‑circuit‑breaker** style architecture.  `LLMService` functions as a **central façade** for all LLM interactions across the DockerizedServices ecosystem.  By exposing a single public API that handles **mode routing**, **in‑memory caching**, and **circuit breaking**, it allows each sub‑component (including `ConstraintMonitoringService`) to stay focused on its domain logic without duplicating cross‑cutting concerns.
 
-1. **Rule Evaluation Core** – `rules-engine.js` encapsulates the algorithmic logic for constraint checking. By keeping the engine independent of data retrieval and notification, the design follows the **Strategy**‑like pattern where the rule set (provided by `constraint‑monitoring.yaml`) can be swapped or extended without touching the engine code.
+`ConstraintMonitoringService` itself follows a **router‑delegation pattern**.  It delegates the decision of which LLM mode to use to its child `LLMRouter`, which in turn calls into `LLMService`.  The sibling services (`SemanticAnalysisService`, `CodeGraphAnalysisService`, `ModeRouter`, `CacheManager`) all share the same underlying façade, indicating a **shared‑service pattern** that reduces duplication and enforces consistent behaviour for routing, caching, and failure handling across the codebase.
 
-2. **Configuration‑Centric Rules** – The YAML file (`constraint‑monitoring.yaml`) externalises all monitoring definitions. This is a classic **External Configuration** pattern that enables operators to add, modify, or disable constraints without recompiling the service.
-
-3. **Data Access Abstraction** – `data-access.js` isolates all interactions with the underlying data stores (databases, caches, or external APIs). This abstraction promotes **Repository**‑style separation, allowing the rule engine to remain agnostic of how data is sourced.
-
-4. **Notification Mechanism** – `notification-handler.js` provides a single point for emitting alerts (e.g., email, Slack, webhook). By delegating all outbound messaging to this module, the service adheres to the **Single Responsibility Principle** and makes the notification channel pluggable.
-
-5. **Caching Layer** – `cache.js` is employed to store “frequently accessed monitoring results”. This reflects a **Cache‑Aside** strategy: the service checks the cache first, falls back to fresh evaluation, and then repopulates the cache. This design reduces latency and throttles load on the data‑access layer.
-
-6. **API Exposure** – The public endpoint `api/constraint-monitoring.js` presents a thin HTTP façade (likely built on Express, as seen in the sibling **APIService**) that forwards requests to the internal modules. This keeps the service’s internal mechanics hidden while providing a stable contract for consumers.
-
-7. **Error Normalisation** – All error paths funnel through `error-handler.js`, which centralises logging, classification, and response generation. This mirrors the **Error‑Handling Middleware** pattern common in Node.js services.
-
-Because **ConstraintMonitoringService** lives inside **DockerizedServices**, it inherits the parent’s **container‑per‑service** deployment model. Each micro‑service, including this one, is started via the robust `startServiceWithRetry` helper (from `lib/service-starter.js`), guaranteeing graceful startup and retry semantics across the whole system.
+The **circuit‑breaker** capability built into `LLMService` is a defensive design choice.  By detecting unhealthy downstream LLM endpoints and short‑circuiting further calls, the system avoids cascading failures that could otherwise bring down the entire DockerizedServices stack.  The **caching** layer, also provided by `LLMService`, implements an in‑memory store for frequently accessed constraint‑monitoring data, improving latency for repeat queries.
 
 ---
 
 ## Implementation Details  
 
-### Rule Engine (`rules-engine.js`)  
-The engine reads the YAML definition at runtime, parses each constraint into an executable predicate, and applies those predicates to the data objects returned by `data-access.js`. The engine likely exposes a function such as `evaluateConstraints(data)` that returns a list of violations.
+The concrete implementation lives in two key files:
 
-### Configuration (`constraint-monitoring.yaml`)  
-The YAML file contains entries like:
+| File | Primary Class | Role |
+|------|---------------|------|
+| `lib/llm/llm-service.ts` | `LLMService` | Provides **mode routing**, **caching**, and **circuit breaking** for all LLM‑related calls. |
+| `lib/llm/constraint-monitoring-service.ts` | `ConstraintMonitoringService` | Orchestrates constraint‑monitoring workflows for the API server and dashboard, leveraging `LLMService` via `LLMRouter`. |
 
-```yaml
-- id: maxUserSessions
-  description: "Total concurrent user sessions must not exceed 10,000"
-  query: "SELECT COUNT(*) FROM sessions"
-  threshold: 10000
-```
+`ConstraintMonitoringService` receives a request (e.g., a request to validate a code snippet against predefined constraints).  It forwards the request to its child **`LLMRouter`**, which inspects the input parameters to decide which mode the underlying LLM should operate in (training vs. inference).  The router then calls the appropriate method on `LLMService`.  
 
-Each entry maps directly to a rule object consumed by the engine, making the rule set data‑driven.
+`LLMService` internally maintains an **in‑memory cache** keyed by request signatures; when a matching entry is found, the service returns the cached result immediately, bypassing the LLM backend and reducing latency.  If the cache miss occurs, `LLMService` proceeds to invoke the LLM endpoint.  Before the call, the service checks the **circuit‑breaker state**: if recent failures have tripped the breaker, the request is rejected early with a controlled error, protecting downstream services.  Successful responses are written back into the cache for future reuse.
 
-### Data Access (`data-access.js`)  
-This module abstracts the underlying storage. It may expose methods such as `fetchMetric(metricName)` or `runQuery(sql)`. By keeping data‑access logic isolated, the service can swap databases or add caching without touching the rule engine.
-
-### Notification (`notification-handler.js`)  
-When the engine reports a violation, the service calls a method like `notify(violation)`. The handler decides the channel (email, Slack, etc.) based on the violation’s severity, which is also defined in the YAML file. This modularity permits adding new channels by extending the handler alone.
-
-### Caching (`cache.js`)  
-Before invoking the engine, the service checks `cache.get(constraintId)`. If a recent result exists, it returns the cached outcome; otherwise, it performs a fresh evaluation and stores the result with a TTL (time‑to‑live). This cache‑aside approach reduces repeated heavy queries.
-
-### API (`api/constraint-monitoring.js`)  
-The endpoint likely registers routes such as:
-
-```js
-router.get('/constraints', constraintController.list);
-router.get('/constraints/:id', constraintController.get);
-router.post('/constraints/:id/evaluate', constraintController.evaluate);
-```
-
-Each controller method orchestrates calls to the engine, cache, and notification modules, returning JSON payloads to callers.
-
-### Error Handling (`error-handler.js`)  
-All asynchronous calls are wrapped in `try/catch` blocks that delegate to `errorHandler.handle(err, res)`. The handler formats a consistent error response, logs the incident via the system‑wide **LoggingService**, and possibly triggers alerts for critical failures.
+The parent component **`DockerizedServices`** treats `LLMService` as a **high‑level façade**, meaning that any new sub‑component added under DockerizedServices can simply import `LLMService` and gain immediate access to the same routing, caching, and resilience mechanisms without additional boilerplate.
 
 ---
 
 ## Integration Points  
 
-* **Parent – DockerizedServices**: The service is packaged as its own Docker image and launched by the `startServiceWithRetry` utility. This guarantees that any transient startup failure (e.g., missing DB connection) is retried with exponential back‑off, aligning with the reliability strategy of the entire suite.
+`ConstraintMonitoringService` is tightly coupled to three other entities:
 
-* **Sibling Services**:  
-  * **LoggingService** – `error-handler.js` forwards error details to the central logging infrastructure, ensuring that constraint violations are recorded alongside other system events.  
-  * **MonitoringService** – While not directly referenced, it is plausible that aggregate health dashboards consume the API exposed by `api/constraint-monitoring.js` to visualise constraint health alongside other metrics.  
-  * **APIService** – Shares the same Express‑style routing conventions, making the API surface of ConstraintMonitoringService consistent with the rest of the platform.
+1. **Parent – `DockerizedServices`**  
+   The parent component orchestrates the lifecycle of `ConstraintMonitoringService` together with its siblings.  Because DockerizedServices already depends on `LLMService`, the sub‑component inherits the same configuration (e.g., cache size, circuit‑breaker thresholds) from the parent’s environment.
 
-* **Data Sources**: Through `data-access.js`, the service may interact with databases used by other components (e.g., the same user‑session store read by **SemanticAnalysisService**). This shared data model encourages data‑consistency across services.
+2. **Sibling Services** (`SemanticAnalysisService`, `CodeGraphAnalysisService`, `ModeRouter`, `CacheManager`)  
+   All siblings share the **same `LLMService` instance**.  This shared usage ensures uniform behaviour across different analysis domains and makes it possible to coordinate cache eviction policies or circuit‑breaker tuning globally.
 
-* **Notification Channels**: The `notification-handler.js` module can be wired to the same messaging brokers or webhook endpoints used by **LoggingService** or external alerting tools, fostering a unified alerting pipeline.
+3. **Child – `LLMRouter`**  
+   `LLMRouter` is the internal routing layer specific to constraint monitoring.  It encapsulates the logic that translates monitoring‑specific parameters into the generic mode‑selection API of `LLMService`.  Because `LLMRouter` is a child of `ConstraintMonitoringService`, any changes to routing rules are localized and do not affect sibling services.
 
-* **Cache Layer**: The `cache.js` implementation could be a thin wrapper around an in‑memory LRU cache or an external Redis instance, which may also be used by other services for cross‑service caching.
+The only external dependency explicitly mentioned is the **LLM backend** (the actual large language model service).  All communication with that backend is funneled through `LLMService`, which abstracts the transport details and provides a stable interface for `ConstraintMonitoringService`.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Define Constraints Declaratively** – Add or modify entries only in `constraint-monitoring.yaml`. Keep the file version‑controlled and avoid hard‑coding thresholds in JavaScript; this preserves the configuration‑driven nature of the service.
+When extending or invoking `ConstraintMonitoringService`, developers should keep the following conventions in mind:
 
-2. **Leverage the Cache** – When writing new constraint queries, consider their computational cost. If a query is expensive but the underlying data changes infrequently, tune the cache TTL in `cache.js` to balance freshness against performance.
-
-3. **Handle Errors Uniformly** – All custom code that interacts with the service (e.g., new API routes or background jobs) should funnel exceptions through `error-handler.js`. This ensures consistent logging and response formatting.
-
-4. **Use the Public API** – External components should query constraints via the routes in `api/constraint-monitoring.js`. Directly invoking internal modules (e.g., `rules-engine.js`) bypasses validation, caching, and error handling, and is discouraged.
-
-5. **Test Rule Changes in Isolation** – Because the rule engine is decoupled from data access, unit tests can mock `data-access.js` to verify rule logic without requiring a live database. This promotes fast, reliable CI pipelines.
-
-6. **Monitor Service Health** – Deploy health‑check endpoints (e.g., `/healthz`) that confirm the service can read its YAML, connect to the data store, and access the cache. This aligns with the health‑monitoring approach used by sibling services.
+* **Leverage the façade** – Always interact with the service through its public methods; never bypass `LLMService` for direct LLM calls, as this would sidestep caching and circuit‑breaker safeguards.  
+* **Provide explicit mode hints** – The routing logic in `LLMRouter` depends on input parameters to select training vs. inference.  Supplying clear, documented flags (e.g., `mode: 'inference'`) ensures deterministic routing and optimal cache utilisation.  
+* **Respect cache semantics** – Cached entries are scoped to the request signature.  If a constraint‑monitoring request changes even slightly, a cache miss is expected.  Developers should avoid unnecessary variations in request payloads to maximise cache hit rates.  
+* **Handle circuit‑breaker errors gracefully** – When `LLMService` rejects a request because the circuit is open, the caller should fall back to a safe default or surface a meaningful error to the end‑user rather than retrying immediately.  
+* **Configure through DockerizedServices** – Any tuning of cache size, TTL, or circuit‑breaker thresholds should be performed at the DockerizedServices level, ensuring consistent behaviour across all LLM‑driven sub‑components.
 
 ---
 
 ### Architectural patterns identified  
 
-* **Modular composition** – distinct modules (`rules-engine`, `data-access`, `notification-handler`, `cache`, `error-handler`) each own a single responsibility.  
-* **External configuration** – constraints are defined in `constraint-monitoring.yaml`.  
-* **Cache‑Aside** – `cache.js` sits in front of the evaluation path to store recent results.  
-* **Repository/Abstraction** – `data-access.js` abstracts persistence details.  
-* **Error‑handling middleware** – centralised in `error-handler.js`.  
-* **Container‑per‑service microservice** – inherited from the parent **DockerizedServices** architecture.
+1. **Facade pattern** – `LLMService` acts as a unified interface for routing, caching, and resilience.  
+2. **Router/Delegation pattern** – `LLMRouter` delegates mode selection to `LLMService`.  
+3. **Circuit‑Breaker pattern** – Built into `LLMService` to protect against downstream failures.  
+4. **Cache‑Aside pattern** – In‑memory caching of frequently accessed monitoring data.
 
 ### Design decisions and trade‑offs  
 
-* **Configuration‑driven rules** trade flexibility for runtime validation overhead; however, it enables non‑developers to adjust constraints without code changes.  
-* **Separate notification module** isolates side‑effects, but introduces an additional asynchronous path that must be monitored for failures.  
-* **Caching** improves throughput for high‑frequency checks but may serve stale data if TTLs are mis‑configured; the design mitigates this by allowing per‑constraint TTL tuning.  
-* **Single‑service container** simplifies deployment and scaling but means that any heavy constraint evaluation could contend for CPU within the container; horizontal scaling (multiple instances) can address this.
+* **Centralised LLM management** reduces duplication but creates a single point of contention; the circuit‑breaker mitigates this risk.  
+* **In‑memory cache** offers low latency but limits scalability across multiple containers unless a distributed cache is introduced.  
+* **Mode routing at the service layer** simplifies client code but couples request semantics to the router’s interpretation, requiring stable request contracts.
 
 ### System structure insights  
 
-ConstraintMonitoringService sits alongside a family of domain‑specific services within **DockerizedServices**. All services share common startup logic, logging, and container orchestration, fostering a cohesive operational model. The service’s internal modules mirror the architectural style of its siblings (e.g., **APIService** uses Express, **LoggingService** uses Winston), suggesting a shared internal library ecosystem.
+The hierarchy is: `DockerizedServices` (parent) → `ConstraintMonitoringService` (sub‑component) → `LLMRouter` (child).  All sibling services share the same `LLMService` façade, forming a **horizontal reuse layer** that standardises LLM interaction across the DockerizedServices domain.
 
 ### Scalability considerations  
 
-* **Horizontal scaling** is straightforward: spin up additional containers behind a load balancer; the stateless nature of the rule engine and the cache‑aside pattern support this.  
-* **Cache distribution** may become a bottleneck if many instances query the same Redis cluster; sharding or per‑instance in‑memory caches can mitigate contention.  
-* **Constraint complexity**: very complex rules could increase CPU usage; profiling the `rules-engine.js` execution path helps decide whether to offload heavy calculations to worker processes.
+* **Cache locality** – Since caching is in‑process, scaling out to multiple Docker containers will fragment the cache; a future move to a shared cache (e.g., Redis) would improve hit rates.  
+* **Circuit‑breaker thresholds** – Must be tuned for the expected load; overly aggressive thresholds could unnecessarily reject traffic under burst conditions.  
+* **Mode routing logic** – As the number of modes grows, `LLMRouter` may need to evolve into a more extensible plugin system to avoid a monolithic switch statement.
 
 ### Maintainability assessment  
 
-The service’s **high cohesion** (each module does one thing) and **low coupling** (modules interact through well‑defined interfaces) make it easy to locate and modify functionality. The declarative YAML file centralises business logic, reducing the need for code changes. Centralised error handling and shared logging conventions further improve observability and debugging. The main maintenance risk lies in the evolving schema of `constraint‑monitoring.yaml`; adding schema validation (e.g., using a JSON schema validator) would protect against malformed configurations. Overall, the design promotes a maintainable codebase that aligns with the broader Docker‑based microservice ecosystem.
+The clear separation between **domain logic** (`ConstraintMonitoringService`) and **cross‑cutting concerns** (`LLMService`) improves maintainability: changes to caching or circuit‑breaker policies are isolated to `LLMService`.  The shared façade also means that bug fixes in routing or resilience automatically benefit all siblings.  However, because many components depend on the same façade, a regression in `LLMService` can have wide‑impact, so comprehensive integration tests at the DockerizedServices level are essential.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service potentially running in its own container. This is evident in the use of the startServiceWithRetry function (lib/service-starter.js) for robust service startup with retry, timeout, and exponential backoff mechanisms. For instance, in scripts/api-service.js, the spawn function from the child_process module is used to start the API server, and in scripts/dashboard-service.js, it is used to start the dashboard. The startServiceWithRetry function ensures that these services are started with a retry mechanism, preventing endless loops and providing graceful degradation when optional services fail.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This design decision allows for a centralized management of mode routing, caching, and circuit breaking. For instance, the LLMService class in lib/llm/llm-service.ts handles the routing of LLM requests to different modes, such as training or inference, based on the input parameters. The caching mechanism in LLMService also ensures that frequently accessed data is stored in memory, reducing the latency of subsequent requests. Furthermore, the circuit breaking feature in LLMService prevents cascading failures by detecting and preventing requests to faulty services. The implementation of these features in LLMService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.
+
+### Children
+- [LLMRouter](./LLMRouter.md) -- The LLMRouter utilizes the LLMService class in lib/llm/llm-service.ts to route requests to different modes.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the spawn function from the child_process module in scripts/semantic-analysis-service.js to start the analysis server
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- CodeGraphAnalysisService uses the graph-analysis.js module to perform graph algorithms on code graphs
-- [APIService](./APIService.md) -- APIService uses the express.js framework to handle HTTP requests and responses
-- [DashboardService](./DashboardService.md) -- DashboardService uses the react.js framework to handle user interface rendering and events
-- [LoggingService](./LoggingService.md) -- LoggingService uses the winston.js library to handle logging of system events and errors
-- [MonitoringService](./MonitoringService.md) -- MonitoringService uses the prometheus.js library to handle monitoring of system performance and health
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route semantic analysis requests to different modes, such as training or inference, based on input parameters.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- CodeGraphAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route code graph analysis requests to different modes, such as training or inference, based on input parameters.
+- [ModeRouter](./ModeRouter.md) -- ModeRouter utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.
+- [CacheManager](./CacheManager.md) -- CacheManager utilizes the lib/llm/llm-service.ts file to handle the caching of frequently accessed data.
 
 
 ---

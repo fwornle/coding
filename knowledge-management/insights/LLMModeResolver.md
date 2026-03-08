@@ -2,100 +2,162 @@
 
 **Type:** SubComponent
 
-The use of dependency injection makes it easy to test the LLMModeResolver in isolation, using mock implementations of the configuration and context to simulate different scenarios.
+In lib/llm/llm-mode-resolver.ts, the LLMModeResolver uses dependency injection to resolve the current LLM provider, supporting various LLM modes and making it easier to switch between different providers or modes.
 
 ## What It Is  
 
-The **LLMModeResolver** is a sub‑component that lives inside the **LLMAbstraction** package and is responsible for determining which “mode” an LLM should operate in at any point in time.  Its implementation is spread across the configuration layer (configuration files that describe each mode) and the runtime layer that evaluates the current *context*—the surrounding usage scenario, request metadata, or any other signals that the application supplies.  The resolver is invoked by the **LLMService** class located at `lib/llm/llm-service.ts`; the service asks the resolver for the active mode and then configures the underlying LLM provider accordingly.  In addition to simply reading a static setting, the resolver also handles *mode transitions*, ensuring that the LLM is re‑configured safely when the required mode changes during the life‑cycle of a request or session.  Because it is a child of **LLMAbstraction**, it can expose a `ModeConfiguration` object that encapsulates the concrete settings for each mode, allowing developers to add custom modes simply by extending the configuration files.
+`LLMModeResolver` is a **sub‑component** that lives in the file **`lib/llm/llm-mode-resolver.ts`**. Its sole responsibility is to determine which LLM “mode” the application should use at runtime – whether the system should operate against a **mock** implementation, a **local** LLM server, or a **public** cloud‑based provider. The resolver is invoked by its parent, **`LLMAbstraction`**, and works hand‑in‑hand with sibling components such as **`LLMProviderFactory`** and **`LLMService`** to route calls to the correct concrete provider.
 
-## Architecture and Design  
-
-The design of **LLMModeResolver** follows a **decoupled, configuration‑driven** architecture.  Rather than hard‑coding any provider‑specific logic, the resolver reads from external configuration files (as noted in Observation 1) and interprets the *context* supplied by callers (Observation 2).  This separation of concerns enables the resolver to remain agnostic of the concrete LLM providers, a decision explicitly called out in Observation 7.  The surrounding system leverages **dependency injection (DI)**—the same DI pattern that powers `LLMService` (see Observation 6 and the parent component description).  By injecting a configuration source and a context provider, the resolver can be unit‑tested in isolation with mock objects, reinforcing testability as a core architectural goal.
-
-Interaction between components is orchestrated through a **registry‑mediated** approach.  The sibling component **LLMProviderManager** maintains a dynamic provider registry (`lib/llm/provider-registry.js`) that can add or remove providers at runtime.  When the resolver determines that a mode change is required, it signals the **LLMService**, which in turn consults the provider registry to obtain the appropriate provider instance for the newly resolved mode.  This pattern resembles a **Mediator** where the resolver mediates between configuration, context, and the provider manager without directly coupling to any concrete provider class such as `dmr-provider.ts` or `anthropic-provider.ts`.  
-
-The resolver’s extensibility is achieved through the **ModeConfiguration** child component.  Because the resolver “contains” a `ModeConfiguration` object, new modes can be introduced simply by adding entries to the configuration files and, if needed, extending the `ModeConfiguration` schema.  This design choice trades a small amount of runtime indirection for a high degree of flexibility—developers can plug in novel modes without touching the resolver’s core logic.
-
-## Implementation Details  
-
-Even though the source repository does not expose explicit symbols for the resolver, the observations give a clear picture of its internal mechanics:
-
-1. **Configuration Loading** – The resolver reads one or more configuration files (likely JSON, YAML, or similar) that map mode identifiers to concrete settings (e.g., temperature, max tokens, provider selection).  These files live alongside the rest of the LLM abstraction assets and are parsed at startup or on‑demand, allowing the resolver to refresh its view of available modes without a redeploy.
-
-2. **Context Evaluation** – A *context* object is supplied to the resolver (either via method parameters or through an injected service).  The resolver examines fields such as request type, user role, or system state to decide which mode best matches the current situation.  This logic is encapsulated within the resolver itself, keeping the decision‑making centralized.
-
-3. **Mode Transition Handling** – When the evaluated context indicates a different mode than the one currently active, the resolver initiates a transition sequence.  This typically involves:
-   - Validating that the target mode’s configuration is complete.
-   - Notifying `LLMService` (via a callback or promise) that a re‑initialization is required.
-   - Allowing `LLMService` to retrieve the appropriate provider from the provider registry and re‑configure the LLM instance with the new `ModeConfiguration`.
-
-4. **Dependency Injection** – The resolver’s constructor (or factory) receives abstractions for the configuration source and the context provider.  In tests, developers can inject mock implementations that return predetermined mode data or simulated contexts, fulfilling Observation 6’s claim about testability.
-
-5. **Extensibility Hooks** – Because the resolver is designed to be *flexible and extensible* (Observation 5), it likely exposes an interface such as `resolveMode(context): ModeConfiguration` that callers can implement or decorate.  Adding a custom mode therefore only requires adding a new configuration entry and, if necessary, a small plug‑in that enriches the context evaluation logic.
-
-## Integration Points  
-
-The **LLMModeResolver** sits at the nexus of three major subsystems:
-
-* **LLMService (`lib/llm/llm-service.ts`)** – The primary consumer.  `LLMService` calls the resolver to obtain the active `ModeConfiguration` before constructing or re‑configuring an LLM client.  This tight coupling is intentional: the service delegates all mode‑related decisions to the resolver, keeping its own responsibilities limited to provider orchestration.
-
-* **LLMProviderManager & Provider Registry (`lib/llm/provider-registry.js`)** – The resolver does not directly manage providers.  Instead, once a mode is resolved, it passes the mode identifier to the service, which queries the provider registry to fetch the concrete provider implementation (e.g., `dmr-provider.ts` or `anthropic-provider.ts`).  This separation allows new providers to be registered without modifying the resolver.
-
-* **Configuration & Context Sources** – The resolver depends on external configuration files (mode definitions) and a context provider (which could be another DI‑injected service that extracts request metadata).  Both are injected, making the resolver agnostic to where the data originates—whether from a file system, environment variables, or a remote config service.
-
-Because the resolver is a child of **LLMAbstraction**, any higher‑level component that consumes the abstraction (for example, a chat‑bot orchestrator) indirectly benefits from the resolver’s capabilities without needing to understand its inner workings.
-
-## Usage Guidelines  
-
-1. **Inject, Don’t Instantiate Directly** – When wiring the LLM stack, always obtain the `LLMModeResolver` through the DI container used by the application (the same container that provides `LLMService`).  This ensures that the resolver receives the correct configuration source and context provider.
-
-2. **Keep Configuration Declarative** – Define new modes by adding entries to the mode configuration files rather than modifying resolver code.  Each entry should include all required provider settings and any mode‑specific flags.  This practice aligns with the design decision to keep the resolver decoupled from provider specifics.
-
-3. **Validate Mode Transitions** – If a component manually triggers a mode change (e.g., after a user upgrades their subscription), verify that the target mode’s configuration is complete before invoking the resolver.  Incomplete configurations can cause the resolver to raise errors during its transition handling.
-
-4. **Test with Mocks** – Leverage the DI‑friendly design by providing mock configuration and context objects in unit tests.  Simulate different contexts (e.g., “high‑latency”, “creative”, “safe”) to confirm that the resolver returns the expected `ModeConfiguration` and that `LLMService` reacts appropriately.
-
-5. **Avoid Provider‑Specific Logic in the Resolver** – All provider‑specific decisions should be encapsulated in the provider implementations (`dmr-provider.ts`, `anthropic-provider.ts`) or the provider registry.  The resolver’s responsibility is limited to mode resolution; mixing provider logic would break the decoupling guarantee described in Observation 7.
+The class is deliberately thin: it reads a configuration object, uses a **factory** to instantiate the appropriate mode implementation, caches the result for subsequent calls, and exposes a small, well‑defined interface that the rest of the codebase can rely on for “current mode” information.
 
 ---
 
-### Architectural Patterns Identified
-* **Dependency Injection** – Central to testability and flexibility (Observations 6, parent hierarchy).
-* **Configuration‑Driven Design** – Mode selection is driven by external files (Observations 1, 5).
-* **Mediator / Decoupling** – Resolver mediates between configuration, context, and provider manager without direct provider coupling (Observations 7, sibling interactions).
+## Architecture and Design  
 
-### Design Decisions and Trade‑offs
-* **Decoupling from Providers** improves extensibility but adds an indirection layer that can slightly increase latency during mode switches.
-* **Configuration Files** make adding new modes trivial but require careful versioning and validation to avoid runtime misconfiguration.
-* **DI‑Based Testing** yields high test coverage at the cost of a more complex bootstrapping process for the application.
+The observations reveal a **modular architecture** anchored around clear separation of concerns. `LLMModeResolver` embodies three primary design patterns:
 
-### System Structure Insights
-* **LLMAbstraction** is the parent container; it aggregates the resolver and its child `ModeConfiguration`.
-* **LLMService** is the primary consumer, while **LLMProviderManager** and the provider registry supply the concrete LLM implementations.
-* The resolver’s position as a child component enables a clean separation: configuration/context → mode resolution → provider selection.
+1. **Factory Pattern** – The resolver “creates instances of different LLM modes based on the provided configuration” (Obs 2). The actual construction logic is delegated to a factory‑style method inside the class, mirroring the approach taken by its sibling `LLMProviderFactory` (which builds concrete provider objects such as Anthropic, OpenAI, Groq). This pattern makes the addition of new modes straightforward: a new mode class only needs to be registered with the factory.
 
-### Scalability Considerations
-* Adding new modes or providers does not affect the resolver’s core logic, supporting horizontal scaling of capabilities.
-* Mode transition handling must be efficient; caching resolved modes per request can reduce repeated configuration parsing.
-* Because the resolver is stateless (aside from cached configurations), it can be instantiated per request or shared across threads without contention.
+2. **Dependency Injection (DI)** – The resolver “uses dependency injection to resolve the current LLM provider” (Obs 3). Rather than hard‑coding any provider, the class receives a configuration object (or a DI container) that supplies the concrete implementation. This decouples the resolver from specific provider libraries and enables easy swapping of providers without touching the resolver’s internal logic.
 
-### Maintainability Assessment
-* The strong reliance on DI and external configuration makes the component highly maintainable: changes to modes or contexts rarely require code changes.
-* Clear boundaries (resolver vs. provider manager) simplify ownership; teams can evolve providers independently of mode‑resolution logic.
-* The main maintenance risk lies in configuration drift—ensuring that configuration files stay in sync with provider capabilities is essential, and automated validation scripts are recommended.
+3. **Caching** – A simple in‑memory cache stores the resolved mode after the first lookup (Obs 7). By remembering the resolved mode, the system avoids repeated configuration parsing and factory instantiation, which improves performance for high‑frequency LLM calls.
+
+The component also follows a **configuration‑based approach** (Obs 4). The mode is selected by reading a predefined set of mode identifiers (`mock`, `local`, `public`) defined in the same file (Obs 5). This design gives operators the ability to change behavior through configuration files or environment variables rather than code changes, supporting dynamic deployment scenarios.
+
+Interaction flow (simplified):
+
+1. **`LLMService`** (parent sibling) receives an LLM request and asks **`LLMModeResolver`** for the active mode.  
+2. **`LLMModeResolver`** reads the configuration, checks its cache, and if needed uses its internal factory logic (mirroring `LLMProviderFactory`) to instantiate the concrete mode class.  
+3. The resolved mode object implements a shared **interface** defined by the resolver (Obs 6), guaranteeing that `LLMService` can call the same methods regardless of the underlying provider.
+
+---
+
+## Implementation Details  
+
+### Core Class – `LLMModeResolver`  
+
+*Location*: `lib/llm/llm-mode-resolver.ts`  
+
+- **Constructor / DI entry point** – Accepts a configuration object (or a DI container) that contains a key such as `llmMode`. This is the entry point for the configuration‑based selection (Obs 4).  
+- **Predefined mode map** – Inside the file a constant map enumerates the supported modes: `{ mock: MockMode, local: LocalMode, public: PublicMode }` (Obs 5). Each entry points to a class that implements the shared mode interface.  
+- **Factory method** – `createModeInstance(modeKey: string)` (conceptual name) checks the map and returns a new instance of the corresponding class. This mirrors the factory pattern used elsewhere in the codebase (Obs 2).  
+- **Caching layer** – A private member, e.g., `_cachedMode?: LLMModeInterface`, stores the resolved instance. The public `resolve()` method first returns the cached value if present; otherwise it runs the factory method, caches the result, and returns it (Obs 7).  
+- **Interface contract** – The resolver “provides a set of interfaces for different LLM modes” (Obs 6). All mode classes implement a common TypeScript interface (e.g., `LLMModeInterface`) exposing methods such as `generate(prompt: string): Promise<string>` or `healthCheck(): Promise<boolean>`. This ensures that downstream consumers (like `LLMService`) can interact with any mode uniformly.
+
+### Interaction with Siblings  
+
+- **`LLMProviderFactory`** – While `LLMModeResolver` decides *which* mode to use, `LLMProviderFactory` decides *which concrete provider* (Anthropic, OpenAI, Groq) to instantiate **inside** a given mode. Both components employ a factory style, reinforcing a consistent creation strategy across the LLM stack.  
+- **`LLMService`** – The service acts as the façade for the rest of the application. It calls `LLMModeResolver.resolve()` to obtain the active mode, then forwards LLM requests to that mode’s implementation. Because `LLMService` also handles caching, circuit breaking, and routing, the resolver’s cache is a secondary performance boost focused solely on mode resolution.
+
+---
+
+## Integration Points  
+
+1. **Configuration Source** – The resolver pulls its mode selection from a configuration file or environment variable that is injected at application start‑up. Changing the value of `llmMode` (e.g., from `mock` to `public`) instantly redirects all LLM traffic without a code redeploy.  
+
+2. **DI Container / Provider Registry** – The resolver expects its dependencies (configuration, possibly logger instances) to be supplied via the same DI framework used by `LLMService` and `LLMProviderFactory`. This keeps the wiring centralized and testable.  
+
+3. **Mode Interfaces** – Each concrete mode class implements the shared interface defined by the resolver. Any new mode must conform to this contract, ensuring compatibility with `LLMService`.  
+
+4. **Caching Layer** – The resolver’s internal cache is transparent to callers; however, if an application needs to force a mode switch at runtime (e.g., during integration tests), it must clear the resolver’s cache or re‑instantiate the resolver.  
+
+5. **Parent Component – `LLMAbstraction`** – The parent aggregates the resolver, provider factory, and service into a cohesive abstraction that higher‑level modules import. The resolver’s public API is thus exposed through `LLMAbstraction`, making it the canonical entry point for mode selection.
+
+---
+
+## Usage Guidelines  
+
+- **Configure before first use** – Ensure the `llmMode` configuration key is set early in the application bootstrap. The resolver caches the result on first call, so later changes to the configuration will not take effect unless the resolver instance is recreated or its cache cleared.  
+
+- **Add new modes via the factory map** – To introduce a new mode (e.g., `sandbox`), create a class that implements the shared mode interface, add it to the predefined mode map in `llm-mode-resolver.ts`, and update any relevant configuration documentation. No changes are required in `LLMService` or `LLMProviderFactory`.  
+
+- **Do not bypass the resolver** – All LLM calls should be routed through `LLMService`, which in turn obtains the active mode from `LLMModeResolver`. Directly instantiating a mode class circumvents the caching and DI benefits and can lead to inconsistent behavior.  
+
+- **Testing** – For unit tests, inject a mock configuration that selects the `mock` mode, or provide a stubbed resolver that returns a pre‑constructed mock mode instance. Because the resolver uses DI, swapping implementations in tests is straightforward.  
+
+- **Cache invalidation** – If an application scenario requires hot‑reloading of the mode (rare in production), provide a utility method on the resolver to clear its internal cache, then call `resolve()` again to re‑evaluate the configuration.  
+
+---
+
+## Architectural Patterns Identified  
+
+| Pattern | Where It Appears | Purpose |
+|---------|------------------|---------|
+| **Factory** | `LLMModeResolver` (mode creation) and `LLMProviderFactory` (provider creation) | Decouples concrete mode/provider classes from calling code; enables easy extension. |
+| **Dependency Injection** | Resolver receives configuration/DI container (Obs 3) | Removes hard‑coded dependencies, promotes testability and configurability. |
+| **Caching** | Internal `_cachedMode` in resolver (Obs 7) | Reduces repeated mode resolution overhead, improves request latency. |
+| **Configuration‑Based Selection** | Resolver reads `llmMode` from config (Obs 4) | Allows runtime switching of behavior without code changes. |
+| **Interface‑Based Polymorphism** | Shared mode interfaces (Obs 6) | Guarantees a consistent API across all mode implementations. |
+
+---
+
+## Design Decisions and Trade‑offs  
+
+1. **Configuration‑Driven Mode Selection** – *Decision*: Use a simple config key to choose the mode.  
+   *Trade‑off*: Extremely flexible for operators, but puts the onus on correct configuration management; a mis‑typed value could lead to runtime errors unless guarded by validation logic.
+
+2. **Factory + DI Combination** – *Decision*: Combine a factory method with DI to instantiate modes.  
+   *Trade‑off*: Provides high extensibility (new modes/providers can be added without touching callers) at the cost of a slightly more complex initialization path and the need for a well‑maintained registration map.
+
+3. **In‑Memory Caching of Resolved Mode** – *Decision*: Cache the resolved mode after the first lookup.  
+   *Trade‑off*: Gains performance for hot paths but introduces stale‑state risk if the configuration is expected to change at runtime. The design mitigates this by keeping the cache private and offering a clear‑cache hook for rare hot‑reload scenarios.
+
+4. **Predefined Mode Set** – *Decision*: Enumerate supported modes (`mock`, `local`, `public`) directly in the file.  
+   *Trade‑off*: Guarantees that only vetted modes are used, simplifying validation, yet it requires a code change to add any new mode, which may be a minor friction point for very dynamic environments.
+
+---
+
+## System Structure Insights  
+
+- **Hierarchical Placement** – `LLMModeResolver` sits under the **`LLMAbstraction`** component, acting as the decision layer for mode selection. Its siblings, `LLMProviderFactory` and `LLMService`, occupy complementary roles: the former builds concrete provider objects, while the latter orchestrates request flow, caching, and circuit breaking.  
+
+- **Modular Cohesion** – Each sub‑component has a single, well‑defined responsibility, which aligns with the modular design highlighted in the parent component’s description. This separation makes the LLM stack easy to reason about and to test in isolation.  
+
+- **Shared Interfaces** – The mode interface defined by the resolver is a contract that both `LLMService` and any future consumer can rely on, reinforcing loose coupling across the module boundary.
+
+---
+
+## Scalability Considerations  
+
+- **Horizontal Scaling** – Because mode resolution is performed once per process and cached, scaling the service horizontally (multiple instances behind a load balancer) does not increase per‑request overhead. Each instance resolves its mode independently, which is acceptable given that mode selection is a global configuration rather than a per‑request decision.  
+
+- **Adding New Modes or Providers** – The factory pattern ensures that extending the system to support additional LLM providers (e.g., a new cloud vendor) or new operational modes (e.g., “sandbox”) does not require changes to `LLMService` or the broader abstraction. This encourages growth without architectural refactoring.  
+
+- **Cache Size** – The cache holds only a single resolved mode instance, so memory impact is negligible even at massive scale. However, if future enhancements introduce per‑user or per‑tenant mode resolution, the current cache design would need to evolve (e.g., using an LRU map).  
+
+- **Configuration Propagation** – In a distributed deployment, configuration must be consistent across all instances. The resolver’s reliance on a single config key makes this straightforward but also means that any inconsistency can cause divergent behavior across nodes.
+
+---
+
+## Maintainability Assessment  
+
+`LLMModeResolver` is **highly maintainable** due to several factors:
+
+- **Clear Separation of Concerns** – The resolver focuses only on mode determination; provider creation, request handling, and resilience are delegated to sibling components.  
+
+- **Explicit Interfaces** – By enforcing a shared mode interface, developers can modify or replace a concrete mode implementation without touching callers.  
+
+- **DI Friendly** – Dependency injection makes unit testing trivial; mocks can be injected for both configuration and logger dependencies.  
+
+- **Simple Caching Logic** – The cache is a straightforward private field with a single responsibility, reducing the surface area for bugs.  
+
+- **Documentation‑Ready Structure** – The predefined mode map and factory method are self‑documenting; adding a new entry is a single line change, which encourages accurate, up‑to‑date documentation.
+
+Potential maintenance challenges are limited to **configuration validation** (ensuring only supported mode strings are accepted) and **cache invalidation** (if hot‑reloading becomes a requirement). Both can be addressed with small utility additions without disturbing the core design.
+
+--- 
+
+**In summary**, `LLMModeResolver` exemplifies a clean, modular approach to runtime mode selection within the LLM abstraction layer. Its use of factory creation, dependency injection, configuration‑driven logic, and lightweight caching yields a component that is extensible, performant, and straightforward to maintain, while fitting neatly into the broader LLM architecture alongside `LLMProviderFactory` and `LLMService`.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's use of dependency injection, as seen in the LLMService class (lib/llm/llm-service.ts), allows for a high degree of flexibility and testability. This is particularly evident in the way that different providers, such as the DMRProvider (lib/llm/providers/dmr-provider.ts) and AnthropicProvider (lib/llm/providers/anthropic-provider.ts), can be easily registered and swapped out as needed. For example, the provider registry (lib/llm/provider-registry.js) enables dynamic addition and removal of providers, making it simple to add support for new LLM services or remove support for outdated ones. Furthermore, the use of dependency injection makes it easy to test the component in isolation, using mock implementations of the providers to simulate different scenarios.
-
-### Children
-- [ModeConfiguration](./ModeConfiguration.md) -- The ModeConfiguration is likely to be implemented based on the parent context, which suggests the use of configuration files to determine the LLM mode.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific responsibilities and functions. For instance, the LLMService (lib/llm/llm-service.ts) serves as the primary entry point for all LLM operations, handling mode routing, caching, and circuit breaking. This modular design promotes code reusability and maintainability, as seen in the use of design patterns such as dependency injection and factory patterns. The dependency injection in LLMService (lib/llm/llm-service.ts) enables the resolution of the current LLM provider and supports various LLM modes, making it easier to switch between different providers or modes without affecting the rest of the codebase.
 
 ### Siblings
-- [LLMProviderManager](./LLMProviderManager.md) -- The LLMProviderManager uses the provider registry (lib/llm/provider-registry.js) to enable dynamic addition and removal of providers.
-- [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) utilizes dependency injection to allow for flexible and testable provider management.
+- [LLMProviderFactory](./LLMProviderFactory.md) -- LLMProviderFactory uses a factory pattern in lib/llm/llm-provider-factory.ts to create instances of different LLM providers, such as Anthropic, OpenAI, and Groq.
+- [LLMService](./LLMService.md) -- LLMService uses a modular design in lib/llm/llm-service.ts to handle LLM operations, including mode routing, caching, and circuit breaking.
 
 
 ---

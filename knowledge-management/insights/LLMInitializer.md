@@ -2,95 +2,82 @@
 
 **Type:** SubComponent
 
-LLMInitializer utilizes the wave-controller.ts runWithConcurrency function to enable parallel processing
+The LLMInitializer uses the ensureLLMInitialized method to ensure the LLM is initialized before execution.
 
 ## What It Is  
 
-The **LLMInitializer** sub‑component lives in the same code base as the broader **SemanticAnalysis** component and is defined by a small set of artefacts: the `LLMInitializer` class (or module) itself, the configuration file `llm‑initializer.yaml`, and its runtime dependency on the utility function `runWithConcurrency` found in `wave‑controller.ts`. Its sole responsibility is to bootstrap one or more **LLMService** instances, expose a callback hook that notifies downstream agents when an LLM service is ready, and emit structured log entries that record the progress of each initialization step. The component is deliberately lightweight – the observations note *zero* code symbols directly in the supplied snippet – but its behaviour is orchestrated through the surrounding infrastructure of the **SemanticAnalysis** parent component and the sibling **WaveController** that supplies the concurrency primitive.
+The **LLMInitializer** is a *SubComponent* that lives inside the **Trajectory** component.  It is the dedicated entry point for preparing a large‑language‑model (LLM) before any downstream work is performed.  The observations tell us that the initializer is built around a class‑style constructor that performs the primary set‑up of the model, and it exposes an `ensureLLMInitialized` method that guarantees the model is ready before any execution proceeds.  By offering a single, unified interface for both initialization and subsequent execution calls, the LLMInitializer abstracts away the low‑level details of model loading, configuration, and readiness checks, allowing other parts of the system—most notably the **Trajectory** parent—to treat the LLM as a ready‑to‑use service.
 
 ## Architecture and Design  
 
-The design of **LLMInitializer** follows a *coordinator* pattern: it acts as the central orchestrator that brings together the **LLMService** class, configuration data, and runtime concurrency support. The key architectural elements are:
+The design of LLMInitializer follows a **Facade**‑style approach: the component hides the complexity of LLM boot‑strapping behind a compact public API (`constructor` + `ensureLLMInitialized`).  The constructor embodies the *initialization* phase, while `ensureLLMInitialized` acts as a *guard* that lazily verifies (or re‑verifies) that the model is fully prepared before any consumer code runs.  This pattern aligns with the way sibling components such as **SpecstoryConnector** or **ServiceStarter** expose a single, high‑level entry point (e.g., `startServiceWithRetry`) while encapsulating protocol‑specific or retry logic internally.
 
-1. **Dependency Inversion** – `LLMInitializer` depends on the abstract `LLMService` interface rather than a concrete implementation, allowing different LLM back‑ends (e.g., OpenAI, Anthropic) to be swapped without changing the initializer logic.  
-2. **Callback‑Based Notification** – a consumer‑provided callback is stored by the initializer and invoked once each LLM service reports successful startup. This decouples the initializer from the agents that consume the services, keeping the component reusable across the system.  
-3. **Work‑Stealing Concurrency** – the initializer does not implement its own threading model; instead it re‑uses the `runWithConcurrency` function from `wave‑controller.ts`. That function implements a work‑stealing loop (as described in the parent **SemanticAnalysis** documentation) and enables the initializer to spin up multiple LLM services in parallel, improving start‑up latency on multi‑core machines.  
-4. **Configuration‑Driven Behaviour** – all tunable parameters (e.g., number of concurrent initializations, service‑specific credentials, retry policies) are read from `llm‑initializer.yaml`. This mirrors the sibling **Pipeline** component’s use of `batch‑analysis.yaml` and the **Ontology** component’s `ontology‑definitions.yaml`, establishing a consistent “YAML‑as‑source‑of‑truth” convention across the code base.
-
-No micro‑service or event‑driven architecture is introduced here; the initializer operates entirely within the same process as the rest of **SemanticAnalysis**, leveraging shared memory and the existing concurrency utilities.
+Interaction-wise, LLMInitializer is invoked by its parent **Trajectory** whenever a workflow needs to run an LLM‑driven step.  The parent does not need to know whether the model was loaded from a local binary, a remote endpoint, or a cached artifact; it simply calls the unified interface and proceeds once the guard confirms readiness.  This separation of concerns mirrors the modularity seen across the sibling set: **GraphDatabaseManager** isolates graph‑DB access, **ConcurrencyController** isolates work‑stealing mechanics, and **PipelineCoordinator** isolates task orchestration.  All share the same high‑level philosophy—provide a clean, single‑method contract while encapsulating internal complexity.
 
 ## Implementation Details  
 
-### Core Classes and Functions  
+* **Constructor** – The class’s constructor is responsible for the *eager* part of the setup.  It likely receives configuration parameters (model path, inference options, environment flags) and performs actions such as loading model weights, initializing inference runtimes, or establishing connections to external LLM services.  Because the observations only mention the presence of a constructor, we can infer that the heavy lifting happens here, and that any failure would be surfaced immediately, preventing a partially‑initialized state.
 
-* **LLMInitializer** – the primary class that reads `llm‑initializer.yaml`, creates configuration objects, and instantiates `LLMService` objects. It holds a reference to a user‑supplied *initialization callback* and a *logger* instance.  
-* **LLMService** – the service class responsible for establishing a connection to a language‑model provider (e.g., loading API keys, performing a health‑check). The observation that “LLMService uses the LLMInitializer service to initialize LLM services” indicates a bidirectional relationship: `LLMService` may request additional runtime data from the initializer (such as shared logging or concurrency limits).  
-* **runWithConcurrency** (`wave‑controller.ts`) – a generic utility that accepts a work queue and a concurrency limit, then executes the queued tasks using a work‑stealing algorithm. `LLMInitializer` packages each `LLMService` start‑up call as a unit of work and hands it to this function.  
+* **ensureLLMInitialized** – This method is the *runtime guard*.  Before any consumer‑level operation (e.g., a call to generate text) executes, the method checks an internal flag or state machine that records whether the constructor succeeded.  If the model is not yet ready, the method can either trigger a lazy initialization path or throw a clear error, thereby guaranteeing that downstream code never runs against an uninitialized LLM.  The method’s name suggests a *idempotent* design: repeated calls are safe and cheap, a pattern also used by **ServiceStarter**’s retry logic.
 
-### Initialization Flow  
-
-1. **Configuration Load** – on construction, `LLMInitializer` parses `llm‑initializer.yaml`. The YAML file defines an array of service descriptors (model name, endpoint, credentials) and a top‑level `concurrency` setting.  
-2. **Task Generation** – for each descriptor, the initializer creates a closure that constructs an `LLMService` instance and invokes its `initialize()` method.  
-3. **Parallel Execution** – the closures are submitted to `runWithConcurrency`. The work‑stealing loop distributes them across available threads, each thread pulling the next unprocessed task from a shared atomic index. This mirrors the pattern used by the parent **SemanticAnalysis** component for large‑scale data analysis.  
-4. **Callback & Logging** – when an `LLMService` finishes initialization, it calls back into the initializer, which then:  
-   * Emits a structured log entry (e.g., `LLMInitializer: Service <id> ready`).  
-   * Invokes the external callback supplied by downstream agents, passing the ready `LLMService` instance.  
-
-### Logging Interface  
-
-The initializer’s logging interface is a thin wrapper around the system‑wide logger (used by other siblings such as **Pipeline** and **Insights**). It tags all messages with the component name (`LLMInitializer`) and includes contextual fields like `serviceId` and `durationMs`, enabling unified observability across the platform.
+* **Unified Interface** – By exposing only the constructor and `ensureLLMInitialized`, the component presents a minimal public surface.  Internally, it may hold private helpers (e.g., `_loadModel`, `_validateConfig`) that are not part of the external contract, keeping the API stable even if the underlying loading mechanism changes (e.g., swapping from a local file to a remote inference API).  This mirrors the way **SpecstoryAdapter** abstracts multiple connection protocols behind a single class interface.
 
 ## Integration Points  
 
-* **SemanticAnalysis (Parent)** – The parent component already employs `runWithConcurrency` for its own work‑stealing tasks. By re‑using the same function, `LLMInitializer` integrates seamlessly into the parent’s concurrency model, ensuring that LLM service start‑up does not starve other analysis tasks.  
-* **WaveController (Sibling)** – `WaveController` also exports `runWithConcurrency`. The shared utility indicates a common concurrency library that all siblings depend on, reinforcing a consistent execution model across the system.  
-* **Pipeline (Sibling)** – While `Pipeline` orchestrates DAG‑based batch steps, it may include a step that depends on LLM services being ready. The callback provided by `LLMInitializer` can be wired into a pipeline node, guaranteeing that downstream DAG execution only proceeds after successful LLM initialization.  
-* **Insights (Sibling)** – The `InsightGenerator` consumes LLM outputs to produce higher‑level insights. By subscribing to the initializer’s callback, it can obtain a ready `LLMService` instance without needing to manage its own boot‑strapping logic.  
-* **Configuration Files** – `llm‑initializer.yaml` lives alongside other YAML artefacts (`batch‑analysis.yaml`, `ontology‑definitions.yaml`). Tools that validate or merge configuration files can treat it uniformly, simplifying deployment pipelines.
+* **Parent – Trajectory** – Trajectory references LLMInitializer as a child.  Whenever a trajectory step requires language‑model inference, it calls the initializer’s guard to ensure readiness, then proceeds with its own logic.  This tight coupling is intentional: Trajectory delegates all LLM concerns to the initializer, keeping its own code focused on orchestration rather than model management.
+
+* **Sibling Components** – While LLMInitializer does not directly interact with siblings, it shares architectural conventions with them.  For instance, **ConcurrencyController** may run LLM inference tasks in parallel, relying on the initializer’s guarantee that each worker thread sees a fully prepared model.  **PipelineCoordinator** could schedule LLM‑driven stages, again depending on the initializer’s unified interface to avoid duplicated readiness checks.
+
+* **External Dependencies** – The observations do not list concrete external libraries, but the constructor’s responsibilities imply dependencies on an LLM runtime (e.g., TensorFlow, PyTorch, or a hosted inference SDK).  The guard method may also depend on health‑check utilities to verify that the runtime is alive, similar to how **ServiceStarter** uses exponential back‑off for connection retries.
 
 ## Usage Guidelines  
 
-1. **Provide a Stable Callback** – The callback passed to `LLMInitializer` should be idempotent and thread‑safe because it may be invoked concurrently for multiple services. Typical usage is to register the ready service in a shared registry or to trigger the next pipeline stage.  
-2. **Respect Concurrency Limits** – The `concurrency` field in `llm‑initializer.yaml` should be set based on the host’s CPU core count and the expected latency of external LLM APIs. Over‑committing can lead to throttling by the provider and wasted threads.  
-3. **Leverage the Logging Interface** – All log statements emitted by the initializer are already structured; developers should add custom fields (e.g., `modelVersion`) when extending the initializer to aid downstream observability dashboards.  
-4. **Avoid Direct Instantiation of LLMService** – External code should never call `new LLMService()` directly; instead, rely on the initializer’s callback to receive fully‑initialized instances. This preserves the centralized error‑handling and retry logic embedded in the initializer.  
-5. **Configuration Hygiene** – Keep `llm‑initializer.yaml` under version control and validate it with the same schema tools used for `batch‑analysis.yaml`. Mis‑typed credentials or missing fields will cause the initializer to abort early, and the failure will be logged with clear context.
+1. **Instantiate Early, Use Later** – Create an instance of LLMInitializer as early as possible in the application lifecycle (e.g., during Trajectory startup).  This allows the constructor to perform any heavyweight loading before the first inference request arrives, reducing latency spikes.
+
+2. **Always Call `ensureLLMInitialized`** – Before invoking any LLM‑dependent functionality, explicitly call `ensureLLMInitialized`.  The method is idempotent, so repeated calls are safe and will not re‑load the model unnecessarily.  Skipping this step can lead to runtime errors because the underlying model may not be ready.
+
+3. **Handle Initialization Failures Gracefully** – The constructor may throw if configuration is invalid or resources are unavailable.  Wrap the instantiation in a try/catch block and surface a clear error to the caller (e.g., Trajectory).  This mirrors the defensive pattern used by **ServiceStarter** when a service fails to start.
+
+4. **Do Not Mutate Internal State Directly** – All configuration should be supplied at construction time.  The component is designed to keep its internal state immutable after the guard has confirmed readiness, which simplifies reasoning about concurrency and aligns with the immutable‑state approach seen in **ConcurrencyController**.
+
+5. **Leverage Shared Configuration** – If multiple subcomponents need to know about LLM settings (e.g., temperature, max tokens), store them in a shared configuration object that is passed to the LLMInitializer constructor.  This avoids duplication and keeps the system’s configuration surface consistent across siblings.
 
 ---
 
-### Architectural Patterns Identified  
-* Coordinator / Orchestrator pattern (LLMInitializer as central orchestrator)  
-* Dependency Inversion (LLMInitializer depends on abstract LLMService)  
-* Callback‑based notification (observer‑like)  
-* Work‑stealing concurrency (via runWithConcurrency)  
+### 1. Architectural patterns identified  
+* **Facade / Unified Interface** – single public API (`constructor`, `ensureLLMInitialized`).  
+* **Guard/Idempotent Check** – `ensureLLMInitialized` acts as a safety gate before execution.  
+* **Separation of Concerns** – LLM loading is isolated from Trajectory orchestration, mirroring sibling component designs.
 
-### Design Decisions and Trade‑offs  
-* **In‑process initialization** – simplifies data sharing and avoids network overhead but ties LLM service start‑up to the host process’s lifecycle.  
-* **YAML‑driven configuration** – promotes declarative setup and easy CI/CD integration, at the cost of requiring schema validation to prevent runtime errors.  
-* **Shared concurrency primitive** – re‑using `runWithConcurrency` ensures consistent scheduling across components, but any limitation or bug in that utility propagates to all siblings.  
+### 2. Design decisions and trade‑offs  
+* **Eager vs. Lazy Loading** – The constructor performs eager initialization, reducing first‑call latency at the cost of longer startup time.  The guard provides a fallback for lazy scenarios without re‑initializing.  
+* **Minimal Public Surface** – Limits API churn and improves maintainability, but requires careful internal handling of errors to keep the external contract stable.  
+* **Idempotent Guard** – Guarantees safety for concurrent callers (important for the work‑stealing model used by ConcurrencyController) but adds a small runtime check on every call.
 
-### System Structure Insights  
-`LLMInitializer` sits one level below **SemanticAnalysis**, sharing the concurrency infrastructure with **WaveController** and providing ready LLM services to siblings like **Insights** and **Pipeline**. The component’s only child‑level artefact is the configuration file, reinforcing a “configuration‑first” hierarchy.  
+### 3. System structure insights  
+LLMInitializer sits as a leaf node under **Trajectory**, acting as the sole provider of a ready LLM.  Its design mirrors the pattern used by other leaf components (e.g., **GraphDatabaseManager**, **SpecstoryConnector**) that each encapsulate a distinct external resource behind a unified class.  This creates a clear, tree‑like hierarchy where the parent coordinates high‑level workflows while children manage concrete resources.
 
-### Scalability Considerations  
-Because initialization work is parallelised with a work‑stealing scheduler, the component scales linearly with the number of CPU cores up to the point where external LLM APIs become the bottleneck. Adjusting the `concurrency` setting in `llm‑initializer.yaml` allows operators to throttle start‑up to respect provider rate limits, making the system adaptable to both small‑scale local runs and large‑scale cloud deployments.  
+### 4. Scalability considerations  
+Because the initializer loads the model once per process, scaling horizontally (multiple process instances) will replicate the memory cost of the model across instances.  The idempotent guard allows safe concurrent access within a process, supporting multi‑threaded inference as seen in the **ConcurrencyController** work‑stealing design.  If future requirements demand model sharing across processes, the current design would need to be extended (e.g., via a shared service or model server), but the existing unified interface would still provide a clean migration path.
 
-### Maintainability Assessment  
-The clear separation of concerns—configuration, concurrency, logging, and callback notification—makes the codebase easy to reason about and extend. Re‑using shared utilities (`runWithConcurrency`, system logger) reduces duplication and aligns maintenance effort with sibling components. The only maintenance risk is the tight coupling between `LLMService` and `LLMInitializer`; any change to the service’s initialization contract must be mirrored in the initializer’s callback handling, suggesting that a well‑documented interface contract is essential. Overall, the component exhibits high readability, low cyclomatic complexity, and a straightforward upgrade path.
+### 5. Maintainability assessment  
+The component’s narrow API and clear separation of initialization logic make it highly maintainable.  Changes to the underlying LLM runtime (e.g., swapping from a local model to a remote API) can be confined to the constructor and any private helpers without affecting callers.  The presence of a single guard method reduces the risk of scattered readiness checks, simplifying testing and debugging.  However, the lack of explicit configuration validation in the observations suggests that adding robust validation logic would further improve maintainability and developer experience.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a work-stealing concurrency approach, as seen in the runWithConcurrency() function in wave-controller.ts, to enable parallel processing. This allows the component to efficiently analyze large amounts of data by distributing tasks across multiple threads. The use of a shared atomic index counter ensures that tasks are properly synchronized and executed in a thread-safe manner. For instance, when analyzing git history, the component can leverage multiple threads to process different commits concurrently, significantly improving overall performance.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js allows for flexible connection establishment with the Specstory extension via multiple protocols such as HTTP, IPC, or file watch. This is evident in the way the SpecstoryAdapter class is instantiated and used throughout the component, providing a unified interface for different connection methods. Furthermore, the retry logic with exponential backoff implemented in the startServiceWithRetry function in lib/service-starter.js ensures that connections are re-established in case of failures, enhancing the overall robustness of the component.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline Coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- UpperOntology definitions are stored in the ontology-definitions.yaml file
-- [Insights](./Insights.md) -- Insight generation is performed using the InsightGenerator class, which utilizes machine learning algorithms
-- [WaveController](./WaveController.md) -- WaveController uses the runWithConcurrency function to enable parallel processing
+- [SpecstoryConnector](./SpecstoryConnector.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to establish connections to the Specstory extension.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager uses a graph database to store and retrieve data.
+- [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
+- [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
+- [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
+- [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 3 observations*

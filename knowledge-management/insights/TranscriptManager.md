@@ -2,112 +2,114 @@
 
 **Type:** SubComponent
 
-TranscriptManager uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to persist transcript data in a graph database, enabling efficient querying and retrieval.
+The TranscriptManager class in transcript-manager.ts extends the BaseManager class to inherit common management functionality
 
 ## What It Is  
 
-**TranscriptManager** is a sub‑component that lives inside the **LiveLoggingSystem**.  Its implementation is centred around the file `storage/graph-database-adapter.ts`, which it uses (via the **GraphDatabaseAdapter**) to persist transcript data in a graph database.  The component exposes a single, unified API for creating, reading, updating and exporting transcripts, shielding callers from the underlying storage mechanics.  It also incorporates a lightweight caching layer that reduces the number of round‑trips to the graph store, and it delegates format‑specific handling to the **AgentAdapter** so that transcripts originating from heterogeneous agents can be normalised and stored consistently.  Finally, TranscriptManager can automatically emit the stored transcript in JSON, making downstream integration straightforward.
+`TranscriptManager` is a **sub‑component** that lives in the file `src/transcript-manager.ts` (the exact path is given by the observations as *transcript‑manager.ts*).  It is responsible for obtaining raw transcript data from external sources, normalising that data into the system’s canonical format, and caching the result for fast subsequent access.  The class is instantiated through the factory function `createTranscriptManager` that also resides in *transcript‑manager.ts*.  Internally it extends the generic `BaseManager` class, inheriting shared management capabilities (such as lifecycle hooks, error handling conventions, or common configuration handling).  Logging of all transcript‑related events and errors is delegated to the `logger` module found in *logger.ts*.  The cached data is persisted via the helper module *transcript‑cache.ts*.  
+
+`TranscriptManager` sits under the **LiveLoggingSystem** component, which aggregates several sub‑components—including `LoggingModule`, `OntologyClassificationAgent`, and `TranscriptManager`—to provide a full‑stack conversation capture and analysis pipeline.  Within `TranscriptManager`, the child component `TranscriptReader` encapsulates the low‑level logic for fetching raw transcript streams, exposing the `readTranscript` method that the manager calls.
 
 ---
 
 ## Architecture and Design  
 
-The design of **TranscriptManager** follows a classic *Adapter‑Repository* style.  The **GraphDatabaseAdapter** (found at `storage/graph-database-adapter.ts`) acts as an **adapter** that abstracts the low‑level graph‑DB driver, connection pooling and query execution.  **TranscriptManager** builds on top of this adapter and presents a higher‑level **repository**‑like façade – the **TranscriptRepository** – which encapsulates the domain‑specific operations on transcript entities (create, fetch, list, delete, export).  
+The observations reveal a **layered, composition‑based architecture**.  At the top, `LiveLoggingSystem` orchestrates high‑level concerns (logging, ontology classification, transcript handling).  `TranscriptManager` composes a dedicated `TranscriptReader` child to separate *data acquisition* from *management* responsibilities, a classic **Separation‑of‑Concerns** design.  By extending `BaseManager`, `TranscriptManager` participates in an **inheritance hierarchy** that centralises common manager behaviour, reducing duplication across similar managers in the code base.
 
-A second, complementary pattern is the **plugin/adapter** approach used by **AgentAdapter**.  Because transcripts can arrive from many agent formats, the system plugs in format‑specific handlers that translate raw agent payloads into the internal transcript model.  This keeps the core manager agnostic of any particular agent protocol while still guaranteeing consistency across formats.  
+Two explicit design patterns emerge:
 
-Caching is introduced as an *optimisation* layer.  Although the exact cache implementation is not enumerated, the observation that “TranscriptManager implements a caching mechanism to reduce the load on the graph database” indicates a read‑through or write‑through strategy that stores recent transcript objects in memory (or a fast key‑value store) before delegating to the graph store.  The cache sits between the **TranscriptRepository** and the **GraphDatabaseAdapter**, providing a transparent performance boost without altering the public API.  
+1. **Factory Method** – The `createTranscriptManager` function acts as a factory, encapsulating the construction details (e.g., injecting the logger, cache, or reader) and returning a ready‑to‑use instance.  This isolates the creation logic from callers and makes future variations (different reader implementations, mock managers for tests) straightforward.
 
-All of these pieces are wired together inside the **LiveLoggingSystem** parent component.  Sibling components such as **LoggingService** and **GraphDatabaseAdapter** share the same storage adapter, reinforcing a *single source of truth* for persistence and allowing uniform query capabilities across logs and transcripts.  The **AgentAdapter** sibling contributes a plugin architecture that both **LoggingService** and **TranscriptManager** can reuse for handling multiple data formats.
+2. **Cache‑Aside (Lazy Loading)** – The manager first attempts to retrieve a transcript from `transcript-cache.ts` via the `cacheTranscript` method.  If the cache miss occurs, it falls back to `readTranscript`, then converts the raw payload with `convertTranscript`, and finally writes the result back to the cache.  This pattern improves performance while keeping the cache transparent to callers.
+
+Interaction flow is linear and synchronous in the sense that the manager orchestrates the steps: **read → convert → cache**.  Logging is woven throughout via the `logger` module, ensuring observability without coupling the manager to a specific logging implementation.
 
 ---
 
 ## Implementation Details  
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – This file encapsulates the connection‑pooling logic and provides CRUD primitives that operate on the graph database.  The adapter hides the graph‑DB query language (e.g., Cypher) behind simple methods such as `saveNode`, `findNodeById`, and `runQuery`.  Both **LoggingService** and **TranscriptRepository** depend on it, ensuring that all persisted entities benefit from the same performance optimisations.  
+* **Class Definition** – `class TranscriptManager extends BaseManager` lives in *transcript‑manager.ts*.  Inheritance provides access to shared utilities (e.g., `this.handleError`, `this.initialize`) defined in `BaseManager`.  
 
-2. **TranscriptRepository** – As the child of **TranscriptManager**, the repository is responsible for translating the domain‑level transcript operations into calls to the **GraphDatabaseAdapter**.  For example, when a new transcript is added, the repository will invoke the adapter’s `saveNode` with a node type like `Transcript` and a property map that reflects the flexible schema supported by the graph DB.  Retrieval methods (`getById`, `searchByAgent`, etc.) map directly to graph queries that can traverse relationships, a strength of the chosen storage technology.  
+* **Factory Function** – `export function createTranscriptManager(): TranscriptManager` constructs the manager, likely injecting a concrete `TranscriptReader` instance, a cache handler from *transcript‑cache.ts*, and a logger from *logger.ts*.  This centralises dependency wiring.
 
-3. **Caching Layer** – While the concrete class name is not listed, the observation that “TranscriptManager implements a caching mechanism” suggests a wrapper around the repository.  A typical flow is: a request for a transcript first checks the cache; a cache miss triggers the repository to fetch from the graph DB; the result is then stored in the cache for subsequent reads.  Write operations likely invalidate or update the cached entry to keep the view consistent.  
+* **Core Methods**  
+  * `readTranscript(sourceId: string): Promise<RawTranscript>` – Delegated to the child `TranscriptReader`.  The observation that “TranscriptManager contains TranscriptReader” tells us the manager holds a reference (e.g., `private reader: TranscriptReader`).  
+  * `convertTranscript(raw: RawTranscript): StandardTranscript` – Performs data‑shape transformation, normalising fields, timestamps, speaker identifiers, etc., so downstream components (e.g., the OntologyClassificationAgent) can operate on a predictable schema.  
+  * `cacheTranscript(id: string, transcript: StandardTranscript): Promise<void>` – Persists the converted transcript using the API exposed by *transcript‑cache.ts*.  The cache is presumably a key‑value store (in‑memory, Redis, or file‑based) that the manager queries before hitting the external source.  
 
-4. **AgentAdapter Integration** – The **AgentAdapter** (a sibling component) provides a plugin‑based system for handling multiple agent formats.  **TranscriptManager** calls into the adapter to normalise incoming raw data before passing it to the repository.  This separation means new agent types can be added without touching the manager’s core logic, adhering to the Open/Closed Principle.  
+* **Logging Integration** – Every public method calls into the `logger` module (imported from *logger.ts*) to emit informational messages (`logger.info('Fetching transcript…')`) and error logs (`logger.error('Failed to read transcript', err)`).  This provides traceability for operational monitoring.
 
-5. **Automatic JSON Export** – After a transcript is persisted, **TranscriptManager** can serialise the internal model to JSON on demand.  The export routine walks the transcript object (including any linked entities such as speaker turns or metadata) and produces a flat JSON structure that downstream services can consume.  Because the underlying storage is a graph, the export logic may need to flatten relationship data, but the manager abstracts that complexity away from callers.
+* **Dependency Modules**  
+  * *transcript‑cache.ts* – Supplies `get(id)` and `set(id, data)` primitives used by `cacheTranscript`.  
+  * *logger.ts* – Exposes a singleton logger (likely Winston or a custom wrapper) used throughout the manager.  
+
+* **Child Component – TranscriptReader** – Although its source file is not listed, the observation that “TranscriptManager uses the readTranscript method to fetch transcript data, implying a clear separation of concerns for data retrieval” tells us `TranscriptReader` implements the low‑level fetch (HTTP request, file I/O, or streaming API) and returns raw data to the manager.
 
 ---
 
 ## Integration Points  
 
-- **Parent – LiveLoggingSystem**: The LiveLoggingSystem composes **TranscriptManager** alongside **LoggingService**.  Both sub‑components share the **GraphDatabaseAdapter**, meaning any configuration change to the adapter (e.g., connection pool size) impacts both logging and transcript persistence uniformly.  
+`TranscriptManager` is tightly coupled to three internal modules:
 
-- **Sibling – AgentAdapter**: TranscriptManager depends on AgentAdapter for format translation.  The plugin architecture of AgentAdapter is also used by other components that ingest agent data, promoting reuse and a consistent contract (`transform(rawPayload) => TranscriptModel`).  
+1. **BaseManager** – Provides the foundational manager contract.  Any change to `BaseManager` (e.g., adding lifecycle hooks) propagates to `TranscriptManager`.  
+2. **logger.ts** – All logging calls flow through this module; swapping the logger implementation requires only changes in *logger.ts* without touching the manager.  
+3. **transcript‑cache.ts** – The caching layer; alternative cache back‑ends can be introduced by modifying this file while keeping the manager’s API stable.
 
-- **Sibling – GraphDatabaseAdapter**: The adapter is a shared low‑level service.  Its connection‑pooling and query‑optimisation strategies affect the performance of both **TranscriptRepository** and **LoggingService**, making it a critical integration hotspot.  
-
-- **Child – TranscriptRepository**: All data‑access operations flow through the repository.  The repository, in turn, calls the GraphDatabaseAdapter.  Any change to repository query logic (e.g., adding a new index or relationship traversal) will be isolated to this layer, keeping the manager’s public API stable.  
-
-- **Export Consumers**: The JSON export feature provides an outward‑facing contract.  External components can request `exportTranscript(id)` and receive a ready‑to‑use JSON payload, enabling easy integration with analytics pipelines, reporting dashboards, or archival services.
+Externally, `TranscriptManager` is consumed by the **LiveLoggingSystem** component, which may request a transcript for a given conversation ID.  The manager’s output (`StandardTranscript`) is subsequently used by sibling components such as `OntologyClassificationAgent` (which classifies observations derived from the transcript) and `LoggingModule` (which may embed transcript excerpts into log entries).  Because the manager follows a clear contract (read → convert → cache), other subsystems can rely on deterministic behaviour and do not need to know about the internal caching strategy.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer the Unified API** – Developers should interact with **TranscriptManager** only through its public methods (e.g., `addTranscript`, `getTranscript`, `exportTranscript`).  Direct calls to the **GraphDatabaseAdapter** or **TranscriptRepository** bypass the caching layer and risk inconsistent state.  
-
-2. **Leverage AgentAdapter for Ingestion** – When feeding raw agent data into the system, always route it through the **AgentAdapter** first.  This guarantees that the transcript conforms to the internal schema and that future agent formats can be accommodated without code changes in the manager.  
-
-3. **Cache Awareness** – Because a caching mechanism is in place, be mindful of cache invalidation semantics.  After a bulk update or delete operation, explicitly call the manager’s `invalidateCache(id)` (or the equivalent method) to avoid stale reads.  
-
-4. **Export When Needed** – The automatic JSON export is intended for integration points, not for internal processing.  Use the export function sparingly to avoid unnecessary serialization overhead, especially in high‑throughput scenarios.  
-
-5. **Configuration Consistency** – Any changes to the **GraphDatabaseAdapter** configuration (e.g., pool size, timeout) should be performed at the LiveLoggingSystem level so that both logging and transcript components benefit equally.  Document such changes in the system’s deployment manifest to keep runtime behaviour predictable.
+* **Instantiation** – Always obtain an instance via `createTranscriptManager()`; do not instantiate `TranscriptManager` directly.  This guarantees that the logger, cache, and reader are correctly wired.  
+* **Error Handling** – Wrap calls to `readTranscript`, `convertTranscript`, or `cacheTranscript` in try/catch blocks or use the manager’s inherited error‑handling helpers.  The manager logs errors automatically, but propagating the exception allows callers (e.g., LiveLoggingSystem) to decide on fallback strategies.  
+* **Cache Awareness** – When a transcript is expected to change (e.g., live updates), explicitly invalidate the cache entry via the cache module before invoking `readTranscript` again; otherwise the manager will return the stale cached version.  
+* **Testing** – Substitute the real `TranscriptReader` with a mock that returns deterministic raw data.  Because the manager receives its dependencies through the factory, tests can inject a mock cache and logger to verify behaviour without side effects.  
+* **Performance** – For high‑throughput scenarios, monitor cache hit ratios.  If miss rates increase, consider scaling the underlying cache store (e.g., moving from an in‑process map to Redis) without altering the manager’s code.
 
 ---
 
 ### Architectural Patterns Identified  
 
-- **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the graph DB driver; `AgentAdapter` abstracts heterogeneous agent formats.  
-- **Repository Pattern** – `TranscriptRepository` encapsulates domain‑specific persistence logic.  
-- **Caching (Read‑Through/Write‑Through)** – Transparent performance layer between repository and storage.  
-- **Plugin Architecture** – Used by `AgentAdapter` to support multiple agent protocols without core changes.  
+1. **Factory Method** – `createTranscriptManager`.  
+2. **Inheritance (Template‑Method)** – Extending `BaseManager`.  
+3. **Composition** – Contains `TranscriptReader`.  
+4. **Cache‑Aside** – `cacheTranscript` with lazy loading on miss.  
 
 ### Design Decisions & Trade‑offs  
 
-- **Graph Database for Transcripts** – Chosen for its flexible schema, enabling diverse transcript structures and relationship queries.  Trade‑off: requires developers to think in graph terms and may introduce complexity in query optimisation.  
-- **Unified Interface** – Simplifies consumer code but adds an extra abstraction layer that must be maintained.  
-- **Caching** – Improves read latency and reduces DB load; however, it introduces cache coherence concerns that must be managed.  
-- **Separate Repository Layer** – Improves testability and isolates storage concerns, at the cost of an additional indirection.  
+* **Inheritance vs. Composition** – Using `BaseManager` centralises common logic but introduces a tight coupling to the base class; future divergence of manager behaviours could be limited.  
+* **Explicit Caching** – Improves read performance but adds statefulness; developers must manage cache invalidation.  
+* **Factory Encapsulation** – Simplifies dependency injection but hides the concrete implementations, which may complicate debugging if not documented.  
 
 ### System Structure Insights  
 
-The system is hierarchically organised: **LiveLoggingSystem** (parent) → **TranscriptManager** (sub‑component) → **TranscriptRepository** (child).  Sibling components share common low‑level services (GraphDatabaseAdapter, AgentAdapter), indicating a modular design where cross‑cutting concerns (persistence, format handling) are centralized.  
+The system follows a **hierarchical modular layout**: `LiveLoggingSystem` (parent) aggregates functional siblings (`LoggingModule`, `OntologyClassificationAgent`, `TranscriptManager`).  Inside `TranscriptManager`, the child `TranscriptReader` isolates external data access.  This hierarchy encourages clear ownership of responsibilities and eases navigation of the code base.
 
 ### Scalability Considerations  
 
-- **Graph DB Scaling** – The adapter’s connection pooling (as noted for GraphDatabaseAdapter) helps handle concurrent workloads.  The flexible schema allows horizontal scaling of transcript types without schema migrations.  
-- **Cache Layer** – By absorbing frequent read traffic, the cache reduces pressure on the database, supporting higher query rates.  Scaling the cache (e.g., moving to a distributed cache) would further improve throughput.  
-- **Export Mechanism** – JSON export is stateless and can be parallelised; however, large transcripts may need streaming to avoid memory bottlenecks.  
+* **Cache Layer** – The most scalable part; moving the cache implementation to a distributed store (Redis, Memcached) can handle increased read volume without altering manager logic.  
+* **Reader Parallelism** – If `TranscriptReader` supports concurrent fetches, the manager can be used in parallel pipelines (e.g., processing many conversation IDs simultaneously).  
+* **Logging Overhead** – Heavy logging (especially at debug level) could become a bottleneck; ensure the logger supports asynchronous buffering as seen in the sibling `LoggingModule`.  
 
 ### Maintainability Assessment  
 
-The clear separation of concerns (adapter, repository, manager, caching) yields high maintainability.  Adding new agent formats only requires a new plugin for **AgentAdapter**.  Modifying storage behaviour is confined to **GraphDatabaseAdapter** and **TranscriptRepository**.  The primary maintenance risk lies in keeping the cache coherent with the graph store; systematic invalidation policies and thorough integration tests are essential.  Overall, the architecture promotes testability, extensibility, and easy onboarding for new developers.
+The clear separation between reading, conversion, and caching, combined with the use of a factory and a base class, yields **high maintainability**.  Adding new transcript sources only requires extending or swapping `TranscriptReader`.  Adjusting the standard format impacts only `convertTranscript`.  Because all external interactions are funneled through well‑named methods, the code is self‑documenting and amenable to unit testing.  The main maintenance risk lies in the inheritance chain; any breaking change in `BaseManager` propagates downstream, so versioning and thorough integration tests are advisable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persisting log data in a graph database, which enables efficient querying and retrieval of log information. This design decision allows for the automatic export of log data in JSON format, facilitating seamless integration with other components. The use of a graph database adapter also enables the LiveLoggingSystem to leverage the benefits of graph databases, such as flexible schema design and high-performance querying. Furthermore, the GraphDatabaseAdapter is designed to handle large volumes of log data, making it an ideal choice for the LiveLoggingSystem component.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This classification process is crucial for providing meaningful insights into the conversations captured by the system. The OntologyClassificationAgent class is designed to work in conjunction with the modular design of the LiveLoggingSystem, allowing for easy extension and maintenance of the classification layers. For instance, the classifyObservation method in the OntologyClassificationAgent class takes in an observation object and returns a classified observation object, which is then used by the LiveLoggingSystem to capture and log the conversation.
 
 ### Children
-- [TranscriptRepository](./TranscriptRepository.md) -- The TranscriptRepository is likely to be implemented using the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the graph database.
+- [TranscriptReader](./TranscriptReader.md) -- The TranscriptManager sub-component uses the readTranscript method to fetch transcript data, implying a clear separation of concerns for data retrieval.
 
 ### Siblings
-- [LoggingService](./LoggingService.md) -- LoggingService uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve log data, enabling efficient querying and analysis.
-- [LSLConfigValidatorService](./LSLConfigValidatorService.md) -- LSLConfigValidatorService uses a rules-based engine to validate LSL configuration against a set of predefined rules and constraints.
-- [AgentAdapter](./AgentAdapter.md) -- AgentAdapter uses a plugin-based architecture to support multiple agent formats and protocols.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses a connection pooling mechanism to improve performance and reduce database load.
+- [LoggingModule](./LoggingModule.md) -- LoggingModule uses the asyncLog method in logging-module.ts to buffer log messages asynchronously
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses the classifyObservation method in ontology-classification-agent.ts to classify observations against the ontology system
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

@@ -2,118 +2,113 @@
 
 **Type:** SubComponent
 
-The HookManager employs a priority-based hook execution mechanism in hook-executor.ts to ensure consistent hook ordering.
+HookManager may leverage observer or listener patterns to notify registered handlers of hook events, as seen in other event-driven systems
 
 ## What It Is  
 
-HookManager is the **sub‑component that orchestrates the lifecycle of “hooks”** – lightweight callbacks that other parts of the platform can register and be notified about. All of its core files live alongside the other constraint‑system utilities: the registration logic resides in **`hook-registry.ts`**, the execution engine in **`hook-executor.ts`**, debugging helpers in **`hook-debugger.ts`**, and the central metadata store in **`hook-metadata.ts`**. By being embedded inside the **ConstraintSystem** component, HookManager supplies the event‑driven glue that lets sibling modules such as **ContentValidator**, **ViolationDetector**, and **AgentManager** react to domain‑specific changes without tight coupling.
-
-The manager’s public API is centered on a **`triggerHook`** function that receives a hook identifier and an optional payload, then routes the call through the registration and execution pipeline. Hook registration is modular: any module can import `hook-registry.ts` and declare a listener together with a priority value. The metadata repository (`hook-metadata.ts`) records each listener’s configuration, enabling later introspection, debugging, and ordered execution.
-
-In practice, when the **ContentValidator** updates an entity’s content, it asks HookManager to fire the *“content‑updated”* hook. HookManager looks up the registered listeners, orders them by priority (via the executor), and invokes each listener in turn. If a developer needs to troubleshoot a misbehaving hook, the **hook‑debugger.ts** utilities expose a transparent view of the registration state and execution trace.
+**HookManager** is the dedicated sub‑component inside the **ConstraintSystem** that centralises the registration, storage and dispatch of hook events.  The observations point to its implementation living in a file such as `integrations/mcp-server-semantic-analysis/src/hook-manager.ts` (or a similarly named `event‑handler.ts`).  Its public surface is a thin, purpose‑built API that lets other parts of the ConstraintSystem – for example the **ContentValidator**, **ViolationProcessor**, and **ConstraintEngine** – register callbacks (handlers) for named hook points and later trigger those hooks when the corresponding lifecycle moments occur.  By providing a single place where events are declared and listeners are managed, HookManager enables the rest of the constraint‑validation pipeline to stay loosely coupled while still reacting to rich, domain‑specific signals.
 
 ---
 
 ## Architecture and Design  
 
-HookManager follows a **modular registration + priority‑based execution** architecture. The registration module (`hook-registry.ts`) acts as a simple in‑memory catalog that maps hook names to an array of listener descriptors. Each descriptor contains a reference to the callback function, a numeric **priority**, and any static metadata required for debugging. This design mirrors the *Observer* pattern but adds explicit ordering, which is essential for deterministic constraint processing.
+The design of HookManager follows an **event‑driven architecture**.  At its core is a **registry (or mapping)** that associates a hook identifier (e.g., `"beforeValidate"`, `"afterViolation"`) with one or more handler functions.  This registry embodies the **Observer / Listener pattern**: a component (the *subject*) publishes an event, and all registered observers are notified in turn.  
 
-The **event‑driven dispatch** is implemented by the `triggerHook` function. Rather than broadcasting events through a global event bus, HookManager directly queries the registry, hands the ordered list to **`hook-executor.ts`**, and executes listeners synchronously (or asynchronously if the listener returns a promise). The executor’s priority algorithm guarantees that higher‑priority hooks run before lower‑priority ones, ensuring that, for example, validation hooks can pre‑empt violation‑detection hooks.
+Because HookManager sits directly under **ConstraintSystem**, it acts as the glue that lets sibling sub‑components share hook points without needing direct references to each other.  The **ConstraintSystem** therefore remains the single point of responsibility for orchestrating constraint evaluation, while the **ContentValidator**, **ViolationProcessor**, and **ConstraintEngine** each contribute their own handlers to the HookManager’s registry.  The interaction flow can be summarised as:
 
-A dedicated **debugging layer** (`hook-debugger.ts`) reads the same metadata repository used by the registry, exposing methods such as `listRegisteredHooks()`, `inspectListener(id)`, and `traceExecution(hookName)`. This keeps debugging concerns separate from core registration/execution logic, adhering to the *Separation of Concerns* principle.
+1. **Registration** – a sibling component calls a method such as `registerHook(eventName, handler, options?)`.  The `options` may include *priority* or *filter* criteria, hinting at the observed features of handler prioritisation and event filtering.  
+2. **Triggering** – when the ConstraintSystem reaches a logical checkpoint (e.g., after a validation run), it invokes `emit(eventName, payload)`.  HookManager looks up the list of handlers, orders them by any defined priority, applies any filters, and then calls each handler in turn.  
+3. **Error handling** – the observations note that robust error handling is likely built‑in.  A typical implementation would catch exceptions from individual handlers, log them, and optionally continue dispatching to remaining listeners so that a single faulty handler does not break the entire pipeline.
 
-Finally, the **metadata repository** (`hook-metadata.ts`) is the single source of truth for hook configuration. By persisting registration data in a structured object (rather than scattering it across disparate modules), HookManager enables introspection, future persistence extensions, and potential static analysis tools.
+The design respects **loose coupling** (handlers only depend on the hook contract, not on the concrete emitter) and **single‑responsibility** (HookManager’s sole job is event registration and dispatch).  No broader architectural styles—such as micro‑services or message queues—are introduced, keeping the component lightweight and in‑process.
 
 ---
 
 ## Implementation Details  
 
-1. **`hook-registry.ts`** – Exposes functions `registerHook(name: string, listener: HookListener, priority?: number)` and `unregisterHook(id: string)`. Internally it maintains a `Map<string, HookDescriptor[]>` where each `HookDescriptor` holds `{ id, listener, priority, sourceFile }`. Registration validates that the same listener isn’t added twice and assigns a unique identifier used later for debugging or removal.
+Although the source code was not directly provided, the observations give a clear picture of the expected implementation skeleton:
 
-2. **`hook-executor.ts`** – Contains the core `executeHooks(name: string, payload: any)` routine. It retrieves the descriptor array from the registry, sorts it descending by `priority` (fallback to registration order), and iterates over the list. Execution respects async semantics: if a listener returns a promise, the executor `await`s it before moving to the next hook, guaranteeing ordered completion. Errors are caught and logged, preventing a single faulty hook from breaking the entire chain.
+* **Registry Structure** – Internally HookManager likely maintains a `Map<string, HookEntry[]>`, where each `HookEntry` stores the handler reference, an optional priority number, and any filter predicate.  This map resides in the file `hook-manager.ts` (or `event‑handler.ts`).  
 
-3. **`hook-debugger.ts`** – Provides a suite of utilities:  
-   * `dumpRegistry()` – prints the full registration map.  
-   * `getListenerInfo(id)` – returns the stored metadata for a particular listener.  
-   * `enableTracing(name?)` – toggles console tracing for a specific hook or globally, showing start/end timestamps and payload snapshots.  
-   These helpers read directly from the same structures used by the registry, ensuring no stale state.
+* **Public API** – The component probably exposes methods such as:  
+  * `register(eventName: string, handler: (payload: any) => void, options?: { priority?: number; filter?: (payload) => boolean }): void`  
+  * `unregister(eventName: string, handler: Function): void`  
+  * `emit(eventName: string, payload: any): void`  
 
-4. **`hook-metadata.ts`** – Acts as a thin wrapper around a plain JavaScript object that stores static configuration (e.g., default priorities, deprecation flags). It also offers `loadMetadata()` and `saveMetadata()` stubs, hinting at future persistence (perhaps via the **GraphDatabaseAdapter** used by sibling components).
+* **Handler Prioritisation** – When `emit` is called, HookManager sorts the collected `HookEntry` objects for that event by the `priority` field (higher values first).  This guarantees deterministic execution order, a design decision that aids predictability for downstream components like **ViolationProcessor** which may need to run after **ContentValidator** has completed its work.  
 
-5. **`triggerHook`** – Defined in the public HookManager façade (likely `index.ts` or a dedicated entry file). It validates the hook name, optionally enriches the payload with system context (e.g., current transaction ID), and forwards the call to `hook-executor.ts`. Because it lives inside the **ConstraintSystem** boundary, other modules like **ContentValidator** can import it without needing to know the internal registry layout.
+* **Event Filtering** – The optional `filter` predicate allows a handler to opt‑out of processing a particular payload, reducing unnecessary work and keeping each handler focused on its relevant subset of events.  
 
-The overall flow is therefore: **register → store metadata → trigger → executor sorts by priority → invoke listeners → optional debugging output**.
+* **Error Isolation** – A `try…catch` block around each handler invocation prevents a single exception from bubbling up and aborting the entire dispatch sequence.  The caught error can be logged via the system’s logging facility, and the dispatch loop continues with the next handler.  
+
+* **Lifecycle Integration** – Because HookManager is a child of **ConstraintSystem**, its lifecycle (construction, initialization, shutdown) is likely tied to the parent component’s own lifecycle methods.  The parent may instantiate HookManager in its constructor, call an `initialize()` method during its own `initialize()` phase, and clean up any resources when the ConstraintSystem is torn down.
 
 ---
 
 ## Integration Points  
 
-HookManager is tightly coupled to its **parent component, ConstraintSystem**, which orchestrates the broader constraint‑processing pipeline. When ConstraintSystem processes a new or updated constraint, it often needs to inform other subsystems; it does so by calling `triggerHook`.  
+HookManager is tightly coupled to the **ConstraintSystem** parent, acting as the central hub for all hook‑related communication.  The sibling components interact with it in the following ways:
 
-* **ContentValidator** – Calls `triggerHook('content-updated', { entityId, newContent })` after persisting a change. The validator itself also registers hooks (e.g., `validateBeforeSave`) with a high priority so that validation runs before any downstream persistence hooks.  
+* **ContentValidator** – Registers hooks such as `"preValidate"` and `"postValidate"` to run custom preprocessing or post‑processing logic around the core validation routine.  
 
-* **ViolationDetector** – Listens for the same `content-updated` hook but with a lower priority, allowing it to react only after validation has succeeded.  
+* **ViolationProcessor** – Subscribes to `"violationDetected"` or `"afterViolation"` hooks so that it can transform, aggregate, or forward constraint violations to downstream systems.  
 
-* **GraphDatabaseManager**, **ConstraintMetadataManager**, and **AgentManager** – While they do not directly fire hooks, they share the same **GraphDatabaseAdapter** and **metadata-repository.ts** patterns, suggesting that HookManager could later store hook registration data in the same graph store for persistence or distributed coordination.  
+* **ConstraintEngine** – May emit higher‑level events like `"constraintEvaluationStart"` and `"constraintEvaluationEnd"` that other subsystems can listen to for telemetry or metrics collection.  
 
-* **Debugging and Testing** – Test suites for any sibling component can import `hook-debugger.ts` to assert that the expected hooks were fired and in the correct order, reinforcing a contract‑first integration style.
-
-All interactions are mediated through **type‑safe function calls** (e.g., `registerHook`, `triggerHook`) rather than shared global variables, which keeps the dependency graph shallow and eases unit testing.
+Because HookManager only deals with plain JavaScript/TypeScript functions and simple data payloads, it imposes minimal dependency overhead.  The only required interface is the contract of the event name and the shape of the payload, which is typically defined in shared type definitions within the ConstraintSystem module.  This lightweight contract makes it straightforward for new sub‑components to plug into the system without altering existing code.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Register Early, Prioritize Thoughtfully** – Modules should register their hooks during initialization (e.g., in a `setup()` function) and assign explicit priority values. High‑priority hooks (e.g., validation, security checks) must use lower numeric values if the executor sorts ascending, or higher values if descending—consult `hook-executor.ts` to confirm the sort direction.  
+1. **Register Early, Unregister When Done** – Handlers should be added during the component’s `initialize()` phase and removed (if necessary) during its shutdown to avoid memory leaks.  
 
-2. **Keep Listeners Pure and Fast** – Because HookManager executes listeners sequentially and awaits async results, a slow listener blocks all subsequent hooks. If a hook performs I/O, make it async and return a promise; otherwise, keep the logic lightweight to avoid latency spikes in the constraint pipeline.  
+2. **Respect Priorities** – When order matters, explicitly set the `priority` option.  The default priority is usually `0`; higher numbers run earlier.  
 
-3. **Leverage the Debugger** – During development, enable tracing via `hook-debugger.ts` to verify registration order and payload integrity. The debugger reads directly from the shared metadata, so no extra instrumentation is required.  
+3. **Keep Handlers Small and Focused** – Because HookManager may invoke many handlers for a single event, each handler should perform a single, well‑defined task and return quickly.  Heavy work should be delegated to asynchronous services if possible.  
 
-4. **Handle Errors Gracefully** – Listeners should catch their own errors when possible. HookManager will log uncaught exceptions and continue processing, but swallowing errors early prevents noisy logs and unintended side effects.  
+4. **Handle Errors Gracefully** – Even though HookManager isolates handler errors, a handler should still catch its own predictable exceptions and surface meaningful logs.  Unexpected errors will be caught by the manager, but they may obscure the original cause if not logged.  
 
-5. **Avoid Circular Registrations** – Since hooks can trigger other hooks, be mindful of potential recursion. The executor does not currently detect cycles; design your hook graph to be acyclic or implement guard logic in the listener itself.  
+5. **Leverage Filtering** – Use the `filter` option to limit handler execution to relevant payloads, reducing unnecessary processing and keeping the event flow efficient.  
 
-6. **Future Persistence** – If you need hook registration to survive restarts, consider extending `hook-metadata.ts` to persist the registry via the GraphDatabaseAdapter used by the ConstraintSystem. Until that feature is stable, treat registration as in‑memory only.
+6. **Do Not Introduce Direct Coupling** – Avoid calling sibling components directly from a handler; instead, rely on the hook contract.  This preserves the loose‑coupling design and makes future refactoring easier.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
 
-* **Observer / Pub‑Sub** – Modular registration of listeners that are notified on demand.  
-* **Priority Queue Execution** – Deterministic ordering of listeners based on explicit priority values.  
-* **Separation of Concerns** – Distinct modules for registration (`hook-registry.ts`), execution (`hook-executor.ts`), debugging (`hook-debugger.ts`), and metadata storage (`hook-metadata.ts`).  
+* Event‑driven architecture  
+* Observer / Listener pattern  
+* Registry (mapping) pattern for event‑to‑handler storage  
 
-### Design Decisions & Trade‑offs  
+### Design decisions and trade‑offs  
 
-* **In‑Memory Registry** – Simplicity and low latency, at the cost of losing state across process restarts.  
-* **Synchronous Ordering with Async Support** – Guarantees order but can introduce latency if a high‑priority listener is slow; developers must write non‑blocking listeners.  
-* **Dedicated Debugger** – Improves developer experience but adds extra runtime code that must be kept in sync with the registry structures.  
+* **Centralised registry** simplifies discovery and debugging of hooks but introduces a single point of contention if many events fire simultaneously.  
+* **Handler prioritisation** gives deterministic ordering at the cost of added complexity in the registration API.  
+* **Error isolation** improves robustness but may mask failures if handlers do not log adequately.  
 
-### System Structure Insights  
+### System structure insights  
 
-HookManager sits one level below **ConstraintSystem** and shares the same architectural philosophy as its siblings: a thin façade that delegates to specialized adapters (graph database, metadata repository). The common use of a metadata repository across components hints at a unified configuration model that could be leveraged for cross‑component introspection.
+HookManager sits as a child of **ConstraintSystem**, acting as the communication backbone for its sibling sub‑components.  The parent orchestrates the overall flow, while the siblings contribute domain‑specific logic via hooks, keeping each sub‑component focused on a single responsibility.  
 
-### Scalability Considerations  
+### Scalability considerations  
 
-Because the registry is a simple `Map` and execution is linear, HookManager scales well for a modest number of hooks (tens to low‑hundreds). If the system grows to thousands of listeners per hook, the sorting step in `hook-executor.ts` may become a bottleneck, and a more sophisticated priority queue or pre‑sorted registration list could be introduced. Additionally, the current design assumes a single Node.js process; distributed execution would require persisting registration data and possibly sharding hook handling across workers.
+Because HookManager operates in‑process and uses simple data structures, it scales well for the typical load of constraint validation (tens to low hundreds of events per request).  If the volume of hooks grows dramatically, the registry could be sharded or moved to a more concurrent data structure, but the current design is appropriate for the observed usage patterns.  
 
-### Maintainability Assessment  
+### Maintainability assessment  
 
-The clear separation into four purpose‑driven files makes the codebase easy to navigate and test. The reliance on plain objects and TypeScript types reduces cognitive load. However, the lack of persistence and cycle detection are potential maintenance risks as the hook graph becomes more complex. Adding unit tests around registration, priority ordering, and error handling, together with the existing debugger utilities, should keep the component maintainable as it evolves.
+The use of a clear, well‑documented API, explicit prioritisation, and error isolation makes HookManager highly maintainable.  New hook points can be added without touching existing handlers, and existing handlers can be reordered or filtered without code changes elsewhere.  The adherence to loose coupling and single‑responsibility principles further reduces the risk of ripple effects when modifying any part of the constraint‑validation pipeline.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing constraint metadata. This allows for efficient persistence and retrieval of constraint data, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that the data remains consistent and up-to-date. Furthermore, the GraphDatabaseAdapter provides a flexible and scalable solution for handling large amounts of constraint metadata, making it an ideal choice for the ConstraintSystem.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve validation metadata.
-- [ViolationDetector](./ViolationDetector.md) -- ViolationDetector uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve violation metadata.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LevelDB database in leveldb-database.ts to store graph data.
-- [ConstraintMetadataManager](./ConstraintMetadataManager.md) -- ConstraintMetadataManager uses a metadata repository in metadata-repository.ts to store constraint configuration and registration data.
-- [AgentManager](./AgentManager.md) -- AgentManager uses an agent repository in agent-repository.ts to store agent configuration and registration data.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator uses the constructor(config) + initialize() + execute(input) pattern in content-validation-agent.ts, allowing for lazy initialization and execution
+- [ViolationProcessor](./ViolationProcessor.md) -- ViolationProcessor likely interacts with the ContentValidator sub-component to receive and process constraint violations
+- [ConstraintEngine](./ConstraintEngine.md) -- ConstraintEngine likely interacts with the ContentValidator sub-component to receive and process constraint evaluations
 
 
 ---

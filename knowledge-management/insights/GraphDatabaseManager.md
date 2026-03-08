@@ -2,102 +2,93 @@
 
 **Type:** SubComponent
 
-GraphDatabaseManager may employ a retry logic with exponential backoff, as implemented in the startServiceWithRetry function, to handle transient errors when interacting with the graph database.
+The GraphDatabaseManager provides methods for creating, reading, updating, and deleting data in the graph database.
 
 ## What It Is  
 
-GraphDatabaseManager is a **sub‑component** of the `DockerizedServices` parent component.  Although no source files are listed directly for the manager itself, the observations make it clear that the service is started and supervised in the same way as the other Docker‑containerised services that live under `DockerizedServices`.  In practice this means that the manager’s entry point is invoked by the **`startServiceWithRetry`** function found in `lib/service-starter.js`.  The manager therefore inherits the same robust start‑up semantics—retry loops with exponential back‑off, environment‑driven configuration, and logging—used throughout the Dockerised micro‑service suite.
-
-Functionally, GraphDatabaseManager is responsible for **interacting with a graph database** (most plausibly Neo4j or Amazon Neptune, given the typical choices for a graph‑backed microservice).  It exposes an API (or, alternatively, consumes a message‑queue endpoint) that other services in the Dockerised ecosystem can call to create, read, update, or delete graph‑structured data.  The manager also implements data‑validation and error‑handling logic to guarantee consistency when persisting or retrieving graph entities.
+The **GraphDatabaseManager** is a sub‑component that lives inside the **Trajectory** component (the parent).  Although the observations do not list a concrete file path, the manager is the dedicated module that “uses a graph database to store and retrieve data” and “provides a centralized interface for graph database operations.”  In practice it is the single point of contact for any code that needs to create, read, update, or delete (CRUD) vertices, edges, or properties in the chosen graph‑database implementation.  All interaction with the underlying graph store is funneled through this manager, which also encapsulates error handling for any database‑related exceptions.
 
 ## Architecture and Design  
 
-The overall architecture follows a **container‑based microservices pattern** as described in the `DockerizedServices` hierarchy.  Each service—including GraphDatabaseManager—runs in its own Docker container, communicating with peers via HTTP APIs or asynchronous message queues.  This design yields **loose coupling** and **fault isolation**: a failure inside the graph manager does not directly bring down unrelated services, and the surrounding ecosystem can continue to operate while the manager is being restarted.
+From the observations we can infer a **centralized façade** architectural style.  The manager presents a unified API that hides the specifics of the underlying graph‑database technology (“uses a specific graph database implementation”).  This façade isolates the rest of the system—including sibling components such as **SpecstoryConnector**, **LLMInitializer**, **ConcurrencyController**, **PipelineCoordinator**, **ServiceStarter**, and **SpecstoryAdapterFactory**—from direct coupling to the database driver.  
 
-A key design pattern evident from the observations is the **“service starter with retry”** pattern, encapsulated in `lib/service-starter.js`.  The `startServiceWithRetry` function implements **exponential back‑off** and caps the number of retries, protecting the system from endless start loops while still giving transient failures (e.g., a temporarily unavailable graph database) a chance to recover.  By re‑using this starter across all Dockerised services, the architecture enforces a consistent start‑up contract and simplifies operational tooling (e.g., health‑check scripts, orchestrators).
+The design also exhibits the **CRUD abstraction** pattern: the manager “provides methods for creating, reading, updating, and deleting data in the graph database.”  By exposing a consistent set of operations, it enables other components (for example, the **Trajectory** component that owns it) to perform graph manipulations without needing to understand query syntax or transaction handling.  
 
-Another implicit pattern is **configuration‑as‑environment**, where GraphDatabaseManager reads its connection strings, credentials, and behavioural flags from environment variables or a shared configuration file—mirroring the approach taken by other services started via the same starter utility.  This keeps container images immutable and allows deployment‑time overrides without code changes, a common best practice in containerised microservices.
+Error handling is explicitly mentioned (“handles errors and exceptions that occur during graph database operations”), suggesting that the manager incorporates a **defensive programming** approach, likely wrapping low‑level driver errors into higher‑level exceptions or return codes that the rest of the system can react to.  This keeps failure semantics localized and prevents error‑propagation leaks across component boundaries.
 
 ## Implementation Details  
 
-The concrete implementation hinges on three reusable artefacts:
+The observations do not enumerate concrete classes, functions, or file locations, so the exact implementation details are unavailable.  What is clear, however, is that the manager encapsulates three core responsibilities:
 
-1. **`lib/service-starter.js` – `startServiceWithRetry`**  
-   - Accepts a service‑initialisation callback (likely the GraphDatabaseManager’s `run` or `init` function).  
-   - Executes the callback inside a retry loop that grows the delay exponentially (e.g., 100 ms → 200 ms → 400 ms …) and respects a maximum‑retry ceiling.  
-   - Logs each attempt and eventual success or fatal failure, providing observability for operators.
+1. **Data Storage & Retrieval** – It translates higher‑level domain objects supplied by callers into the graph‑database’s native representation (nodes, relationships, properties) and vice‑versa when reading data back.  
+2. **CRUD Operations** – Dedicated methods exist for each of the four basic data‑manipulation actions.  These methods likely accept parameters that describe the target graph elements (e.g., node identifiers, edge types) and return success indicators or the requested data structures.  
+3. **Error Management** – Any exception thrown by the underlying driver (connection loss, query syntax errors, transaction failures) is caught inside the manager.  The manager then either logs the issue, transforms it into a domain‑specific error object, or retries the operation where appropriate.  
 
-2. **GraphDatabaseManager’s start‑up entry point** (not named in the observations but inferred to exist)  
-   - Reads required configuration such as `GRAPH_DB_URI`, `GRAPH_DB_USER`, `GRAPH_DB_PASS`, and optional flags like `MAX_RETRIES`.  
-   - Instantiates a driver/client for the selected graph database (Neo4j driver or AWS Neptune SDK).  
-   - Wraps the driver creation and initial health‑check (e.g., a simple ping query) inside a function passed to `startServiceWithRetry`.
-
-3. **Operational logic inside the manager**  
-   - **Data validation**: before any write operation, the manager checks payload shapes against a schema (e.g., using JSON‑Schema or a custom validator).  
-   - **Error handling**: transient database errors trigger the same exponential back‑off logic used at start‑up, while permanent errors are surfaced to callers via structured error responses.  
-   - **Logging**: leveraging the same logger that `service‑starter` configures, the manager emits contextual logs for each request, including request IDs, query strings, and outcome status.
-
-Because the observations do not list explicit class or function names inside GraphDatabaseManager, the above description stays faithful to the provided clues while avoiding invented identifiers.
+Because the manager “uses a specific graph database implementation,” the code probably imports a driver library (e.g., Neo4j, Amazon Neptune, or another graph store) and maintains a connection pool or session object that is reused across calls.  The connection lifecycle is likely controlled by the manager itself, ensuring that resources are opened once and closed cleanly when the parent **Trajectory** component shuts down.
 
 ## Integration Points  
 
-GraphDatabaseManager sits alongside its sibling **ServiceStarter** component, both of which depend on `lib/service-starter.js`.  The manager’s **public interface** is an HTTP API (or a message‑queue consumer) that other Dockerised services invoke to manipulate graph data.  Consequently, the manager must expose:
+* **Parent – Trajectory** – The **Trajectory** component owns the **GraphDatabaseManager**.  Trajectory likely invokes the manager when it needs to persist or query graph‑structured data that represents trajectories, routes, or related entities.  Because Trajectory also interacts with other siblings (e.g., **SpecstoryConnector** for external data ingestion, **PipelineCoordinator** for workflow orchestration), the manager serves as the data‑persistence back‑end for any workflow that requires graph storage.  
 
-* **API routes** (e.g., `POST /nodes`, `GET /nodes/:id`, `DELETE /edges/:id`).  
-* **Message‑queue listeners** (if the ecosystem prefers event‑driven communication), subscribing to topics such as `graph.create` or `graph.delete`.
+* **Sibling Components** – While the siblings do not directly call the manager (based on the supplied observations), they share the same runtime environment and may depend on the manager indirectly.  For instance, **SpecstoryConnector** might fetch raw events that are later transformed into graph nodes via the manager; **ConcurrencyController** could schedule parallel graph writes, relying on the manager’s thread‑safe API; **PipelineCoordinator** may orchestrate a series of graph mutations as part of a larger pipeline.  
 
-The manager’s **runtime dependencies** include the graph‑database client library (Neo4j driver or AWS SDK) and any shared utilities for logging, configuration, and retry handling.  It also consumes the **environment‑variable configuration** supplied by the Docker orchestrator (Docker Compose, Kubernetes, etc.), which is the same mechanism used by its parent `DockerizedServices`.
-
-From a deployment perspective, the manager is packaged as its own Docker image and referenced in the `docker-compose.yml` (or equivalent) of the `DockerizedServices` suite.  The orchestrator ensures that the manager’s container starts after any prerequisite services (e.g., the underlying graph database) and that health‑checks are performed using the same retry logic that `startServiceWithRetry` provides.
+* **External Dependencies** – The manager’s “specific graph database implementation” is the primary external dependency.  Any configuration (connection strings, authentication credentials, pool sizes) is likely supplied by the surrounding system (perhaps via environment variables or a config file managed by **Trajectory**).  No other explicit libraries are mentioned.
 
 ## Usage Guidelines  
 
-1. **Configuration** – Always provide the required environment variables (`GRAPH_DB_URI`, `GRAPH_DB_USER`, `GRAPH_DB_PASS`, etc.) before launching the container.  Missing variables will cause the start‑up retry loop to fail after the configured maximum attempts.  
-
-2. **Idempotent Start‑up** – The manager’s entry point should be **idempotent**; repeated invocations by `startServiceWithRetry` must not create duplicate connections or alter persistent state.  This aligns with the retry pattern’s expectation that a failed start can be safely retried.  
-
-3. **Error Propagation** – When the manager encounters a permanent error (e.g., authentication failure), it should return a clear HTTP status (4xx) or publish an error event, rather than silently retrying indefinitely.  Transient errors (network hiccups, throttling) should be handled with the same exponential back‑off strategy used at start‑up.  
-
-4. **Logging Discipline** – Leverage the shared logger configured by `service‑starter`.  Include correlation IDs from incoming requests so that end‑to‑end traces can be reconstructed across service boundaries.  
-
-5. **Testing & Validation** – Unit tests should mock the graph‑database client and verify that validation logic rejects malformed payloads before any database call is made.  Integration tests should spin up a real (or in‑memory) graph database instance to confirm that the retry logic behaves as expected under simulated transient failures.
+1. **Always go through the manager** – Direct driver usage bypasses the centralized error handling and may lead to inconsistent state.  All CRUD work should be performed via the manager’s public methods.  
+2. **Handle manager‑level errors** – Since the manager “handles errors and exceptions,” callers should be prepared to receive its wrapped error objects or status codes and react appropriately (e.g., retry, fallback, or surface a user‑friendly message).  
+3. **Respect transaction boundaries** – If the manager exposes transaction‑related APIs, callers should ensure that a series of related writes are performed within a single transaction to maintain graph integrity.  
+4. **Avoid heavy synchronous loops** – Graph databases often perform best with batched operations.  When integrating with **ConcurrencyController**, prefer bulk insert/update calls rather than issuing many tiny requests.  
+5. **Configuration awareness** – The manager’s connection parameters are likely defined at the **Trajectory** level; any changes to the underlying graph store (e.g., switching from an embedded instance to a cloud service) should be made in the configuration rather than in code.
 
 ---
 
-### Architectural Patterns Identified
-* Container‑based **microservices** pattern (DockerisedServices)  
-* **Service‑starter with retry** (exponential back‑off) pattern (`lib/service-starter.js`)  
-* **Configuration‑as‑environment** for runtime parameters  
-* **API / Message‑queue** communication for loose coupling  
+### Architectural patterns identified  
 
-### Design Decisions & Trade‑offs
-* **Robust start‑up** via retry protects against temporary DB outages but adds latency on first launch.  
-* **Separate container per service** improves fault isolation but increases orchestration complexity.  
-* **Environment‑driven config** simplifies deployments but requires careful secret management.  
+* Centralized façade (single point of database interaction)  
+* CRUD abstraction (dedicated create/read/update/delete methods)  
+* Defensive/error‑handling encapsulation  
 
-### System Structure Insights
-* GraphDatabaseManager is a leaf node under `DockerizedServices`, sharing the same starter logic as its sibling `ServiceStarter`.  
-* All services rely on a common retry‑centric start‑up routine, creating a uniform operational surface.  
+### Design decisions and trade‑offs  
 
-### Scalability Considerations
-* Because each service runs in its own container, horizontal scaling is straightforward—simply increase the replica count of the GraphDatabaseManager container behind a load balancer.  
-* The exponential back‑off start‑up logic prevents cascade failures when the underlying graph database scales out or experiences brief hiccups.  
+* **Centralization** simplifies maintenance and enforces consistent error handling, but it creates a single point of failure and may become a bottleneck if not designed for concurrency.  
+* **Specific graph‑DB implementation** gives performance benefits of native driver features, at the cost of reduced portability; swapping the underlying DB would require changes inside the manager.  
+* **Explicit CRUD methods** provide a clear contract for callers, yet they may limit flexibility for complex queries unless the manager also exposes a lower‑level query interface.  
 
-### Maintainability Assessment
-* Re‑using `startServiceWithRetry` centralises start‑up logic, reducing duplicated code and easing future changes to retry policies.  
-* Keeping configuration external to the codebase and using standard logging aids observability and troubleshooting.  
-* The lack of concrete internal class names in the current observations suggests a need for clearer documentation within the GraphDatabaseManager codebase itself to aid future developers.
+### System structure insights  
+
+* **GraphDatabaseManager** sits one level beneath **Trajectory**, acting as the persistence layer for any graph‑oriented data.  
+* It is a sibling to components that handle connectivity (**SpecstoryConnector**, **SpecstoryAdapterFactory**), orchestration (**PipelineCoordinator**), and concurrency (**ConcurrencyController**), indicating a modular decomposition where data storage is isolated from communication, workflow, and parallelism concerns.  
+
+### Scalability considerations  
+
+* Because all graph operations funnel through a single manager, scalability hinges on the manager’s ability to manage connection pooling and support asynchronous or batched operations.  
+* Integration with **ConcurrencyController** suggests that the system anticipates parallel workloads; the manager must therefore be thread‑safe and capable of handling concurrent requests without contention.  
+* If the underlying graph database supports clustering or sharding, the manager could be extended to route queries accordingly, but the current design (a “specific implementation”) may need refactoring to expose such capabilities.  
+
+### Maintainability assessment  
+
+* The façade approach improves maintainability: changes to the underlying driver or query syntax are confined to the manager.  
+* Centralized error handling reduces duplicated try/catch blocks across the codebase.  
+* However, the lack of visible abstraction layers (e.g., repository interfaces) could make unit testing harder unless the manager itself is designed with injectable driver mocks.  
+* Keeping the manager thin—delegating complex business logic to higher‑level components like **Trajectory**—will preserve readability and ease future enhancements.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service having its own container and communication happening through APIs or message queues, as seen in the lib/service-starter.js file which employs the startServiceWithRetry function to start services with retry logic and exponential backoff. This design decision allows for easy addition or removal of services as needed, making the system highly scalable and flexible. The use of APIs or message queues for communication between services is a common pattern in microservices architecture, enabling loose coupling and fault tolerance. The startServiceWithRetry function in lib/service-starter.js ensures robust startup and prevents endless loops, making the system more reliable.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js allows for flexible connection establishment with the Specstory extension via multiple protocols such as HTTP, IPC, or file watch. This is evident in the way the SpecstoryAdapter class is instantiated and used throughout the component, providing a unified interface for different connection methods. Furthermore, the retry logic with exponential backoff implemented in the startServiceWithRetry function in lib/service-starter.js ensures that connections are re-established in case of failures, enhancing the overall robustness of the component.
 
 ### Siblings
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the startServiceWithRetry function in lib/service-starter.js to start services with retry logic and exponential backoff.
+- [SpecstoryConnector](./SpecstoryConnector.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to establish connections to the Specstory extension.
+- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer uses a constructor to initialize the LLM.
+- [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
+- [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
+- [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
+- [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

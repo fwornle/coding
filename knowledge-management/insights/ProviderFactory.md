@@ -2,77 +2,85 @@
 
 **Type:** Detail
 
-The providers.json file contains the configuration settings for each registered provider, including their modes, endpoints, and authentication details, which are used by the ProviderFactory to create provider instances
+The factory pattern implemented in the ProviderFactory enables the ProviderRegistryModule to support multiple LLM providers without requiring significant modifications to the underlying code.
 
 ## What It Is  
 
-`ProviderFactory` lives in **ProviderFactory.java** and is the concrete implementation of the factory that creates concrete provider objects. The factory’s single public entry point is the `createProvider` method, which receives a **provider configuration** (the JSON fragment that describes a particular provider) and returns a fully‑initialised provider instance that matches the configuration’s **type** field. The configuration data that drives the factory comes from the **providers.json** file, a central catalogue that enumerates every registered provider together with its mode, endpoint URLs, and authentication credentials. `ProviderFactory` is not a stand‑alone component – it is owned by **ProviderRegistry**, which delegates the creation of providers to the factory whenever a new provider is requested.
+`ProviderFactory` lives inside the **ProviderRegistryModule** and is defined in the file `lib/llm/provider-registry-module.ts`.  Its sole responsibility is to encapsulate the creation of concrete LLM‑provider modules—most notably `DMRProviderModule` and `MockServiceModule`.  By centralising the instantiation logic, the factory shields the rest of the registry from the details of how each provider is constructed, configured, or wired.  The result is a single, well‑known entry point that the `ProviderRegistryModule` can call whenever it needs a concrete provider instance, without having to know the provider’s class name or construction nuances.
 
 ## Architecture and Design  
 
-The design revolves around a **Factory pattern** coupled with a **configuration‑driven registry**. `ProviderFactory` encapsulates the logic that maps a configuration’s *type* to a concrete provider class, thereby isolating the construction details from callers. This is evident from the observation that “the createProvider method … returns a provider instance based on the configuration type.” Because the mapping is driven by entries in **providers.json**, the system achieves *open‑for‑extension, closed‑for‑modification*: new provider types can be introduced simply by adding a new JSON entry, without touching Java code.  
+The observations make it clear that the **factory pattern** is the primary architectural mechanism at work.  `ProviderFactory` implements a classic “create‑object‑by‑key” approach: the `ProviderRegistryModule` supplies a provider identifier (e.g., `"dmr"` or `"mock"`), the factory selects the corresponding concrete module, constructs it, and returns the ready‑to‑use instance.  This design decouples the **registry** (the client) from the **provider implementations** (the products), enabling the registry to remain unchanged when new providers are added.
 
-`ProviderRegistry` acts as a higher‑level façade that holds the factory and likely maintains a lookup table of already‑created provider instances. Its relationship to `ProviderFactory` is explicit – “ProviderRegistry contains ProviderFactory” – indicating a **Registry‑Factory composition** where the registry coordinates lifecycle concerns while the factory handles instantiation. The sibling components, **ProviderConfigurationManager** (presumed to be implemented in `ProviderConfiguration.java`) and **ProviderInstanceLifecycleManager** (presumed to be `ProviderInstanceManager.java`), share the same tier of responsibility: configuration parsing/validation and lifecycle handling, respectively. Together they form a cohesive subsystem that isolates configuration, creation, and lifecycle management.
+Because the factory sits inside the `ProviderRegistryModule`, the module acts as a **facade** for the broader system.  External callers interact only with the registry, which in turn delegates provider creation to the factory.  The relationship can be visualised as:
+
+```
+[External Consumer] → ProviderRegistryModule → ProviderFactory → {DMRProviderModule, MockServiceModule, …}
+```
+
+No other design patterns are mentioned in the observations, so the architecture is deliberately kept simple: a single factory layer that provides extensibility while preserving a clean, low‑coupling contract between the registry and its providers.
 
 ## Implementation Details  
 
-The core of the implementation is the `createProvider` method in **ProviderFactory.java**. At runtime the method receives a configuration object that has been deserialized from **providers.json**. Internally, the method likely performs a conditional or reflective lookup based on the configuration’s `type` field, instantiating the matching provider class (e.g., `AwsProvider`, `RestProvider`, etc.). After construction, the method injects the remaining configuration values – such as `mode`, `endpoint`, and authentication credentials – into the provider instance, ensuring it is ready for immediate use.  
+Although the source code is not enumerated in the observations, the described behaviour implies a few concrete elements inside `lib/llm/provider-registry-module.ts`:
 
-`providers.json` serves as the single source of truth for all provider metadata. Each entry contains keys for **mode**, **endpoint**, and **authentication**, which the factory consumes. Because the file is external to the compiled code, changes to provider definitions can be deployed without rebuilding the application, provided the JSON schema remains compatible.  
+1. **ProviderFactory class / object** – likely exposes a method such as `createProvider(type: string): ProviderInterface`.  The method contains a conditional (switch/lookup table) that maps the supplied `type` to the concrete class (`DMRProviderModule` or `MockServiceModule`).  
+2. **Provider modules** – `DMRProviderModule` and `MockServiceModule` are separate modules that implement a common provider contract (e.g., a `generate(prompt)` method).  Because the factory can instantiate them interchangeably, they must share an interface or abstract base class.  
+3. **Registration logic** – The `ProviderRegistryModule` probably holds a reference to the factory and calls it during its own initialization or on‑demand when a consumer requests a specific LLM provider.  This indirection means the registry never directly imports `DMRProviderModule` or `MockServiceModule`; it only knows the factory.
 
-`ProviderRegistry` holds a reference to the factory and probably exposes methods such as `getProvider(String id)` that first consult an internal cache and, if absent, call `ProviderFactory.createProvider` with the appropriate configuration slice from **providers.json**. The sibling `ProviderConfigurationManager` is responsible for loading and validating the JSON file, while `ProviderInstanceLifecycleManager` deals with start/stop, health‑check, and disposal of provider objects after they are created.
+The mechanics are straightforward: the factory receives a request, selects the appropriate concrete class, constructs it (possibly injecting configuration values), and returns the instance.  Because the factory abstracts this process, adding a new provider would involve adding a new entry to the factory’s lookup without touching the registry’s core logic.
 
 ## Integration Points  
 
-- **ProviderConfigurationManager** (`ProviderConfiguration.java`): Loads **providers.json**, validates its schema, and supplies the raw configuration objects that `ProviderFactory.createProvider` consumes. This manager is the entry point for any external system that wishes to modify provider definitions.  
-- **ProviderRegistry**: Acts as the consumer of `ProviderFactory`. Any component that needs a provider (e.g., request routing, data ingestion pipelines) asks the registry for an instance, thereby indirectly invoking the factory.  
-- **ProviderInstanceLifecycleManager** (`ProviderInstanceManager.java`): Takes the provider instances produced by the factory and applies lifecycle hooks (initialisation, health monitoring, shutdown). The lifecycle manager may register callbacks with the provider objects, assuming they implement a common lifecycle interface.  
-- **External Systems**: Because the factory’s behaviour is driven by **providers.json**, external deployment pipelines can update this file to add or reconfigure providers without touching the Java codebase. The registry will pick up the changes on the next reload cycle orchestrated by the configuration manager.
+`ProviderFactory` is tightly coupled to its **parent**—the `ProviderRegistryModule`.  The registry is the only consumer of the factory, using it as the sole gateway to obtain LLM provider instances.  Conversely, the factory depends on the concrete provider modules (`DMRProviderModule`, `MockServiceModule`) which are its **children**.  These provider modules, in turn, may depend on lower‑level SDKs, configuration files, or external services (e.g., an actual LLM endpoint or a mock server).  
+
+From a system‑wide perspective, any component that needs to issue LLM calls will interact with the `ProviderRegistryModule`, which will delegate to the factory.  Therefore, the integration surface consists of:
+
+* **Public API of ProviderRegistryModule** – methods like `getProvider(name)` that internally call `ProviderFactory`.
+* **Configuration objects** – the factory may read a configuration file or environment variables to decide which provider type to instantiate.
+* **External LLM SDKs** – the concrete provider modules encapsulate those dependencies, keeping them out of the registry and factory.
+
+No other modules are mentioned, so the integration scope is limited to the registry‑factory‑provider chain.
 
 ## Usage Guidelines  
 
-When adding a new provider, developers should **only modify** **providers.json**. The entry must include a unique identifier, a `type` that matches a concrete provider class already present on the classpath, and all required fields (`mode`, `endpoint`, authentication). After committing the JSON change, the `ProviderConfigurationManager` should be triggered to reload the file so that the registry can recognise the new provider. Direct instantiation of provider classes outside the factory is discouraged; always obtain providers through `ProviderRegistry` to guarantee that configuration is applied consistently and that lifecycle hooks are correctly attached.  
-
-If a new provider type is required that does not yet have a Java implementation, the appropriate class must be added to the codebase and registered with the factory’s internal type‑to‑class map. This is the only circumstance where code changes are needed; once the class exists, future providers of that type can be added purely via JSON.  
-
-When updating authentication credentials or endpoint URLs, prefer editing **providers.json** rather than hard‑coding values. Ensure that any changes respect the JSON schema enforced by `ProviderConfigurationManager` to avoid runtime factory failures.  
-
-Finally, when deprecating a provider, remove its entry from **providers.json** and, if necessary, clean up any lingering instances via `ProviderInstanceLifecycleManager` to prevent resource leaks.
+1. **Always request providers through the ProviderRegistryModule** – Directly importing `DMRProviderModule` or `MockServiceModule` bypasses the factory and defeats the extensibility intent.  
+2. **Supply a valid provider identifier** – The identifier string (or enum) must match one of the keys recognised by `ProviderFactory`.  Using an unknown key will result in a factory error or a fallback to a default provider if such logic exists.  
+3. **Add new providers by extending the factory only** – When a new LLM provider is required, implement the provider module to conform to the shared provider interface, then register the new type inside `ProviderFactory`.  No changes to `ProviderRegistryModule` are needed, preserving backward compatibility.  
+4. **Avoid mutating provider instances after creation** – Because the factory returns fully‑initialised objects, downstream code should treat them as immutable or manage state internally within the provider.  
+5. **Keep provider‑specific configuration separate** – If a provider needs credentials or endpoint URLs, store those in a configuration source that the factory can read when constructing the provider, rather than hard‑coding them in the registry.
 
 ---
 
-### Architectural patterns identified  
-1. **Factory Pattern** – encapsulated in `ProviderFactory.createProvider`.  
-2. **Registry Pattern** – embodied by `ProviderRegistry` that stores and retrieves provider instances.  
-3. **Configuration‑Driven Extensibility** – the JSON‑based provider catalogue that drives factory behaviour.
+### Architectural patterns identified
+* **Factory pattern** – centralises creation of heterogeneous LLM provider objects.
+* Implicit **Facade** – `ProviderRegistryModule` presents a simplified interface while delegating to the factory.
 
-### Design decisions and trade‑offs  
-- **Configuration‑only extension** reduces code churn but shifts validation responsibility to the JSON schema and the configuration manager.  
-- **Centralised factory** simplifies client code but introduces a single point of failure if the type‑to‑class mapping is incorrect.  
-- **Lazy creation via registry** conserves resources but may add latency on first‑use lookups.
+### Design decisions and trade‑offs
+* **Decision:** Use a factory to decouple the registry from concrete providers.  
+  *Trade‑off:* Introduces an extra indirection layer, but gains extensibility.
+* **Decision:** Keep provider implementations behind a common interface.  
+  *Trade‑off:* Requires all providers to conform, which may limit provider‑specific features unless exposed through the interface.
 
-### System structure insights  
-The provider subsystem is layered:  
-1. **Configuration Layer** (`ProviderConfigurationManager`) → loads JSON.  
-2. **Factory Layer** (`ProviderFactory`) → creates concrete providers from config.  
-3. **Registry Layer** (`ProviderRegistry`) → caches and supplies providers.  
-4. **Lifecycle Layer** (`ProviderInstanceLifecycleManager`) → manages runtime state.
+### System structure insights
+* Hierarchical: `ProviderRegistryModule` (parent) → `ProviderFactory` (child) → concrete provider modules (`DMRProviderModule`, `MockServiceModule`).  
+* The factory acts as the only bridge between the registry and the provider implementations, ensuring a single point of change for adding/removing providers.
 
-### Scalability considerations  
-Because provider creation is driven by a flat JSON file, the system can scale to many providers as long as the file size remains manageable and parsing remains efficient. The factory’s instantiation logic is lightweight, so adding hundreds of providers does not significantly impact performance. However, extremely large configuration files may increase start‑up latency; in such cases, consider paging the JSON or sharding configurations per domain.  
+### Scalability considerations
+* Adding new providers scales linearly: each new provider adds one entry in the factory’s lookup.  
+* Because provider instantiation is isolated, the system can later introduce lazy‑loading or caching strategies within the factory without affecting the registry.  
+* The simple conditional mapping may become unwieldy if the number of providers grows dramatically; at that point a registration map or plugin architecture could be introduced.
 
-### Maintainability assessment  
-The design scores high on maintainability: adding or removing providers requires only JSON edits, and the factory logic remains untouched. Centralising configuration reduces duplication, and the clear separation of concerns (configuration, creation, registry, lifecycle) makes each component independently testable. The main maintenance risk lies in keeping the JSON schema synchronized with provider class expectations; robust schema validation in `ProviderConfigurationManager` mitigates this risk.
+### Maintainability assessment
+* **High maintainability** – The factory isolates provider‑specific code, so modifications to a provider do not ripple through the registry.  
+* **Clear separation of concerns** – Registry handles orchestration; factory handles creation; providers handle LLM interaction.  
+* **Potential risk** – If the factory’s mapping logic is not well‑documented, developers may add duplicate keys or forget to update the mapping when a provider is renamed. Regular code‑review of the factory file (`lib/llm/provider-registry-module.ts`) mitigates this risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a factory pattern in ProviderFactory.java to create instances of different provider classes based on their configurations in providers.json
-
-### Siblings
-- [ProviderConfigurationManager](./ProviderConfigurationManager.md) -- The ProviderConfigurationManager is likely implemented in a separate module or class, such as ProviderConfiguration.java, which defines the configuration settings for each provider
-- [ProviderInstanceLifecycleManager](./ProviderInstanceLifecycleManager.md) -- The ProviderInstanceLifecycleManager is likely implemented in a separate module or class, such as ProviderInstanceManager.java, which defines the lifecycle methods for provider instances
+- [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.
 
 
 ---

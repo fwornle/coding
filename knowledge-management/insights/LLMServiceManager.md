@@ -2,133 +2,142 @@
 
 **Type:** SubComponent
 
-LLMServiceManager utilizes separate scripts for starting the API service and the dashboard service, such as scripts/api-service.js and scripts/dashboard-service.js, to provide flexibility and scalability.
+LLMServiceInitializer initializes the LLM services lazily using the LLMServiceInitializer class in llm-service-manager/initializer.ts
 
 ## What It Is  
 
-The **LLMServiceManager** lives inside the *DockerizedServices* component and is the orchestrator that prepares, starts, and supervises the LLM‑related services that run in their own containers. Its implementation is spread across a handful of concrete files that appear throughout the repository:
+**LLMServiceManager** is a sub‑component that lives inside the `llm-service-manager` directory of the code‑base. Its primary responsibility is to orchestrate the lifecycle of large‑language‑model (LLM) service instances that are required by the broader **SemanticAnalysis** component. The manager does not contain the concrete service implementations itself; instead, it relies on three dedicated collaborators that live side‑by‑side in the same folder:
 
-* **`lib/llm/llm-service.ts`** – the core `LLMService` class that supplies a uniform interface for all LLM operations (mode routing, caching, circuit‑breaking).  
-* **`lib/service-starter.js`** – a reusable start‑up helper that performs retries, enforces start‑up timeouts, and validates health checks before a service is considered “ready”.  
-* **`scripts/api-service.js`** and **`scripts/dashboard-service.js`** – thin entry‑point scripts used by the manager to launch the API and dashboard processes respectively.
+* `llm-service-manager/factory.ts` – defines the **LLMServiceFactory** class.  
+* `llm-service-manager/initializer.ts` – defines the **LLMServiceInitializer** class.  
+* `llm-service-manager/registry.ts` – defines the **LLMServiceRegistry** class.  
 
-Together, these pieces give the manager the ability to spin up the LLM API and its accompanying UI in a reliable, repeatable fashion while delegating the heavy‑lifting of LLM request handling to `LLMService`.
+Together these classes give LLMServiceManager a clear separation of concerns: creating services, registering them for discovery, and lazily initializing them only when they are first needed.
 
 ---
 
 ## Architecture and Design  
 
-The observed code reveals a **service‑orchestration** architecture that leans on a few well‑defined responsibilities:
+The observable design is built around three classic object‑oriented patterns that are explicitly manifested in the file structure:
 
-1. **Standardised LLM façade** – `LLMService` (in `lib/llm/llm-service.ts`) encapsulates all LLM‑specific concerns (mode routing, caching, circuit‑breaking). By exposing a single, stable API, the manager can treat every LLM backend uniformly, which simplifies extension and testing.
+1. **Factory Pattern** – `LLMServiceFactory` encapsulates the construction logic for the various LLM service types. By delegating creation to a factory, LLMServiceManager stays agnostic of concrete service classes and can support new providers simply by extending the factory.
 
-2. **Robust start‑up choreography** – `ServiceStarter` (in `lib/service‑starter.js`) implements a **retry‑with‑timeout** pattern combined with a health‑verification step. The manager invokes this helper for each child process (API or dashboard), ensuring that transient failures do not leave the system in a partially‑started state.
+2. **Lazy Initialization** – `LLMServiceInitializer` implements a “initialize‑on‑first‑use” strategy. Rather than instantiating every possible LLM service at application start‑up, the initializer defers heavy setup (e.g., loading model weights, establishing remote connections) until a consumer actually requests the service. This reduces start‑up latency and conserves resources.
 
-3. **Process registration** – The manager optionally collaborates with the **ProcessManagementService** (via its `ProcessStateManager`) to register child processes. This creates a single source of truth for process lifecycles across the DockerizedServices suite.
+3. **Registry (Service Locator) Pattern** – `LLMServiceRegistry` maintains a map of service identifiers to ready‑to‑use instances (or to their lazy‑initializers). Consumers query the registry to obtain a reference, which abstracts away the underlying creation and initialization steps.
 
-4. **Separation of entry points** – Distinct scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`) give the manager the flexibility to launch each component independently, supporting horizontal scaling (multiple API instances) or independent upgrades (dashboard only).
+The interaction flow can be described as:
 
-These decisions collectively reflect a **component‑based** design where each concern (LLM logic, start‑up robustness, process bookkeeping) lives in its own module and is wired together by the manager. The parent component *DockerizedServices* supplies the containerised execution environment, while sibling components such as **ProcessManagementService**, **APIService**, and **DashboardService** share the same start‑up infrastructure (`ServiceStarter`) and process‑registration conventions.
+1. **Registration** – At application boot, LLMServiceManager asks the **LLMServiceRegistry** to register all known service keys. For each key, the registry stores a reference to a **LLMServiceInitializer** that knows how to obtain the concrete service from **LLMServiceFactory**.
+
+2. **Resolution** – When a downstream component (e.g., a SemanticAnalysis agent) requests a particular LLM service, it asks the registry for that key. The registry forwards the request to the associated initializer.
+
+3. **Lazy Creation** – The **LLMServiceInitializer** checks whether the service has already been instantiated. If not, it invokes **LLMServiceFactory** to build the concrete service, caches the result, and returns it to the caller.
+
+This layered approach isolates responsibilities, making the manager a thin coordinator rather than a monolithic factory or initializer.
 
 ---
 
 ## Implementation Details  
 
-### LLMService (`lib/llm/llm-service.ts`)  
-`LLMService` is the workhorse for all LLM interactions. Its public interface likely includes methods such as `runPrompt`, `setMode`, and `clearCache`. Internally it:
+### Core Classes  
 
-* **Mode routing** – selects the appropriate LLM backend (e.g., GPT‑4, Claude) based on a configuration flag or request metadata.  
-* **Caching** – stores recent request‑response pairs, probably in an in‑memory map or a lightweight persistent store, to avoid redundant calls.  
-* **Circuit breaking** – monitors error rates and latency; when thresholds are breached it short‑circuits further calls and returns a fallback, protecting downstream services from cascading failures.
+| File | Class | Role |
+|------|-------|------|
+| `llm-service-manager/factory.ts` | **LLMServiceFactory** | Contains static or instance methods that know how to construct each concrete LLM service (e.g., OpenAI, Anthropic, local model wrappers). The factory likely uses a switch or map keyed by a service identifier to decide which concrete class to instantiate. |
+| `llm-service-manager/initializer.ts` | **LLMServiceInitializer** | Wraps a factory call with a guard that ensures the service is created only once. It may store a private `instance?: LLMService` field and expose a `getInstance(): LLMService` method that performs the lazy check. |
+| `llm-service-manager/registry.ts` | **LLMServiceRegistry** | Holds a dictionary such as `Map<string, LLMServiceInitializer>`. It provides `register(key: string, initializer: LLMServiceInitializer)` and `resolve(key: string): LLMService` methods. The registry is the single source of truth for which services are available in the system. |
 
-Because the manager does not implement these behaviours itself, any change to caching strategy or circuit‑breaker thresholds is isolated to this file, keeping the manager thin.
+### LLMServiceManager  
 
-### ServiceStarter (`lib/service-starter.js`)  
-`ServiceStarter` provides a `start(serviceScript, options)` function (or similar) that:
+Although the source file for the manager itself is not listed, the observations make it clear that the manager **uses** the three classes above. Its typical responsibilities include:
 
-* **Spawns** a child process for the supplied script (`api-service.js` or `dashboard-service.js`).  
-* **Retries** the launch a configurable number of times if the process exits prematurely.  
-* **Enforces a timeout** after which the launch is considered failed.  
-* **Performs health verification**, likely by polling a health endpoint exposed by the child or checking a readiness flag.
+* **Boot‑time wiring** – iterating over a configuration (perhaps supplied by the parent **SemanticAnalysis** component) and populating the registry with appropriate initializers.
+* **Facade methods** – exposing high‑level APIs such as `getService(name: string): LLMService` that delegate to the registry, thereby shielding callers from the registry’s internal API.
+* **Lifecycle hooks** – possibly providing a `shutdown()` method that iterates over the registry and disposes of any instantiated services (e.g., closing network connections).
 
-The manager calls this helper for each service, passing the appropriate script path and any environment variables required for the LLM mode.
-
-### Process Management Integration  
-When the manager “registers” a service, it hands the child‑process identifier to the **ProcessManagementService**. That service, backed by the `ProcessStateManager`, tracks the state (running, stopped, restarting) of each child, enabling coordinated shutdowns or restarts across the DockerizedServices ecosystem.
-
-### Startup Scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`)  
-These scripts are intentionally minimal: they import `LLMService`, configure it (e.g., select the desired mode), expose an HTTP server for API calls, and signal readiness (perhaps by writing to stdout or opening a health endpoint). Because the manager starts them via `ServiceStarter`, they inherit the same retry and health‑check guarantees as any other DockerizedServices child.
+Because the manager is a sub‑component of **SemanticAnalysis**, it is likely instantiated early in the SemanticAnalysis startup sequence and then handed to downstream agents (e.g., OntologyClassificationAgent) that need LLM capabilities.
 
 ---
 
 ## Integration Points  
 
-* **Parent – DockerizedServices** – The manager is a sub‑component of DockerizedServices, meaning it runs inside a Docker container that also hosts its sibling services. Docker provides the isolation and networking needed for the API and dashboard to communicate with the LLM backend.
+1. **Parent – SemanticAnalysis**  
+   *SemanticAnalysis* incorporates LLMServiceManager as part of its processing pipeline. When the DAG‑based execution model (described for the parent) schedules an agent that requires language‑model inference, that agent calls the manager to obtain the appropriate LLM service. The manager’s lazy initialization aligns well with the parent’s topological sort: services are only spun up when the dependent node in the DAG is executed.
 
-* **Sibling – ProcessManagementService** – By delegating process bookkeeping to this sibling, the manager benefits from a centralized lifecycle view. The `ProcessStateManager` acts as the contract: the manager supplies a process ID and optional metadata; the sibling records state changes and can trigger restarts if needed.
+2. **Sibling Components**  
+   *Pipeline*, *Ontology*, *Insights*, *CodeGraphConstructor*, and *SemanticInsightGenerator* all follow a similar “configuration → factory → registry” style (e.g., OntologyConfigManager loads a YAML file, InsightGenerator uses a generator class). LLMServiceManager shares this architectural flavor, which promotes consistency across the code‑graph. The shared pattern makes it easier for developers to reason about service discovery and initialization across siblings.
 
-* **Sibling – APIService & DashboardService** – Both are started by the manager using the dedicated scripts. They share the same start‑up contract (`ServiceStarter`) and thus exhibit identical resilience characteristics (retry, timeout, health checks).
+3. **External Configuration**  
+   While not directly observed, the presence of a factory suggests that service types and credentials are likely driven by a configuration file (similar to `ontology-config.yaml` used by OntologyConfigManager). The manager would read that config during its boot‑time wiring phase and pass the relevant parameters to the factory.
 
-* **LLMService (`lib/llm/llm-service.ts`)** – The manager does not call LLM APIs directly; it relies on this class to abstract away provider‑specific details. Any future LLM provider can be added by extending `LLMService` without touching the manager.
-
-* **External Dependencies** – While not explicitly listed, `LLMService` likely depends on third‑party SDKs or HTTP clients for contacting LLM providers. The manager’s only external contract is the script entry points, keeping its dependency surface small.
+4. **Public Interfaces**  
+   The only outward‑facing contract that other components can rely on is the manager’s “resolve” method (exposed via the registry). This contract is deliberately narrow, reducing coupling and allowing the underlying implementation to evolve (e.g., swapping a factory for a dependency‑injection container) without breaking callers.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Never invoke the child scripts directly** – Always use `LLMServiceManager` (or its underlying `ServiceStarter`) so that retries, timeouts, and health verification are applied uniformly. Direct execution bypasses the circuit‑breaker and process‑registration logic.
+* **Prefer the Manager’s Facade** – Callers should never instantiate a service directly or reach into the factory. Use `LLMServiceManager.getService('<serviceKey>')` (or the equivalent registry resolve call) so that lazy initialization and caching remain effective.
 
-2. **Configure LLM mode through `LLMService`** – If a new LLM backend is required, extend `LLMService` with the routing logic and update the configuration file read by the API script. The manager will automatically pick up the change because it only launches the script.
+* **Register All Needed Services Early** – During application start‑up, ensure that every LLM service you anticipate using is registered with the **LLMServiceRegistry**. Missing registrations will result in a runtime “service not found” error.
 
-3. **Leverage the ProcessManagementService for supervision** – Register any spawned process with `ProcessStateManager` immediately after start‑up. This ensures that graceful shutdowns (e.g., during container stop) propagate correctly and that restarts are coordinated across siblings.
+* **Avoid Re‑initializing** – The **LLMServiceInitializer** is designed to create the service once. Do not manually call the factory outside of the initializer; doing so would bypass the caching mechanism and could lead to duplicated resources (e.g., multiple HTTP clients).
 
-4. **Respect the health‑check contract** – The API and dashboard scripts must expose a health endpoint (or emit a readiness signal) that `ServiceStarter` can poll. Failure to do so will cause the manager to treat the service as unhealthy and trigger retries.
+* **Graceful Shutdown** – If an LLM service holds external resources (socket connections, file handles), invoke the manager’s shutdown routine (if provided) before the process exits. This ensures the registry can iterate over instantiated services and invoke any `dispose` or `close` methods.
 
-5. **Cache and circuit‑breaker tuning** – Adjust caching TTLs and circuit‑breaker thresholds inside `LLMService` only. Because the manager does not cache results itself, changes remain localized and do not affect start‑up behaviour.
+* **Configuration Consistency** – Mirror the configuration style used by sibling components (YAML files in `integrations/.../config`). Keeping service definitions in a central config file simplifies onboarding new LLM providers and aligns with the existing pattern used by OntologyConfigManager.
 
 ---
 
-### Architectural patterns identified
-* **Circuit Breaker** – implemented inside `LLMService` to protect against flaky LLM providers.  
-* **Caching** – also within `LLMService` to reduce duplicate calls.  
-* **Retry‑with‑Timeout / Health‑Check start‑up pattern** – provided by `ServiceStarter`.  
-* **Process Registration / Centralised Process Management** – via `ProcessManagementService` and `ProcessStateManager`.
+### Architectural Patterns Identified  
 
-### Design decisions and trade‑offs
-* **Separation of concerns** – LLM logic, start‑up robustness, and process bookkeeping live in distinct modules, improving testability but adding a small indirection overhead when tracing failures.  
-* **Thin manager** – The manager delegates most work, which keeps its codebase minimal but makes it dependent on the correctness of the helper scripts.  
-* **Explicit scripts per service** – Improves flexibility (different env vars per service) at the cost of duplicated boiler‑plate code in the entry points.
+* **Factory Pattern** – `LLMServiceFactory` abstracts concrete service construction.  
+* **Lazy Initialization** – `LLMServiceInitializer` defers heavy setup until first use.  
+* **Registry / Service Locator** – `LLMServiceRegistry` provides a central lookup table for services.
 
-### System structure insights
-* The DockerizedServices component forms a **container‑per‑service** topology; LLMServiceManager is the entry point that launches the API and dashboard containers from within the same host container.  
-* All child processes are tracked centrally by ProcessManagementService, providing a unified view of the system’s runtime state.  
-* The LLMService abstraction isolates provider‑specific changes, allowing the rest of the system to remain stable.
+### Design Decisions & Trade‑offs  
 
-### Scalability considerations
-* Because each API instance is launched via a separate script, horizontal scaling can be achieved by running multiple manager instances or by extending `ServiceStarter` to spawn multiple processes.  
-* Caching inside `LLMService` is local to the process; scaling out will require a distributed cache if shared state is needed.  
-* Circuit‑breaker thresholds can be tuned per instance, enabling graceful degradation under load without affecting other services.
+* **Separation of Concerns** – By splitting creation, registration, and lazy loading into distinct classes, the system gains modularity and testability. The trade‑off is a modest increase in indirection, which can add cognitive overhead for newcomers.  
+* **Lazy vs Eager Loading** – Lazy initialization reduces start‑up time and memory pressure, especially when many LLM providers exist but only a subset are needed per run. The downside is a small latency on the first request for a service.  
+* **Registry Centralization** – A single registry simplifies discovery but introduces a global mutable state. Proper encapsulation (e.g., exposing only read‑only resolve methods) mitigates risks.
 
-### Maintainability assessment
-* **High modularity** – Clear boundaries between LLM logic, start‑up, and process management make the codebase easy to navigate and modify.  
-* **Low coupling** – The manager communicates with siblings through well‑defined interfaces (`ServiceStarter`, `ProcessStateManager`), reducing ripple effects of changes.  
-* **Potential duplication** – The two start‑up scripts (`api-service.js`, `dashboard-service.js`) may share similar boiler‑plate; extracting a common bootstrap module could further improve maintainability.  
+### System Structure Insights  
 
-Overall, the LLMServiceManager demonstrates a pragmatic, well‑encapsulated approach to orchestrating LLM‑related services within a Docker‑based micro‑service landscape, balancing reliability (through retries and circuit‑breaking) with extensibility (via the `LLMService` façade).
+* The **llm-service-manager** folder is a self‑contained subsystem with three collaborating classes.  
+* It sits one level below **SemanticAnalysis**, indicating that LLM services are a supporting capability rather than a core analytical engine.  
+* Its design mirrors sibling subsystems (Ontology, Pipeline, Insights), suggesting a deliberate architectural theme of “config → factory → registry → consumer”.
+
+### Scalability Considerations  
+
+* **Horizontal Scaling** – Adding new LLM providers only requires extending `LLMServiceFactory` and registering the new key. No changes to the manager or consumers are needed.  
+* **Resource Management** – Lazy initialization ensures that only the services actually demanded by the DAG execution are instantiated, allowing the system to scale to many potential providers without proportional resource consumption.  
+* **Concurrency** – If multiple agents may request the same service concurrently, the initializer must be thread‑safe (e.g., using a double‑checked lock) to avoid creating duplicate instances. This is an implementation detail to verify in the initializer code.
+
+### Maintainability Assessment  
+
+* **High Cohesion, Low Coupling** – Each class has a single responsibility, making unit testing straightforward.  
+* **Predictable Extension Points** – New services are added in a single location (the factory) and registered in a uniform way, reducing the chance of divergent code paths.  
+* **Potential Risks** – The global registry could become a hidden dependency if over‑used. Documentation and linting rules that enforce access through the manager’s façade will help keep the coupling disciplined.  
+
+Overall, LLMServiceManager embodies a clean, pattern‑driven design that aligns with the broader architectural conventions of the SemanticAnalysis ecosystem, offering both extensibility for future LLM integrations and efficient runtime behavior through lazy loading.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component leverages a microservices architecture, where each service runs in its own container, providing flexibility, scalability, and ease of deployment. This is evident in the use of separate scripts for starting the API service (scripts/api-service.js) and the dashboard service (scripts/dashboard-service.js). The ServiceStarter script (lib/service-starter.js) is used for robust service startup with retry, timeout, and health verification, ensuring that services are properly initialized and registered. The LLMService class (lib/llm/llm-service.ts) handles high-level LLM operations, including mode routing, caching, and circuit breaking, which helps in managing the complexity of LLM-related tasks.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
 
 ### Siblings
-- [ProcessManagementService](./ProcessManagementService.md) -- ProcessManagementService utilizes the ProcessStateManager to manage child processes, providing a centralized point for process management.
-- [APIService](./APIService.md) -- APIService uses the scripts/api-service.js file to start the API service, providing a clear entry point for API-related functionality.
-- [DashboardService](./DashboardService.md) -- DashboardService uses the scripts/dashboard-service.js file to start the dashboard service, providing a clear entry point for dashboard-related functionality.
+- [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
+- [Insights](./Insights.md) -- InsightGenerator generates insights from the processed observations using the InsightGenerator class in insights/generator.ts
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the ASTParser class in code-graph/parser.ts to parse the abstract syntax tree of the code
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text
+- [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph uses the GraphDatabase class in knowledge-graph/database.ts to store the knowledge entities and their relationships
+- [OntologyRepository](./OntologyRepository.md) -- OntologyRepository uses the OntologyDatabase class in ontology-repository/database.ts to store the ontology definitions and their relationships
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

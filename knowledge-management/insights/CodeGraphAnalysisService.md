@@ -2,155 +2,130 @@
 
 **Type:** SubComponent
 
-The CodeGraphAnalysisService exposes APIs for interacting with the analysis results through the api/code-graph-analysis.js endpoint
+CodeGraphAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route code graph analysis requests to different modes, such as training or inference, based on input parameters.
 
 ## What It Is  
 
-**CodeGraphAnalysisService** is a sub‑component that lives inside the *DockerizedServices* container‑oriented ecosystem. Its entry point for external interaction is the **`api/code-graph-analysis.js`** endpoint, which exposes a set of HTTP APIs that callers can use to request graph‑analysis results. Internally the service stitches together a handful of purpose‑built modules:
+**CodeGraphAnalysisService** is a sub‑component that lives in the source tree at  
 
-* **`graph-analysis.js`** – implements the core graph‑algorithmic logic (the *GraphAnalyzer* child component).  
-* **`code-graph.yaml`** – a declarative configuration file that defines the pipelines and parameters for each analysis run.  
-* **`graph-db.js`** – abstracts persistence, allowing the service to store and retrieve code‑graph structures.  
-* **`graph-visualization.js`** – turns raw analysis output into visual artefacts for downstream consumption.  
-* **`cache.js`** – provides an in‑memory (or possibly Redis‑backed) cache for frequently accessed results.  
-* **`error-handler.js`** – centralises exception capture and translation into API‑friendly error responses.  
+```
+lib/llm/code-graph-analysis-service.ts
+```  
 
-Together these pieces form a focused service whose responsibility is to accept a request, materialise the appropriate code graph, run the configured analysis, optionally visualise the outcome, and return the result while leveraging caching and robust error handling.
+The class defined in this file is responsible for performing “code‑graph analysis” for the broader **DockerizedServices** component (the parent).  Its core job is to take a request that describes a code base (e.g., the API server or the dashboard) and obtain the appropriate analysis result from a large‑language‑model (LLM) backend.  To do so, it does not implement the LLM interaction itself; instead it delegates every LLM‑related operation to the **LLMService** class found in  
+
+```
+lib/llm/llm-service.ts
+```  
+
+Through this delegation the service gains access to three key capabilities that are explicitly mentioned in the observations: **mode routing** (training vs. inference), **in‑memory caching**, and a **circuit‑breaker** that protects the system from cascading failures.  The service also owns an **LLMRouter** child component (implemented inside the same `llm-service.ts` file) that encapsulates the routing logic.
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture is **modular and layered**. The top‑level API layer (`api/code-graph-analysis.js`) delegates to lower‑level modules, each of which encapsulates a single concern:
+The architecture that emerges from the observations is a **centralized LLM façade** pattern.  The parent component **DockerizedServices** treats `LLMService` as the single entry point for all LLM interactions, and each sibling service (e.g., `SemanticAnalysisService`, `ConstraintMonitoringService`) as well as `CodeGraphAnalysisService` rely on that façade.  This yields a **Facade** pattern: complex LLM concerns (routing, caching, resilience) are hidden behind a simple, well‑defined API surface.
 
-1. **Configuration Layer** – `code-graph.yaml` supplies a declarative description of analysis pipelines. This keeps algorithmic code free from hard‑coded parameters and makes it easy to add or modify pipelines without code changes.  
-2. **Persistence Layer** – `graph-db.js` abstracts the underlying graph database (e.g., Neo4j, JanusGraph, or a custom store). By isolating storage behind a module, the service can swap the database implementation without affecting the analysis logic.  
-3. **Algorithmic Layer** – `graph-analysis.js` (exposed as the child component **GraphAnalyzer**) contains the actual graph‑traversal, clustering, or metric‑calculation algorithms. Its isolation makes the service testable and reusable by other components that might need raw graph analytics.  
-4. **Visualization Layer** – `graph-visualization.js` converts algorithmic results into visual formats (likely JSON structures consumable by the DashboardService). This separation lets the service support multiple visualisation strategies (e.g., SVG, D3, Cytoscape) without touching the core analysis code.  
-5. **Caching Layer** – `cache.js` sits between the API and the analysis pipeline, short‑circuiting repeat requests for identical inputs. The cache is consulted early in the request flow, reducing load on the graph database and the computationally intensive analysis step.  
-6. **Error‑Handling Layer** – `error-handler.js` provides a uniform way to capture exceptions from any lower layer and translate them into HTTP status codes and messages, promoting a consistent developer experience.
+Inside the façade, the **Router** role is played by the `LLMRouter` child.  The router inspects request parameters (e.g., a flag indicating “training” or “inference”) and forwards the call to the appropriate mode implementation.  This is a classic **Router** (or **Strategy**) pattern, allowing new modes to be added without touching the callers.
 
-The **DockerizedServices** parent indicates that each sub‑component, including CodeGraphAnalysisService, runs inside its own container. This containerisation aligns with the microservices style described for the parent, giving the service its own lifecycle, resource limits, and network namespace while still being orchestrated alongside siblings such as **SemanticAnalysisService**, **ConstraintMonitoringService**, and **APIService**.
+The **Cache** capability is implemented directly in `LLMService`.  By keeping frequently accessed analysis data in memory, the service reduces round‑trip latency for repeated graph‑analysis queries.  This is an **in‑memory cache** (a simple key‑value store) that is shared across all services that use the façade.
+
+Finally, the **Circuit Breaker** logic lives in the same `LLMService`.  It monitors the health of downstream LLM endpoints and, once a failure threshold is crossed, short‑circuits further calls to protect the rest of the system.  This is a textbook **Circuit Breaker** pattern that prevents cascading failures.
+
+All of these patterns are **co‑located** in the `lib/llm` package, which encourages reuse but also creates a tight coupling between the façade and its consumers.  The design decision to place the routing, caching, and resilience concerns in a single class simplifies the call‑graph (each sub‑component has only one dependency) but makes the façade a critical piece of infrastructure.
 
 ---
 
 ## Implementation Details  
 
-### API Surface (`api/code-graph-analysis.js`)  
-The endpoint file registers route handlers (likely via Express, as used by the sibling APIService). Each handler follows a pattern:
+### Core Classes  
 
-```js
-router.post('/analyze', async (req, res) => {
-  try {
-    const cacheKey = buildCacheKey(req.body);
-    const cached = await cache.get(cacheKey);
-    if (cached) return res.json(cached);
+| File | Class | Responsibility |
+|------|-------|----------------|
+| `lib/llm/llm-service.ts` | `LLMService` | Central façade that exposes methods for “runLLMRequest”, handles mode routing via `LLMRouter`, caches results, and enforces circuit‑breaker checks. |
+| `lib/llm/llm-service.ts` | `LLMRouter` (child of `LLMService`) | Examines request metadata (e.g., `mode: 'training' | 'inference'`) and dispatches the call to the correct internal handler. |
+| `lib/llm/code-graph-analysis-service.ts` | `CodeGraphAnalysisService` | Orchestrates the code‑graph analysis workflow for services such as the API server and dashboard. It builds the request payload, forwards it to `LLMService`, and post‑processes the LLM response. |
 
-    const graph = await graphDb.load(req.body.graphId);
-    const pipeline = loadPipelineFromYaml(req.body.pipelineName);
-    const result = await graphAnalysis.run(graph, pipeline);
-    const visual = await graphVisualization.render(result);
-    await cache.set(cacheKey, visual);
-    res.json(visual);
-  } catch (err) {
-    errorHandler.handle(err, res);
-  }
-});
-```
+### Request Flow  
 
-* **Cache lookup** uses `cache.js` to avoid recomputation.  
-* **Graph retrieval** is delegated to `graph-db.js`.  
-* **Pipeline loading** parses `code-graph.yaml` to configure the `graph-analysis.js` run.  
-* **Result visualisation** is performed by `graph-visualization.js`.  
-* **Error handling** funnels any exception through `error-handler.js`, guaranteeing a consistent JSON error payload.
+1. **Entry** – A consumer (e.g., the API server) creates a `CodeGraphAnalysisService` instance or calls its static method.  
+2. **Payload Construction** – The service gathers the source‑code representation (AST, dependency graph, etc.) and packages it into a request object.  
+3. **Facade Call** – The request is handed to `LLMService.runLLMRequest(request)`.  
+4. **Routing** – Inside `LLMService`, the `LLMRouter` inspects `request.mode`. If the mode is `training`, it forwards to the training handler; if `inference`, it forwards to the inference handler.  
+5. **Cache Lookup** – Before invoking the downstream LLM endpoint, `LLMService` checks its in‑memory cache for a matching key (often a hash of the graph). A cache hit returns the stored result immediately, bypassing network latency.  
+6. **Circuit‑Breaker Check** – If the cache misses, the circuit‑breaker state is examined. When the breaker is **closed**, the call proceeds; if **open**, the request is rejected early with a fallback error.  
+7. **LLM Invocation** – The appropriate LLM client (training or inference) is called. The raw response is cached for future identical requests.  
+8. **Result Return** – `CodeGraphAnalysisService` receives the LLM output, extracts the graph‑analysis insights (e.g., dependency cycles, hot‑spot modules) and returns them to the caller.
 
-### Graph Analyzer (`graph-analysis.js`)  
-Although the source symbols are not listed, the module is identified as the *GraphAnalyzer* child component. It likely exports a `run(graph, pipeline)` function that iterates over the steps defined in the YAML pipeline (e.g., “detect cycles”, “compute centrality”, “extract sub‑graphs”). Because the pipeline is data‑driven, the analyzer can be extended by adding new step definitions in the YAML without touching the JavaScript code.
+### Shared Infrastructure  
 
-### Persistence (`graph-db.js`)  
-This module abstracts CRUD operations for code graphs. It may expose methods like `load(id)`, `save(id, graph)`, and `query(filter)`. By keeping persistence separate, the service can adopt different back‑ends (embedded file store, external graph DB, or even a mock for testing).
-
-### Visualization (`graph-visualization.js`)  
-The visualisation layer receives the raw analysis output and produces a consumable representation. Given the presence of a DashboardService sibling that uses React, it is reasonable to infer that the output is JSON suitable for client‑side rendering with libraries such as D3 or Cytoscape.
-
-### Caching (`cache.js`)  
-The cache implementation is not detailed, but its usage pattern (key generation, `get`, `set`) suggests a simple key‑value store. The design decision to cache *after* visualisation means that the entire response payload (including any heavy visual artefacts) is cached, minimizing both compute and serialization overhead for repeated requests.
-
-### Error Handling (`error-handler.js`)  
-All modules forward errors to this central handler, which likely maps internal error types to HTTP status codes (e.g., 400 for validation errors, 500 for unexpected failures) and logs them via the system‑wide LoggingService.
+All sibling services (`SemanticAnalysisService`, `ConstraintMonitoringService`, etc.) follow the identical flow, reusing the same `LLMRouter`, cache store, and circuit‑breaker logic.  This uniformity is evident from the sibling observations, which explicitly state that each leverages `LLMService` for mode routing and caching.
 
 ---
 
 ## Integration Points  
 
-* **Parent – DockerizedServices**: The service is packaged as its own Docker image and started via the `startServiceWithRetry` utility (found in `lib/service-starter.js`). This gives it resilience against transient start‑up failures and aligns it with the broader micro‑service orchestration strategy.  
-* **Sibling – APIService**: While CodeGraphAnalysisService exposes its own API, the sibling APIService may act as a gateway, forwarding external requests to the internal `api/code-graph-analysis.js` endpoint. Shared conventions (e.g., JSON payload shape, error format) are enforced by the common `error-handler.js`.  
-* **Sibling – DashboardService**: The visualisation output generated by `graph-visualization.js` is consumed by the DashboardService’s React front‑end, enabling end‑users to explore analysis results.  
-* **Child – GraphAnalyzer (`graph-analysis.js`)**: The core algorithmic work is performed here. Any enhancements to graph algorithms (new metrics, heuristics) are made inside this module, keeping the higher‑level service stable.  
-* **External – Graph Database**: `graph-db.js` may communicate with an external graph store (e.g., Neo4j). The service therefore depends on network connectivity, authentication, and schema compatibility with that store.  
-* **Cache Backend**: `cache.js` could be backed by an in‑process LRU cache, a Redis instance, or another distributed cache. The choice influences latency and horizontal scalability.
+1. **Parent – DockerizedServices**  
+   - `DockerizedServices` includes `CodeGraphAnalysisService` as one of its internal services. The parent component orchestrates the lifecycle of the service (instantiation, dependency injection) and expects the façade to provide a stable API for LLM calls.  
+
+2. **Sibling Services**  
+   - `SemanticAnalysisService`, `ConstraintMonitoringService`, `ModeRouter`, and `CacheManager` all depend on the same `LLMService`. This creates a **shared‑dependency** graph where any change to routing, caching, or circuit‑breaker behavior propagates to all siblings.  
+
+3. **Child – LLMRouter**  
+   - Implemented inside `lib/llm/llm-service.ts`, `LLMRouter` is the internal routing engine used exclusively by `CodeGraphAnalysisService` (and its siblings). It is not exposed publicly; instead it is invoked through the façade’s public methods.  
+
+4. **External LLM Back‑ends**  
+   - The actual LLM providers (training clusters, inference endpoints) are abstracted behind the mode handlers inside `LLMService`. The service’s circuit‑breaker monitors these external calls, and the cache stores their responses.  
+
+5. **Data Stores**  
+   - The in‑memory cache lives within the process that hosts `LLMService`. No persistent store is mentioned, so the cache is volatile and scoped to the service’s runtime.  
+
+These integration points indicate a **tight coupling** between `CodeGraphAnalysisService` and the LLM façade, but a **loose coupling** between the façade and the concrete LLM providers (thanks to the routing abstraction).
 
 ---
 
 ## Usage Guidelines  
 
-1. **Define Pipelines Declaratively** – Always add or modify analysis pipelines in `code-graph.yaml`. Keep the JavaScript code untouched; this preserves the separation of concerns and allows non‑engineers to adjust analysis behaviour.  
-2. **Leverage Caching** – When designing client‑side workflows, prefer re‑using identical request payloads (same `graphId` and `pipelineName`) to benefit from the cache. If you need fresh results, include a cache‑bypass flag (to be implemented in `api/code-graph-analysis.js`).  
-3. **Handle Errors Gracefully** – Consumers should expect a uniform error payload generated by `error-handler.js`. Parse the `code` and `message` fields rather than relying on HTTP status text alone.  
-4. **Respect Service Boundaries** – Treat CodeGraphAnalysisService as a black box: send requests via its HTTP API, do not attempt to call internal modules directly. This maintains container isolation and allows the service to evolve independently.  
-5. **Monitor Resource Usage** – Because graph algorithms can be CPU‑intensive, monitor the container’s CPU and memory limits. If you observe throttling, consider scaling the service horizontally (multiple containers behind a load balancer) and ensure the cache backend is shared across instances.
+1. **Prefer the Facade API** – Callers should never interact directly with the routing or caching logic. All requests must go through `LLMService.runLLMRequest` (or the higher‑level wrapper methods exposed by `CodeGraphAnalysisService`). This guarantees that caching and circuit‑breaker protections are applied.  
+
+2. **Specify the Mode Explicitly** – When constructing a request, include a `mode` field (`'training'` or `'inference'`). The router relies on this flag to select the correct downstream path; omitting it may cause the request to default to an undesired mode.  
+
+3. **Design for Cacheability** – Because the cache key is derived from the request payload (typically a hash of the code graph), identical analysis requests will be served from memory. Re‑using the same payload structure across calls maximizes cache hits and reduces latency.  
+
+4. **Handle Circuit‑Breaker Errors** – If the circuit breaker is open, `LLMService` will reject the request early. Callers should be prepared to catch a specific `CircuitBreakerOpenError` (or similar) and implement a fallback strategy (e.g., retry after a back‑off or return a graceful degradation message).  
+
+5. **Avoid Tight Coupling to Implementation Details** – Do not import `LLMRouter` or manipulate the internal cache directly. Those internals are considered private to `LLMService`. Future refactors may move routing or caching to separate modules, and relying on them would break the contract.  
+
+6. **Testing Considerations** – When unit‑testing `CodeGraphAnalysisService`, mock `LLMService` rather than the underlying LLM providers. This isolates the service logic from external network calls and lets you verify that the correct mode flag is passed.  
 
 ---
 
-### 1. Architectural patterns identified  
+### Summary of Requested Items  
 
-* **Modular layered architecture** – distinct layers for API, caching, persistence, algorithmic processing, visualisation, and error handling.  
-* **Configuration‑driven pipelines** – use of `code-graph.yaml` to dictate analysis flow, a form of *Declarative Configuration* pattern.  
-* **Container‑based micro‑service deployment** – each sub‑component runs in its own Docker container, coordinated by the parent DockerizedServices.  
-* **Cache‑aside pattern** – explicit lookup‑then‑populate logic in the API layer.  
-* **Centralised error handling** – `error-handler.js` provides a single point for translating exceptions to API responses.
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Facade (`LLMService` as a unified LLM entry point), Router (`LLMRouter` for mode selection), In‑memory Cache, Circuit Breaker. |
+| **Design decisions and trade‑offs** | Centralizing routing, caching, and resilience simplifies the call graph and encourages reuse across siblings, but creates a single point of failure and tight coupling. In‑memory caching improves latency at the cost of memory usage and volatility. Circuit‑breaker adds robustness but may increase latency for fallback handling. |
+| **System structure insights** | `DockerizedServices` → contains `CodeGraphAnalysisService` (and other analysis services). Each analysis service → depends on `LLMService` (facade) → internally uses `LLMRouter`, cache, and circuit‑breaker. Sibling services share the same façade, reinforcing a common infrastructure layer. |
+| **Scalability considerations** | Cache scalability is bounded by process memory; large graphs could exhaust memory, suggesting a future move to a distributed cache. The router’s simple switch on `mode` scales well, but adding many new modes may warrant a more extensible strategy pattern. Circuit‑breaker thresholds must be tuned for the expected request volume to avoid premature tripping under load. |
+| **Maintainability assessment** | High maintainability for common concerns (routing, caching, resilience) because they reside in a single, well‑named class. However, any change to `LLMService` impacts all dependent services, so thorough regression testing is required. Clear separation of concerns (facade vs. specific analysis logic) aids readability and future extension. |
 
-### 2. Design decisions and trade‑offs  
-
-* **Separation of concerns** improves testability and allows independent evolution of persistence, analysis, and visualisation, at the cost of added indirection and more modules to maintain.  
-* **YAML‑driven pipelines** give flexibility to non‑developers but require rigorous schema validation to avoid runtime misconfiguration.  
-* **Caching after visualisation** reduces repeated computation but may increase cache memory pressure because visual artefacts are larger than raw analysis data.  
-* **Container isolation** enhances fault containment and scaling, yet introduces inter‑service network latency (e.g., between the service and the external graph DB).  
-
-### 3. System structure insights  
-
-* The service sits one level beneath *DockerizedServices* and directly above the *GraphAnalyzer* child component, forming a clear vertical hierarchy.  
-* Sibling services share common infrastructure (Docker orchestration, logging via LoggingService, monitoring via MonitoringService), indicating a cohesive platform.  
-* The API surface is thin; most business logic resides in dedicated modules, which aligns with the *Single Responsibility Principle*.  
-
-### 4. Scalability considerations  
-
-* **Horizontal scaling** is straightforward: spin up additional containers behind a load balancer; ensure the cache backend (`cache.js`) and graph database (`graph-db.js`) are either distributed or can handle concurrent connections.  
-* **CPU‑bound analysis** may become a bottleneck; profiling the `graph-analysis.js` functions and possibly off‑loading heavy computations to worker threads or a dedicated compute service could mitigate this.  
-* **Cache coherence** across instances must be addressed; using a shared Redis cache would keep hit‑rates high when scaling out.  
-
-### 5. Maintainability assessment  
-
-* The clear modular boundaries and declarative configuration make the codebase **highly maintainable**. Adding new algorithms or visualisation formats requires changes only in the respective module.  
-* The absence of tightly‑coupled code (e.g., no hard‑coded DB queries inside the API) reduces the risk of regression when swapping implementations.  
-* However, the reliance on many small modules increases the **cognitive load** for new developers; comprehensive documentation and unit tests for each layer are essential to keep the system approachable.
+*All statements above are directly derived from the provided observations; no external assumptions have been introduced.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service potentially running in its own container. This is evident in the use of the startServiceWithRetry function (lib/service-starter.js) for robust service startup with retry, timeout, and exponential backoff mechanisms. For instance, in scripts/api-service.js, the spawn function from the child_process module is used to start the API server, and in scripts/dashboard-service.js, it is used to start the dashboard. The startServiceWithRetry function ensures that these services are started with a retry mechanism, preventing endless loops and providing graceful degradation when optional services fail.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This design decision allows for a centralized management of mode routing, caching, and circuit breaking. For instance, the LLMService class in lib/llm/llm-service.ts handles the routing of LLM requests to different modes, such as training or inference, based on the input parameters. The caching mechanism in LLMService also ensures that frequently accessed data is stored in memory, reducing the latency of subsequent requests. Furthermore, the circuit breaking feature in LLMService prevents cascading failures by detecting and preventing requests to faulty services. The implementation of these features in LLMService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.
 
 ### Children
-- [GraphAnalyzer](./GraphAnalyzer.md) -- The graph-analysis.js module is used to perform graph algorithms, indicating a key dependency for the CodeGraphAnalysisService
+- [LLMRouter](./LLMRouter.md) -- The LLMRouter is implemented in the lib/llm/llm-service.ts file, which suggests that it is a key component of the CodeGraphAnalysisService.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the spawn function from the child_process module in scripts/semantic-analysis-service.js to start the analysis server
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses the rules-engine.js module to evaluate constraints against system data
-- [APIService](./APIService.md) -- APIService uses the express.js framework to handle HTTP requests and responses
-- [DashboardService](./DashboardService.md) -- DashboardService uses the react.js framework to handle user interface rendering and events
-- [LoggingService](./LoggingService.md) -- LoggingService uses the winston.js library to handle logging of system events and errors
-- [MonitoringService](./MonitoringService.md) -- MonitoringService uses the prometheus.js library to handle monitoring of system performance and health
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route semantic analysis requests to different modes, such as training or inference, based on input parameters.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService leverages the LLMService class in lib/llm/llm-service.ts to route constraint monitoring requests to different modes, such as training or inference, based on input parameters.
+- [ModeRouter](./ModeRouter.md) -- ModeRouter utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.
+- [CacheManager](./CacheManager.md) -- CacheManager utilizes the lib/llm/llm-service.ts file to handle the caching of frequently accessed data.
 
 
 ---

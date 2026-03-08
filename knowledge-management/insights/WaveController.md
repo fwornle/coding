@@ -2,122 +2,95 @@
 
 **Type:** SubComponent
 
-The WaveController sub-component uses the LLMInitializer service to initialize LLM services
+WaveController implements work-stealing via a shared nextIndex counter, allowing idle workers to pull tasks immediately, as seen in the runWithConcurrency method.
 
 ## What It Is  
 
-**WaveController** is a **sub‑component** that lives inside the **SemanticAnalysis** component. Its implementation is centred in the file **`wave-controller.ts`** and is driven by configuration stored in **`wave-controller.yaml`**. The controller’s primary responsibility is to orchestrate the parallel execution of “waves” of work – for example, processing a batch of commits when analysing git history. It does this by exposing a **runWithConcurrency** entry point, a shared **`nextIndex`** counter for work‑stealing synchronization, a **callback interface** for notifying downstream agents when a wave finishes, a **logging interface** for observability, and a **plugin mechanism** that lets external modules extend its behaviour. The controller also depends on the **LLMInitializer** service to bootstrap any required large‑language‑model (LLM) resources before work begins.
-
----
+WaveController is a **sub‑component of the KnowledgeManagement module** that orchestrates the execution of “wave agents” – units of work that are processed concurrently.  The only concrete implementation detail that surfaces in the observations is the **`runWithConcurrency`** method, which drives the controller’s core scheduling loop.  Inside that loop a **shared `nextIndex` counter** is used to implement *work‑stealing*: idle workers read and increment the counter to claim the next task without needing a central dispatcher.  Although the exact file location is not listed in the source observations, the component lives under the KnowledgeManagement hierarchy and therefore shares the same persistence layer (Graphology + LevelDB) that the rest of the KnowledgeManagement stack uses.
 
 ## Architecture and Design  
 
-The design of WaveController follows a **work‑stealing concurrency** model, as explicitly referenced in the parent **SemanticAnalysis** description. The **`runWithConcurrency`** function launches a pool of worker threads (or async tasks) that repeatedly fetch the next unit of work by atomically incrementing the shared **`nextIndex`** counter. This approach balances load dynamically: faster workers automatically “steal” work from slower ones, keeping the CPU utilisation high without a static partitioning scheme.
+The design that emerges from the observations is a **lightweight, shared‑counter work‑stealing scheduler**.  Rather than a heavyweight thread‑pool manager or a message‑queue broker, WaveController relies on a simple atomic counter (`nextIndex`) that all workers consult.  This pattern yields a **pull‑based concurrency model**: each worker repeatedly attempts to “steal” the next index, executes the associated wave agent, and then loops again.  
 
-Two lightweight interfaces are baked into the controller:
+Because the component is part of KnowledgeManagement, it inherits the **graph‑oriented persistence strategy** (Graphology + LevelDB).  The observations suggest that task‑related metadata—such as assignments, priorities, and worker status—may be stored in that database, enabling fast look‑ups without additional services.  No explicit “event‑driven” or “micro‑service” patterns are mentioned, so the architecture stays within the bounds of a **single‑process, multi‑threaded (or multi‑process) scheduler** that is tightly coupled to the surrounding KnowledgeManagement code base.
 
-1. **Callback Interface** – Consumers register a function that is invoked once a wave (a logical group of tasks) completes. This decouples WaveController from the concrete agents that need to react, enabling a publish‑subscribe style interaction without a full event‑bus.  
-
-2. **Logging Interface** – All significant lifecycle events (start, per‑wave completion, errors) are emitted through a logger that WaveController owns. The logger is configurable via **`wave-controller.yaml`**, allowing different verbosity levels or back‑ends (e.g., console, file) without code changes.
-
-Extensibility is achieved through a **plugin system**. Plugins are discovered (likely via a configuration section in **`wave-controller.yaml`**) and can hook into the controller’s lifecycle – for instance, to inject custom preprocessing, post‑processing, or alternative scheduling policies. This keeps the core controller small while allowing domain‑specific extensions.
-
-Finally, the controller’s dependency on **LLMInitializer** demonstrates a **service‑oriented** relationship: before any wave runs, WaveController invokes the initializer to guarantee that LLM services are ready. This mirrors the sibling component **LLMInitializer**, which itself wraps the **LLMService** class.
-
----
+Interaction with sibling components is implicit: while WaveController focuses on scheduling, **IntelligentRouter** decides how knowledge‑graph queries are routed, **GraphDatabaseAdapter** provides the low‑level storage primitives, and **ManualLearning / OnlineLearning** feed new tasks into the system.  WaveController therefore sits in the middle of a pipeline that receives tasks from learning modules, stores state via the graph adapter, and dispatches execution to worker threads.
 
 ## Implementation Details  
 
-- **`runWithConcurrency(concurrency: number, workFn: (index: number) => Promise<void>)`** – The entry point that receives a desired concurrency level and a user‑supplied asynchronous work function. Inside, a loop spawns `concurrency` workers. Each worker repeatedly executes:
-  ```ts
-  const myIndex = Atomics.add(nextIndex, 0, 1);
-  if (myIndex >= totalWork) break;
-  await workFn(myIndex);
-  ```
-  The **`nextIndex`** variable is an atomic counter (likely a `SharedArrayBuffer`‑backed `Uint32Array`) ensuring thread‑safe increments across workers.
+* **`runWithConcurrency`** – the entry point that spins up a configurable number of workers.  Each worker executes a loop that:
+  1. Reads the current value of the shared **`nextIndex`** counter atomically.
+  2. Increments the counter so the next worker sees a new index.
+  3. Retrieves the corresponding wave‑agent payload (likely via a lookup in the Graphology + LevelDB store).
+  4. Executes the agent’s logic.
+  5. Repeats until the index exceeds the total number of pending agents.
 
-- **Callback registration** – WaveController exposes something akin to `onWaveComplete(callback: (waveId: number) => void)`. After a worker finishes processing its assigned slice, the controller invokes the registered callback, passing the identifier of the completed wave. This enables downstream agents (e.g., InsightGenerator) to start their own processing as soon as data becomes available.
+* **Work‑stealing via `nextIndex`** – this counter is the sole coordination primitive.  Because it is shared and updated atomically, there is no need for a central task queue, reducing contention and latency.  The observations do not detail the exact synchronization primitive (e.g., `AtomicInteger`, `Mutex`), but the semantics are clear: *idle workers can instantly pull work*.
 
-- **Logging** – A logger instance is created during controller construction, its configuration read from **`wave-controller.yaml`** (fields such as `level`, `output`). Throughout `runWithConcurrency`, the logger records events like “Wave X started”, “Wave X finished in Y ms”, and any caught exceptions.
+* **Task Scheduling Mechanism** – while the exact class name is not given, the description of “utilizes a task scheduling mechanism to manage the execution of wave agents” points to an internal scheduler that likely maps each index to a concrete agent object.  The scheduler may also respect **task prioritization**, as hinted, by ordering indices according to priority or by consulting the Graphology + LevelDB store for priority metadata before workers claim them.
 
-- **Plugin loading** – The YAML file contains a `plugins:` array. For each entry, WaveController dynamically imports the module (using `import()` or `require`) and calls a known hook, for example `plugin.init(controller)`. Plugins can augment the work function, replace the scheduling algorithm, or attach additional metrics.
+* **Concurrency Handling** – the same `runWithConcurrency` method is referenced as the custom concurrency entry point.  It probably accepts a concurrency level (number of workers) and may expose hooks for monitoring (e.g., number of tasks completed, worker idle time).  No additional concurrency frameworks are mentioned, so the implementation is probably built on native language constructs (threads, async workers, or child processes).
 
-- **LLMInitializer integration** – Before any concurrency loop begins, WaveController calls `LLMInitializer.initialize()` (or a similarly named method). This ensures that any LLM models required by the work function are loaded and ready, preventing runtime latency spikes.
-
-Because the observation list reports **“0 code symbols found”**, the exact class names are not enumerated, but the functional signatures described above are directly inferred from the documented behaviour.
-
----
+* **Performance Monitoring** – the observations note that WaveController “may utilize performance monitoring and optimization techniques.”  This could be realized through instrumentation inside the worker loop (timing each task, tracking queue length) and feeding those metrics back to the KnowledgeManagement layer for adaptive tuning.
 
 ## Integration Points  
 
-1. **Parent – SemanticAnalysis** – WaveController is the concurrency engine behind SemanticAnalysis’s heavy‑weight data processing. SemanticAnalysis invokes `runWithConcurrency` to distribute analysis of commits, files, or other artifacts across multiple workers. The shared **work‑stealing** pattern aligns with the parent’s overall design for scaling large‑scale analysis.
+1. **GraphDatabaseAdapter (storage/graph-database-adapter.ts)** – provides the persistence API used by WaveController to read/write task descriptors, worker status, and possibly priority information.  Because the parent KnowledgeManagement component already relies on Graphology + LevelDB, WaveController’s data access is consistent with the rest of the system.
 
-2. **Sibling – Pipeline** – While Pipeline coordinates DAG‑based execution using `batch-analysis.yaml`, WaveController focuses on intra‑step parallelism. A Pipeline step may instantiate a WaveController to accelerate a particular stage, feeding it the step’s inputs and receiving callbacks when each wave finishes, allowing the DAG to progress.
+2. **IntelligentRouter** – while not directly invoked by WaveController, the router’s decision‑making about whether to use the VKB API or direct database access can affect how wave agents retrieve or store knowledge.  WaveController’s agents may call into the router when they need to resolve graph queries.
 
-3. **Sibling – Ontology** – Ontology definitions are static data; WaveController does not directly interact with them, but any plugin that enriches analysis results could consult the `ontology-definitions.yaml` to map entities discovered during a wave.
+3. **ManualLearning & OnlineLearning** – these sibling components generate new knowledge‑extraction tasks that eventually become wave agents.  WaveController therefore depends on the output of these modules, either via a shared task queue or by reading newly inserted records in the graph database.
 
-4. **Sibling – Insights** – The InsightGenerator class consumes the results produced by WaveController. The callback interface is a natural hand‑off point: once a wave completes, InsightGenerator can start generating insights for that slice, keeping the overall pipeline responsive.
+4. **UKBTraceReportGenerator** – may consume the results produced by wave agents (e.g., trace logs) and thus represents a downstream consumer of WaveController’s output.
 
-5. **Sibling – LLMInitializer** – WaveController’s reliance on LLMInitializer ensures that any LLM‑backed processing (e.g., semantic similarity, code summarisation) is ready before work begins. This creates a clear service dependency: WaveController cannot start until LLMInitializer signals readiness.
-
-6. **Configuration – wave‑controller.yaml** – All tunable aspects (concurrency level, logging, enabled plugins) are externalised, making WaveController a configurable building block that can be tailored per deployment without code changes.
-
----
+5. **Concurrency Configuration** – the `runWithConcurrency` method likely exposes an API that other components (e.g., a higher‑level orchestrator in KnowledgeManagement) can call to adjust the degree of parallelism based on system load or resource availability.
 
 ## Usage Guidelines  
 
-- **Configure concurrency deliberately** – Set the `concurrency` field in `wave-controller.yaml` to match the host’s CPU core count or the I/O‑bound nature of the work. Over‑provisioning can lead to context‑switch overhead, while under‑provisioning wastes available resources.
+* **Configure Concurrency Wisely** – invoke `runWithConcurrency` with a worker count that matches the host’s CPU cores and expected I/O profile.  Over‑provisioning can increase context‑switch overhead without improving throughput, while under‑provisioning leaves the work‑stealing mechanism under‑utilized.
 
-- **Leverage the callback** – Register a callback early (e.g., during controller construction) to avoid missing wave‑completion events. The callback should be lightweight; heavy processing belongs in the downstream component (e.g., InsightGenerator) to keep workers free.
+* **Persist Task Metadata Before Scheduling** – ensure that any wave agent’s definition (including priority, dependencies, and required resources) is stored in the Graphology + LevelDB store *prior* to invoking the scheduler.  This guarantees that workers can locate the task data when they pull the next index.
 
-- **Implement plugins responsibly** – Plugins must respect the atomic `nextIndex` contract and should avoid blocking the event loop. If a plugin needs long‑running work, it should spawn its own worker pool rather than block the WaveController’s workers.
+* **Leverage Prioritization if Available** – if the system exposes a priority field in the task records, order the indices accordingly (e.g., high‑priority tasks receive lower indices).  This works naturally with the shared‑counter approach because workers always claim the lowest remaining index.
 
-- **Respect logging configuration** – Adjust the logger’s `level` in `wave-controller.yaml` for the appropriate environment: verbose (`debug`) in development, concise (`info`/`error`) in production. Excessive logging inside the per‑wave loop can degrade performance.
+* **Monitor Performance** – instrument the worker loop (start/end timestamps, success/failure counts) and feed those metrics to the KnowledgeManagement monitoring subsystem.  This data can be used to tune the concurrency level or to identify bottlenecks in the graph database access path.
 
-- **Ensure LLM services are initialized** – Do not bypass the LLMInitializer call. If a custom LLM service is required, extend LLMInitializer rather than calling the model directly from the work function; this preserves the start‑up sequencing guarantees.
-
-- **Handle errors gracefully** – Wrap the user‑provided `workFn` in a try/catch inside the worker loop. Propagate failures through the logger and, optionally, through an error‑callback so that the overall analysis can decide whether to abort or continue.
+* **Graceful Shutdown** – when terminating the controller, signal workers to stop after completing their current task.  Because the work‑stealing loop checks the `nextIndex` against the total task count, a shutdown flag can be introduced without altering the core scheduling algorithm.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural Patterns Identified
+1. **Work‑Stealing Scheduler** – implemented via a shared atomic `nextIndex` counter.
+2. **Pull‑Based Concurrency** – workers actively fetch work rather than being pushed tasks.
+3. **Graph‑Oriented Persistence** – reliance on Graphology + LevelDB for task metadata.
 
-1. **Work‑Stealing Concurrency** – Dynamic load balancing via a shared atomic index.  
-2. **Callback (Publish‑Subscribe) Interface** – Decoupled notification of wave completion.  
-3. **Plugin Extensibility** – Runtime discovery and injection of additional behaviour.  
-4. **Configuration‑Driven Behaviour** – YAML‑based tuning of concurrency, logging, and plugins.  
+### Design Decisions and Trade‑offs
+* **Simplicity vs. Flexibility** – using a single counter avoids complex queue structures, reducing contention but limits dynamic task re‑ordering after workers have started.
+* **Tight Coupling to Graph Database** – storing task state in the same graph store used by KnowledgeManagement simplifies data access but couples scheduling performance to the database’s read latency.
+* **In‑process Scheduling** – keeping the scheduler inside the KnowledgeManagement process eliminates network overhead but may constrain scalability to a single machine.
 
-### Design Decisions and Trade‑offs  
+### System Structure Insights
+WaveController sits at the heart of KnowledgeManagement’s execution pipeline, bridging task creation (ManualLearning/OnlineLearning) and result consumption (UKBTraceReportGenerator).  Its only external dependency is the GraphDatabaseAdapter, and it shares the same persistence layer as its siblings.
 
-- **Atomic Counter vs. Task Queue** – Using a single `nextIndex` is simple and low‑overhead, but can become a contention point under extreme thread counts. A task queue would reduce contention but adds complexity.  
-- **Plugin Model** – Provides flexibility without modifying core code, yet introduces runtime load‑time errors if plugins are mis‑configured.  
-- **Callback over Event Bus** – Keeps the communication surface small and performant; however, it limits multi‑consumer scenarios unless the callback itself forwards events.  
+### Scalability Considerations
+* **Horizontal Scaling** – because the scheduler relies on a shared in‑process counter, scaling beyond a single host would require redesign (e.g., distributed counter or external queue).  
+* **CPU‑Bound vs. I/O‑Bound Workloads** – the work‑stealing model scales well for CPU‑intensive agents; for I/O‑heavy agents, increasing the worker count may improve throughput but could saturate the LevelDB store.
 
-### System Structure Insights  
-
-WaveController sits as the **concurrency engine** inside SemanticAnalysis, bridging the high‑level DAG orchestration of Pipeline with the low‑level LLM‑enabled processing supplied by LLMInitializer. Its YAML‑driven configuration makes it a reusable, self‑contained module that can be instantiated by any sibling that needs parallel work distribution.
-
-### Scalability Considerations  
-
-- **Horizontal scaling** is achieved by increasing the `concurrency` value, allowing more workers to process independent indices.  
-- The **work‑stealing** approach automatically adapts to heterogeneous task durations, ensuring that faster workers stay busy.  
-- Potential bottlenecks are the atomic `nextIndex` and any synchronous I/O inside `workFn`; profiling these paths is essential before scaling to very high worker counts.  
-
-### Maintainability Assessment  
-
-Because WaveController’s core logic is confined to a few well‑named functions (`runWithConcurrency`, callback registration, plugin loading) and its behaviour is driven by an external YAML file, the component is **highly maintainable**. Adding new behaviour is typically a matter of writing a plugin rather than altering the controller itself. The reliance on standard atomic operations and explicit logging further aids debugging. The main maintenance risk lies in plugin compatibility and ensuring that LLMInitializer’s contract remains stable; careful versioning and integration tests mitigate this risk.
+### Maintainability Assessment
+The design’s minimalism (single counter, straightforward worker loop) makes the code easy to understand and modify.  However, the lack of explicit abstractions (e.g., a dedicated task queue interface) could make future extensions—such as priority re‑balancing or distributed execution—more invasive.  Keeping task metadata schema stable in the Graphology + LevelDB store will be essential to avoid breaking the scheduler’s assumptions.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a work-stealing concurrency approach, as seen in the runWithConcurrency() function in wave-controller.ts, to enable parallel processing. This allows the component to efficiently analyze large amounts of data by distributing tasks across multiple threads. The use of a shared atomic index counter ensures that tasks are properly synchronized and executed in a thread-safe manner. For instance, when analyzing git history, the component can leverage multiple threads to process different commits concurrently, significantly improving overall performance.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of a Graphology+LevelDB database for persistence, as seen in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), allows for efficient storage and querying of knowledge graphs. This choice of database is particularly noteworthy due to its ability to handle large amounts of data and provide a robust foundation for the component's intelligent routing mechanism. The intelligent routing, which switches between VKB API and direct database access, enables the component to optimize its interactions with the knowledge graph, thus improving overall performance. For instance, when an agent needs to store an entity, it can use the storeEntity method in GraphDatabaseAdapter, which ultimately relies on the Graphology+LevelDB database for persistence.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline Coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- UpperOntology definitions are stored in the ontology-definitions.yaml file
-- [Insights](./Insights.md) -- Insight generation is performed using the InsightGenerator class, which utilizes machine learning algorithms
-- [LLMInitializer](./LLMInitializer.md) -- LLMInitializer uses the LLMService class to initialize LLM services
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely utilizes the storeEntity method in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to persist manually created entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning probably utilizes a batch analysis pipeline, similar to the one described in batch-analysis.yaml, to extract knowledge from git history and other sources.
+- [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator probably utilizes a report generation mechanism to create detailed trace reports for UKB workflow runs.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology+LevelDB database for storing and querying knowledge graphs, as seen in the storeEntity method.
+- [IntelligentRouter](./IntelligentRouter.md) -- IntelligentRouter utilizes the VKB API and direct database access to optimize interactions with the knowledge graph, as seen in the intelligent routing mechanism.
 
 
 ---
