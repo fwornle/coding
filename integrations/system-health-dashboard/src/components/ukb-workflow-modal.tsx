@@ -1972,11 +1972,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_1fr] gap-3 overflow-hidden">
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_1fr] gap-3 overflow-hidden [&>button.absolute]:right-2 [&>button.absolute]:top-2 [&>button.absolute]:z-50">
         <DialogHeader className="pb-0">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 pr-8">
             {/* Left side: Title + Tabs inline */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 shrink-0">
               <DialogTitle className="flex items-center gap-2 shrink-0">
                 <Brain className="h-5 w-5" />
                 UKB Workflow Monitor
@@ -2014,7 +2014,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             </div>
             {/* Center: Historical workflow context when viewing details */}
             {activeTab === 'history' && selectedHistoricalWorkflowState && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2033,7 +2033,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             )}
 
             {/* Right side: Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {/* View Trace button - show when there are steps to trace */}
               {((currentProcess?.steps?.length ?? 0) > 0 || activeTab === 'history') && (
                 <Button
