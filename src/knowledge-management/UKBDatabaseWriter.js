@@ -67,6 +67,11 @@ export class UKBDatabaseWriter {
     if (entity.isScaffoldNode !== undefined) entityData.isScaffoldNode = entity.isScaffoldNode;
     if (entity.childEntityNames !== undefined) entityData.childEntityNames = entity.childEntityNames;
 
+    // Forward operator-enriched fields if present
+    if (entity.embedding !== undefined) entityData.embedding = entity.embedding;
+    if (entity.role !== undefined) entityData.role = entity.role;
+    if (entity.enrichedContext !== undefined) entityData.enrichedContext = entity.enrichedContext;
+
     try {
       await this.queryService.storeEntity(entityData);
 
@@ -110,6 +115,11 @@ export class UKBDatabaseWriter {
     if (updates.hierarchyLevel !== undefined) entityData.hierarchyLevel = updates.hierarchyLevel;
     if (updates.isScaffoldNode !== undefined) entityData.isScaffoldNode = updates.isScaffoldNode;
     if (updates.childEntityNames !== undefined) entityData.childEntityNames = updates.childEntityNames;
+
+    // Forward operator-enriched fields if present
+    if (updates.embedding !== undefined) entityData.embedding = updates.embedding;
+    if (updates.role !== undefined) entityData.role = updates.role;
+    if (updates.enrichedContext !== undefined) entityData.enrichedContext = updates.enrichedContext;
 
     if (this.debug) {
       console.log(`[UKBDatabaseWriter] Updating entity: ${entityName}`);

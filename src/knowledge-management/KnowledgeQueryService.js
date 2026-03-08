@@ -455,6 +455,11 @@ export class KnowledgeQueryService {
       if (entity.isScaffoldNode !== undefined) graphEntity.isScaffoldNode = entity.isScaffoldNode;
       if (entity.childEntityNames !== undefined) graphEntity.childEntityNames = entity.childEntityNames;
 
+      // Forward operator-enriched fields if present
+      if (entity.embedding !== undefined) graphEntity.embedding = entity.embedding;
+      if (entity.role !== undefined) graphEntity.role = entity.role;
+      if (entity.enrichedContext !== undefined) graphEntity.enrichedContext = entity.enrichedContext;
+
       const nodeId = await graphDB.storeEntity(graphEntity, { team });
 
       if (this.debug) {
