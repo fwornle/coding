@@ -49,6 +49,7 @@ Progress: [██████████] 97%
 | 10    | 03   | 15min    | 2     | 3     |
 | 10    | 04   | 3min     | 2     | 1     |
 | 10    | 05   | 2min     | 2     | 1     |
+| 11    | 01   | 3min     | 2     | 2     |
 | 11    | 03   | 2min     | 2     | 4     |
 
 ## Accumulated Context
@@ -81,6 +82,9 @@ Progress: [██████████] 97%
 - [10-05]: Added typed optional fields to SharedMemoryEntity rather than relying solely on (as any) casts
 - [10-05]: Unified UPDATE path handles enriched field propagation regardless of new observations
 - [10-05]: Used queryEntities + storeEntity pattern for non-destructive field updates on existing entities
+- [11-01]: QA validation is informational/log-only -- plan 11-02 adds retry loop
+- [11-01]: Content quality gate rejects entities with < 3 observations or all-generic content
+- [11-01]: PersistenceAgent validation modes changed from disabled to lenient
 - [11-03]: Require 2+ observations with code evidence per L3 entity (up from 1+)
 - [11-03]: Unified ANTI-HALLUCINATION RULES block format across all 3 wave agents
 

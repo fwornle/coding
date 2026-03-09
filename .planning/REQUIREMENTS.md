@@ -51,8 +51,8 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 ### Content Quality
 
-- [ ] **QUAL-06**: Content validation enforced in wave persistence path
-- [ ] **QUAL-07**: QA agent validates every agent output (continuous gate, not single pipeline stage)
+- [x] **QUAL-06**: Content validation enforced in wave persistence path
+- [x] **QUAL-07**: QA agent validates every agent output (continuous gate, not single pipeline stage)
 - [ ] **QUAL-08**: Coordinator receives QA feedback and can reject/retry agent outputs
 - [x] **QUAL-09**: Hallucination guards completed (L3 caps, code evidence filter, prompt hardening)
 
@@ -143,8 +143,8 @@ Which phases cover which requirements.
 | KGOP-04 | Phase 10 | Complete |
 | KGOP-05 | Phase 10 | Complete |
 | KGOP-06 | Phase 10 | Complete |
-| QUAL-06 | Phase 11 | Pending |
-| QUAL-07 | Phase 11 | Pending |
+| QUAL-06 | Phase 11 | Complete |
+| QUAL-07 | Phase 11 | Complete |
 | QUAL-08 | Phase 11 | Pending |
 | QUAL-09 | Phase 11 | Complete |
 | OBSV-01 | Phase 12 | Pending |
