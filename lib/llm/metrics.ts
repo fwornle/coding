@@ -29,6 +29,8 @@ export class MetricsTracker {
     tokens: { input: number; output: number; total: number },
     latencyMs: number,
     operationType?: string,
+    promptPreview?: string,
+    responsePreview?: string,
   ): void {
     this.totalCalls++;
 
@@ -58,6 +60,8 @@ export class MetricsTracker {
       latencyMs,
       operationType,
       timestamp: Date.now(),
+      promptPreview,
+      responsePreview,
     });
   }
 

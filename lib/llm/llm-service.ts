@@ -200,7 +200,9 @@ export class LLMService extends EventEmitter {
     const latencyMs = Date.now() - startTime;
     result.latencyMs = latencyMs;
 
-    this.metrics.recordCall('mock', result.model, result.tokens, latencyMs, request.operationType);
+    this.metrics.recordCall('mock', result.model, result.tokens, latencyMs, request.operationType,
+      request.messages[request.messages.length - 1]?.content?.slice(0, 500),
+      result.content?.slice(0, 500));
     this.emit('complete', { mode: 'mock', ...result });
     return result;
   }
@@ -220,7 +222,9 @@ export class LLMService extends EventEmitter {
         result.latencyMs = latencyMs;
 
         this.circuitBreaker.recordSuccess(provider.name);
-        this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType);
+        this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType,
+          request.messages[request.messages.length - 1]?.content?.slice(0, 500),
+          result.content?.slice(0, 500));
         this.emit('complete', { mode: 'local', ...result });
         return result;
       } catch (error: any) {
@@ -327,7 +331,9 @@ export class LLMService extends EventEmitter {
 
         this.circuitBreaker.recordSuccess(provider.name);
         console.info(`[llm] used=${provider.name}/${result.model} tier=${request.tier || 'default'} ${skipped.length > 0 ? `skipped=[${skipped}]` : ''} ${latencyMs}ms`);
-        this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType);
+        this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType,
+          request.messages[request.messages.length - 1]?.content?.slice(0, 500),
+          result.content?.slice(0, 500));
 
         // Record subscription usage for subscription providers
         const isSubscriptionProvider = provider.name === 'claude-code' || provider.name === 'copilot';
