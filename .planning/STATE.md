@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 Phase: 12 of 12 (Pipeline Observability)
 Plan: 2 of 4 complete
 Status: Executing
-Last activity: 2026-03-09 -- Completed 12-02 Frontend Data Transport
+Last activity: 2026-03-09 -- Completed 12-01 Backend Trace Instrumentation
 
 Progress: [█████████░] 88%
 
@@ -51,6 +51,7 @@ Progress: [█████████░] 88%
 | 10    | 05   | 2min     | 2     | 1     |
 | 11    | 01   | 3min     | 2     | 2     |
 | 11    | 03   | 2min     | 2     | 4     |
+| 12    | 01   | 5min     | 3     | 3     |
 | 12    | 01   | 4min     | 2     | 3     |
 | 12    | 02   | 4min     | 2     | 4     |
 
@@ -92,6 +93,10 @@ Progress: [█████████░] 88%
 - [12-02]: Duplicated trace types in frontend (TraceLLMCall etc.) rather than cross-package import
 - [12-02]: Added trace-history handler to Express server.js since project is Vite+Express, not Next.js
 
+- [12-01]: Fire-and-forget trace capture pattern -- never throw from capture methods
+- [12-01]: Entity _traceData converted to TraceLLMCall via helper, not modifying wave agents
+- [12-01]: Trace history limited to last 10 files with auto-cleanup
+
 ### Critical Pitfalls
 
 - **processEntity() hierarchy mapping**: Must extend -- fields silently dropped without it
@@ -108,6 +113,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T09:33:29.786Z
-Stopped at: Completed 12-02 Frontend Data Transport
+Last session: 2026-03-09T09:33:26Z
+Stopped at: Completed 12-01 Backend Trace Instrumentation + 12-02 Frontend Data Transport
 Resume with: `/gsd:execute-phase 12` (continue Phase 12, Plan 03 next)
