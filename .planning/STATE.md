@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: completed
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-03-09T17:21:44Z"
-last_activity: 2026-03-09 -- Completed 13-01 CGR Foundation
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-03-09T17:30:01Z"
+last_activity: 2026-03-09 -- Completed 13-02 CGR Wave Agent Integration
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 13 of 13 (Code Graph Agent Integration)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In Progress
-Last activity: 2026-03-09 -- Completed 13-01 CGR Foundation
+Last activity: 2026-03-09 -- Completed 13-02 CGR Wave Agent Integration
 
-Progress: [████████░░] 89%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 89%
 | 12    | 04   | 3min     | 2     | 2     |
 | Phase 12 P03 | 5min | 2 tasks | 1 files |
 | 13    | 01   | 4min     | 2     | 5     |
+| 13    | 02   | 5min     | 2     | 5     |
 
 ## Accumulated Context
 
@@ -107,6 +108,9 @@ Progress: [████████░░] 89%
 - [13-01]: CGR index refresh is fire-and-forget at wave1_init with 30s timeout
 - [13-01]: CgrObservationBuilder formats <code_graph> XML with anti-hallucination rules
 - [13-01]: CGR getters on WaveController avoid modifying wave agent constructors (Plan 02 scope)
+- [13-02]: autoTagObservations uses regex code-ref detection, not LLM self-tagging alone
+- [13-02]: Wave agent constructors extended with optional cgrCache/cgrBuilder params (backward compatible)
+- [13-02]: Existing [CGR] observations preserved when SAA replaces entity observations
 
 ### Critical Pitfalls
 
@@ -124,6 +128,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T17:21:44Z
-Stopped at: Completed 13-01-PLAN.md
-Resume with: Execute 13-02-PLAN.md (wire CGR into wave agents)
+Last session: 2026-03-09T17:30:01Z
+Stopped at: Completed 13-02-PLAN.md
+Resume with: Execute 13-03-PLAN.md (CGR trace integration and dashboard indicators)

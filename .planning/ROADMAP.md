@@ -126,8 +126,8 @@ Plans:
 **Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
-- [ ] 13-02-PLAN.md -- Wave agent CGR integration: all 3 agents query CGR, SAA cgrContext injection, observation tagging
+- [x] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
+- [x] 13-02-PLAN.md -- Wave agent CGR integration: all 3 agents query CGR, SAA cgrContext injection, observation tagging
 - [ ] 13-03-PLAN.md -- Dashboard indicators: trace modal CGR section, freshness indicators, observation source breakdown
 
 #### Phase 14: Documentation Generation

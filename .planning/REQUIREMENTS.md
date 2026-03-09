@@ -65,9 +65,9 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 ### Code Graph Integration
 
-- [ ] **CGR-01**: Code-graph-rag (CGR) wired into wave pipeline as code-evidence source for entity observations
-- [ ] **CGR-02**: Wave agents query CGR for call graphs, dependencies, and code snippets relevant to each entity
-- [ ] **CGR-03**: CGR evidence attached to entities as code-grounded observations (not just LLM-generated text)
+- [x] **CGR-01**: Code-graph-rag (CGR) wired into wave pipeline as code-evidence source for entity observations
+- [x] **CGR-02**: Wave agents query CGR for call graphs, dependencies, and code snippets relevant to each entity
+- [x] **CGR-03**: CGR evidence attached to entities as code-grounded observations (not just LLM-generated text)
 - [x] **CGR-04**: CGR index refreshed automatically at wave1_init before analysis begins
 
 ### Documentation Generation
@@ -152,9 +152,9 @@ Which phases cover which requirements.
 | OBSV-03 | Phase 12 | Complete |
 | OBSV-04 | Phase 12 | Complete |
 
-| CGR-01 | Phase 13 | Pending |
-| CGR-02 | Phase 13 | Pending |
-| CGR-03 | Phase 13 | Pending |
+| CGR-01 | Phase 13 | Complete |
+| CGR-02 | Phase 13 | Complete |
+| CGR-03 | Phase 13 | Complete |
 | CGR-04 | Phase 13 | Complete |
 | DOC-01 | Phase 14 | Pending |
 | DOC-02 | Phase 14 | Pending |
