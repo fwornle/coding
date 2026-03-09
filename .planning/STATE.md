@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: completed
-stopped_at: Phase 13 context gathered
-last_updated: "2026-03-09T16:55:17.231Z"
-last_activity: 2026-03-09 -- Completed 12-04 Trace History Comparison
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-03-09T17:21:44Z"
+last_activity: 2026-03-09 -- Completed 13-01 CGR Foundation
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_plans: 18
+  completed_plans: 16
+  percent: 89
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 12 in progress -- pipeline observability frontend data transport complete
+**Current focus:** Phase 13 in progress -- Code Graph Agent integration
 
 ## Current Position
 
-Phase: 12 of 12 (Pipeline Observability)
-Plan: 4 of 4 complete
-Status: Phase Complete
-Last activity: 2026-03-09 -- Completed 12-04 Trace History Comparison
+Phase: 13 of 13 (Code Graph Agent Integration)
+Plan: 1 of 3 complete
+Status: In Progress
+Last activity: 2026-03-09 -- Completed 13-01 CGR Foundation
 
-Progress: [██████████] 100%
+Progress: [████████░░] 89%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 | 12    | 02   | 4min     | 2     | 4     |
 | 12    | 04   | 3min     | 2     | 2     |
 | Phase 12 P03 | 5min | 2 tasks | 1 files |
+| 13    | 01   | 4min     | 2     | 5     |
 
 ## Accumulated Context
 
@@ -102,6 +103,10 @@ Progress: [██████████] 100%
 - [12-01]: Trace history limited to last 10 files with auto-cleanup
 - [Phase 12]: Hierarchical expand IDs use slash-delimited paths for parent-child collapse
 - [Phase 12]: Code evidence detection via regex for file paths and PascalCase identifiers in LLM previews
+- [13-01]: CgrQueryCache wraps CodeGraphAgent with Map-based component-level caching
+- [13-01]: CGR index refresh is fire-and-forget at wave1_init with 30s timeout
+- [13-01]: CgrObservationBuilder formats <code_graph> XML with anti-hallucination rules
+- [13-01]: CGR getters on WaveController avoid modifying wave agent constructors (Plan 02 scope)
 
 ### Critical Pitfalls
 
@@ -119,6 +124,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T16:55:17.221Z
-Stopped at: Phase 13 context gathered
-Resume with: All phases complete (v2.1 milestone finished)
+Last session: 2026-03-09T17:21:44Z
+Stopped at: Completed 13-01-PLAN.md
+Resume with: Execute 13-02-PLAN.md (wire CGR into wave agents)

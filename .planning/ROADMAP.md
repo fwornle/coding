@@ -123,7 +123,7 @@ Plans:
   2. Wave agents query CGR for each entity they analyze, visible in trace logs as CGR API calls
   3. CGR index is automatically refreshed at wave1_init before analysis begins
   4. Entities have a mix of LLM-generated and code-grounded observations distinguishable by source tag
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
@@ -151,5 +151,5 @@ Plans:
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
 | 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
-| 13. Code Graph Agent Integration | v2.1 | 0/3 | Planned | - |
+| 13. Code Graph Agent Integration | 1/3 | In Progress|  | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
