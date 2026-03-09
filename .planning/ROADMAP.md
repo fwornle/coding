@@ -106,7 +106,7 @@ Plans:
   2. The trace modal shows wall-clock timing for each wave and each agent invocation, enabling identification of bottlenecks
   3. The trace modal displays which LLM model and provider were used for each agent call
   4. The trace modal includes a data flow view showing what input each agent received and what output it produced, enabling diagnosis of information loss between pipeline stages
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 - [ ] 12-01-PLAN.md -- Backend trace instrumentation: type contracts, per-LLM-call capture, entity flow, trace history
@@ -145,6 +145,6 @@ Plans:
 | 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
-| 12. Pipeline Observability | 1/4 | In Progress|  | - |
+| 12. Pipeline Observability | 2/4 | In Progress|  | - |
 | 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
