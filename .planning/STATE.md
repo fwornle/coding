@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: completed
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-09T17:30:01Z"
-last_activity: 2026-03-09 -- Completed 13-02 CGR Wave Agent Integration
+stopped_at: Completed 13-03-PLAN.md
+last_updated: "2026-03-09T17:33:20Z"
+last_activity: 2026-03-09 -- Completed 13-03 Dashboard CGR Indicators
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 7
   total_plans: 18
-  completed_plans: 17
-  percent: 94
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 13 of 13 (Code Graph Agent Integration)
-Plan: 2 of 3 complete
-Status: In Progress
-Last activity: 2026-03-09 -- Completed 13-02 CGR Wave Agent Integration
+Plan: 3 of 3 complete
+Status: Completed
+Last activity: 2026-03-09 -- Completed 13-03 Dashboard CGR Indicators
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████░] 94%
 | 12    | 04   | 3min     | 2     | 2     |
 | Phase 12 P03 | 5min | 2 tasks | 1 files |
 | 13    | 01   | 4min     | 2     | 5     |
+| 13    | 03   | 8min     | 2     | 7     |
 | 13    | 02   | 5min     | 2     | 5     |
 
 ## Accumulated Context
@@ -108,6 +109,10 @@ Progress: [█████████░] 94%
 - [13-01]: CGR index refresh is fire-and-forget at wave1_init with 30s timeout
 - [13-01]: CgrObservationBuilder formats <code_graph> XML with anti-hallucination rules
 - [13-01]: CGR getters on WaveController avoid modifying wave agent constructors (Plan 02 scope)
+- [13-03]: TraceCGRQuery duplicated in frontend per Phase 12 pattern (no cross-package imports)
+- [13-03]: CGR freshness uses cache-metadata.json + nc port check for Memgraph
+- [13-03]: CGR regression detection at <50% of average queries across recent runs
+- [13-03]: Used CGR query stats (not observation source tags) since trace files lack observation-level detail
 - [13-02]: autoTagObservations uses regex code-ref detection, not LLM self-tagging alone
 - [13-02]: Wave agent constructors extended with optional cgrCache/cgrBuilder params (backward compatible)
 - [13-02]: Existing [CGR] observations preserved when SAA replaces entity observations
@@ -128,6 +133,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T17:30:01Z
-Stopped at: Completed 13-02-PLAN.md
-Resume with: Execute 13-03-PLAN.md (CGR trace integration and dashboard indicators)
+Last session: 2026-03-09T17:33:20Z
+Stopped at: Completed 13-03-PLAN.md
+Resume with: All plans complete. Milestone v2.1 finished.
