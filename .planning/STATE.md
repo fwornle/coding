@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
-status: in-progress
-stopped_at: Completed 14-01 Relationship Diagrams and CGR Evidence
-last_updated: "2026-03-09T20:49:09Z"
+status: executing
+stopped_at: Completed 14-02 Unified Constraint Validation Gate
+last_updated: "2026-03-09T20:53:39.864Z"
 last_activity: 2026-03-09 -- Completed 14-01 Relationship Diagrams and CGR Evidence
 progress:
-  total_phases: 7
+  total_phases: 6
   completed_phases: 5
   total_plans: 21
-  completed_plans: 19
+  completed_plans: 20
   percent: 90
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 14 of 14 (Documentation Generation)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In Progress
-Last activity: 2026-03-09 -- Completed 14-01 Relationship Diagrams and CGR Evidence
+Last activity: 2026-03-09 -- Completed 14-02 Unified Constraint Validation Gate
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [█████████░] 90%
 | 13    | 03   | 8min     | 2     | 7     |
 | 13    | 02   | 5min     | 2     | 5     |
 | 14    | 01   | 4min     | 2     | 1     |
+| Phase 14 P02 | 2min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,8 @@ Progress: [█████████░] 90%
 - [14-01]: CGR evidence grouped by type (Structural/Relationships/Other) capped at 15 items
 - [14-01]: Diagram storage moved to .data/knowledge-graph/insights/puml/ and images/
 - [14-01]: Graceful fallback: .puml written even without plantuml CLI (success=true)
+- [Phase 14-02]: hierarchyPath accessed via (as any) cast since SharedMemoryEntity lacks field
+- [Phase 14-02]: Validation collects ALL failure reasons per entity (no short-circuit) for complete log output
 
 ### Critical Pitfalls
 
@@ -138,6 +141,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T20:49:09Z
-Stopped at: Completed 14-01 Relationship Diagrams and CGR Evidence
+Last session: 2026-03-09T20:53:39.861Z
+Stopped at: Completed 14-02 Unified Constraint Validation Gate
 Resume with: Execute 14-02 and 14-03 to complete Phase 14.

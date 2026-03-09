@@ -74,7 +74,7 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 - [x] **DOC-01**: Docs agent generates PlantUML diagrams (.puml) for architectural entities (Component, SubComponent)
 - [ ] **DOC-02**: PlantUML diagrams compiled to PNG and embedded in entity insight markdown documents
-- [ ] **DOC-03**: Constraint agent validates pipeline outputs before persistence (content quality, naming, observation count)
+- [x] **DOC-03**: Constraint agent validates pipeline outputs before persistence (content quality, naming, observation count)
 - [x] **DOC-04**: Generated documentation includes entity relationships, hierarchy context, and cross-references
 
 ## Future Requirements
@@ -158,7 +158,7 @@ Which phases cover which requirements.
 | CGR-04 | Phase 13 | Complete |
 | DOC-01 | Phase 14 | Complete |
 | DOC-02 | Phase 14 | Pending |
-| DOC-03 | Phase 14 | Pending |
+| DOC-03 | Phase 14 | Complete |
 | DOC-04 | Phase 14 | Complete |
 
 **Coverage:**

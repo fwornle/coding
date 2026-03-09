@@ -139,7 +139,7 @@ Plans:
   2. PlantUML diagrams are compiled to PNG and embedded (as image links) in the entity's insight markdown document
   3. The constraint agent validates entity naming, observation count, and content quality before persistence -- rejections visible in logs
   4. Insight documents include relationship diagrams showing connections to parent/child/sibling entities
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 14-01-PLAN.md -- Relationship diagrams, CGR evidence sections, new diagram storage paths in InsightGenerationAgent
@@ -157,4 +157,4 @@ Plans:
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
 | 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
 | 13. Code Graph Agent Integration | 3/3 | Complete    | 2026-03-09 | - |
-| 14. Documentation Generation | 1/3 | In Progress|  | - |
+| 14. Documentation Generation | 2/3 | In Progress|  | - |
