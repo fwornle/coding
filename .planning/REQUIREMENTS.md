@@ -58,10 +58,10 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 ### Observability
 
-- [ ] **OBSV-01**: Trace modal displays LLM call counts per wave and agent
-- [ ] **OBSV-02**: Trace modal displays timing breakdown per agent and wave
-- [ ] **OBSV-03**: Trace modal displays model info (which LLM, provider)
-- [ ] **OBSV-04**: Trace modal shows data flow — what went in/out of each agent to diagnose information loss
+- [x] **OBSV-01**: Trace modal displays LLM call counts per wave and agent
+- [x] **OBSV-02**: Trace modal displays timing breakdown per agent and wave
+- [x] **OBSV-03**: Trace modal displays model info (which LLM, provider)
+- [x] **OBSV-04**: Trace modal shows data flow — what went in/out of each agent to diagnose information loss
 
 ### Code Graph Integration
 
@@ -147,10 +147,10 @@ Which phases cover which requirements.
 | QUAL-07 | Phase 11 | Complete |
 | QUAL-08 | Phase 11 | Pending |
 | QUAL-09 | Phase 11 | Complete |
-| OBSV-01 | Phase 12 | Pending |
-| OBSV-02 | Phase 12 | Pending |
-| OBSV-03 | Phase 12 | Pending |
-| OBSV-04 | Phase 12 | Pending |
+| OBSV-01 | Phase 12 | Complete |
+| OBSV-02 | Phase 12 | Complete |
+| OBSV-03 | Phase 12 | Complete |
+| OBSV-04 | Phase 12 | Complete |
 
 | CGR-01 | Phase 13 | Pending |
 | CGR-02 | Phase 13 | Pending |
