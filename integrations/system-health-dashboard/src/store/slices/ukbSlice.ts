@@ -99,6 +99,58 @@ const initialPreferencesState: WorkflowPreferencesState = {
 // Step status type
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
 
+// Trace extension types (mirror backend trace-types.ts)
+// These types are copied from trace-types.ts to avoid cross-package imports
+export interface TraceLLMCall {
+  id: string
+  model: string
+  provider: string
+  purpose: string
+  durationMs: number
+  tokensIn: number
+  tokensOut: number
+  status: 'success' | 'failed' | 'retried'
+  error?: string
+  promptPreview?: string
+  responsePreview?: string
+}
+
+export interface TraceAgentInstance {
+  agentId: string
+  agentType: string
+  parentEntity: string
+  startTime: string
+  endTime?: string
+  status: 'running' | 'completed' | 'failed'
+  llmCalls: TraceLLMCall[]
+  entityCount: number
+  observationCount: number
+}
+
+export interface TraceEntityFlow {
+  produced: number
+  passedQA: number
+  persisted: number
+  rejectedReasons?: Record<string, number>
+}
+
+export interface TraceQAResult {
+  passed: boolean
+  score: number
+  errors?: string[]
+  retried?: boolean
+}
+
+// Wave group for grouping steps by wave number
+export interface WaveGroup {
+  waveNumber: number
+  steps: StepInfo[]
+  totalDuration: number
+  totalLLMCalls: number
+  totalTokens: number
+  entityFlow: TraceEntityFlow
+}
+
 // Step info for each workflow step
 export interface StepInfo {
   name: string
@@ -113,6 +165,12 @@ export interface StepInfo {
   llmCalls?: number
   error?: string
   outputs?: Record<string, any>
+  // Trace extension fields (Phase 12)
+  wave?: number
+  agentInstances?: TraceAgentInstance[]
+  entityFlow?: TraceEntityFlow
+  qaResult?: TraceQAResult
+  llmCallEvents?: TraceLLMCall[]
 }
 
 // Active workflow process
@@ -1721,6 +1779,53 @@ export const selectAgentHasOverride = createSelector(
 export const selectPerAgentOverrides = createSelector(
   [selectUkbState],
   (ukb) => ukb.llmState.perAgentOverrides
+)
+
+// Wave grouping selector: groups steps by wave number for trace visualization
+export const selectWaveGroups = createSelector(
+  [selectCurrentProcess],
+  (process): WaveGroup[] => {
+    const steps = process?.steps || []
+    const waveMap = new Map<number, StepInfo[]>()
+
+    for (const step of steps) {
+      const waveNum = step.wave ?? 0
+      if (!waveMap.has(waveNum)) {
+        waveMap.set(waveNum, [])
+      }
+      waveMap.get(waveNum)!.push(step)
+    }
+
+    const groups: WaveGroup[] = []
+    for (const [waveNumber, waveSteps] of waveMap) {
+      let totalDuration = 0
+      let totalLLMCalls = 0
+      let totalTokens = 0
+      const entityFlow: TraceEntityFlow = { produced: 0, passedQA: 0, persisted: 0 }
+
+      for (const step of waveSteps) {
+        totalDuration += step.duration ?? 0
+        totalLLMCalls += step.llmCalls ?? 0
+        totalTokens += step.tokensUsed ?? 0
+        if (step.entityFlow) {
+          entityFlow.produced += step.entityFlow.produced
+          entityFlow.passedQA += step.entityFlow.passedQA
+          entityFlow.persisted += step.entityFlow.persisted
+        }
+      }
+
+      groups.push({
+        waveNumber,
+        steps: waveSteps,
+        totalDuration,
+        totalLLMCalls,
+        totalTokens,
+        entityFlow,
+      })
+    }
+
+    return groups.sort((a, b) => a.waveNumber - b.waveNumber)
+  }
 )
 
 export default ukbSlice.reducer
