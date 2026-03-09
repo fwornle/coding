@@ -10,8 +10,8 @@ progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 15
-  completed_plans: 14
-  percent: 94
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 12 of 12 (Pipeline Observability)
-Plan: 3 of 4 complete
-Status: Executing
-Last activity: 2026-03-09 -- Completed 12-03 Trace Modal Nested Visualization
+Plan: 4 of 4 complete
+Status: Phase Complete
+Last activity: 2026-03-09 -- Completed 12-04 Trace History Comparison
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [█████████░] 94%
 | 12    | 01   | 5min     | 3     | 3     |
 | 12    | 01   | 4min     | 2     | 3     |
 | 12    | 02   | 4min     | 2     | 4     |
+| 12    | 04   | 3min     | 2     | 2     |
 | Phase 12 P03 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
@@ -94,6 +95,8 @@ Progress: [█████████░] 94%
 - [12-02]: Duplicated trace types in frontend (TraceLLMCall etc.) rather than cross-package import
 - [12-02]: Added trace-history handler to Express server.js since project is Vite+Express, not Next.js
 
+- [12-04]: Self-contained TraceHistoryPanel fetches own data -- no props needed
+- [12-04]: Anomaly thresholds: entity drop <50% avg, duration >2x avg, QA rejection >50%
 - [12-01]: Fire-and-forget trace capture pattern -- never throw from capture methods
 - [12-01]: Entity _traceData converted to TraceLLMCall via helper, not modifying wave agents
 - [12-01]: Trace history limited to last 10 files with auto-cleanup
@@ -116,6 +119,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T12:24:31.854Z
-Stopped at: Completed 12-03 Trace Modal Nested Visualization
-Resume with: `/gsd:execute-phase 12` (continue Phase 12, Plan 03 next)
+Last session: 2026-03-09T12:27:28Z
+Stopped at: Completed 12-04 Trace History Comparison -- Phase 12 complete
+Resume with: All phases complete (v2.1 milestone finished)
