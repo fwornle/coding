@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: executing
-stopped_at: Completed 12-02 Frontend Data Transport
-last_updated: "2026-03-09T09:33:29.789Z"
-last_activity: 2026-03-09 -- Completed 12-02 Frontend Data Transport
+stopped_at: Completed 12-03 Trace Modal Nested Visualization
+last_updated: "2026-03-09T12:24:34.429Z"
+last_activity: 2026-03-09 -- Completed 12-03 Trace Modal Nested Visualization
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
-  percent: 88
+  completed_plans: 14
+  percent: 94
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 12 of 12 (Pipeline Observability)
-Plan: 2 of 4 complete
+Plan: 3 of 4 complete
 Status: Executing
-Last activity: 2026-03-09 -- Completed 12-01 Backend Trace Instrumentation
+Last activity: 2026-03-09 -- Completed 12-03 Trace Modal Nested Visualization
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [█████████░] 88%
 | 12    | 01   | 5min     | 3     | 3     |
 | 12    | 01   | 4min     | 2     | 3     |
 | 12    | 02   | 4min     | 2     | 4     |
+| Phase 12 P03 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Progress: [█████████░] 88%
 - [12-01]: Fire-and-forget trace capture pattern -- never throw from capture methods
 - [12-01]: Entity _traceData converted to TraceLLMCall via helper, not modifying wave agents
 - [12-01]: Trace history limited to last 10 files with auto-cleanup
+- [Phase 12]: Hierarchical expand IDs use slash-delimited paths for parent-child collapse
+- [Phase 12]: Code evidence detection via regex for file paths and PascalCase identifiers in LLM previews
 
 ### Critical Pitfalls
 
@@ -113,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T09:33:26Z
-Stopped at: Completed 12-01 Backend Trace Instrumentation + 12-02 Frontend Data Transport
+Last session: 2026-03-09T12:24:31.854Z
+Stopped at: Completed 12-03 Trace Modal Nested Visualization
 Resume with: `/gsd:execute-phase 12` (continue Phase 12, Plan 03 next)
