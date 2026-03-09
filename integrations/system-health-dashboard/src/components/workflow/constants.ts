@@ -839,6 +839,46 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
   ],
 }
 
+// Agent type color mapping for trace detail panel (Phase 12)
+export const AGENT_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  SemanticAnalyzer: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
+  InsightGeneration: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30' },
+  OntologyClassification: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+  PersistenceAgent: { bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30' },
+  QAAgent: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
+  ContentValidation: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
+}
+
+// Wave display names for trace grouping (Phase 12)
+export const WAVE_DISPLAY_NAMES: Record<number, string> = {
+  0: 'Initialization',
+  1: 'Wave 1: Project Survey',
+  2: 'Wave 2: Component Analysis',
+  3: 'Wave 3: Detail Extraction',
+  4: 'Wave 4: Insights & Finalization',
+}
+
+// Step type categorization for step-level nesting within waves (Phase 12)
+export const STEP_CATEGORIES: Record<string, 'analyze' | 'classify' | 'persist' | 'qa' | 'init' | 'insights' | 'kgops'> = {
+  wave1_init: 'init',
+  wave1_analyze: 'analyze',
+  wave1_classify: 'classify',
+  wave1_persist: 'persist',
+  wave1_qa: 'qa',
+  wave2_analyze: 'analyze',
+  wave2_classify: 'classify',
+  wave2_persist: 'persist',
+  wave2_qa: 'qa',
+  wave3_analyze: 'analyze',
+  wave3_classify: 'classify',
+  wave3_persist: 'persist',
+  wave3_qa: 'qa',
+  wave4_insights: 'insights',
+  wave4_kgops: 'kgops',
+  wave4_persist: 'persist',
+  wave4_finalize: 'init',
+}
+
 /**
  * Human-readable display names for wave-analysis steps in the tracer.
  * Maps internal step names to descriptive labels.
