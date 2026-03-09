@@ -347,13 +347,13 @@ export default function TraceHistoryPanel() {
         <Separator />
 
         {/* Wave-by-wave comparison */}
-        <ScrollArea className="max-h-[60vh]">
+        <div>
           <div className="space-y-3">
             {waveComparisons.map(wc => (
               <WaveComparisonRow key={wc.waveNumber} data={wc} />
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     )
   }
@@ -381,7 +381,7 @@ export default function TraceHistoryPanel() {
         </Button>
       </div>
 
-      <ScrollArea className="max-h-[60vh]">
+      <div>
         <div className="space-y-1">
           {traces.map((trace, idx) => {
             const anomalies = detectAnomalies(trace, averages)
@@ -462,7 +462,7 @@ export default function TraceHistoryPanel() {
             )
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
