@@ -19,11 +19,18 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, XCircle, Loader2, Clock, Database, Info } from 'lucide-react'
 import { Logger, LogCategories } from '@/utils/logging'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
+
+interface CGRFreshness {
+  lastIndexedAt: string | null
+  entityCount: number
+  incrementalRefreshAvailable: boolean
+  memgraphRunning: boolean
+}
 
 interface ReindexProgress {
   status: 'running' | 'completed' | 'failed' | 'idle'
@@ -44,6 +51,21 @@ export default function CGRReindexModal() {
   const cgr = useAppSelector((state) => state.cgr)
   const [elapsedTime, setElapsedTime] = useState(0)
   const [progress, setProgress] = useState<ReindexProgress | null>(null)
+  const [freshness, setFreshness] = useState<CGRFreshness | null>(null)
+
+  // Fetch freshness on mount
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE_URL}/api/cgr/freshness`)
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.status === 'success' && data.data) {
+          setFreshness(data.data)
+        }
+      })
+      .catch(() => { /* ignore */ })
+    return () => { cancelled = true }
+  }, [cgr.reindexStatus]) // Refetch when status changes (e.g., after reindex completes)
 
   // Poll for progress during reindexing
   const pollProgress = useCallback(async () => {
@@ -103,6 +125,14 @@ export default function CGRReindexModal() {
       clearInterval(pollInterval)
     }
   }, [cgr.reindexStatus, cgr.reindexStartTime, pollProgress])
+
+  const formatRelativeTime = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime()
+    if (diff < 60000) return 'just now'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+    return `${Math.floor(diff / 86400000)}d ago`
+  }
 
   const formatElapsedTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -212,6 +242,35 @@ export default function CGRReindexModal() {
                 including all integrations (code-graph-rag, semantic-analysis, etc.). This covers ~33k functions across
                 the entire monorepo. Other repositories indexed via UKB remain in Memgraph but aren&apos;t cache-tracked.
               </div>
+              {/* Index freshness indicator (Phase 13) */}
+              {freshness && (
+                <div className="text-xs bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-2.5 rounded-md space-y-1">
+                  {!freshness.memgraphRunning ? (
+                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      <span className="font-medium">Memgraph offline</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+                        <Info className="h-3.5 w-3.5" />
+                        <span className="font-medium">Index Freshness</span>
+                      </div>
+                      <div className="flex gap-4 text-muted-foreground pl-5">
+                        <span>
+                          Last indexed: {freshness.lastIndexedAt
+                            ? formatRelativeTime(freshness.lastIndexedAt)
+                            : 'never'}
+                        </span>
+                        <span>Entities: {freshness.entityCount.toLocaleString()}</span>
+                      </div>
+                      <div className="pl-5 text-muted-foreground">
+                        Incremental refresh: {freshness.incrementalRefreshAvailable ? 'Ready' : 'Not available'}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

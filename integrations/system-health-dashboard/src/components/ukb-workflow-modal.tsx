@@ -1511,6 +1511,26 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           )
                         })}
                       </div>
+                      {/* CGR availability badge (Phase 13) */}
+                      {(() => {
+                        const initStep = steps.find((s: { name: string }) => s.name === 'wave1_init')
+                        const cgrAvailable = initStep?.outputs?.cgrAvailable
+                        const cgrStats = initStep?.outputs?.cgrStats as { queriesMade?: number; cacheHits?: number } | undefined
+                        if (cgrAvailable === undefined) return null
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs mt-1.5 pt-1.5 border-t">
+                            <span className={`w-2 h-2 rounded-full ${cgrAvailable ? 'bg-green-500' : 'bg-gray-400'}`} />
+                            <span className={cgrAvailable ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}>
+                              {cgrAvailable ? 'CGR' : 'No CGR'}
+                            </span>
+                            {cgrStats && cgrStats.queriesMade != null && (
+                              <span className="text-muted-foreground text-[10px]">
+                                {cgrStats.queriesMade}q {cgrStats.cacheHits ?? 0}h
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )
                 })()}

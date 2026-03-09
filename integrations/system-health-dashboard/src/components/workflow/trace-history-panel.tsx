@@ -16,6 +16,7 @@ import {
   Clock,
   XCircle,
   GitCompare,
+  Database,
 } from 'lucide-react'
 import { WAVE_DISPLAY_NAMES } from './constants'
 
@@ -30,6 +31,8 @@ interface TraceHistorySummary {
   totalLLMCalls: number
   totalTokens: number
   entityCounts: { produced: number; persisted: number }
+  // Phase 13: CGR query stats per run
+  cgrStats?: { totalQueries: number; cacheHits: number; totalDurationMs: number }
 }
 
 interface TraceStepDetail {
@@ -40,6 +43,9 @@ interface TraceStepDetail {
   tokensUsed?: number
   entityFlow?: { produced: number; passedQA?: number; persisted: number }
   status?: string
+  // Phase 13: CGR queries per step
+  cgrQueries?: number
+  cgrCacheHits?: number
 }
 
 interface TraceDetail {
@@ -51,16 +57,18 @@ interface TraceDetail {
   totalTokens: number
   entityCounts: { produced: number; persisted: number }
   stepsDetail?: TraceStepDetail[]
+  // Phase 13: CGR stats
+  cgrStats?: { totalQueries: number; cacheHits: number; totalDurationMs: number }
 }
 
 interface WaveComparison {
   waveName: string
   waveNumber: number
-  a: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number }
-  b: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number }
+  a: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number; cgrQueries: number }
+  b: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number; cgrQueries: number }
 }
 
-type AnomalyType = 'Entity drop' | 'Slow run' | 'Failed steps' | 'High rejection'
+type AnomalyType = 'Entity drop' | 'Slow run' | 'Failed steps' | 'High rejection' | 'CGR regression'
 
 interface AnomalyInfo {
   type: AnomalyType
@@ -100,7 +108,7 @@ function formatTimestamp(iso: string): string {
 
 function detectAnomalies(
   trace: TraceHistorySummary,
-  averages: { persisted: number; duration: number; rejectionRate: number }
+  averages: { persisted: number; duration: number; rejectionRate: number; avgCgrQueries: number }
 ): AnomalyInfo[] {
   const anomalies: AnomalyInfo[] = []
   const duration = computeDurationMs(trace.startTime, trace.endTime)
@@ -124,6 +132,13 @@ function detectAnomalies(
     }
   }
 
+  // Phase 13: CGR integration regression detection
+  if (averages.avgCgrQueries > 0 && trace.cgrStats) {
+    if (trace.cgrStats.totalQueries < averages.avgCgrQueries * 0.5) {
+      anomalies.push({ type: 'CGR regression', severity: 'amber' })
+    }
+  }
+
   return anomalies
 }
 
@@ -138,19 +153,20 @@ function groupStepsByWave(steps: TraceStepDetail[]): Map<number, TraceStepDetail
 }
 
 function aggregateWave(steps: TraceStepDetail[]): {
-  duration: number; llmCalls: number; tokens: number; produced: number; persisted: number
+  duration: number; llmCalls: number; tokens: number; produced: number; persisted: number; cgrQueries: number
 } {
-  let duration = 0, llmCalls = 0, tokens = 0, produced = 0, persisted = 0
+  let duration = 0, llmCalls = 0, tokens = 0, produced = 0, persisted = 0, cgrQueries = 0
   for (const s of steps) {
     duration += s.durationMs || 0
     llmCalls += s.llmCalls || 0
     tokens += s.tokensUsed || 0
+    cgrQueries += s.cgrQueries || 0
     if (s.entityFlow) {
       produced += s.entityFlow.produced || 0
       persisted += s.entityFlow.persisted || 0
     }
   }
-  return { duration, llmCalls, tokens, produced, persisted }
+  return { duration, llmCalls, tokens, produced, persisted, cgrQueries }
 }
 
 function deltaClass(a: number, b: number, lowerIsBetter: boolean): string {
@@ -201,12 +217,14 @@ export default function TraceHistoryPanel() {
   }, [])
 
   const averages = useMemo(() => {
-    if (traces.length === 0) return { persisted: 0, duration: 0, rejectionRate: 0 }
+    if (traces.length === 0) return { persisted: 0, duration: 0, rejectionRate: 0, avgCgrQueries: 0 }
 
     let totalPersisted = 0
     let totalDuration = 0
     let totalRejectionRate = 0
     let rejectionCount = 0
+    let totalCgrQueries = 0
+    let cgrRunCount = 0
 
     for (const t of traces) {
       totalPersisted += t.entityCounts.persisted
@@ -215,12 +233,17 @@ export default function TraceHistoryPanel() {
         totalRejectionRate += (t.entityCounts.produced - t.entityCounts.persisted) / t.entityCounts.produced
         rejectionCount++
       }
+      if (t.cgrStats && t.cgrStats.totalQueries > 0) {
+        totalCgrQueries += t.cgrStats.totalQueries
+        cgrRunCount++
+      }
     }
 
     return {
       persisted: totalPersisted / traces.length,
       duration: totalDuration / traces.length,
       rejectionRate: rejectionCount > 0 ? totalRejectionRate / rejectionCount : 0,
+      avgCgrQueries: cgrRunCount > 0 ? totalCgrQueries / cgrRunCount : 0,
     }
   }, [traces])
 
@@ -437,6 +460,15 @@ export default function TraceHistoryPanel() {
                   <span title="Entities">
                     {trace.entityCounts.persisted}/{trace.entityCounts.produced} entities
                   </span>
+                  {trace.cgrStats && trace.cgrStats.totalQueries > 0 && (
+                    <span title="CGR Queries" className="flex items-center gap-0.5">
+                      <Database className="h-3 w-3 inline text-purple-400" />
+                      {trace.cgrStats.totalQueries}q
+                      {trace.cgrStats.cacheHits > 0 && (
+                        <span className="text-green-600">({trace.cgrStats.cacheHits}h)</span>
+                      )}
+                    </span>
+                  )}
                 </div>
 
                 {/* Anomaly badges */}
@@ -454,6 +486,7 @@ export default function TraceHistoryPanel() {
                       {a.type === 'Entity drop' && <TrendingDown className="h-3 w-3 mr-1" />}
                       {a.type === 'Slow run' && <Clock className="h-3 w-3 mr-1" />}
                       {a.type === 'Failed steps' && <XCircle className="h-3 w-3 mr-1" />}
+                      {a.type === 'CGR regression' && <Database className="h-3 w-3 mr-1" />}
                       {a.type}
                     </Badge>
                   ))}
@@ -482,6 +515,12 @@ function CompareHeader({ label, trace }: { label: string; trace: TraceDetail }) 
         <span>
           {trace.entityCounts?.persisted ?? 0}/{trace.entityCounts?.produced ?? 0} entities
         </span>
+        {trace.cgrStats && trace.cgrStats.totalQueries > 0 && (
+          <span className="flex items-center gap-0.5">
+            <Database className="h-3 w-3 text-purple-400" />
+            {trace.cgrStats.totalQueries} CGR
+          </span>
+        )}
       </div>
       <Badge
         variant="outline"
@@ -533,6 +572,15 @@ function WaveComparisonRow({ data }: { data: WaveComparison }) {
         <MetricCell value={`${a.persisted} persisted`} />
         <DeltaCell a={a.persisted} b={b.persisted} suffix="" lowerIsBetter={false} />
         <MetricCell value={`${b.persisted} persisted`} />
+
+        {/* CGR Queries (Phase 13) - only show if either trace has CGR data */}
+        {(a.cgrQueries > 0 || b.cgrQueries > 0) && (
+          <>
+            <MetricCell value={`${a.cgrQueries} CGR`} />
+            <DeltaCell a={a.cgrQueries} b={b.cgrQueries} suffix="" lowerIsBetter={false} />
+            <MetricCell value={`${b.cgrQueries} CGR`} />
+          </>
+        )}
       </div>
     </div>
   )
