@@ -2,87 +2,88 @@
 
 **Type:** Detail
 
-The CodeKnowledgeGraphBuilder uses AST parsing to construct the graph, as hinted by the parent context of SemanticAnalysis and the mention of CodeKnowledgeGraphBuilder.buildGraph()
+The Tree-sitter AST parsing is a key component in the CodeGraphConstructor, allowing it to analyze the code structure and extract meaningful information.
 
 ## What It Is  
 
-**AstParser** is the core component that transforms source‑code text into an abstract syntax tree (AST) representation, which is then consumed by the **CodeKnowledgeGraphBuilder** to populate a graph‑based knowledge store.  The only concrete location we can point to from the supplied observations is the call‑site inside **`CodeKnowledgeGraphBuilder.buildGraph()`** – this method invokes the parser and immediately hands the resulting AST to the graph‑construction logic.  AstParser therefore lives conceptually within the *CodeKnowledgeGraph* subsystem and is a direct child of the **CodeKnowledgeGraph** entity (the parent component that ultimately owns the knowledge graph).  No explicit file‑system paths were listed in the observations, so the exact source‑file location cannot be enumerated, but every reference to the parser is anchored to the **CodeKnowledgeGraphBuilder** workflow.
-
-The parser is not a stand‑alone tool; it is tightly coupled to the rest of the knowledge‑graph pipeline.  Its output feeds the **CodeKnowledgeGraph** data model, which is persisted in **Memgraph**, a native graph database.  Consequently, AstParser is the bridge between raw code syntax and the graph‑oriented semantic layer that powers downstream analysis, search, and recommendation features.
-
----
+**AstParser** is the parsing engine embedded inside the **CodeGraphConstructor** component.  Although the source tree does not list a dedicated file for the parser, the observations make clear that the **CodeGraphConstructor** class *contains* an **AstParser** instance that leverages **Tree‑sitter** to walk a program’s abstract syntax tree (AST).  By delegating the low‑level syntactic analysis to Tree‑sitter, the parser can recognise language‑specific constructs while presenting a uniform, language‑agnostic representation to the rest of the graph‑building pipeline.  In practice, AstParser is the bridge between raw source code and the knowledge‑graph structures that the **GraphBuilder** later assembles.
 
 ## Architecture and Design  
 
-From the observations we can infer a **Builder**‑style architecture.  The **CodeKnowledgeGraphBuilder** orchestrates the creation of a complete knowledge graph by sequentially invoking distinct phases: (1) parsing source files with **AstParser**, (2) translating the AST into graph entities, and (3) persisting those entities in **Memgraph**.  This staged construction isolates concerns—parsing, transformation, and storage—while allowing each phase to evolve independently.
+The architecture around **AstParser** follows a **composition** pattern: the higher‑level **CodeGraphConstructor** composes an AstParser object rather than inheriting from it.  This keeps the parsing concern isolated and interchangeable.  The surrounding components—**CodeGraphAgent** (found at `src/agents/code-graph-agent.ts`) and **GraphBuilder**—form a thin‑layer orchestration stack.  The **CodeGraphAgent** drives the overall workflow, invoking the **CodeGraphConstructor**; the constructor, in turn, calls its internal **AstParser** to obtain a Tree‑sitter AST, and finally passes the extracted semantic nodes to **GraphBuilder** for knowledge‑graph construction.  
 
-The interaction pattern resembles a **pipeline**: the parser produces an intermediate representation (the AST) that is consumed by a downstream transformer.  Although the observations do not name a transformer class, the existence of `CodeKnowledgeGraphBuilder.buildGraph()` implies a method that iterates over AST nodes and issues graph‑mutation commands to Memgraph.  The parser itself likely adopts an **Adapter** pattern to hide the specifics of the underlying parsing library (e.g., a language‑specific parser such as `ast` in Python or a third‑party Java parser).  By exposing a uniform interface—perhaps `parse(source: str) -> AST`—the rest of the system remains agnostic to the concrete parsing implementation.
-
-The **graph‑storage** side is represented by **Memgraph**, which suggests a **Repository**‑like abstraction: the builder writes nodes and edges into Memgraph, while other components (e.g., query services) read from it.  The overall architecture therefore consists of three layers:
-
-1. **Parsing Layer** – AstParser (adapter over a parsing library).  
-2. **Transformation Layer** – CodeKnowledgeGraphBuilder (builder that maps AST nodes to graph constructs).  
-3. **Persistence Layer** – Memgraph (graph repository).
-
-No evidence points to micro‑services, event‑driven messaging, or other distributed patterns; the design appears to be a tightly coupled, in‑process workflow.
-
----
+Because Tree‑sitter itself is a **plug‑in language runtime**, the design inherits its ability to support many programming languages without the need for custom parsers per language.  This choice reflects a **language‑agnostic** design decision: the system does not embed language‑specific parsing logic, but rather relies on Tree‑sitter’s grammars to produce a consistent AST shape that the rest of the pipeline can consume.
 
 ## Implementation Details  
 
-The only concrete implementation artifact we have is the method **`CodeKnowledgeGraphBuilder.buildGraph()`**, which is documented as the entry point for graph construction.  Inside this method, the following logical steps are expected:
+The core implementation revolves around three collaborating classes:
 
-1. **Source Acquisition** – The builder collects source files (paths, strings, or streams) from a configured location.  
-2. **AST Generation** – For each source unit, it calls **AstParser**.  The parser likely exposes a function such as `parse(source_code: str) -> ASTNode`.  The AST object contains hierarchical nodes (e.g., modules, classes, functions, statements) that capture both syntactic structure and, possibly, enriched semantic information (type hints, symbol tables).  
-3. **Graph Mapping** – The builder walks the AST, converting each node into a corresponding graph vertex (e.g., a `Function` node, a `Class` node) and establishes edges that reflect relationships like “defines”, “calls”, or “inherits”.  The mapping logic is the heart of the knowledge‑graph creation and is where domain‑specific heuristics reside.  
-4. **Memgraph Persistence** – Using Memgraph’s client API, the builder issues `CREATE` statements or uses a bulk import mechanism to insert vertices and edges.  Because Memgraph is a native graph DB, it can efficiently store and index the resulting structure for fast traversal.
+1. **CodeGraphConstructor** – the orchestrator that owns an **AstParser** instance.  Its responsibility is to feed source files into the parser, receive the parsed AST, and translate relevant nodes into intermediate representations suitable for graph building.  
 
-Although the specific parsing library is not named, the observation that “AST parsing is likely done using a library or module specifically designed for this purpose” tells us the implementation does not reinvent parsing from scratch.  Instead, AstParser wraps a mature parser, exposing only the subset of functionality needed by the builder (e.g., node type enumeration, child iteration).  This wrapper isolates the rest of the system from library version changes and permits swapping parsers for different languages without touching the graph‑building code.
+2. **AstParser** – a thin wrapper around Tree‑sitter.  It creates a Tree‑sitter `Parser` object, loads the appropriate language grammar (e.g., JavaScript, Python, etc.), and invokes `parser.parse(sourceCode)` to obtain a concrete syntax tree.  The wrapper then traverses the tree, exposing utility methods such as `getFunctions()`, `getClasses()`, and `getImports()` that the **CodeGraphConstructor** can call.  
 
----
+3. **GraphBuilder** – consumes the semantic fragments produced by **CodeGraphConstructor** (which are derived from the AstParser output) and creates nodes and edges in the knowledge graph.  While the exact graph‑building API is not detailed in the observations, the relationship is explicit: “The CodeGraphConstructor class constructs the knowledge graph from the parsed AST, which is facilitated by the GraphBuilder.”
+
+The flow can be summarised as:
+
+```
+CodeGraphAgent → CodeGraphConstructor
+    └─> AstParser (Tree‑sitter) → AST
+        └─> CodeGraphConstructor extracts semantic info
+            └─> GraphBuilder builds knowledge graph
+```
+
+No additional files or functions are mentioned, so the implementation is inferred strictly from the composition described above.
 
 ## Integration Points  
 
-AstParser sits at the intersection of three system boundaries:
+* **CodeGraphAgent (`src/agents/code-graph-agent.ts`)** – Acts as the entry point for graph construction jobs.  It instantiates **CodeGraphConstructor**, which in turn creates the **AstParser**.  The agent therefore indirectly depends on Tree‑sitter through the parser.  
 
-1. **Upstream – Source Ingestion** – It receives raw source code from whatever component supplies files (e.g., a repository scanner, a file‑system watcher, or a CI pipeline).  The contract is a simple string or stream input, keeping the parser independent of file‑system concerns.  
+* **GraphBuilder** – Receives the processed AST data from **CodeGraphConstructor**.  The integration is a producer‑consumer relationship: the constructor produces a language‑agnostic representation, and the builder consumes it to emit graph entities.  
 
-2. **Downstream – Graph Builder** – Its sole consumer is **CodeKnowledgeGraphBuilder**.  The builder expects a well‑defined AST object; any change in the AST shape would require a coordinated update in both AstParser and the builder’s traversal logic.  
+* **Tree‑sitter library** – External dependency that supplies language grammars and parsing capabilities.  Because Tree‑sitter is a native library with language‑specific modules, the parser must load the correct grammar at runtime based on the source file’s language.  
 
-3. **External Library – Parsing Engine** – AstParser delegates the heavy lifting to an external parsing library.  The integration point is the adapter code that translates library‑specific node objects into the internal AST model used by the builder.  This layer also handles error reporting (syntax errors, unsupported constructs) and may surface diagnostics back to the caller.
-
-Because Memgraph is the persistence back‑end, the builder (and therefore AstParser indirectly) must respect Memgraph’s data model constraints—e.g., property types, label conventions, and transaction limits.  Any future integration with alternative graph stores would require either a new repository implementation or an additional abstraction layer between the builder and Memgraph, but the parser itself would remain untouched.
-
----
+No other explicit interfaces are described, so the integration surface is limited to the constructor‑parser‑builder chain.
 
 ## Usage Guidelines  
 
-* **Treat AstParser as a pure function** – Call it with source code and expect an immutable AST.  Do not mutate the returned tree; any transformation should happen downstream in the builder.  
-* **Handle parsing errors gracefully** – The parser may raise syntax‑error exceptions; callers (typically the builder) should catch these, log the offending file, and decide whether to abort the whole graph build or continue with the remaining sources.  
-* **Keep language‑specific concerns localized** – If the system must support multiple programming languages, instantiate a language‑specific parser implementation behind a common `AstParser` interface.  This preserves the builder’s language‑agnostic traversal logic.  
-* **Avoid deep coupling with Memgraph** – AstParser should not contain any persistence logic.  All graph‑creation responsibilities belong to the builder; this separation eases testing (AST generation can be unit‑tested without a running Memgraph instance).  
-* **Cache results when appropriate** – For large codebases, parsing can be expensive.  If the surrounding pipeline permits, cache the AST for unchanged files and reuse it across successive `buildGraph()` runs.
+1. **Invoke through the CodeGraphAgent** – Direct use of **AstParser** is discouraged; callers should request graph construction via the **CodeGraphAgent** so that the full pipeline (parsing → graph building) is honoured.  
+
+2. **Provide source code as raw text** – The parser expects a string containing the source file.  Supplying pre‑tokenised or partially parsed data can break Tree‑sitter’s expectations.  
+
+3. **Select the correct language grammar** – When extending support for a new language, ensure the corresponding Tree‑sitter grammar is installed and referenced in the **AstParser** configuration.  This is the only place where language‑specific handling occurs.  
+
+4. **Avoid mutating AST nodes** – The AST returned by Tree‑sitter should be treated as read‑only.  Any transformation should happen in the **CodeGraphConstructor** layer before passing data to **GraphBuilder**.  
+
+5. **Handle parsing errors gracefully** – Tree‑sitter can produce partial trees for malformed code.  The constructor should check for error nodes and decide whether to abort graph construction or continue with best‑effort extraction.
 
 ---
 
-### Summary of Architectural Findings  
+### Architectural patterns identified  
+* **Composition** – **CodeGraphConstructor** composes an **AstParser** rather than inheriting from it.  
+* **Pipeline / Producer‑Consumer** – The flow from **CodeGraphAgent → CodeGraphConstructor → AstParser → GraphBuilder** forms a clear processing pipeline.  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns** | Builder (CodeKnowledgeGraphBuilder), Pipeline (parse → transform → store), Adapter (AstParser wrapping a parsing library), Repository (Memgraph) |
-| **Key design decisions** | Use of a dedicated AST parser to decouple syntax handling from graph construction; reliance on Memgraph for scalable graph storage; encapsulation of parsing behind a simple interface |
-| **Trade‑offs** | Parsing overhead vs. rich semantic graph; tight coupling between builder and parser (requires coordinated changes); dependence on Memgraph limits portability but gives powerful graph queries |
-| **System structure** | Hierarchical: CodeKnowledgeGraph (parent) → CodeKnowledgeGraphBuilder (orchestrator) → AstParser (leaf) → Memgraph (persistence) |
-| **Scalability** | Graph storage scales horizontally via Memgraph’s clustering; parsing can be parallelized per source file, but the builder must manage concurrent writes to Memgraph |
-| **Maintainability** | Clear separation of concerns makes the parser replaceable; however, the AST contract is a shared surface area that must be version‑controlled.  Adding language support requires new parser adapters but no changes to the builder’s core logic. |
+### Design decisions and trade‑offs  
+* **Leveraging Tree‑sitter** trades the effort of writing custom parsers for the dependency on an external native library, gaining multi‑language support at the cost of managing language grammar binaries.  
+* Keeping the parser as a child of **CodeGraphConstructor** isolates parsing logic, simplifying testing but coupling the constructor tightly to a specific parsing implementation.  
 
-All statements above are grounded directly in the provided observations: the relationship between **AstParser**, **CodeKnowledgeGraphBuilder**, and **Memgraph**, and the fact that AST parsing is delegated to a specialized library.  No additional patterns or components have been invented beyond what the evidence supports.
+### System structure insights  
+* The system is layered: an agent layer triggers work, a constructor layer handles domain‑specific extraction, a parser layer provides language‑agnostic syntax, and a builder layer materialises the graph.  
+
+### Scalability considerations  
+* Because Tree‑sitter parses files in linear time relative to source length, the **AstParser** scales well with large codebases.  Parallelising the **CodeGraphAgent** to process multiple files concurrently would further improve throughput, provided the underlying Tree‑sitter grammars are thread‑safe.  
+
+### Maintainability assessment  
+* The clear separation of concerns (agent, constructor, parser, builder) aids maintainability; changes to language support are confined to the **AstParser** configuration.  However, the lack of a dedicated file for **AstParser** in the observed tree could make locating the wrapper harder for new developers, suggesting a future refactor to give the parser its own module with explicit documentation.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) for constructing knowledge graphs.
+
+### Siblings
+- [GraphBuilder](./GraphBuilder.md) -- The CodeGraphConstructor class constructs the knowledge graph from the parsed AST, which is facilitated by the GraphBuilder.
 
 
 ---

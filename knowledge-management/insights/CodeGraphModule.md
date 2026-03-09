@@ -2,95 +2,104 @@
 
 **Type:** SubComponent
 
-This sub-component might have a mechanism for handling entity extraction, potentially through an extractEntities() function in entity-extraction.ts, which identifies and extracts relevant entities from the code.
+CodeGraphModule constructs the code knowledge graph using AST parsing and provides semantic code search capabilities through its interaction with the GraphDatabaseAdapter.
 
 ## What It Is  
 
-The **CodeGraphModule** is a sub‑component of the **KnowledgeManagement** component that turns raw source‑code into a structured knowledge graph.  Its implementation lives alongside the rest of the knowledge‑management stack and relies on the **GraphDatabaseAdapter** found at `storage/graph-database-adapter.ts` for all persistence operations.  The module’s core responsibility is to ingest code (via a function analogous to `analyzeCode()` in `code-analysis.ts`), extract meaningful entities, classify them with the help of the **OntologyModule**, and write the resulting triples into the graph database through the adapter.  Supporting concerns such as caching (`cacheCodeAnalysis()` in `caching.ts`), logging (`logCodeAnalysis()` in `logging.ts`), and concurrency control (via the **ConcurrencyControlModule**) are also part of its design, ensuring that analyses are fast, observable, and safe when run in parallel.
+The **CodeGraphModule** is a sub‑component that lives inside the **KnowledgeManagement** hierarchy and is responsible for turning source‑code artefacts into a rich, queryable knowledge graph. All of its persistence work is funneled through the **GraphDatabaseAdapter** found at `storage/graph-database-adapter.ts`. By delegating storage, routing, and synchronization concerns to this adapter, the module can focus on its core responsibilities: AST‑based parsing of code, construction of code‑entity nodes and relationship edges, and providing semantic search over the resulting graph. The module also contains a dedicated child component, **CodeGraphStorage**, which acts as the thin façade that the higher‑level logic uses to interact with the shared adapter.
 
 ## Architecture and Design  
 
-The architecture of **CodeGraphModule** follows a **layered composition** pattern.  At the outermost layer the module receives input code and delegates to a **code‑analysis** service (`analyzeCode()`).  The analysis service orchestrates a pipeline that includes **entity extraction** (`extractEntities()` in `entity‑extraction.ts`) and **ontology classification** (through calls to the **OntologyModule**).  Once the entities and relationships are prepared, the module hands the data off to the **GraphDatabaseAdapter**, which abstracts the underlying graph store (the VkbApiClient is dynamically imported inside the adapter, as described in the parent component’s documentation).  
+The design of **CodeGraphModule** follows a *adapter‑centric* architecture. The central `GraphDatabaseAdapter` encapsulates all low‑level graph‑database interactions—entity insertion, relationship management, concurrent request handling, and automatic JSON export sync. This creates a clear separation of concerns: the module’s business logic (AST parsing, graph construction, search) never talks directly to the database driver; instead it calls the adapter’s public API.  
 
-The module also adopts **cross‑cutting concerns** implemented as reusable utilities: caching is performed by `cacheCodeAnalysis()` to avoid re‑processing unchanged code, while `logCodeAnalysis()` records each analysis run for auditability.  Concurrency safety is achieved by collaborating with the **ConcurrencyControlModule**, which likely provides locks or version checks to prevent race conditions when multiple analyses target the same code base.  This design keeps the core graph‑building logic pure and lets orthogonal concerns be swapped or tuned independently.
+The adapter implements **intelligent routing**, a pattern that decides at runtime whether a request should be served via an external API endpoint or a direct in‑process database call. This routing logic is shared across sibling components such as **ManualLearning**, **OnlineLearning**, and **PersistenceModule**, which all depend on the same adapter file. Consequently, the system exhibits a *shared‑service* pattern where a single, well‑defined service (`GraphDatabaseAdapter`) is reused by multiple higher‑level modules, reducing duplication and ensuring consistent behaviour (e.g., JSON export sync) across the knowledge‑graph ecosystem.  
+
+The module’s own internal design is layered: the top layer (exposed to the rest of KnowledgeManagement) is **CodeGraphStorage**, which forwards calls to the adapter; the middle layer performs **AST parsing** to extract symbols, definitions, and dependencies; the bottom layer builds the graph by invoking the adapter’s “store entity” and “create relationship” operations. This layered approach isolates parsing concerns from persistence concerns, making each part easier to test and evolve.
 
 ## Implementation Details  
 
-* **Entry point – `analyzeCode()` (code‑analysis.ts)**  
-  The function accepts a code string (or AST) and drives the pipeline.  It first checks the cache via `cacheCodeAnalysis()`.  If a cached result exists, it returns early; otherwise it proceeds to extraction.
+Although the source snapshot reports “0 code symbols found,” the observations make clear that the implementation hinges on two concrete artifacts:
 
-* **Entity extraction – `extractEntities()` (entity‑extraction.ts)**  
-  This routine parses the supplied code, identifies constructs such as classes, functions, variables, and relationships (e.g., inheritance, calls).  The output is a collection of raw entity descriptors.
+1. **`storage/graph-database-adapter.ts`** – This file defines the adapter class (or module) that offers methods for:
+   * **Intelligent routing** – logic that inspects a request and chooses between API‑based or direct DB access.
+   * **Automatic JSON export sync** – a background or hook‑driven mechanism that mirrors the in‑memory graph state to a JSON representation, guaranteeing data consistency and providing an easy export format.
+   * **Concurrency handling** – safeguards for simultaneous reads/writes, likely via promises or locking primitives.
 
-* **Ontology classification – OntologyModule**  
-  The raw descriptors are passed to the OntologyModule, which maps them onto the system’s canonical ontology (e.g., “SoftwareComponent”, “Method”, “Dependency”).  This step guarantees semantic consistency across the knowledge graph.
+2. **`CodeGraphStorage`** – While not listed with a concrete path, it is the child component that the **CodeGraphModule** uses to interact with the adapter. Its responsibilities include:
+   * Translating high‑level “store code entity” calls into the adapter’s API.
+   * Managing transaction boundaries for a batch of AST‑derived nodes, ensuring that a partially parsed file does not leave the graph in an inconsistent state.
 
-* **Persistence – GraphDatabaseAdapter (storage/graph-database-adapter.ts)**  
-  The classified entities are transformed into graph triples and handed to the adapter’s `writeBatch()` (or similar) method.  The adapter encapsulates the dynamic import of `VkbApiClient`, allowing the module to remain agnostic of the concrete graph database implementation.
+The module’s core processing pipeline can be inferred as:
+* **AST parsing** – source files are parsed into an Abstract Syntax Tree; relevant nodes (functions, classes, imports, etc.) are extracted.
+* **Graph construction** – each extracted symbol becomes a node; relationships (e.g., “calls”, “inherits”, “imports”) are derived from the AST structure.
+* **Persistence** – `CodeGraphStorage` forwards these nodes and edges to the `GraphDatabaseAdapter`, which routes the operations appropriately and triggers the JSON export sync.
 
-* **Cross‑cutting utilities**  
-  - **Caching**: `cacheCodeAnalysis()` stores intermediate results keyed by a hash of the input code, reducing redundant work.  
-  - **Logging**: `logCodeAnalysis()` records timestamps, input identifiers, and any errors, feeding into the system‑wide observability pipeline.  
-  - **Concurrency control**: Interaction with the **ConcurrencyControlModule** ensures that simultaneous analyses do not corrupt shared graph state; the exact mechanism (optimistic locking, semaphore, etc.) is encapsulated within that sibling component.
+Because the adapter is shared, any change to its routing or export logic instantly propagates to all consumers, including **CodeGraphModule** and its siblings.
 
 ## Integration Points  
 
-The **CodeGraphModule** sits at the heart of the **KnowledgeManagement** hierarchy.  It consumes services from several siblings:  
-* **OntologyModule** – provides the classification schema and may also store ontology definitions via the same `GraphDatabaseAdapter`.  
-* **ConcurrencyControlModule** – offers APIs (e.g., `acquireLock()`, `releaseLock()`) that the CodeGraphModule invokes before writing to the graph.  
-* **Caching** and **Logging** utilities are shared across siblings, ensuring uniform performance optimizations and audit trails.  
+**CodeGraphModule** sits under the **KnowledgeManagement** parent, which itself relies on the same `GraphDatabaseAdapter`. This means the module’s graph data becomes part of the broader knowledge graph managed by KnowledgeManagement, enabling cross‑domain queries (e.g., linking code entities to manually entered knowledge from **ManualLearning**).  
 
-All persistence funnels through its child component, **GraphDatabaseAdapter**, which is also used by other siblings such as **ManualLearning**, **OnlineLearning**, **PersistenceModule**, and **GraphDatabaseModule**.  Because the adapter abstracts the underlying VkbApiClient, any change to the graph store (e.g., swapping Neo4j for another backend) propagates transparently to the CodeGraphModule and its peers.
+Sibling modules—**ManualLearning**, **OnlineLearning**, **GraphDatabaseModule**, **PersistenceModule**, **CheckpointManagementModule**—all consume the same adapter. Consequently, they share:
+* **Routing policies** – any optimisation (e.g., preferring direct DB access for bulk inserts) benefits all.
+* **JSON export format** – downstream tools that ingest the exported JSON can treat data from any sibling uniformly.
+
+The child **CodeGraphStorage** abstracts the adapter for the rest of the module, presenting a clean interface (e.g., `storeNode`, `createEdge`). External callers (perhaps higher‑level services in KnowledgeManagement) interact with **CodeGraphModule** through this storage façade, never touching the adapter directly.
 
 ## Usage Guidelines  
 
-1. **Always invoke through `analyzeCode()`** – this guarantees that caching, logging, and concurrency safeguards are applied.  Direct calls to lower‑level functions (e.g., `extractEntities()`) should be avoided unless you are extending the pipeline.  
-2. **Respect the cache contract** – when providing code for analysis, ensure that the input is deterministic (e.g., trimmed, normalized) so that the cache key remains stable.  If you need to force a re‑analysis, use the provided `invalidateCache()` helper.  
-3. **Do not bypass the OntologyModule** – classification must occur before persisting; otherwise the graph may contain orphaned or inconsistent nodes.  
-4. **Handle concurrency explicitly** – when performing bulk analyses that may target overlapping code bases, acquire the appropriate lock from the **ConcurrencyControlModule** before invoking `analyzeCode()`.  This prevents write conflicts in the graph.  
-5. **Monitor logs** – `logCodeAnalysis()` emits structured events; integrate them with your observability stack to detect failures early and to track analysis throughput.
+1. **Always go through CodeGraphStorage** – Direct calls to `storage/graph-database-adapter.ts` from within the module bypass the abstraction layer and can lead to inconsistent transaction handling. Use the storage façade for all node/edge operations.  
+2. **Leverage the automatic JSON export** – The adapter’s export sync runs automatically; however, if a bulk operation is performed, it is advisable to batch writes to minimise the number of export cycles.  
+3. **Respect intelligent routing** – When invoking operations that may be latency‑sensitive (e.g., real‑time semantic search), prefer the API‑based path if the adapter’s routing logic indicates it is more efficient. The routing decision is internal, but developers can influence it by configuring request metadata (if the adapter exposes such knobs).  
+4. **Keep AST parsing deterministic** – Since the graph is derived from AST output, ensure that the parser version and configuration are consistent across builds; otherwise node identifiers may diverge, breaking the integrity of the exported JSON.  
+5. **Coordinate with sibling modules** – When performing large migrations or schema changes, remember that all siblings share the same adapter. Schedule downtime or use the adapter’s versioning hooks (if any) to avoid race conditions across modules.
 
 ---
 
-### Architectural patterns identified  
-* **Layered composition** (pipeline of analysis → extraction → classification → persistence)  
-* **Adapter pattern** (GraphDatabaseAdapter abstracts the concrete graph client)  
-* **Cross‑cutting concerns** implemented via separate utilities (caching, logging, concurrency)  
+### Architectural patterns identified
+* **Adapter pattern** – `GraphDatabaseAdapter` abstracts the underlying graph database.
+* **Shared‑service / common‑utility** – The same adapter is reused by multiple sibling modules.
+* **Layered architecture** – Parsing → Graph construction → Storage façade → Adapter.
+* **Intelligent routing** – Dynamic decision‑making for API vs. direct DB access.
 
-### Design decisions and trade‑offs  
-* **Dynamic import of VkbApiClient** gives flexibility in swapping the graph backend but adds a small runtime overhead at first use.  
-* **Caching** improves performance for unchanged code at the cost of additional storage and cache‑invalidation complexity.  
-* **Explicit concurrency control** ensures data integrity but requires callers to be aware of lock acquisition semantics.  
+### Design decisions and trade‑offs
+* **Centralising persistence** reduces duplication but creates a single point of failure; the adapter must be robust and well‑tested.
+* **Automatic JSON export** provides out‑of‑the‑box consistency but may add overhead for high‑frequency writes; batching mitigates this.
+* **Intelligent routing** improves performance but adds complexity to the adapter’s internal logic, requiring careful monitoring.
 
-### System structure insights  
-The **KnowledgeManagement** component is organized around a shared graph‑persistence layer (`GraphDatabaseAdapter`).  All knowledge‑creation sub‑components (ManualLearning, OnlineLearning, CodeGraphModule, etc.) funnel their output through this adapter, promoting a single source of truth for the knowledge graph.  
+### System structure insights
+* The **KnowledgeManagement** parent orchestrates a unified knowledge graph; **CodeGraphModule** contributes the code‑specific sub‑graph.
+* Sibling modules contribute complementary sub‑graphs (manual knowledge, online‑extracted knowledge, checkpoints, etc.) that are all stored in the same underlying graph database via the shared adapter.
+* **CodeGraphStorage** acts as the module‑specific gateway, preserving encapsulation while still leveraging the shared adapter.
 
-### Scalability considerations  
-* **Horizontal scaling** is feasible because the adapter is stateless; multiple instances of CodeGraphModule can run concurrently, provided they respect the concurrency‑control contract.  
-* **Cache sharding** or distributed caches would be needed if the analysis workload grows beyond a single node.  
-* **Batch writes** to the graph (via the adapter’s bulk API) can reduce round‑trip latency and improve throughput.  
+### Scalability considerations
+* Because the adapter handles concurrent access, the system can scale horizontally as more modules issue writes/reads concurrently.
+* The automatic JSON export could become a bottleneck at massive write volumes; designers should monitor export latency and consider sharding or incremental export strategies.
+* Intelligent routing enables the system to direct read‑heavy workloads to a fast API cache while keeping write‑heavy workloads on a direct connection, supporting heterogeneous scaling.
 
-### Maintainability assessment  
-The clear separation of concerns—analysis, extraction, ontology mapping, persistence, and cross‑cutting utilities—makes the module easy to extend or replace individual stages.  Reusing the same **GraphDatabaseAdapter** across siblings reduces duplication but creates a single point of failure; robust error handling and health‑checking of the adapter are therefore critical.  Overall, the design balances flexibility with simplicity, supporting straightforward evolution of the code‑graph pipeline.
+### Maintainability assessment
+* **High cohesion** within the module (AST parsing, graph building) and **low coupling** to the database (via the adapter) make the codebase easy to evolve.
+* Shared adapter logic means changes propagate automatically, reducing the maintenance surface but also requiring rigorous regression testing.
+* The clear separation between **CodeGraphStorage** and the adapter provides a stable contract for future extensions (e.g., swapping the underlying graph engine) without touching the parsing layer.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's architecture is designed to support multiple workflows and use cases, including code graph analysis, entity persistence, and ontology classification, through a set of APIs and interfaces for interacting with the knowledge graph. This is evident in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which provides a unified interface for graph database operations, making it easy to integrate with other components and tools. The use of a dynamic import mechanism in GraphDatabaseAdapter to load the VkbApiClient module allows for flexibility in the component's dependencies.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database. This adapter enables the component to perform tasks such as entity storage and relationship management, while also providing automatic JSON export sync. The use of this adapter allows for a flexible and scalable solution for knowledge graph management. Furthermore, the intelligent routing implemented in the GraphDatabaseAdapter enables the component to efficiently route requests for API or direct database access, ensuring optimal performance. The code in storage/graph-database-adapter.ts demonstrates how the adapter is used to handle concurrent access and provide a robust solution for graph database interactions.
 
 ### Children
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The CodeGraphModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store extracted insights in the knowledge graph, as mentioned in the parent context.
+- [CodeGraphStorage](./CodeGraphStorage.md) -- The CodeGraphModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage code-related entities and relationships.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities in the knowledge graph.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store automatically extracted knowledge in the knowledge graph.
-- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store entities in the knowledge graph.
-- [OntologyModule](./OntologyModule.md) -- OntologyModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store ontology information in the knowledge graph.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses a dynamic import mechanism in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to load the VkbApiClient module, allowing for flexibility in the component's dependencies.
-- [ConcurrencyControlModule](./ConcurrencyControlModule.md) -- ConcurrencyControlModule uses a locking mechanism, such as acquireLock() in locking-mechanism.ts, to prevent data inconsistencies when multiple components are accessing the knowledge graph simultaneously.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage manually created entities and relationships.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning relies on the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage automatically extracted knowledge and relationships.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage entities and their relationships.
+- [CheckpointManagementModule](./CheckpointManagementModule.md) -- CheckpointManagementModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage checkpoint-related entities and relationships.
+- [ObservationDerivationModule](./ObservationDerivationModule.md) -- ObservationDerivationModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage observation-related entities and relationships.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

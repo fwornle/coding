@@ -2,116 +2,109 @@
 
 **Type:** SubComponent
 
-OntologyManager uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+The OntologyManager uses the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system.
 
 ## What It Is  
 
-**OntologyManager** is a sub‑component that lives inside the **KnowledgeManagement** domain. Its source code resides in  
-`integrations/mcp-server-semantic-analysis/src/ontology/ontology-manager.ts`. The class is responsible for managing the system’s ontology – the formal representation of concepts, relationships, and classifications that drive inference across the platform. To persist and retrieve ontology data it delegates all storage concerns to the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). In addition to basic CRUD operations, OntologyManager guarantees that the ontology is continuously synchronized with the broader knowledge graph and that a JSON representation of the ontology is automatically exported whenever the underlying data changes. The component also exposes a unified inference engine that other parts of the system (e.g., ManualLearning, InsightGenerator, OnlineLearning) can invoke to obtain ontology‑based classifications.
+**OntologyManager** is the core sub‑component that drives semantic classification of conversation transcripts inside the **LiveLoggingSystem**. Its implementation lives alongside the rest of the logging stack and collaborates directly with two concrete modules that are explicitly referenced in the code base:  
+
+* **OntologyClassificationAgent** – `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`  
+* **TranscriptAdapter** – `lib/agent-api/transcript-api.js`  
+
+The manager’s primary responsibilities are to (1) load and validate ontology configuration files, (2) receive raw session transcripts, (3) hand those transcripts to a **TranscriptAdapter** for normalization, and (4) forward the normalized data to the **OntologyClassificationAgent** for rule‑based categorisation. The result of the classification is then made available to the rest of the LiveLoggingSystem (e.g., logging, formatting, downstream analytics).
 
 ---
 
 ## Architecture and Design  
 
-The overall architecture follows a **layered abstraction** in which the OntologyManager sits in the business‑logic layer while the GraphDatabaseAdapter provides a **storage‑abstraction layer**. The adapter pattern is evident: GraphDatabaseAdapter encapsulates the concrete graph database implementation (Graphology + LevelDB) and presents a clean, domain‑specific API to OntologyManager. This decouples ontology logic from the particulars of how the graph is stored, making it possible to swap the underlying database without touching the manager.
+The observed interactions reveal a **layered, adapter‑centric architecture**. The **OntologyManager** sits in the middle tier, acting as a coordinator between the **data‑ingress layer** (raw transcripts) and the **semantic‑processing layer** (the classification agent).  
 
-Because OntologyManager relies on an **automatic JSON export sync feature**, the design implicitly uses an **observer‑like synchronization** mechanism – changes made through the manager trigger a side‑effect that writes a fresh JSON snapshot. The same sync capability is described for the GraphDatabaseAdapter, indicating that both the knowledge graph and the ontology share a common “export‑on‑change” strategy. This creates a **consistent data‑flow contract** across siblings such as ManualLearning, InsightGenerator, and CodeGraphAgent, all of which also consume the GraphDatabaseAdapter.
+* **Adapter Pattern** – The presence of `TranscriptAdapter` (an abstract base class defined in `lib/agent-api/transcript-api.js`) demonstrates a classic Adapter pattern. Each agent that produces a transcript can implement its own concrete subclass, overriding `adaptTranscript` to translate proprietary structures into the canonical format expected by the classification logic. This isolates OntologyManager from the heterogeneity of upstream agents and enables new agents to be added without touching the manager’s core.  
 
-The component hierarchy is straightforward:
+* **Strategy‑like Classification** – The **OntologyClassificationAgent** encapsulates the classification algorithm and the ontology rule set. By delegating the `classify` call to this agent, OntologyManager follows a Strategy‑style separation: the manager does not embed classification logic; it simply supplies the prepared transcript. The agent can be swapped or extended (e.g., a different rule engine) without altering the manager.  
 
-- **Parent** – KnowledgeManagement (orchestrates the overall knowledge graph and provides the GraphDatabaseAdapter).  
-- **Sibling** – ManualLearning, OnlineLearning, InsightGenerator, GraphDatabaseAdapter, CodeGraphAgent (all share the same storage adapter).  
-- **Child** – None directly observed; however, OntologyManager’s inference engine may internally instantiate helper classes (not listed) to perform classification.
+* **Configuration‑Driven Validation** – Observation 5 notes that OntologyManager “loads and validates ontology configurations.” This suggests a configuration‑driven design where the ontology schema, rule files, or mapping tables are externalised (likely JSON/YAML) and parsed at start‑up. Validation ensures that malformed or out‑of‑date ontology definitions do not corrupt the classification pipeline.  
 
-The design emphasizes **single responsibility** (OntologyManager handles ontology concerns) and **dependency inversion** (higher‑level modules depend on the abstraction GraphDatabaseAdapter rather than a concrete DB).
+* **Parent‑Sibling Relationships** – OntologyManager is a child of **LiveLoggingSystem**, which orchestrates the overall logging workflow. Its siblings—**TranscriptProcessor**, **Logger**, **LSLFormatter**, and **TranscriptAdapter**—share the same parent and collectively constitute the logging pipeline. The shared use of `TranscriptAdapter` between OntologyManager and TranscriptProcessor highlights a common contract for transcript handling across siblings.
+
+No evidence of distributed or event‑driven mechanisms is present, so the architecture appears to be a **single‑process, in‑memory pipeline** that relies on well‑defined interfaces.
 
 ---
 
 ## Implementation Details  
 
-The core class, `OntologyManager`, is defined in `integrations/mcp-server-semantic-analysis/src/ontology/ontology-manager.ts`. Its constructor receives an instance of `GraphDatabaseAdapter`, establishing the primary communication channel to the persistent graph. All ontology‑related operations—adding concepts, defining relationships, updating classifications—are translated into calls on the adapter, which in turn uses **Graphology** (an in‑memory graph library) to manipulate the graph structure and **LevelDB** as the durable backing store.
+1. **Loading & Validating Ontology Configurations**  
+   OntologyManager likely reads a configuration file (e.g., `ontology-config.json`) during initialization. Validation steps probably include schema checks (required fields, correct data types) and cross‑reference verification (ensuring every classification rule points to an existing ontology node). Errors detected at this stage would be reported through the **Logger** sibling, keeping start‑up failures visible to operators.
 
-Two notable implementation aspects are:
+2. **Transcript Normalization**  
+   The manager receives a raw session transcript (the exact source is not enumerated but could be any agent that implements the `TranscriptAdapter` contract). It instantiates the appropriate concrete adapter—perhaps via a factory or a registration map maintained in `lib/agent-api/transcript-api.js`. The call `adapter.adaptTranscript(rawTranscript)` returns a **standardized transcript object** (likely a plain JavaScript/TypeScript structure with fields such as `speaker`, `timestamp`, `utterance`). This object is the only data structure passed downstream, guaranteeing a stable interface for the classification agent.
 
-1. **Automatic JSON Export Sync** – Both OntologyManager and GraphDatabaseAdapter expose a “sync” capability that writes the current graph state to a JSON file whenever a mutation occurs. This ensures that any external consumer (e.g., a visualization tool or downstream analytics pipeline) can always retrieve an up‑to‑date representation without additional polling.
+3. **Classification Invocation**  
+   With the normalized transcript in hand, OntologyManager calls `OntologyClassificationAgent.classify(normalizedTranscript)`. The agent resides in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` and implements the actual rule evaluation against the loaded ontology. The method returns a classification payload (e.g., an array of ontology tags, confidence scores, or a hierarchical category). OntologyManager may then enrich the original transcript with this metadata before forwarding it to downstream components like **LSLFormatter**.
 
-2. **Unified Inference Engine** – OntologyManager bundles an inference engine that consumes the stored ontology to produce classifications. While the concrete inference algorithm is not listed, the observation that it provides a “unified inference engine” suggests a central service that other components invoke rather than each component implementing its own reasoning logic.
+4. **Error Handling & Logging**  
+   While not explicitly described, the presence of a sibling **Logger** implies that OntologyManager routes any exceptions (failed validation, adapter errors, classification failures) to this logging service. This keeps the manager’s responsibilities focused on orchestration rather than diagnostics.
 
-Because the adapter uses Graphology, the graph is first built in memory, enabling fast traversals for inference, and then persisted to LevelDB for durability. The level of indirection also allows the same JSON export logic to be reused by sibling components that also depend on the adapter.
+5. **Extensibility Hooks**  
+   Because the manager does not embed hard‑coded agent names or classification rules, adding a new source of transcripts or a new ontology version involves only (a) providing a new adapter subclass in `lib/agent-api/transcript-api.js` and (b) updating the configuration file that OntologyManager validates. No changes to the manager’s core code are required.
 
 ---
 
 ## Integration Points  
 
-- **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`): The sole storage interface for OntologyManager. All persistence, retrieval, and export responsibilities are delegated here. The adapter’s use of Graphology and LevelDB is shared across siblings (ManualLearning, InsightGenerator, CodeGraphAgent), establishing a common data‑access contract.
+* **LiveLoggingSystem (Parent)** – The parent component creates and wires OntologyManager into the overall logging workflow. LiveLoggingSystem likely supplies the raw transcript source and consumes the classification results for storage, analytics, or real‑time alerts.  
 
-- **KnowledgeManagement** (parent): OntologyManager is a child of this domain. KnowledgeManagement coordinates the overall knowledge graph, and OntologyManager contributes the ontology layer that enriches the graph with semantic meaning.
+* **TranscriptAdapter (Sibling/Shared Contract)** – Both OntologyManager and TranscriptProcessor depend on the abstract `TranscriptAdapter`. Concrete adapters are registered here, enabling both components to work with a unified transcript representation.  
 
-- **Sibling Components**: ManualLearning, InsightGenerator, and CodeGraphAgent also depend on GraphDatabaseAdapter. This means that any change to the adapter’s API or storage strategy has ripple effects across all these components, reinforcing the need for a stable abstraction.
+* **OntologyClassificationAgent (External Agent)** – The manager’s sole downstream processing dependency is the classification agent located at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. This agent is the only component that knows the ontology’s internal structure.  
 
-- **Export Consumers**: The automatic JSON export is likely consumed by external services (e.g., dashboards, reporting tools) that require a static snapshot of the ontology or knowledge graph. Because the export is synchronized automatically, these consumers can rely on eventual consistency without implementing their own polling mechanisms.
+* **Logger (Sibling)** – Error and diagnostic messages from OntologyManager flow to the Logger, ensuring observability across the LiveLoggingSystem.  
+
+* **LSLFormatter (Sibling)** – After classification, OntologyManager’s enriched transcript may be handed to LSLFormatter for final output formatting, though the exact hand‑off is not detailed in the observations.  
+
+* **Configuration Files (External)** – OntologyManager reads ontology configuration files that are external to the source tree; these files constitute a critical integration point for domain experts who define or evolve the ontology.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via Dependency Injection** – Always create OntologyManager by passing a pre‑configured instance of GraphDatabaseAdapter. This preserves the abstraction boundary and ensures that the automatic sync behavior is correctly wired.
+1. **Provide a Proper Adapter** – When integrating a new agent that emits transcripts, implement a subclass of `TranscriptAdapter` in `lib/agent-api/transcript-api.js` and ensure `adaptTranscript` returns the canonical structure expected by the classification agent. Register the adapter so OntologyManager can discover it (typically via a map or naming convention).  
 
-2. **Prefer Adapter Methods for Direct Graph Access** – If a use‑case requires low‑level graph manipulation (e.g., bulk imports), interact with GraphDatabaseAdapter directly rather than reaching into OntologyManager’s internal structures. This keeps ontology‑specific logic isolated.
+2. **Maintain Valid Ontology Configurations** – Any change to the ontology (addition of new categories, rule adjustments) must be reflected in the configuration files that OntologyManager validates at start‑up. Run the validation step locally before deploying to avoid runtime classification errors.  
 
-3. **Leverage the JSON Export for External Integration** – Consumers that need a snapshot of the ontology should read the exported JSON file rather than querying the LevelDB store. The export is kept up‑to‑date by the sync feature, guaranteeing freshness.
+3. **Handle Classification Results Gracefully** – The payload returned by `OntologyClassificationAgent.classify` should be checked for empty or ambiguous results. If confidence scores are provided, downstream components (e.g., Logger or LSLFormatter) can decide whether to flag low‑confidence classifications.  
 
-4. **Treat the Inference Engine as a Service** – When performing classification, call the public inference API exposed by OntologyManager rather than re‑implementing reasoning logic. This ensures that all components use the same unified inference rules.
+4. **Leverage the Logger** – All exceptional conditions—failed adapter conversion, malformed configuration, classification exceptions—should be logged through the sibling Logger. This keeps the system observable and aids troubleshooting.  
 
-5. **Avoid Direct LevelDB Access** – Direct reads/writes to LevelDB bypass the Graphology layer and the sync mechanism, leading to potential inconsistencies. All persistence should go through GraphDatabaseAdapter.
+5. **Avoid Direct Dependency on Agent Internals** – Consumers of OntologyManager (including LiveLoggingSystem) should treat the manager as a black box that accepts raw transcripts and returns enriched data. Do not rely on internal implementation details such as the exact shape of the normalized transcript; instead, use the documented output contract.  
 
 ---
 
-### Architectural patterns identified  
+### Summary Deliverables  
 
-- **Adapter pattern** – GraphDatabaseAdapter abstracts the concrete graph database (Graphology + LevelDB).  
-- **Observer‑style synchronization** – Automatic JSON export sync reacts to data changes.  
-- **Layered architecture** – Separation between business logic (OntologyManager) and storage abstraction (GraphDatabaseAdapter).  
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Adapter pattern (`TranscriptAdapter`), Strategy‑like delegation to `OntologyClassificationAgent`, configuration‑driven validation. |
+| **Design decisions and trade‑offs** | *Decision*: Centralize ontology loading/validation in OntologyManager to guarantee a single source of truth. *Trade‑off*: Adds a start‑up dependency on correct config files; a misconfiguration blocks the whole pipeline. <br>*Decision*: Use an abstract adapter to normalize transcripts. *Trade‑off*: Requires each new agent to implement an adapter, adding upfront effort but yielding long‑term flexibility. |
+| **System structure insights** | OntologyManager sits as a middle tier under LiveLoggingSystem, sharing the `TranscriptAdapter` contract with its sibling TranscriptProcessor. It isolates classification logic in a separate agent, enabling independent evolution of ontology rules. |
+| **Scalability considerations** | Because classification is performed in‑process via `OntologyClassificationAgent`, scaling horizontally would require replicating the manager and its dependencies across instances. The adapter abstraction makes it easy to parallelize transcript handling, but the classification agent may become a bottleneck if rule evaluation is computationally heavy. Caching of validated configurations and re‑using adapter instances can mitigate overhead. |
+| **Maintainability assessment** | High maintainability: clear separation of concerns, externalized configuration, and a single point of adaptation for new transcript sources. The lack of hard‑coded dependencies means updates to the ontology or addition of agents rarely touch OntologyManager’s code. The main maintenance risk lies in keeping the configuration schema synchronized with the classification agent’s expectations. |
 
-### Design decisions and trade‑offs  
-
-- **Choice of Graphology + LevelDB** provides fast in‑memory graph operations with simple key‑value persistence, but limits complex query capabilities compared to a full‑featured graph DB.  
-- **Automatic JSON export** simplifies external consumption but introduces I/O overhead on every mutation; this is a trade‑off between immediacy and performance.  
-- **Centralized inference engine** ensures consistency across the system but creates a single point of failure and may become a bottleneck as the ontology grows.  
-
-### System structure insights  
-
-- OntologyManager is a leaf component under KnowledgeManagement, tightly coupled to the GraphDatabaseAdapter, which is a shared service for multiple sibling components.  
-- The hierarchy promotes reuse of storage logic while keeping domain‑specific reasoning isolated.  
-
-### Scalability considerations  
-
-- **LevelDB** scales well for write‑heavy workloads on a single node but does not natively support horizontal sharding; scaling beyond a single process may require re‑architecting the storage layer.  
-- The JSON export sync could become a bottleneck under high mutation rates; batching or throttling the export may be required for large‑scale deployments.  
-- In‑memory Graphology structures grow with the size of the ontology; careful memory management or graph partitioning may be needed for very large ontologies.  
-
-### Maintainability assessment  
-
-- The clear separation via GraphDatabaseAdapter makes the storage implementation replaceable, aiding long‑term maintainability.  
-- Shared use of the adapter across many siblings means that changes to the adapter’s contract must be coordinated, increasing the impact of modifications.  
-- Automatic sync reduces the need for manual export logic, decreasing the surface area for bugs, but it also introduces hidden side‑effects that developers need to be aware of when performing bulk updates.  
-
-Overall, OntologyManager exhibits a well‑structured, abstraction‑driven design that aligns with the broader KnowledgeManagement ecosystem while providing a solid foundation for ontology‑centric features.
+These observations paint OntologyManager as a well‑encapsulated orchestration layer that leverages adapters and a dedicated classification agent to provide robust, configurable semantic analysis within the LiveLoggingSystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides a layer of abstraction between the component and the underlying graph database, allowing for flexible data storage and retrieval. The GraphDatabaseAdapter class uses Graphology and LevelDB to store and manage the knowledge graph, and it also provides an automatic JSON export sync feature. This ensures that the knowledge graph is always up-to-date and can be easily exported for further analysis or processing. For example, the CodeGraphAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, uses the GraphDatabaseAdapter to store and retrieve code graph data.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This is evident in the way the agent is instantiated and used within the LiveLoggingSystem's classification layer. The OntologyClassificationAgent's classify method is called with the session transcript as an argument, allowing the system to categorize the conversation based on predefined ontology rules. Furthermore, the use of the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, as an abstract base class for agent-specific transcript adapters, enables the system to handle transcripts from various agents in a unified manner. The TranscriptAdapter's adaptTranscript method is responsible for converting agent-specific transcripts into a standardized format, which is then passed to the OntologyClassificationAgent for classification.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [InsightGenerator](./InsightGenerator.md) -- InsightGenerator uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to store and manage the knowledge graph
-- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts to abstract the underlying graph database
+- [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, to handle transcripts from various agents in a unified manner.
+- [Logger](./Logger.md) -- The Logger is expected to provide a logging API for the LiveLoggingSystem component to log events and errors.
+- [LSLFormatter](./LSLFormatter.md) -- The LSLFormatter uses a templating engine or formatting library to generate the output format.
+- [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptAdapter defines an abstract base class for agent-specific transcript adapters.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

@@ -2,116 +2,138 @@
 
 **Type:** SubComponent
 
-This sub-component might have a mechanism for handling entity typing, potentially through a typeEntity() function in entity-typing.ts, which assigns a type to an entity based on the ontology.
+OntologyModule relies on the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve ontology data.
 
 ## What It Is  
 
-**OntologyModule** is a sub‑component of the **KnowledgeManagement** component that is responsible for interpreting and enriching entities with ontological semantics.  The module lives alongside its siblings – *ManualLearning*, *OnlineLearning*, *CodeGraphModule*, *PersistenceModule*, *GraphDatabaseModule* and *ConcurrencyControlModule* – and shares the same low‑level storage primitive: the **GraphDatabaseAdapter** found at `storage/graph-database-adapter.ts`.  All ontology‑related operations (classification, typing, caching, logging, and concurrency protection) are performed against the knowledge graph through this adapter, ensuring a single source of truth for graph persistence across the whole KnowledgeManagement domain.
+**OntologyModule** is a sub‑component that lives inside the **KnowledgeManagement** component.  Its primary responsibility is to expose a *unified interface* for all interactions with the system‑wide ontology.  It receives raw entities from other sub‑components, runs them through the **OntologyClassifier**, persists the resulting classifications in the graph store via the **GraphDatabaseAdapter** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`), and keeps the ontology up‑to‑date when changes occur.  In addition, the module supplies downstream consumers—most notably **InsightGenerationModule** and **TraceReportModule**—with the classified ontology data they need to generate recommendations and detailed workflow trace reports.
 
-The observable surface suggests the module provides at least three core capabilities:  
-
-1. **Entity classification** – a function analogous to `classifyEntity()` (see `ontology-classification.ts`) that maps a raw entity to one or more ontology classes.  
-2. **Entity typing** – a helper similar to `typeEntity()` (see `entity-typing.ts`) that assigns a concrete type based on the ontology hierarchy.  
-3. **Performance optimisation** – a cache layer (`cacheOntologyClassification()` in `caching.ts`) that stores intermediate classification results.  
-
-Together, these capabilities allow downstream modules (e.g., *PersistenceModule*) to store semantically enriched entities in the graph while preserving consistency through the *ConcurrencyControlModule* and traceability via `logOntologyClassification()` in `logging.ts`.
+The module therefore acts as the “gatekeeper” for ontology data: it shields the rest of the system from the low‑level storage details while guaranteeing that every entity is correctly classified and linked to the current version of the ontology.
 
 ---
 
 ## Architecture and Design  
 
-The design of **OntologyModule** follows a **layered, adapter‑centric architecture**.  The bottom layer is the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`), which abstracts all graph‑database interactions (create, read, update, delete).  Ontology‑specific logic sits on top of this adapter, forming a thin service layer that does not directly manipulate the database driver but instead calls the adapter’s unified API.  
+The design of **OntologyModule** follows a *modular, adapter‑based* architecture.  The key design elements that emerge from the observations are:
 
-Key architectural traits identified from the observations:
+1. **Adapter Pattern** – The module does **not** interact directly with the underlying graph database.  Instead it delegates all persistence concerns to **GraphDatabaseAdapter**, a concrete adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`.  This isolates the ontology logic from storage implementation details (e.g., Graphology, LevelDB) and makes it possible to swap the storage backend without touching the classification code.
 
-* **Adapter pattern** – the module depends on `GraphDatabaseAdapter` rather than a concrete graph client, enabling the same code to work with different back‑ends (e.g., Neo4j, VkbApiClient) without modification.  
-* **Separation of concerns** – classification (`classifyEntity`), typing (`typeEntity`), caching (`cacheOntologyClassification`), logging (`logOntologyClassification`) and concurrency control are each encapsulated in their own files/functions.  This modularisation makes each concern testable in isolation.  
-* **Cross‑cutting concerns via composition** – the module composes the caching, logging, and concurrency utilities rather than embedding them, which mirrors the way its siblings also compose the same utilities (e.g., *PersistenceModule* also uses the GraphDatabaseAdapter).  
-* **Implicit contract with PersistenceModule** – the observation that OntologyModule “may utilize the PersistenceModule to store classified entities” indicates a **service‑to‑service contract** where OntologyModule produces enriched entities and hands them off to PersistenceModule for durable storage.  
+2. **Facade / Unified Interface** – By providing a single, well‑defined API for “accessing and updating ontology data”, OntologyModule acts as a façade for the rest of the KnowledgeManagement ecosystem.  Other sub‑components (e.g., **InsightGenerationModule**, **TraceReportModule**, **ManualLearning**, **CodeGraphModule**) call into this façade rather than dealing with the classifier or the graph adapter themselves.
 
-Interaction flow (as inferred): an incoming raw entity is passed to `classifyEntity()`. The function may first consult `cacheOntologyClassification()`; if a cache miss occurs, it performs graph queries via the adapter, possibly invoking `typeEntity()` to resolve the exact type. Before committing any changes, the module engages *ConcurrencyControlModule* to obtain a lock or transaction token, then writes the enriched entity back through the adapter. Finally, `logOntologyClassification()` records the operation for auditability.
+3. **Separation of Concerns** – Classification, persistence, insight generation, and trace reporting are each handled by dedicated collaborators:
+   * **OntologyClassifier** – encapsulates the logic that maps raw entities to ontology concepts.
+   * **GraphDatabaseAdapter** – abstracts graph‑store CRUD operations.
+   * **InsightGenerationModule** – consumes ontology data to produce improvement recommendations.
+   * **TraceReportModule** – consumes ontology data to build detailed execution trace reports.
+
+4. **Event‑like Update Flow** – When the ontology is updated, OntologyModule ensures that affected entities are *re‑classified* and *re‑linked*.  Although the observations do not explicitly name an event bus, the implicit flow is: update → re‑classification → persistence → notification to downstream modules (InsightGeneration, TraceReport).  This keeps the ontology consistent across the system.
+
+Because the parent **KnowledgeManagement** component already uses the same **GraphDatabaseAdapter** for other graph‑related sub‑components (e.g., **CodeGraphModule**, **ManualLearning**), OntologyModule inherits a shared persistence contract, reinforcing a cohesive architectural style across siblings.
 
 ---
 
 ## Implementation Details  
 
-### Core Functions  
+### Core Collaborators  
 
-| Function (file) | Responsibility | Interaction |
-|-----------------|----------------|-------------|
-| `classifyEntity()` – `ontology-classification.ts` | Determines the ontology class(es) that best describe a given entity. Likely queries the graph for class definitions and relationships. | Calls `cacheOntologyClassification()` for memoisation, uses `GraphDatabaseAdapter` for look‑ups, may invoke `typeEntity()` for finer‑grained typing. |
-| `typeEntity()` – `entity-typing.ts` | Assigns a concrete type to an entity based on the ontology hierarchy (e.g., “Method”, “Class”, “Package”). | Operates on the classification result, may also read from the graph via the adapter. |
-| `cacheOntologyClassification()` – `caching.ts` | Stores classification outcomes in an in‑memory or distributed cache to avoid repeated graph traversals. | Exposed as a helper to `classifyEntity()`. Cache invalidation is likely tied to ontology updates (not observed). |
-| `logOntologyClassification()` – `logging.ts` | Emits structured logs (probably JSON) describing the classification event, including entity ID, assigned class, timestamps, and any errors. | Invoked after a successful classification and before or after persisting the result. |
-| Concurrency hooks – *ConcurrencyControlModule* | Provides lock acquisition, optimistic concurrency tokens, or transaction scopes to guard simultaneous classification/typing of the same entity. | Wrapped around the critical section that writes classification data via the adapter. |
+| Symbol | Location / Role |
+|--------|-----------------|
+| **OntologyClassifier** | Not directly referenced by a file path, but it is the classification engine invoked by OntologyModule. |
+| **GraphDatabaseAdapter** | `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` – provides `saveNode`, `getNode`, `updateNode`, and query utilities for the underlying graph store. |
+| **InsightGenerationModule** | Consumes ontology data; its own implementation is outside the scope of the current observations but it is a sibling that calls OntologyModule’s read API. |
+| **TraceReportModule** | Generates trace reports; similarly consumes OntologyModule’s read API. |
 
-### Storage Interaction  
+### Data Flow  
 
-All persistence actions funnel through **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  The adapter implements a **unified interface** (e.g., `executeQuery`, `upsertNode`, `createRelationship`) that abstracts away the underlying VkbApiClient or any other graph client.  This approach mirrors the sibling components, ensuring that OntologyModule can reuse the same dynamic import mechanism described for *GraphDatabaseModule*.
+1. **Incoming Entity** – A caller (e.g., **PersistenceModule** after an entity is persisted) sends a raw entity to OntologyModule.  
+2. **Classification** – OntologyModule forwards the entity to **OntologyClassifier**, which returns a set of ontology tags and a confidence score.  
+3. **Persistence** – The module packages the classification result into a graph node and calls the **GraphDatabaseAdapter** methods (e.g., `saveNode` or `updateNode`). The adapter writes the node to the graph store, handling JSON export sync as described in the parent component’s documentation.  
+4. **Update Propagation** – When the ontology definition itself changes, OntologyModule iterates over all affected nodes, re‑runs **OntologyClassifier**, and persists the new classifications. Downstream modules (InsightGeneration, TraceReport) are then invoked to refresh their cached views.  
 
-### Caching  
+### Interface Surface  
 
-`cacheOntologyClassification()` is likely a thin wrapper around a cache library (e.g., `node-cache`, Redis).  Its placement in a dedicated `caching.ts` file suggests that the module can swap cache implementations without touching classification logic, reinforcing the **separation of concerns** principle.
+While the exact method signatures are not listed, the observations imply at least the following high‑level API:
 
-### Logging  
+* `classifyAndStore(entity: RawEntity): Promise<ClassificationResult>` – runs the classifier and persists the result.  
+* `getClassification(entityId: string): Promise<ClassificationResult>` – reads a stored classification via the adapter.  
+* `handleOntologyUpdate(updatedOntology: OntologyDefinition): Promise<void>` – triggers re‑classification of impacted entities.  
 
-`logOntologyClassification()` centralises audit trails.  By keeping logging isolated, the module can adopt different log sinks (console, file, external observability platform) without altering classification code.
-
-### Concurrency  
-
-The mention of *ConcurrencyControlModule* indicates that OntologyModule does not rely on the graph database’s native transaction isolation alone; instead, it explicitly coordinates concurrent writes.  This design reduces the risk of race conditions when multiple learning pipelines (e.g., *OnlineLearning* and *ManualLearning*) attempt to classify the same entity simultaneously.
+These functions hide the adapter and classifier internals, presenting a clean contract to sibling modules.
 
 ---
 
 ## Integration Points  
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – The sole persistence gateway.  OntologyModule imports the adapter and calls its methods for reading ontology definitions and persisting classification results.  
-2. **PersistenceModule** – Receives enriched entities from OntologyModule for long‑term storage.  The hand‑off likely occurs through a well‑defined interface such as `storeEnrichedEntity(entity)`; the exact contract is not observed but is implied by the statement that OntologyModule “may utilize the PersistenceModule.”  
-3. **ConcurrencyControlModule** – Provides lock or transaction primitives (`acquireLock`, `releaseLock`, or `runInTransaction`).  OntologyModule wraps its critical graph‑write sections with these primitives to guarantee consistency.  
-4. **Caching (`caching.ts`)** – Shared cache utilities that may be used by other siblings (e.g., *OnlineLearning*) for similar memoisation patterns, promoting reuse.  
-5. **Logging (`logging.ts`)** – Centralised logging that can be consumed by system‑wide observability pipelines, ensuring that classification events are visible alongside other knowledge‑graph operations.  
-6. **Parent Component – KnowledgeManagement** – Supplies the overarching API surface (e.g., `classifyAndPersist(entity)`) that orchestrates calls across OntologyModule, PersistenceModule, and other siblings.  KnowledgeManagement’s design to “support multiple workflows” is realised through OntologyModule’s ability to classify entities before they are persisted or further processed.  
+1. **GraphDatabaseAdapter** – The sole persistence dependency.  All read/write operations funnel through the adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`.  Because other siblings (e.g., **CodeGraphModule**, **ManualLearning**) also rely on this adapter, OntologyModule benefits from a shared transaction model and consistent data‑export behavior.
+
+2. **OntologyClassifier** – The classification engine is an internal collaborator.  Its implementation details are not exposed, but it is the only place where ontology‑specific heuristics live, keeping the rest of the system agnostic of classification rules.
+
+3. **InsightGenerationModule** – Consumes the read API of OntologyModule to generate recommendations.  The sibling relationship means that InsightGeneration does not need to know about the graph store; it simply asks OntologyModule for the latest ontology data.
+
+4. **TraceReportModule** – Similar to InsightGeneration, it calls OntologyModule to retrieve the ontology context required for building trace reports of workflow runs.
+
+5. **Parent – KnowledgeManagement** – The parent component orchestrates the overall knowledge graph lifecycle.  OntologyModule fits into this hierarchy by providing the ontology‑specific slice of the graph, while the parent’s agents (e.g., **PersistenceAgent**, **CodeGraphAgent**) handle broader entity persistence and code‑graph construction.
+
+6. **Sibling Modules** – The shared reliance on **GraphDatabaseAdapter** creates a natural coupling: any change in the adapter’s contract (e.g., a new query API) must be coordinated across OntologyModule, **CodeGraphModule**, and **ManualLearning**.  Conversely, this commonality simplifies testing and deployment because a single storage mock can satisfy multiple sub‑components.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always route graph operations through `GraphDatabaseAdapter`.** Direct driver calls bypass the abstraction and will break consistency guarantees across siblings.  
-* **Leverage the cache** by invoking `cacheOntologyClassification()` before performing expensive classification queries.  Remember to invalidate or refresh the cache when the ontology schema changes (the mechanism is not defined, so coordinate with the team responsible for ontology updates).  
-* **Wrap classification calls in concurrency controls.** Use the provided functions from *ConcurrencyControlModule* (e.g., `runInTransaction(async () => { … })`) to avoid race conditions when multiple pipelines classify the same entity concurrently.  
-* **Log every classification outcome** using `logOntologyClassification()`.  Include the entity identifier, selected ontology class, and any error information to aid debugging and audit trails.  
-* **Pass enriched entities to PersistenceModule** rather than persisting them directly.  This respects the intended service boundary and allows PersistenceModule to handle versioning, soft‑deletes, or other persistence policies centrally.  
-* **Do not embed ontology logic in other modules** (e.g., ManualLearning or OnlineLearning).  Keep ontology concerns confined to OntologyModule; other modules should treat classification as a black‑box service.  
+* **Always go through the OntologyModule façade** when you need to read or write ontology data. Direct use of the GraphDatabaseAdapter bypasses classification logic and can lead to inconsistent ontology states.  
+* **When updating the ontology definition**, invoke `handleOntologyUpdate` (or the equivalent method) rather than manually editing graph nodes.  This ensures that all affected entities are re‑classified and that downstream modules receive fresh data.  
+* **Prefer asynchronous calls** (`Promise`‑based) to the module’s API to avoid blocking the event loop, especially when large batches of entities are being classified.  
+* **Cache results locally only if you invalidate the cache** after any ontology update.  Since OntologyModule may re‑classify many nodes in bulk, stale caches can cause InsightGeneration or TraceReport to work with outdated concepts.  
+* **Do not modify GraphDatabaseAdapter directly** from within OntologyModule.  Treat the adapter as a black‑box persistence layer; any custom query logic should be encapsulated in the module’s own methods.  
+* **Testing** – Mock `GraphDatabaseAdapter` and `OntologyClassifier` separately.  Because OntologyModule’s responsibilities are clearly split (classification vs. persistence), unit tests can focus on the orchestration logic without needing a real graph database.
 
 ---
 
-## Summary of Requested Insights  
+### Architectural patterns identified  
 
-| Insight | Details |
-|---------|---------|
-| **Architectural patterns identified** | Adapter pattern (GraphDatabaseAdapter), Separation of Concerns (classification, typing, caching, logging, concurrency), Composition of cross‑cutting utilities, Service‑to‑service contract with PersistenceModule. |
-| **Design decisions and trade‑offs** | *Decision*: Centralise all graph access behind a single adapter – **trade‑off**: adds an indirection layer but yields flexibility across graph back‑ends. <br>*Decision*: Isolate caching, logging, and concurrency as independent modules – **trade‑off**: extra import overhead but improves testability and allows independent evolution. |
-| **System structure insights** | OntologyModule sits under KnowledgeManagement, sharing the same storage adapter as its siblings.  It acts as a semantic enrichment layer that feeds classified entities downstream, while siblings focus on acquisition (*ManualLearning*, *OnlineLearning*) or raw persistence (*PersistenceModule*). |
-| **Scalability considerations** | Caching (`cacheOntologyClassification`) mitigates repeated graph traversals, supporting high‑throughput classification.  Concurrency control prevents write conflicts, enabling parallel processing of many entities.  Because the adapter abstracts the underlying graph client, scaling the graph (sharding, clustering) can be done without touching OntologyModule code. |
-| **Maintainability assessment** | High maintainability: clear separation of concerns, single point of persistence abstraction, and reusable cross‑cutting utilities.  The main risk is cache invalidation and ontology schema evolution; these require coordinated updates across the caching layer and any code that relies on cached classifications.  The modular layout also eases unit testing—each function can be mocked independently. |
+* **Adapter pattern** – via `GraphDatabaseAdapter`.  
+* **Facade pattern** – OntologyModule’s unified interface hides classification and storage details.  
+* **Separation of Concerns** – distinct responsibilities for classification, persistence, insight generation, and trace reporting.  
 
-*All statements above are directly grounded in the observations provided; no speculative patterns have been introduced beyond what the source material implies.*
+### Design decisions and trade‑offs  
+
+* **Centralised ontology handling** simplifies consistency but creates a single point of failure; the module must be highly available.  
+* **Using a shared GraphDatabaseAdapter** reduces duplication across siblings but couples their release cycles; a breaking change in the adapter impacts multiple modules.  
+* **Re‑classification on ontology updates** guarantees up‑to‑date semantics at the cost of potentially expensive batch processing; this trade‑off is acceptable because the system already processes large batches in the **OnlineLearning** pipeline.  
+
+### System structure insights  
+
+* OntologyModule sits at the heart of the **KnowledgeManagement** hierarchy, providing the ontology slice of the overall knowledge graph.  
+* Its sibling modules (ManualLearning, CodeGraphModule, etc.) each manage different graph domains but all converge on the same storage backend, creating a cohesive data‑layer architecture.  
+
+### Scalability considerations  
+
+* Because persistence is delegated to the GraphDatabaseAdapter, scaling the ontology store follows the scaling characteristics of the underlying graph database (e.g., sharding, replication).  
+* Batch re‑classification during ontology updates can be parallelised; the module should expose a streaming or chunked API to avoid memory pressure.  
+* Read‑heavy workloads from InsightGeneration and TraceReport can be satisfied by adding a read‑through cache in front of OntologyModule, provided cache invalidation follows ontology updates.  
+
+### Maintainability assessment  
+
+* **High cohesion** – OntologyModule’s responsibilities are narrowly defined, making the codebase easier to understand and evolve.  
+* **Loose coupling** – By depending only on abstract adapters and classifiers, the module can be tested in isolation and swapped for alternative implementations with minimal impact.  
+* **Potential risk** – The tight coupling to a single storage adapter means that any refactor of `graph-database-adapter.ts` must be coordinated across all siblings, increasing the integration testing burden.  
+* Overall, the design promotes maintainability through clear boundaries, but disciplined versioning of shared adapters is essential to keep the system stable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's architecture is designed to support multiple workflows and use cases, including code graph analysis, entity persistence, and ontology classification, through a set of APIs and interfaces for interacting with the knowledge graph. This is evident in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which provides a unified interface for graph database operations, making it easy to integrate with other components and tools. The use of a dynamic import mechanism in GraphDatabaseAdapter to load the VkbApiClient module allows for flexibility in the component's dependencies.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) enables seamless integration with Graphology and LevelDB for graph data persistence. This allows for efficient storage and querying of the knowledge graph, with automatic JSON export sync ensuring data consistency across the system. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) plays a crucial role in constructing the code knowledge graph, leveraging AST-based analysis for semantic code search capabilities. Furthermore, the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) handles entity persistence, including ontology classification and content validation, ensuring that the knowledge graph remains accurate and up-to-date.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities in the knowledge graph.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store automatically extracted knowledge in the knowledge graph.
-- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store extracted insights in the knowledge graph.
-- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store entities in the knowledge graph.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses a dynamic import mechanism in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to load the VkbApiClient module, allowing for flexibility in the component's dependencies.
-- [ConcurrencyControlModule](./ConcurrencyControlModule.md) -- ConcurrencyControlModule uses a locking mechanism, such as acquireLock() in locking-mechanism.ts, to prevent data inconsistencies when multiple components are accessing the knowledge graph simultaneously.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve user-created entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
+- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve the code knowledge graph.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
+- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the CodeGraphModule to access the code knowledge graph and generate insights.
+- [TraceReportModule](./TraceReportModule.md) -- TraceReportModule uses the CodeGraphModule to access the code knowledge graph and generate trace reports.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

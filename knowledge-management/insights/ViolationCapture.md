@@ -2,154 +2,79 @@
 
 **Type:** SubComponent
 
-ViolationCapture employs the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to capture constraint violations from tool interactions.
+The ViolationCapture is tightly integrated with the ConstraintSystem, enabling the capture and persistence of constraint violations
 
 ## What It Is  
 
-ViolationCapture is the **centralised sub‑component** responsible for detecting, recording and persisting constraint‑violation events that arise from tool interactions throughout the *ConstraintSystem*.  The implementation lives in the same repository as the other agents and utilities and is wired together through the **content‑validation‑agent** located at  
-
-```
-integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-```  
-
-This agent is the entry point for the tool‑level checks that surface violations.  Once a violation is identified, ViolationCapture forwards the information to the **GraphDatabase** layer (via its child *GraphDatabasePersistence*) for durable storage and later export as JSON.  The component also relies on the **Logger** (via the `centralLog` wrapper) to emit diagnostic information, and on the **HookManager** to receive hook events that trigger the capture workflow.  In short, ViolationCapture is the “single source of truth” for all constraint‑violation data that powers the dashboard view of the system.
-
----
+ViolationCapture is the sub‑component that **captures and persists constraint‑violation events** produced by the surrounding `ConstraintSystem`.  Although the concrete source files are not listed in the observations, the component lives inside the same modular boundary that houses other sub‑systems such as `ContentValidator`, `HookManager`, `ConnectionHandler` and `WorkflowManager`.  Its primary responsibility is to act as the **data‑management gate‑keeper** for any rule‑breakage detected by the constraint engine – it records the violation details and makes them durable for downstream processing, reporting, or audit.  Because the parent `ConstraintSystem` explicitly *integrates* the ViolationCapture, the component is invoked automatically whenever a validation rule fires, ensuring a consistent and reliable capture path across the entire system.
 
 ## Architecture and Design  
 
-The architecture surrounding ViolationCapture is **modular** and **orchestrated**.  Each sibling component (ContentValidator, HookManager, Logger, GraphDatabase, AgentManager) lives in its own file and owns a distinct responsibility, a design explicitly highlighted in the parent **ConstraintSystem** description.  ViolationCapture sits at the intersection of three concerns:
+The observations repeatedly emphasize a **modular architecture** for ViolationCapture.  Rather than embedding violation‑handling logic directly inside the core constraint engine, the system **decouples** that concern into its own module.  This separation follows a classic *separation‑of‑concerns* pattern: the constraint evaluator focuses on rule evaluation, while ViolationCapture focuses on persistence and bookkeeping.  The design is deliberately **plug‑and‑play** – the “easy addition or removal of violation capture rules” indicates that the module likely exposes a collection of rule handlers or adapters that can be registered or deregistered without touching the core engine.  
 
-1. **Detection** – The `content-validation-agent.ts` parses entities and flags violations; this logic is encapsulated in the **ContentValidator** sibling, which delegates to the agent.  
-2. **Orchestration** – The **HookManager** acts as a central dispatcher for hook events.  By loading configuration and routing events to registered handlers, it provides a lightweight *mediator*‑style layer that allows ViolationCapture to be invoked without tight coupling to the callers.  
-3. **Persistence** – ViolationCapture forwards the captured payload to **GraphDatabasePersistence**, a child component that abstracts the underlying **GraphDatabase** API.  The persistence layer automatically synchronises the stored data to a JSON export, ensuring that downstream dashboards receive a consistent snapshot.
-
-Although no explicit “design pattern” labels appear in the observations, the observable structure maps cleanly onto well‑known patterns:
-
-| Observed Behaviour | Implicit Pattern |
-|--------------------|------------------|
-| Separate files per agent / validator / manager | **Modular / Component‑Based** organization |
-| HookManager loading configs and dispatching to handlers | **Mediator / Event‑Dispatcher** style |
-| `centralLog` wrapping a logger instance | **Wrapper / Facade** for logging |
-| GraphDatabasePersistence isolating persistence details | **Repository / Data‑Access** abstraction |
-| Automatic JSON export after persistence | **Synchronization** between storage and presentation layers |
-
-These patterns together enable a clear separation of concerns while still allowing ViolationCapture to act as the single aggregation point for violation data.
-
----
+Within the broader `ConstraintSystem` hierarchy, ViolationCapture sits alongside sibling components that each address a distinct cross‑cutting concern (validation, hook management, connection handling, workflow orchestration).  All of these siblings share the same **modular integration strategy**: they are imported by the parent and wired together at runtime, allowing each to evolve independently.  No explicit event‑bus or micro‑service pattern is mentioned; the coupling appears to be **direct method calls** or interface injection between the parent and ViolationCapture, which keeps the interaction lightweight and low‑latency—important for a component that must react immediately to a rule failure.
 
 ## Implementation Details  
 
-### Core Flow  
+The observations do not enumerate concrete classes, functions, or file paths for ViolationCapture itself, so the analysis stays at the architectural level.  What is clear is that ViolationCapture implements **two complementary responsibilities**:
 
-1. **Tool Interaction → ContentValidationAgent**  
-   The `content-validation-agent.ts` (under `integrations/mcp-server-semantic-analysis/src/agents/`) receives raw artefacts from the tooling pipeline.  It parses entities, validates references and identifies any constraint breaches.  
+1. **Capture** – as soon as the `ConstraintSystem` detects a violation, it forwards the violation payload (likely a structured object containing rule ID, offending entity, timestamp, and context) to ViolationCapture.  The “easy capture” phrasing suggests a thin façade method such as `captureViolation(violation)` that abstracts away the persistence details.
 
-2. **Agent → ContentValidator**  
-   The **ContentValidator** component consumes the agent’s output.  Its responsibility is to translate raw validation results into a structured *violation* object that ViolationCapture can store.  
+2. **Persist** – the component then stores the violation using whatever persistence mechanism the system employs (database, log store, or external telemetry).  Because the component is described as “flexible” and “modular,” the persistence layer is probably abstracted behind an interface, allowing different storage back‑ends (e.g., SQL, NoSQL, file) to be swapped without altering the capture logic.
 
-3. **ViolationCapture Invocation**  
-   When a violation object is ready, ViolationCapture is called—typically from a hook handler registered with **HookManager**.  The hook manager loads its configuration, matches the “violation‑captured” event, and dispatches the payload to ViolationCapture’s public API (the exact function name is not listed, but the flow is evident from the observations).  
-
-4. **Logging**  
-   Immediately upon receipt, ViolationCapture emits a diagnostic entry via the **Logger**.  The `centralLog` function provides a thin wrapper, guaranteeing a uniform log format across the subsystem.  
-
-5. **Persistence**  
-   ViolationCapture forwards the structured violation to its child **GraphDatabasePersistence**.  This class encapsulates all interactions with the **GraphDatabase**—creating nodes/edges, running queries, and ensuring that each persisted record is also written to a JSON export file.  The export mechanism is described as “automatic JSON export sync,” meaning that after each write the JSON representation is refreshed without additional developer effort.  
-
-### Key Classes / Functions  
-
-| Entity | Role | Notable Member(s) |
-|--------|------|-------------------|
-| `content-validation-agent.ts` | Parses source artefacts and flags violations | – |
-| **ContentValidator** | Transforms raw agent output into ViolationCapture‑ready objects | – |
-| **ViolationCapture** (sub‑component) | Central hub for storing violation data | – (public capture method inferred) |
-| **HookManager** | Loads hook configs, dispatches events to handlers | – |
-| **Logger** (`centralLog`) | Simple wrapper for logging | `centralLog(message: string)` |
-| **GraphDatabasePersistence** | Persistence façade for GraphDatabase | – (methods for create/update, JSON sync) |
-| **GraphDatabase** | Underlying graph store used by Persistence | – |
-
-Because the source observations do not list explicit method signatures, the description focuses on the responsibilities and the data flow between these named entities.
-
----
+The modularity also implies that **rule‑specific capture handlers** can be registered.  For example, a “duplicate‑entity” rule might add extra metadata before persistence, while a “schema‑mismatch” rule could trigger an alert.  This extensibility is achieved by maintaining a registry of **capture rule objects** that the core `ViolationCapture` iterates over when handling a new violation.
 
 ## Integration Points  
 
-ViolationCapture is tightly coupled to three primary integration surfaces:
+ViolationCapture is **tightly integrated** with its parent `ConstraintSystem`.  The parent component orchestrates the flow: after a validation agent (e.g., `ContentValidationAgent` under `ContentValidator`) evaluates content, any breach is funneled to ViolationCapture.  This integration is likely realized through a **dependency injection** pattern where the parent constructs ViolationCapture and passes a reference to it when initializing the constraint engine.  
 
-1. **ContentValidationAgent / ContentValidator** – The detection side.  Any change to the parsing logic or to the shape of the violation payload must be reflected in the contract that ViolationCapture expects.  This contract is implicit; developers should keep the JSON schema of the violation object stable.  
-
-2. **HookManager** – The event‑driven entry point.  Hook configurations (likely JSON/YAML files read by HookManager) determine when ViolationCapture is invoked.  Adding new hook types or altering existing ones requires updating HookManager’s configuration and possibly extending the handler registration code.  
-
-3. **GraphDatabasePersistence** – The storage side.  ViolationCapture delegates all persistence concerns to this child component.  If the underlying graph database technology changes (e.g., switching from Neo4j to another graph store), only GraphDatabasePersistence needs to be updated, leaving ViolationCapture untouched.  
-
-Additionally, the **Logger** is a cross‑cutting concern; any modification to logging levels or formats should be made inside `centralLog` so that all components—including ViolationCapture—continue to emit consistent logs.
-
----
+Because the sibling components share the same parent, they can also interact indirectly with ViolationCapture.  For instance, `HookManager` could register a hook that listens for persisted violations and triggers downstream side‑effects (notifications, retries).  `WorkflowManager` might query persisted violations to decide whether a workflow should be aborted or rerouted.  `ConnectionHandler`’s retry‑with‑backoff logic could be informed by the rate of violations to adjust its back‑off strategy.  These cross‑component relationships are **implicit contracts** – each sibling expects ViolationCapture to reliably store violations and expose a read‑only view (e.g., a `getViolations()` API) for analysis.
 
 ## Usage Guidelines  
 
-* **Treat ViolationCapture as the sole writer** for constraint‑violation records.  Direct writes to the GraphDatabase bypassing ViolationCapture will break the automatic JSON sync and may cause dashboard inconsistencies.  
-* **Maintain the violation payload schema** as defined by the ContentValidator output.  Adding new fields should be backward compatible, and any downstream consumer (dashboard) must be updated in lockstep.  
-* **Register hook handlers through HookManager** rather than invoking ViolationCapture directly from ad‑hoc code.  This preserves the central orchestration model and ensures that logging and error handling remain consistent.  
-* **Rely on the Logger’s `centralLog`** for any diagnostic output related to violation capture.  Avoid creating separate logger instances; this keeps log aggregation simple.  
-* **When extending persistence** (e.g., adding indexes, changing export format), modify only GraphDatabasePersistence.  ViolationCapture’s public API remains stable, protecting callers from persistence‑layer churn.  
+1. **Invoke via the parent only** – developers should not call ViolationCapture directly; instead, they should raise violations through the `ConstraintSystem` API.  This preserves the decoupling and ensures that any pre‑processing (such as rule enrichment) performed by the parent is applied consistently.
 
-Following these conventions keeps the subsystem loosely coupled, easy to test, and aligned with the modular philosophy of the broader ConstraintSystem.
+2. **Register custom capture rules early** – if a new business rule requires special handling of its violations (e.g., additional audit fields), register the rule handler during application bootstrap.  Because the component is modular, adding a handler after the system has started may lead to missed captures.
+
+3. **Treat persisted violations as immutable** – once a violation is stored, it should be considered an audit record.  Mutating stored violations can break downstream consumers (HookManager alerts, WorkflowManager decisions).  If correction is needed, create a new “resolution” entry rather than editing the original.
+
+4. **Monitor performance impact** – since ViolationCapture is invoked on every constraint failure, its persistence path should be performant.  Choose a storage backend that can sustain the expected violation throughput, and consider batching or asynchronous writes only if the parent’s contract permits eventual consistency.
+
+5. **Leverage sibling services for downstream actions** – after a violation is persisted, use `HookManager` to attach side‑effects (email, Slack, etc.) and `WorkflowManager` to adapt workflow execution.  Keeping these concerns out of ViolationCapture itself maintains its single responsibility and simplifies future maintenance.
 
 ---
 
-## Summary of Architectural Insights  
+### Architectural patterns identified
+* **Modular design / separation of concerns** – ViolationCapture is a distinct module that isolates violation handling from core constraint logic.
+* **Dependency injection / direct integration** – The parent `ConstraintSystem` supplies ViolationCapture, allowing tight but low‑overhead coupling.
 
-| 1️⃣ Architectural patterns identified |
-|---------------------------------------|
-| Modular / component‑based file separation (each agent, validator, manager in its own file) |
-| Mediator / event‑dispatcher style via HookManager |
-| Wrapper / façade for logging (`centralLog`) |
-| Repository / data‑access abstraction in GraphDatabasePersistence |
-| Automatic synchronization (graph → JSON export) |
+### Design decisions and trade‑offs
+* **Decoupling vs. latency** – By extracting capture logic, the system gains flexibility (easily add/remove rules) at the cost of an extra method call layer.  The design favors maintainability over ultra‑low latency, which is acceptable for most validation scenarios.
+* **Extensible rule registry** – Enables future growth without core changes, but introduces a modest runtime overhead for iterating over handlers.
 
-| 2️⃣ Design decisions and trade‑offs |
-|------------------------------------|
-| **Centralised capture** simplifies dashboard data consistency but creates a single point of failure; high‑availability would require replication of the persistence layer. |
-| **Hook‑driven orchestration** decouples detection from capture, enabling easy addition of new event sources, yet introduces indirect control flow that can be harder to trace during debugging. |
-| **Graph‑based persistence** gives rich relationship modelling for violations, at the cost of requiring a graph DB runtime and associated operational overhead. |
-| **Automatic JSON export** removes manual serialization steps, improving developer productivity, but couples the export format tightly to the internal graph schema. |
+### System structure insights
+* ViolationCapture sits in a **parallel sub‑component tier** under `ConstraintSystem`, sharing the same integration pattern as `ContentValidator`, `HookManager`, `ConnectionHandler`, and `WorkflowManager`.
+* All siblings are **plug‑compatible**; they can be swapped or upgraded independently, reinforcing the overall modular architecture.
 
-| 3️⃣ System structure insights |
-|------------------------------|
-| ViolationCapture sits under **ConstraintSystem** and owns **GraphDatabasePersistence** as its child, forming a clear parent‑child persistence relationship. |
-| Sibling components (ContentValidator, HookManager, Logger, GraphDatabase, AgentManager) each provide a distinct service that ViolationCapture consumes, illustrating a clean separation of concerns. |
-| The shared use of `content-validation-agent.ts` across several siblings indicates a **single source of truth** for validation logic, reducing duplication. |
+### Scalability considerations
+* Because every violation passes through ViolationCapture, its persistence layer must scale horizontally (e.g., sharded DB, write‑optimized log store) to avoid bottlenecks under high‑volume validation loads.
+* The modular rule registry can be partitioned or sharded if rule‑specific processing becomes a hotspot.
 
-| 4️⃣ Scalability considerations |
-|-------------------------------|
-| Because violations are persisted in a graph database, scaling horizontally will depend on the underlying graph DB’s clustering capabilities. |
-| HookManager can distribute events across multiple handler instances, allowing the capture pipeline to be parallelised if the event volume grows. |
-| JSON export is performed automatically after each write; for very high write rates, batching or asynchronous export may be required to avoid I/O bottlenecks. |
-
-| 5️⃣ Maintainability assessment |
-|-------------------------------|
-| The modular layout (one file per agent/manager) promotes easy navigation and low cognitive load for new developers. |
-| Centralising logging through `centralLog` and persistence through GraphDatabasePersistence isolates cross‑cutting concerns, making future refactors straightforward. |
-| The reliance on a single agent file (`content-validation-agent.ts`) means changes to validation logic have wide impact; careful versioning and thorough tests are essential. |
-| Overall, the design favours **readability and replaceability** (agents can be swapped) while keeping the core capture flow stable, which bodes well for long‑term maintainability.
+### Maintainability assessment
+* The clear separation of capture and persistence logic makes the component **highly maintainable** – changes to storage or rule handling do not ripple into the constraint engine.
+* The lack of a dedicated event bus simplifies the call graph, reducing cognitive load for new developers, though it also means that adding asynchronous processing will require explicit redesign.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem employs a modular architecture, with each agent having its own file and responsibility. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for parsing entities and verifying references in the codebase. This modular approach allows for easier maintenance and updates, as each agent can be modified or replaced without affecting the entire system. Furthermore, the use of a separate file for each agent promotes code organization and readability, making it easier for new developers to understand the system's architecture.
-
-### Children
-- [GraphDatabasePersistence](./GraphDatabasePersistence.md) -- The GraphDatabase class is likely to be used for persistence, given the parent context of ConstraintSystem and ViolationCapture
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to parse entities and verify references.
-- [HookManager](./HookManager.md) -- HookManager utilizes a modular approach, allowing for easier maintenance and updates as each hook can be modified or replaced without affecting the entire system.
-- [Logger](./Logger.md) -- Logger utilizes the centralLog function as a simple logger wrapper to provide a logging mechanism for the system.
-- [GraphDatabase](./GraphDatabase.md) -- GraphDatabase utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to handle graph database persistence and querying.
-- [AgentManager](./AgentManager.md) -- AgentManager utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to manage the ContentValidationAgent.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator uses a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [HookManager](./HookManager.md) -- HookManager is responsible for managing hook configurations and registrations, indicating a key role in the system's workflow
+- [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management
+- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager is responsible for managing workflow definitions and interactions, indicating a key role in the system's workflow
 
 
 ---

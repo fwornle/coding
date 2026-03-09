@@ -2,97 +2,134 @@
 
 **Type:** SubComponent
 
-OntologyClassifier uses the GraphDatabaseAdapter class in the graph-database-adapter.ts file to provide a type-safe interface for agents to interact with the central knowledge graph
+OntologyClassifier could leverage the VkbApiClientWrapper (vkb-api-client-wrapper module) for simplifying server-based knowledge graph operations.
 
 ## What It Is  
 
-**OntologyClassifier** is a sub‑component that lives inside the **KnowledgeManagement** module.  All of its source code is anchored in the same repository that contains the `graph-database-adapter.ts` and `persistence-agent.ts` files.  The classifier is the logical engine that examines incoming entities and decides which ontology class they belong to.  It does this by delegating the actual graph operations to the **GraphDatabaseAdapter** (implemented in `graph-database-adapter.ts`), which supplies a type‑safe façade over the underlying **Graphology+LevelDB** store.  In practice, a `PersistenceAgent` (found in `persistence-agent.ts`) invokes OntologyClassifier to obtain the proper class label before persisting the entity, and the classifier also drives the automatic JSON‑export synchronisation that keeps the LevelDB backing store in step with any external VKB API endpoint.
-
-The component is deliberately lock‑free: when the server process is running it talks directly to the LevelDB graph, but when the server is stopped it can fall back to the VKB API without needing any heavyweight locking or transaction coordination.  This dual‑mode capability is a core part of its design and is exposed through the same `GraphDatabaseAdapter` interface, keeping callers (e.g., `PersistenceAgent`, `ManualLearning`, `PersistenceManager`) oblivious to the underlying transport.
-
----
+**OntologyClassifier** is a sub‑component of the **KnowledgeManagement** component that provides LLM‑driven reasoning to assign ontology classes to incoming entities.  The classifier lives inside the KnowledgeManagement code‑base (the exact source file is not listed in the observations, but its logical location is alongside the other KnowledgeManagement agents such as `src/agents/persistence‑agent.ts`).  Its primary responsibility is to take a raw entity—whether generated automatically by the system or created manually by a user—and, using a large language model, decide which ontology node best describes that entity.  The result of the classification is then handed off to the persistence stack so that the entity and its ontology label are stored in the graph database.
 
 ## Architecture and Design  
 
-The architecture centres on an **Adapter pattern**.  `graph-database-adapter.ts` defines the `GraphDatabaseAdapter` class, which abstracts the details of Graphology+LevelDB and the optional VKB API behind a single, type‑safe API.  OntologyClassifier consumes this adapter, meaning that the classifier does not need to know whether a read/write will hit a local LevelDB instance or a remote VKB service.  This separation of concerns enables the **lock‑free architecture** highlighted in the observations: the system can switch between direct database access and API calls transparently, avoiding contention and the need for explicit lock management.
+The design of **OntologyClassifier** follows the *separation‑of‑concerns* principle that is evident throughout the KnowledgeManagement hierarchy.  Classification is isolated from persistence, graph management, and API communication, allowing each sibling component to evolve independently.  The classifier itself does **not** perform any storage work; instead it delegates those responsibilities to the **PersistenceModule** (which wraps `src/agents/persistence‑agent.ts`).  This delegation mirrors the *adapter* pattern used by the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) that translates Graphology operations into LevelDB calls.  
 
-A second, implicit pattern is **Separation of Classification and Persistence**.  `PersistenceAgent` (in `persistence-agent.ts`) is responsible for persisting entities, but it delegates the decision of *what* class an entity belongs to to OntologyClassifier.  This keeps the classification logic isolated, making it reusable across sibling components such as **ManualLearning** and **PersistenceManager**, both of which also rely on the same `GraphDatabaseAdapter`.  The shared adapter therefore becomes a common contract for all knowledge‑graph‑related sub‑components.
+Interaction flow (as inferred from the observations):  
 
-Finally, the design embraces **Event‑free synchronization** via “automatic JSON export sync”.  Rather than emitting events that other parts of the system must listen to, the `GraphDatabaseAdapter` itself writes a JSON snapshot whenever the graph changes.  This deterministic side‑effect simplifies the data‑flow model and contributes to the lock‑free guarantee because there is no asynchronous event queue that could introduce race conditions.
+1. An entity arrives from a consumer (e.g., the **ManualLearning** module).  
+2. **OntologyClassifier** invokes an LLM service to obtain a classification label.  
+3. The label, together with the entity payload, is passed to the **PersistenceModule** for durable storage.  
+4. The **PersistenceModule** uses the **GraphDatabaseManager** (which in turn relies on **GraphDatabaseAdapter**) to write the entity into the underlying graph database.  
 
----
+When external knowledge‑graph operations are required—such as synchronising the new classification with a remote service—the classifier can call the **VkbApiClientWrapper** (from the `vkb-api-client-wrapper` module).  This wrapper abstracts the HTTP/GraphQL details of the server‑side knowledge‑graph API, keeping the classifier’s core logic focused on reasoning rather than transport concerns.
+
+Because the parent **KnowledgeManagement** component is described as “micro‑services‑oriented,” the classifier is positioned as a logical service within that ecosystem, even though the concrete implementation is a library‑level class rather than a network‑exposed endpoint.  The micro‑service framing provides a scalability mindset: each agent (e.g., **PersistenceAgent**, **CodeGraphAgent**) can be scaled independently, and the classifier can be swapped for a more capable LLM without touching the persistence layer.
 
 ## Implementation Details  
 
-At the heart of the implementation is the `GraphDatabaseAdapter` class defined in `graph-database-adapter.ts`.  It offers methods such as `addNode`, `addEdge`, `query`, and `exportJSON`.  These methods are typed, ensuring that callers—most notably OntologyClassifier—receive compile‑time guarantees about the shape of the data they manipulate.  The adapter internally decides whether to route a call to the **Graphology+LevelDB** engine (the default persistence layer) or to forward it to the **VKB API** when the local server is unavailable.  This decision logic is encapsulated within the adapter, so OntologyClassifier never contains conditional code for “online vs. offline” modes.
+While no concrete symbols were discovered in the source dump, the observations give a clear picture of the key collaborators:
 
-OntologyClassifier itself is a pure‑logic module.  It receives an entity (typically a plain JavaScript object) and, using the adapter’s query capabilities, inspects the current ontology graph to locate the most appropriate class node.  The classifier may employ rule‑based matching or similarity heuristics—details not exposed in the observations—but the output is a deterministic class identifier that is then handed back to the caller.  Because the classifier does not perform any I/O itself, it remains lightweight and easily testable.
+| Collaborator | Path / Module | Role in Classification |
+|--------------|---------------|------------------------|
+| **OntologyClassifier** | (sub‑component of KnowledgeManagement) | Runs LLM inference, produces ontology tags |
+| **PersistenceModule** | `src/agents/persistence-agent.ts` (via PersistenceModule) | Persists classified entities |
+| **GraphDatabaseAdapter** | `storage/graph-database-adapter.ts` | Bridges Graphology → LevelDB for efficient graph writes |
+| **GraphDatabaseManager** | `graph-database-manager` module | Provides higher‑level CRUD APIs used by PersistenceModule |
+| **VkbApiClientWrapper** | `vkb-api-client-wrapper` module | Wraps remote KG API calls for sync or enrichment |
+| **ManualLearning** | sibling component | Supplies manually created entities for classification |
 
-The `PersistenceAgent` (in `persistence-agent.ts`) ties the two together.  When a new entity arrives, the agent calls `OntologyClassifier.classify(entity)`, receives the ontology class, and then invokes `GraphDatabaseAdapter.addNode` (or `addEdge` as appropriate) to store the entity together with its classification.  After the mutation, the adapter’s automatic JSON export mechanism writes a fresh snapshot to disk, guaranteeing that the LevelDB store and any external consumers stay in sync without additional coordination code.
+The classifier likely follows a simple pipeline:
 
----
+```text
+receive(entity) → invokeLLM(entity) → classificationResult
+→ PersistenceModule.save(entity, classificationResult)
+```
+
+* **LLM Invocation** – The classifier calls an LLM (the exact client is not named; it could be a wrapper around OpenAI, Anthropic, etc.).  The input is the raw entity description; the output is a string or identifier that matches a node in the ontology graph.  
+
+* **Persistence Hand‑off** – By handing the result to **PersistenceModule**, the classifier avoids direct coupling to storage concerns.  The PersistenceModule internally creates a graph node (or updates an existing one) using the **GraphDatabaseManager**.  
+
+* **Graph Storage** – The **GraphDatabaseManager** uses the **GraphDatabaseAdapter** to write the node into LevelDB via the Graphology library.  This adapter ensures that the graph is kept in sync with a JSON export, as described in the parent component’s documentation.  
+
+* **Remote Sync** – When a classification must be reflected in an external knowledge graph, the **VkbApiClientWrapper** is invoked.  This wrapper hides authentication, request throttling, and response parsing, allowing the classifier to remain agnostic of the external API contract.
 
 ## Integration Points  
 
-OntologyClassifier sits directly under the **KnowledgeManagement** parent component.  All siblings that need to interact with the knowledge graph—**ManualLearning**, **PersistenceManager**, and **TraceReportGenerator**—share the same `GraphDatabaseAdapter`.  This common dependency means that any change to the adapter’s contract (e.g., adding a new query method) propagates uniformly across the entire knowledge‑management subsystem.
+1. **ManualLearning** – When a user manually creates an entity, ManualLearning calls **OntologyClassifier** to obtain an ontology tag before persisting the entity.  This ensures that even hand‑crafted data follows the same semantic standards as automatically generated data.  
 
-The primary integration surface for OntologyClassifier is the `classify` method (implicit from the observations).  Callers such as `PersistenceAgent` import the classifier and invoke it before persisting data.  Because the classifier relies on the adapter, the integration chain looks like:  
+2. **PersistenceModule** – The classifier’s only required runtime dependency is the PersistenceModule’s `save` method.  The contract is simple: `save(entity, classification)`; any implementation that respects this signature can be swapped in.  
 
-`PersistenceAgent → OntologyClassifier → GraphDatabaseAdapter → Graphology+LevelDB / VKB API → JSON export`.  
+3. **GraphDatabaseManager / GraphDatabaseAdapter** – These two layers sit beneath PersistenceModule.  They expose methods such as `createNode`, `updateNode`, and `queryNode`.  Because the adapter abstracts LevelDB specifics, the classifier does not need to know about storage format or indexing strategies.  
 
-No other modules are mentioned as direct consumers of OntologyClassifier, but the design makes it trivial for future components to plug in the same classification step simply by importing the classifier and the adapter.
+4. **VkbApiClientWrapper** – Optional but recommended for environments where the ontology must be mirrored to a central knowledge‑graph service.  The wrapper provides methods like `pushClassification(entityId, ontologyId)` and `fetchOntologyUpdates()`.  
 
----
+5. **KnowledgeManagement (Parent)** – The parent component orchestrates the lifecycle of agents.  OntologyClassifier is registered as a service within the KnowledgeManagement container, making it discoverable by other agents (e.g., OnlineLearning could reuse the classifier for auto‑labeling newly mined code entities).  
+
+All integration points are defined through explicit module imports; there is no implicit coupling, which eases testing and future refactoring.
 
 ## Usage Guidelines  
 
-1. **Always obtain a classifier instance through the KnowledgeManagement export** rather than constructing it manually; this ensures the underlying `GraphDatabaseAdapter` is correctly initialised with the current mode (local DB vs. VKB API).  
-2. **Pass plain, serialisable entity objects** to the classifier.  Because the adapter enforces type safety, malformed payloads will be caught at compile time (or throw clear runtime errors).  
-3. **Do not perform persistence inside OntologyClassifier**.  Its responsibility ends at returning the ontology class; persisting the result must be delegated to a dedicated agent such as `PersistenceAgent` or `PersistenceManager`.  
-4. **Rely on the automatic JSON export** for any downstream processes that need a snapshot of the graph.  There is no need to trigger additional export calls; the adapter handles it after every mutation.  
-5. **When testing, mock the GraphDatabaseAdapter** rather than the classifier.  Since the classifier is pure logic, a mock adapter that returns deterministic query results will allow unit tests to focus on classification rules without involving the LevelDB store or network calls.
+* **Invoke via the PersistenceModule** – Direct calls to OntologyClassifier should be avoided; instead, submit the entity to the PersistenceModule which will internally trigger classification.  This guarantees that every persisted entity has an associated ontology label.  
+
+* **Provide a clear textual description** – The LLM’s accuracy depends heavily on the quality of the input.  When constructing the entity payload, include domain‑specific keywords and context that match the ontology’s terminology.  
+
+* **Handle classification failures gracefully** – The LLM may return an “unknown” or low‑confidence label.  In such cases, the classifier should return a sentinel value (e.g., `null` or `unclassified`) and let the caller decide whether to store the entity as‑is or flag it for manual review.  
+
+* **Keep the VkbApiClientWrapper configuration up‑to‑date** – If the external knowledge‑graph API changes (e.g., endpoint URLs, auth tokens), update the wrapper only; the classifier will automatically pick up the new behavior.  
+
+* **Testing** – Mock the LLM client and the PersistenceModule when unit‑testing OntologyClassifier.  Because the classifier does not touch the graph database directly, tests can focus on the reasoning logic without requiring LevelDB or Graphology.  
+
+* **Performance** – Classification is typically the most time‑consuming step due to remote LLM calls.  Consider batching entities or using a cached inference layer if throughput becomes a concern.  
 
 ---
 
-### Architectural Patterns Identified  
+### 1. Architectural patterns identified  
 
-* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts Graphology+LevelDB and VKB API behind a unified, type‑safe interface.  
-* **Separation of Concerns** – Classification (OntologyClassifier) is decoupled from persistence (PersistenceAgent).  
-* **Lock‑Free Design** – Dual‑mode operation (direct DB vs. API) eliminates the need for mutexes or transaction locks.  
+* **Separation of Concerns** – Classification, persistence, graph storage, and remote API interaction are split into distinct modules.  
+* **Adapter Pattern** – `GraphDatabaseAdapter` adapts the Graphology API to LevelDB storage.  
+* **Facade/Wrapper** – `VkbApiClientWrapper` provides a simplified façade over the external KG API.  
+* **Dependency Injection (implicit)** – Components receive collaborators (e.g., PersistenceModule) rather than instantiating them directly, enabling easy swapping in tests or alternative implementations.  
 
-### Design Decisions and Trade‑offs  
+### 2. Design decisions and trade‑offs  
 
-* **Lock‑free vs. Consistency** – By avoiding locks, the system gains responsiveness and simplicity, but it must rely on the adapter’s internal logic to keep the two data paths (LevelDB and VKB) consistent.  
-* **Single Adapter for Multiple Consumers** – Centralising graph access reduces duplication but creates a single point of failure; any bug in the adapter impacts all siblings.  
-* **Automatic JSON Export** – Guarantees a fresh snapshot but may introduce I/O overhead on every write; this trade‑off is acceptable for the current use‑case where real‑time external sync is required.  
+| Decision | Reasoning | Trade‑off |
+|----------|-----------|-----------|
+| Keep classification logic separate from persistence | Allows independent evolution of LLM reasoning and storage strategies | Adds an extra hop (classifier → PersistenceModule) which may introduce latency |
+| Use a dedicated GraphDatabaseAdapter | Encapsulates LevelDB quirks and enables automatic JSON export sync | Requires maintenance of an extra abstraction layer |
+| Optional remote sync via VkbApiClientWrapper | Enables the system to operate in offline mode while still supporting central KG updates | Increases surface area; developers must manage wrapper configuration |
+| Rely on LLM for ontology mapping | Leverages powerful semantic reasoning without hand‑crafted rules | Classification quality depends on LLM prompts and may vary; incurs external API costs |
 
-### System Structure Insights  
+### 3. System structure insights  
 
-The KnowledgeManagement hierarchy forms a **core graph‑centric layer**: the adapter sits at the bottom, providing low‑level access; OntologyClassifier sits just above it, adding domain‑specific logic; agents (PersistenceAgent, PersistenceManager, ManualLearning) sit on top, orchestrating workflow.  Sibling components share the same adapter, reinforcing a **horizontal cohesion** around the knowledge graph.  
+* **KnowledgeManagement** acts as the container for a suite of agents (PersistenceAgent, CodeGraphAgent, OntologyClassifier, etc.).  
+* **OntologyClassifier** sits at the semantic layer, consuming raw entities and emitting ontology identifiers.  
+* **PersistenceModule** bridges the semantic layer to the graph‑storage layer (`GraphDatabaseManager` → `GraphDatabaseAdapter`).  
+* Sibling components such as **ManualLearning** and **OnlineLearning** feed entities into the classifier, while **GraphDatabaseManager** and **CodeGraphConstructor** consume the persisted, classified graph for downstream analytics.  
 
-### Scalability Considerations  
+### 4. Scalability considerations  
 
-* **Horizontal scaling** is facilitated by the lock‑free approach; additional instances can read/write to the LevelDB store concurrently without contention, provided the underlying storage supports concurrent access.  
-* **API fallback** allows the system to scale out to a distributed VKB service when the local LevelDB becomes a bottleneck, making the architecture adaptable to larger datasets.  
-* **JSON export size** could become a limiting factor; large graphs may need incremental export or streaming rather than full‑snapshot writes.  
+* Because classification is LLM‑driven, scaling horizontally (multiple classifier instances) is the primary way to increase throughput.  The micro‑service‑style decomposition of KnowledgeManagement supports this pattern.  
+* The underlying graph storage (LevelDB via Graphology) is designed for efficient key‑value writes; however, heavy write bursts from massive classification jobs may require sharding or partitioning the LevelDB files.  
+* The optional `VkbApiClientWrapper` can become a bottleneck if every classification triggers a remote sync; batching sync calls or using an asynchronous queue mitigates this risk.  
 
-### Maintainability Assessment  
+### 5. Maintainability assessment  
 
-The clear separation between adapter, classifier, and agents makes the codebase **highly maintainable**.  Type safety enforced by the adapter reduces runtime errors, and the lock‑free model simplifies concurrency reasoning.  However, because many components share the same adapter, any change to its API requires coordinated updates across all siblings, which can increase the coordination overhead during refactors.  Overall, the design balances extensibility with simplicity, supporting straightforward unit testing and future feature addition.
+* **High** – Clear module boundaries and well‑named adapters make the codebase easy to navigate.  
+* **Medium** – The reliance on an external LLM introduces a moving target (model updates, pricing changes) that must be tracked.  
+* **Low** – No direct coupling between classification and storage reduces the risk of ripple changes when swapping out the graph database or the LLM provider.  
+* Documentation should explicitly capture the LLM prompt templates and confidence thresholds, as these are the most volatile parts of the classifier’s behavior.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a Graphology+LevelDB database for persistence, which is facilitated by the GraphDatabaseAdapter class in the graph-database-adapter.ts file. This adapter provides a type-safe interface for agents to interact with the central knowledge graph and implements automatic JSON export sync. For instance, the PersistenceAgent class in the persistence-agent.ts file uses the GraphDatabaseAdapter to persist entities and classify ontologies. This design decision enables lock-free architecture, allowing the component to seamlessly switch between VKB API and direct database access when the server is running or stopped.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of a microservices architecture allows for a high degree of scalability and maintainability, with each agent responsible for a specific task. For instance, the PersistenceAgent (src/agents/persistence-agent.ts) handles entity persistence and ontology classification, while the CodeGraphAgent (src/agents/code-graph-agent.ts) is responsible for constructing knowledge graphs from code repositories. This separation of concerns enables the development team to focus on individual components without affecting the overall system. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) provides a crucial link between the Graphology library and LevelDB, facilitating efficient graph persistence and automatic JSON export sync.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter class in the graph-database-adapter.ts file to provide a type-safe interface for agents to interact with the central knowledge graph
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [PersistenceManager](./PersistenceManager.md) -- PersistenceManager uses the GraphDatabaseAdapter class in the graph-database-adapter.ts file to provide a type-safe interface for agents to interact with the central knowledge graph
-- [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor uses the batch analysis pipeline to construct the code knowledge graph
-- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the batch analysis pipeline to generate detailed trace reports of workflow runs and data flow
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology+LevelDB database for persistence
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely relies on the PersistenceModule (src/agents/persistence-agent.ts) for storing manually created entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely utilizes the CodeGraphConstructor (src/agents/code-graph-agent.ts) for constructing knowledge graphs from code repositories.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient graph persistence.
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) for constructing knowledge graphs.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) for handling entity persistence.
+- [VkbApiClientWrapper](./VkbApiClientWrapper.md) -- VkbApiClientWrapper utilizes the VKB API client for server-based knowledge graph operations.
 
 
 ---

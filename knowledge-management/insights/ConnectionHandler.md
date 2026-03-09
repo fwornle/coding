@@ -2,86 +2,105 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter class (lib/integrations/specstory-adapter.js) utilizes the ConnectionHandler sub-component for handling connections, ensuring that connections are accurately handled.
+ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management
 
 ## What It Is  
 
-The **ConnectionHandler** sub‑component lives inside the **Trajectory** component and is implemented across the integration layer of the project. The concrete code that drives its behaviour is found in **`lib/integrations/specstory-adapter.js`**, most notably the call to **`connectViaHTTP`** at line 45. ConnectionHandler’s responsibility is to mediate all connection‑establishment activities for the system, delegating the HTTP‑specific work to its child **HTTPConnectionHandler** while remaining agnostic to the underlying transport. By exposing a clean, modular interface, it enables the surrounding **SpecstoryAdapter** class (also in `lib/integrations/specstory-adapter.js`) to “plug‑in” the appropriate connection strategy without needing to understand the internal state‑machine or error‑handling logic.
+The **ConnectionHandler** is a sub‑component that lives inside the **ConstraintSystem**.  Although the source repository does not expose a concrete file path for the handler (the “Code Structure” section reports *0 code symbols found*), the surrounding documentation makes its role crystal‑clear: it is the piece that **manages external connections** and does so with a **retry‑with‑back‑off** strategy.  By being housed in the same modular package that contains other sub‑components such as *ContentValidator*, *HookManager*, *ViolationCapture*, and *WorkflowManager*, the ConnectionHandler inherits the same architectural intent of the parent – a loosely‑coupled, replace‑able set of services that together enable the ConstraintSystem’s workflow.  
+
+The observations repeatedly stress that the handler **decouples connection logic from the core system** and that its design “allows for the easy handling of connections, making it a flexible solution.”  In practice this means that any code that needs to talk to an external service (e.g., a database, a remote API, or a messaging broker) does not embed retry logic directly; instead it delegates to the ConnectionHandler, which abstracts the back‑off algorithm and any reconnection plumbing.  This makes the overall system easier to test, reason about, and evolve.
 
 ## Architecture and Design  
 
-The design of ConnectionHandler is **modular** and **state‑machine‑driven**. Observations describe the connection handling mechanism as “implemented using a state machine approach, allowing for easy addition of new connection scenarios.” This indicates that the component progresses through well‑defined states (e.g., *idle*, *connecting*, *connected*, *error*) and transitions are triggered by events such as a successful HTTP handshake or a retry timeout.  
+From the observations we can infer a **modular architecture**.  The ConstraintSystem is described as “integrating multiple sub‑components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService,” and the ConnectionHandler follows the same pattern: it is a self‑contained module that can be added, removed, or swapped without disturbing the rest of the system.  The modularity is reinforced by the explicit statement that the handler’s design “allows for the easy addition or removal of connection handlers,” which points to a **plug‑in style** where the parent component holds a collection of handler instances and iterates over them as needed.  
 
-Within the same file, the **`connectViaHTTP`** method (line 45) embodies the HTTP‑specific branch of the state machine. The method is also referenced by the sibling **RetryMechanism** component, which supplies an exponential back‑off strategy for retries. By separating the retry logic into its own sibling, the architecture follows a **separation‑of‑concerns** principle: ConnectionHandler focuses on state progression, while RetryMechanism handles timing and back‑off calculations.  
+The only concrete design pattern that appears in the observations is the **retry‑with‑back‑off** mechanism.  While the exact implementation details (e.g., exponential back‑off, jitter) are not enumerated, the repeated mention that the handler “enables the handling of connections with retry‑with‑back‑off” tells us that the component encapsulates this algorithm, shielding callers from the intricacies of timing and error handling.  This encapsulation is a classic example of the **Strategy pattern**—the retry policy can be viewed as a strategy that the ConnectionHandler applies whenever a connection attempt fails.  
 
-The **DynamicImporter** sibling (line 10) introduces a **dynamic import** capability that the SpecstoryAdapter class uses to load modules only when needed. Although not part of ConnectionHandler directly, this dynamic loading pattern complements the modular design by allowing ConnectionHandler (and its children) to be instantiated lazily, reducing start‑up overhead.  
-
-Finally, the presence of a dedicated child component, **HTTPConnectionHandler**, signals a **composition** relationship: ConnectionHandler delegates HTTP‑specific responsibilities to this child, keeping the parent component free from protocol‑specific details. This composition mirrors the “parent‑child” hierarchy described in the observations (Trajectory → ConnectionHandler → HTTPConnectionHandler).
+Interaction with other parts of the system is straightforward: the **ConstraintSystem** owns the ConnectionHandler and invokes it whenever a workflow step requires external communication.  Because the handler is a sibling to components such as *ContentValidator* and *HookManager*, they share the same lifecycle management (initialisation, graceful shutdown) provided by the parent, but they do not directly call each other.  This separation keeps the dependency graph shallow and reduces the risk of circular imports.
 
 ## Implementation Details  
 
-The core implementation resides in **`lib/integrations/specstory-adapter.js`**. The **SpecstoryAdapter** class creates an instance of ConnectionHandler and invokes its **`connectViaHTTP`** method when an HTTP connection is required. The method at line 45 incorporates a retry mechanism supplied by the **RetryMechanism** sibling, using an exponential back‑off to mitigate transient network failures.  
+The observations do not list concrete class names, method signatures, or file locations for the ConnectionHandler, so the implementation description must stay at a conceptual level.  The handler is likely realised as a **class** (e.g., `ConnectionHandler`) that exposes at least two public members:
 
-ConnectionHandler itself is built as a **state machine**. Although the exact state definitions are not enumerated in the observations, the description of “easy addition of new connection scenarios” implies that new states (e.g., *IPCConnecting*, *FileWatchConnecting*) can be introduced without disturbing existing logic. Errors are “properly handled,” suggesting that each state transition includes error‑catching pathways that funnel failures back into a safe *error* state, possibly invoking cleanup or notification routines.  
+1. **`connect()` / `execute()`** – a method that initiates a connection or performs a request.  Internally it wraps the low‑level network call with a retry loop.
+2. **`configureRetryPolicy(options)`** – an optional hook that lets the parent or a consumer supply parameters such as maximum retries, initial delay, multiplier, and jitter.
 
-The **HTTPConnectionHandler** child encapsulates the low‑level HTTP details (socket creation, request formatting, response parsing). By containing these details, it enables ConnectionHandler to remain protocol‑agnostic and to switch to other transport handlers (e.g., IPC or file watch) by simply swapping the child component.  
+The retry‑with‑back‑off loop would follow a typical structure:
 
-The sibling **ConversationLogger** interacts with the same SpecstoryAdapter file, logging conversation entries with rich metadata. While not directly part of ConnectionHandler, its coexistence illustrates a **cross‑cutting concern** where logging can be attached to state transitions within ConnectionHandler, providing visibility into connection lifecycles.
+```ts
+let attempt = 0;
+while (attempt < maxRetries) {
+  try {
+    return await lowLevelConnect();   // actual I/O
+  } catch (err) {
+    attempt++;
+    if (attempt >= maxRetries) throw err;
+    const delay = computeBackoff(attempt, baseDelay, multiplier);
+    await sleep(delay);
+  }
+}
+```
+
+Because the handler is “modular” and “allows for easy addition or removal,” the system probably registers the handler through a **dependency‑injection container** or a simple registry inside the ConstraintSystem.  This registry could be an array or map of handler instances, enabling the parent to iterate over them or replace one at runtime (e.g., swapping a mock handler for tests).  The integration point with the ConstraintSystem is therefore a **tight coupling** in terms of ownership (the parent creates the handler) but a **loose coupling** in terms of behaviour (the rest of the system only sees the abstracted `connect` interface).
 
 ## Integration Points  
 
-- **Parent (Trajectory)** – Trajectory houses ConnectionHandler, exposing it to higher‑level workflow orchestration. Trajectory can command ConnectionHandler to start or stop connections as part of broader system trajectories.  
-- **Sibling – RetryMechanism** – Provides the exponential back‑off logic used by `connectViaHTTP`. This decouples timing policy from the connection state machine, allowing the retry strategy to evolve independently.  
-- **Sibling – DynamicImporter** – Supplies the `import()` call at line 10, enabling SpecstoryAdapter (and therefore ConnectionHandler) to load the appropriate connection module on demand. This reduces initial bundle size and supports plug‑in‑style extensions.  
-- **Sibling – ConversationLogger** – Consumes events emitted by ConnectionHandler (e.g., connection success, failure) to produce detailed logs, aiding debugging and observability.  
-- **Child – HTTPConnectionHandler** – Implements the concrete HTTP transport. ConnectionHandler forwards HTTP‑specific events to this child, which returns status information back to the parent state machine.  
+The only explicit integration point mentioned is the **ConstraintSystem**, which “contains ConnectionHandler” and “enables the handling of connections.”  Consequently, any component that resides under the ConstraintSystem—such as *ContentValidator*, *HookManager*, *ViolationCapture*, or *WorkflowManager*—may indirectly depend on the ConnectionHandler when they need to reach external services (e.g., loading hook configurations from a remote store).  The integration is likely performed via a **service locator** pattern: the parent component exposes a getter like `getConnectionHandler()` that child components call when they need a connection.  
 
-These integration points form a **loosely coupled** network where each component can be swapped, extended, or mocked for testing without breaking the overall flow.
+Because the handler implements retry logic, downstream components do not need to implement their own back‑off; they simply invoke the handler and handle the eventual success or failure.  This reduces duplicated error‑handling code across siblings and centralises connection‑related configuration (timeouts, retry limits) in a single place.  No other external libraries or services are referenced in the observations, so we cannot claim any additional dependencies.
 
 ## Usage Guidelines  
 
-1. **Instantiate via SpecstoryAdapter** – Developers should obtain a ConnectionHandler instance through the SpecstoryAdapter class rather than constructing it directly. This ensures the dynamic import and retry mechanisms are correctly wired.  
-2. **Prefer the high‑level API** – Interact with the connection lifecycle through the exposed methods (e.g., `connectViaHTTP`) rather than manipulating internal states. The state‑machine implementation expects transitions to follow the defined sequence.  
-3. **Leverage RetryMechanism configuration** – When customizing retry behaviour (e.g., max attempts, back‑off factor), adjust the RetryMechanism sibling rather than altering `connectViaHTTP` directly. This keeps the retry policy isolated.  
-4. **Extend via child handlers** – To support a new transport (e.g., WebSocket), create a new child component (e.g., `WebSocketConnectionHandler`) that implements the same interface expected by ConnectionHandler and register it in the parent’s configuration. The state machine will treat it as another scenario without code changes.  
-5. **Observe logging** – Enable ConversationLogger during development to capture state transitions and error details; this aids troubleshooting without modifying ConnectionHandler logic.  
+1. **Delegate all external calls** – Whenever a sub‑component of the ConstraintSystem needs to communicate with an outside system, it should call the ConnectionHandler rather than embedding raw network code.  This guarantees that the retry‑with‑back‑off policy is consistently applied.  
+
+2. **Do not alter the retry policy locally** – The ConnectionHandler’s retry configuration is intended to be set once (typically at system start‑up) by the ConstraintSystem.  Changing the policy inside a consumer can lead to unpredictable back‑off behaviour and should be avoided.  
+
+3. **Prefer the registered instance** – Retrieve the handler through the parent’s accessor (e.g., `constraintSystem.getConnectionHandler()`).  Directly instantiating a new handler bypasses the modular registration mechanism and defeats the “easy addition or removal” design goal.  
+
+4. **Handle final failures** – Even with back‑off, the handler will eventually surface an exception after exhausting its retries.  Callers must be prepared to handle this terminal error, perhaps by logging, alerting, or falling back to a degraded path.  
+
+5. **Testing** – For unit tests, replace the real ConnectionHandler with a mock that simulates success or failure without waiting for real back‑off delays.  Because the handler is modular, this swap can be done by re‑registering a test implementation in the ConstraintSystem’s registry.
 
 ---
 
-### Architectural Patterns Identified  
-- **Modular composition** (ConnectionHandler → HTTPConnectionHandler)  
-- **State‑machine pattern** for connection lifecycle management  
-- **Separation of concerns** (RetryMechanism, DynamicImporter, ConversationLogger as distinct siblings)  
+### Consolidated Answers  
 
-### Design Decisions and Trade‑offs  
-- **State machine vs. ad‑hoc callbacks** – Choosing a state machine provides predictable transitions and easier scenario addition, at the cost of added boilerplate for state definitions.  
-- **Modular child handlers** – Enables protocol extensibility but introduces an extra indirection layer, which may slightly increase call‑stack depth.  
-- **Dynamic import** – Improves start‑up performance and reduces bundle size, but requires handling of asynchronous loading errors.  
+1. **Architectural patterns identified**  
+   * Modular architecture (plug‑in style)  
+   * Strategy‑like encapsulation of retry‑with‑back‑off  
+   * Service‑locator / dependency‑injection for handler registration  
 
-### System Structure Insights  
-The system is organized as a hierarchy: **Trajectory** (parent) → **ConnectionHandler** (core sub‑component) → **HTTPConnectionHandler** (leaf). Sibling components provide orthogonal services (retry, dynamic loading, logging) that are consumed by the same integration file, illustrating a clean, feature‑segregated architecture.  
+2. **Design decisions and trade‑offs**  
+   * **Decoupling connection logic** – isolates retry concerns, improves testability, but adds an indirection layer.  
+   * **Modular registration** – enables hot‑swap of handlers, at the cost of a small runtime registry overhead.  
+   * **Centralised retry policy** – ensures consistency, yet limits per‑caller customisation unless the policy is made configurable per instance.  
 
-### Scalability Considerations  
-Because connection scenarios are modelled as states, adding new transports scales linearly: each new transport adds a child handler and a corresponding state transition. The exponential back‑off in RetryMechanism helps the system remain stable under high contention or flaky networks, preventing cascade failures.  
+3. **System structure insights**  
+   * The ConstraintSystem acts as the parent container, hosting ConnectionHandler alongside other sub‑components (ContentValidator, HookManager, ViolationCapture, WorkflowManager).  
+   * Siblings share the same lifecycle management but remain functionally independent, each focusing on a distinct aspect of the workflow.  
 
-### Maintainability Assessment  
-The modular layout, clear separation between transport logic (HTTPConnectionHandler) and orchestration (ConnectionHandler), and the use of dedicated siblings for cross‑cutting concerns (retry, logging, dynamic loading) all contribute to high maintainability. Changes to one transport or retry policy can be made in isolation, and the state‑machine backbone ensures that unintended side effects are minimized. The only maintenance burden lies in keeping the state definitions synchronized across any new child handlers, but the documented pattern makes this straightforward.
+4. **Scalability considerations**  
+   * Because the handler abstracts retries, scaling the number of concurrent external calls does not require each caller to implement its own back‑off; the handler can internally manage concurrency limits if needed.  
+   * Modular design allows horizontal scaling by deploying additional instances of the ConstraintSystem, each with its own ConnectionHandler, without code changes.  
+
+5. **Maintainability assessment**  
+   * High maintainability: the single responsibility of the ConnectionHandler isolates a complex concern (retry‑with‑back‑off) into one place.  
+   * The modular plug‑in approach simplifies updates—replacing the handler or tweaking its policy does not ripple through sibling components.  
+   * Lack of exposed code symbols means developers must rely on documentation and the parent’s accessor methods, which underscores the importance of keeping the registration API stable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of modular design is exemplified in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js), where separate methods are implemented for connecting via HTTP, IPC, and file watch. For instance, the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) is designed to handle the specifics of HTTP connections, including a retry mechanism with backoff for robust service initialization. This modular approach allows for easier maintenance and updates, as each connection method can be modified or extended independently without affecting the others. Furthermore, the dynamic import mechanism utilized in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js:10) enables flexible module loading, which can be beneficial for adapting to different integration scenarios.
-
-### Children
-- [HTTPConnectionHandler](./HTTPConnectionHandler.md) -- The ConnectionHandler sub-component uses the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connections via HTTP, indicating a specific implementation for HTTP connections.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
 
 ### Siblings
-- [RetryMechanism](./RetryMechanism.md) -- RetryMechanism uses a exponential backoff strategy in the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connection retries.
-- [DynamicImporter](./DynamicImporter.md) -- DynamicImporter uses the import() function (lib/integrations/specstory-adapter.js:10) to load modules dynamically, allowing for flexible module loading.
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the Specstory extension (lib/integrations/specstory-adapter.js) to log conversation entries with detailed metadata.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator uses a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [HookManager](./HookManager.md) -- HookManager is responsible for managing hook configurations and registrations, indicating a key role in the system's workflow
+- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture is responsible for capturing and persisting constraint violations, indicating a key role in the system's workflow
+- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager is responsible for managing workflow definitions and interactions, indicating a key role in the system's workflow
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

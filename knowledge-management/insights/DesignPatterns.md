@@ -2,128 +2,112 @@
 
 **Type:** SubComponent
 
-The DesignPatterns sub-component follows the Model-View-Controller (MVC) pattern, separating concerns into model, view, and controller components
+The design patterns used in the project enable developers to focus on specific aspects of the system, such as language models or provider management, without affecting other parts of the system.
 
 ## What It Is  
 
-The **DesignPatterns** sub‑component lives inside the **CodingPatterns** component and is responsible for managing the catalogue of software design patterns. All persistence operations are delegated to the **GraphDatabaseAdapter** that resides in `storage/graph-database-adapter.ts`. When a new design pattern is created, the sub‑component calls `GraphDatabaseAdapter.storePattern`; when the catalogue needs to be displayed or analysed, it invokes `GraphDatabaseAdapter.retrievePatterns`.  
-
-DesignPatterns is organised according to the **Model‑View‑Controller (MVC)** style: a model that represents the pattern data, a view that renders the pattern information to the user, and a controller that orchestrates user actions and database calls. The sub‑component also contains a child component, **DesignPatternCategorizer**, which leverages the same storage API to persist categorisation metadata for each pattern.  
-
-Within the broader **CodingPatterns** ecosystem, DesignPatterns shares the same storage contract with its siblings—**CodingConventions**, **BestPractices**, **AntiPatterns**, and **CodeAnalysis**—all of which also use `storePattern` to write their respective artefacts to the graph database. This common contract enforces a uniform persistence strategy across the whole domain.
+The **DesignPatterns** sub‑component lives primarily in the **`lib/llm/provider-registry.js`** file.  This module implements a *provider registry* that knows about every language‑model provider defined in **`llm-providers.yaml`** and can select the appropriate one at runtime based on the current *mode* (e.g., `development`, `production`) and provider *availability*.  Because the registry is a thin indirection layer, the rest of the codebase never talks to a concrete model directly – it always asks the registry for a provider instance.  The parent component **CodingPatterns** uses this same modular approach to organise all language‑model related code, while sibling components such as **CodingConventions** (which enforces PascalCase naming) and **ArchitectureGuidelines** (which documents the same modular architecture) share the same overall philosophy.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of DesignPatterns is deliberately layered and pattern‑rich. The top‑level **MVC** separation isolates UI concerns (view) from business rules (controller) and data representation (model). This promotes testability: the controller can be exercised with mock models, while the view can be rendered independently of the persistence layer.
+The observed code follows a **modular, registry‑based architecture**.  The central **Provider Registry** acts as a *catalog* of provider implementations, exposing a uniform interface for lookup and selection.  This is a classic **Registry pattern**: each provider registers itself (implicitly via the YAML configuration) and the registry can retrieve it without the caller needing to know the concrete class name.  
 
-Two behavioural patterns are woven throughout the sub‑component:
+In addition, the ability to switch providers based on *mode* and *availability* introduces a **Strategy‑like** behaviour.  At runtime the registry evaluates the current execution context and chooses the most suitable strategy (i.e., provider) to satisfy a request.  Because the selection logic is isolated inside the registry, other components can remain agnostic of which concrete model they are using, which is a key tenet of the **Separation of Concerns** principle.
 
-1. **Observer** – the model publishes change events (e.g., “patternAdded”, “patternUpdated”) to any registered observers. UI components, logging services, or the **DesignPatternCategorizer** can subscribe and react without the model needing to know their concrete implementations.  
-
-2. **Factory** – creation of concrete `DesignPattern` objects is abstracted behind a factory interface. This allows the controller to request a new pattern instance without coupling to a specific class hierarchy, making it straightforward to introduce new pattern types (e.g., “Creational”, “Structural”) in the future.
-
-Command encapsulation is used for the two primary persistence actions. The controller builds a **StorePatternCommand** or **RetrievePatternsCommand**, each implementing a common `execute()` method. This decouples the *what* (store or retrieve) from the *how* (the GraphDatabaseAdapter implementation) and enables potential future extensions such as command queuing, undo/redo, or remote execution.
-
-All classes respect the **Single Responsibility Principle (SRP)**: the model only holds pattern data, the controller only coordinates flow, the factory only constructs objects, observers only react, and commands only perform a single database operation. This disciplined separation reduces the likelihood of ripple changes when requirements evolve.
+The directory layout (each language model in its own folder, configuration in `llm‑providers.yaml`) reinforces a **plug‑in architecture**: new providers can be dropped in as a new folder and a YAML entry, and the registry will automatically recognise them.  This design mirrors the **Open/Closed Principle** – the system is open for extension (new providers) but closed for modification (no need to alter existing registry code).
 
 ---
 
 ## Implementation Details  
 
-* **GraphDatabaseAdapter (storage/graph-database-adapter.ts)** – Provides two public methods, `storePattern(pattern: DesignPattern)` and `retrievePatterns(): DesignPattern[]`. The adapter abstracts the underlying graph database (e.g., Neo4j) and presents a simple CRUD‑like API to the rest of the system.  
+* **`lib/llm/provider-registry.js`** – This file defines the registry object (often exposed as a class or singleton).  Its responsibilities include:
+  * Loading the **`llm-providers.yaml`** file at startup, parsing each provider entry (name, module path, supported modes, health‑check endpoint, etc.).
+  * Maintaining an internal map keyed by provider identifier, where each value is a lazily‑instantiated provider instance or a factory function.
+  * Exposing a method such as `getProvider(mode)` that iterates over the registered providers, checks their *availability* flags (e.g., health‑check results), and returns the first matching provider for the requested mode.
 
-* **DesignPatterns MVC** –  
-  * *Model*: a plain data class (e.g., `DesignPattern`) that holds fields such as `id`, `name`, `description`, and `category`. It includes an `addObserver(observer: PatternObserver)` method and notifies observers on mutation.  
-  * *View*: a presentation layer (could be a web component or CLI formatter) that subscribes to the model’s events and re‑renders the pattern list whenever a change is announced.  
-  * *Controller*: receives UI actions (e.g., “Create Pattern”), invokes the **Factory** to obtain a new `DesignPattern` instance, wraps the operation in a **StorePatternCommand**, and calls `command.execute()`. For listing patterns, it builds a **RetrievePatternsCommand** and forwards the result to the view.  
+* **`llm-providers.yaml`** – Acts as the declarative source of truth for which providers exist.  Each entry typically contains:
+  * `id` – a unique identifier used by the registry.
+  * `module` – the path to the JavaScript file that implements the provider’s API.
+  * `modes` – an array of execution modes the provider supports.
+  * `availability` – optional health‑check configuration that the registry can query.
 
-* **Factory** – Exposed as `DesignPatternFactory.create(type: string): DesignPattern`. The factory decides which concrete subclass (e.g., `CreationalPattern`, `BehavioralPattern`) to instantiate based on the supplied type string.  
+* **Provider Modules** – While not listed explicitly, the modular design implies that each provider lives in its own directory (e.g., `lib/llm/openai/`, `lib/llm/anthropic/`).  These modules export a consistent interface (e.g., `generate(prompt)`) that the registry can invoke without further adaptation.
 
-* **Observer** – Implemented via a simple interface `PatternObserver { onPatternChanged(event: PatternEvent): void; }`. The view and **DesignPatternCategorizer** implement this interface to stay synchronized with the model.  
-
-* **Command** – Two concrete command classes: `StorePatternCommand` (holds a reference to a `DesignPattern` and the adapter) and `RetrievePatternsCommand` (holds a reference to the adapter). Both expose an `execute()` method that performs the respective database call.  
-
-* **DesignPatternCategorizer** – A child component that subscribes to pattern change events. When a new pattern is added, it determines the appropriate category (perhaps via a rule engine) and persists the categorisation using the same `storePattern` method, ensuring that categorisation data lives alongside the pattern itself in the graph.
-
-Because the observations do not list concrete file names for the MVC pieces, the description stays at the architectural level while still grounding every element in the observed behaviours.
+* **Naming Conventions** – Consistent with the sibling **CodingConventions** component, class and function names inside `provider-registry.js` follow PascalCase (e.g., `ProviderRegistry`, `ProviderFactory`).  This uniformity aids discoverability and tooling support across the codebase.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – CodingPatterns** – DesignPatterns is a child of the **CodingPatterns** component, inheriting the shared `GraphDatabaseAdapter` contract. Any change to the adapter’s API (e.g., a new `updatePattern` method) will ripple through all sibling sub‑components, so the adapter is a critical integration boundary.  
+The **DesignPatterns** sub‑component integrates with the broader **CodingPatterns** system through several clear interfaces:
 
-2. **Siblings – CodingConventions, BestPractices, AntiPatterns, CodeAnalysis** – All these components also invoke `storePattern` to persist domain‑specific artefacts. This common usage suggests that they could share higher‑level abstractions (e.g., a generic `PatternService`) if the system grows, but currently each sub‑component maintains its own MVC stack.  
+1. **Configuration Layer** – The YAML file (`llm-providers.yaml`) is read by the registry at initialization, making it a configuration‑driven integration point.  Any changes to provider definitions are reflected automatically without code changes.
 
-3. **Child – DesignPatternCategorizer** – The categorizer registers as an observer on the DesignPatterns model. Its only direct integration point is the observer subscription and the reuse of `storePattern` for persisting categorisation metadata.  
+2. **Consumer Code** – Application logic that needs language‑model capabilities imports the registry (e.g., `import ProviderRegistry from 'lib/llm/provider-registry'`) and calls its public API (`ProviderRegistry.getProvider('production')`).  This decouples consumers from concrete provider implementations.
 
-4. **External Consumers** – Any UI layer or API endpoint that needs to expose design pattern data will interact with the DesignPatterns controller, which in turn uses commands to talk to the adapter. This indirect path keeps external callers insulated from database specifics.  
+3. **Health‑Check / Availability** – The registry may invoke health‑check endpoints defined in the YAML to verify a provider’s runtime status.  This creates a runtime dependency on external services but is encapsulated inside the registry.
 
-5. **Testing Hooks** – Because commands encapsulate database calls, unit tests can replace the real `GraphDatabaseAdapter` with a mock that records method invocations, enabling isolated testing of controller logic and observer notifications.
+4. **Sibling Components** – The **ArchitectureGuidelines** component documents the same modular approach, reinforcing that other subsystems (e.g., data storage, authentication) should follow a similar plug‑in style.  The **CodingConventions** component ensures naming consistency across these integration points.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through the controller** – Direct manipulation of the model or the adapter bypasses the command and observer pipelines, breaking the notification chain and potentially leaving the graph in an inconsistent state.  
+* **Declare providers declaratively** – Add a new language model by creating a folder with its implementation and adding a corresponding entry to `llm-providers.yaml`.  Do not modify `provider-registry.js`; the registry will pick up the new entry automatically.
 
-* **Prefer the factory for new patterns** – Instantiating `DesignPattern` objects directly couples code to concrete classes. Use `DesignPatternFactory.create(type)` so that future pattern subclasses can be added without touching controller code.  
+* **Respect the mode contract** – When requesting a provider, always specify the intended mode (`development`, `testing`, `production`).  The registry’s selection algorithm relies on this value to honour the configuration’s `modes` field.
 
-* **Subscribe via the observer interface** – When extending the UI or adding analytics, implement `PatternObserver` and register with the model. Do not poll the model for changes; rely on the event‑driven mechanism to keep the system responsive.  
+* **Health‑check readiness** – Ensure each provider module implements any health‑check endpoint required by the YAML entry.  A mis‑behaving health‑check can cause the registry to skip a perfectly valid provider.
 
-* **Treat commands as single‑purpose objects** – A command should encapsulate *one* database operation. If a workflow requires multiple steps (e.g., store a pattern then immediately retrieve its generated ID), compose commands sequentially rather than merging logic into a monolithic command.  
+* **Follow naming conventions** – Keep class and function names in PascalCase as highlighted by **CodingConventions**.  This avoids accidental mismatches when the registry dynamically loads modules.
 
-* **Respect SRP when extending** – New responsibilities (e.g., validation, auditing) should be introduced as separate collaborators (validators, audit loggers) that are invoked by the controller, not as additions to the model or command classes.  
-
-* **Coordinate with siblings through the adapter** – If a new sibling component needs to store a different artefact type, reuse the existing `storePattern` method rather than creating a parallel storage API. This keeps the graph schema coherent and simplifies migration.  
+* **Do not bypass the registry** – Directly importing a provider module defeats the purpose of the registry and can lead to hard‑coded dependencies.  Always obtain a provider through `ProviderRegistry.getProvider()`.
 
 ---
 
-### 1. Architectural patterns identified  
-* Model‑View‑Controller (MVC) – structural separation of concerns.  
-* Observer – event‑driven notification of model changes.  
-* Factory – encapsulated creation of `DesignPattern` instances.  
-* Command – encapsulation of store and retrieve operations.  
-* Single Responsibility Principle (SRP) – each class/module has one reason to change.  
+### Architectural Patterns Identified  
 
-### 2. Design decisions and trade‑offs  
-* **MVC** provides clear boundaries and testability but introduces three layers that must be kept in sync, adding modest overhead.  
-* **Observer** decouples UI and categorizer from the model, enabling extensibility; however, it requires careful management of subscription lifecycles to avoid memory leaks.  
-* **Factory** future‑proofs object creation at the cost of an extra indirection layer.  
-* **Command** isolates persistence logic, allowing easy swapping of storage strategies or adding cross‑cutting concerns (logging, retries), but may lead to a proliferation of tiny command classes if not managed.  
-* **SRP** yields high maintainability but can increase the number of small classes, which may feel fragmented to newcomers.  
+1. **Registry Pattern** – Central catalogue of providers (`provider-registry.js`).  
+2. **Strategy‑like Provider Switching** – Runtime selection based on mode and availability.  
+3. **Plug‑in / Modular Architecture** – Providers live in independent directories and are wired via YAML.  
+4. **Open/Closed Principle** – New providers added without modifying existing registry code.  
 
-### 3. System structure insights  
-* The **CodingPatterns** parent component defines a shared persistence contract (`GraphDatabaseAdapter`) that all child sub‑components (DesignPatterns, CodingConventions, etc.) adhere to, fostering consistency across the domain.  
-* DesignPatterns’ internal MVC stack mirrors that of its siblings, suggesting a common architectural template that could be abstracted into a reusable framework.  
-* The child **DesignPatternCategorizer** demonstrates a vertical integration pattern: it consumes events from its parent’s model and writes back to the same storage, reinforcing a tight feedback loop.  
+### Design Decisions & Trade‑offs  
 
-### 4. Scalability considerations  
-* Because persistence is delegated to a graph database via a thin adapter, scaling reads/writes can be achieved by scaling the underlying graph engine without altering the sub‑component code.  
-* The command pattern enables queuing or batching of `storePattern` calls, which can be introduced later to handle high‑throughput ingestion of patterns.  
-* Observer notifications are in‑process; if the number of observers grows dramatically, a more robust event bus (e.g., message queue) might be required to avoid synchronous bottlenecks.  
+* **Configuration‑driven extensibility** (YAML) trades a small runtime parsing cost for the ability to add providers without code changes.  
+* **Centralised provider selection** simplifies consumer code but creates a single point of failure; robust health‑check handling mitigates this risk.  
+* **Loose coupling via a common interface** improves testability but requires all providers to conform to the same contract, potentially limiting provider‑specific features.  
 
-### 5. Maintainability assessment  
-The strict adherence to SRP, combined with well‑known patterns (MVC, Observer, Factory, Command), yields a highly maintainable codebase. Each responsibility is isolated, making unit testing straightforward. The shared `GraphDatabaseAdapter` reduces duplication across siblings, but it also creates a single point of failure—any breaking change in the adapter must be coordinated across all sub‑components. Overall, the design balances extensibility with clarity, positioning the system for incremental evolution without large‑scale rewrites.
+### System Structure Insights  
+
+* The **DesignPatterns** sub‑component is a thin orchestration layer sitting between raw provider implementations and the rest of the application.  
+* It mirrors the parent **CodingPatterns** component’s emphasis on modularity, while sibling components reinforce naming and architectural standards.  
+
+### Scalability Considerations  
+
+* Because provider lookup is O(n) over the registered list, the registry remains performant even with dozens of providers; however, if the list grows very large, caching the “best provider per mode” could be added.  
+* Adding providers is a linear operation (add YAML entry, drop folder) – the system scales horizontally across new language models without code churn.  
+
+### Maintainability Assessment  
+
+* **High maintainability** – The separation of configuration, registry logic, and provider implementations means changes are localized.  
+* **Ease of onboarding** – New developers can add a provider by following a clear pattern documented in `llm‑providers.yaml` and the registry code.  
+* **Consistent conventions** (PascalCase) reduce cognitive load and support automated linting.  
+* Potential maintenance burden lies in keeping health‑check definitions accurate; automated tests that verify registry selection can mitigate this.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flexible data storage and retrieval. This adapter is crucial for the component's functioning, as it allows for the storage and retrieval of complex relationships between coding patterns and practices. For instance, the `storePattern` method in the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) is used to store a new pattern in the graph database, while the `retrievePatterns` method is used to retrieve all patterns from the database. The use of this adapter simplifies the process of managing complex data relationships, making it easier to analyze and understand the coding patterns and practices employed throughout the project.
-
-### Children
-- [DesignPatternCategorizer](./DesignPatternCategorizer.md) -- Based on the parent context, the DesignPatterns sub-component uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database, which implies a categorization mechanism.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has its own directory and configuration, allowing for easier maintenance and extension of the system. For instance, the lib/llm/provider-registry.js file defines a provider registry that manages different providers and enables provider switching based on mode and availability. This modular design enables developers to add or remove language models without affecting the overall system.
 
 ### Siblings
-- [CodingConventions](./CodingConventions.md) -- CodingConventions uses the GraphDatabaseAdapter's storePattern method to store new coding conventions in the graph database
-- [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter's storePattern method to store new best practices in the graph database
-- [AntiPatterns](./AntiPatterns.md) -- AntiPatterns uses the GraphDatabaseAdapter's storePattern method to store new anti-patterns in the graph database
-- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the GraphDatabaseAdapter's storePattern method to store new code analysis results in the graph database
+- [CodingConventions](./CodingConventions.md) -- The use of a consistent naming convention, such as PascalCase, is evident throughout the project, as seen in the lib/llm/provider-registry.js file.
+- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The use of a modular architecture enables developers to add or remove language models without affecting the overall system, as seen in the directory structure of the project.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*
