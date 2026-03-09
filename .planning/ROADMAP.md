@@ -123,7 +123,12 @@ Plans:
   2. Wave agents query CGR for each entity they analyze, visible in trace logs as CGR API calls
   3. CGR index is automatically refreshed at wave1_init before analysis begins
   4. Entities have a mix of LLM-generated and code-grounded observations distinguishable by source tag
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
+- [ ] 13-02-PLAN.md -- Wave agent CGR integration: all 3 agents query CGR, SAA cgrContext injection, observation tagging
+- [ ] 13-03-PLAN.md -- Dashboard indicators: trace modal CGR section, freshness indicators, observation source breakdown
 
 #### Phase 14: Documentation Generation
 **Goal**: A docs agent generates PlantUML architecture diagrams for entities, compiles them to PNG, and embeds them in insight markdown documents. The constraint agent validates pipeline outputs before persistence.
@@ -146,5 +151,5 @@ Plans:
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
 | 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
-| 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
+| 13. Code Graph Agent Integration | v2.1 | 0/3 | Planned | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
