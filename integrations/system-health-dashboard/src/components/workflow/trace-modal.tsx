@@ -45,6 +45,7 @@ import {
   STEP_DISPLAY_NAMES,
   shortenModel,
 } from './constants'
+import TraceHistoryPanel from './trace-history-panel'
 
 // ---------- Props ----------
 
@@ -306,6 +307,7 @@ export function TraceModal({
   workflowName,
   startTime,
 }: TraceModalProps) {
+  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [selectedLevel, setSelectedLevel] = useState<{
     type: 'wave' | 'step' | 'agent'
@@ -542,6 +544,39 @@ export function TraceModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Tab Bar */}
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            className={`px-3 py-1.5 text-sm rounded-t transition-colors ${
+              activeTab === 'current'
+                ? 'border-b-2 border-blue-400 text-blue-400 font-medium'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            onClick={() => setActiveTab('current')}
+          >
+            Current Run
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm rounded-t transition-colors ${
+              activeTab === 'history'
+                ? 'border-b-2 border-blue-400 text-blue-400 font-medium'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            onClick={() => setActiveTab('history')}
+          >
+            History
+          </button>
+        </div>
+
+        {/* History Tab Content */}
+        {activeTab === 'history' && (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <TraceHistoryPanel />
+          </div>
+        )}
+
+        {/* Current Run Tab Content */}
+        {activeTab === 'current' && <>
         {/* Summary Stats Bar - enhanced with wave breakdown */}
         <div className="flex-shrink-0 space-y-2 border-b pb-3">
           {/* Wave-level breakdown */}
@@ -704,7 +739,7 @@ export function TraceModal({
                                             isExpanded={expandedIds.has(agentNodeId)}
                                             onToggle={() => toggleExpand(agentNodeId)}
                                             expandedLLMCalls={expandedIds}
-                                            onToggleLLMCall={(callId) => toggleExpand(`${agentNodeId}/llm-${callId}`)}
+                                            onToggleLLMCall={(callId) => toggleExpand(callId)}
                                             waveStart={waveStartMs}
                                             waveDuration={wg.totalDuration}
                                           />
@@ -959,6 +994,7 @@ export function TraceModal({
             </ScrollArea>
           </div>
         </div>
+        </>}
       </DialogContent>
     </Dialog>
   )
