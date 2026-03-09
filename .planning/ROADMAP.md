@@ -40,7 +40,7 @@ Four phases that restore the full multi-agent pipeline into the wave-based archi
 
 - [x] **Phase 9: Agent Pipeline Integration** - Route wave agents through the full agent pipeline (semantic analysis, persistence, insight generation, ontology classification) (completed 2026-03-07)
 - [x] **Phase 10: KG Operations Restoration** - Re-enable all six KG operators (conv, aggr, embed, dedup, pred, merge) in wave persistence (completed 2026-03-07)
-- [ ] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback
+- [x] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback (completed 2026-03-09)
 - [ ] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave
 - [ ] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source
 - [ ] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment
@@ -90,7 +90,7 @@ Plans:
   2. The QA agent reviews every agent output (not just a final pipeline stage) -- visible in logs as QA validation entries after each agent step
   3. When QA rejects an agent output, the coordinator retries the agent with feedback -- visible in logs as retry attempts with QA feedback included in the prompt
   4. L3 detail nodes are capped per parent, code-evidence filtering is active, and prompts include hardened anti-hallucination instructions
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 11-01-PLAN.md -- Content validation gate in persistWaveResult + QA agent wired after each wave analyze step
@@ -138,7 +138,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
-| 11. Content Quality Gate | 2/3 | In Progress|  | - |
+| 11. Content Quality Gate | 3/3 | Complete   | 2026-03-09 | - |
 | 12. Pipeline Observability | v2.1 | 0/? | Not started | - |
 | 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
