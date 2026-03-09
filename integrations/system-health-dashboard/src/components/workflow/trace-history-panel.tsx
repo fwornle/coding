@@ -105,22 +105,18 @@ function detectAnomalies(
   const anomalies: AnomalyInfo[] = []
   const duration = computeDurationMs(trace.startTime, trace.endTime)
 
-  // Entity count drop: persisted < 50% of average
   if (averages.persisted > 0 && trace.entityCounts.persisted < averages.persisted * 0.5) {
     anomalies.push({ type: 'Entity drop', severity: 'red' })
   }
 
-  // Failed steps
   if (trace.status === 'failed' || trace.status === 'error') {
     anomalies.push({ type: 'Failed steps', severity: 'red' })
   }
 
-  // Duration 2x+ average
   if (averages.duration > 0 && duration > averages.duration * 2) {
     anomalies.push({ type: 'Slow run', severity: 'amber' })
   }
 
-  // High QA rejection: (produced - persisted) / produced > 50%
   if (trace.entityCounts.produced > 0) {
     const rejection = (trace.entityCounts.produced - trace.entityCounts.persisted) / trace.entityCounts.produced
     if (rejection > 0.5) {
@@ -158,19 +154,12 @@ function aggregateWave(steps: TraceStepDetail[]): {
 }
 
 function deltaClass(a: number, b: number, lowerIsBetter: boolean): string {
-  if (a === 0 && b === 0) return 'text-zinc-400'
+  if (a === 0 && b === 0) return 'text-gray-400'
   const threshold = 0.1
   const pct = a > 0 ? (b - a) / a : (b > 0 ? 1 : 0)
-  if (Math.abs(pct) < threshold) return 'text-zinc-400'
+  if (Math.abs(pct) < threshold) return 'text-gray-400'
   const bIsBetter = lowerIsBetter ? b < a : b > a
-  return bIsBetter ? 'text-green-400' : 'text-red-400'
-}
-
-function deltaText(a: number, b: number, suffix = ''): string {
-  const diff = b - a
-  if (diff === 0) return '-'
-  const sign = diff > 0 ? '+' : ''
-  return `${sign}${diff}${suffix}`
+  return bIsBetter ? 'text-green-600' : 'text-red-600'
 }
 
 // ---------- Component ----------
@@ -182,11 +171,9 @@ export default function TraceHistoryPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<'list' | 'compare'>('list')
 
-  // Comparison state
   const [compareData, setCompareData] = useState<{ a: TraceDetail; b: TraceDetail } | null>(null)
   const [compareLoading, setCompareLoading] = useState(false)
 
-  // Fetch trace list
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -213,7 +200,6 @@ export default function TraceHistoryPanel() {
     return () => { cancelled = true }
   }, [])
 
-  // Compute averages for anomaly detection
   const averages = useMemo(() => {
     if (traces.length === 0) return { persisted: 0, duration: 0, rejectionRate: 0 }
 
@@ -238,7 +224,6 @@ export default function TraceHistoryPanel() {
     }
   }, [traces])
 
-  // Toggle selection (max 2)
   const toggleSelect = useCallback((filename: string) => {
     setSelected(prev => {
       const next = new Set(prev)
@@ -251,7 +236,6 @@ export default function TraceHistoryPanel() {
     })
   }, [])
 
-  // Start comparison
   const startCompare = useCallback(async () => {
     const filenames = Array.from(selected)
     if (filenames.length !== 2) return
@@ -269,7 +253,6 @@ export default function TraceHistoryPanel() {
 
       const [dataA, dataB] = await Promise.all([resA.json(), resB.json()])
 
-      // Sort: older = A (left), newer = B (right)
       const timeA = new Date(dataA.startTime || '').getTime()
       const timeB = new Date(dataB.startTime || '').getTime()
       if (timeA <= timeB) {
@@ -286,7 +269,6 @@ export default function TraceHistoryPanel() {
     }
   }, [selected])
 
-  // Build wave comparison rows
   const waveComparisons = useMemo((): WaveComparison[] => {
     if (!compareData) return []
 
@@ -310,7 +292,7 @@ export default function TraceHistoryPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-zinc-400">
+      <div className="flex items-center justify-center py-12 text-gray-500">
         <Loader2 className="h-5 w-5 animate-spin mr-2" />
         Loading trace history...
       </div>
@@ -319,7 +301,7 @@ export default function TraceHistoryPanel() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-12 text-red-400">
+      <div className="flex items-center justify-center py-12 text-red-600">
         <AlertTriangle className="h-5 w-5 mr-2" />
         {error}
       </div>
@@ -328,7 +310,7 @@ export default function TraceHistoryPanel() {
 
   if (traces.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-zinc-500">
+      <div className="flex items-center justify-center py-12 text-gray-500">
         No trace history yet. Run a pipeline to generate traces.
       </div>
     )
@@ -344,17 +326,17 @@ export default function TraceHistoryPanel() {
             variant="ghost"
             size="sm"
             onClick={() => { setMode('list'); setCompareData(null) }}
-            className="text-zinc-400 hover:text-zinc-200"
+            className="text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to list
           </Button>
-          <span className="text-sm text-zinc-400">
+          <span className="text-sm text-gray-500">
             Comparing {formatTimestamp(compareData.a.startTime)} vs {formatTimestamp(compareData.b.startTime)}
           </span>
         </div>
 
-        <Separator className="bg-zinc-700" />
+        <Separator />
 
         {/* Summary row */}
         <div className="grid grid-cols-2 gap-4">
@@ -362,7 +344,7 @@ export default function TraceHistoryPanel() {
           <CompareHeader label="Trace B (newer)" trace={compareData.b} />
         </div>
 
-        <Separator className="bg-zinc-700" />
+        <Separator />
 
         {/* Wave-by-wave comparison */}
         <ScrollArea className="max-h-[500px]">
@@ -381,14 +363,14 @@ export default function TraceHistoryPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-zinc-400">
+        <span className="text-sm text-gray-600">
           {traces.length} trace{traces.length !== 1 ? 's' : ''} available
         </span>
         <Button
           size="sm"
           disabled={selected.size !== 2 || compareLoading}
           onClick={startCompare}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40"
+          className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40"
         >
           {compareLoading ? (
             <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -411,21 +393,22 @@ export default function TraceHistoryPanel() {
                 key={trace.filename}
                 onClick={() => toggleSelect(trace.filename)}
                 className={`
-                  flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors
-                  ${idx % 2 === 0 ? 'bg-zinc-800/40' : 'bg-zinc-800/20'}
-                  ${isSelected ? 'ring-1 ring-blue-500 bg-blue-950/20' : 'hover:bg-zinc-700/40'}
+                  flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors border
+                  ${isSelected
+                    ? 'border-blue-400 bg-blue-50 shadow-sm'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'}
                 `}
               >
                 {/* Checkbox */}
                 <div className={`
                   w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center
-                  ${isSelected ? 'bg-blue-600 border-blue-500' : 'border-zinc-600'}
+                  ${isSelected ? 'bg-blue-600 border-blue-500' : 'border-gray-400'}
                 `}>
                   {isSelected && <span className="text-white text-xs">&#10003;</span>}
                 </div>
 
                 {/* Date */}
-                <span className="text-sm text-zinc-300 w-32 flex-shrink-0">
+                <span className="text-sm font-medium text-gray-900 w-32 flex-shrink-0">
                   {formatTimestamp(trace.startTime)}
                 </span>
 
@@ -434,19 +417,19 @@ export default function TraceHistoryPanel() {
                   variant="outline"
                   className={`text-xs flex-shrink-0 ${
                     trace.status === 'completed'
-                      ? 'border-green-500/40 text-green-400'
+                      ? 'border-green-500 text-green-700 bg-green-50'
                       : trace.status === 'failed'
-                      ? 'border-red-500/40 text-red-400'
-                      : 'border-zinc-500/40 text-zinc-400'
+                      ? 'border-red-500 text-red-700 bg-red-50'
+                      : 'border-gray-400 text-gray-600'
                   }`}
                 >
                   {trace.status}
                 </Badge>
 
                 {/* Metrics */}
-                <div className="flex items-center gap-4 text-xs text-zinc-400 flex-1 min-w-0">
+                <div className="flex items-center gap-4 text-xs text-gray-600 flex-1 min-w-0">
                   <span title="Duration">
-                    <Clock className="h-3 w-3 inline mr-1" />
+                    <Clock className="h-3 w-3 inline mr-1 text-gray-400" />
                     {formatDuration(duration)}
                   </span>
                   <span title="LLM Calls">{trace.totalLLMCalls} calls</span>
@@ -464,8 +447,8 @@ export default function TraceHistoryPanel() {
                       variant="outline"
                       className={`text-xs ${
                         a.severity === 'red'
-                          ? 'border-red-500/50 text-red-400 bg-red-500/10'
-                          : 'border-amber-500/50 text-amber-400 bg-amber-500/10'
+                          ? 'border-red-400 text-red-700 bg-red-50'
+                          : 'border-amber-400 text-amber-700 bg-amber-50'
                       }`}
                     >
                       {a.type === 'Entity drop' && <TrendingDown className="h-3 w-3 mr-1" />}
@@ -489,10 +472,10 @@ export default function TraceHistoryPanel() {
 function CompareHeader({ label, trace }: { label: string; trace: TraceDetail }) {
   const duration = computeDurationMs(trace.startTime, trace.endTime)
   return (
-    <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1">
-      <div className="text-xs text-zinc-500 uppercase tracking-wide">{label}</div>
-      <div className="text-sm text-zinc-200">{formatTimestamp(trace.startTime)}</div>
-      <div className="flex gap-3 text-xs text-zinc-400">
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
+      <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</div>
+      <div className="text-sm font-semibold text-gray-900">{formatTimestamp(trace.startTime)}</div>
+      <div className="flex gap-3 text-xs text-gray-600">
         <span>{formatDuration(duration)}</span>
         <span>{trace.totalLLMCalls} LLM calls</span>
         <span>{(trace.totalTokens / 1000).toFixed(1)}k tokens</span>
@@ -504,8 +487,8 @@ function CompareHeader({ label, trace }: { label: string; trace: TraceDetail }) 
         variant="outline"
         className={`text-xs mt-1 ${
           trace.status === 'completed'
-            ? 'border-green-500/40 text-green-400'
-            : 'border-red-500/40 text-red-400'
+            ? 'border-green-500 text-green-700 bg-green-50'
+            : 'border-red-500 text-red-700 bg-red-50'
         }`}
       >
         {trace.status}
@@ -518,13 +501,13 @@ function WaveComparisonRow({ data }: { data: WaveComparison }) {
   const { waveName, a, b } = data
 
   return (
-    <div className="bg-zinc-800/30 rounded-lg p-3">
-      <div className="text-sm font-medium text-zinc-300 mb-2">{waveName}</div>
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+      <div className="text-sm font-semibold text-gray-900 mb-2">{waveName}</div>
       <div className="grid grid-cols-[1fr_auto_1fr] gap-2 text-xs">
         {/* Headers */}
-        <div className="text-zinc-500 text-center">Trace A</div>
-        <div className="text-zinc-500 text-center">Delta</div>
-        <div className="text-zinc-500 text-center">Trace B</div>
+        <div className="text-gray-500 text-center font-medium">Trace A</div>
+        <div className="text-gray-500 text-center font-medium">Delta</div>
+        <div className="text-gray-500 text-center font-medium">Trace B</div>
 
         {/* Duration */}
         <MetricCell value={formatDuration(a.duration)} />
@@ -556,7 +539,7 @@ function WaveComparisonRow({ data }: { data: WaveComparison }) {
 }
 
 function MetricCell({ value }: { value: string }) {
-  return <div className="text-zinc-300 text-center py-0.5">{value}</div>
+  return <div className="text-gray-700 text-center py-0.5">{value}</div>
 }
 
 function DeltaCell({
@@ -574,7 +557,7 @@ function DeltaCell({
 }) {
   const diff = b - a
   if (diff === 0) {
-    return <div className="text-zinc-500 text-center py-0.5">-</div>
+    return <div className="text-gray-400 text-center py-0.5">-</div>
   }
 
   const cls = deltaClass(a, b, lowerIsBetter)
@@ -582,7 +565,7 @@ function DeltaCell({
   const text = format ? `${sign}${format(Math.abs(diff))}` : `${sign}${diff}${suffix}`
 
   return (
-    <div className={`text-center py-0.5 font-medium ${cls}`}>
+    <div className={`text-center py-0.5 font-semibold ${cls}`}>
       {text}
     </div>
   )
