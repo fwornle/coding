@@ -42,7 +42,7 @@ Four phases that restore the full multi-agent pipeline into the wave-based archi
 - [x] **Phase 10: KG Operations Restoration** - Re-enable all six KG operators (conv, aggr, embed, dedup, pred, merge) in wave persistence (completed 2026-03-07)
 - [x] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback (completed 2026-03-09)
 - [x] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave (completed 2026-03-09)
-- [ ] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source
+- [x] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source (completed 2026-03-09)
 - [ ] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment
 
 ### Phase Details
@@ -123,7 +123,7 @@ Plans:
   2. Wave agents query CGR for each entity they analyze, visible in trace logs as CGR API calls
   3. CGR index is automatically refreshed at wave1_init before analysis begins
   4. Entities have a mix of LLM-generated and code-grounded observations distinguishable by source tag
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
@@ -151,5 +151,5 @@ Plans:
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
 | 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
-| 13. Code Graph Agent Integration | 1/3 | In Progress|  | - |
+| 13. Code Graph Agent Integration | 3/3 | Complete   | 2026-03-09 | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
