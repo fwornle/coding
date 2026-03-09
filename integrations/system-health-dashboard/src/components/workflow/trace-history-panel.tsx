@@ -1,0 +1,586 @@
+'use client'
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import {
+  Loader2,
+  ArrowLeft,
+  AlertTriangle,
+  TrendingDown,
+  Clock,
+  XCircle,
+  GitCompare,
+} from 'lucide-react'
+import { WAVE_DISPLAY_NAMES } from './constants'
+
+// ---------- Types ----------
+
+interface TraceHistorySummary {
+  filename: string
+  workflowName: string
+  startTime: string
+  endTime: string
+  status: string
+  totalLLMCalls: number
+  totalTokens: number
+  entityCounts: { produced: number; persisted: number }
+}
+
+interface TraceStepDetail {
+  stepName: string
+  wave?: number
+  durationMs?: number
+  llmCalls?: number
+  tokensUsed?: number
+  entityFlow?: { produced: number; passedQA?: number; persisted: number }
+  status?: string
+}
+
+interface TraceDetail {
+  workflowName: string
+  startTime: string
+  endTime: string
+  status: string
+  totalLLMCalls: number
+  totalTokens: number
+  entityCounts: { produced: number; persisted: number }
+  stepsDetail?: TraceStepDetail[]
+}
+
+interface WaveComparison {
+  waveName: string
+  waveNumber: number
+  a: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number }
+  b: { duration: number; llmCalls: number; tokens: number; produced: number; persisted: number }
+}
+
+type AnomalyType = 'Entity drop' | 'Slow run' | 'Failed steps' | 'High rejection'
+
+interface AnomalyInfo {
+  type: AnomalyType
+  severity: 'amber' | 'red'
+}
+
+// ---------- Helpers ----------
+
+function computeDurationMs(start: string, end: string): number {
+  if (!start || !end) return 0
+  return new Date(end).getTime() - new Date(start).getTime()
+}
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return '-'
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.round((ms % 60000) / 1000)
+  return `${minutes}m ${seconds}s`
+}
+
+function formatTimestamp(iso: string): string {
+  if (!iso) return '-'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function detectAnomalies(
+  trace: TraceHistorySummary,
+  averages: { persisted: number; duration: number; rejectionRate: number }
+): AnomalyInfo[] {
+  const anomalies: AnomalyInfo[] = []
+  const duration = computeDurationMs(trace.startTime, trace.endTime)
+
+  // Entity count drop: persisted < 50% of average
+  if (averages.persisted > 0 && trace.entityCounts.persisted < averages.persisted * 0.5) {
+    anomalies.push({ type: 'Entity drop', severity: 'red' })
+  }
+
+  // Failed steps
+  if (trace.status === 'failed' || trace.status === 'error') {
+    anomalies.push({ type: 'Failed steps', severity: 'red' })
+  }
+
+  // Duration 2x+ average
+  if (averages.duration > 0 && duration > averages.duration * 2) {
+    anomalies.push({ type: 'Slow run', severity: 'amber' })
+  }
+
+  // High QA rejection: (produced - persisted) / produced > 50%
+  if (trace.entityCounts.produced > 0) {
+    const rejection = (trace.entityCounts.produced - trace.entityCounts.persisted) / trace.entityCounts.produced
+    if (rejection > 0.5) {
+      anomalies.push({ type: 'High rejection', severity: 'amber' })
+    }
+  }
+
+  return anomalies
+}
+
+function groupStepsByWave(steps: TraceStepDetail[]): Map<number, TraceStepDetail[]> {
+  const map = new Map<number, TraceStepDetail[]>()
+  for (const step of steps) {
+    const wave = step.wave ?? 0
+    if (!map.has(wave)) map.set(wave, [])
+    map.get(wave)!.push(step)
+  }
+  return map
+}
+
+function aggregateWave(steps: TraceStepDetail[]): {
+  duration: number; llmCalls: number; tokens: number; produced: number; persisted: number
+} {
+  let duration = 0, llmCalls = 0, tokens = 0, produced = 0, persisted = 0
+  for (const s of steps) {
+    duration += s.durationMs || 0
+    llmCalls += s.llmCalls || 0
+    tokens += s.tokensUsed || 0
+    if (s.entityFlow) {
+      produced += s.entityFlow.produced || 0
+      persisted += s.entityFlow.persisted || 0
+    }
+  }
+  return { duration, llmCalls, tokens, produced, persisted }
+}
+
+function deltaClass(a: number, b: number, lowerIsBetter: boolean): string {
+  if (a === 0 && b === 0) return 'text-zinc-400'
+  const threshold = 0.1
+  const pct = a > 0 ? (b - a) / a : (b > 0 ? 1 : 0)
+  if (Math.abs(pct) < threshold) return 'text-zinc-400'
+  const bIsBetter = lowerIsBetter ? b < a : b > a
+  return bIsBetter ? 'text-green-400' : 'text-red-400'
+}
+
+function deltaText(a: number, b: number, suffix = ''): string {
+  const diff = b - a
+  if (diff === 0) return '-'
+  const sign = diff > 0 ? '+' : ''
+  return `${sign}${diff}${suffix}`
+}
+
+// ---------- Component ----------
+
+export default function TraceHistoryPanel() {
+  const [traces, setTraces] = useState<TraceHistorySummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [mode, setMode] = useState<'list' | 'compare'>('list')
+
+  // Comparison state
+  const [compareData, setCompareData] = useState<{ a: TraceDetail; b: TraceDetail } | null>(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+
+  // Fetch trace list
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetch('/api/trace-history')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data: { traces: TraceHistorySummary[] }) => {
+        if (!cancelled) {
+          setTraces(data.traces || [])
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setError(err.message || 'Failed to fetch trace history')
+          setLoading(false)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [])
+
+  // Compute averages for anomaly detection
+  const averages = useMemo(() => {
+    if (traces.length === 0) return { persisted: 0, duration: 0, rejectionRate: 0 }
+
+    let totalPersisted = 0
+    let totalDuration = 0
+    let totalRejectionRate = 0
+    let rejectionCount = 0
+
+    for (const t of traces) {
+      totalPersisted += t.entityCounts.persisted
+      totalDuration += computeDurationMs(t.startTime, t.endTime)
+      if (t.entityCounts.produced > 0) {
+        totalRejectionRate += (t.entityCounts.produced - t.entityCounts.persisted) / t.entityCounts.produced
+        rejectionCount++
+      }
+    }
+
+    return {
+      persisted: totalPersisted / traces.length,
+      duration: totalDuration / traces.length,
+      rejectionRate: rejectionCount > 0 ? totalRejectionRate / rejectionCount : 0,
+    }
+  }, [traces])
+
+  // Toggle selection (max 2)
+  const toggleSelect = useCallback((filename: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(filename)) {
+        next.delete(filename)
+      } else if (next.size < 2) {
+        next.add(filename)
+      }
+      return next
+    })
+  }, [])
+
+  // Start comparison
+  const startCompare = useCallback(async () => {
+    const filenames = Array.from(selected)
+    if (filenames.length !== 2) return
+
+    setCompareLoading(true)
+    setError(null)
+
+    try {
+      const [resA, resB] = await Promise.all([
+        fetch(`/api/trace-history?file=${encodeURIComponent(filenames[0])}`),
+        fetch(`/api/trace-history?file=${encodeURIComponent(filenames[1])}`),
+      ])
+
+      if (!resA.ok || !resB.ok) throw new Error('Failed to fetch trace details')
+
+      const [dataA, dataB] = await Promise.all([resA.json(), resB.json()])
+
+      // Sort: older = A (left), newer = B (right)
+      const timeA = new Date(dataA.startTime || '').getTime()
+      const timeB = new Date(dataB.startTime || '').getTime()
+      if (timeA <= timeB) {
+        setCompareData({ a: dataA as TraceDetail, b: dataB as TraceDetail })
+      } else {
+        setCompareData({ a: dataB as TraceDetail, b: dataA as TraceDetail })
+      }
+
+      setMode('compare')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load comparison')
+    } finally {
+      setCompareLoading(false)
+    }
+  }, [selected])
+
+  // Build wave comparison rows
+  const waveComparisons = useMemo((): WaveComparison[] => {
+    if (!compareData) return []
+
+    const stepsA = compareData.a.stepsDetail || []
+    const stepsB = compareData.b.stepsDetail || []
+    const wavesA = groupStepsByWave(stepsA)
+    const wavesB = groupStepsByWave(stepsB)
+
+    const allWaves = new Set([...wavesA.keys(), ...wavesB.keys()])
+    const sorted = Array.from(allWaves).sort((x, y) => x - y)
+
+    return sorted.map(waveNumber => {
+      const waveName = WAVE_DISPLAY_NAMES[waveNumber] || `Wave ${waveNumber}`
+      const a = aggregateWave(wavesA.get(waveNumber) || [])
+      const b = aggregateWave(wavesB.get(waveNumber) || [])
+      return { waveName, waveNumber, a, b }
+    })
+  }, [compareData])
+
+  // ---------- Render ----------
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-zinc-400">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        Loading trace history...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-12 text-red-400">
+        <AlertTriangle className="h-5 w-5 mr-2" />
+        {error}
+      </div>
+    )
+  }
+
+  if (traces.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12 text-zinc-500">
+        No trace history yet. Run a pipeline to generate traces.
+      </div>
+    )
+  }
+
+  // ---------- Comparison View ----------
+
+  if (mode === 'compare' && compareData) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setMode('list'); setCompareData(null) }}
+            className="text-zinc-400 hover:text-zinc-200"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to list
+          </Button>
+          <span className="text-sm text-zinc-400">
+            Comparing {formatTimestamp(compareData.a.startTime)} vs {formatTimestamp(compareData.b.startTime)}
+          </span>
+        </div>
+
+        <Separator className="bg-zinc-700" />
+
+        {/* Summary row */}
+        <div className="grid grid-cols-2 gap-4">
+          <CompareHeader label="Trace A (older)" trace={compareData.a} />
+          <CompareHeader label="Trace B (newer)" trace={compareData.b} />
+        </div>
+
+        <Separator className="bg-zinc-700" />
+
+        {/* Wave-by-wave comparison */}
+        <ScrollArea className="max-h-[500px]">
+          <div className="space-y-3">
+            {waveComparisons.map(wc => (
+              <WaveComparisonRow key={wc.waveNumber} data={wc} />
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    )
+  }
+
+  // ---------- List View ----------
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-zinc-400">
+          {traces.length} trace{traces.length !== 1 ? 's' : ''} available
+        </span>
+        <Button
+          size="sm"
+          disabled={selected.size !== 2 || compareLoading}
+          onClick={startCompare}
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40"
+        >
+          {compareLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+          ) : (
+            <GitCompare className="h-4 w-4 mr-1" />
+          )}
+          Compare Selected
+        </Button>
+      </div>
+
+      <ScrollArea className="max-h-[500px]">
+        <div className="space-y-1">
+          {traces.map((trace, idx) => {
+            const anomalies = detectAnomalies(trace, averages)
+            const isSelected = selected.has(trace.filename)
+            const duration = computeDurationMs(trace.startTime, trace.endTime)
+
+            return (
+              <div
+                key={trace.filename}
+                onClick={() => toggleSelect(trace.filename)}
+                className={`
+                  flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors
+                  ${idx % 2 === 0 ? 'bg-zinc-800/40' : 'bg-zinc-800/20'}
+                  ${isSelected ? 'ring-1 ring-blue-500 bg-blue-950/20' : 'hover:bg-zinc-700/40'}
+                `}
+              >
+                {/* Checkbox */}
+                <div className={`
+                  w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center
+                  ${isSelected ? 'bg-blue-600 border-blue-500' : 'border-zinc-600'}
+                `}>
+                  {isSelected && <span className="text-white text-xs">&#10003;</span>}
+                </div>
+
+                {/* Date */}
+                <span className="text-sm text-zinc-300 w-32 flex-shrink-0">
+                  {formatTimestamp(trace.startTime)}
+                </span>
+
+                {/* Status */}
+                <Badge
+                  variant="outline"
+                  className={`text-xs flex-shrink-0 ${
+                    trace.status === 'completed'
+                      ? 'border-green-500/40 text-green-400'
+                      : trace.status === 'failed'
+                      ? 'border-red-500/40 text-red-400'
+                      : 'border-zinc-500/40 text-zinc-400'
+                  }`}
+                >
+                  {trace.status}
+                </Badge>
+
+                {/* Metrics */}
+                <div className="flex items-center gap-4 text-xs text-zinc-400 flex-1 min-w-0">
+                  <span title="Duration">
+                    <Clock className="h-3 w-3 inline mr-1" />
+                    {formatDuration(duration)}
+                  </span>
+                  <span title="LLM Calls">{trace.totalLLMCalls} calls</span>
+                  <span title="Tokens">{(trace.totalTokens / 1000).toFixed(1)}k tok</span>
+                  <span title="Entities">
+                    {trace.entityCounts.persisted}/{trace.entityCounts.produced} entities
+                  </span>
+                </div>
+
+                {/* Anomaly badges */}
+                <div className="flex gap-1 flex-shrink-0">
+                  {anomalies.map((a, i) => (
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className={`text-xs ${
+                        a.severity === 'red'
+                          ? 'border-red-500/50 text-red-400 bg-red-500/10'
+                          : 'border-amber-500/50 text-amber-400 bg-amber-500/10'
+                      }`}
+                    >
+                      {a.type === 'Entity drop' && <TrendingDown className="h-3 w-3 mr-1" />}
+                      {a.type === 'Slow run' && <Clock className="h-3 w-3 mr-1" />}
+                      {a.type === 'Failed steps' && <XCircle className="h-3 w-3 mr-1" />}
+                      {a.type}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+}
+
+// ---------- Sub-components ----------
+
+function CompareHeader({ label, trace }: { label: string; trace: TraceDetail }) {
+  const duration = computeDurationMs(trace.startTime, trace.endTime)
+  return (
+    <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1">
+      <div className="text-xs text-zinc-500 uppercase tracking-wide">{label}</div>
+      <div className="text-sm text-zinc-200">{formatTimestamp(trace.startTime)}</div>
+      <div className="flex gap-3 text-xs text-zinc-400">
+        <span>{formatDuration(duration)}</span>
+        <span>{trace.totalLLMCalls} LLM calls</span>
+        <span>{(trace.totalTokens / 1000).toFixed(1)}k tokens</span>
+        <span>
+          {trace.entityCounts?.persisted ?? 0}/{trace.entityCounts?.produced ?? 0} entities
+        </span>
+      </div>
+      <Badge
+        variant="outline"
+        className={`text-xs mt-1 ${
+          trace.status === 'completed'
+            ? 'border-green-500/40 text-green-400'
+            : 'border-red-500/40 text-red-400'
+        }`}
+      >
+        {trace.status}
+      </Badge>
+    </div>
+  )
+}
+
+function WaveComparisonRow({ data }: { data: WaveComparison }) {
+  const { waveName, a, b } = data
+
+  return (
+    <div className="bg-zinc-800/30 rounded-lg p-3">
+      <div className="text-sm font-medium text-zinc-300 mb-2">{waveName}</div>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 text-xs">
+        {/* Headers */}
+        <div className="text-zinc-500 text-center">Trace A</div>
+        <div className="text-zinc-500 text-center">Delta</div>
+        <div className="text-zinc-500 text-center">Trace B</div>
+
+        {/* Duration */}
+        <MetricCell value={formatDuration(a.duration)} />
+        <DeltaCell a={a.duration} b={b.duration} suffix="" format={formatDuration} lowerIsBetter />
+        <MetricCell value={formatDuration(b.duration)} />
+
+        {/* LLM Calls */}
+        <MetricCell value={`${a.llmCalls} calls`} />
+        <DeltaCell a={a.llmCalls} b={b.llmCalls} suffix=" calls" lowerIsBetter />
+        <MetricCell value={`${b.llmCalls} calls`} />
+
+        {/* Tokens */}
+        <MetricCell value={`${(a.tokens / 1000).toFixed(1)}k`} />
+        <DeltaCell a={a.tokens} b={b.tokens} suffix="" format={v => `${(v / 1000).toFixed(1)}k`} lowerIsBetter />
+        <MetricCell value={`${(b.tokens / 1000).toFixed(1)}k`} />
+
+        {/* Entities produced */}
+        <MetricCell value={`${a.produced} produced`} />
+        <DeltaCell a={a.produced} b={b.produced} suffix="" lowerIsBetter={false} />
+        <MetricCell value={`${b.produced} produced`} />
+
+        {/* Entities persisted */}
+        <MetricCell value={`${a.persisted} persisted`} />
+        <DeltaCell a={a.persisted} b={b.persisted} suffix="" lowerIsBetter={false} />
+        <MetricCell value={`${b.persisted} persisted`} />
+      </div>
+    </div>
+  )
+}
+
+function MetricCell({ value }: { value: string }) {
+  return <div className="text-zinc-300 text-center py-0.5">{value}</div>
+}
+
+function DeltaCell({
+  a,
+  b,
+  suffix = '',
+  lowerIsBetter,
+  format,
+}: {
+  a: number
+  b: number
+  suffix?: string
+  lowerIsBetter: boolean
+  format?: (v: number) => string
+}) {
+  const diff = b - a
+  if (diff === 0) {
+    return <div className="text-zinc-500 text-center py-0.5">-</div>
+  }
+
+  const cls = deltaClass(a, b, lowerIsBetter)
+  const sign = diff > 0 ? '+' : ''
+  const text = format ? `${sign}${format(Math.abs(diff))}` : `${sign}${diff}${suffix}`
+
+  return (
+    <div className={`text-center py-0.5 font-medium ${cls}`}>
+      {text}
+    </div>
+  )
+}
