@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
-status: completed
-stopped_at: Phase 14 context gathered
-last_updated: "2026-03-09T20:33:42.822Z"
-last_activity: 2026-03-09 -- Completed 13-03 Dashboard CGR Indicators
+status: in-progress
+stopped_at: Completed 14-01 Relationship Diagrams and CGR Evidence
+last_updated: "2026-03-09T20:49:09Z"
+last_activity: 2026-03-09 -- Completed 14-01 Relationship Diagrams and CGR Evidence
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
+  total_plans: 21
+  completed_plans: 19
+  percent: 90
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 13 in progress -- Code Graph Agent integration
+**Current focus:** Phase 14 in progress -- Documentation Generation
 
 ## Current Position
 
-Phase: 13 of 13 (Code Graph Agent Integration)
-Plan: 3 of 3 complete
-Status: Completed
-Last activity: 2026-03-09 -- Completed 13-03 Dashboard CGR Indicators
+Phase: 14 of 14 (Documentation Generation)
+Plan: 1 of 3 complete
+Status: In Progress
+Last activity: 2026-03-09 -- Completed 14-01 Relationship Diagrams and CGR Evidence
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [██████████] 100%
 | 13    | 01   | 4min     | 2     | 5     |
 | 13    | 03   | 8min     | 2     | 7     |
 | 13    | 02   | 5min     | 2     | 5     |
+| 14    | 01   | 4min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -116,6 +117,10 @@ Progress: [██████████] 100%
 - [13-02]: autoTagObservations uses regex code-ref detection, not LLM self-tagging alone
 - [13-02]: Wave agent constructors extended with optional cgrCache/cgrBuilder params (backward compatible)
 - [13-02]: Existing [CGR] observations preserved when SAA replaces entity observations
+- [14-01]: Relationship diagrams use PlantUML component type with stereotype-based coloring
+- [14-01]: CGR evidence grouped by type (Structural/Relationships/Other) capped at 15 items
+- [14-01]: Diagram storage moved to .data/knowledge-graph/insights/puml/ and images/
+- [14-01]: Graceful fallback: .puml written even without plantuml CLI (success=true)
 
 ### Critical Pitfalls
 
@@ -133,6 +138,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09T20:33:42.813Z
-Stopped at: Phase 14 context gathered
-Resume with: All plans complete. Milestone v2.1 finished.
+Last session: 2026-03-09T20:49:09Z
+Stopped at: Completed 14-01 Relationship Diagrams and CGR Evidence
+Resume with: Execute 14-02 and 14-03 to complete Phase 14.
