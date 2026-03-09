@@ -174,6 +174,8 @@ export interface LLMCallMetrics {
   latencyMs: number;
   operationType?: string;
   timestamp: number;
+  promptPreview?: string;
+  responsePreview?: string;
 }
 
 export interface LLMMetrics {

@@ -2009,6 +2009,45 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // For wave-analysis workflows, try to load rich trace data from trace-history JSON
+            // This provides wave, agentInstances, entityFlow, llmCallEvents etc. for 3-level trace view
+            const isWaveWorkflow = (workflowMatch?.[1]?.trim() || '').includes('wave');
+            let enrichedSteps = steps;
+            if (isWaveWorkflow) {
+                try {
+                    const traceDir = join(projectDir, 'trace-history');
+                    if (existsSync(traceDir)) {
+                        // Find trace file matching this report's start time
+                        const traceFiles = readdirSync(traceDir)
+                            .filter(f => f.endsWith('.json') && f.includes('wave'))
+                            .sort()
+                            .reverse(); // newest first
+                        // Match by start time if available, otherwise use most recent
+                        const reportStart = startTimeMatch?.[1]?.trim();
+                        let traceFile = traceFiles[0]; // default: most recent
+                        if (reportStart) {
+                            for (const tf of traceFiles) {
+                                try {
+                                    const td = JSON.parse(readFileSync(join(traceDir, tf), 'utf-8'));
+                                    if (td.startTime && new Date(td.startTime).getTime() === new Date(reportStart).getTime()) {
+                                        traceFile = tf;
+                                        break;
+                                    }
+                                } catch { /* skip */ }
+                            }
+                        }
+                        if (traceFile) {
+                            const traceData = JSON.parse(readFileSync(join(traceDir, traceFile), 'utf-8'));
+                            if (traceData.stepsDetail && traceData.stepsDetail.length > 0) {
+                                enrichedSteps = traceData.stepsDetail;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not load trace history for wave workflow:', e.message);
+                }
+            }
+
             res.json({
                 status: 'success',
                 data: {
@@ -2026,7 +2065,7 @@ class SystemHealthAPIServer {
                     team: teamMatch?.[1] || 'unknown',
                     repositoryPath: repoMatch?.[1] || 'unknown',
                     recommendations,
-                    steps,
+                    steps: enrichedSteps,
                     rawContent: content,
                     // Aggregated data from all batches
                     accumulatedStats,

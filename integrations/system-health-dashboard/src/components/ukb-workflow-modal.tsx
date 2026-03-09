@@ -2456,16 +2456,26 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 } else {
                   // No batch data - show flat list (wave-analysis or other non-batch workflows)
                   // Keep raw step names so TraceModal can use STEP_DISPLAY_NAMES
+                  // Pass through ALL trace extension fields (wave, agentInstances, entityFlow, etc.)
                   for (const step of historicalWorkflowDetail?.steps || []) {
+                    const s = step as any
                     allSteps.push({
                       name: step.name,  // Raw step name — TraceModal handles display mapping
                       status: step.status === 'success' ? 'completed' : step.status as any,
                       duration: step.duration ? parseFloat(String(step.duration).replace(/s$/i, '')) * 1000 : undefined,
-                      llmProvider: (step as any).llmProvider,
-                      tokensUsed: (step as any).tokensUsed,
-                      llmCalls: (step as any).llmCalls,
+                      llmProvider: s.llmProvider,
+                      tokensUsed: s.tokensUsed,
+                      llmCalls: s.llmCalls,
                       error: step.errors?.join('\n'),
                       outputs: step.outputs,
+                      // Trace extension fields for 3-level nested view
+                      wave: s.wave,
+                      startTime: s.startTime,
+                      endTime: s.endTime,
+                      agentInstances: s.agentInstances,
+                      entityFlow: s.entityFlow,
+                      qaResult: s.qaResult,
+                      llmCallEvents: s.llmCallEvents,
                     })
                   }
                 }
