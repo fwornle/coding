@@ -145,6 +145,6 @@ Plans:
 | 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
-| 12. Pipeline Observability | 4/4 | Complete   | 2026-03-09 | - |
+| 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
 | 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
