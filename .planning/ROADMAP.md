@@ -41,7 +41,7 @@ Four phases that restore the full multi-agent pipeline into the wave-based archi
 - [x] **Phase 9: Agent Pipeline Integration** - Route wave agents through the full agent pipeline (semantic analysis, persistence, insight generation, ontology classification) (completed 2026-03-07)
 - [x] **Phase 10: KG Operations Restoration** - Re-enable all six KG operators (conv, aggr, embed, dedup, pred, merge) in wave persistence (completed 2026-03-07)
 - [x] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback (completed 2026-03-09)
-- [ ] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave
+- [x] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave (completed 2026-03-09)
 - [ ] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source
 - [ ] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment
 
@@ -106,7 +106,7 @@ Plans:
   2. The trace modal shows wall-clock timing for each wave and each agent invocation, enabling identification of bottlenecks
   3. The trace modal displays which LLM model and provider were used for each agent call
   4. The trace modal includes a data flow view showing what input each agent received and what output it produced, enabling diagnosis of information loss between pipeline stages
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 - [ ] 12-01-PLAN.md -- Backend trace instrumentation: type contracts, per-LLM-call capture, entity flow, trace history
@@ -145,6 +145,6 @@ Plans:
 | 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
 | 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
 | 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
-| 12. Pipeline Observability | 3/4 | In Progress|  | - |
+| 12. Pipeline Observability | 4/4 | Complete   | 2026-03-09 | - |
 | 13. Code Graph Agent Integration | v2.1 | 0/? | Not started | - |
 | 14. Documentation Generation | v2.1 | 0/? | Not started | - |
