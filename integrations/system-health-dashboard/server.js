@@ -142,6 +142,9 @@ class SystemHealthAPIServer {
         this.app.post('/api/batch/pause', this.handlePauseBatch.bind(this));
         this.app.post('/api/batch/resume', this.handleResumeBatch.bind(this));
 
+        // Trace history endpoint (Phase 12 - pipeline observability)
+        this.app.get('/api/trace-history', this.handleTraceHistory.bind(this));
+
         // Code Graph RAG cache endpoints
         this.app.get('/api/cgr/status', this.handleGetCGRStatus.bind(this));
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
@@ -2372,6 +2375,86 @@ class SystemHealthAPIServer {
                 message: 'Failed to resume batch processing',
                 error: error.message
             });
+        }
+    }
+
+    /**
+     * Trace history endpoint (Phase 12 - pipeline observability)
+     * GET /api/trace-history       - List available trace summaries
+     * GET /api/trace-history?file=X - Return full trace detail for one file
+     */
+    async handleTraceHistory(req, res) {
+        const SAFE_FILENAME = /^[\w\-:.]+\.json$/;
+        try {
+            const traceDir = join(codingRoot, '.data', 'trace-history');
+
+            if (!existsSync(traceDir)) {
+                return res.status(404).json({ error: 'No trace history directory found', traces: [] });
+            }
+
+            const fileParam = req.query.file;
+
+            // Single file detail request
+            if (fileParam) {
+                if (!SAFE_FILENAME.test(fileParam)) {
+                    return res.status(400).json({ error: 'Invalid filename' });
+                }
+
+                const filePath = join(traceDir, fileParam);
+                if (!existsSync(filePath)) {
+                    return res.status(404).json({ error: 'Trace file not found' });
+                }
+
+                const content = readFileSync(filePath, 'utf-8');
+                const data = JSON.parse(content);
+                return res.json(data);
+            }
+
+            // List all traces
+            const files = readdirSync(traceDir)
+                .filter(f => f.endsWith('.json'))
+                .sort()
+                .reverse(); // newest first (filenames include timestamps)
+
+            const traces = [];
+            for (const file of files) {
+                try {
+                    const content = readFileSync(join(traceDir, file), 'utf-8');
+                    const data = JSON.parse(content);
+                    const stepsDetail = data.stepsDetail || data.steps || [];
+
+                    let totalLLMCalls = 0;
+                    let totalTokens = 0;
+                    let produced = 0;
+                    let persisted = 0;
+
+                    for (const step of stepsDetail) {
+                        totalLLMCalls += step.llmCalls || 0;
+                        totalTokens += step.tokensUsed || 0;
+                        if (step.entityFlow) {
+                            produced += step.entityFlow.produced || 0;
+                            persisted += step.entityFlow.persisted || 0;
+                        }
+                    }
+
+                    traces.push({
+                        filename: file,
+                        workflowName: data.workflowName || 'unknown',
+                        startTime: data.startTime || '',
+                        endTime: data.endTime || '',
+                        status: data.status || 'unknown',
+                        totalLLMCalls,
+                        totalTokens,
+                        entityCounts: { produced, persisted },
+                    });
+                } catch {
+                    // Skip malformed files
+                }
+            }
+
+            return res.json({ traces });
+        } catch (err) {
+            return res.status(500).json({ error: err.message || 'Unknown error' });
         }
     }
 
