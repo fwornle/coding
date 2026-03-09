@@ -27,11 +27,13 @@ import {
   ArrowRight,
   FileCode,
   Shield,
+  Database,
 } from 'lucide-react'
 import type {
   StepInfo,
   WaveGroup,
   TraceLLMCall,
+  TraceCGRQuery,
   TraceAgentInstance,
   TraceEntityFlow,
   TraceQAResult,
@@ -218,6 +220,74 @@ const LLMCallRow = React.memo(function LLMCallRow({
               <div className="text-zinc-500 mb-1">Response preview:</div>
               <div className="bg-zinc-900 rounded p-2 font-mono text-[11px] text-zinc-300 max-h-32 overflow-auto whitespace-pre-wrap break-all">
                 {renderWithCodeEvidence(call.responsePreview.slice(0, 500))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+})
+
+/** CGR query type colors */
+const CGR_QUERY_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  component_entities: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+  entity_details: { bg: 'bg-green-500/10', text: 'text-green-400' },
+  call_graph: { bg: 'bg-purple-500/10', text: 'text-purple-400' },
+  index_refresh: { bg: 'bg-zinc-500/10', text: 'text-zinc-400' },
+}
+
+/** CGR query row */
+const CGRQueryRow = React.memo(function CGRQueryRow({
+  query,
+  isExpanded,
+  onToggle,
+}: {
+  query: TraceCGRQuery
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  const colors = CGR_QUERY_TYPE_COLORS[query.queryType] || CGR_QUERY_TYPE_COLORS.index_refresh
+  return (
+    <div className="border border-zinc-700/50 rounded mb-1">
+      <div
+        className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-zinc-800/50 text-xs"
+        onClick={onToggle}
+      >
+        {getStatusIcon(query.status, 'h-3.5 w-3.5')}
+        <Badge className={`${colors.bg} ${colors.text} text-[10px] h-4 px-1.5`}>
+          {query.queryType.replace(/_/g, ' ')}
+        </Badge>
+        <span className="text-zinc-400 truncate flex-1" title={query.entityName}>
+          {query.entityName}
+        </span>
+        {query.cacheHit && (
+          <span className="text-green-400 text-[10px]" title="Cache hit">&#10003; cached</span>
+        )}
+        <span className="text-zinc-500 tabular-nums">{query.resultCount} results</span>
+        <span className="text-zinc-500 tabular-nums">{query.durationMs}ms</span>
+        {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      </div>
+      {isExpanded && (
+        <div className="px-3 py-2 border-t border-zinc-700/50 space-y-2 text-xs">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-zinc-400">
+            <div>Query type: <span className="text-zinc-300">{query.queryType}</span></div>
+            <div>Entity: <span className="text-zinc-300">{query.entityName}</span></div>
+            <div>Results: <span className="text-zinc-300">{query.resultCount}</span></div>
+            <div>Duration: <span className="text-zinc-300">{query.durationMs}ms</span></div>
+            <div>Cache hit: <span className="text-zinc-300">{query.cacheHit ? 'Yes' : 'No'}</span></div>
+            <div>Status: <span className="text-zinc-300">{query.status}</span></div>
+          </div>
+          {query.error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded p-2 text-red-400">
+              {query.error}
+            </div>
+          )}
+          {query.cypherQuery && (
+            <div>
+              <div className="text-zinc-500 mb-1">Cypher query:</div>
+              <div className="bg-zinc-900 rounded p-2 font-mono text-[11px] text-zinc-300 max-h-32 overflow-auto whitespace-pre-wrap break-all">
+                {query.cypherQuery}
               </div>
             </div>
           )}
@@ -699,7 +769,7 @@ export function TraceModal({
                                     setSelectedLevel({ type: 'step', stepName: step.name, waveNumber: wg.waveNumber })
                                   }}
                                 >
-                                  {(step.agentInstances && step.agentInstances.length > 0) || (step.llmCallEvents && step.llmCallEvents.length > 0) ? (
+                                  {(step.agentInstances && step.agentInstances.length > 0) || (step.llmCallEvents && step.llmCallEvents.length > 0) || (step.cgrQueryEvents && step.cgrQueryEvents.length > 0) ? (
                                     isStepExpanded
                                       ? <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
                                       : <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
@@ -763,11 +833,45 @@ export function TraceModal({
                                     )}
                                     {/* Non-LLM step with no agents */}
                                     {(!step.agentInstances || step.agentInstances.length === 0) &&
-                                      (!step.llmCallEvents || step.llmCallEvents.length === 0) && (
+                                      (!step.llmCallEvents || step.llmCallEvents.length === 0) &&
+                                      (!step.cgrQueryEvents || step.cgrQueryEvents.length === 0) && (
                                       <div className="text-xs text-zinc-500 italic px-2 py-1">
-                                        No LLM calls or agent instances
+                                        No LLM calls, CGR queries, or agent instances
                                       </div>
                                     )}
+                                    {/* Code Graph Queries (Phase 13) */}
+                                    <div className="mt-1">
+                                      <div className="flex items-center gap-2 px-2 py-1 text-xs">
+                                        <Database className="h-3 w-3 text-purple-400" />
+                                        <span className="text-zinc-400 font-medium">Code Graph Queries</span>
+                                        {step.cgrQueryEvents && step.cgrQueryEvents.length > 0 && (
+                                          <span className="text-zinc-500">
+                                            {step.cgrQueryEvents.length} queries
+                                            {' | '}
+                                            {step.cgrQueryEvents.filter(q => q.cacheHit).length} cached
+                                            {' | '}
+                                            {step.cgrQueryEvents.reduce((sum, q) => sum + q.durationMs, 0)}ms total
+                                          </span>
+                                        )}
+                                      </div>
+                                      {step.cgrQueryEvents && step.cgrQueryEvents.length > 0 ? (
+                                        step.cgrQueryEvents.map((query) => {
+                                          const queryNodeId = `${stepId}/cgr-${query.id}`
+                                          return (
+                                            <CGRQueryRow
+                                              key={queryNodeId}
+                                              query={query}
+                                              isExpanded={expandedIds.has(queryNodeId)}
+                                              onToggle={() => toggleExpand(queryNodeId)}
+                                            />
+                                          )
+                                        })
+                                      ) : (
+                                        <div className="text-xs text-zinc-500 italic px-2 py-0.5">
+                                          No CGR queries in this step
+                                        </div>
+                                      )}
+                                    </div>
                                     {/* Entity flow detail for persist steps */}
                                     {category === 'persist' && step.entityFlow && (
                                       <div className="px-2 py-1.5 bg-zinc-800/30 rounded text-xs space-y-1">

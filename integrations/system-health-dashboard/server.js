@@ -147,6 +147,7 @@ class SystemHealthAPIServer {
 
         // Code Graph RAG cache endpoints
         this.app.get('/api/cgr/status', this.handleGetCGRStatus.bind(this));
+        this.app.get('/api/cgr/freshness', this.handleGetCGRFreshness.bind(this));
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
 
@@ -2494,6 +2495,83 @@ class SystemHealthAPIServer {
             return res.json({ traces });
         } catch (err) {
             return res.status(500).json({ error: err.message || 'Unknown error' });
+        }
+    }
+
+    /**
+     * Get CGR index freshness (Phase 13)
+     * Returns last indexed timestamp, entity count, and Memgraph availability
+     */
+    async handleGetCGRFreshness(req, res) {
+        try {
+            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
+            const metadataFile = join(cgrDir, 'shared-data', 'cache-metadata.json');
+            const lastIndexedFile = join(codingRoot, '.data', 'cgr-last-indexed');
+
+            // Check Memgraph availability via bolt port
+            let memgraphRunning = false;
+            try {
+                const { execSync: execSyncLocal } = require('child_process');
+                execSyncLocal('nc -z localhost 7687', { timeout: 2000, stdio: 'ignore' });
+                memgraphRunning = true;
+            } catch {
+                // Memgraph not reachable
+            }
+
+            if (!memgraphRunning) {
+                return res.json({
+                    status: 'success',
+                    data: { memgraphRunning: false }
+                });
+            }
+
+            // Read last indexed timestamp
+            let lastIndexedAt = null;
+            if (existsSync(lastIndexedFile)) {
+                try {
+                    lastIndexedAt = readFileSync(lastIndexedFile, 'utf-8').trim();
+                } catch {
+                    // ignore read error
+                }
+            }
+
+            // Fall back to cache-metadata.json indexed_at
+            if (!lastIndexedAt && existsSync(metadataFile)) {
+                try {
+                    const metadata = JSON.parse(readFileSync(metadataFile, 'utf-8'));
+                    lastIndexedAt = metadata.indexed_at || null;
+                } catch {
+                    // ignore parse error
+                }
+            }
+
+            // Get entity count from cache-metadata stats
+            let entityCount = 0;
+            if (existsSync(metadataFile)) {
+                try {
+                    const metadata = JSON.parse(readFileSync(metadataFile, 'utf-8'));
+                    entityCount = (metadata.stats?.functions || 0) + (metadata.stats?.relationships || 0);
+                } catch {
+                    // ignore
+                }
+            }
+
+            res.json({
+                status: 'success',
+                data: {
+                    lastIndexedAt,
+                    entityCount,
+                    incrementalRefreshAvailable: !!lastIndexedAt,
+                    memgraphRunning: true
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get CGR freshness:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve CGR freshness',
+                error: error.message
+            });
         }
     }
 

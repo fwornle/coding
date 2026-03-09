@@ -116,6 +116,19 @@ export interface WorkflowDefinitionsAPI {
   }
 }
 
+// Code Graph RAG query trace (Phase 13 - duplicated from ukbSlice per Phase 12 pattern)
+export interface TraceCGRQuery {
+  id: string
+  queryType: 'component_entities' | 'entity_details' | 'call_graph' | 'index_refresh'
+  entityName: string
+  cypherQuery?: string
+  resultCount: number
+  durationMs: number
+  cacheHit: boolean
+  status: 'success' | 'failed' | 'timeout'
+  error?: string
+}
+
 // Props for workflow graph component
 export interface WorkflowGraphProps {
   process: ProcessInfo
