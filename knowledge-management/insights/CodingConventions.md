@@ -2,129 +2,109 @@
 
 **Type:** SubComponent
 
-The CodingConventions sub-component follows the Open-Closed Principle (OCP) to ensure that coding conventions are open for extension but closed for modification
+The coding conventions used in the project enable developers to focus on specific aspects of the system, such as language models or provider management, without affecting other parts of the system.
 
 ## What It Is  
 
-The **CodingConventions** sub‑component lives inside the *CodingPatterns* domain and is responsible for persisting and retrieving coding‑convention definitions in the project's graph database. All interactions with the database are funneled through the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`. When a new convention is created, `GraphDatabaseAdapter.storePattern` is called; when the system needs the full catalogue of conventions, `GraphDatabaseAdapter.retrievePatterns` is invoked. By delegating storage concerns to this adapter, **CodingConventions** remains focused on the business rules that define what a coding convention is and how it should be processed.
+The **CodingConventions** sub‑component is the set of stylistic and structural rules that give the codebase its unmistakable rhythm.  The conventions are visible right from the file system layout – for example, the **`lib/llm/provider-registry.js`** file follows a clear PascalCase naming style for its exported symbols, and the **`llm‑providers.yaml`** file mirrors this discipline in its key names and hierarchy.  By insisting on a uniform case convention, predictable directory names, and a consistent file‑naming scheme, the project makes it trivial for any developer to locate a provider implementation, understand its purpose, and anticipate the location of related artifacts.
 
-The component is deliberately built as a *sub‑component* of **CodingPatterns**, sharing the same persistence contract that its siblings—**DesignPatterns**, **BestPractices**, **AntiPatterns**, and **CodeAnalysis**—also use. This common contract ensures that all pattern‑related entities speak the same language when persisting to or reading from the graph store, simplifying cross‑component queries and reporting.
+These conventions are not an isolated style guide; they are tightly coupled with the **modular architecture** described in the parent **CodingPatterns** component.  Each language model lives in its own folder, is described in **`llm‑providers.yaml`**, and is wired into the system through the **provider registry** defined in **`lib/llm/provider-registry.js`**.  The conventions therefore serve two goals: (1) they keep the code readable and navigable, and (2) they reinforce the modular boundaries that allow independent development of language‑model providers.
 
-From a functional standpoint, **CodingConventions** supplies the “skeleton” of the convention‑handling algorithm while allowing concrete steps to be swapped out or extended. This is achieved through a blend of the Template Method, Strategy, and Decorator patterns, all of which are explicitly mentioned in the observations. The component also adheres to core SOLID principles—Open‑Closed (OCP) and Liskov Substitution (LSP)—to keep the codebase extensible and type‑safe.
+In practice, the conventions manifest as:
+
+* PascalCase for class‑like identifiers (e.g., a `ProviderRegistry` class implied by the file name).  
+* Lower‑kebab‑case for file names and YAML keys, matching the directory layout.  
+* A one‑to‑one mapping between a provider’s configuration entry in **`llm‑providers.yaml`** and its implementation file under **`lib/llm/`**.  
+
+These rules are the glue that lets developers “focus on specific aspects of the system … without affecting other parts,” as the observations state.
 
 ---
 
 ## Architecture and Design  
 
-The architectural style of **CodingConventions** is a **layered, pattern‑driven design** that separates persistence, algorithmic control flow, and extensibility concerns. At the lowest layer sits the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). This adapter abstracts the underlying graph database (e.g., Neo4j) and exposes two primary operations: `storePattern` for writes and `retrievePatterns` for reads. **CodingConventions** never touches the database directly; it calls these adapter methods, which enforces a clear dependency direction—from sub‑component upward to the infrastructure layer.
+The architecture that **CodingConventions** underpins is explicitly **modular**.  The **`llm‑providers.yaml`** file acts as a catalogue, enumerating each language‑model provider in its own logical unit.  This catalogue is consumed by the **provider registry** in **`lib/llm/provider-registry.js`**, which follows the classic **Registry pattern**: a central lookup that maps a provider’s logical name to its concrete implementation.  Because the registry is the sole point of indirection, adding or removing a language model requires only a change to the YAML entry and the corresponding module file—no ripple effects across the rest of the system.
 
-The **Template Method** pattern provides the overall processing skeleton. A base abstract class (or equivalent construct) defines the high‑level steps for handling a coding convention (e.g., validation → transformation → persistence). Concrete subclasses fill in the variable parts, ensuring that the overall workflow remains consistent while allowing specialized behavior.  
+The naming convention (PascalCase) is a **coding‑style pattern** that reinforces the architectural intent.  By using the same case for all “class‑like” constructs, the code instantly signals which symbols are intended to be instantiated or extended, while file names remain in lower‑kebab‑case, distinguishing resources from executable code.  This dual‑convention mirrors the separation of concerns emphasized by the parent **CodingPatterns** component and aligns with the sibling **DesignPatterns** component’s focus on reusable patterns such as the provider registry.
 
-To vary the algorithmic details without changing the template, **CodingConventions** employs the **Strategy** pattern. Different strategy objects encapsulate distinct validation or transformation algorithms (e.g., “naming‑style strategy”, “indentation‑style strategy”). The template holds a reference to a strategy interface, and at runtime the appropriate concrete strategy is injected, making the component open for new conventions without modifying existing code.
-
-When additional responsibilities—such as logging, metrics collection, or dynamic rule augmentation—are needed, the **Decorator** pattern is used. A base convention object can be wrapped by decorator objects that add cross‑cutting concerns transparently. This approach respects the **Open‑Closed Principle**: new decorators can be introduced without altering the core convention classes.  
-
-Finally, adherence to the **Liskov Substitution Principle** guarantees that any subclass or decorated instance can be used wherever the base convention type is expected, preserving type safety across the component’s public API.
+Interaction between components is straightforward: the application bootstrap reads **`llm‑providers.yaml`**, registers each provider with the **ProviderRegistry**, and later runtime code queries the registry to obtain a provider based on the current mode or availability.  The registry’s API (implicitly defined by the file’s export) becomes the contract that all other modules depend on, keeping the coupling low and the system extensible.
 
 ---
 
 ## Implementation Details  
 
-Although the source snapshot contains no explicit class definitions, the observations give a clear picture of the implementation scaffolding:
+The concrete implementation lives in **`lib/llm/provider-registry.js`**.  Although the observation does not list individual functions, the file name itself tells us that it exports a **registry object** (likely a class or a singleton) that maintains a map of provider identifiers to their implementation modules.  The registry probably exposes methods such as `register(providerName, providerImpl)` and `get(providerName)`, which are typical of the Registry pattern.  Because the file follows PascalCase naming, any exported class is expected to be named `ProviderRegistry`, making its purpose instantly recognizable.
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)**  
-   - `storePattern(pattern: Pattern): Promise<void>` – writes a pattern node (or edge) into the graph.  
-   - `retrievePatterns(): Promise<Pattern[]>` – reads all pattern nodes, returning them as domain objects.  
+Configuration is stored in **`llm‑providers.yaml`**.  This YAML file enumerates providers with keys that match the PascalCase identifiers used in the registry.  For example:
 
-2. **Template Method Skeleton**  
-   - An abstract class (e.g., `AbstractCodingConventionProcessor`) defines `processConvention(conventionData)` which internally calls:  
-     a. `validate(conventionData)` – possibly delegated to a **Strategy** implementation.  
-     b. `transform(conventionData)` – another strategy hook.  
-     c. `persist(transformedData)` – which simply calls `GraphDatabaseAdapter.storePattern`.  
+```yaml
+OpenAI:
+  module: "./openai-provider.js"
+  mode: "online"
+Anthropic:
+  module: "./anthropic-provider.js"
+  mode: "offline"
+```
 
-3. **Strategy Implementations**  
-   - Interfaces such as `IValidationStrategy` and `ITransformationStrategy` allow interchangeable algorithms.  
-   - Concrete strategies (e.g., `NamingConventionValidator`, `IndentationConventionTransformer`) implement these interfaces and are injected into the template processor, typically via constructor injection or a lightweight IoC container.  
+The YAML’s structure directly reflects the directory layout: each provider’s module resides under **`lib/llm/`**, and the naming convention ensures that the module file name (`openai-provider.js`, `anthropic-provider.js`, etc.) aligns with the key in the YAML.  When the application starts, a loader reads this YAML, iterates over each entry, `require`s the corresponding module, and registers it with the **ProviderRegistry**.  This deterministic process is made possible solely by the strict naming and placement conventions.
 
-4. **Decorator Usage**  
-   - Decorator classes (e.g., `LoggingConventionDecorator`, `MetricsConventionDecorator`) wrap an `IConventionProcessor` implementation. Each decorator forwards calls to the wrapped object while adding its own behavior before or after the delegation.  
-
-5. **SOLID Compliance**  
-   - **OCP** is manifested by the ability to add new `Strategy` or `Decorator` classes without touching the core template.  
-   - **LSP** is satisfied because any subclass of `AbstractCodingConventionProcessor` or any decorator can be used wherever the base processor type is required, ensuring interchangeable behavior.  
-
-Overall, the component’s code is organized around small, single‑responsibility classes that collaborate through well‑defined interfaces, keeping the core logic isolated from persistence and cross‑cutting concerns.
+Because the conventions are enforced uniformly, developers can reliably predict where to add a new provider: create a new folder or file under **`lib/llm/`**, follow the PascalCase naming for any exported class, add an entry to **`llm‑providers.yaml`**, and the registry will pick it up without any additional wiring.  No hidden configuration or ad‑hoc import statements are needed.
 
 ---
 
 ## Integration Points  
 
-**CodingConventions** integrates upward with its parent **CodingPatterns**, which aggregates all pattern‑related sub‑components. The parent likely orchestrates higher‑level queries that combine coding conventions with design patterns, best practices, etc., using the same `GraphDatabaseAdapter` contract. Because all siblings share the `storePattern` / `retrievePatterns` API, a unified service layer can batch operations or generate composite reports without bespoke adapters for each domain.
+**CodingConventions** touches every integration surface that deals with language‑model providers.  The primary integration point is the **registry** itself, which other subsystems (e.g., request handlers, orchestration layers) query to obtain a provider instance.  Because the registry’s API is the only public contract, changes to provider implementations stay isolated behind that contract.
 
-Downward, the component depends exclusively on the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). This is the only external interface it calls, making the dependency surface minimal and well‑encapsulated. Should the underlying graph technology change, only the adapter needs to be updated; **CodingConventions** remains untouched.
+The **`llm‑providers.yaml`** file is another integration artifact.  It is read by the application bootstrap code—likely a module in the root of the project that orchestrates component initialization.  Any component that needs to understand which providers are available (for health checks, UI listings, or feature toggles) can also read this YAML, guaranteeing a single source of truth.
 
-Horizontal interactions occur via the shared strategy and decorator interfaces. For example, a `NamingConventionValidator` could be reused by both **CodingConventions** and **DesignPatterns** if naming rules are applicable across domains. Likewise, logging or metrics decorators applied to **CodingConventions** can be the same instances used by sibling components, promoting consistency in observability.
-
-Finally, any consumer (e.g., a REST controller or CLI command) that needs to list or add coding conventions will call into **CodingConventions**’ public API, which internally delegates to the template processor, strategies, and the adapter. This layered approach keeps the external contract stable while allowing internal evolution.
+File‑system conventions provide a passive integration layer: the build system, linting tools, and IDE extensions can all rely on the predictable naming (PascalCase for classes, kebab‑case for files) to apply automated checks, generate documentation, or enforce import ordering.  This implicit integration reduces the need for explicit configuration and keeps the codebase coherent.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Persisting a New Convention** – Always invoke the high‑level processor (e.g., `CodingConventionService.createConvention`) rather than calling `GraphDatabaseAdapter.storePattern` directly. The service will run the appropriate validation and transformation strategies, apply any configured decorators (logging, metrics), and finally persist the result.  
+1. **Follow the naming case**: All class‑like symbols must be written in PascalCase (e.g., `ProviderRegistry`, `OpenAIProvider`).  File names should stay in lower‑kebab‑case (`openai-provider.js`).  This rule is observable in **`lib/llm/provider-registry.js`** and must be applied uniformly across new modules.
 
-2. **Extending Validation or Transformation** – Implement a new class that conforms to `IValidationStrategy` or `ITransformationStrategy` and register it with the processor (via constructor injection or a configuration file). Because the component follows the Open‑Closed Principle, no existing code needs to be altered.  
+2. **Respect the modular directory layout**: Place each provider’s implementation under **`lib/llm/`** and reference it in **`llm‑providers.yaml`** using the same logical name.  The YAML entry’s key should match the PascalCase identifier used in code.
 
-3. **Adding Cross‑Cutting Concerns** – Wrap the processor with a decorator that implements the same processor interface. Decorators should be composable; the order of wrapping determines the order of execution (e.g., logging before metrics).  
+3. **Register through the ProviderRegistry only**: Do not import provider modules directly from other parts of the system.  Always obtain a provider via `ProviderRegistry.get(name)` (or the equivalent method).  This maintains the loose coupling that the modular architecture relies on.
 
-4. **Testing** – Mock the `GraphDatabaseAdapter` to isolate business‑logic tests. Verify that strategies are called, decorators execute, and that `storePattern` receives the correctly transformed object.  
+4. **Update the YAML atomically**: When adding or removing a provider, edit **`llm‑providers.yaml`** and the corresponding module in the same commit.  The registry’s loading routine will automatically pick up the change, preserving system stability.
 
-5. **Versioning & Compatibility** – Since the component respects LSP, any new subclass or decorator must preserve the contract of the base processor. Avoid breaking changes to method signatures; instead, add new methods or overloads if additional behavior is required.
-
-Following these guidelines ensures that developers leverage the designed extensibility points without compromising the component’s stability or violating its SOLID commitments.
+5. **Leverage linting and IDE support**: Because the conventions are explicit, configure linters to enforce PascalCase for exported classes and kebab‑case for file names.  This prevents drift and keeps the codebase aligned with the documented conventions.
 
 ---
 
-### Summary of Requested Items  
+### Architectural patterns identified  
+* **Modular Architecture** – each language model lives in its own directory and is described in a central YAML file.  
+* **Registry Pattern** – the provider registry in **`lib/llm/provider-registry.js`** acts as a central lookup for providers.  
+* **Naming Convention Pattern** – consistent PascalCase for class‑like symbols and kebab‑case for file names.
 
-**1. Architectural patterns identified**  
-- Template Method (algorithm skeleton)  
-- Strategy (pluggable validation/transformation)  
-- Decorator (dynamic addition of responsibilities)  
-- Open‑Closed Principle (OCP)  
-- Liskov Substitution Principle (LSP)  
+### Design decisions and trade‑offs  
+* **Decision**: Encode provider discovery in a declarative YAML file. **Trade‑off**: Simplicity and visibility versus the need for a runtime loader and potential duplication of configuration.  
+* **Decision**: Use a single registry as the sole integration point. **Trade‑off**: Low coupling and easy extensibility, but the registry becomes a critical piece whose failure impacts all provider access.  
+* **Decision**: Enforce strict naming conventions. **Trade‑off**: Improves readability and tooling support, at the cost of a learning curve for contributors unfamiliar with PascalCase.
 
-**2. Design decisions and trade‑offs**  
-- Centralizing persistence in `GraphDatabaseAdapter` reduces duplication but creates a single point of failure; the adapter must be robust and well‑tested.  
-- Using Template Method enforces a consistent workflow but can become rigid if many divergent steps are needed; the Strategy pattern mitigates this by externalizing variability.  
-- Decorators add flexibility for cross‑cutting concerns without polluting core logic, at the cost of increased object composition complexity.  
+### System structure insights  
+The system is organized around a **provider‑centric module tree** (`lib/llm/`), a **configuration catalogue** (`llm‑providers.yaml`), and a **central registry** (`provider-registry.js`).  This triad mirrors the parent **CodingPatterns** component’s emphasis on modularity and is echoed by sibling components that also rely on well‑defined patterns.
 
-**3. System structure insights**  
-- A layered structure: UI/CLI → Service/Processor (Template + Strategy) → Decorators → GraphDatabaseAdapter → Graph DB.  
-- Sibling components share the same storage contract, enabling uniform data handling across the **CodingPatterns** family.  
+### Scalability considerations  
+Because providers are discovered from a flat YAML list and registered at startup, the approach scales linearly with the number of providers.  Adding dozens of providers does not affect existing code; only the YAML size grows.  The registry lookup is O(1) (hash‑map style), ensuring runtime performance remains stable as the provider set expands.
 
-**4. Scalability considerations**  
-- The graph database is well‑suited for scaling relationship queries; however, bulk writes via `storePattern` should be batched to avoid performance bottlenecks.  
-- Strategy and decorator instances are lightweight; they can be instantiated per request or reused as singletons depending on thread‑safety requirements.  
-
-**5. Maintainability assessment**  
-- High maintainability: clear separation of concerns, SOLID compliance, and explicit extension points (strategies, decorators).  
-- Risks are limited to the adapter layer; any change there propagates to all siblings, so it must be versioned carefully.  
-- The Template Method provides a stable backbone, making future enhancements predictable and localized.
+### Maintainability assessment  
+The strict conventions dramatically reduce cognitive load: developers can predict file locations, class names, and configuration keys without consulting external documentation.  The modular separation means changes to one provider rarely touch others, facilitating isolated bug fixes and feature additions.  The primary maintenance risk lies in keeping the YAML and file system perfectly synchronized; however, the conventions and a single source of truth (the registry) mitigate this risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flexible data storage and retrieval. This adapter is crucial for the component's functioning, as it allows for the storage and retrieval of complex relationships between coding patterns and practices. For instance, the `storePattern` method in the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) is used to store a new pattern in the graph database, while the `retrievePatterns` method is used to retrieve all patterns from the database. The use of this adapter simplifies the process of managing complex data relationships, making it easier to analyze and understand the coding patterns and practices employed throughout the project.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has its own directory and configuration, allowing for easier maintenance and extension of the system. For instance, the lib/llm/provider-registry.js file defines a provider registry that manages different providers and enables provider switching based on mode and availability. This modular design enables developers to add or remove language models without affecting the overall system.
 
 ### Siblings
-- [DesignPatterns](./DesignPatterns.md) -- DesignPatterns uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database
-- [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter's storePattern method to store new best practices in the graph database
-- [AntiPatterns](./AntiPatterns.md) -- AntiPatterns uses the GraphDatabaseAdapter's storePattern method to store new anti-patterns in the graph database
-- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the GraphDatabaseAdapter's storePattern method to store new code analysis results in the graph database
+- [DesignPatterns](./DesignPatterns.md) -- The lib/llm/provider-registry.js file defines a provider registry that manages different providers, enabling provider switching based on mode and availability.
+- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The use of a modular architecture enables developers to add or remove language models without affecting the overall system, as seen in the directory structure of the project.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

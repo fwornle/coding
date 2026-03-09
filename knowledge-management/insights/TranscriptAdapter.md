@@ -2,145 +2,125 @@
 
 **Type:** SubComponent
 
-The TranscriptAdapter interacts with the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format.
+The TranscriptAdapter's adapter logic is likely defined in a separate file or module, allowing for easy modification and extension of the adapter pipeline.
 
 ## What It Is  
 
-**TranscriptAdapter** is a sub‑component that lives inside the **LiveLoggingSystem**. Its concrete implementation resides in the files that make up the agent‑API layer, most notably `lib/agent-api/transcript-api.js`.  The class extends the **TranscriptAPI** abstract base class defined in the same file and is responsible for bridging the gap between an agent‑specific transcript format and the unified **Live Session Logging (LSL)** format used throughout the system.  
-
-The adapter works hand‑in‑hand with the **LSLConverter** (`lib/agent-api/transcripts/lsl-converter.js`) to translate raw transcript entries into LSL structures, and then hands those structures off to the **LSLFormatter** for final rendering as either markdown or JSON‑Lines.  All logging activity is funneled through the **LoggingService**, which supplies asynchronous, buffer‑managed logging to avoid blocking the Node.js event loop.  Real‑time updates are observed via the **watch mechanism** that lives in `lib/agent-api/transcript-api.js`, allowing the adapter to react instantly when new transcript data appears.
-
----
+The **TranscriptAdapter** is an abstract base class that lives in the file **`lib/agent-api/transcript-api.js`**.  Its sole purpose is to define a contract – the `adaptTranscript` method – that concrete, agent‑specific adapters must implement.  By converting the raw, agent‑dependent transcript format into a **standardized representation**, the adapter enables downstream components (most notably the **TranscriptProcessor** and the **OntologyClassificationAgent**) to work with a uniform data shape.  The adapter is a child of the **LiveLoggingSystem** component, which orchestrates logging, classification, and formatting for live conversational sessions.  
 
 ## Architecture and Design  
 
-The design of **TranscriptAdapter** follows a **modular, abstract‑base‑class** approach.  `TranscriptAPI` provides the contract (method signatures, lifecycle hooks, and the watch registration API) that concrete adapters must implement.  By inheriting from this abstract class, each agent‑specific adapter can plug into the larger **LiveLoggingSystem** without altering the surrounding infrastructure.  
+The design of the TranscriptAdapter follows a classic **Adapter pattern** combined with **polymorphic inheritance**.  An abstract class defines the required interface (`adaptTranscript`), while each agent supplies its own concrete subclass that knows how to translate that agent’s native transcript structure.  This approach isolates agent‑specific parsing logic from the rest of the system, allowing the **TranscriptProcessor** to treat every transcript uniformly.  
 
-The adapter’s internal workflow is a **pipeline**:
+Because the adapter logic “is likely defined in a separate file or module” (Observation 4), the system encourages a **plug‑in style architecture**.  New adapters can be added by dropping a new subclass into the appropriate module and, if the optional registration/discovery feature is implemented (Observation 5), the adapter can self‑register with a central registry.  This keeps the **LiveLoggingSystem** loosely coupled to any particular agent implementation and makes the classification pipeline extensible.  
 
-1. **Watch Mechanism** – `TranscriptAPI` registers a watcher that emits events whenever the underlying transcript source updates.  
-2. **Conversion** – The watcher callback invokes **LSLConverter** (`lib/agent-api/transcripts/lsl-converter.js`) to map the agent‑specific payload into the canonical LSL schema.  
-3. **Formatting** – The resulting LSL object is passed to **LSLFormatter**, which can emit either markdown or JSON‑Lines representations, depending on downstream consumer needs.  
-4. **Async Logging** – The formatted output is handed to **LoggingService**, whose implementation (see `integrations/mcp-server-semantic-analysis/src/logging.ts`) performs non‑blocking, buffered writes to the log store.
+Interaction flow:  
+1. An agent produces a raw transcript.  
+2. The **LiveLoggingSystem** (or a downstream **TranscriptProcessor**) selects the matching concrete TranscriptAdapter.  
+3. The adapter’s `adaptTranscript` method converts the raw data into the system‑wide transcript schema.  
+4. The standardized transcript is handed to the **OntologyClassificationAgent** (found in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) for ontology‑based classification.  
 
-This composition of well‑defined responsibilities yields a **separation‑of‑concerns** architecture: conversion, formatting, and logging are each isolated in their own sibling components (TranscriptProcessor, LSLFormatter, LoggingService).  The only coupling between them is through explicit interfaces (e.g., the LSL object shape and the async `log` method).  
-
-Because the adapter relies on the **watch mechanism** for change detection, it avoids polling and therefore minimizes unnecessary CPU usage.  The use of async logging directly addresses the need to **prevent event‑loop blocking**, a design decision explicitly noted in the observations.
-
----
+Thus, the TranscriptAdapter sits at the **boundary** between heterogeneous external agents and the internal processing chain, acting as a translator and a registration point.
 
 ## Implementation Details  
 
-### Core Classes & Functions  
+The abstract class in `lib/agent-api/transcript-api.js` declares the method signature:
 
-| Path | Primary Export | Role |
-|------|----------------|------|
-| `lib/agent-api/transcript-api.js` | `TranscriptAPI` (abstract) | Defines the contract for transcript adapters, provides the watch registration API, and contains shared utilities for monitoring transcript updates. |
-| `lib/agent-api/transcript-api.js` | `TranscriptAdapter` (concrete) | Extends `TranscriptAPI`, implements the agent‑specific logic that receives raw transcript chunks, forwards them to the converter, and triggers logging. |
-| `lib/agent-api/transcripts/lsl-converter.js` | `LSLConverter` | Contains pure functions that map agent‑specific transcript structures to the LSL schema (e.g., timestamps, speaker IDs, message bodies). |
-| `integrations/mcp-server-semantic-analysis/src/logging.ts` | `LoggingService` (async) | Provides `log(entry: string): Promise<void>` and internal buffering to batch writes, ensuring the event loop remains responsive. |
-| `LSLFormatter` (sibling) | – | Formats LSL objects into markdown or JSON‑Lines; used by the adapter after conversion. |
+```javascript
+class TranscriptAdapter {
+  /**
+   * Convert an agent‑specific transcript into the standard format.
+   * @param {Object} rawTranscript – the native transcript payload
+   * @returns {StandardTranscript}
+   */
+  adaptTranscript(rawTranscript) {
+    throw new Error('adaptTranscript must be implemented by subclass');
+  }
+}
+```
 
-### Watch Mechanism  
+Concrete adapters extend this class, for example `ZoomTranscriptAdapter` or `SlackTranscriptAdapter`, each overriding `adaptTranscript` with logic that maps native fields (timestamps, speaker IDs, message bodies, etc.) onto the **StandardTranscript** schema expected by the rest of the system.  
 
-The **watch mechanism** lives inside `TranscriptAPI`.  It registers a listener on the underlying transcript source (e.g., a file stream, WebSocket, or in‑memory buffer).  When a new transcript entry arrives, the listener fires a callback that the concrete `TranscriptAdapter` overrides.  This callback performs the following steps:
+The **TranscriptProcessor** (a sibling component) imports the base class and, at runtime, resolves the appropriate concrete adapter—either via a hard‑coded map or through a registration API if the system implements discovery.  Once resolved, the processor invokes `adapter.adaptTranscript(raw)` and forwards the result to the **OntologyClassificationAgent** for downstream analysis.  
 
-1. **Receive raw entry** – The raw payload is passed unchanged to the adapter.  
-2. **Convert** – `LSLConverter.convert(rawEntry)` returns an LSL‑compliant object.  
-3. **Format** – `LSLFormatter.format(lslObj, formatType)` produces a string in the desired output format.  
-4. **Log** – `LoggingService.log(formattedString)` writes the entry asynchronously.
+The optional **adapter registration/discovery** mechanism hinted at in Observation 5 could be a simple static registry:
 
-### Async Logging & Buffer Management  
+```javascript
+const registry = new Map();
+function registerAdapter(agentName, AdapterClass) {
+  registry.set(agentName, new AdapterClass());
+}
+function getAdapter(agentName) {
+  return registry.get(agentName);
+}
+```
 
-`LoggingService` implements a small in‑memory buffer that accumulates formatted strings until a size or time threshold is met.  At that point it flushes the buffer to the persistent log destination using `await fs.promises.appendFile(...)` (or an equivalent async I/O call).  Because the flush operation is awaited inside an async function, the main event loop is never blocked, satisfying the design goal of **preventing event‑loop blocking**.
-
-### Formatter Flexibility  
-
-`LSLFormatter` is deliberately agnostic of the source adapter.  It receives a plain LSL object and a format identifier (`'markdown' | 'jsonl'`).  This allows the same adapter to serve multiple downstream consumers (e.g., UI components that render markdown or analytics pipelines that ingest JSON‑Lines).
-
----
+Such a registry would allow the **LiveLoggingSystem** to dynamically locate the correct adapter without hard‑coded conditionals, supporting future agents with minimal code changes.
 
 ## Integration Points  
 
-- **Parent – LiveLoggingSystem**: The LiveLoggingSystem orchestrates the overall logging pipeline.  It instantiates one or more concrete `TranscriptAdapter`s (one per agent type) and registers them with the system’s central event bus.  The parent relies on the adapter’s adherence to the `TranscriptAPI` contract to treat all adapters uniformly.  
+- **Parent – LiveLoggingSystem**: The LiveLoggingSystem owns the transcript pipeline. It creates or receives raw transcripts from various agents, then delegates conversion to a TranscriptAdapter instance.  
+- **Sibling – TranscriptProcessor**: Directly consumes the abstract `TranscriptAdapter`. It is responsible for selecting the right concrete adapter and passing the standardized transcript downstream.  
+- **Sibling – OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`): Receives the standardized transcript from the processor and performs ontology‑based classification. The quality of the adapter’s output directly influences classification accuracy.  
+- **Sibling – Logger & LSLFormatter**: While not directly tied to the adapter, they operate on the same processing flow. The Logger may record adapter selection events, and the LSLFormatter may format the final classified output.  
 
-- **Sibling – TranscriptProcessor**: Although not directly invoked by the adapter, `TranscriptProcessor` also extends `TranscriptAPI`.  Both components share the same watch infrastructure, meaning they can coexist without interfering with each other’s event streams.  
-
-- **Sibling – LoggingService**: The adapter delegates all persistence concerns to `LoggingService`.  This decouples the adapter from storage details (file system, cloud log store, etc.) and enables swapping the logging backend without touching the adapter logic.  
-
-- **Sibling – LSLFormatter**: After conversion, the adapter hands the LSL object to `LSLFormatter`.  Because the formatter is a pure utility, the adapter can select the output format at runtime (e.g., based on configuration flags).  
-
-- **Sibling – WatchMechanism**: The watch implementation lives inside `TranscriptAPI`.  Both `TranscriptAdapter` and `TranscriptProcessor` rely on it for real‑time change detection, ensuring a consistent notification model across the logging subsystem.  
-
-- **External – LSLConverter** (`lib/agent-api/transcripts/lsl-converter.js`): This module is the only place where agent‑specific quirks are normalized.  The adapter’s dependency on it is explicit, making the conversion step a clear integration point.
-
----
+The only explicit dependency of the TranscriptAdapter is on the **standard transcript schema** used throughout the system; it does not depend on any external services, making it a pure transformation layer.
 
 ## Usage Guidelines  
 
-1. **Extend the Correct Base** – When adding support for a new agent, create a class that extends `TranscriptAPI` (as `TranscriptAdapter` does) and implement the required callbacks (`onTranscriptUpdate`, etc.).  Do not duplicate watch logic; rely on the base class’s `watch` method.  
+1. **Implement the Interface Exactly** – Every concrete adapter must extend `TranscriptAdapter` and provide a synchronous (or promise‑based) `adaptTranscript` that returns a fully populated `StandardTranscript`.  Throwing or returning incomplete objects will break the downstream classification pipeline.  
 
-2. **Keep Conversion Pure** – All mapping from the agent’s native transcript schema to LSL should be confined to `LSLConverter`.  This keeps the adapter thin and testable.  
+2. **Register New Adapters Early** – If the system uses the optional registration API, call `registerAdapter('agentName', ConcreteAdapter)` during application bootstrap (e.g., in the LiveLoggingSystem initialization code).  This ensures the **TranscriptProcessor** can locate the adapter when a new agent is introduced.  
 
-3. **Choose a Formatter Early** – Decide whether downstream consumers need markdown or JSON‑Lines and pass the appropriate format identifier to `LSLFormatter`.  Changing the format at runtime is supported but should be avoided in hot paths for performance consistency.  
+3. **Keep Adapter Logic Pure** – Since adapters are pure translators, avoid side effects such as network calls or logging inside `adaptTranscript`.  Side effects belong to higher‑level components (e.g., the Logger).  
 
-4. **Respect Async Boundaries** – Never call `LoggingService.log` synchronously.  Always `await` the promise or chain it with `.then()` to preserve the non‑blocking guarantee.  
+4. **Unit Test Against the Standard Schema** – Write tests that feed representative raw transcripts into the adapter and assert that the output matches the `StandardTranscript` contract.  This guards against regressions when the schema evolves.  
 
-5. **Buffer Size Awareness** – If the logging volume is expected to be high, tune the buffer thresholds in `LoggingService` (found in `integrations/mcp-server-semantic-analysis/src/logging.ts`) to balance memory usage against I/O frequency.  
-
-6. **Testing** – Unit‑test the adapter by mocking the watch events, feeding raw transcript payloads, and asserting that the final call to `LoggingService.log` receives correctly formatted LSL strings.  Because conversion and formatting are isolated, they can be stubbed to focus on adapter orchestration.  
+5. **Document Agent‑Specific Edge Cases** – If an agent’s transcript contains ambiguous fields (e.g., missing speaker IDs), document how the adapter resolves them (default values, error handling, etc.) so that downstream components have predictable behavior.  
 
 ---
 
 ### Architectural Patterns Identified  
 
-1. **Abstract Base Class** – `TranscriptAPI` defines a contract that concrete adapters (including `TranscriptAdapter`) implement.  
-2. **Pipeline / Chain of Responsibility** – The flow from watch → converter → formatter → logger forms a clear processing pipeline.  
-3. **Dependency Injection (lightweight)** – The adapter receives instances of `LSLConverter`, `LSLFormatter`, and `LoggingService` via imports, allowing substitution in tests.  
-4. **Observer (Watch Mechanism)** – Real‑time updates are delivered through an observer pattern implemented in `TranscriptAPI`.  
+1. **Adapter Pattern** – Provides a uniform interface (`adaptTranscript`) for heterogeneous agent transcript formats.  
+2. **Strategy/Polymorphism** – Concrete adapters are interchangeable strategies selected at runtime.  
+3. **Plug‑in / Registry (optional)** – Potential registration/discovery mechanism enables dynamic extension without modifying core code.  
 
 ### Design Decisions and Trade‑offs  
 
-* **Modularity vs. Indirection** – By separating conversion, formatting, and logging into distinct siblings, the system gains flexibility and easier unit testing, at the cost of additional function calls and import indirection.  
-* **Async Logging** – Prioritizing non‑blocking I/O protects system responsiveness but introduces buffering latency; the trade‑off is mitigated by configurable flush thresholds.  
-* **Unified LSL Format** – Converging all agent transcripts into a single LSL schema simplifies downstream processing but requires a robust `LSLConverter` to handle edge‑case agent formats.  
+- **Abstract Base Class vs. Interface**: Choosing an abstract class gives a concrete place for shared utilities (e.g., default validation) but ties adapters to a JavaScript inheritance chain.  An interface‑only approach would be more language‑agnostic but would forgo any common implementation.  
+- **Separate Module for Adapter Logic**: Isolating adapters in their own files promotes **single‑responsibility** and makes the system easier to extend, at the cost of an extra import indirection.  
+- **Optional Registration Mechanism**: Adding a registry improves extensibility but introduces a small runtime lookup cost and requires careful initialization ordering.  
 
 ### System Structure Insights  
 
-* The **LiveLoggingSystem** acts as the orchestration layer, treating every transcript source uniformly through the `TranscriptAPI` contract.  
-* Sibling components (`TranscriptProcessor`, `LoggingService`, `LSLFormatter`, `WatchMechanism`) are deliberately thin utilities that each own a single responsibility, reinforcing the **single‑responsibility principle**.  
-* The hierarchy is shallow: adapters directly depend on conversion/formatting/logging utilities, avoiding deep inheritance trees or circular dependencies.  
+- The **LiveLoggingSystem** sits at the top of the hierarchy, orchestrating logging, transcript adaptation, classification, and formatting.  
+- **TranscriptAdapter** is the bridge between external agent data and internal processing, positioned directly under LiveLoggingSystem and above the **TranscriptProcessor**.  
+- Sibling components (**OntologyManager**, **Logger**, **LSLFormatter**) operate on the same pipeline but focus on classification, observability, and output formatting respectively.  
 
 ### Scalability Considerations  
 
-* **Horizontal Scaling** – Because adapters are stateless aside from their watch subscriptions, multiple instances can run in parallel (e.g., across Node.js worker threads) to handle high‑throughput agents.  
-* **Back‑pressure Management** – The buffer inside `LoggingService` provides natural back‑pressure; however, if the ingestion rate exceeds the flush capacity, memory usage will grow.  Tuning buffer limits and possibly introducing a streaming logger would be necessary for extreme loads.  
-* **Watch Efficiency** – The observer model scales well as long as the underlying transcript source can emit events efficiently (e.g., using native streams).  Polling would degrade performance, but the observed design avoids it.  
+- **Horizontal Scaling of Adapters**: Because adapters are pure functions, they can be executed in parallel across multiple worker threads or services, enabling the system to handle high‑throughput streams of transcripts.  
+- **Adding New Agents**: The plug‑in style registration means new agents can be onboarded without redeploying the entire LiveLoggingSystem—only the new adapter module needs to be deployed.  
+- **Potential Bottleneck**: If `adaptTranscript` performs heavy computation (e.g., deep parsing of large transcript blobs), it could become a CPU bottleneck; profiling and, if needed, offloading to background workers would mitigate this.  
 
 ### Maintainability Assessment  
 
-* **High** – Clear separation of concerns, explicit interfaces, and reliance on an abstract base class make the codebase approachable for new developers.  
-* **Testability** – Pure functions in `LSLConverter` and `LSLFormatter` coupled with async‑aware logging enable straightforward unit and integration tests.  
-* **Extensibility** – Adding a new agent type only requires a new subclass of `TranscriptAPI` and possibly extending `LSLConverter` for new edge cases, without touching the logging or formatting layers.  
-* **Potential Risks** – The primary maintenance burden lies in keeping `LSLConverter` up‑to‑date with evolving agent transcript schemas; a well‑documented mapping schema is essential to avoid regression.  
-
----  
-
-**In summary**, `TranscriptAdapter` exemplifies a clean, modular approach to normalizing heterogeneous transcript data within the **LiveLoggingSystem**. By leveraging an abstract base class, an observer‑based watch mechanism, and async, buffered logging, it achieves real‑time, non‑blocking processing while remaining highly extensible and maintainable.
+The use of an abstract base class and a clear, single‑method contract makes the **TranscriptAdapter** highly maintainable.  Adding or modifying adapters does not affect other parts of the system, provided the output adheres to the standard schema.  The optional registration mechanism, if implemented cleanly, further isolates changes.  However, maintainers must ensure that the **StandardTranscript** definition remains stable; any schema change will ripple through all adapters and downstream consumers, requiring coordinated updates.  Overall, the design promotes low coupling and high cohesion, which are favorable for long‑term upkeep.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes a modular design, as seen in the TranscriptAdapter class (lib/agent-api/transcript-api.js), which serves as an abstract base class for implementing agent-specific transcript adapters. This design decision allows for the integration of different agent types and the adaptation of various transcript formats into a unified Live Session Logging (LSL) format. For instance, the TranscriptAPI (lib/agent-api/transcript-api.js) employs the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format, providing functionalities for markdown and JSON-Lines conversions. The use of async logging, as implemented in the logging mechanism (integrations/mcp-server-semantic-analysis/src/logging.ts), prevents event loop blocking, ensuring efficient logging without impacting system performance. Furthermore, the watch mechanism (lib/agent-api/transcript-api.js) for monitoring transcript updates enables real-time notifications and adaptations based on new entries.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This is evident in the way the agent is instantiated and used within the LiveLoggingSystem's classification layer. The OntologyClassificationAgent's classify method is called with the session transcript as an argument, allowing the system to categorize the conversation based on predefined ontology rules. Furthermore, the use of the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, as an abstract base class for agent-specific transcript adapters, enables the system to handle transcripts from various agents in a unified manner. The TranscriptAdapter's adaptTranscript method is responsible for converting agent-specific transcripts into a standardized format, which is then passed to the OntologyClassificationAgent for classification.
 
 ### Siblings
-- [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor utilizes the TranscriptAPI class (lib/agent-api/transcript-api.js) as an abstract base class for implementing agent-specific transcript adapters.
-- [LoggingService](./LoggingService.md) -- LoggingService implements async logging, as seen in the logging mechanism (integrations/mcp-server-semantic-analysis/src/logging.ts), to prevent event loop blocking.
-- [LSLFormatter](./LSLFormatter.md) -- LSLFormatter uses the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format.
-- [WatchMechanism](./WatchMechanism.md) -- WatchMechanism uses the TranscriptAPI class (lib/agent-api/transcript-api.js) for monitoring transcript updates.
+- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system.
+- [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, to handle transcripts from various agents in a unified manner.
+- [Logger](./Logger.md) -- The Logger is expected to provide a logging API for the LiveLoggingSystem component to log events and errors.
+- [LSLFormatter](./LSLFormatter.md) -- The LSLFormatter uses a templating engine or formatting library to generate the output format.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

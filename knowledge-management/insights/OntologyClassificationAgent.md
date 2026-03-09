@@ -1,111 +1,89 @@
 # OntologyClassificationAgent
 
-**Type:** SubComponent
+**Type:** Detail
 
-OntologyClassificationAgent's classification process potentially uses a configuration file to determine classification rules, allowing for easy modification without requiring code changes.
+The OntologyClassificationAgent utilizes the classifyObservation function in ontology-classification-agent.ts to map observations to their corresponding ontology classes, enabling semantic analysis in the SemanticAnalysis project.
 
 ## What It Is  
 
-The **OntologyClassificationAgent** is a TypeScript class that lives in the *semantic‑analysis* portion of the live‑logging stack, located at  
+The **OntologyClassificationAgent** is implemented in the file  
 
 ```
 integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
-Its primary responsibility is to take raw observations and entity objects that flow through a live logging session and enrich them with ontology‑derived metadata before they are persisted.  The enrichment logic is driven entirely by an external **configuration file** that defines the classification rules, allowing the behaviour of the agent to be altered without code changes.  The agent is part of the **LiveLoggingSystem** component and is used by sibling modules such as **SessionManager** and **TranscriptProcessor** to provide a single, unified abstraction for ontology‑based classification throughout the system.
-
----
+within the *SemanticAnalysis* code‑base. It is the dedicated agent responsible for performing ontology‑based classification of incoming observations. The agent lives under the **Ontology** component (the parent) and is referenced as the primary classifier for the project’s semantic analysis pipeline. Its core responsibility is to invoke the `classifyObservation` function, which maps raw observation data to the appropriate ontology classes, thereby enabling downstream semantic reasoning.
 
 ## Architecture and Design  
 
-The observations describe a **modular architecture** centred on clear separation of concerns.  The OntologyClassificationAgent is a self‑contained module that exposes a classification interface while delegating rule definition to a configuration asset.  This design yields a *configuration‑driven* pattern: the agent’s core algorithm stays stable, and the business‑logic of “what belongs to which ontology class” is expressed declaratively.  
+The limited observations reveal an **agent‑oriented** architectural style: the OntologyClassificationAgent is positioned alongside other agents in the `src/agents/` directory, suggesting a modular collection of self‑contained processing units. The agent follows a **single‑responsibility** design—its sole purpose is to translate observations into ontology terms.  
 
-Interaction between modules follows a *co‑ordinator* style.  The **SessionManager** orchestrates live‑session logging and invokes the OntologyClassificationAgent to classify observations and entities as they are streamed.  Meanwhile, the **TranscriptProcessor** prepares transcript data for the Live Session Logging (LSL) format and, through the **LSLConfigValidator**, ensures that the configuration file consumed by the OntologyClassificationAgent is well‑formed.  This creates a pipeline where validation, processing, classification, and persistence are chained but loosely coupled, each module focusing on a single responsibility.
-
-Because the agent is referenced directly from multiple siblings (SessionManager, TranscriptProcessor), the system adopts a **shared‑service** approach within the LiveLoggingSystem hierarchy: the OntologyClassificationAgent acts as a reusable service that any component needing ontology metadata can call.  No explicit micro‑service or event‑driven mechanisms are mentioned, so the design remains intra‑process and synchronous.
-
----
+Interaction is driven through a **function‑call** contract: the agent calls `classifyObservation`, a function defined in the same file (`ontology-classification-agent.ts`). This indicates a **procedural** encapsulation where the classification logic is exposed as a reusable function rather than being scattered across the code base. Because the agent is part of the **Ontology** parent component, it likely depends on the shared ontology model (e.g., class definitions, hierarchy) that the rest of the system consumes. No explicit patterns such as micro‑services, event‑driven messaging, or dependency injection are mentioned, so the design appears to be a straightforward, in‑process module.
 
 ## Implementation Details  
 
-* **Class & Location** – The core implementation resides in `ontology-classification-agent.ts`.  Although the source file contains no exposed symbols in the provided observations, the name itself indicates a class that likely implements methods such as `classifyObservation(observation)` and `classifyEntity(entity)`.  
+The concrete implementation detail that can be extracted is the existence of the `classifyObservation` function. While the source code is not provided, the naming convention implies the function accepts an **observation object** and returns a **classification result**—most likely an identifier or instance of an ontology class. Because the agent lives in `ontology-classification-agent.ts`, it is reasonable to infer that the file exports either a class named `OntologyClassificationAgent` or a plain object exposing the classification capability.  
 
-* **Configuration‑Driven Rules** – A dedicated configuration file (path not enumerated) stores classification rules.  The agent reads this file at startup or on demand, parses the rule definitions, and applies them to incoming data.  This enables “easy modification without requiring code changes,” as observed.  The rule format is presumably JSON or YAML, given the typical tooling in TypeScript projects, but the exact schema is validated by the **LSLConfigValidator** script (`scripts/validate-lsl-config.js`).  
+The classification workflow can be described as:
 
-* **Metadata Enrichment** – After determining the appropriate ontology class for an observation or entity, the agent attaches the resulting metadata to the object before it is persisted.  This step is described as “adding ontology metadata to entities before persistence,” implying that the agent either mutates the original object or returns a decorated copy.  
+1. **Input Reception** – The agent receives an observation (raw data, sensor reading, event payload, etc.).
+2. **Mapping Logic** – `classifyObservation` examines the observation’s attributes and consults the ontology definitions to determine the best‑fit class.
+3. **Output Generation** – The function returns the ontology class (or a structured classification object) that downstream components can use for semantic analysis.
 
-* **Unified Abstraction** – By exposing a single classification API, the OntologyClassificationAgent abstracts away the underlying ontology system (e.g., external knowledge base, internal taxonomy).  Consumers such as SessionManager do not need to know how rules are stored or applied; they simply call the agent and receive enriched data.  
-
-* **Modular Packaging** – The agent lives alongside other agents and utilities under the `integrations/mcp-server-semantic-analysis/src/agents/` directory, reinforcing the modular approach noted in the hierarchy context.  Its sibling **LSLConfigValidator** resides in a scripts folder, indicating a clear split between runtime agents and auxiliary tooling.
-
----
+Since the observations do not list additional helper methods, data structures, or external libraries, the implementation likely relies on the internal ontology model that resides elsewhere in the project (perhaps under an `ontology/` package).
 
 ## Integration Points  
 
-1. **LiveLoggingSystem (Parent)** – The OntologyClassificationAgent is a child of LiveLoggingSystem, which aggregates several agents to provide end‑to‑end live‑session logging.  The parent component benefits from the agent’s ability to consistently annotate data with ontology metadata, a prerequisite for downstream analytics.  
+The OntologyClassificationAgent is tightly coupled with two parts of the system:
 
-2. **SessionManager (Sibling)** – SessionManager directly invokes the agent to classify observations and entities as part of its live‑session handling.  The interaction is likely a method call such as `ontologyAgent.classify(observation)` inside the session’s processing loop.  
+* **Ontology (Parent Component)** – The agent consumes the ontology definitions to perform its mapping. Any change to the ontology schema (new classes, altered hierarchy) will directly affect the agent’s behavior.
+* **SemanticAnalysis Pipeline** – As the primary classifier, the agent feeds classified observations into the broader semantic analysis workflow. Other agents or services that perform enrichment, correlation, or reasoning will depend on the classification output.
 
-3. **TranscriptProcessor (Sibling)** – While the TranscriptProcessor does not call the agent directly, it works with the **LSLConfigValidator** to ensure the configuration file used by the OntologyClassificationAgent is valid.  This creates an indirect dependency: any change to the classification config must pass validation before the agent can safely consume it.  
-
-4. **LSLConfigValidator (Sibling)** – This script validates the configuration file that drives the agent’s rule engine.  The validation step prevents runtime classification errors caused by malformed rules, reinforcing robustness.  
-
-5. **Persistence Layer (External)** – The enriched entities are handed off to whatever persistence mechanism the LiveLoggingSystem employs (e.g., a database or event store).  The agent’s contract is to return fully annotated objects ready for storage, but the persistence implementation is outside the scope of the observations.  
-
-Overall, the integration model is **tight‑coupled at the code‑level** (direct imports and method calls) but **loosely coupled in responsibilities**, thanks to the configuration‑driven rule set and validation step.
-
----
+Because the agent resides in the `integrations/mcp-server-semantic-analysis` module, it is reasonable to assume that it is invoked by higher‑level orchestration code (e.g., a request handler or a batch processor) that supplies observations. No explicit external dependencies (databases, message queues) are mentioned, so the integration surface appears to be limited to in‑process function calls.
 
 ## Usage Guidelines  
 
-* **Validate Configuration First** – Before deploying or modifying classification rules, run the `scripts/validate-lsl-config.js` validator.  This ensures the OntologyClassificationAgent will not encounter parsing errors at runtime.  
+Developers who need to classify observations should import the `OntologyClassificationAgent` (or the `classifyObservation` function) from  
 
-* **Treat the Agent as a Stateless Service** – The agent’s behaviour is driven solely by the external configuration file; therefore, it can be instantiated once and reused across many sessions.  Avoid creating multiple instances per request, as this adds unnecessary overhead.  
+```
+integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+```  
 
-* **Do Not Hard‑Code Classification Logic** – All classification criteria should be expressed in the configuration file.  Introducing inline conditional logic inside the agent defeats the design goal of easy rule modification.  
+and pass well‑formed observation objects that conform to the expected schema (the schema is defined by the Ontology component). It is advisable to:
 
-* **Persist Enriched Objects Directly** – After classification, forward the returned object (or the mutated original) to the persistence layer without further transformation.  The ontology metadata is already attached and expected by downstream consumers.  
-
-* **Coordinate with SessionManager** – When integrating new observation types, ensure SessionManager routes them through the OntologyClassificationAgent so that every piece of data entering the LiveLoggingSystem carries consistent ontology metadata.  
-
-* **Version Configuration Files** – Since the classification rules are external, maintain versioned copies of the configuration files (e.g., via Git).  This enables rollback if a new rule set introduces unexpected classification outcomes.  
+1. **Validate Observations** before classification to avoid runtime errors inside `classifyObservation`.
+2. **Keep Ontology Synchronized** – When extending the ontology, ensure the classification logic is updated accordingly; otherwise, new observation types may be mis‑classified or left unhandled.
+3. **Leverage Returned Classification** – The output should be fed directly into downstream semantic analysis modules; avoid re‑interpreting the classification outside the defined ontology terms.
+4. **Unit Test Classification Paths** – Because the agent’s core function is deterministic mapping, unit tests that cover each ontology class mapping will help maintain correctness as the ontology evolves.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Modular Architecture** – Separate agents (OntologyClassificationAgent, LSLConfigValidator) live in distinct directories, promoting independent development and replacement.  
-* **Configuration‑Driven Rule Engine** – Classification logic is externalized to a configuration file, allowing runtime behaviour changes without code edits.  
-* **Unified Abstraction / Service Facade** – The agent offers a single API for ontology classification, hiding the underlying ontology system from callers.  
+### Architectural patterns identified
+- **Agent‑oriented modularity** – the classification logic is encapsulated in a dedicated agent.
+- **Single‑responsibility / functional decomposition** – the `classifyObservation` function isolates the mapping concern.
 
-### 2. Design decisions and trade‑offs  
-* **Decision:** Use a configuration file for classification rules.  
-  * *Trade‑off:* Gains flexibility and rapid rule updates, but introduces a dependency on correct configuration syntax and validation.  
-* **Decision:** Keep the agent within the same process as SessionManager and TranscriptProcessor.  
-  * *Trade‑off:* Simpler synchronous calls and lower latency, but limits horizontal scalability that a separate service would provide.  
-* **Decision:** Centralise ontology metadata enrichment in one agent.  
-  * *Trade‑off:* Ensures consistency across the system, yet creates a single point of failure if the agent cannot load its configuration.  
+### Design decisions and trade‑offs
+- **In‑process function call** keeps latency low and simplifies dependency management, at the cost of tighter coupling to the ontology model.
+- **Centralized classification** via one agent reduces duplication but creates a single point of change when the ontology evolves.
 
-### 3. System structure insights  
-The LiveLoggingSystem forms a hierarchy where the OntologyClassificationAgent, SessionManager, TranscriptProcessor, and LSLConfigValidator are peer modules under the same parent.  Each module focuses on a distinct phase of the logging pipeline—validation, transcript conversion, session handling, and ontology enrichment—yet they share the same configuration‑driven philosophy, reinforcing a cohesive design language across the system.  
+### System structure insights
+- The OntologyClassificationAgent sits under the **Ontology** parent and is part of the **SemanticAnalysis** integration module, indicating a layered structure: ontology definitions → classification agent → semantic analysis pipeline.
 
-### 4. Scalability considerations  
-Because the agent operates synchronously within the live‑session processing loop, its performance directly impacts overall throughput.  Scaling horizontally would require either (a) running multiple instances of the LiveLoggingSystem process (each with its own agent) behind a load balancer, or (b) refactoring the agent into a stateless microservice that can be independently scaled.  The current design’s reliance on a single configuration file is lightweight, but large rule sets could increase parsing time; caching the parsed rules in memory mitigates this.  
+### Scalability considerations
+- Because classification is performed via a synchronous function, scaling horizontally will require replicating the service or exposing the agent through an API gateway if load increases.
+- The agent’s performance will be bounded by the complexity of the ontology lookup; optimizing the ontology data structure (e.g., indexing) would improve throughput.
 
-### 5. Maintainability assessment  
-The modular, configuration‑driven approach scores highly on maintainability.  Updating classification rules is a matter of editing a file and re‑validating it, avoiding code recompilation.  The clear separation between validation (LSLConfigValidator), processing (TranscriptProcessor), and classification (OntologyClassificationAgent) reduces the risk of regression when changes are made in one area.  However, the lack of explicit unit‑test references in the observations suggests that test coverage should be verified to ensure future modifications do not break the rule‑engine logic.
+### Maintainability assessment
+- The clear separation of classification logic into `classifyObservation` promotes maintainability; updates to ontology classes are localized.
+- However, the tight coupling to the ontology model means any schema change must be reflected in the agent, necessitating disciplined versioning and comprehensive test coverage.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component employs a modular architecture, with classes such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the LSLConfigValidator (scripts/validate-lsl-config.js) working together to provide a unified abstraction for reading and converting transcripts from different agent formats into the Live Session Logging (LSL) format. This modular approach allows for easier maintenance and updates, as individual modules can be modified or replaced without affecting the entire system. For example, the OntologyClassificationAgent uses a configuration file to classify observations and entities against the ontology system, adding ontology metadata to entities before persistence. The use of a configuration file allows for easy modification of the classification rules without requiring changes to the code.
-
-### Siblings
-- [SessionManager](./SessionManager.md) -- SessionManager uses the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) to classify observations and entities against the ontology system.
-- [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the LSLConfigValidator (scripts/validate-lsl-config.js) to validate configuration files before processing transcripts.
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a modular architecture for easier maintenance and updates.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes the ontology system to classify observations.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

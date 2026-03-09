@@ -2,94 +2,93 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter class in lib/integrations/specstory-adapter.js implements a retry-with-backoff pattern for connection attempts, ensuring the component can recover from temporary network issues.
+The SpecstoryAdapter sub-component utilizes the `specstory_api.py` module to establish an HTTP API connection, enabling seamless data exchange between the Trajectory component and Specstory.
 
 ## What It Is  
 
-The **SpecstoryAdapter** is a sub‑component that lives in the file **`lib/integrations/specstory-adapter.js`**.  It is exposed as the class `SpecstoryAdapter` and acts as the single, unified gateway through which the rest of the system talks to the external **Specstory** extension.  All interaction—whether establishing a connection, handling transient failures, or persisting conversation data—is funneled through this class.  The parent component **Trajectory** delegates its integration responsibilities to `SpecstoryAdapter`, and the adapter in turn shares concrete responsibilities with its siblings **ConnectionManager**, **LoggingMechanism**, and **RetryMechanism**, each of which leverages the same underlying methods (`connectViaHTTP`, `logConversation`, etc.) defined in `specstory-adapter.js`.
+**SpecstoryAdapter** is a sub‑component that lives inside the *Trajectory* component and is responsible for communicating with the external **Specstory** service. The concrete implementation lives in the JavaScript file `lib/integrations/specstory‑adapter.js`, with the core connection logic anchored at line 104 in the `connectViaHTTP` function.  At runtime the adapter delegates the low‑level HTTP handling to the Python module `specstory_api.py`, which abstracts the REST endpoints of Specstory and presents a clean API for the JavaScript side.  The adapter therefore acts as a bridge between the Node‑based Trajectory ecosystem and the Python‑based Specstory service, enabling bidirectional data exchange while keeping the two codebases loosely coupled.
 
-## Architecture and Design  
-
-The architecture that emerges from the observations is a **facade‑style integration layer**.  `SpecstoryAdapter` presents a clean, high‑level API while hiding the complexities of the three distinct connection strategies—**HTTP**, **IPC**, and **file‑watch**—behind internal helpers.  This façade is deliberately placed under the **Trajectory** component, making the adapter the sole point of contact between the core application logic and the Specstory extension.
-
-A notable design pattern explicitly employed is **retry‑with‑backoff**, implemented inside the `connectViaHTTP` method.  By progressively increasing the delay between successive connection attempts, the adapter can survive temporary network glitches without overwhelming the remote service.  The presence of sibling components named **ConnectionManager**, **LoggingMechanism**, and **RetryMechanism** indicates a deliberate separation of concerns: the connection logic, the logging logic, and the retry logic are each conceptually isolated, even though they converge on the same implementation in `specstory-adapter.js`.  This shared‑implementation approach reduces duplication while preserving logical boundaries in the documentation and conceptual model.
-
-The logging strategy follows a **consistent formatting convention**.  The `logConversation` method formats conversation entries in a deterministic way before forwarding them to the Specstory extension.  By centralising the format in the adapter, downstream consumers (including the **LoggingMechanism** sibling) can rely on a stable contract for log data, which simplifies downstream parsing and analytics.
-
-## Implementation Details  
-
-The core of the implementation is the `SpecstoryAdapter` class defined in **`lib/integrations/specstory-adapter.js`**.  Its public surface includes methods for establishing connections (`connectViaHTTP`, `connectViaIPC`, `watchFileChanges`) and for emitting logs (`logConversation`).  
-
-* **Connection handling** – Each connection method abstracts a different transport.  `connectViaHTTP` encapsulates an HTTP client, applies the retry‑with‑backoff algorithm, and returns a promise that resolves once the Specstory extension acknowledges the handshake.  `connectViaIPC` likely uses a local inter‑process channel (e.g., Unix domain sockets or Windows named pipes) and follows a similar retry strategy, though the back‑off detail is only confirmed for the HTTP path.  `watchFileChanges` sets up a file‑system watcher that reacts to changes in a designated Specstory data file, providing a lightweight, event‑driven fallback when network‑based transports are unavailable.
-
-* **Retry‑with‑backoff** – The algorithm is embedded directly in `connectViaHTTP`.  On a failed attempt, the method waits for an exponentially increasing interval (e.g., 100 ms → 200 ms → 400 ms…) before retrying, up to a configurable maximum.  This pattern protects the system from rapid, repeated connection bursts while still guaranteeing eventual consistency when the remote service recovers.
-
-* **Logging** – The `logConversation` method receives a conversation payload, formats it according to a predefined schema (timestamp, participant IDs, message content, etc.), and forwards the formatted string to the Specstory extension via the currently active transport.  The consistent format ensures that any consumer—whether the built‑in **LoggingMechanism** sibling or an external log aggregator—can reliably parse the logs.
-
-* **Interaction with siblings** – Although the code base does not expose separate classes for **ConnectionManager**, **LoggingMechanism**, or **RetryMechanism**, the hierarchy description treats them as logical siblings.  They all invoke the same adapter methods, reinforcing a single source of truth for connection retries and log formatting.
-
-* **No observed child entities** – The observations do not mention any child components under `SpecstoryAdapter`.  All functionality appears to be encapsulated within the adapter itself.
-
-## Integration Points  
-
-`SpecstoryAdapter` sits directly under the **Trajectory** component, which orchestrates higher‑level workflows and delegates all Specstory‑specific actions to the adapter.  The adapter’s public methods are the only integration surface exposed to the rest of the system.  Consequently, any module that needs to communicate with the Specstory extension imports `SpecstoryAdapter` from **`lib/integrations/specstory-adapter.js`** and calls the appropriate connection or logging method.
-
-The three transport mechanisms constitute the external dependencies of the adapter:
-
-1. **HTTP endpoint** – Requires a reachable URL and network connectivity; the retry‑with‑backoff logic mitigates transient failures.
-2. **IPC channel** – Relies on a locally running Specstory process exposing a named pipe or socket; the adapter abstracts the low‑level details.
-3. **File watch** – Depends on a shared file location that both the adapter and Specstory can read/write; the file‑system watcher must have appropriate permissions.
-
-Internally, the adapter also depends on a logging utility (presumably part of the **LoggingMechanism** sibling) to emit its own debug or error messages, though this is not explicitly listed in the observations.  The unified interface ensures that any future changes to the transport layer or logging format are isolated within `specstory-adapter.js`, preserving backward compatibility for callers.
-
-## Usage Guidelines  
-
-Developers should treat `SpecstoryAdapter` as the **sole** entry point for all Specstory interactions.  When initializing a workflow, invoke the most appropriate connection method based on the deployment environment: use `connectViaHTTP` in cloud or distributed settings, fall back to `connectViaIPC` for local daemon‑style deployments, and resort to `watchFileChanges` only when network or IPC channels are unavailable.  Because `connectViaHTTP` already embeds a retry‑with‑backoff strategy, callers do **not** need to implement additional retry logic; doing so would duplicate effort and could lead to exponential back‑off collisions.
-
-All conversation data should be logged through `logConversation`.  The method expects the payload to conform to the adapter’s formatting contract; developers must avoid pre‑formatting the data themselves, as doing so could break the deterministic schema that downstream log consumers rely on.  If custom metadata is required, it should be added to the payload **before** calling `logConversation`, allowing the adapter to incorporate it into the standard format.
-
-When extending the system, any new transport or logging requirement should be added **inside** `SpecstoryAdapter` rather than creating a parallel connection class.  This preserves the façade pattern and ensures that sibling components (ConnectionManager, LoggingMechanism, RetryMechanism) continue to operate against a single, consistent API.
+The component is deliberately isolated: **Trajectory** contains the adapter, and the adapter itself contains a dedicated **RetryMechanism** child that encapsulates the retry‑with‑backoff logic.  This hierarchy makes the adapter a self‑contained integration point that can be swapped, extended, or mocked without rippling changes through the rest of the system.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Facade / Unified Interface** – `SpecstoryAdapter` centralises all Specstory interactions.  
-* **Retry‑with‑Backoff** – Explicitly used in `connectViaHTTP` to handle transient failures.  
-* **Separation of Concerns (Logical siblings)** – Connection, logging, and retry responsibilities are conceptually split into ConnectionManager, LoggingMechanism, and RetryMechanism, even though they share the same implementation.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Single‑point integration** simplifies usage but creates a tight coupling between Trajectory and the Specstory extension.  
-* **Multiple transport options** increase flexibility (HTTP, IPC, file watch) at the cost of added complexity inside the adapter.  
-* **Embedding retry logic directly in the adapter** avoids duplicated retry code elsewhere but makes the adapter responsible for both transport and resilience, which could grow the class size.  
-* **Standardised logging format** guarantees downstream consistency but limits ad‑hoc log structures unless the adapter is extended.
+The primary architectural style evident in SpecstoryAdapter is the **Adapter Pattern**.  By exposing a uniform interface (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`, etc.) the adapter hides the specifics of how Specstory is reached—whether over HTTP, inter‑process communication, or file‑system watching—from the rest of Trajectory.  This modularity aligns with the broader **micro‑services‑inspired** organization of the Trajectory component, where each external integration is encapsulated in its own adapter module.
 
-### 3. System structure insights  
-* The system is layered: **Trajectory** → **SpecstoryAdapter** → transport implementations (HTTP, IPC, file watch).  
-* Sibling components (ConnectionManager, LoggingMechanism, RetryMechanism) act as conceptual lenses on the same underlying methods, reinforcing a **single source of truth** for connection and logging behavior.  
-* No child components are observed; all responsibilities are encapsulated within the adapter class.
+A second, complementary pattern is the **Retry‑With‑Backoff** strategy, implemented inside the child **RetryMechanism**.  The `connectViaHTTP` method (see `lib/integrations/specstory‑adapter.js:104`) wraps the HTTP request in a loop that progressively increases the wait time between attempts, protecting the system from transient network glitches while avoiding tight retry storms.  This resilience mechanism is a design decision that trades a modest increase in latency for higher overall availability.
 
-### 4. Scalability considerations  
-* The retry‑with‑backoff algorithm helps the adapter scale under intermittent network stress by throttling reconnection attempts.  
-* Supporting three independent transports allows the system to scale across different deployment topologies (cloud, on‑prem, edge) without code duplication.  
-* However, because all transport logic resides in a single class, extremely high‑throughput scenarios may require refactoring to offload heavy I/O to dedicated workers.
+Interaction between the parts is straightforward: the JavaScript adapter invokes functions exported by `specstory_api.py` (likely via a child‑process bridge or a native binding), while the RetryMechanism intercepts any thrown errors and schedules the next attempt according to the back‑off policy.  The parent **Trajectory** component merely calls the adapter’s public methods, remaining agnostic to the underlying retry logic or transport details.
 
-### 5. Maintainability assessment  
-* **High maintainability** in the short term: a single, well‑documented class reduces the surface area for bugs, and the unified logging format simplifies downstream changes.  
-* **Potential technical debt**: as new transports or more sophisticated retry policies are added, `SpecstoryAdapter` could become monolithic, making it harder to test and evolve.  Future maintainers should consider extracting transport‑specific strategies into separate modules while preserving the façade.  
-* The clear naming (`connectViaHTTP`, `logConversation`) and explicit pattern usage (retry‑with‑backoff) aid readability and onboarding for new developers.
+---
+
+## Implementation Details  
+
+The **connectViaHTTP** function is the entry point for establishing a connection to Specstory over HTTP.  At line 104 of `lib/integrations/specstory‑adapter.js`, the method initiates a request to the endpoint defined in `specstory_api.py`.  If the request fails (network error, non‑2xx response, timeout), the function hands control to the embedded **RetryMechanism**.  This child component tracks the number of attempts, calculates the exponential back‑off delay (e.g., `baseDelay * 2^attempt`), and schedules the next call using `setTimeout` or an equivalent async timer.
+
+The **RetryMechanism** is deliberately isolated: it does not contain any knowledge of HTTP specifics, only generic error handling and back‑off calculation.  This separation means the same mechanism can be reused by other adapters or by future transport methods (IPC, file watch) without duplication.  The adapter also imports the Python module `specstory_api.py`, which likely exposes functions such as `initialize_connection`, `send_payload`, and `close_connection`.  The JavaScript side calls these via a bridging layer (e.g., `child_process.spawn` with stdio communication or a native addon), allowing the two runtimes to remain independent while sharing data structures (JSON payloads).
+
+Because the adapter is a **sub‑component**, its public API is limited to a small set of well‑named functions (e.g., `connectViaHTTP`, `disconnect`, `sendData`).  Internally, any state—such as authentication tokens, connection handles, or retry counters—is kept private to the module scope, reducing the risk of accidental mutation from the parent Trajectory component.
+
+---
+
+## Integration Points  
+
+SpecstoryAdapter sits at the intersection of three distinct layers:
+
+1. **Parent – Trajectory**: Trajectory imports the adapter (`require('lib/integrations/specstory‑adapter')`) and invokes its public methods as part of its workflow pipelines.  Trajectory treats the adapter as a black box that either succeeds or throws a recoverable error, relying on the built‑in RetryMechanism to shield it from transient failures.
+
+2. **Child – RetryMechanism**: The retry logic lives inside the adapter and is exposed only through internal calls.  Its configuration (maximum attempts, base delay, jitter) can be tuned via environment variables or a configuration object passed to the adapter at initialization, allowing system operators to balance latency against resilience.
+
+3. **External – Specstory (via specstory_api.py)**: The actual HTTP calls are delegated to the Python module `specstory_api.py`.  This module defines the concrete REST endpoints, authentication flow, and payload schemas.  The bridge between JavaScript and Python is the only external dependency of the adapter, meaning that changes in Specstory’s API surface are isolated to `specstory_api.py` and the adapter’s request‑building code.
+
+No other sibling adapters are mentioned, but the pattern suggests that any new external service would follow the same structure: a dedicated adapter module, a shared RetryMechanism, and a language‑specific API wrapper.
+
+---
+
+## Usage Guidelines  
+
+When integrating SpecstoryAdapter into new Trajectory workflows, developers should first instantiate the adapter once at application start‑up and reuse that instance throughout the process lifetime.  This avoids repeated initialization of the Python bridge and preserves any cached authentication tokens.  All calls to external services should be made through the high‑level methods (`connectViaHTTP`, `sendData`, `disconnect`) rather than reaching into the Python module directly; this ensures the retry logic remains in effect.
+
+Configuration of the retry behavior should be performed via the adapter’s initialization options.  For production deployments where network reliability is a concern, increase the `maxRetries` and introduce a modest `jitter` to prevent synchronized retry bursts across multiple instances.  Conversely, for latency‑sensitive environments, consider lowering `maxRetries` and using a smaller back‑off base, accepting a higher probability of failure.
+
+Error handling should respect the adapter’s contract: recoverable errors are surfaced as specific exception types (e.g., `RetryableError`), while unrecoverable conditions (authentication failure, malformed payload) raise distinct exceptions that the caller must handle explicitly.  Logging should be performed at the adapter level for each retry attempt, including attempt count and delay, to aid in observability and troubleshooting.
+
+Finally, any modification to the communication contract with Specstory—such as adding new API endpoints or changing request schemas—should be confined to `specstory_api.py`.  The adapter’s JavaScript side should then be updated only to invoke the new functions, preserving the existing retry and integration scaffolding.
+
+---
+
+### Architectural patterns identified  
+1. **Adapter Pattern** – isolates external Specstory service behind a uniform interface.  
+2. **Retry‑With‑Backoff** – encapsulated in the child **RetryMechanism** for resilient connections.  
+3. **Modular / Micro‑services‑inspired componentization** – each integration lives in its own sub‑component under the parent **Trajectory**.
+
+### Design decisions and trade‑offs  
+*Choosing an adapter* keeps Trajectory agnostic of Specstory’s protocol, simplifying future swaps but adds an extra indirection layer.  
+*Embedding retry logic* inside the adapter improves reliability without burdening callers, at the cost of increased latency on repeated failures and added complexity in the adapter code.  
+*Using a Python bridge* (`specstory_api.py`) leverages existing Specstory client code but introduces cross‑runtime communication overhead and a dependency on the Python runtime.
+
+### System structure insights  
+- **Trajectory** (parent) orchestrates high‑level workflows and delegates external calls to adapters.  
+- **SpecstoryAdapter** (sub‑component) provides a focused integration point, containing its own **RetryMechanism** child.  
+- The hierarchy promotes clear separation of concerns: orchestration, integration, and resilience are each handled in distinct layers.
+
+### Scalability considerations  
+Because each adapter is self‑contained, multiple Trajectory instances can run in parallel, each maintaining its own connection pool to Specstory.  The exponential back‑off prevents thundering‑herd scenarios during outages.  Scaling horizontally simply requires provisioning additional Trajectory processes; no shared state exists within the adapter that would become a bottleneck.
+
+### Maintainability assessment  
+The adapter pattern combined with an isolated retry module yields high maintainability: changes to Specstory’s API are limited to `specstory_api.py`, while adjustments to resilience policies are confined to the **RetryMechanism**.  The clear file‑level boundaries (`lib/integrations/specstory‑adapter.js` and `specstory_api.py`) and the absence of tangled cross‑component logic make the codebase approachable for new developers and facilitate unit testing of each layer independently.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is centered around the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which provides a unified interface for interacting with the Specstory extension. This class implements multiple connection methods, including HTTP, IPC, and file watch, allowing for flexibility in how the component connects to the Specstory extension. For example, the connectViaHTTP method in lib/integrations/specstory-adapter.js uses a retry-with-backoff pattern to handle connection failures, ensuring that the component can recover from temporary network issues. The SpecstoryAdapter class also logs conversation entries via the logConversation method, which formats the entries and logs them via the Specstory extension.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's design reflects a microservices architecture, where each adapter or module is responsible for a specific function or service. This is evident in the use of the SpecstoryAdapter (lib/integrations/specstory-adapter.js) for connecting to Specstory via HTTP API, IPC, or file watch. The adapter pattern allows for modular development and maintenance, enabling developers to modify or replace individual components without affecting the entire system. For instance, the connectViaHTTP method (lib/integrations/specstory-adapter.js:104) demonstrates a retry-with-backoff pattern for resilient connection attempts, showcasing the component's ability to handle complex workflows and interactions with external services.
 
-### Siblings
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses a retry-with-backoff pattern in connectViaHTTP method in lib/integrations/specstory-adapter.js to handle connection failures.
-- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism uses the logConversation method in lib/integrations/specstory-adapter.js to format conversation entries and log them via the Specstory extension.
-- [RetryMechanism](./RetryMechanism.md) -- RetryMechanism uses a retry-with-backoff pattern in connectViaHTTP method in lib/integrations/specstory-adapter.js to handle connection failures.
+### Children
+- [RetryMechanism](./RetryMechanism.md) -- The connectViaHTTP method in lib/integrations/specstory-adapter.js:104 implements a retry-with-backoff pattern for resilient connection attempts.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 3 observations*

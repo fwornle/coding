@@ -1,0 +1,1371 @@
+{
+  "workflowName": "wave-analysis",
+  "startTime": "2026-03-09T09:54:22.305Z",
+  "endTime": "2026-03-09T09:57:42.918Z",
+  "status": "completed",
+  "totalLLMCalls": 124,
+  "totalTokens": 290664,
+  "entityCounts": {
+    "wave1_analyze": 9,
+    "wave2_analyze": 29,
+    "wave3_analyze": 4
+  },
+  "stepsDetail": [
+    {
+      "name": "wave1_init",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-09T09:54:22.370Z",
+      "endTime": "2026-03-09T09:54:22.376Z",
+      "outputs": {
+        "manifestEntries": 13,
+        "existingEntities": 337
+      }
+    },
+    {
+      "name": "wave1_analyze",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-09T09:54:22.376Z",
+      "endTime": "2026-03-09T09:54:59.797Z",
+      "llmProvider": "llama-3.3-70b-versatile@groq",
+      "tokensUsed": 72470,
+      "llmCalls": 16,
+      "outputs": {
+        "totalEntities": 9,
+        "discoveredEntities": 0
+      },
+      "agentInstances": [
+        {
+          "agentId": "wave1_agent_project",
+          "agentType": "Wave1ProjectAgent",
+          "parentEntity": "Project",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:54:59.793Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "f8126363-2a8a-4377-950e-3d7c34d9566a",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2569,
+              "tokensIn": 8569,
+              "tokensOut": 501,
+              "status": "success"
+            },
+            {
+              "id": "79fad17b-551d-4389-84d9-d741d92d1c30",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2404,
+              "tokensIn": 7973,
+              "tokensOut": 526,
+              "status": "success"
+            },
+            {
+              "id": "926140da-6c99-489e-a082-645cf511789c",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2423,
+              "tokensIn": 7798,
+              "tokensOut": 537,
+              "status": "success"
+            },
+            {
+              "id": "c09b417b-d0a7-4a38-bd79-c112636b9796",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2249,
+              "tokensIn": 3321,
+              "tokensOut": 611,
+              "status": "success"
+            },
+            {
+              "id": "130ac1af-a346-46d1-b76a-6ca451e7e846",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2330,
+              "tokensIn": 8875,
+              "tokensOut": 475,
+              "status": "success"
+            },
+            {
+              "id": "006d964e-ea19-41ee-b513-888fd782ef6b",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1834,
+              "tokensIn": 2175,
+              "tokensOut": 444,
+              "status": "success"
+            },
+            {
+              "id": "feef250b-a273-4199-8eca-f2bd97b4e9a6",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2912,
+              "tokensIn": 9718,
+              "tokensOut": 617,
+              "status": "success"
+            },
+            {
+              "id": "7bf93b7d-ca56-4330-b7c1-b654104548e4",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2834,
+              "tokensIn": 9504,
+              "tokensOut": 562,
+              "status": "success"
+            },
+            {
+              "id": "2c0201b8-603b-4d71-a6e2-a208f26a336a",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2416,
+              "tokensIn": 505,
+              "tokensOut": 855,
+              "status": "success"
+            },
+            {
+              "id": "36b548ba-b2d4-49b6-9ade-f3dfdf075700",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1986,
+              "tokensIn": 536,
+              "tokensOut": 669,
+              "status": "success"
+            },
+            {
+              "id": "058ab0cf-470c-4199-8fb5-23a0098550b6",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2356,
+              "tokensIn": 525,
+              "tokensOut": 782,
+              "status": "success"
+            },
+            {
+              "id": "f969597c-110f-43b5-8093-142523154f90",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1947,
+              "tokensIn": 505,
+              "tokensOut": 746,
+              "status": "success"
+            },
+            {
+              "id": "e61765bd-1a5d-408d-b882-df3306366b6f",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2661,
+              "tokensIn": 462,
+              "tokensOut": 816,
+              "status": "success"
+            },
+            {
+              "id": "7d6bde63-ce70-4c9c-8e2f-561f67b7006b",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2037,
+              "tokensIn": 487,
+              "tokensOut": 713,
+              "status": "success"
+            },
+            {
+              "id": "41e6c55b-cdbe-4443-a3b1-0ed3c457cd94",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1851,
+              "tokensIn": 611,
+              "tokensOut": 707,
+              "status": "success"
+            },
+            {
+              "id": "0c0a8848-70ab-4ced-a806-9975f4585319",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2475,
+              "tokensIn": 554,
+              "tokensOut": 791,
+              "status": "success"
+            }
+          ],
+          "entityCount": 9,
+          "observationCount": 47
+        }
+      ],
+      "entityFlow": {
+        "produced": 9,
+        "passedQA": 9,
+        "persisted": 9
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 94
+      },
+      "llmCallEvents": [
+        {
+          "id": "3b6c76b8-fef2-4329-bde0-3729062f193f",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 2416,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "2c556829-db9b-4751-afbc-73539e8ac0fb",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 1986,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "d251c5fb-73ad-4a3f-87e3-04c215fd3376",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 2356,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "4c7bb8d8-a402-4841-a791-0adfa523a4c3",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 1947,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "97ed1a37-9634-464d-9618-6ddae52ff974",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 2661,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "3779c974-a58e-48f7-9584-137a63dd1585",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 2038,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "7931d1a3-47ce-4833-b8c7-b87cb57582dd",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 1851,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        },
+        {
+          "id": "d219f33c-4ab0-4edc-a6f6-8d64b1dbd6da",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "Wave1MultiStep",
+          "durationMs": 2475,
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "name": "wave1_classify",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:00.735Z",
+      "llmProvider": "groq",
+      "tokensUsed": 1720,
+      "llmCalls": 2,
+      "outputs": {
+        "entitiesClassified": 9
+      }
+    },
+    {
+      "name": "wave1_persist",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:01.990Z",
+      "outputs": {
+        "entitiesPersisted": 9
+      }
+    },
+    {
+      "name": "wave2_analyze",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:10.507Z",
+      "llmProvider": "llama-3.3-70b-versatile@groq",
+      "tokensUsed": 17355,
+      "llmCalls": 11,
+      "outputs": {
+        "totalEntities": 29,
+        "discoveredEntities": 0
+      },
+      "agentInstances": [
+        {
+          "agentId": "wave2_agent_LiveLoggingSystem",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "LiveLoggingSystem",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "8c1f51d9-2bdc-4d95-b90d-ba4c17d86378",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1005,
+              "tokensIn": 893,
+              "tokensOut": 284,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave2_agent_LLMAbstraction",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "LLMAbstraction",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "22622b09-bef3-4298-904b-4d6caa80d9cc",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 3352,
+              "tokensIn": 973,
+              "tokensOut": 1367,
+              "status": "success"
+            }
+          ],
+          "entityCount": 4,
+          "observationCount": 28
+        },
+        {
+          "agentId": "wave2_agent_DockerizedServices",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "DockerizedServices",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "0e19d9e7-4202-4076-91c6-fc59847b07b6",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 3422,
+              "tokensIn": 997,
+              "tokensOut": 1567,
+              "status": "success"
+            }
+          ],
+          "entityCount": 5,
+          "observationCount": 35
+        },
+        {
+          "agentId": "wave2_agent_Trajectory",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "Trajectory",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "d312bbb6-5d2a-4466-9843-2a67c1e34a36",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1016,
+              "tokensIn": 898,
+              "tokensOut": 239,
+              "status": "success"
+            },
+            {
+              "id": "ea4022fa-ae17-4a31-97c8-af0f64b31cf8",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 280,
+              "tokensIn": 215,
+              "tokensOut": 37,
+              "status": "success"
+            }
+          ],
+          "entityCount": 1,
+          "observationCount": 3
+        },
+        {
+          "agentId": "wave2_agent_KnowledgeManagement",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "KnowledgeManagement",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "4ddbf6d6-599a-4dd5-9862-cb50deb578e6",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 4068,
+              "tokensIn": 1037,
+              "tokensOut": 1937,
+              "status": "success"
+            }
+          ],
+          "entityCount": 7,
+          "observationCount": 49
+        },
+        {
+          "agentId": "wave2_agent_CodingPatterns",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "CodingPatterns",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "4734ed67-f858-443d-b931-893208f4efc0",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 957,
+              "tokensIn": 904,
+              "tokensOut": 335,
+              "status": "success"
+            },
+            {
+              "id": "5e8bdc61-eafa-4ca1-bffa-d3b2d4088879",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 391,
+              "tokensIn": 211,
+              "tokensOut": 42,
+              "status": "success"
+            },
+            {
+              "id": "82f64c75-389e-48b5-ae33-ac45ffe41b93",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 335,
+              "tokensIn": 208,
+              "tokensOut": 38,
+              "status": "success"
+            }
+          ],
+          "entityCount": 2,
+          "observationCount": 6
+        },
+        {
+          "agentId": "wave2_agent_ConstraintSystem",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "ConstraintSystem",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "38a7bcd6-b0c9-4f89-b647-3c3547cf2339",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 2295,
+              "tokensIn": 886,
+              "tokensOut": 781,
+              "status": "success"
+            }
+          ],
+          "entityCount": 2,
+          "observationCount": 14
+        },
+        {
+          "agentId": "wave2_agent_SemanticAnalysis",
+          "agentType": "Wave2ComponentAgent",
+          "parentEntity": "SemanticAnalysis",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:10.506Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "e50f2065-6401-4760-a9b5-a2bf37500426",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 4959,
+              "tokensIn": 1089,
+              "tokensOut": 2417,
+              "status": "success"
+            }
+          ],
+          "entityCount": 8,
+          "observationCount": 40
+        }
+      ],
+      "entityFlow": {
+        "produced": 29,
+        "passedQA": 29,
+        "persisted": 29
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 100
+      }
+    },
+    {
+      "name": "wave2_classify",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:12.396Z",
+      "llmProvider": "groq",
+      "tokensUsed": 4436,
+      "llmCalls": 10,
+      "outputs": {
+        "entitiesClassified": 29
+      }
+    },
+    {
+      "name": "wave2_persist",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:22.894Z",
+      "outputs": {
+        "entitiesPersisted": 29
+      }
+    },
+    {
+      "name": "wave3_analyze",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:30.603Z",
+      "llmProvider": "llama-3.3-70b-versatile@groq",
+      "tokensUsed": 34323,
+      "llmCalls": 29,
+      "outputs": {
+        "totalEntities": 4,
+        "discoveredEntities": 4
+      },
+      "agentInstances": [
+        {
+          "agentId": "wave3_agent_LLMModeManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "LLMModeManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "b7d9cac7-1185-4099-a906-b391bac15bf4",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 986,
+              "tokensIn": 1004,
+              "tokensOut": 194,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ProviderRegistry",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ProviderRegistry",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "ead43f42-6470-4d83-ae45-ef392735d302",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1252,
+              "tokensIn": 1035,
+              "tokensOut": 333,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_CacheManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "CacheManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "5976eaec-dc4c-42d0-b1ca-edd5258b4130",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1329,
+              "tokensIn": 1001,
+              "tokensOut": 283,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ConnectionManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ConnectionManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "9f4a51b9-9e46-433d-bfeb-f05a70adc1df",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 505,
+              "tokensIn": 989,
+              "tokensOut": 64,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_LLMServiceManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "LLMServiceManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "6de7f5c8-8557-4820-9a43-50d9676c7c98",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 758,
+              "tokensIn": 991,
+              "tokensOut": 190,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_APIServiceWrapper",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "APIServiceWrapper",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "937619fa-ef12-4c11-83cb-2cfa30b24657",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 908,
+              "tokensIn": 983,
+              "tokensOut": 244,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_DashboardServiceWrapper",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "DashboardServiceWrapper",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "c2e948ed-6a1e-4152-a33f-2af924a23988",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 876,
+              "tokensIn": 983,
+              "tokensOut": 227,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ProviderRegistry",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ProviderRegistry",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "e05f8707-5885-463c-bfb0-12667fd36517",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 925,
+              "tokensIn": 1037,
+              "tokensOut": 185,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ServiceStarter",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ServiceStarter",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "5661ad7c-4a68-4ecc-9e11-315ccb8ea217",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 908,
+              "tokensIn": 970,
+              "tokensOut": 195,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_SpecstoryAdapter",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "SpecstoryAdapter",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "d199e393-76fe-4787-9550-3f8312aa4b55",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 786,
+              "tokensIn": 992,
+              "tokensOut": 171,
+              "status": "success"
+            }
+          ],
+          "entityCount": 1,
+          "observationCount": 3
+        },
+        {
+          "agentId": "wave3_agent_ManualLearning",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ManualLearning",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "39e195e3-5d52-4a04-acdb-798b8dcba701",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1140,
+              "tokensIn": 970,
+              "tokensOut": 292,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_OnlineLearning",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "OnlineLearning",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "8b9b559c-9ef6-4219-8611-7241837d15f6",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 586,
+              "tokensIn": 963,
+              "tokensOut": 94,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_GraphDatabaseManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "GraphDatabaseManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "f3dfa784-d3f5-414a-9735-3f19501dec36",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 766,
+              "tokensIn": 966,
+              "tokensOut": 183,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_CodeGraphConstructor",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "CodeGraphConstructor",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "127e57bd-f47b-4063-9f56-0af1c76eb7af",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1226,
+              "tokensIn": 965,
+              "tokensOut": 322,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_OntologyClassifier",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "OntologyClassifier",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "a5acf237-7e3a-463c-b54b-6491d6152207",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1090,
+              "tokensIn": 957,
+              "tokensOut": 244,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_PersistenceModule",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "PersistenceModule",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "0302a775-e0df-4331-b916-317757b304e9",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 956,
+              "tokensIn": 959,
+              "tokensOut": 201,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_VkbApiClientWrapper",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "VkbApiClientWrapper",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "ed7ccb76-d617-4523-9546-18b0b79e3fbb",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 928,
+              "tokensIn": 963,
+              "tokensOut": 218,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ConfigManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ConfigManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "72ed195c-b0d3-4608-a696-26626ae0d74c",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 585,
+              "tokensIn": 960,
+              "tokensOut": 133,
+              "status": "success"
+            }
+          ],
+          "entityCount": 1,
+          "observationCount": 3
+        },
+        {
+          "agentId": "wave3_agent_TypeScriptCompiler",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "TypeScriptCompiler",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "8d52e634-4b02-400f-9b44-43f3dfd829cf",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 750,
+              "tokensIn": 963,
+              "tokensOut": 178,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_WorkflowLayoutManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "WorkflowLayoutManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "f297ccc4-5741-49b8-aaeb-7cecfe41235b",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1155,
+              "tokensIn": 988,
+              "tokensOut": 325,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_GraphDatabaseAdapter",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "GraphDatabaseAdapter",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "b2089483-f4c7-40e1-a043-3e712d5da038",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1435,
+              "tokensIn": 897,
+              "tokensOut": 280,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_Pipeline",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "Pipeline",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "4fe184db-436d-4f03-9149-fd3c96d6d14e",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1141,
+              "tokensIn": 897,
+              "tokensOut": 309,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_Ontology",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "Ontology",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "a1636e54-2922-48c5-943f-8669c1e4f20a",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1446,
+              "tokensIn": 903,
+              "tokensOut": 326,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_Insights",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "Insights",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "8a9c7a1a-7bca-4be0-9508-d4dcf25a5382",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1022,
+              "tokensIn": 899,
+              "tokensOut": 254,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_OntologyManager",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "OntologyManager",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "7f87881b-3d62-4cc5-9ae6-e1f9886f6335",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 854,
+              "tokensIn": 902,
+              "tokensOut": 209,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_CodeGraphConstructor",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "CodeGraphConstructor",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "defa8ac1-38d0-415d-859d-31a5eb800284",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1126,
+              "tokensIn": 977,
+              "tokensOut": 316,
+              "status": "success"
+            }
+          ],
+          "entityCount": 2,
+          "observationCount": 6
+        },
+        {
+          "agentId": "wave3_agent_SemanticAnalyzer",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "SemanticAnalyzer",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "1a4a9312-170d-40f2-b845-cb94262b4fb9",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1403,
+              "tokensIn": 895,
+              "tokensOut": 296,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_ContentValidator",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "ContentValidator",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "393d6fca-87fb-4866-ba12-6176709da64f",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 1018,
+              "tokensIn": 892,
+              "tokensOut": 173,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        },
+        {
+          "agentId": "wave3_agent_LLMService",
+          "agentType": "Wave3DetailAgent",
+          "parentEntity": "LLMService",
+          "startTime": "2026-03-09T09:54:22.332Z",
+          "endTime": "2026-03-09T09:55:30.602Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "67f79f98-9817-4c3b-9b42-f686cde67fa2",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 526,
+              "tokensIn": 898,
+              "tokensOut": 85,
+              "status": "success"
+            }
+          ],
+          "entityCount": 0,
+          "observationCount": 0
+        }
+      ],
+      "entityFlow": {
+        "produced": 4,
+        "passedQA": 4,
+        "persisted": 4
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 100
+      }
+    },
+    {
+      "name": "wave3_classify",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:31.810Z",
+      "llmProvider": "groq",
+      "tokensUsed": 2506,
+      "llmCalls": 6,
+      "outputs": {
+        "entitiesClassified": 4
+      }
+    },
+    {
+      "name": "wave3_persist",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:32.652Z",
+      "outputs": {
+        "entitiesPersisted": 4
+      }
+    },
+    {
+      "name": "operator_conv",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:32.766Z",
+      "outputs": {
+        "inputEntities": 42,
+        "outputEntities": 42,
+        "withEnrichedContext": 42,
+        "durationMs": 11
+      }
+    },
+    {
+      "name": "operator_aggr",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:32.869Z",
+      "outputs": {
+        "inputEntities": 42,
+        "core": 42,
+        "nonCore": 0,
+        "durationMs": 0
+      }
+    },
+    {
+      "name": "operator_embed",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:44.902Z",
+      "outputs": {
+        "inputEntities": 42,
+        "embeddingsBefore": 0,
+        "embeddingsAfter": 42,
+        "newEmbeddings": 42,
+        "durationMs": 11929
+      }
+    },
+    {
+      "name": "operator_dedup",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:45.011Z",
+      "outputs": {
+        "inputEntities": 42,
+        "outputEntities": 42,
+        "merged": 0,
+        "durationMs": 6
+      }
+    },
+    {
+      "name": "operator_pred",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:45.120Z",
+      "outputs": {
+        "inputEntities": 42,
+        "relationsBefore": 41,
+        "predictedEdges": 13,
+        "durationMs": 4
+      }
+    },
+    {
+      "name": "operator_merge",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:55:45.508Z",
+      "outputs": {
+        "inputEntities": 40,
+        "inputRelations": 54,
+        "outputEntities": 40,
+        "outputRelations": 54,
+        "added": {
+          "entities": 40,
+          "relations": 54
+        },
+        "updated": {
+          "entities": 2,
+          "relations": 0
+        },
+        "durationMs": 2
+      }
+    },
+    {
+      "name": "wave4_insights",
+      "status": "completed",
+      "wave": 4,
+      "startTime": "2026-03-09T09:54:59.797Z",
+      "endTime": "2026-03-09T09:57:42.907Z",
+      "llmProvider": "groq",
+      "tokensUsed": 157854,
+      "llmCalls": 42,
+      "outputs": {
+        "generated": 42,
+        "failed": 0,
+        "skippedDiagrams": 42
+      }
+    }
+  ]
+}

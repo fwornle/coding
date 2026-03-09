@@ -2,98 +2,103 @@
 
 **Type:** Detail
 
-The SpecstoryConnector sub-component's ability to attempt connections on multiple ports implies the presence of a loop or recursive function call in the ConnectionEstablisher implementation.
+The lack of explicit source files suggests that ConnectionEstablisher's implementation details, such as the specific retry policy, would need to be inferred from the parent component's analysis.
 
 ## What It Is  
 
-**ConnectionEstablisher** is the core sub‑component that lives inside **SpecstoryConnector**.  Although the concrete file path is not disclosed in the observations, the naming and its placement within the *SpecstoryConnector* hierarchy make it clear that this class (or module) is responsible for the low‑level mechanics of opening a link to the Specstory extension.  The surrounding context tells us that the connector ultimately calls `connectViaHTTP` on **SpecstoryAdapter**, so **ConnectionEstablisher** must prepare the necessary parameters—most notably the target host and a set of candidate ports—before delegating the actual HTTP handshake to the adapter.  
+**ConnectionEstablisher** is the logical unit that actually opens a communication channel on behalf of the **ConnectionManager**.  In the current code base there are no concrete source‑file references for the class (the “Code Structure” report shows *0 code symbols found*), so the exact file path cannot be listed.  What is clear from the observations is that the *ConnectionEstablisher* lives inside the **ConnectionManager** package/module and is invoked whenever the manager needs to create a new link to the Specstory extension.  Its responsibility is limited to the low‑level act of establishing the socket/HTTP/IPC connection, while higher‑level concerns such as orchestration and lifecycle are handled by the parent component.
 
-The design goal, explicitly called out in the observations, is **extensibility**: the establisher should be able to accommodate new transport protocols without requiring a rewrite of the surrounding connector logic.  At the same time, it must support trying several ports in succession, a behavior that is hinted at by the “multiple ports” capability of **SpecstoryConnector**.  In practice, **ConnectionEstablisher** therefore acts as a thin orchestration layer that iterates over possible endpoints, selects an appropriate protocol handler, and invokes the corresponding adapter method (currently `connectViaHTTP`).  
-
-Because no source files are listed, the exact location of the implementation cannot be quoted verbatim, but the logical placement is within the same package or directory that houses **SpecstoryConnector** and **SpecstoryAdapter**, preserving a tight coupling among these three entities.
+The entity is therefore a **detail‑level** component whose public contract is consumed only by its parent.  No sibling or child components are mentioned, so its scope is narrowly focused on the connection‑setup phase.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **layered, protocol‑agnostic architecture**.  At the top sits **SpecstoryConnector**, which owns a **ConnectionEstablisher** instance.  Below that, protocol‑specific adapters such as **SpecstoryAdapter** expose concrete connection primitives (e.g., `connectViaHTTP`).  This separation mirrors a **Strategy pattern**: the establisher selects a “connection strategy” (currently HTTP) at runtime and hands off the work to the appropriate adapter.  While the term “Strategy” is not explicitly used in the source, the behavior—choosing a method based on protocol capability—matches the pattern’s intent.  
+The observations reveal two architectural decisions that shape the design of **ConnectionEstablisher**:
 
-The multi‑port probing requirement implies a **loop‑or‑recursive control flow** inside **ConnectionEstablisher**.  The component likely iterates over a list of candidate ports, invoking the selected protocol strategy for each until a successful handshake occurs or the list is exhausted.  This loop is a simple, deterministic algorithm that keeps the establisher’s responsibilities focused on *when* to try a connection rather than *how* to perform the low‑level socket work.  
+1. **Adapter‑based decoupling** – The *ConnectionManager* “uses the **SpecstoryAdapter** to establish connections,” which tells us that the actual protocol‑specific work (e.g., building a WebSocket, invoking a REST client, etc.) is delegated to an adapter implementation.  This is a classic **Adapter pattern**: the *ConnectionEstablisher* calls a generic interface exposed by **SpecstoryAdapter**, allowing the underlying transport to be swapped without touching the establisher’s code.
 
-Because the only observed protocol is HTTP, the current implementation probably hard‑codes a call to `SpecstoryAdapter.connectViaHTTP`.  However, the design decision to keep the establisher protocol‑agnostic suggests that future extensions (e.g., WebSocket, gRPC, or custom binary protocols) can be added by introducing new adapter methods and registering them with the establisher’s strategy map.  No other architectural styles—such as micro‑services, event‑driven messaging, or dependency injection containers—are mentioned, so the analysis stays within the observed scope.
+2. **Retry handling for transient failures** – The second observation speculates that the establisher “would utilize a retry mechanism to handle transient connection errors.”  While the concrete policy is not enumerated, the presence of a retry loop indicates an intentional **Resilience** design.  In practice this often manifests as a **Retry/Back‑off strategy** (e.g., fixed‑interval or exponential back‑off) wrapped around the adapter call.  Because the retry logic is inferred rather than explicit, it is likely encapsulated inside the *ConnectionEstablisher* itself rather than being exposed to the parent.
+
+These two decisions together produce a thin, purpose‑built component that isolates *how* a connection is made (via the adapter) from *when* it should be retried (via an internal policy).  The design keeps the **ConnectionManager** free of protocol details and error‑handling intricacies, which improves testability and future extensibility.
 
 ---
 
 ## Implementation Details  
 
-The **ConnectionEstablisher** implementation can be inferred to contain three logical parts:
+Even though the source files are not listed, the observations allow us to reconstruct the probable internal structure:
 
-1. **Port Enumeration** – A collection (array, list, or configuration‑driven set) of integer ports that the Specstory extension might be listening on.  The observations that *SpecstoryConnector* “attempts connections on multiple ports” point to a loop such as `for (int port : candidatePorts) { … }`.  This loop lives inside **ConnectionEstablisher**, ensuring the connector does not need to duplicate the iteration logic.
+* **Primary class / function** – *ConnectionEstablisher* likely exposes a single public method such as `establish()` or `connect()`.  This method receives the necessary connection parameters (endpoint URL, authentication tokens, etc.) from the **ConnectionManager**.
 
-2. **Protocol Selection** – Although only HTTP is currently used, the establisher likely holds a mapping from protocol identifiers to adapter method references.  The decision point would look like `if (protocol == HTTP) { adapter.connectViaHTTP(host, port); }`.  The presence of a *flexible connection establishment approach* signals that this mapping is designed for easy extension.
+* **Adapter invocation** – Inside the method, the establisher obtains a reference to **SpecstoryAdapter** (either via constructor injection, a service locator, or a factory).  The call would look conceptually like `adapter.openConnection(params)`.  Because the adapter abstracts the concrete transport, the establisher does not need to know whether the underlying channel is a WebSocket, a gRPC stream, or a simple HTTP request.
 
-3. **Result Handling** – After each `connectViaHTTP` invocation, the establisher must interpret the outcome (success, timeout, error).  On success it returns a live connection object or a success flag to **SpecstoryConnector**; on failure it proceeds to the next port.  The loop terminates early on success, which is a typical “first‑successful‑connection” strategy.
+* **Retry loop** – Around the adapter call, a retry construct is expected.  A typical implementation might:
+  1. Define a maximum retry count and a delay strategy (e.g., `maxAttempts = 3`, `delay = 200ms`).
+  2. Execute the adapter call inside a `try/catch`.
+  3. On a transient exception (network timeout, connection refused), wait for the computed delay and retry.
+  4. Propagate a non‑recoverable error after exhausting attempts.
 
-Because no concrete code symbols were discovered, the exact class name (e.g., `class ConnectionEstablisher`) and method signatures are not listed, but the above responsibilities are directly derived from the three observations.  The implementation is deliberately lightweight: it does not embed any HTTP logic itself, delegating that to **SpecstoryAdapter**’s `connectViaHTTP` method, thereby respecting the *single‑responsibility principle*.
+* **Result handling** – On success, the establisher returns a connection handle or a wrapper object to the **ConnectionManager**.  On failure, it throws a domain‑specific exception that the manager can translate into a higher‑level error state.
+
+Because no concrete symbols are present, the above description is derived entirely from the observed relationships (parent‑child, adapter usage) and the inferred retry requirement.
 
 ---
 
 ## Integration Points  
 
-**ConnectionEstablisher** sits at the intersection of three entities:
+**ConnectionEstablisher** sits at the intersection of three system concerns:
 
-* **Parent – SpecstoryConnector**: The connector creates or owns an instance of the establisher and passes configuration data (host, list of ports, desired protocol).  It relies on the establisher to report back whether a viable connection was found.  
+1. **Parent – ConnectionManager** – The manager creates an instance of the establisher (or calls a static helper) whenever a new Specstory link is required.  The manager passes configuration data and expects a ready‑to‑use connection object in return.  This tight coupling is intentional: the manager owns the lifecycle of the connection and therefore dictates when the establisher is invoked.
 
-* **Sibling – SpecstoryAdapter** (and any future adapters): The establisher calls `SpecstoryAdapter.connectViaHTTP`.  This is the only observed external interface, so the establisher’s contract with the adapter is a simple method call that takes a host and port and returns a connection result.  Adding a new protocol would require a sibling adapter exposing a method with a comparable signature.  
+2. **Adapter – SpecstoryAdapter** – The establisher depends on the adapter’s public contract (e.g., `openConnection`, `closeConnection`).  Any change to the adapter interface would directly affect the establisher, but because the adapter is a separate component, the establisher does not need to be rewritten for a new transport implementation; only the adapter implementation would change.
 
-* **Children – None observed**: The current design does not indicate that **ConnectionEstablisher** has its own sub‑components.  If future protocols demand richer handling (e.g., TLS handshakes), new internal helper classes could be introduced without breaking the existing parent–sibling contracts.
+3. **Error‑handling utilities** – If a dedicated retry library or utility class exists in the code base (e.g., `RetryPolicy`, `BackoffStrategy`), the establisher would import and configure it.  This external dependency is the only other integration point besides the adapter.
 
-The dependency direction is clear: **SpecstoryConnector → ConnectionEstablisher → SpecstoryAdapter**.  This linear flow keeps the system loosely coupled; changes in the adapter’s internals (e.g., switching from a raw `HttpURLConnection` to an async client) do not affect the establisher as long as the method signature remains stable.
+No sibling components are mentioned, so the establisher does not appear to be part of a larger family of “establisher” classes.  Its sole consumer is the **ConnectionManager**, and its sole provider is the **SpecstoryAdapter**.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Do not embed protocol logic in the establisher** – Keep the establisher’s role limited to iterating over ports and selecting the appropriate adapter method.  All transport‑specific details must remain inside the adapter (e.g., `connectViaHTTP`).  
+* **Instantiate through ConnectionManager** – Developers should never create a *ConnectionEstablisher* directly.  The manager encapsulates required configuration and ensures the correct adapter instance is supplied.  Use the manager’s public API (e.g., `manager.connectToSpecstory()`) which internally delegates to the establisher.
 
-2. **Configure the port list centrally** – Because the multi‑port loop lives inside **ConnectionEstablisher**, any change to the set of ports should be made in the configuration supplied by **SpecstoryConnector** rather than hard‑coding values inside the establisher.  
+* **Do not bypass the retry logic** – The built‑in retry mechanism is the primary safeguard against transient network glitches.  If a caller needs to enforce a custom retry policy, it should be done by configuring the manager (if it exposes such options) rather than by calling the establisher’s low‑level method.
 
-3. **Register new protocols through a strategy map** – When extending the system, add a new entry that maps a protocol identifier to a method on a new adapter (e.g., `connectViaWebSocket`).  Do not modify the looping logic; the establisher will automatically pick up the new strategy.  
+* **Treat the returned connection as opaque** – The object returned by the establisher is intended for consumption by the **ConnectionManager** only.  External code should interact with the connection through the manager’s higher‑level methods (e.g., `sendMessage`, `close`) to avoid breaking encapsulation.
 
-4. **Handle failure gracefully** – The establisher should return a clear status (success flag, exception, or nullable connection object) to the parent.  The parent can then decide whether to retry, log, or abort.  Avoid swallowing exceptions inside the loop; surface them to aid debugging.  
+* **Handle exceptions at the manager level** – Since the establisher translates low‑level transport errors into domain exceptions, the manager should be the place where those exceptions are caught and transformed into user‑visible error messages or retry‑fallback actions.
 
-5. **Keep the public API stable** – Since **SpecstoryConnector** depends on the establisher’s contract, any change to method signatures (e.g., adding extra parameters) must be coordinated across both components to prevent breakage.
+* **Testing** – Unit tests for the establisher should mock the **SpecstoryAdapter** and verify that the retry loop behaves correctly (e.g., retries the expected number of times, respects back‑off delays).  Because the establisher is a detail component, its tests can remain isolated from the rest of the system.
 
 ---
 
-### Architectural patterns identified  
+### Summary Deliverables  
 
-* **Strategy (protocol‑selection)** – The establisher chooses a connection method based on the desired protocol.  
-* **Template Method / Loop** – A fixed iteration over candidate ports, delegating the variable part (the actual connection) to the adapter.  
+**1. Architectural patterns identified**  
+* Adapter pattern – decoupling via **SpecstoryAdapter**.  
+* Retry/Back‑off (Resilience) pattern – inferred retry mechanism for transient errors.
 
-### Design decisions and trade‑offs  
+**2. Design decisions and trade‑offs**  
+* **Decoupling**: By delegating transport work to an adapter, the establisher remains agnostic of protocol changes, at the cost of an extra indirection layer.  
+* **Embedded retry logic**: Placing retries inside the establisher simplifies the manager’s code but couples error‑handling policy to this detail component; changing the policy requires modifying the establisher.  
 
-* **Protocol agnosticism vs. current simplicity** – By abstracting the protocol, the system is future‑proof but introduces an indirection layer that adds a tiny runtime overhead.  
-* **Port‑scanning loop inside the establisher** – Centralising the retry logic simplifies the parent component but couples the establisher to the notion of “multiple ports,” which may be unnecessary for single‑port protocols.  
+**3. System structure insights**  
+* *ConnectionEstablisher* is a leaf/detail component owned exclusively by **ConnectionManager**.  
+* It has a single outward dependency (**SpecstoryAdapter**) and no siblings, indicating a linear, hierarchical relationship rather than a network of peers.  
 
-### System structure insights  
+**4. Scalability considerations**  
+* Because the establisher is invoked per‑connection, its performance characteristics (e.g., retry delay, adapter latency) directly affect the throughput of **ConnectionManager**.  Scaling to many concurrent connections would require the establisher to be thread‑safe or to use async primitives, but no evidence of such mechanisms is present in the observations.  
+* The adapter abstraction makes it possible to swap in a higher‑performance transport without touching the establisher, supporting scalability upgrades at the adapter layer.  
 
-The system follows a **vertical slice** organization: the high‑level connector, the middle‑level establisher, and the low‑level adapter each own a distinct responsibility, enabling clear ownership and easier testing of each slice in isolation.
-
-### Scalability considerations  
-
-* Adding more ports or protocols scales linearly; the loop will simply iterate over a larger list, and new adapters can be plugged in without touching existing code.  
-* If the number of ports grows dramatically, the sequential loop could become a bottleneck; a future optimization might be to parallelise connection attempts, but that would require redesigning the establisher’s control flow.  
-
-### Maintainability assessment  
-
-The current separation of concerns yields high maintainability: changes to HTTP handling stay within **SpecstoryAdapter**, while changes to port‑selection logic stay within **ConnectionEstablisher**.  The lack of hard‑coded protocol logic inside the establisher further reduces the risk of regression when new protocols are added.  The main maintenance risk is the implicit contract between the establisher and the adapter; documenting the expected method signatures and return types is essential to keep the two components in sync.
+**5. Maintainability assessment**  
+* The clear separation of concerns (adapter vs. retry logic) aids maintainability; changes to the transport protocol are isolated to **SpecstoryAdapter**.  
+* However, the lack of explicit source files and the inferred nature of the retry policy mean that documentation and tests become critical to avoid hidden coupling.  Maintaining a well‑defined interface for the adapter and exposing configuration hooks for the retry behavior would improve long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the connectViaHTTP method in SpecstoryAdapter to attempt connections to the Specstory extension on multiple ports, demonstrating a flexible connection establishment approach.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter to establish connections with the Specstory extension.
 
 
 ---

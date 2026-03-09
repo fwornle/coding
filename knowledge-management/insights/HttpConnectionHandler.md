@@ -2,74 +2,89 @@
 
 **Type:** Detail
 
-The retry-with-backoff pattern is a notable architectural decision in the ConnectionManager, allowing it to handle transient connection errors.
+The HTTPConnectionHandler is expected to handle HTTP connections, including implementing the retry-with-backoff pattern, although the exact implementation details are not visible in the provided context.
 
 ## What It Is  
 
-`HTTPConnectionHandler` lives inside the **ConnectionManager** hierarchy and is the concrete component that carries out HTTP‑based communication with the Specstory extension. The only concrete code reference we have is the `connectViaHTTP` method found in **`lib/integrations/specstory-adapter.js`**. This method is the entry point where `HTTPConnectionHandler` is exercised: the ConnectionManager delegates to it when it needs to establish a connection to the external Specstory service. In practice, `HTTPConnectionHandler` is the low‑level wrapper around the raw HTTP request/response cycle, while the surrounding `ConnectionManager` adds higher‑level concerns such as retry logic and lifecycle management.
+`HTTPConnectionHandler` is the component that owns the low‑level logic for establishing and maintaining HTTP‑based communication with the **Specstory** extension. Although the source file for the handler itself is not listed in the observations, its role is inferred from the surrounding architecture: the `ConnectionManager` delegates the actual HTTP handshake to `HTTPConnectionHandler` through a method named **`connectViaHTTP`**. The concrete implementation of the retry‑with‑backoff strategy that powers this handshake lives in **`lib/integrations/specstory-adapter.js`**, where `ConnectionManager` invokes the same pattern. In practice, `HTTPConnectionHandler` is the child of `ConnectionManager` and the gateway through which all HTTP traffic to the Specstory service flows.
 
 ## Architecture and Design  
 
-The primary architectural decision highlighted by the observations is the **retry‑with‑backoff** pattern. This pattern is implemented inside `connectViaHTTP` (in `lib/integrations/specstory-adapter.js`) and is explicitly called out as a notable decision in the `ConnectionManager`. By placing the back‑off logic at the `ConnectionManager` level, the design cleanly separates *connection reliability* (handled by the manager) from *raw HTTP transport* (handled by `HTTPConnectionHandler`).  
+The design that emerges from the observations is a **layered, responsibility‑segregated architecture**. The top‑level `ConnectionManager` orchestrates connection lifecycles, while the `HTTPConnectionHandler` encapsulates the protocol‑specific details. This separation follows the **Facade pattern**: `ConnectionManager` presents a simple, high‑level API (e.g., “connect to Specstory”) and hides the complexity of retries, back‑off timing, and HTTP request construction inside the handler.
 
-The relationship can be described as a **composition**: `ConnectionManager` **contains** an instance of `HTTPConnectionHandler`. The manager invokes the handler’s `connectViaHTTP` method, wraps it in a retry loop, and only propagates a successful connection upward. This separation adheres to the **Single Responsibility Principle**—the handler focuses solely on issuing HTTP calls, while the manager focuses on resiliency and orchestration. No other design patterns (e.g., micro‑services, event‑driven) are mentioned, so the architecture remains straightforward and synchronous.
+The only explicit design pattern mentioned is the **retry‑with‑backoff** algorithm, implemented in `lib/integrations/specstory-adapter.js`. Because `HTTPConnectionHandler` is expected to “implement the retry‑with‑backoff pattern,” the same algorithm is likely reused or delegated to that module, reinforcing **code reuse** and **single‑source‑of‑truth** for resilience logic. Interaction proceeds as follows:
+
+1. `ConnectionManager` receives a request to open a Specstory connection.  
+2. It calls `HTTPConnectionHandler.connectViaHTTP()`.  
+3. Inside `connectViaHTTP`, the handler either directly contains the back‑off loop or forwards to the helper in `specstory-adapter.js`.  
+4. On success, the handler returns an active HTTP client or socket to the manager; on failure, the manager can decide to abort or propagate the error.
+
+This flow demonstrates **dependency inversion**: higher‑level components depend on an abstract handler interface rather than a concrete HTTP client, allowing the underlying implementation to evolve without affecting the manager.
 
 ## Implementation Details  
 
-- **`lib/integrations/specstory-adapter.js` → `connectViaHTTP`**: This function is the concrete implementation that performs the HTTP request to the Specstory extension. The source observation tells us it incorporates a **retry‑with‑backoff** algorithm, meaning it likely tracks attempt count, calculates an increasing delay (exponential or linear), and re‑issues the request until a success threshold or a maximum retry limit is reached.  
+While the exact source of `HTTPConnectionHandler` is not listed, the observations give us three concrete anchors:
 
-- **`ConnectionManager`**: The manager owns an `HTTPConnectionHandler` instance. Its responsibility is to invoke `connectViaHTTP` and to apply the retry policy. The observation that “the ConnectionManager uses this pattern to ensure reliable connections” indicates that the manager does not duplicate the back‑off logic; instead, it orchestrates the calls and possibly logs failures, updates metrics, or surfaces a final error if retries are exhausted.  
+* **File path** – the retry logic resides in **`lib/integrations/specstory-adapter.js`**.  
+* **Method name** – `connectViaHTTP` is the entry point used by `ConnectionManager`.  
+* **Pattern** – a **retry‑with‑backoff** loop is applied when attempting the HTTP handshake.
 
-- **`HTTPConnectionHandler`** (implicit): While no source file directly names this class, the hierarchical note (“ConnectionManager contains HTTPConnectionHandler”) tells us the handler is a dedicated class or module whose public API includes the `connectViaHTTP` method. Its implementation is likely thin: constructing request headers, handling response parsing, and returning a promise or callback result to the manager.
+From these clues we can infer the handler’s internal structure:
 
-Because the observations do not provide additional code symbols, we cannot enumerate private helpers, configuration objects, or specific error‑type handling, but the presence of a retry‑with‑backoff loop strongly suggests the use of timers (`setTimeout`/`sleep`) and error classification to decide when to retry.
+1. **Constructor / Dependency Injection** – The handler likely receives configuration (base URL, timeout values, authentication tokens) from `ConnectionManager`. This keeps the handler stateless with respect to environment specifics.  
+2. **`connectViaHTTP`** – This method wraps the actual HTTP request (e.g., a `GET /health` or a WebSocket upgrade) inside a retry loop. The back‑off algorithm probably starts with a small delay (e.g., 100 ms) and exponentially increases it up to a ceiling, respecting a maximum retry count.  
+3. **Error Classification** – To decide whether a retry is appropriate, the handler must distinguish transient network errors (timeouts, 5xx responses) from permanent failures (4xx client errors). The shared implementation in `specstory-adapter.js` likely provides utility functions for this classification.  
+4. **Success Path** – On a successful HTTP response, the handler returns a ready‑to‑use connection object (such as an `axios` instance, `node-fetch` response, or a raw `http.ClientRequest`). This object is then handed back to `ConnectionManager` for further orchestration (e.g., subscribing to events, sending commands).  
+
+Because the retry logic is centralized in `specstory-adapter.js`, any change to back‑off timing, jitter, or maximum attempts propagates automatically to `HTTPConnectionHandler`, ensuring consistent resilience across the integration.
 
 ## Integration Points  
 
-`HTTPConnectionHandler` integrates with two primary system boundaries:
+`HTTPConnectionHandler` sits at the intersection of three system zones:
 
-1. **External Specstory Extension** – The handler’s `connectViaHTTP` method issues network calls to the Specstory service. All request details (URL, authentication, payload) are defined within `specstory-adapter.js`. This external dependency is the reason the retry‑with‑backoff pattern is required: network latency, transient outages, or rate‑limiting can cause occasional failures.
+* **Parent – `ConnectionManager`**: The manager calls `connectViaHTTP` and consumes the resulting connection. It also decides when to re‑invoke the handler (e.g., after a disconnection) and may expose higher‑level events (connected, disconnected, error) to the rest of the application.  
+* **Sibling – Other Handlers**: If the system supports additional transport mechanisms (e.g., a WebSocket handler or a gRPC handler), they would share the same retry‑with‑backoff utility from `specstory-adapter.js`. This promotes a uniform error‑handling strategy across all communication channels.  
+* **Child – `specstory-adapter.js`**: The adapter provides the concrete back‑off implementation. `HTTPConnectionHandler` either imports a function like `retryWithBackoff(fn, options)` or extends a base class defined there. This tight coupling means that any change in the adapter’s API directly affects the handler’s import statements and call signatures.  
 
-2. **Internal ConnectionManager** – The manager treats `HTTPConnectionHandler` as a child component. It calls `connectViaHTTP`, captures its result, and decides whether to retry. This integration is synchronous from the manager’s perspective: the manager does not expose the retry logic to other parts of the codebase, thereby encapsulating resilience.
-
-No other siblings or parent components are identified in the observations, so we limit the integration discussion to these two direct relationships.
+External dependencies are limited to standard Node.js HTTP libraries (or a higher‑level wrapper) and the `specstory-adapter` utilities. No database, message queue, or UI layer is mentioned, reinforcing that `HTTPConnectionHandler` is a pure networking module.
 
 ## Usage Guidelines  
 
-- **Invoke Through the Manager** – Developers should never call `connectViaHTTP` directly. Instead, they should request a connection via the `ConnectionManager` API, which guarantees that the retry‑with‑backoff policy is applied. This preserves the intended reliability guarantees.
-
-- **Do Not Alter Back‑off Logic** – The back‑off strategy is a deliberate design decision to handle transient errors. Changing the delay algorithm or the maximum retry count without a thorough impact analysis could either mask persistent failures or cause excessive load on the Specstory service.
-
-- **Handle Final Failure Gracefully** – After the manager exhausts its retry attempts, it will surface an error. Callers must be prepared to catch this error and decide on fallback behavior (e.g., user notification, degraded mode).  
-
-- **Keep HTTP Handler Stateless** – Since `HTTPConnectionHandler` is a thin wrapper, it should avoid maintaining mutable state across calls. Statelessness ensures that retries are safe and that concurrent connection attempts do not interfere with each other.
-
-- **Log and Monitor** – Although not explicitly mentioned, the pattern’s presence implies that logging each retry attempt is valuable for observability. Developers extending the manager should continue to emit metrics (attempt count, latency, success/failure) to aid in operational monitoring.
+1. **Never bypass the handler** – All code that needs to talk to Specstory should request a connection through `ConnectionManager`. Directly constructing HTTP requests against the Specstory endpoint circumvents the retry‑with‑backoff logic and can lead to flaky behavior.  
+2. **Respect the back‑off limits** – The handler’s retry policy is deliberately tuned to avoid overwhelming the Specstory service. Callers should avoid aggressive polling or rapid reconnection attempts; instead, rely on the handler’s built‑in delay.  
+3. **Handle propagated errors** – `connectViaHTTP` will eventually throw an error after the maximum retry count is exhausted. Consumers must catch this error, log it, and decide whether to abort the operation or trigger a fallback path.  
+4. **Do not modify `specstory-adapter.js` locally** – Since the adapter is the single source of the back‑off algorithm, any custom tweaks should be made through configuration parameters passed to `HTTPConnectionHandler` (e.g., `maxRetries`, `initialDelay`). This keeps the retry behavior predictable across the codebase.  
+5. **Unit‑test with mocks** – When testing components that depend on `HTTPConnectionHandler`, replace the handler with a mock that mimics the success/failure contract of `connectViaHTTP`. This isolates tests from real network calls and from the timing nuances of exponential back‑off.
 
 ---
 
-### Architectural Patterns Identified  
-1. **Retry‑with‑Backoff** – Implemented in `connectViaHTTP` and orchestrated by `ConnectionManager`.  
-2. **Composition** – `ConnectionManager` contains `HTTPConnectionHandler`, separating concerns.  
+### Architectural patterns identified
+* **Facade** – `ConnectionManager` hides the HTTP details behind `HTTPConnectionHandler`.
+* **Retry‑with‑Backoff** – Centralized in `lib/integrations/specstory-adapter.js` and reused by the handler.
+* **Dependency Inversion** – Higher‑level manager depends on an abstract handler interface rather than a concrete HTTP client.
 
-### Design Decisions and Trade‑offs  
-- **Reliability vs. Latency** – Introducing retries improves resilience to transient failures but adds latency for each retry cycle. The back‑off delay mitigates overload on the external service but can increase overall connection time.  
-- **Encapsulation of Retry Logic** – Placing the back‑off in the manager keeps the HTTP handler simple but couples the manager tightly to the retry policy, making it the single point of change for resilience behavior.  
+### Design decisions and trade‑offs
+* **Centralizing retry logic** improves consistency and reduces duplication but creates a hard dependency on the adapter module.
+* **Separating protocol handling** (HTTP) from connection orchestration (manager) enhances testability and future extensibility (e.g., adding a WebSocket handler) at the cost of an extra indirection layer.
+* **Exponential back‑off** protects the remote Specstory service but adds latency to initial connection attempts; the trade‑off favors reliability over immediacy.
 
-### System Structure Insights  
-- The system follows a layered approach: the low‑level `HTTPConnectionHandler` performs raw HTTP work, while the higher‑level `ConnectionManager` adds robustness. This clear layering aids readability and testing.  
+### System structure insights
+* The system is organized as a thin orchestration layer (`ConnectionManager`) over a set of transport‑specific handlers (`HTTPConnectionHandler` and potential siblings).  
+* Shared utilities live under `lib/integrations/`, indicating a modular “integration” package that houses resilience patterns.
 
-### Scalability Considerations  
-- Because retries are performed client‑side, scaling the number of concurrent connection attempts could amplify load on the Specstory extension. The back‑off algorithm helps throttle retries, but in a high‑traffic scenario the manager may need configurable limits (max concurrent connections, max retries) to prevent cascading failures.  
+### Scalability considerations
+* Because the retry logic is pure in‑process, scaling out (e.g., running multiple Node.js instances) does not affect its behavior; each instance independently respects back‑off timings.  
+* If the number of concurrent Specstory connections grows, the handler must ensure that simultaneous retries do not collectively exceed the service’s rate limits—this could be mitigated by adding a global rate‑limiter in the adapter.
 
-### Maintainability Assessment  
-- The separation of concerns yields good maintainability: changes to HTTP request details stay within `specstory-adapter.js`, while adjustments to retry policy stay within `ConnectionManager`. The lack of additional code symbols suggests a small, focused codebase, which is easier to test and evolve. However, any future expansion (e.g., supporting additional transport protocols) should preserve this separation to avoid entangling retry logic with transport specifics.
+### Maintainability assessment
+* **High maintainability** – The clear separation of concerns and single location for retry logic make future changes straightforward.  
+* **Potential fragility** – Tight coupling to `specstory-adapter.js` means that API changes in that file require coordinated updates in the handler. Proper versioning and comprehensive integration tests are essential to mitigate this risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses a retry-with-backoff pattern in connectViaHTTP method in lib/integrations/specstory-adapter.js to handle connection failures.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses a retry-with-backoff pattern in connectViaHTTP to establish a connection to the Specstory extension, as implemented in lib/integrations/specstory-adapter.js.
 
 
 ---
