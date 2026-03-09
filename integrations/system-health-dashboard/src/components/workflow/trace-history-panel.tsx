@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+
+const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
+const TRACE_API = `http://localhost:${API_PORT}/api/trace-history`
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -189,7 +192,7 @@ export default function TraceHistoryPanel() {
     setLoading(true)
     setError(null)
 
-    fetch('/api/trace-history')
+    fetch(TRACE_API)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
@@ -258,8 +261,8 @@ export default function TraceHistoryPanel() {
 
     try {
       const [resA, resB] = await Promise.all([
-        fetch(`/api/trace-history?file=${encodeURIComponent(filenames[0])}`),
-        fetch(`/api/trace-history?file=${encodeURIComponent(filenames[1])}`),
+        fetch(`${TRACE_API}?file=${encodeURIComponent(filenames[0])}`),
+        fetch(`${TRACE_API}?file=${encodeURIComponent(filenames[1])}`),
       ])
 
       if (!resA.ok || !resB.ok) throw new Error('Failed to fetch trace details')
