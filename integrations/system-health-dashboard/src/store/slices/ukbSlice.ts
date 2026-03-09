@@ -141,6 +141,19 @@ export interface TraceQAResult {
   retried?: boolean
 }
 
+// Code Graph RAG query trace (Phase 13 - mirrors backend TraceCGRQuery)
+export interface TraceCGRQuery {
+  id: string
+  queryType: 'component_entities' | 'entity_details' | 'call_graph' | 'index_refresh'
+  entityName: string
+  cypherQuery?: string
+  resultCount: number
+  durationMs: number
+  cacheHit: boolean
+  status: 'success' | 'failed' | 'timeout'
+  error?: string
+}
+
 // Wave group for grouping steps by wave number
 export interface WaveGroup {
   waveNumber: number
@@ -171,6 +184,7 @@ export interface StepInfo {
   entityFlow?: TraceEntityFlow
   qaResult?: TraceQAResult
   llmCallEvents?: TraceLLMCall[]
+  cgrQueryEvents?: TraceCGRQuery[]  // Phase 13: Code Graph RAG query events
 }
 
 // Active workflow process

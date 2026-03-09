@@ -2476,6 +2476,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       entityFlow: s.entityFlow,
                       qaResult: s.qaResult,
                       llmCallEvents: s.llmCallEvents,
+                      cgrQueryEvents: s.cgrQueryEvents,
                     })
                   }
                 }
