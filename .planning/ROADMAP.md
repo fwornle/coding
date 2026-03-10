@@ -69,7 +69,10 @@ Five phases that replace the ad-hoc workflow state management with a typed state
   3. RunConfig (singleStepMode, mockLLM, llmMode, stepIntoSubsteps) is a readonly type set once at workflow start; RunProgress is a separate mutable type tracking current position
   4. Step and substep status values are derived from the state machine position via a pure function -- no separate mutable status fields exist
   5. Zod schemas exist for WorkflowState and can parse/reject JSON at runtime (e.g., reading progress file, receiving SSE event)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 15-01-PLAN.md -- Core Zod schemas: WorkflowState discriminated union, RunConfig/RunProgress separation, migration preprocess
+- [ ] 15-02-PLAN.md -- Typed transitions, step status derivation, file-copy build script
 
 #### Phase 16: Backend State Machine
 **Goal**: The wave-controller and health API operate through typed state transitions instead of ad-hoc progress updates
@@ -120,7 +123,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. Type Definitions | v3.0 | 0/? | Not started | - |
+| 15. Type Definitions | v3.0 | 0/2 | Planning complete | - |
 | 16. Backend State Machine | v3.0 | 0/? | Not started | - |
 | 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
