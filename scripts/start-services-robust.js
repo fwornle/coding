@@ -1166,6 +1166,16 @@ async function cleanupDanglingProcesses() {
       console.log(`   ⚠️  PSM cleanup warning: ${error.message}`);
     }
 
+    // Clear any stale stop markers — a new session start means the user wants services running
+    try {
+      const cleared = await psm.clearProjectStop(TARGET_PROJECT_PATH);
+      if (cleared) {
+        process.stderr.write(`   ✅ Cleared stale stop marker for ${path.basename(TARGET_PROJECT_PATH)}\n`);
+      }
+    } catch (error) {
+      process.stderr.write(`   ⚠️  Stop marker cleanup warning: ${error.message}\n`);
+    }
+
     // Check if a transcript monitor is already running for THIS project
     // If so, we'll reuse it during startup (no need to kill it)
     const isRunningPerProject = await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH });

@@ -3034,7 +3034,7 @@ async function main() {
         './timezone-utils.js',
         './classification-logger.js'
       ],
-      cleanupFn: () => monitor.stop(),
+      cleanupFn: () => monitor.stop({ setStopMarker: false }),
       logger: (msg) => monitor.debug(msg)
     });
   } catch (error) {
