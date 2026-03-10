@@ -8,20 +8,18 @@ An agentic coding environment with a multi-agent UKB analysis pipeline, knowledg
 
 The semantic analysis pipeline must operate as a hierarchical wave-based multi-agent system — not a flat DAG — producing self-sufficient knowledge at every level, with rich observations, detailed insight documents, and proper parent-child structure from stem to leaves.
 
-## Current Milestone: v2.1 Wave Pipeline Quality Restoration
+## Current Milestone: v3.0 Workflow State Machine
 
-**Goal:** Re-integrate the full multi-agent pipeline (semantic analysis, KG operators, content validation, QA, ontology classification, trace reporting) into the wave-based architecture. v2.0 built the hierarchical wave structure but dropped the rich agent pipeline — this milestone restores it.
+**Goal:** Replace the ad-hoc workflow state management (scattered if/else, untyped JSON progress file, multiple competing state sources, fallback inference in the dashboard) with a proper typed state machine. Single source of truth, typed transitions, dashboard as pure consumer.
 
-**Foundation available:** Working wave-controller (3 waves + insight finalization), 691 entities in KG, component manifest, ontology classification agent (partially restored), persistence agent, insight generation agent.
-
-**Key problems to fix:**
-- Wave agents do lightweight LLM calls — need deep semantic analysis integration
-- KG operators (conv, aggr, embed, dedup, pred, merge) completely skipped
-- Content validation disabled in wave persistence
-- No QA step in wave pipeline
-- Trace modal broken (no LLM counts, no timing, no model info)
-- Ontology classification was auto-assigning hierarchy level as class (partially fixed)
-- Hallucination risk from unbounded L3 suggestions (basic guards added)
+**Key problems driving this:**
+- Workflow progress tracked via untyped JSON file (`workflow-progress.json`) with ad-hoc fields
+- Dashboard has "fallback inference" logic that guesses substep status — often wrong
+- Single-step/substep mode uses boolean flags (`singleStepMode`, `stepIntoSubsteps`, `stepPaused`) that get stuck
+- Multiple state sources compete: SSE events, polling, progress file, Redux store
+- Step/substep coloring is fundamentally broken — green when should be blue, stuck states
+- "Batch" label still shown instead of "Wave Analysis"
+- Every fix introduces new edge cases — the architecture needs replacement, not more band-aids
 
 ## Requirements
 
