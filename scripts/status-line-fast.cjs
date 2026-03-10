@@ -26,26 +26,58 @@ try {
 
 const env = { ...process.env, ...envFromFile, CODING_REPO: codingRepo };
 
+// Read cache — used for fresh path and as fallback when CSL times out
+let cachedContent = '';
 let cacheAgeMs = Infinity;
 try {
   const stat = fs.statSync(cacheFile);
   cacheAgeMs = Date.now() - stat.mtimeMs;
-  if (cacheAgeMs < 60000) {
-    const cached = fs.readFileSync(cacheFile, 'utf8').trim();
-    if (cached) {
-      process.stdout.write(cached + '\n');
-      // If cache is aging (>20s), trigger background refresh — but don't wait
-      if (cacheAgeMs > 20000) {
-        const bg = spawn('node', [cslScript], {
-          env, stdio: 'ignore', detached: true
-        });
-        bg.unref();
-      }
-      process.exit(0);
-    }
-  }
-} catch { /* fall through */ }
+  cachedContent = fs.readFileSync(cacheFile, 'utf8').trim();
+} catch { /* no cache */ }
 
-// Cache stale (>60s) or missing — must run full CSL synchronously
-const child = spawn('node', [cslScript], { env, stdio: 'inherit' });
-child.on('exit', (code) => process.exit(code || 0));
+// Fresh cache (<60s): use it directly
+if (cacheAgeMs < 60000 && cachedContent) {
+  process.stdout.write(cachedContent + '\n');
+  // If cache is aging (>20s), trigger background refresh — but don't wait
+  if (cacheAgeMs > 20000) {
+    const bg = spawn('node', [cslScript], {
+      env, stdio: 'ignore', detached: true
+    });
+    bg.unref();
+  }
+  process.exit(0);
+}
+
+// Cache stale (>60s) or missing — run full CSL synchronously,
+// but use stale cache as fallback if CSL fails or times out
+const child = spawn('node', [cslScript], { env, stdio: 'pipe' });
+
+let output = '';
+child.stdout.on('data', (d) => { output += d; });
+child.stderr.on('data', () => {}); // discard stderr
+
+// Safety timeout: if CSL hangs beyond 5s, fall back to stale cache
+const fallbackTimer = setTimeout(() => {
+  child.kill('SIGKILL');
+}, 5000);
+
+child.on('exit', (code) => {
+  clearTimeout(fallbackTimer);
+  const result = output.trim();
+  if (code === 0 && result) {
+    process.stdout.write(result + '\n');
+    process.exit(0);
+  }
+  // CSL failed — use stale cache rather than showing "Status Offline"
+  if (cachedContent) {
+    process.stdout.write(cachedContent + '\n');
+    // Trigger background refresh for next cycle
+    const bg = spawn('node', [cslScript], {
+      env, stdio: 'ignore', detached: true
+    });
+    bg.unref();
+    process.exit(0);
+  }
+  // No cache at all — nothing to show
+  process.exit(code || 1);
+});

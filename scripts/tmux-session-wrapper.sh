@@ -45,7 +45,7 @@ tmux_session_wrapper() {
     tmux set-option -t "$target_session" status-interval 5
     tmux set-option -t "$target_session" status-right-length 200
     tmux set-option -t "$target_session" status-style "bg=default,fg=default"
-    tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]') %H:%M"
+    tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')  "
     tmux set-option -t "$target_session" mouse on
   }
 
@@ -134,4 +134,10 @@ tmux_session_wrapper() {
 
   # After attach returns, clean up the session if it still exists
   tmux kill-session -t "$session_name" 2>/dev/null || true
+
+  # Reset terminal state — tmux/agent may leave the terminal in raw mode,
+  # causing "staircase" output (LF without CR) after detach/exit
+  stty sane 2>/dev/null || true
+  printf '\e[?1004l' 2>/dev/null || true   # Disable focus reporting
+  printf '\ec' 2>/dev/null || true          # Full terminal reset (RIS)
 }
