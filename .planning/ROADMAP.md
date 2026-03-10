@@ -83,7 +83,10 @@ Plans:
   2. The health API step-advance endpoint calls a state machine transition function that validates the transition is legal before applying it
   3. The progress file is written by a single subscriber function that serializes the current WorkflowState -- neither wave-controller nor health API write to it directly
   4. Cancelling a workflow triggers a typed Cancel transition that moves the state machine to the cancelled state, cleaning up in-flight work
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 16-01-PLAN.md -- State machine singleton, progress file subscriber, health API integration
+- [ ] 16-02-PLAN.md -- Wave-controller migration (30 updateProgress calls to typed dispatch), legacy cleanup
 
 #### Phase 17: SSE Event Typing
 **Goal**: Every workflow state transition is broadcast to connected clients as a typed SSE event carrying the full current state
@@ -124,7 +127,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
-| 16. Backend State Machine | v3.0 | 0/? | Not started | - |
+| 16. Backend State Machine | v3.0 | 0/2 | Not started | - |
 | 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
