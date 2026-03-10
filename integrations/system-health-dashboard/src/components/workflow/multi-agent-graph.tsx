@@ -16,7 +16,7 @@ import {
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 // WebSocket hook disabled - no server-side implementation exists yet
 // import useWorkflowWebSocket from '@/hooks/useWorkflowWebSocket'
-import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
+import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES, SUBSTEP_COLORS, EDGE_TYPE_COLORS } from './constants'
 import { Logger, LogCategories } from '@/utils/logging'
 
 interface MultiAgentGraphProps {
@@ -45,14 +45,8 @@ const STATUS_COLORS = {
   inactive: { bg: 'fill-slate-50', border: 'stroke-slate-200', text: 'text-slate-300' },
 }
 
-// Edge colors by type
-const EDGE_COLORS = {
-  control: '#6366f1',  // Indigo - orchestrator control
-  retry: '#f59e0b',    // Amber - retry connections
-  dataflow: '#10b981', // Emerald - data flow
-  dependency: '#64748b', // Slate - dependencies
-  self: '#8b5cf6',     // Purple - self-loops
-}
+// Edge colors imported from constants (EDGE_TYPE_COLORS), aliased for local use
+const EDGE_COLORS = EDGE_TYPE_COLORS
 
 // Sub-step definitions for agents with multiple internal operations
 export interface SubStep {
@@ -1294,18 +1288,24 @@ export function MultiAgentGraph({
                 return isParentStep && step.status === 'completed'
               })
 
-              if (agentParentStepCompleted) {
-                // Agent's parent step completed - mark ALL substeps as completed
+              // Only trust parent-step-completed when we have NO granular substep data.
+              // In single-step mode, the parent step may report "completed" while substeps
+              // are still running — individual substep statuses should take priority.
+              const hasGranularSubstepData = substepStatuses.size > 0
+              if (agentParentStepCompleted && !hasGranularSubstepData) {
+                // No per-substep data available — trust the parent step status
                 substepOrder.forEach(substepId => {
                   substepStatuses.set(substepId, 'completed')
                 })
               } else if (currentStepAgentId === expandedSubStepsAgent && currentStepSubstepId) {
-                // We're currently running a substep of this agent - infer completion from position
+                // We're currently running a substep of this agent — infer statuses
+                // for substeps that DON'T already have event-driven data
                 const currentIdx = substepOrder.indexOf(currentStepSubstepId)
 
                 if (currentIdx >= 0) {
-                  // Mark substeps before current as completed, current as running, after as pending
                   substepOrder.forEach((substepId, idx) => {
+                    // Don't overwrite SSE-sourced statuses
+                    if (substepStatuses.has(substepId)) return
                     if (idx < currentIdx) {
                       substepStatuses.set(substepId, 'completed')
                     } else if (idx === currentIdx) {
@@ -1354,27 +1354,26 @@ export function MultiAgentGraph({
                 const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
                 const isActiveSubStep = substepStatus === 'running'
                 const isPending = !substepStatus || substepStatus === 'pending'
-                // Determine visual state: completed (green), active (dark blue), pending (light blue)
-                const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted || isAgentCompleted
+                // Per-substep status takes priority over isAgentCompleted.
+                // isAgentCompleted only applies when no granular substep data exists.
+                const useAgentCompleted = isAgentCompleted && !substepStatuses.has(substep.id)
+                const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted || useAgentCompleted
 
-                // Colors based on per-substep state:
-                // - Completed: green (#22c55e)
-                // - Active/Running: dark blue (#1d4ed8) with glow
-                // - Pending (not yet started): light blue (#93c5fd)
-                let fillColor = '#93c5fd'  // light blue for pending (default)
-                let strokeColor = '#60a5fa'  // blue-400 stroke for pending
-                if (isSubstepCompleted || isAgentCompleted) {
-                  fillColor = '#22c55e'  // green-500
-                  strokeColor = '#16a34a'  // green-600
+                // Colors based on per-substep state (centralized in SUBSTEP_COLORS)
+                let fillColor: string = SUBSTEP_COLORS.pending.fill
+                let strokeColor: string = SUBSTEP_COLORS.pending.stroke
+                if (isSubstepCompleted || useAgentCompleted) {
+                  fillColor = SUBSTEP_COLORS.completed.fill
+                  strokeColor = SUBSTEP_COLORS.completed.stroke
                 } else if (isActiveSubStep) {
-                  fillColor = '#1d4ed8'  // dark blue-700 for active
-                  strokeColor = '#fff'
+                  fillColor = SUBSTEP_COLORS.running.fill
+                  strokeColor = SUBSTEP_COLORS.running.stroke
                 } else if (isSelected && isPending) {
-                  fillColor = '#60a5fa'  // blue-400 for selected pending
-                  strokeColor = '#3b82f6'
+                  fillColor = SUBSTEP_COLORS.selected.fill
+                  strokeColor = SUBSTEP_COLORS.selected.stroke
                 }
 
-                const statusText = isSubstepCompleted || isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
+                const statusText = isSubstepCompleted || useAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
 
                 return (
                   <g
