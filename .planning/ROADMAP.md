@@ -4,7 +4,7 @@
 
 - v1.0 -- UKB Pipeline Fix & Improvement (shipped 2026-03-03) -> [archive](milestones/v1.0-ROADMAP.md)
 - v2.0 -- Wave-Based Hierarchical Semantic Analysis (Phases 5-8, shipped 2026-03-07)
-- v2.1 -- Wave Pipeline Quality Restoration (Phases 9-12, in progress)
+- v2.1 -- Wave Pipeline Quality Restoration (Phases 9-14, shipped 2026-03-10)
 
 ---
 
@@ -43,7 +43,7 @@ Four phases that restore the full multi-agent pipeline into the wave-based archi
 - [x] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback (completed 2026-03-09)
 - [x] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave (completed 2026-03-09)
 - [x] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source (completed 2026-03-09)
-- [ ] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment
+- [~] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment (14-03 deferred to v3.0)
 
 ### Phase Details
 
