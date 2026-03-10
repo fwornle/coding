@@ -1,0 +1,610 @@
+{
+  "workflowName": "wave-analysis",
+  "startTime": "2026-03-10T09:50:40.036Z",
+  "endTime": "2026-03-10T09:54:23.285Z",
+  "status": "completed",
+  "totalLLMCalls": 50,
+  "totalTokens": 100946,
+  "entityCounts": {
+    "wave1_analyze": 9,
+    "wave2_analyze": 5,
+    "wave3_analyze": 0
+  },
+  "stepsDetail": [
+    {
+      "name": "wave1_init",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "outputs": {
+        "manifestEntries": 13,
+        "existingEntities": 373,
+        "cgrAvailable": true
+      }
+    },
+    {
+      "name": "wave1_analyze",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "llmProvider": "llama-3.3-70b-versatile@groq",
+      "tokensUsed": 1393,
+      "llmCalls": 5,
+      "outputs": {
+        "totalEntities": 9,
+        "discoveredEntities": 0,
+        "cgrStats": {
+          "queriesMade": 8,
+          "cacheHits": 0,
+          "available": true
+        }
+      },
+      "agentInstances": [
+        {
+          "agentId": "wave1_agent_project",
+          "agentType": "Wave1ProjectAgent",
+          "parentEntity": "Project",
+          "startTime": "2026-03-10T09:50:40.060Z",
+          "endTime": "2026-03-10T09:51:06.696Z",
+          "status": "completed",
+          "llmCalls": [
+            {
+              "id": "864cbbef-ef84-49a8-ac74-de1542438483",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 399,
+              "tokensIn": 278,
+              "tokensOut": 45,
+              "status": "success",
+              "promptPreview": "You are generating specific observations about the \"LLMAbstraction\" component.\n\nContext:\n- Description: Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.\n- Hierarchy: Coding/LLMAbstraction\n- Source files: integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, integrations/mcp-server-semantic-analysis/src/providers/dmr-provider.ts, lib/llm/llm-service.ts, lib/llm/providers/anthropi",
+              "responsePreview": "[\"The LLMAbstraction component utilizes the llm-mock-service.ts file to enable mock mode for testing, allowing for provider-agnostic model calls and tier-based routing as implemented in the llm-service.ts class.\"]"
+            },
+            {
+              "id": "a1b40e14-ba67-4b90-8792-272567c30e43",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 313,
+              "tokensIn": 248,
+              "tokensOut": 48,
+              "status": "success",
+              "promptPreview": "You are generating specific observations about the \"DockerizedServices\" component.\n\nContext:\n- Description: Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.\n- Hierarchy: Coding/DockerizedServices\n- Source files: integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, lib/llm/llm-service.ts, lib/service-starter.js, scripts/api-service.js, scripts/dashboard-service.js\n\nGenerate exact",
+              "responsePreview": "[\"The DockerizedServices component utilizes the llm-service.ts module, specifically the LLMService class, to provide semantic analysis capabilities, as evidenced by its import and instantiation in the scripts/api-service.js and scripts/dashboard-service.js files.\"]"
+            },
+            {
+              "id": "82ed0e99-4acb-4999-8672-e7c6847345da",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 290,
+              "tokensIn": 207,
+              "tokensOut": 44,
+              "status": "success",
+              "promptPreview": "You are generating specific observations about the \"Trajectory\" component.\n\nContext:\n- Description: AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.\n- Hierarchy: Coding/Trajectory\n- Source files: lib/integrations/specstory-adapter.js\n\nGenerate exactly 1 specific observation(s) about this component. Each observation MUST:\n- Reference at least one specific code artifact (file path, class name, function name, or module)\n-",
+              "responsePreview": "[\"The Trajectory component utilizes the specstory-adapter.js file in the lib/integrations directory to integrate with external planning systems and manage project milestones, GSD workflow, phase planning, and implementation task tracking.\"]"
+            },
+            {
+              "id": "180a59ed-db6e-464b-ac69-1e644da4d084",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 230,
+              "tokensIn": 199,
+              "tokensOut": 33,
+              "status": "success",
+              "promptPreview": "You are generating specific observations about the \"CodingPatterns\" component.\n\nContext:\n- Description: General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.\n- Hierarchy: Coding/CodingPatterns\n\n\nGenerate exactly 1 specific observation(s) about this component. Each observation MUST:\n- Reference at least one specific code artifact (file path, class name, function name, or module)\n- Be ",
+              "responsePreview": "[\"The CodingPatterns component utilizes the Singleton pattern in the LoggerFactory class (utils/logger.ts) to ensure a single instance of the logger is used throughout the application.\"]"
+            },
+            {
+              "id": "52fabea9-4162-475e-9d15-1bf5f370510f",
+              "model": "llama-3.3-70b-versatile",
+              "provider": "groq",
+              "purpose": "llm_call",
+              "durationMs": 276,
+              "tokensIn": 253,
+              "tokensOut": 38,
+              "status": "success",
+              "promptPreview": "You are generating specific observations about the \"ConstraintSystem\" component.\n\nContext:\n- Description: Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.\n- Hierarchy: Coding/ConstraintSystem\n- Source files: integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, lib/agent-api/hooks/hook-config.js, scripts/violation-capture-service.js, integrations/system-health-dashboard/s",
+              "responsePreview": "[\"The ConstraintSystem component utilizes the hook-config.js module in lib/agent-api/hooks to configure and manage hooks for validating code actions and file operations against predefined rules during Claude Code sessions.\"]"
+            }
+          ],
+          "entityCount": 9,
+          "observationCount": 37
+        }
+      ],
+      "entityFlow": {
+        "produced": 9,
+        "passedQA": 9,
+        "persisted": 9
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 94
+      }
+    },
+    {
+      "name": "wave1_classify",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "llmProvider": "groq",
+      "tokensUsed": 1880,
+      "llmCalls": 4,
+      "outputs": {
+        "entitiesClassified": 9
+      },
+      "llmCallEvents": [
+        {
+          "id": "bf0ae56e-cd58-4705-acc0-881fb16c3217",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave1_classify",
+          "durationMs": 0,
+          "tokensIn": 423,
+          "tokensOut": 66,
+          "status": "success",
+          "promptPreview": "Team context: coding\n\nClassify the following text into one of the ontology entity classes.\n\nAvailable entity classes:\n- ClassificationLayer\n- Component\n- Config\n- ConfigurationFile\n- ConstraintRule\n- Container\n- Contract\n- EmbeddingVector\n- Fault\n- Feature\n- File\n- GraphDatabase\n- HealthFile\n- HookConfiguration\n- KnowledgeEntity\n- LSLSession\n- Limitation\n- MCPAgent\n- MonitoringLayer\n- PlantUMLDiagram\n- Port\n- Process\n- RedactionPattern\n- Revision\n- RuntimeDiagnostics\n- Service\n- ServiceRegistry\n",
+          "responsePreview": "```json\n{\n  \"entityClass\": \"Component\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"The text explicitly states 'Type: Component' and describes the characteristics and functionality of the LLMAbstraction as a component, making it a clear classification as a Component entity class.\"\n}\n```"
+        },
+        {
+          "id": "9c27d63a-6d4d-4a64-963b-8ec9950b4a0a",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave1_classify",
+          "durationMs": 0,
+          "tokensIn": 423,
+          "tokensOut": 66,
+          "status": "success"
+        },
+        {
+          "id": "6cb7fc3d-7b02-4988-a9b3-e98d34b415dd",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave1_classify",
+          "durationMs": 0,
+          "tokensIn": 387,
+          "tokensOut": 64,
+          "status": "success",
+          "promptPreview": "Team context: coding\n\nClassify the following text into one of the ontology entity classes.\n\nAvailable entity classes:\n- ClassificationLayer\n- Component\n- Config\n- ConfigurationFile\n- ConstraintRule\n- Container\n- Contract\n- EmbeddingVector\n- Fault\n- Feature\n- File\n- GraphDatabase\n- HealthFile\n- HookConfiguration\n- KnowledgeEntity\n- LSLSession\n- Limitation\n- MCPAgent\n- MonitoringLayer\n- PlantUMLDiagram\n- Port\n- Process\n- RedactionPattern\n- Revision\n- RuntimeDiagnostics\n- Service\n- ServiceRegistry\n",
+          "responsePreview": "```json\n{\n  \"entityClass\": \"Component\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"The text explicitly states 'Type: Component' and describes the characteristics and functionality of a component within the Coding project, making it a clear fit for the Component entity class.\"\n}\n```"
+        },
+        {
+          "id": "531e4585-84a9-46c1-ad26-ec50b42da0cc",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave1_classify",
+          "durationMs": 0,
+          "tokensIn": 387,
+          "tokensOut": 64,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "name": "wave1_persist",
+      "status": "completed",
+      "wave": 1,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "outputs": {
+        "entitiesPersisted": 9
+      }
+    },
+    {
+      "name": "wave2_analyze",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "llmProvider": "pending",
+      "outputs": {
+        "totalEntities": 5,
+        "discoveredEntities": 0,
+        "cgrStats": {
+          "queriesMade": 8,
+          "cacheHits": 0,
+          "available": true
+        }
+      },
+      "entityFlow": {
+        "produced": 5,
+        "passedQA": 5,
+        "persisted": 5
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 60
+      }
+    },
+    {
+      "name": "wave2_classify",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "llmProvider": "groq",
+      "tokensUsed": 704,
+      "llmCalls": 2,
+      "outputs": {
+        "entitiesClassified": 5
+      },
+      "llmCallEvents": [
+        {
+          "id": "2f360e35-fa79-419d-ac52-b34c57bebfd8",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave2_classify",
+          "durationMs": 0,
+          "tokensIn": 292,
+          "tokensOut": 60,
+          "status": "success",
+          "promptPreview": "Team context: coding\n\nClassify the following text into one of the ontology entity classes.\n\nAvailable entity classes:\n- ClassificationLayer\n- Component\n- Config\n- ConfigurationFile\n- ConstraintRule\n- Container\n- Contract\n- EmbeddingVector\n- Fault\n- Feature\n- File\n- GraphDatabase\n- HealthFile\n- HookConfiguration\n- KnowledgeEntity\n- LSLSession\n- Limitation\n- MCPAgent\n- MonitoringLayer\n- PlantUMLDiagram\n- Port\n- Process\n- RedactionPattern\n- Revision\n- RuntimeDiagnostics\n- Service\n- ServiceRegistry\n",
+          "responsePreview": "```json\n{\n  \"entityClass\": \"SubComponent\",\n  \"confidence\": 1.0,\n  \"reasoning\": \"The text explicitly states 'Type: SubComponent', indicating that it is a sub-component of a larger system, in this case, KnowledgeManagement.\"\n}\n```"
+        },
+        {
+          "id": "2900ac5e-9cf2-4961-8f79-e312f99e8a9b",
+          "model": "llama-3.3-70b-versatile",
+          "provider": "groq",
+          "purpose": "wave2_classify",
+          "durationMs": 0,
+          "tokensIn": 292,
+          "tokensOut": 60,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "name": "wave2_persist",
+      "status": "completed",
+      "wave": 2,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:27.943Z",
+      "duration": "0.00s",
+      "outputs": {
+        "entitiesPersisted": 5
+      }
+    },
+    {
+      "name": "wave3_analyze",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:27.943Z",
+      "endTime": "2026-03-10T09:53:30.710Z",
+      "duration": "2.77s",
+      "llmProvider": "llama-3.3-70b-versatile@groq",
+      "tokensUsed": 5867,
+      "llmCalls": 5,
+      "outputs": {
+        "totalEntities": 0,
+        "discoveredEntities": 0,
+        "cgrStats": {
+          "queriesMade": 8,
+          "cacheHits": 0,
+          "available": true
+        }
+      },
+      "entityFlow": {
+        "produced": 0,
+        "passedQA": 0,
+        "persisted": 0
+      },
+      "qaResult": {
+        "passed": true,
+        "score": 100
+      }
+    },
+    {
+      "name": "wave3_classify",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:30.868Z",
+      "duration": "0.16s",
+      "llmProvider": "pending",
+      "outputs": {
+        "entitiesClassified": 0
+      }
+    },
+    {
+      "name": "wave3_persist",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:31.157Z",
+      "duration": "0.45s",
+      "outputs": {
+        "entitiesPersisted": 0
+      }
+    },
+    {
+      "name": "operator_conv",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:31.264Z",
+      "duration": "0.55s",
+      "outputs": {
+        "inputEntities": 14,
+        "outputEntities": 14,
+        "withEnrichedContext": 14,
+        "durationMs": 6
+      }
+    },
+    {
+      "name": "operator_aggr",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:31.367Z",
+      "duration": "0.66s",
+      "outputs": {
+        "inputEntities": 14,
+        "core": 14,
+        "nonCore": 0,
+        "durationMs": 1
+      }
+    },
+    {
+      "name": "operator_embed",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:46.538Z",
+      "duration": "15.83s",
+      "outputs": {
+        "inputEntities": 14,
+        "embeddingsBefore": 0,
+        "embeddingsAfter": 14,
+        "newEmbeddings": 14,
+        "durationMs": 15062
+      }
+    },
+    {
+      "name": "operator_dedup",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:46.654Z",
+      "duration": "15.94s",
+      "outputs": {
+        "inputEntities": 14,
+        "outputEntities": 14,
+        "merged": 0,
+        "durationMs": 10
+      }
+    },
+    {
+      "name": "operator_pred",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:46.761Z",
+      "duration": "16.05s",
+      "outputs": {
+        "inputEntities": 14,
+        "relationsBefore": 13,
+        "predictedEdges": 14,
+        "durationMs": 3
+      }
+    },
+    {
+      "name": "operator_merge",
+      "status": "completed",
+      "wave": 3,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:53:47.077Z",
+      "duration": "16.37s",
+      "outputs": {
+        "inputEntities": 14,
+        "inputRelations": 27,
+        "outputEntities": 14,
+        "outputRelations": 27,
+        "added": {
+          "entities": 14,
+          "relations": 27
+        },
+        "updated": {
+          "entities": 0,
+          "relations": 0
+        },
+        "durationMs": 1
+      }
+    },
+    {
+      "name": "wave4_insights",
+      "status": "completed",
+      "wave": 4,
+      "startTime": "2026-03-10T09:53:30.710Z",
+      "endTime": "2026-03-10T09:54:23.268Z",
+      "duration": "52.56s",
+      "llmProvider": "groq",
+      "tokensUsed": 44259,
+      "llmCalls": 14,
+      "outputs": {
+        "generated": 14,
+        "failed": 0,
+        "skippedDiagrams": 13
+      },
+      "llmCallEvents": [
+        {
+          "id": "2807f356-7e9a-4e24-a19c-5baad2a283f7",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1223,
+          "tokensOut": 1825,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for LiveLoggingSystem\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"LiveLoggingSystem\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicit",
+          "responsePreview": "## What It Is  \n\nLiveLoggingSystem is a **component** of the **Coding** project that provides the live‑session logging infrastructure for capturing Claude‑Code conversations.  It is the concrete implementation of the “LSL” (Live‑Logging) service, also known by the aliases *live‑logging*, *session‑logging* and *SpecStory*.  Its responsibilities are explicitly described in the observations as **session windowing, file routing, classification layers, and transcript capture**.  No concrete file path"
+        },
+        {
+          "id": "0ae677a4-0472-4352-8478-a31b67e50e38",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1186,
+          "tokensOut": 2503,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for Coding\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"Coding\" (type: Project).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly mentioned\n3. Build yo",
+          "responsePreview": "## What It Is  \n\nThe **Coding** project is a top‑level knowledge‑hierarchy node that aggregates the entire development‑infrastructure stack for Claude‑driven code generation. All eight first‑level components—**LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis**—live under this root node. The observations do not enumerate concrete file‑system locations, but the hierarchy itself"
+        },
+        {
+          "id": "7d8c215b-902a-45ce-a032-a0b67995a3cc",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1265,
+          "tokensOut": 2416,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for LLMAbstraction\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"LLMAbstraction\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly men",
+          "responsePreview": "## What It Is  \n\n**LLMAbstraction** is the dedicated component that lives inside the **Coding** project and provides a unified, provider‑agnostic façade over the three large‑language‑model (LLM) services used by the system: **Anthropic**, **OpenAI**, and **Groq**. The implementation lives in the source tree under the files **`src/llm-service.ts`** (the concrete service class) and **`src/llm-mock-service.ts`** (the mock‑mode implementation). By exposing a single, consistent API, the rest of the c"
+        },
+        {
+          "id": "0301299a-4749-4907-836a-37b322922e2e",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1253,
+          "tokensOut": 2307,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for DockerizedServices\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"DockerizedServices\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explic",
+          "responsePreview": "## What It Is  \n\nDockerizedServices is the **Docker‑containerization layer** for the *Coding* project. It lives in the same repository as the rest of the code base and is referenced from the top‑level scripts that start the various services, for example `scripts/api‑service.js` and `scripts/dashboard‑service.js`. Those scripts import the `LLMService` class from `llm-service.ts`, instantiate it, and then run inside Docker containers that are described by the project’s Docker‑Compose configuration"
+        },
+        {
+          "id": "793dbf0b-c659-4f14-8325-026becae2db6",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1239,
+          "tokensOut": 2180,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for Trajectory\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"Trajectory\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly mentioned\n3",
+          "responsePreview": "## What It Is  \n\nTrajectory is the **AI‑driven planning and milestone‑tracking component** of the **Coding** project.  All of its source lives under the project’s repository and its only explicit code artifact is the **`specstory‑adapter.js`** file located in **`lib/integrations/specstory‑adapter.js`**.  The component’s purpose, as described in the observations, is to **manage project milestones, the “Get‑Stuff‑Done” (GSD) workflow, phase planning, and implementation‑task tracking**.  It does no"
+        },
+        {
+          "id": "28d15858-35bc-429c-8fc8-cb945a681221",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1315,
+          "tokensOut": 2911,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for KnowledgeManagement\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"KnowledgeManagement\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless expl",
+          "responsePreview": "## What It Is  \n\n**KnowledgeManagement** is the central component that provides *knowledge‑graph storage, query, and lifecycle management* for the entire **Coding** project.  It lives inside the “Coding” hierarchy (the root of the development‑infrastructure knowledge base) and is implemented as a single logical component; the observations do not list concrete file‑system paths or source symbols, so the exact directory layout is currently unknown.  The component brings together several low‑level "
+        },
+        {
+          "id": "d9f68bf0-e0ac-48ec-9b19-66af47e08696",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1237,
+          "tokensOut": 1660,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for CodingPatterns\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"CodingPatterns\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly men",
+          "responsePreview": "## What It Is  \n\n**CodingPatterns** is a **component** of the top‑level **Coding** knowledge hierarchy (see the *Parent component: Coding* entry). It lives conceptually rather than as a concrete code package – its purpose is to house the collective **programming wisdom, design patterns, best‑practice recommendations, and coding conventions** that apply across the entire project. The only concrete artifact that the observations surface is the **`LoggerFactory` class** located at **`utils/logger.t"
+        },
+        {
+          "id": "346160c4-db22-4ffa-a652-31275db920a2",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1224,
+          "tokensOut": 1629,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for ConstraintSystem\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"ConstraintSystem\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly",
+          "responsePreview": "## What It Is  \n\nThe **ConstraintSystem** component lives inside the *Coding* project and is responsible for monitoring and enforcing a set of configurable constraints during a Claude Code session. Its core implementation is anchored in the **`lib/agent-api/hooks/hook-config.js`** module, which defines and registers the hooks that intercept code‑action and file‑operation events. When a developer (or an automated agent) performs an edit, creates, moves, or deletes a file, the hooks fire, compare "
+        },
+        {
+          "id": "9ab394fb-3070-4950-9608-10aaae042611",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 1349,
+          "tokensOut": 2790,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for SemanticAnalysis\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"SemanticAnalysis\" (type: Component).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly",
+          "responsePreview": "## What It Is  \n\n**SemanticAnalysis** is a core **component** of the **Coding** project that implements a **multi‑agent semantic‑analysis pipeline** for batch‑style processing of source‑code history (Git) and live‑session logs (LSL).  The component lives under the top‑level *Coding* hierarchy and is realised through three dedicated sub‑components – **Pipeline**, **Ontology**, and **Insights** – each of which encapsulates a distinct phase of the overall workflow.  Although the source observations"
+        },
+        {
+          "id": "33283402-e463-4034-bc1e-6ec2a5f1ffda",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 647,
+          "tokensOut": 2387,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for ManualLearning\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"ManualLearning\" (type: SubComponent).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly ",
+          "responsePreview": "## What It Is  \n\n**ManualLearning** is a **sub‑component** of the **KnowledgeManagement** component that lives inside the overall *Coding* project.  Its sole responsibility, as described in the observations, is to **manage knowledge that originates from human activity** – manual authoring, direct edits, and hand‑crafted observations.  In other words, any piece of knowledge that does not flow automatically from an online learning pipeline is routed through ManualLearning.  The component sits alon"
+        },
+        {
+          "id": "c5d99993-9254-4d37-91cb-cda6135c4858",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 648,
+          "tokensOut": 1676,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for OnlineLearning\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"OnlineLearning\" (type: SubComponent).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly ",
+          "responsePreview": "## What It Is  \n\n**OnlineLearning** is a **sub‑component** of the **KnowledgeManagement** component that lives inside the overall *Coding* project.  It is responsible for ingesting **knowledge that is produced automatically** by the batch‑analysis pipeline – knowledge that originates from three distinct sources: the **Git history** of the code base, **Live‑Session Logging (LSL) sessions**, and **static code analysis** results.  The observations do not list concrete file‑system locations, class n"
+        },
+        {
+          "id": "78d41db0-cb1a-4e16-b5c6-fa97d833355f",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 661,
+          "tokensOut": 2173,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for Pipeline\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"Pipeline\" (type: SubComponent).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly mentioned\n3.",
+          "responsePreview": "## What It Is  \n\n**Pipeline** is the batch‑processing engine that lives inside the **SemanticAnalysis** component of the Coding project.  It is explicitly listed as a *sub‑component* of **SemanticAnalysis**, alongside its siblings **Ontology** and **Insights**.  The only concrete information we have about its location is that it is defined inside the source tree of the **SemanticAnalysis** package – no concrete file paths or symbols were extracted by the analysis tooling, so the exact directory "
+        },
+        {
+          "id": "bb6b1054-24b1-4965-971c-bf7da2bd448b",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 658,
+          "tokensOut": 1474,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for Ontology\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"Ontology\" (type: SubComponent).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly mentioned\n3.",
+          "responsePreview": "## What It Is  \n\n**Ontology** is a **sub‑component** of the **SemanticAnalysis** component in the Coding project. It lives inside the same logical package as the other SemanticAnalysis sub‑components – **Pipeline** and **Insights** – and its responsibility is to provide the *ontology classification system*. This system defines both **upper‑level** and **lower‑level** ontologies, resolves the concrete **entity types** that appear in the semantic analysis pipeline, and validates that the produced "
+        },
+        {
+          "id": "4fa894bd-130d-4e62-8e38-200619bcd210",
+          "model": "openai/gpt-oss-120b",
+          "provider": "groq",
+          "purpose": "wave4_insights",
+          "durationMs": 0,
+          "tokensIn": 653,
+          "tokensOut": 1770,
+          "status": "success",
+          "promptPreview": "Analyze the following for architectural insights and design decisions.\n\nContext: Deep insight generation for Insights\n\n\n\nContent:\nYou are a technical documentation expert creating a comprehensive insight document for \"Insights\" (type: SubComponent).\n\n**CRITICAL GROUNDING RULES:**\n1. PRESERVE ALL specific file paths, class names, function names from observations - these are your primary source of truth\n2. DO NOT invent patterns (like \"microservices\", \"event-driven\") unless explicitly mentioned\n3.",
+          "responsePreview": "## What It Is  \n\n**Insights** is a dedicated sub‑component of the **SemanticAnalysis** component in the Coding project. It lives alongside the sibling sub‑components **Pipeline** and **Ontology** under the same parent. Although the source repository does not expose concrete file paths or symbols for Insights, the observations make clear that its primary responsibilities are three‑fold:  \n\n1. **Insight generation** – analysing the output of the broader semantic analysis to surface high‑level obse"
+        }
+      ]
+    }
+  ]
+}

@@ -2,134 +2,137 @@
 
 **Type:** Component
 
-[LLM] The ContentValidationAgent plays a crucial role in validating entity content and detecting staleness, ensuring that the knowledge graph constructed by the CodeGraphAgent remains up-to-date and accurate. The validateEntityContent method in content-validation-agent.ts illustrates how the agent checks entity content for validity, while the detectStaleness method demonstrates how the agent identifies stale entities. The ContentValidationAgent's implementation, as seen in content-validation-agent.ts, extends the BaseAgent abstract base class, ensuring consistency with other agents in the component. Moreover, the agent's interaction with the SemanticAnalysisAgent, as shown in semantic-analysis-agent.ts, highlights the component's ability to integrate multiple agents to achieve comprehensive semantic analysis.
+SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
 
 ## What It Is  
 
-The **SemanticAnalysis** component lives under the **Coding** knowledge hierarchy and is implemented in the *integrations/mcp‑server‑semantic‑analysis/src/agents* directory.  Its core is a collection of specialised agents – `OntologyClassificationAgent` ( *ontology-classification-agent.ts* ), `SemanticAnalysisAgent` ( *semantic-analysis-agent.ts* ), `CodeGraphAgent` ( *code-graph-agent.ts* ) and `ContentValidationAgent` ( *content-validation-agent.ts* ) – all of which extend the shared abstract class `BaseAgent` ( *base-agent.ts* ).  Each agent encapsulates a single responsibility (classification, LLM‑driven analysis, graph construction/query, or content validation) and participates in a **workflow‑based execution model** that orchestrates the agents, propagates upstream context, and retries on transient failures.  The component therefore provides a pipeline that ingests raw observations, classifies them against an ontology, builds a knowledge graph of code entities, validates the graph’s freshness, and finally produces semantic insights that feed the child sub‑components **Pipeline**, **Ontology**, and **Insights**.
+**SemanticAnalysis** is a core **component** of the **Coding** project that implements a **multi‑agent semantic‑analysis pipeline** for batch‑style processing of source‑code history (Git) and live‑session logs (LSL).  The component lives under the top‑level *Coding* hierarchy and is realised through three dedicated sub‑components – **Pipeline**, **Ontology**, and **Insights** – each of which encapsulates a distinct phase of the overall workflow.  Although the source observations do not list concrete file‑system locations, the component is referenced throughout the project as the “semantic analysis MCP” (managed container process) that is packaged together with the Dockerised services supplied by the sibling **DockerizedServices** component.  
+
+In practice, **SemanticAnalysis** ingests raw artefacts, runs a series of specialised agents (coordinator, observation‑generation, knowledge‑graph operators, deduplication, persistence), classifies entities against an upper/lower **Ontology**, and finally produces consumable **Insights** such as pattern catalogs and knowledge‑report drafts.  The output is persisted as structured knowledge‑graph entities that feed downstream systems like **KnowledgeManagement**.
 
 ---
 
 ## Architecture and Design  
 
-SemanticAnalysis follows a **modular, agent‑centric architecture**.  The `BaseAgent` abstract class defines a canonical `execute` method, a retry wrapper, and a `handleUpstreamContext` hook (see *base-agent.ts*).  By inheriting from this base, each concrete agent gains a uniform lifecycle, enabling the **workflow‑based execution model** to treat them as interchangeable steps in a pipeline.  This model is a lightweight orchestration pattern rather than a full‑blown workflow engine; it is realised through sequential calls where each agent receives the output (or enriched context) of its predecessor.
+The architecture that emerges from the observations is **agent‑oriented pipeline processing**.  A **coordinator agent** orchestrates a linear yet extensible batch workflow, dispatching work to downstream agents that each own a single responsibility:
 
-The component also employs a **facade pattern** for LLM interactions.  `SemanticAnalysisAgent` imports `LLMService` from *lib/llm/dist/index.js* and delegates all large‑language‑model calls to this façade, keeping the agent agnostic of provider‑specific details.  This mirrors the approach used by the sibling **LLMAbstraction** component, reinforcing a system‑wide strategy for LLM integration.
+* **Observation‑generation agents** parse Git commits and LSL session streams, turning raw text into provisional knowledge objects.  
+* **KG (knowledge‑graph) operator agents** enrich those objects, resolve relationships, and apply the **Ontology** classification rules.  
+* **Deduplication agents** eliminate redundant entities before they are handed to the **persistence agents**, which write the final, validated triples into the graph store.
 
-A **graph‑database‑backed knowledge store** underpins the `CodeGraphAgent`.  The `buildCodeGraph` method constructs nodes and edges that represent code entities and their relationships, while `queryCodeGraph` runs graph queries to retrieve relevant context for downstream agents.  The graph database is hinted at in *code-graph-agent.ts* and is shared with the **KnowledgeManagement** sibling, which also relies on a `GraphDatabaseAdapter`.  This reuse of a common storage abstraction reduces duplication and aligns the data model across components.
+This division of labour follows the **pipeline pattern** (each stage consumes the output of the previous stage) while also embodying a **coordinator pattern** that centralises control flow.  The three logical sub‑components – **Pipeline**, **Ontology**, **Insights** – reflect a **separation‑of‑concerns** design: the pipeline deals with data movement, the ontology subsystem handles type resolution and validation, and the insights subsystem performs higher‑level pattern extraction and report authoring.
 
-Finally, the **ContentValidationAgent** provides a validation layer that checks entity payloads and detects staleness, ensuring that the graph remains accurate over time.  Its placement in the workflow guarantees that stale or malformed data never propagates to the insight‑generation stage.
+Because the sibling **DockerizedServices** component provides containerisation for “semantic analysis MCP”, the pipeline is likely packaged as a self‑contained service that can be launched, stopped, or scaled independently of the rest of the codebase.  No explicit micro‑service or event‑driven messaging infrastructure is mentioned, so the design stays within a **single‑process, multi‑agent** model that is nevertheless amenable to container deployment.
 
 ---
 
 ## Implementation Details  
 
-### BaseAgent (`base-agent.ts`)  
-`BaseAgent` declares an abstract `execute(context: AgentContext): Promise<AgentResult>` and implements a retry loop around it.  The loop catches transient errors, backs off, and re‑invokes `execute` up to a configurable limit.  It also defines `handleUpstreamContext(previousResult)` which allows an agent to enrich the context for the next step.  All concrete agents inherit these behaviours, guaranteeing consistent error handling and context propagation.
+The observations enumerate the **agents** that make up the **Pipeline** sub‑component:
 
-### OntologyClassificationAgent (`ontology-classification-agent.ts`)  
-Extending `BaseAgent`, this agent’s `execute` method receives raw observations, calls an internal ontology service, and returns a structured classification payload.  The classification result is persisted as a knowledge entity, forming the first “semantic” layer of the pipeline.  Because it follows the `BaseAgent` contract, it automatically benefits from retry and upstream‑context handling.
+1. **Coordinator** – the entry point for a batch run. It reads configuration (e.g., which Git repos or LSL sessions to analyse) and creates work‑items for the downstream agents.  
+2. **Observation Generation** – parses raw artefacts. For Git history, it extracts commit metadata, diff hunks, and file‑level changes; for LSL sessions it extracts dialogue turns, timestamps, and code snippets. The result is a provisional “observation” object.  
+3. **KG Operators** – take each observation and map it onto the **Ontology** model. This involves entity‑type resolution (upper vs. lower ontology), attribute extraction, and relationship inference. Validation logic lives in the **Ontology** sub‑component, which defines the schema for “entity type resolution” and enforces constraints.  
+4. **Deduplication** – scans the provisional knowledge graph for duplicate nodes or edges, using deterministic hashes of entity signatures to decide which duplicates to collapse.  
+5. **Persistence** – writes the clean, validated graph fragments to the underlying knowledge‑graph store (the same store that **KnowledgeManagement** later queries).  
 
-### SemanticAnalysisAgent (`semantic-analysis-agent.ts`)  
-The heart of LLM‑driven analysis, this agent imports `LLMService` from *lib/llm/dist/index.js*.  Its `analyzeCode` function sends code snippets and their ontology tags to the LLM, receives a natural‑language interpretation, and attaches the result to the entity’s metadata.  The same file also calls `ContentValidationAgent.contentValidation` to verify the LLM output before it is stored, demonstrating intra‑agent collaboration.
+The **Ontology** sub‑component supplies the classification vocabulary: an *upper ontology* (high‑level concepts such as “Agent”, “Artifact”, “Event”) and a *lower ontology* (domain‑specific types like “GitCommit”, “LSLSession”, “CodePattern”).  Entity‑type resolution functions compare observation attributes against these definitions, and a validation routine checks for required fields and type consistency before the persistence step.
 
-### CodeGraphAgent (`code-graph-agent.ts`)  
-`buildCodeGraph` iterates over classified and analysed entities, creating graph nodes (e.g., functions, classes, modules) and edges (e.g., “calls”, “extends”).  The implementation leverages the underlying graph database driver (not shown) to batch‑write these structures.  `queryCodeGraph` provides a read‑only API used by downstream agents (including the upcoming **Insights** child) to fetch relationship‑aware context for pattern detection.
+The **Insights** sub‑component consumes the fully persisted graph. It runs pattern‑catalog extraction algorithms (e.g., frequent sub‑graph mining, temporal sequence detection) and assembles human‑readable knowledge reports.  These reports are then available to downstream consumers such as the **KnowledgeManagement** component or to end‑users via UI tooling.
 
-### ContentValidationAgent (`content-validation-agent.ts`)  
-Through `validateEntityContent` it checks that each entity’s payload conforms to schema expectations (e.g., required fields, type constraints).  `detectStaleness` compares timestamps or version hashes against a freshness policy, flagging entities that need re‑analysis.  Both methods return a `ValidationResult` that the workflow uses to decide whether to re‑run earlier agents or prune the entity.
-
-All agents are instantiated and wired together by the component’s entry point (not listed in the observations but implied by the workflow model).  The orchestrator creates a `Pipeline` object (child component) that sequentially invokes `OntologyClassificationAgent → SemanticAnalysisAgent → ContentValidationAgent → CodeGraphAgent`, passing the evolving `AgentContext` along the way.
+No concrete class or function names appear in the observations, and no file paths are listed, so the description stays at the agent/sub‑component level rather than referencing specific source files.
 
 ---
 
 ## Integration Points  
 
-1. **LLM Service** – `SemanticAnalysisAgent` imports `LLMService` from *lib/llm/dist/index.js*.  This façade abstracts provider‑specific APIs (OpenAI, Anthropic, etc.) and supplies a single `invoke` method used for code‑semantic analysis.  The same service is leveraged by the sibling **LLMAbstraction** component, ensuring a consistent LLM contract across the system.  
+* **Parent – Coding** – As a child of the root *Coding* component, **SemanticAnalysis** contributes the “semantic layer” of the overall development‑knowledge stack.  Its outputs (structured entities) become inputs for the **KnowledgeManagement** component, which provides graph storage, query APIs, and lifecycle services.  
+* **Sibling – DockerizedServices** – The pipeline is packaged as a containerised service (referred to as the “semantic analysis MCP”).  DockerisedServices therefore supplies the runtime environment, networking, and any required side‑car containers (e.g., a graph database).  
+* **Sibling – LiveLoggingSystem** – LiveLoggingSystem produces the LSL session logs that feed the observation‑generation agents.  The two components share a common data contract for session transcripts.  
+* **Sibling – LLMAbstraction** – Although not directly invoked, any LLM‑based classification or pattern‑extraction logic inside **Ontology** or **Insights** would likely call the provider‑agnostic API exposed by LLMAbstraction.  
+* **Sibling – ConstraintSystem** – Validation rules defined in **Ontology** may be aligned with the broader constraint policies enforced by ConstraintSystem, ensuring that persisted entities respect project‑wide quality gates.  
 
-2. **Ontology System** – `OntologyClassificationAgent` talks to the ontology backend (details reside in the parent **Ontology** child component).  The classification results become the basis for downstream graph construction and insight generation.  
-
-3. **Graph Database** – `CodeGraphAgent` writes to and reads from the graph store that is also used by **KnowledgeManagement** (via `GraphDatabaseAdapter`).  This shared persistence layer enables cross‑component queries, such as retrieving code relationships from the **Trajectory** component’s adapters.  
-
-4. **Content Validation** – `ContentValidationAgent` interacts with both the `SemanticAnalysisAgent` (to validate LLM output) and the `CodeGraphAgent` (to ensure only fresh nodes are persisted).  Its validation logic is aligned with the **ConstraintSystem** sibling, which enforces domain‑wide integrity rules.  
-
-5. **Pipeline & Insights** – The child component **Pipeline** orchestrates the agent sequence, while **Insights** consumes the final graph to produce patterns, recommendations, or anomaly reports.  Both children rely on the well‑defined output contracts of the agents, making the component a reusable semantic‑analysis service for the broader **Coding** ecosystem.
+The only explicit integration contract visible in the observations is the **batch‑analysis workflow**: the pipeline reads from Git repositories and LSL session stores, writes to the knowledge graph, and hands off to the insights engine.  All other connections are inferred from sibling responsibilities.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via the Pipeline** – Consumers should request a `Pipeline` instance (the child component) rather than calling agents directly.  The pipeline guarantees the correct ordering, context propagation, and retry semantics defined in `BaseAgent`.  
-
-* **Provide a Complete AgentContext** – When kicking off a run, include the raw observations, any pre‑existing ontology identifiers, and optional configuration flags (e.g., `maxRetries`).  Missing fields will cause early validation failures in `ContentValidationAgent`.  
-
-* **Treat LLMService as a Black Box** – Do not embed provider‑specific logic in `SemanticAnalysisAgent`.  If a new LLM provider is required, extend `LLMService` in the **LLMAbstraction** component; the agent will automatically pick up the change.  
-
-* **Monitor Graph Consistency** – After each run, inspect the validation report returned by `ContentValidationAgent`.  Stale or invalid entities should trigger a re‑run of the pipeline or a targeted refresh of the affected sub‑graph.  
-
-* **Leverage Upstream Context** – When extending the component (e.g., adding a new agent), implement `handleUpstreamContext` to enrich the context for downstream steps.  This keeps the workflow extensible without breaking existing agents.  
-
-* **Respect Retry Configuration** – The default retry count is tuned for transient network or LLM errors.  Increasing it may improve resilience but also prolong execution time; decreasing it can speed up failures but may cause unnecessary aborts.
+1. **Run as a Batch Job** – Invoke the **Coordinator** agent (typically via the container entry point) with a manifest that lists the target Git repositories and LSL session sources.  Because the pipeline is batch‑oriented, it should be scheduled during off‑peak hours or triggered by CI events.  
+2. **Validate Ontology Extensions** – When extending the lower ontology (e.g., adding a new entity type for a custom code artefact), update the **Ontology** definitions and run the validation suite to ensure that all downstream agents can resolve the new type.  
+3. **Monitor Deduplication** – The deduplication stage can be tuned via hash‑function parameters; developers should review deduplication logs to avoid accidental loss of distinct but similar entities.  
+4. **Leverage DockerisedServices** – Deploy the semantic analysis container alongside the graph database and any required LLM services.  Keep the container image versioned in sync with the sibling **DockerizedServices** release cadence.  
+5. **Consume Insights via KnowledgeManagement** – Downstream tools should query the persisted graph through the KnowledgeManagement API rather than reading raw files; this guarantees that insights are always based on the latest validated knowledge base.  
 
 ---
 
-### Architectural patterns identified  
+## Architectural Patterns Identified  
 
-1. **Modular/Agent‑Centric Architecture** – Separate agents with single responsibilities.  
-2. **Abstract Base Class (Template Method)** – `BaseAgent` defines the execution skeleton.  
-3. **Workflow‑Based Execution Model** – Sequential orchestration with retry and context propagation.  
-4. **Facade Pattern** – `LLMService` abstracts LLM provider details.  
-5. **Graph‑Database Persistence** – Knowledge graph storage for code entities.  
+| Pattern | Evidence from Observations |
+|--------|-----------------------------|
+| **Agent‑Oriented Pipeline** | “batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence.” |
+| **Coordinator Pattern** | A single *coordinator* agent orchestrates the workflow. |
+| **Separation‑of‑Concerns** | Distinct sub‑components: *Pipeline*, *Ontology*, *Insights*. |
+| **Containerisation (Docker)** | Mentioned in sibling **DockerizedServices** (“semantic analysis MCP”). |
+| **Batch Processing** | Explicit “batch‑analysis workflow” that processes Git history and LSL sessions. |
 
-### Design decisions and trade‑offs  
+---
 
-* **Agent Isolation vs. Coupling** – Each agent is isolated, simplifying testing and replacement, but the workflow introduces a linear dependency chain; a failure in an early agent can halt the entire pipeline unless retries succeed.  
-* **Retry Loop in BaseAgent** – Improves robustness against transient failures (network, LLM timeouts) at the cost of longer worst‑case latency.  
-* **Facade for LLM** – Decouples LLM providers from analysis logic, enabling easy swapping, but adds an extra indirection layer that must be kept in sync with provider capabilities.  
-* **Graph Database Choice** – Provides expressive relationship queries, supporting rich insights; however, it introduces operational overhead (graph DB provisioning, backup, scaling).  
+## Design Decisions and Trade‑offs  
 
-### System structure insights  
+* **Agent granularity vs. overhead** – Splitting the pipeline into fine‑grained agents improves modularity and testability but introduces inter‑agent coordination cost.  
+* **Batch‑centric processing** – Guarantees deterministic, repeatable runs on historic data, yet may delay insight generation compared with a streaming approach.  
+* **Ontology‑driven validation** – Centralising type rules in the *Ontology* sub‑component yields strong data consistency but requires careful versioning when the domain model evolves.  
+* **Container packaging** – Deploying the pipeline as a Dockerised service isolates dependencies and eases scaling, but adds operational complexity (image management, orchestration).  
 
-* The component sits under the **Coding** root and shares the same modular philosophy as its siblings (LiveLoggingSystem, KnowledgeManagement, etc.).  
-* Child components (**Pipeline**, **Ontology**, **Insights**) are thin wrappers that expose higher‑level APIs built on the agents.  
-* Sibling components reuse common abstractions: `LLMService` from **LLMAbstraction**, `GraphDatabaseAdapter` from **KnowledgeManagement**, and validation rules from **ConstraintSystem**.  
+---
 
-### Scalability considerations  
+## System Structure Insights  
 
-* **Horizontal scaling** can be achieved by running multiple pipeline instances, each processing a disjoint set of observations.  The stateless nature of agents (except for graph writes) supports this model.  
-* The **graph database** must be sized to handle the volume of code entities; sharding or clustering may be required for large codebases.  
-* **LLM calls** are the primary latency bottleneck; caching results in `LLMService` (as done in **LLMAbstraction**) can reduce load.  
-* The retry mechanism should be tuned to avoid cascading back‑off storms under high load.  
+* **Hierarchical placement** – *SemanticAnalysis* sits directly under the root *Coding* component, indicating it is a foundational knowledge‑extraction service.  
+* **Sibling relationships** – It shares the same level with logging, LLM abstraction, containerisation, trajectory planning, knowledge management, coding patterns, and constraint enforcement.  This positions it as the bridge between raw development artefacts (LiveLoggingSystem) and the structured knowledge store (KnowledgeManagement).  
+* **Child composition** – The three children (*Pipeline*, *Ontology*, *Insights*) map cleanly to the classic **Extract‑Transform‑Load (ETL)** flow, with an additional *Insights* “load‑plus‑analysis” stage.  
 
-### Maintainability assessment  
+---
 
-* **High** – The clear separation of concerns, standardized `BaseAgent` contract, and explicit workflow make the codebase easy to navigate and extend.  
-* **Medium** – Changes to the underlying graph schema or ontology model may ripple through multiple agents, requiring coordinated updates.  
-* **Low** – The reliance on external services (LLM providers, graph DB) introduces dependency management complexity, but the façade and adapter layers mitigate direct coupling.  
+## Scalability Considerations  
 
-Overall, the **SemanticAnalysis** component exhibits a well‑engineered, modular design that aligns with the broader architectural language of the **Coding** parent and its sibling components, offering a solid foundation for future extensions and scaling.
+* **Parallel agent execution** – Because each stage processes independent work‑items (e.g., per‑commit or per‑session), the pipeline can be parallelised across CPU cores or distributed across multiple containers.  
+* **Deduplication bottleneck** – The deduplication stage may become a hotspot as the knowledge graph grows; employing sharding or incremental hashing can mitigate latency.  
+* **Batch size tuning** – Large batches reduce container start‑up overhead but increase memory pressure; developers should balance batch size against available resources.  
+* **Horizontal scaling via Docker** – The containerised MCP can be replicated behind a simple load‑balancer if the coordinator supports work‑item partitioning, enabling the system to handle higher ingestion rates.  
+
+---
+
+## Maintainability Assessment  
+
+The component’s **modular sub‑component layout** (Pipeline, Ontology, Insights) promotes clear ownership and eases isolated testing.  The explicit agent responsibilities make the codebase approachable for new contributors, as each agent encapsulates a well‑defined transformation.  However, the lack of visible source symbols in the current observations suggests that documentation may be sparse; developers should maintain up‑to‑date interface contracts (e.g., JSON schemas for observations) to avoid drift between agents.  
+
+Versioning the **Ontology** definitions is critical; any change ripples through KG operators, validation, and insights, so a robust migration strategy (backward‑compatible schema evolution) is essential.  Containerisation via **DockerizedServices** simplifies deployment but adds a dependency on the Docker image lifecycle; automated CI pipelines that rebuild and test the MCP image on each change will keep maintainability high.  
+
+Overall, the design choices favour **extensibility** (new agents can be added) and **traceability** (each knowledge entity can be traced back to its originating observation), which are strong maintainability signals, provided that the supporting documentation and testing infrastructure keep pace with the evolving ontology and insight algorithms.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging p; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class in; DockerizedServices: [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible enviro; Trajectory: [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter cl; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and kno; CodingPatterns: [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-data; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a wor.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.
 
 ### Children
-- [Pipeline](./Pipeline.md) -- The OntologyClassificationAgent class in ontology-classification-agent.ts extends the BaseAgent abstract base class, demonstrating standardized agent behavior and response formats.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent class utilizes an ontology system to classify observations, as seen in the execute method in ontology-classification-agent.ts.
-- [Insights](./Insights.md) -- The Insights sub-component likely utilizes the knowledge graph and ontology system to generate insights and patterns, as mentioned in the description of the Insights sub-component.
+- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
+- [Ontology](./Ontology.md) -- Ontology is a sub-component of SemanticAnalysis
+- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class incorporates mode routing, caching, and provider fallback, allowing for efficient and flexible management of LLM providers. The LLMService class is responsible for routing requests to the appropriate provider based on the mode and configuration. For example, in the lib/llm/llm-service.ts file, the getProvider method is used to determine the provider based on the mode and configuration. The use of this facade pattern allows for loose coupling between the LLM providers and the rest of the system, making it easier to add or remove providers as needed.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides a connection to the Specstory extension via HTTP, IPC, or file watch, and is a key part of the component's functionality. The use of separate modules for different functionalities, such as logging and data persistence, allows for a clear separation of concerns and makes the codebase easier to understand and maintain. For example, the createLogger function from ../logging/Logger.js is used in SpecstoryAdapter to implement logging functionality.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-database-adapter.ts file. This adapter enables the component to leverage Graphology+LevelDB persistence, with automatic JSON export sync. The PersistenceAgent, implemented from integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts, plays a crucial role in handling persistence tasks. For instance, the PersistenceAgent's handlePersistenceTask function, defined in the persistence-agent.ts file, is responsible for orchestrating the persistence workflow. This modular design allows for seamless integration of various coding patterns and practices, ensuring consistency and quality in the project's codebase.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .
+- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .
+- [Trajectory](./Trajectory.md) -- Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .
+- [KnowledgeManagement](./KnowledgeManagement.md) -- KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
+- [CodingPatterns](./CodingPatterns.md) -- CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.. It contains 0 sub-components: .
+- [ConstraintSystem](./ConstraintSystem.md) -- ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*
