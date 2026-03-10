@@ -164,9 +164,9 @@ getTrajectoryState() {
 }
 ```
 
-**Display Format**: `[🛡️ {compliance}% {trajectory}]`
+**Display Format**: `[🔒 {compliance}% {trajectory}]`
 
-Example: `[🛡️ 94% ⚙️ IMP]` shows 94% constraint compliance and "implementing" state.
+Example: `[🔒 94% ⚙️ IMP]` shows 94% constraint compliance and "implementing" state.
 
 ![Status Line Display](../images/status-line-display.png)
 

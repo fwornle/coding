@@ -23,17 +23,17 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
 
-**Format**: `[🐳] [🐳MCP:health] [🏥 health] [api-quota] [sessions] [🛡️ compliance trajectory] [📚 knowledge] 📋time`
+**Format**: `[🐳] [🐳MCP:health] [🏥 health] [api-quota] [sessions] [🔒 compliance trajectory] [📚 knowledge] 📋time`
 
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
@@ -41,7 +41,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[Gq$0FEB A$0 O$0 X$25]` - **API Quota**: LLM provider spend/balance (see below)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
-- `🛡️ 67%` - **Constraint Compliance**: Code quality compliance percentage
+- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage
 - `🔍 EX` - **Trajectory State**: Current development activity
 - `[📚✅]` - **Knowledge System**: Knowledge extraction status
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
@@ -367,12 +367,12 @@ The status line displays information for **multiple active coding agent sessions
 
 **Single Active Session**:
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -530,7 +530,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+# [🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting

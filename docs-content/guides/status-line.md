@@ -10,12 +10,12 @@ Real-time visual indicators of system health and development activity rendered v
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Component Breakdown
@@ -27,7 +27,7 @@ Real-time visual indicators of system health and development activity rendered v
 | System Health | `[🏥✅]` | Unified health (infrastructure + services) |
 | API Quota | `[Gq$0FEB A$0 O$0 X$25]` | LLM provider spend/balance (live) |
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons |
-| Constraint Compliance | `🛡️ 67%` | Code quality compliance percentage |
+| Constraint Compliance | `🔒 67%` | Code quality compliance percentage |
 | Trajectory State | `🔍 EX` | Current development activity |
 | Knowledge System | `[📚✅]` | Knowledge extraction status |
 | LSL Time Window | `📋17-18` | Session time range (HHMM-HHMM) |

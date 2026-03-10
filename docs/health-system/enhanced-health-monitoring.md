@@ -365,7 +365,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ### Current Display
 ```
-[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🫒] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Component Breakdown
@@ -373,7 +373,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 | Component | Icon | Description | Example |
 |-----------|------|-------------|---------|
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
-| Constraint Compliance | `🛡️ 67%` | Code quality compliance | 67% compliance |
+| Constraint Compliance | `🔒 67%` | Code quality compliance | 67% compliance |
 | Trajectory State | `🔍EX` | Development activity | EX=exploring, IMP=implementing |
 | API Quota | `[Gq$0FEB A$0 O$0 X$25]` | LLM provider spend/balance (live) | All providers auto-tracked |
 | Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |

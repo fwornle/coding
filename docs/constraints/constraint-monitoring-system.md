@@ -8,7 +8,7 @@ The Constraint Monitoring System provides **real-time enforcement** of coding st
 
 ### Key Features
 
-- **🛡️ PreToolUse Hook Integration**: Intercepts tool calls BEFORE execution to block violations
+- **🔒 PreToolUse Hook Integration**: Intercepts tool calls BEFORE execution to block violations
 - **📊 18 Active Constraints**: Security, code quality, architecture, and documentation standards
 - **🎯 Severity-Based Enforcement**: CRITICAL/ERROR blocks, WARNING/INFO allows with feedback
 - **📈 Compliance Scoring**: Real-time scoring (0-10) with violation impact tracking

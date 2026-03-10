@@ -216,7 +216,7 @@ The status line shows the current state of the knowledge management system:
 | Processing | `[📚⏳]` | Actively extracting knowledge from session |
 | Idle | `[📚💤]` | Operational but waiting/sleeping |
 | Warning | `[📚⚠️ ⚠️N]` | Has N errors but still operational |
-| Paused/Disabled | `[📚⏸️ ]` | Knowledge extraction disabled in config |
+| Paused/Disabled | `[📚🔇]` | Knowledge extraction disabled in config |
 | Offline | `[📚❌]` | System offline or initialization failed |
 
 ### Automatic Operation

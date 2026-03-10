@@ -120,7 +120,7 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 
 - **🏥 Health System** - Real-time monitoring, auto-healing, and status line indicators
 - **📋 Live Session Logging** - Real-time conversation classification and routing
-- **🛡️ Constraint Monitoring** - PreToolUse hook enforcement for code quality
+- **🔒 Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
 - **📈 Trajectory Generation** - Automated project analysis and documentation
 - **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
@@ -194,7 +194,7 @@ Real-time development state tracking and comprehensive project analysis
 - Status line integration
 - Automated project capability documentation
 
-#### [🛡️ Constraints](docs/constraints/)
+#### [🔒 Constraints](docs/constraints/)
 Real-time code quality enforcement through PreToolUse hooks
 - 18 active constraints (security, architecture, code quality, PlantUML, documentation)
 - Severity-based enforcement (CRITICAL/ERROR blocks, WARNING/INFO allows)
