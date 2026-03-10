@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
-status: planning
-stopped_at: Phase 15 context gathered
-last_updated: "2026-03-10T20:52:40.958Z"
-last_activity: 2026-03-10 — Roadmap created for v3.0
+status: executing
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-10T21:13:00Z"
+last_activity: 2026-03-10 — Completed plan 15-01 (type definitions)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -26,20 +26,22 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 15 of 19 (Type Definitions)
-Plan: — (phase not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-10 — Roadmap created for v3.0
+Plan: 1 of 2 complete
+Status: Executing
+Last activity: 2026-03-10 — Completed plan 15-01 (type definitions)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
+- Total plans completed: 1
+- Average duration: 3min
+- Total execution time: 3min
 
-*Updated after each plan completion*
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 15    | 01   | 3min     | 2     | 6     |
 
 ## Accumulated Context
 
@@ -50,6 +52,9 @@ Progress: [░░░░░░░░░░] 0%
 - [v3.0]: Zod for runtime validation at system boundaries
 - [v3.0]: File-copy sync for shared types between backend and dashboard (not npm package)
 - [v3.0]: Backend owns state, dashboard is pure consumer — no inference
+- [15-01]: Zod-first schemas as single source of truth, TS types derived via z.infer<>
+- [15-01]: Single RunningStateSchema with subStatus enum (not nested discriminatedUnion)
+- [15-01]: Migration preprocess at boundaries for old format compatibility
 
 ### Critical Pitfalls
 
@@ -63,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:52:40.950Z
-Stopped at: Phase 15 context gathered
-Resume with: `/gsd:plan-phase 15`
+Last session: 2026-03-10T21:13:00Z
+Stopped at: Completed 15-01-PLAN.md
+Resume with: `/gsd:execute-phase 15` (plan 15-02 next)
