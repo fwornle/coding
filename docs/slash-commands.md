@@ -130,7 +130,7 @@ curriculum-alignment (2 sessions):
 
 ---
 
-## 🛡️ /lg - Live Guardrails
+## 🔒 /lg - Live Guardrails
 
 **Purpose**: Access constraint monitor dashboard and real-time compliance status
 
@@ -161,9 +161,9 @@ The `/lg` command provides instant access to:
 
 Output:
 ```
-🛡️ Live Guardrails - System Status
+🔒 Live Guardrails - System Status
 ═══════════════════════════════════════════════
-📊 Current Status: 🛡️ 8.5 🔍EX 🧠 ✅
+📊 Current Status: 🔒 8.5 🔍EX 🧠 ✅
 
 🎯 Detailed Metrics:
 📊 Compliance: 8.5/10.0
@@ -195,7 +195,7 @@ Opens web interface at `http://localhost:3001/dashboard` showing:
 
 | Icon | Meaning |
 |------|---------|
-| 🛡️ | Constraint Monitor active |
+| 🔒 | Constraint Monitor active |
 | 🔍 EX | Exploring (gathering information) |
 | 📈 ON | On Track (productive trajectory) |
 | ⚙️ IMP | Implementing (active code changes) |
@@ -237,7 +237,7 @@ The Live Guardrails system monitors for:
 
 The `/lg` command complements the status line display:
 
-**Status Line**: `🛡️ 8.5 🔍EX 🧠 ✅`
+**Status Line**: `🔒 8.5 🔍EX 🧠 ✅`
 - Quick visual indicator in every message
 - Compact format
 
@@ -273,7 +273,7 @@ The `/lg` command complements the status line display:
 
 ### During Development
 
-- **Status line** provides continuous monitoring: `🛡️ 8.5 🔍EX`
+- **Status line** provides continuous monitoring: `🔒 8.5 🔍EX`
 - **`/lg`** for detailed checks when needed
 - **Constraint violations** block critical issues automatically
 

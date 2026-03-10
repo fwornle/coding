@@ -360,9 +360,9 @@ Edit `constraints.yaml` and set `enabled: false` for any constraint:
 - [Health System](../health-system/) - Monitors constraint monitor service health
 - [Trajectories](../trajectories/) - Status line shows compliance score with trajectory state
 
-**Status Line Display**: `[🛡️ {compliance}% {trajectory}]`
+**Status Line Display**: `[🔒 {compliance}% {trajectory}]`
 
-Example: `[🛡️ 94% ⚙️ IMP]` shows 94% constraint compliance and "implementing" trajectory state.
+Example: `[🔒 94% ⚙️ IMP]` shows 94% constraint compliance and "implementing" trajectory state.
 
 ## See Also
 

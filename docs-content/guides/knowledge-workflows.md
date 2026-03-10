@@ -287,7 +287,7 @@ Knowledge ages over time with configurable decay rates:
 | Processing | `[📚⏳]` | Actively extracting knowledge from session |
 | Idle | `[📚💤]` | Operational but waiting/sleeping |
 | Warning | `[📚⚠️ ⚠️N]` | Has N errors but still operational |
-| Paused/Disabled | `[📚⏸️ ]` | Knowledge extraction disabled in config |
+| Paused/Disabled | `[📚🔇]` | Knowledge extraction disabled in config |
 | Offline | `[📚❌]` | System offline or initialization failed |
 
 ---
