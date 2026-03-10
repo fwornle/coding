@@ -1,169 +1,150 @@
-# Stack Research
+# Stack Research: v3.0 Workflow State Machine
 
-**Domain:** Multi-agent knowledge graph pipeline (UKB) — v2.0 Hierarchical Restructuring
-**Researched:** 2026-03-01
-**Confidence:** HIGH — sourced from direct codebase inspection and npm registry verification
+**Domain:** Typed state machine for multi-agent workflow orchestration
+**Researched:** 2026-03-10
+**Confidence:** HIGH — based on codebase inspection, npm registry, official docs
 
 ---
 
 ## What This Milestone Adds
 
-This document extends the existing stack documentation (originally 2026-02-26) with additions required
-for the v2.0 hierarchical restructuring. The existing stack is sound and documented below in full;
-this section highlights **net-new additions only**.
+Replace ad-hoc workflow state management (untyped JSON progress file, boolean flags, fallback inference in dashboard) with a typed state machine. This document covers ONLY the net-new stack decisions for v3.0. The existing stack (TypeScript 5.8.3, React 18, Redux Toolkit 2.9, Express 4.21, Graphology, etc.) is unchanged and documented in prior versions of this file below.
+
+---
+
+## Key Decision: Hand-Rolled Discriminated Union State Machine
+
+**Recommendation: Do NOT use XState or robot3. Hand-roll a discriminated union state machine.**
+
+### Rationale
+
+| Factor | XState v5 | robot3 | Hand-rolled DU |
+|--------|-----------|--------|----------------|
+| Bundle size | ~17KB min+gz | ~1KB | 0KB (it's your code) |
+| TypeScript DX | Good with `setup()` API, but state-specific context not supported until v6 | Functional API, weaker TS inference | Perfect — discriminated unions ARE TypeScript's type system |
+| Learning curve | Significant — actors, services, guards, invoke patterns | Moderate — functional but different paradigm | Zero — team already knows TS unions |
+| State-specific data | NOT supported (confirmed: XState v6 feature) | Not supported | Native — each state variant carries its own data |
+| Visualization | Stately.ai visualizer | None | None needed — states are explicit in code |
+| Dependencies added | 1 (xstate) + 1 (@xstate/react) for dashboard | 1 (robot3) + 1 (react-robot) | 0 |
+| Fits this codebase | Over-engineered for 6 workflow states | Too small community (2K stars vs 29K) | Matches existing TypeScript-first, zero-dep approach |
+
+**The decisive factor:** XState v5 cannot associate different context shapes with different states. The workflow needs `idle` (no data), `running` (currentStep, substepIndex), `paused` (pausedAt, resumeToken), `failed` (error, failedStep). Discriminated unions do this natively:
+
+```typescript
+type WorkflowState =
+  | { status: 'idle' }
+  | { status: 'running'; currentStep: string; substepIndex: number; startedAt: Date }
+  | { status: 'paused'; pausedAt: Date; pausedStep: string; resumeToken: string }
+  | { status: 'completed'; completedAt: Date; summary: WorkflowSummary }
+  | { status: 'failed'; error: string; failedStep: string; failedAt: Date };
+```
+
+TypeScript's `switch (state.status)` gives exhaustive checking. XState would add complexity without adding value for a workflow with ~6 states and ~10 transitions.
+
+**When XState WOULD be right:** If the workflow had 20+ states, nested parallel regions, or needed the Stately.ai visual editor for non-developer stakeholders. This workflow does not.
 
 ---
 
 ## New Stack Additions
 
-### 1. Hierarchy Traversal — graphology-traversal
+### 1. Shared Type Package — No New Library
 
-**Package:** `graphology-traversal` ^0.3.1
-**Install in:** `integrations/mcp-server-semantic-analysis/` (MCP server submodule)
+**What:** A shared TypeScript types file defining `WorkflowState`, `WorkflowEvent`, and `WorkflowTransition` types, consumed by both the backend (MCP server) and frontend (dashboard).
 
-**Why:** The existing Graphology ^0.25.4 graph already stores all hierarchy via `storeRelationship()`
-edges (relation_type: 'parent-of'). However there is no package currently installed that provides
-BFS/DFS traversal from a root node. `graphology-traversal` is the official Graphology standard
-library package for this — it is peer-compatible with graphology ^0.25.4 and exports
-`bfs`, `bfsFromNode`, `dfs`, `dfsFromNode`.
+**Pattern:** Single `.ts` file with type-only exports, copied or symlinked to both packages at build time. NOT a separate npm package — the overhead of publishing/versioning a private package for ~100 lines of types is not justified.
 
-**What it enables:**
-- Migration script: walk the graph from 'Coding' root to L2 components to L3 sub-components to leaf entities
-- Hierarchy assignment during pipeline: classify any new entity by traversing from the target parent node
-- VKB API: serve `/api/entities/tree?team=coding` by doing BFS from root
+**Location:** `integrations/mcp-server-semantic-analysis/src/types/workflow-state.ts` (source of truth)
+**Consumer:** `integrations/system-health-dashboard/src/types/workflow-state.ts` (copy, kept in sync by build script)
 
-**Compatibility confirmed:** graphology-traversal peer dependency is `graphology-types >=0.20.0`;
-current graphology ^0.25.4 satisfies this (verified via `npm view graphology-traversal peerDependencies`).
+**Why not a shared package:** This project already manages 3 submodules with build+Docker rebuild cycles. Adding a 4th package with its own package.json, tsconfig, and build step would slow iteration. A copied types file with a header comment `// GENERATED — source: mcp-server-semantic-analysis/src/types/workflow-state.ts` is simpler and the team already uses this pattern (the dashboard manually defines types that mirror backend shapes).
+
+**Why not path aliases / tsconfig paths:** The backend runs in Docker (compiled to dist/), the dashboard is a Vite app. Cross-submodule path resolution across these build systems is fragile. A simple copy is robust.
 
 ```bash
-# In integrations/mcp-server-semantic-analysis/
-npm install graphology-traversal@^0.3.1
-```
-
-**Usage pattern:**
-```typescript
-import { bfsFromNode } from 'graphology-traversal/bfs';
-
-bfsFromNode(graph, 'coding:Coding', (nodeId, attributes, depth) => {
-  console.log(`${depth}: ${attributes.name} (${attributes.entityType})`);
-});
-```
-
-Note: `graphology-utils` ^2.5.2 is already installed at the root level and provides helpers
-like `subgraph()` — available but not needed for the primary hierarchy traversal case.
-
----
-
-### 2. Tree Navigation UI — react-arborist
-
-**Package:** `react-arborist` ^3.4.3
-**Install in:** `integrations/memory-visualizer/` (VKB viewer)
-
-**Why:** The VKB viewer is a React 18 + D3 + Redux app with Tailwind CSS and Vite.
-The current view is a D3 force-directed graph — flat, no drill-down, no expand/collapse.
-For the hierarchy milestone the viewer needs a separate tree panel that shows
-Coding to L2 to L3 to leaf nodes with click-to-drill-down behavior.
-
-`react-arborist` is the right choice over alternatives because:
-- It is built for React 18 (peer dep `react >= 16.14`, tested against 18)
-- Virtualizes rendering — handles 126 entities today, scales to 1000+
-- TypeScript definitions are built-in (no separate `@types` package needed)
-- Supports click selection, keyboard navigation, expand/collapse out of the box
-- Does NOT require MUI, Syncfusion, or any design system — integrates cleanly with Tailwind
-- Shadcn tree view alternatives are not npm packages; they are registry snippets that
-  must be copied and maintained by hand — wrong choice for this project
-
-**Peer dependency check confirmed:** react-arborist ^3.4.3 requires `react >= 16.14`;
-current VKB viewer uses React 18.2.0 which satisfies this (verified via `npm view react-arborist peerDependencies`).
-
-```bash
-# In integrations/memory-visualizer/
-npm install react-arborist@^3.4.3
-```
-
-**Usage pattern:**
-```tsx
-import { Tree } from 'react-arborist';
-
-type HierarchyNode = {
-  id: string;
-  name: string;
-  children?: HierarchyNode[];
-  entityType: string;
-  level: number;
-};
-
-<Tree<HierarchyNode>
-  data={hierarchyData}
-  onSelect={(nodes) => dispatch(selectNode(nodes[0].data))}
-  rowHeight={32}
->
-  {({ node, style }) => (
-    <div style={style} onClick={() => node.toggle()}>
-      {node.data.name}
-    </div>
-  )}
-</Tree>
+# Sync script (add to dashboard package.json scripts)
+cp ../mcp-server-semantic-analysis/src/types/workflow-state.ts src/types/workflow-state.ts
 ```
 
 ---
 
-### 3. Entity Schema Extensions — parentId, level, hierarchyPath
+### 2. SSE Event Typing — No New Library
 
-**No new packages needed.** Graphology node attributes are a free-form object — adding
-`parentId`, `level`, and `hierarchyPath` fields to `storeEntity()` requires only a
-TypeScript type change, not a new library.
+**What:** Typed SSE events using the same discriminated union pattern. No library needed.
 
-**Fields to add to `KGEntity` interface in `kg-operators.ts`:**
+**Why not better-sse or ts-sse:** The backend already has a working Express SSE implementation on port 3848. The problem is not SSE transport — it works. The problem is that events are untyped strings with ad-hoc JSON payloads. The fix is TypeScript types on existing code, not a new SSE library.
+
+**Pattern:**
+
 ```typescript
-export interface KGEntity {
-  // ... existing fields ...
-  parentId?: string;          // node ID of parent entity (e.g., 'coding:KnowledgeManagement')
-  level?: number;             // 0=root, 1=L2 component, 2=L3 sub-component, 3=leaf
-  hierarchyPath?: string[];   // breadcrumb from root ['Coding', 'KnowledgeManagement', 'ManualLearning']
+// Shared type (in workflow-state.ts)
+type SSEEvent =
+  | { type: 'workflow:state-change'; payload: WorkflowState }
+  | { type: 'workflow:step-progress'; payload: { step: string; substep: string; progress: number } }
+  | { type: 'workflow:heartbeat'; payload: { timestamp: number } }
+  | { type: 'workflow:error'; payload: { message: string; step?: string } };
+
+// Backend: type-safe emit
+function emitSSE(res: Response, event: SSEEvent): void {
+  res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`);
+}
+
+// Frontend: type-safe parse
+function parseSSE(eventType: string, data: string): SSEEvent | null {
+  // parse + validate against discriminated union
 }
 ```
 
-**In `GraphDatabaseService.storeEntity()`:** The spread `...entityWithoutRelationships` already
-passes through any extra fields to Graphology node attributes. The fields will persist
-automatically to LevelDB on the next flush cycle. No storage schema migration is required —
-Graphology + LevelDB stores attributes as arbitrary JSON.
-
-**VKB API `GET /api/entities` response:** `lib/vkb-server/api-routes.js` already returns all
-node attributes. The new fields appear in the response immediately once stored — no API
-route changes are needed for basic entity reads.
-
-**New API endpoint needed:** `GET /api/entities/tree?team=coding` — serves a tree-shaped
-JSON response for `react-arborist`. This needs one new route in `lib/vkb-server/api-routes.js`
-that calls `bfsFromNode` from root and builds a nested structure.
+**What this replaces:** The current system where the dashboard receives raw SSE events and guesses meaning via fallback inference logic. With typed events, the dashboard becomes a pure consumer — no inference needed.
 
 ---
 
-### 4. Migration Tooling — Node.js Script (no new packages)
+### 3. Zod for Runtime Validation — New Dependency
 
-**Pattern:** Follow `scripts/purge-knowledge-entities.js` — plain Node.js ESM script that calls
-the VKB HTTP API at `http://localhost:8080`. No new packages required.
+**Package:** `zod` ^3.24
+**Install in:** Both `integrations/mcp-server-semantic-analysis/` and `integrations/system-health-dashboard/`
 
-**Why API-based, not direct DB:** The purge script established this pattern correctly.
-Calling the VKB HTTP API ensures LevelDB locking is handled by the server and the JSON
-export stays in sync via `GraphKnowledgeExporter`. Writing directly to LevelDB from a
-migration script would fight the lock and risk corrupting the export files.
+**Why:** TypeScript types are compile-time only. The workflow-progress.json file is read from disk, SSE events arrive as strings, and the dashboard receives JSON over HTTP. Runtime validation is needed at these boundaries:
 
-**Script location:** `scripts/knowledge-management/migrate-to-hierarchy.js`
+1. **Reading workflow-progress.json** — currently untyped `JSON.parse()`, source of stuck boolean flags
+2. **Parsing SSE events in dashboard** — currently untyped, source of fallback inference bugs
+3. **API responses from health endpoint** — currently trust-and-cast
 
-**What the script does:**
-1. `GET /api/entities?team=coding&limit=1000` — load all 126 entities
-2. Apply classification rules: assign each entity to a parent L2 component based on
-   `entity_type`, `entity_name`, and keyword heuristics
-3. `PUT /api/entities/:name` — write `parentId`, `level`, `hierarchyPath` attributes back
-4. `POST /api/relations` — create 'parent-of' edges for each parent-child pair
-5. Create curated L2 nodes (LSL, LLMAbstraction, DockerizedServices, Trajectory,
-   KnowledgeManagement, CodingPatterns) via `POST /api/entities` if they do not exist
-6. Merge generic entities into CodingPatterns via observation consolidation and delete source entities
-7. Output a dry-run report before committing any changes (--dry-run flag, same as purge script)
+Zod is the right choice because:
+- Zero dependencies
+- TypeScript-first — `z.infer<typeof schema>` derives types from schemas (single source of truth)
+- Already the community standard (30M+ weekly downloads)
+- Works in both Node.js and browser (Vite) environments
+- Small: ~14KB min+gz
 
-**No new npm packages required** — `fetch` is built into Node.js 18+, and the existing
-VKB API surface already covers all needed operations (POST, PUT, DELETE entities; POST relations).
+**What NOT to use:** io-ts (functional programming style mismatch), yup (less TypeScript integration), ajv (JSON Schema based, more verbose for this use case).
+
+```bash
+# In both submodules
+cd integrations/mcp-server-semantic-analysis && npm install zod@^3.24
+cd integrations/system-health-dashboard && npm install zod@^3.24
+```
+
+**Usage:**
+
+```typescript
+import { z } from 'zod';
+
+const WorkflowStateSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('idle') }),
+  z.object({ status: z.literal('running'), currentStep: z.string(), substepIndex: z.number() }),
+  z.object({ status: z.literal('paused'), pausedAt: z.string(), pausedStep: z.string() }),
+  z.object({ status: z.literal('completed'), completedAt: z.string() }),
+  z.object({ status: z.literal('failed'), error: z.string(), failedStep: z.string() }),
+]);
+
+type WorkflowState = z.infer<typeof WorkflowStateSchema>;
+
+// Runtime-safe read from disk
+function loadProgress(filePath: string): WorkflowState {
+  const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  return WorkflowStateSchema.parse(raw); // throws ZodError if invalid
+}
+```
 
 ---
 
@@ -171,210 +152,82 @@ VKB API surface already covers all needed operations (POST, PUT, DELETE entities
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| graphology-layout / sigma.js | Only needed for force-directed layout; D3 already handles this in the VKB viewer | Existing D3 code |
-| graphology-communities | Louvain community detection is overkill for a known, curated hierarchy | Manual parent assignment in migration script |
-| Neo4j / ArangoDB | Replacing Graphology + LevelDB breaks 14 pipeline agents and the VKB server | Graphology edges for parent-child relations |
-| @mui/x-tree-view | Pulls in the entire MUI package (~450KB) for a component that uses no MUI elsewhere | react-arborist (standalone, no design system) |
-| Syncfusion TreeView | Commercial license, adds unnecessary dependency surface | react-arborist |
-| graphology-shortest-path | Not needed — hierarchy is a DAG with known roots, BFS suffices | graphology-traversal bfsFromNode |
-| better-sqlite3 in migration | Creates LevelDB lock conflicts; root package has it but migration must use HTTP API | VKB HTTP API at localhost:8080 |
+| XState v5 | Over-engineered for ~6 states; no state-specific context until v6; adds 17KB + learning curve | Discriminated union with exhaustive switch |
+| robot3 | Small community (2K GitHub stars), less TypeScript inference than raw unions | Discriminated union |
+| @xstate/react | Unnecessary if not using XState | Redux dispatch of typed state changes |
+| better-sse / ts-sse | SSE transport already works; problem is typing, not transport | Type the existing Express SSE code |
+| Redux Saga / redux-observable | Workflow runs on backend, not in Redux; dashboard just displays state | SSE event listener dispatching to Redux |
+| Socket.io | Bidirectional not needed; SSE is sufficient for server-to-client state push | Existing Express SSE |
+| Separate shared npm package | Overhead of package management for ~100 lines of types | Copy types file with sync script |
+| io-ts | FP style (Either/fold) clashes with imperative codebase style | Zod (imperative throw/catch) |
 
 ---
 
 ## Installation Summary
 
 ```bash
-# Step 1: MCP server submodule — graphology-traversal
+# Step 1: Backend — add Zod
 cd /Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis
-npm install graphology-traversal@^0.3.1
+npm install zod@^3.24
 
-# Step 2: Rebuild submodule (CRITICAL — dist/ must be updated)
+# Step 2: Rebuild submodule (CRITICAL)
 npm run build
 
-# Step 3: Docker rebuild (CRITICAL — container runs from dist/)
+# Step 3: Docker rebuild (CRITICAL)
 cd /Users/Q284340/Agentic/coding/docker
 docker-compose build coding-services && docker-compose up -d coding-services
 
-# Step 4: VKB viewer — react-arborist (bind-mounted, no Docker rebuild)
-cd /Users/Q284340/Agentic/coding/integrations/memory-visualizer
-npm install react-arborist@^3.4.3
+# Step 4: Dashboard — add Zod
+cd /Users/Q284340/Agentic/coding/integrations/system-health-dashboard
+npm install zod@^3.24
 npm run build
 ```
+
+**Total new dependencies: 1 (Zod).** Everything else is TypeScript types on existing code.
 
 ---
 
 ## Version Compatibility Matrix
 
 | Package | Version | Compatible With | Verified |
-|---------|---------|----------------|---------|
-| graphology | ^0.25.4 (installed) | graphology-traversal ^0.3.1 | YES — peer dep graphology-types >=0.20.0 satisfied |
-| graphology-traversal | ^0.3.1 (new) | graphology ^0.25.4 | YES — npm view peerDependencies |
-| react | 18.2.0 (installed) | react-arborist ^3.4.3 | YES — peer dep react >= 16.14 satisfied |
-| react-arborist | ^3.4.3 (new) | React 18, TypeScript 5.3.3 | YES — built-in types, no @types/ needed |
-| level | ^10.0.0 (installed) | No changes — not modified | N/A |
-| graphology-utils | ^2.5.2 (root, installed) | graphology ^0.25.4 | YES — already in root package.json |
+|---------|---------|----------------|----------|
+| zod | ^3.24 | TypeScript ^5.8.3, Node.js 20, Vite 5 | YES — zero deps, pure TS |
+| typescript | ^5.8.3 (installed) | Discriminated unions, exhaustive checks | YES — native since TS 2.0 |
+| @reduxjs/toolkit | ^2.9.0 (installed) | Typed action payloads from WorkflowState | YES — createSlice handles DU types |
+| express | ^4.21.0 (installed) | Typed SSE emit wrapper | YES — Response type accepts write() |
 
 ---
 
-## Existing Stack (Unchanged)
+## Existing Stack (Unchanged from v2.0)
 
-The following documents the production stack from the v1.0 milestone. Nothing below this line
-changes for v2.0 — reproduced here so this file remains the single authoritative stack reference.
+All entries from the v2.0 STACK.md remain valid. Key components for reference:
 
----
-
-### Agent Framework
-
-**Pattern:** Custom multi-agent framework — NOT LangChain, AutoGen, or any third-party agent library.
-
-| Agent | ID | LLM? | Tier |
-|---|---|---|---|
-| Batch Scheduler | batch_scheduler | No | fast |
-| Git History | git_history | Yes | standard |
-| Vibe History | vibe_history | Yes | standard |
-| Semantic Analysis | semantic_analysis | Yes | standard (premium for batch) |
-| Observation Generation | observation_generation | Yes | premium |
-| Ontology Classification | ontology_classification | Yes | standard |
-| KG Operators | kg_operators | Yes | mixed per operator |
-| Quality Assurance | quality_assurance | Yes | premium |
-| Batch Checkpoint | batch_checkpoint_manager | No | fast |
-| Code Graph | code_graph | Yes (external) | standard |
-| Documentation Linker | documentation_linker | Yes | standard |
-| Web Search | web_search | Yes (optional) | fast |
-| Insight Generation | insight_generation | Yes | premium |
-| Persistence | persistence | No | fast |
-| Deduplication | deduplication | No (embeddings only) | standard |
-| Content Validation | content_validation | Yes | standard |
-
----
-
-### LLM Integration Layer
-
-**Library:** Custom `@coding/llm` shared library at `lib/llm/` — NOT a third-party routing library.
-
-**Mode system:** mock / local (Docker Model Runner) / public (cloud APIs per provider priority chain).
-
----
-
-### LLM Providers
-
-All configured in `config/llm-providers.yaml`. Priority chain (first available wins):
-
-| Provider | Models | Notes |
-|---|---|---|
-| copilot | claude-haiku-4.5 / claude-sonnet-4.5 / claude-opus-4.6 | Primary |
-| claude-code | sonnet / opus | Secondary subscription provider |
-| groq | llama-3.1-8b / llama-3.3-70b | API, per-token |
-| anthropic | claude-haiku/sonnet/opus | API, per-token |
-| openai | gpt-4.1-mini / gpt-4.1 / o4-mini | API, per-token |
-| gemini | gemini-2.5-flash / gemini-2.5-pro | API, per-token |
-| DMR | localhost:12434 | Local Docker Model Runner |
-
----
-
-### SDK Bindings
-
-| SDK | Package | Version |
-|---|---|---|
-| Anthropic SDK | @anthropic-ai/sdk | ^0.57.0 |
-| OpenAI SDK | openai | ^4.52.0 |
-| Groq SDK | groq-sdk | ^0.36.0 |
-| Google Generative AI | @google/generative-ai | ^0.24.1 |
-
----
-
-### Knowledge Graph Storage
-
-**In-memory graph:** Graphology ^0.25.4 — multi-edge directed graph.
-**Persistence:** Level (LevelDB) ^10.0.0 — single key `graph` stores serialized Graphology state.
-**Node ID schema:** `{team}:{entityName}` pattern for team isolation.
-**Database path:** `.data/knowledge-graph/` (relative to CODING_ROOT).
-
-Access routing:
-- `GraphDatabaseService` — core service (`src/knowledge-management/GraphDatabaseService.js`)
-- `GraphDatabaseAdapter` — uses VKB HTTP API when vkb-server is running (lock-free), falls back to direct access
-- `lib/vkb-server/api-routes.js` — Express API server, exposes `/api/entities`, `/api/relations`, `/api/stats`, `/api/teams`
-- JSON export: `.data/knowledge-export/{team}.json` kept in sync via `GraphKnowledgeExporter`
-
----
-
-### VKB Viewer Stack
-
-**Location:** `integrations/memory-visualizer/`
-**Framework:** React 18.2.0 + Vite 6 + TypeScript 5.3.3
-**State:** Redux Toolkit ^2.9.2 + React-Redux ^9.2.0
-**Visualization:** D3 ^7.8.5 (force-directed graph, current view)
-**Styling:** Tailwind CSS ^3.4.1
-**Markdown:** react-markdown ^10.1.0 + mermaid ^11.6.0 + highlight.js ^11.11.1
-**Bind-mounted:** no Docker rebuild needed after source changes — `npm run build` only
-
----
-
-### Infrastructure
-
-| Component | Technology | Port |
-|---|---|---|
-| MCP SSE server | Node.js 20 + Express | 3848 |
-| VKB server | Node.js | 8080 |
-| System health dashboard | React (bind-mounted) | 3032 |
-| Memgraph (code graph) | Memgraph graph DB | Docker internal |
-| Docker Model Runner | llama.cpp local LLM | 12434 |
-
----
-
-### Supporting Libraries (MCP Server)
-
-| Library | Version | Purpose |
-|---|---|---|
-| express | ^4.21.0 | SSE server HTTP layer |
-| yaml | ^2.8.2 | Config file parsing |
-| graphology | ^0.25.4 | In-memory knowledge graph |
-| level | ^10.0.0 | LevelDB persistence |
-| axios | ^1.6.0 | HTTP client |
-| cheerio | ^1.0.0-rc.12 | HTML parsing for web search scraping |
-| typescript | ^5.8.3 | Language (strict mode, ES2022 target) |
-
----
-
-### Key Configuration Files
-
-| File | Purpose |
-|---|---|
-| config/llm-providers.yaml | Provider priority chain, model assignments |
-| config/agents.yaml | Agent registry |
-| config/workflows/batch-analysis.yaml | Primary workflow DAG |
-| .data/workflow-progress.json | Runtime state |
-| .data/batch-checkpoints.json | Per-batch completion state for resume |
+- **Backend:** TypeScript 5.8.3, Express 4.21, Node.js 20, Graphology 0.25.4, Level 10.0
+- **Frontend (Dashboard):** React 18.3.1, Redux Toolkit 2.9.0, Vite 5.3.1, Radix UI
+- **Frontend (VKB):** React 18.2.0, D3 7.8.5, Redux Toolkit, Tailwind CSS
+- **Infrastructure:** Docker, SSE on port 3848, Health API on port 3033
+- **LLM:** Custom provider chain (Copilot/Claude/Groq/Anthropic/OpenAI/Gemini/DMR)
 
 ---
 
 ## Sources
 
-**Directly inspected (HIGH confidence):**
-- `integrations/mcp-server-semantic-analysis/package.json` — confirmed graphology ^0.25.4, level ^10.0.0
-- `integrations/memory-visualizer/package.json` — confirmed React 18.2.0, D3 7.8.5, Tailwind 3.4.1, TypeScript 5.3.3
-- `package.json` (root) — confirmed graphology-utils ^2.5.2 already present
-- `src/knowledge-management/GraphDatabaseService.js` — storeEntity, storeRelationship, attribute spread pattern, LevelDB persistence
-- `lib/vkb-server/api-routes.js` — confirmed existing API surface (GET/POST/PUT/DELETE entities, POST relations)
-- `integrations/memory-visualizer/src/api/databaseClient.ts` — Entity interface, no hierarchy fields
-- `integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts` — KGEntity interface, no parentId/level fields
-- `integrations/memory-visualizer/src/components/KnowledgeGraph/GraphVisualization.tsx` — D3 force-directed, no tree panel
-- `scripts/purge-knowledge-entities.js` — established VKB HTTP API pattern for migration scripts
-- Runtime: `node -e "..."` confirmed Graphology ^0.25.4 supports addNode, addEdge, getNodeAttributes correctly
+**Codebase inspection (HIGH confidence):**
+- `integrations/mcp-server-semantic-analysis/package.json` — confirmed TS ^5.8.3, Express ^4.21.0, no existing state machine libs
+- `integrations/system-health-dashboard/package.json` — confirmed React ^18.3.1, Redux Toolkit ^2.9.0, Vite ^5.3.1
+- `integrations/mcp-server-semantic-analysis/src/workflow-runner.ts` — confirmed ad-hoc state via cleanupState object, untyped progress file writes
+- `.planning/PROJECT.md` — confirmed v3.0 scope: typed state machine, SSE event typing
 
-**npm registry (HIGH confidence, verified live 2026-03-01):**
-- `npm view graphology-traversal version` → 0.3.1
-- `npm view graphology-traversal peerDependencies` → `{ 'graphology-types': '>=0.20.0' }`
-- `npm view react-arborist version` → 3.4.3
-- `npm view react-arborist peerDependencies` → `{ react: '>= 16.14', 'react-dom': '>= 16.14' }`
-- `npm view graphology version` → 0.26.0 (latest; project uses 0.25.4 — both satisfy traversal peer dep)
-- `npm view react version` → 19.2.4 (latest; project uses 18.2.0 — satisfies react-arborist peer dep)
-
-**Web search (MEDIUM confidence):**
-- graphology-traversal npm page — BFS/DFS API: `bfsFromNode(graph, startNode, callback(node, attrs, depth))`
-- react-arborist GitHub — React 18 compatibility confirmed, built-in TypeScript types, virtualized rendering
-- Shadcn tree view — confirmed: not an npm package, registry snippet only — not suitable for this project
+**Web research (MEDIUM confidence):**
+- [XState v5 TypeScript improvements](https://github.com/statelyai/xstate/discussions/2323) — confirmed state-specific context NOT supported in v5
+- [XState v5 release blog](https://stately.ai/blog/2023-12-01-xstate-v5) — confirmed ~17KB bundle, setup() API
+- [XState different context per state discussion](https://github.com/statelyai/xstate/discussions/1975) — confirmed "likely v6 feature"
+- [robot3 npm](https://www.npmjs.com/package/robot3) — confirmed 148K weekly downloads, 2K stars
+- [xstate npm](https://www.npmjs.com/package/xstate) — confirmed 2.4M weekly downloads, 29K stars
+- [XState vs Robot comparison](https://blog.logrocket.com/comparing-state-machines-xstate-vs-robot/) — functional vs object API differences
+- [better-sse](https://github.com/MatthewWid/better-sse) — confirmed spec-compliant but unnecessary when SSE transport already works
+- [npm trends: state machine comparison](https://npmtrends.com/machina-vs-robot3-vs-state-machine-vs-stately.js-vs-ts-fsm-vs-typescript-fsm-vs-xstate) — download trend data
 
 ---
-*Stack research for: v2.0 Hierarchical Knowledge Restructuring*
-*Researched: 2026-03-01*
+*Stack research for: v3.0 Workflow State Machine*
+*Researched: 2026-03-10*
