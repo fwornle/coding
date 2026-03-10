@@ -2,99 +2,80 @@
 
 **Type:** Detail
 
-The GraphAnalyzer's functionality is likely tied to the CodeGraphAnalysisService's primary purpose, implying a central role in the component's operation
+The CodeGraphAnalyzer sub-component uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 ## What It Is  
 
-**GraphAnalyzer** is the core analysis component that lives inside the **CodeGraphAnalysisService**. The only concrete location we can cite from the observations is the *graph‑analysis.js* module, which supplies the low‑level graph‑algorithm implementations that **GraphAnalyzer** orchestrates. In practice, **GraphAnalyzer** acts as the higher‑level façade that applies those algorithms to *code graphs*—the abstract representation of source‑code entities (files, classes, functions) and their relationships. Because the observations do not list a full file‑system path, we refer to the module simply as `graph-analysis.js` and to the containing service as `CodeGraphAnalysisService`.
+**GraphAnalyzer** is the core analysis engine that lives inside the **CodeGraphAnalyzer** sub‑component.  The only concrete location we can point to is the Docker‑Compose definition that supplies the backing service used by the surrounding component:  
 
-The purpose of **GraphAnalyzer** is therefore to translate the generic graph‑processing capabilities of *graph‑analysis.js* into domain‑specific insights about a codebase. This positions it as a pivotal piece of the analysis pipeline: without it, the service would have no way to reason about the structure, dependencies, or cycles within the code graph.
+```
+integrations/code-graph-rag/docker-compose.yaml
+```  
+
+Within that compose file the service **mcp‑server‑semantic‑analysis** is declared, and the observation *“The CodeGraphAnalyzer sub‑component uses the mcp‑server‑semantic‑analysis service … to analyze code graphs”* tells us that **GraphAnalyzer** delegates the heavy‑lifting of semantic code‑graph processing to this external container.  In other words, GraphAnalyzer is the logical façade that orchestrates calls to the semantic‑analysis service and returns structured graph data to its callers inside CodeGraphAnalyzer.
+
+Because no source files or class definitions for GraphAnalyzer were discovered, the description must remain high‑level: GraphAnalyzer is the entry point for graph‑generation requests, it marshals input (e.g., source‑code snippets or repository identifiers), forwards the request to the **mcp‑server‑semantic‑analysis** service, and then post‑processes the returned data into the format expected by the rest of the system.
 
 ---
 
 ## Architecture and Design  
 
-The architecture revealed by the observations follows a **layered, modular composition**. At the bottom layer sits the *graph‑analysis.js* module, which encapsulates reusable graph‑algorithm primitives (e.g., traversal, shortest‑path, cycle detection). Above that, **GraphAnalyzer** constitutes a *domain‑specific service layer* that composes those primitives to address the needs of code‑graph analysis. Finally, the **CodeGraphAnalysisService** is the *application‑level façade* that exposes the analysis capabilities to the rest of the system.
+The architecture evident from the observations follows a **service‑oriented** pattern that isolates the computationally intensive semantic analysis in its own Docker container.  CodeGraphAnalyzer acts as the parent orchestrator, and GraphAnalyzer is the child component that knows *how* to talk to the **mcp‑server‑semantic‑analysis** service defined in `integrations/code-graph-rag/docker-compose.yaml`.  This separation yields a clear **boundary** between the host application (CodeGraphAnalyzer) and the analysis engine (the semantic‑analysis service).
 
-The only explicit design pattern we can identify is **Composition**: **CodeGraphAnalysisService** *contains* a **GraphAnalyzer**, and **GraphAnalyzer** *depends on* the functions exported by *graph‑analysis.js*. This separation of concerns keeps the generic algorithmic logic isolated from the code‑graph semantics, facilitating reuse and independent evolution. No other patterns (e.g., microservices, event‑driven) are mentioned, so we refrain from speculating beyond what the observations support.
+The design leans on **container‑based decoupling**: the analysis workload can be scaled, upgraded, or swapped independently of the rest of the code‑graph pipeline.  Interaction is likely performed over HTTP/REST or gRPC, although the exact protocol is not listed in the observations.  By keeping GraphAnalyzer thin—essentially a client wrapper—it avoids embedding heavyweight language‑processing libraries directly in the main codebase, reducing the overall binary size and simplifying dependency management.
 
-Interaction between components is straightforward: when a request to analyse a codebase arrives at **CodeGraphAnalysisService**, the service delegates the heavy lifting to **GraphAnalyzer**, which in turn invokes the appropriate functions from *graph‑analysis.js*. The flow is synchronous and tightly coupled within the same process, reflecting a monolithic module organization rather than distributed services.
+Because the only concrete integration point is the Docker‑Compose file, we can infer that the system relies on **infrastructure‑as‑code** to spin up the required service.  This approach makes the deployment reproducible and portable across environments (development, CI, production).  The pattern also supports **horizontal scaling**: additional instances of the semantic‑analysis container can be added to the compose file or migrated to an orchestrator like Kubernetes without changing GraphAnalyzer’s code.
 
 ---
 
 ## Implementation Details  
 
-Although the source symbols are not enumerated, the observations give us three concrete artefacts:
+The implementation details we can assert are limited to the interaction contract between GraphAnalyzer and the **mcp‑server‑semantic‑analysis** service.  GraphAnalyzer likely contains a small set of functions or methods that:
 
-1. **graph‑analysis.js** – a utility module that implements generic graph algorithms. It likely exports functions such as `traverseGraph`, `detectCycles`, or `computeShortestPath`. These functions operate on a plain graph data structure (nodes and edges) without any knowledge of code‑specific concepts.
+1. **Validate and package input** – converting raw source files or repository identifiers into the payload format expected by the service (e.g., JSON with code snippets, language hints, or file paths).  
+2. **Invoke the service** – issuing an HTTP request (POST) to the endpoint exposed by the container defined in `integrations/code-graph-rag/docker-compose.yaml`.  The compose file would expose a port (commonly `8000` or `8080`) that GraphAnalyzer references via an environment variable or configuration key.  
+3. **Handle the response** – parsing the returned graph representation (possibly in a format like GraphQL, JSON‑LD, or a custom node/edge schema) and transforming it into the internal model used by CodeGraphAnalyzer.  
+4. **Error handling and retries** – detecting service unavailability, timeouts, or malformed responses, and surfacing meaningful exceptions to the caller.
 
-2. **GraphAnalyzer** – a class or object that lives inside **CodeGraphAnalysisService**. Its responsibility is to map code‑specific entities (e.g., AST nodes, import statements) onto the generic graph model expected by *graph‑analysis.js*, invoke the needed algorithm, and then translate the raw results back into meaningful analysis data (e.g., dependency cycles, unreachable code, tightly coupled modules).
-
-3. **CodeGraphAnalysisService** – the public service that exposes methods such as `analyzeCodeGraph` or `getAnalysisReport`. Internally it creates or holds an instance of **GraphAnalyzer** and forwards incoming analysis requests to it.
-
-The technical mechanics therefore involve three steps:
-- **Graph construction** – **GraphAnalyzer** builds a representation of the codebase as a graph (nodes = code units, edges = relationships).
-- **Algorithm execution** – it calls the appropriate routine from *graph‑analysis.js* (e.g., `detectCycles(graph)`).
-- **Result interpretation** – the raw algorithm output is post‑processed into domain‑specific insights that **CodeGraphAnalysisService** can return to callers.
-
-Because the observations do not list specific function names, the description remains at this abstract level, directly reflecting the observed dependency chain.
+Because no concrete class names or function signatures were captured, we cannot enumerate exact symbols.  However, the pattern of a thin wrapper around a remote service is evident, and any internal state is expected to be minimal—perhaps just configuration (service URL, authentication token) and a small cache for recent graph results.
 
 ---
 
 ## Integration Points  
 
-The primary integration point for **GraphAnalyzer** is its parent, **CodeGraphAnalysisService**. The service acts as the consumer of **GraphAnalyzer**’s API and is the entry point for any external module that needs code‑graph analysis (e.g., a CI pipeline, an IDE plugin, or a reporting dashboard). The only external dependency explicitly mentioned is the *graph‑analysis.js* module, which **GraphAnalyzer** imports to gain access to the algorithmic toolbox.
+The primary integration point is the **mcp‑server‑semantic‑analysis** service declared in `integrations/code-graph-rag/docker-compose.yaml`.  This service provides the semantic analysis capabilities that GraphAnalyzer consumes.  Consequently, GraphAnalyzer depends on:
 
-No sibling components are described, but any other analysis utilities that also rely on *graph‑analysis.js* would be natural siblings, sharing the same low‑level algorithm library. If the system later introduces additional services (e.g., a **CodeMetricsService**), they could reuse the same module, reinforcing the modular design.
+* **Docker‑Compose infrastructure** – the service must be up and reachable at the network address defined in the compose file.  Developers need to ensure that `docker-compose up` (or an equivalent orchestration command) runs before invoking any GraphAnalyzer APIs.  
+* **Configuration management** – environment variables or a configuration file that supplies the service endpoint, any required authentication headers, and possibly request‑size limits.  
+* **CodeGraphAnalyzer** – as the parent component, it calls GraphAnalyzer to request graph generation.  The contract between them is likely a method like `generateGraph(source: string): Graph`.  Any changes to the service API will ripple up to CodeGraphAnalyzer, so versioning must be coordinated.
 
-The integration surface is therefore limited to:
-- **Import statements** in **GraphAnalyzer** that bring in *graph‑analysis.js*.
-- **Method calls** from **CodeGraphAnalysisService** to **GraphAnalyzer**.
-- Potential **data contracts** (e.g., the shape of the code graph object) that must be respected across these boundaries.
+There are no sibling components mentioned, but the overall system may include other analysis tools that also rely on the same semantic‑analysis service, indicating a shared backend that multiple front‑ends can reuse.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Treat GraphAnalyzer as an internal helper** – It is designed to be used exclusively by **CodeGraphAnalysisService**. Direct consumption by external code bypasses the service’s validation and may lead to inconsistent graph representations.
-
-2. **Provide well‑formed code‑graph objects** – Since **GraphAnalyzer** expects a specific node/edge structure compatible with *graph‑analysis.js*, callers (i.e., the service) must ensure that the graph is correctly built before invoking analysis functions. This includes unique node identifiers and accurate edge directionality.
-
-3. **Prefer the high‑level service API** – Developers should call the public methods exposed by **CodeGraphAnalysisService** (e.g., `analyzeCodeGraph`) rather than invoking **GraphAnalyzer** methods directly. This guarantees that any future changes to the underlying algorithm library remain transparent to the consumer.
-
-4. **Avoid mutating the graph while an analysis is in progress** – Because the underlying algorithms may traverse the graph multiple times, concurrent modifications could cause nondeterministic results. If the system evolves to support parallel analyses, a defensive copy of the graph should be made inside **GraphAnalyzer**.
-
-5. **Stay within the supported algorithm set** – The only algorithms available are those exported by *graph‑analysis.js*. Introducing custom graph logic should be done by extending that module, not by patching **GraphAnalyzer**, to preserve the clear separation of concerns.
+1. **Ensure the service is running** – Before using GraphAnalyzer, start the Docker composition defined at `integrations/code-graph-rag/docker-compose.yaml`.  Verify that the container `mcp-server-semantic-analysis` is healthy and listening on the expected port.  
+2. **Configure the endpoint** – Populate the environment variable (e.g., `SEMANTIC_ANALYSIS_URL`) or configuration key that GraphAnalyzer reads.  Keeping this configurable allows the service to be relocated without code changes.  
+3. **Respect payload limits** – The remote service may impose size or rate limits.  Chunk large codebases into smaller requests or implement client‑side throttling to avoid HTTP 429 responses.  
+4. **Handle failures gracefully** – Wrap GraphAnalyzer calls in try/catch blocks, log the error, and consider retrying with exponential back‑off.  Because the analysis runs in a separate container, transient network glitches are possible.  
+5. **Version compatibility** – If the `mcp-server-semantic-analysis` container is upgraded, confirm that the request/response schema has not changed.  Align the GraphAnalyzer client version with the service version to prevent breaking changes.
 
 ---
 
-### 1. Architectural patterns identified  
-- **Composition** (CodeGraphAnalysisService → GraphAnalyzer → graph‑analysis.js)  
-- **Layered modular architecture** (utility layer → domain‑specific analyser → service façade)
+### Summarized Findings  
 
-### 2. Design decisions and trade‑offs  
-- **Separation of concerns**: generic algorithms are isolated from code‑specific logic, improving reusability but adding an extra translation layer.  
-- **Synchronous, in‑process coupling**: simplifies data flow and debugging, yet limits scalability across process or machine boundaries.  
-- **Single responsibility**: GraphAnalyzer focuses solely on mapping code graphs to algorithm inputs, which aids maintainability but requires strict contract enforcement between layers.
-
-### 3. System structure insights  
-- The system is organized around a **core analysis service** (CodeGraphAnalysisService) that delegates to a **specialised analyser** (GraphAnalyzer).  
-- The **graph‑analysis.js** module serves as a shared utility library that could be leveraged by other analysis components, indicating a potential for code‑graph‑related feature expansion.
-
-### 4. Scalability considerations  
-- Because the current design is monolithic and synchronous, scaling horizontally would require refactoring the service into separate processes or exposing the analysis as a remote procedure call.  
-- The modular nature of *graph‑analysis.js* does allow the algorithmic layer to be swapped for more performant implementations (e.g., native extensions) without altering the higher layers.
-
-### 5. Maintainability assessment  
-- **High maintainability** for the algorithmic layer: changes to generic graph functions are localized to *graph‑analysis.js*.  
-- **Medium maintainability** for GraphAnalyzer: any change in the code‑graph schema forces updates in the translation logic.  
-- **Low risk** overall because the clear composition and limited public surface (only the service API) reduce the impact of internal changes on external consumers.
+1. **Architectural patterns identified** – Service‑oriented architecture with container‑based decoupling; infrastructure‑as‑code via Docker‑Compose; thin client wrapper pattern.  
+2. **Design decisions and trade‑offs** – Off‑loading heavy semantic analysis to an external service improves modularity and keeps the main codebase lightweight, at the cost of added network latency and the need for reliable service orchestration.  
+3. **System structure insights** – GraphAnalyzer is a child of CodeGraphAnalyzer, acting as a façade to the `mcp-server-semantic-analysis` service; the service is defined centrally in `integrations/code-graph-rag/docker-compose.yaml`.  
+4. **Scalability considerations** – The Docker‑Compose service can be horizontally scaled (multiple container instances) and potentially moved to a more robust orchestrator; GraphAnalyzer’s stateless nature makes it easy to run in parallel across multiple callers.  
+5. **Maintainability assessment** – Clear separation of concerns aids maintainability; however, the lack of visible source code for GraphAnalyzer limits deep static analysis.  Maintaining alignment between client expectations and service API contracts will be the primary maintenance burden.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- CodeGraphAnalysisService uses the graph-analysis.js module to perform graph algorithms on code graphs
+- [CodeGraphAnalyzer](./CodeGraphAnalyzer.md) -- CodeGraphAnalyzer uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 
 ---

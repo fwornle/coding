@@ -2,109 +2,80 @@
 
 **Type:** SubComponent
 
-The LoggingModule could utilize a modular design to allow for easy integration of new logging frameworks.
+The createLogger function from ../logging/Logger.js is used to create logger instances for standardized logging.
 
 ## What It Is  
 
-The **LoggingModule** is a sub‑component of the **LiveLoggingSystem** that centralises all logging concerns for the live‑session pipeline.  While the current source snapshot does not expose a concrete file path for the module, the surrounding hierarchy makes its location clear: it lives alongside sibling modules such as **TranscriptManager**, **LSLConverterModule**, **GraphDatabaseModule**, and **TranscriptAdapter** under the top‑level *LiveLoggingSystem* package.  Its primary responsibility is to provide a reusable logging API that other components can call, to handle log message formatting, filtering, categorisation, rotation, and retention, and to expose a configuration surface for runtime customisation.  The module also collaborates with **TranscriptManager** to emit transcript‑related events, ensuring that every significant step in the transcript processing flow is captured in the system log.
-
----
+The **LoggingModule** lives inside the *Trajectory* component and is responsible for providing a single, consistent way to record events and errors throughout that component. All logger instances are created through the `createLogger` function that lives in `../logging/Logger.js`. Whenever the Trajectory code needs to emit a message—whether it is an informational event, a warning, or an exception—it calls the logger supplied by this module. Because the module is part of the same modular family as `SpecstoryAdapterModule` and `ErrorHandlingModule`, it shares the same design philosophy of clear separation of concerns while remaining tightly integrated with the rest of the Trajectory subsystem.
 
 ## Architecture and Design  
 
-The observations point to a **modular design** as the core architectural approach for the LoggingModule.  Rather than being hard‑wired to a single logging framework, the module is described as “utilizing a logging framework” and “allowing for easy integration of new logging frameworks.”  This suggests an abstraction layer (e.g., a logger interface) that can be swapped or extended without touching the rest of the code base—an application of the *Strategy* pattern at a very lightweight level.  
+The observations point to a **modular architecture**: each functional concern (logging, error handling, adapters) lives in its own module under the Trajectory parent component. The LoggingModule follows a **factory‑based design** by delegating logger creation to the `createLogger` function in `../logging/Logger.js`. This factory abstracts the underlying logging implementation (e.g., console, file, external service) and guarantees that every consumer receives a logger that conforms to the same interface.  
 
-Configuration is exposed through a “configuration interface for customizing logging settings,” indicating a **configuration‑driven** design.  Settings such as log level, output destinations, rotation policy, and retention limits are likely supplied at start‑up (or via a hot‑reload mechanism) and consumed by the module to shape its runtime behaviour.  
-
-The module also appears to implement **cross‑cutting concerns** such as log filtering and categorisation.  By providing a central API, it becomes the single point where log messages are tagged (e.g., by component or severity) and optionally filtered before being handed off to the underlying framework.  This centralisation reduces duplication across siblings like **TranscriptManager** and **LSLConverterModule**, which can simply call the LoggingModule’s API instead of embedding their own logging logic.  
-
-Finally, the mention of “log rotation and retention” shows that the module takes responsibility for **operational scalability** of log data, likely delegating to the underlying framework’s rotation facilities (size‑based, time‑based) while exposing retention policies to the system administrator.
-
----
+Interaction between modules is deliberately **decoupled**. The LoggingModule does not embed any error‑handling logic itself; instead, it relies on the sibling **ErrorHandlingModule** to process exceptions that are first reported via the logger. Similarly, the **SpecstoryAdapterModule** can use the same logger instance to trace its own HTTP/IPC/file‑watch operations, ensuring a uniform log format across the whole Trajectory component. The design therefore emphasizes **separation of concerns** (logging vs. error handling vs. integration) while still enabling easy cross‑module collaboration through shared utilities.
 
 ## Implementation Details  
 
-Because no concrete symbols were discovered in the current code snapshot, the implementation can be inferred from the functional responsibilities listed:
+At the heart of the module is the `createLogger` export from `../logging/Logger.js`. When the LoggingModule is initialized, it calls this function—typically once per logical sub‑system—to obtain a logger object. The returned logger exposes methods such as `info`, `warn`, `error`, and possibly `debug`, each of which writes a structured message to the chosen destination. Because the factory lives outside the module, the LoggingModule can remain lightweight: its only responsibility is to expose the configured logger to the rest of Trajectory.  
 
-1. **Logging API** – A set of exported functions (e.g., `logInfo`, `logError`, `logDebug`) that accept a message, optional metadata, and a category tag.  These functions forward the payload to the selected logging framework instance.
-
-2. **Framework Adapter** – An internal adapter layer abstracts the concrete logging library (e.g., Winston, Bunyan, or a custom logger).  The adapter implements the same contract expected by the API, enabling the “easy integration of new logging frameworks” described in the observations.
-
-3. **Configuration Interface** – A configuration object (perhaps loaded from `config/logging.json` or injected via environment variables) defines:
-   * Log level thresholds
-   * Output transports (console, file, remote syslog)
-   * Rotation policy (max file size, daily rollover)
-   * Retention period (number of days or files to keep)
-   The module reads this configuration at initialisation and reconfigures the underlying logger accordingly.
-
-4. **Rotation & Retention Logic** – Leveraging the underlying framework’s rotation capabilities, the module sets up file handlers that automatically rotate when size or time limits are reached.  A cleanup routine enforces the retention policy, deleting or archiving old log files.
-
-5. **Filtering & Categorisation** – Before delegating to the framework, the module examines the supplied category and applies any active filters (e.g., suppressing verbose logs from `TranscriptAdapter` while keeping error logs from `GraphDatabaseModule`).  This filtering logic is likely driven by the same configuration interface.
-
-6. **Interaction with TranscriptManager** – When the **TranscriptManager** processes a transcript, it calls the LoggingModule’s API to record events such as “transcript load start,” “conversion success,” or “error parsing transcript.”  This coupling is one‑way: the LoggingModule does not depend on TranscriptManager, preserving a clean dependency direction.
-
----
+Error handling is delegated: when an exception occurs, the LoggingModule records the stack trace and message via `logger.error(...)` and then forwards the error object to the **ErrorHandlingModule**. That sibling module decides whether to retry, abort, or surface the error to the user. The LoggingModule therefore acts as a *pass‑through* for diagnostics while keeping the actual recovery logic out of its own codebase. The module’s extensibility stems from the fact that `createLogger` can be swapped or extended (e.g., adding a transport for a remote log aggregation service) without touching any of the LoggingModule’s consumer code.
 
 ## Integration Points  
 
-* **Parent – LiveLoggingSystem** – The LoggingModule is a child of the LiveLoggingSystem and therefore inherits any system‑wide configuration conventions (e.g., a top‑level `logging` section in the system config).  LiveLoggingSystem likely orchestrates the initialisation order, ensuring the LoggingModule is ready before sibling components start emitting logs.
+* **Parent – Trajectory** – The LoggingModule is a child of the Trajectory component, supplying logging capabilities to every sub‑module within Trajectory, including `SpecstoryAdapterModule` and any future adapters. Because Trajectory’s architecture groups adapters and services into separate modules, the logger can be injected wherever needed, preserving a consistent log format across the whole component.  
 
-* **Sibling – TranscriptManager / LSLConverterModule / GraphDatabaseModule / TranscriptAdapter** – These components all consume the LoggingModule’s API.  Because they share the same logging surface, their log output is uniformly formatted and routed, simplifying downstream log aggregation and analysis.  No sibling appears to provide logging services back to the LoggingModule, preserving a clear “consumer‑only” relationship.
+* **Sibling – ErrorHandlingModule** – Errors captured by the logger are handed off to this module. The hand‑off is a simple contract: the LoggingModule emits an `error`‑level entry and then calls a method (e.g., `ErrorHandlingModule.process(error)`) to let the error‑handling logic decide the next steps.  
 
-* **External Frameworks** – The module abstracts the underlying logging framework, meaning any third‑party library can be swapped in as long as it satisfies the internal adapter contract.  This abstraction also shields the rest of the system from framework‑specific APIs.
+* **Sibling – SpecstoryAdapterModule** – This adapter imports the same logger (via the LoggingModule) to trace its HTTP, IPC, or file‑watch interactions. Because both modules use the identical logger instance, correlation of events across adapters is straightforward.  
 
-* **Configuration Sources** – The module likely reads from configuration files or environment variables that are also used by other subsystems.  Consistency across the system is maintained by centralising these settings in the LiveLoggingSystem’s configuration hierarchy.
-
----
+* **External – ../logging/Logger.js** – The only external dependency of the LoggingModule is the logger factory. Any change to the factory (new transports, formatters, or level controls) automatically propagates to all consumers, making the integration point both powerful and low‑risk.
 
 ## Usage Guidelines  
 
-1. **Prefer the Central API** – All components should import the LoggingModule’s exported functions rather than instantiating their own logger instances.  This guarantees consistent formatting, categorisation, and rotation handling.
+1. **Obtain the logger through the module** – Do not import `createLogger` directly in application code. Instead, require the LoggingModule (or a higher‑level Trajectory service that exposes the logger) so that the same logger instance is shared across the component.  
 
-2. **Categorise Log Entries** – When calling the API, always supply a category that matches the originating component (e.g., `TranscriptManager`, `LSLConverterModule`).  This enables the built‑in filtering mechanism to work correctly and aids downstream log search.
+2. **Log at the appropriate level** – Use `info` for normal operational events, `warn` for recoverable anomalies, and `error` for exceptions that will be routed to the ErrorHandlingModule. Consistent level usage ensures that downstream log aggregators can filter correctly.  
 
-3. **Respect Configuration** – Do not hard‑code log levels or output destinations inside component code.  Instead, rely on the configuration interface to adjust verbosity at runtime.  Changing the `logging.level` in the system config should be sufficient to increase or decrease output across the entire LiveLoggingSystem.
+3. **Never swallow errors** – When catching an exception, always call `logger.error(...)` before delegating to `ErrorHandlingModule`. This guarantees that the full stack trace is persisted for post‑mortem analysis.  
 
-4. **Avoid Direct Framework Calls** – Direct interaction with the underlying logging library (e.g., calling Winston’s `logger.info` directly) bypasses the abstraction and may lead to inconsistent rotation or retention behaviour.  All log emission should funnel through the LoggingModule.
+4. **Keep logging statements lightweight** – Because the logger is shared, heavy string interpolation or synchronous I/O inside a log call can affect all modules. Prefer lazy evaluation (e.g., passing a function or using template placeholders) if the underlying logger supports it.  
 
-5. **Monitor Rotation & Retention** – Verify that the configured rotation size/time and retention period align with operational storage constraints.  If the system generates high‑volume transcript logs, consider tighter rotation thresholds to prevent disk exhaustion.
+5. **Extend via the factory, not the module** – If a new transport or format is required, modify or wrap `../logging/Logger.js` rather than altering the LoggingModule itself. This preserves the module’s thin abstraction and keeps the dependency graph clean.
 
 ---
 
-### Architectural patterns identified
-* **Modular design** – a self‑contained sub‑component with a well‑defined API.
-* **Strategy‑like abstraction** – interchangeable logging framework adapters.
-* **Configuration‑driven behaviour** – runtime‑adjustable settings for levels, transports, rotation, and retention.
-* **Cross‑cutting concern centralisation** – logging as an aspect applied uniformly across siblings.
+### Architectural patterns identified  
+* **Modular architecture** – distinct modules for logging, error handling, and adapters.  
+* **Factory pattern** – `createLogger` centralizes logger construction.  
+* **Separation of concerns** – logging, error handling, and integration logic are isolated in sibling modules.  
 
-### Design decisions and trade‑offs
-* **Abstraction vs. performance** – Introducing an adapter layer adds a small indirection but gains flexibility to swap frameworks without code changes.
-* **Centralised filtering** – Simplifies log management but requires disciplined category usage to avoid over‑filtering.
-* **Rotation & retention built‑in** – Improves operational scalability at the cost of additional configuration complexity.
+### Design decisions and trade‑offs  
+* **Centralized logger factory** simplifies configuration but creates a single point of change; any modification to the factory instantly impacts all consumers.  
+* **Delegating error handling** keeps the LoggingModule simple, at the cost of an extra hand‑off step that must be correctly wired.  
+* **Extensibility via the factory** enables future transports without touching the module, but requires that the factory expose a stable API.  
 
-### System structure insights
-* LoggingModule sits under **LiveLoggingSystem**, acting as a service provider for all sibling modules.
-* It maintains a **one‑directional dependency**: siblings depend on it, but it does not depend on them, preserving a clean hierarchical architecture.
+### System structure insights  
+* The Trajectory component acts as a container for several focused sub‑components.  
+* LoggingModule provides a cross‑cutting concern service that is consumed by all siblings, reinforcing a “shared services” model within the parent.  
 
-### Scalability considerations
-* Log rotation and retention policies allow the system to handle growing log volume without manual intervention.
-* The modular adapter permits scaling to more sophisticated logging back‑ends (e.g., remote log aggregators) if future load demands increase.
+### Scalability considerations  
+* Because logging is centralized, scaling the logger (e.g., batching, async writes, remote aggregation) can be achieved by upgrading `../logging/Logger.js` without touching the LoggingModule or its consumers.  
+* The lightweight nature of the module means it does not become a bottleneck; the real scalability hinges on the underlying logger implementation.  
 
-### Maintainability assessment
-* The modular, configuration‑driven approach isolates logging concerns, making updates (framework upgrades, policy changes) localized to the LoggingModule.
-* Consistent API usage across the codebase reduces duplication and eases onboarding for new developers, enhancing long‑term maintainability.
+### Maintainability assessment  
+* High maintainability: the module’s responsibilities are narrow, its API is stable, and it relies on a single external factory.  
+* Adding new log levels or transports only requires changes in the factory, leaving the module untouched.  
+* Clear contracts with ErrorHandlingModule and other siblings reduce coupling and simplify future refactors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component's architecture is designed with modularity in mind, as evident from the separate modules for TranscriptAdapter, LSLConverter, and logging utilities. The TranscriptAdapter class, located in lib/agent-api/transcript-api.js, provides a unified abstraction for reading and converting transcripts from different agent formats into the Live Session Logging (LSL) format. This design decision allows for easy integration of new agent formats by simply creating a new adapter, without modifying the existing codebase. The LSLConverter class, found in lib/agent-api/transcripts/lsl-converter.js, is responsible for converting between agent-specific transcript formats and the unified LSL format, ensuring consistency across the system.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
 
 ### Siblings
-- [TranscriptManager](./TranscriptManager.md) -- The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format.
-- [LSLConverterModule](./LSLConverterModule.md) -- The LSLConverter class in lib/agent-api/transcripts/lsl-converter.js is responsible for converting between agent-specific transcript formats and the unified LSL format.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- The GraphDatabaseModule may utilize a graph database framework to handle data storage and retrieval.
-- [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format.
+- [SpecstoryAdapterModule](./SpecstoryAdapterModule.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js encapsulates the logic for connecting to the Specstory extension.
+- [ErrorHandlingModule](./ErrorHandlingModule.md) -- The ErrorHandlingModule handles errors and exceptions that occur during the interaction with the Specstory extension.
 
 
 ---

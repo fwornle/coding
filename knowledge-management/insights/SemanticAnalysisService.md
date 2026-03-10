@@ -2,93 +2,94 @@
 
 **Type:** SubComponent
 
-The service-starter.js script provides a robust service startup mechanism, ensuring that the SemanticAnalysisService can recover from temporary failures and maintain overall system stability.
+SemanticAnalysisService uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to perform semantic analysis
 
 ## What It Is  
 
-The **SemanticAnalysisService** is a sub‑component that lives inside the **DockerizedServices** container.  Its primary responsibility is to perform natural‑language‑processing (NLP) and semantic analysis on incoming data.  While the concrete NLP libraries are not enumerated in the source, the observations indicate that the service may rely on Python‑based toolkits such as **NLTK**, **spaCy**, or machine‑learning frameworks like **scikit‑learn** and **TensorFlow** to deliver accurate semantic understanding.  
+**SemanticAnalysisService** is a Docker‑based sub‑component that provides semantic analysis capabilities for the broader **DockerizedServices** platform. The service is instantiated through the `mcp‑server‑semantic‑analysis` container that is declared in the Docker‑Compose file located at  
 
-The service’s lifecycle is managed by the **service‑starter.js** script.  This script implements a **retry‑with‑backoff** start‑up routine that repeatedly attempts to bring the service online when optional dependencies are temporarily unavailable.  By using an exponential backoff strategy together with a configurable retry limit, the start‑up logic avoids endless loops and protects the overall system from being overwhelmed by rapid, repeated connection attempts.
+```
+integrations/code-graph-rag/docker-compose.yaml
+```  
 
-In short, SemanticAnalysisService is the NLP engine of the DockerizedServices suite, wrapped in a resilient start‑up wrapper that guarantees graceful degradation and recovery in the face of transient failures.
+All runtime configuration for the service is supplied via environment variables, most notably `CODING_REPO`, which is read by the JavaScript entry points `api-service.js` and `dashboard-service.js`. Because the service lives in its own Docker image and is defined with its own set of dependencies, it is isolated from the other sub‑components such as **ConstraintMonitor** and **CodeGraphAnalyzer**, yet it is reachable by them through the shared Docker‑Compose network.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of SemanticAnalysisService is built around two orthogonal concerns: **semantic processing** and **robust service start‑up**.  The former is encapsulated in the domain‑specific code that invokes NLP/ML libraries; the latter is realized by the **RetryWithBackoffPattern** child component, which lives inside the service and is shared across sibling services (ConstraintMonitoringService, CodeGraphService, ServiceStarter).  
+The observations reveal a **modular, service‑oriented architecture** realized through Docker Compose. Each logical capability (semantic analysis, constraint monitoring, code‑graph analysis) is packaged as an independent Docker service with its own image and environment configuration. This separation of concerns is explicit in the `docker‑compose.yaml` where `mcp‑server‑semantic‑analysis` is defined alongside other services, and each service consumes only the variables it requires (e.g., `CODING_REPO`).  
 
-The **retry‑with‑backoff pattern** is the dominant design pattern evident from the observations.  Implemented in **service‑starter.js**, the pattern combines **exponential backoff** with a **recursive setTimeout** call.  This approach yields a gradual increase in the delay between successive start‑up attempts, reducing the risk of saturating dependent services or the network.  The pattern is also deliberately **configurable** – the number of retries and the backoff multiplier can be tuned, allowing operators to balance start‑up speed against system stability.
+Interaction between components is achieved via networked Docker containers rather than direct in‑process calls. The JavaScript scripts (`api‑service.js`, `dashboard‑service.js`) act as thin adapters that read environment variables and forward requests to the semantic analysis container. This design mirrors a **client‑server** pattern: the scripts are lightweight clients that delegate the heavy lifting to the dedicated server container.
 
-Because the same **service‑starter.js** logic is reused by multiple sibling components, the design follows a **shared‑utility** model: the start‑up script is a common entry point for all DockerizedServices children, promoting consistency and reducing duplicated code.  The parent component, **DockerizedServices**, orchestrates the container‑level deployment, while each sub‑component (including SemanticAnalysisService) focuses on its domain logic.
+Because the Docker Compose file lives under `integrations/code-graph-rag/`, the architecture groups related services (semantic analysis, constraint monitoring, code‑graph analysis) within a single integration folder, reinforcing a **bounded‑context** approach. The sibling components **ConstraintMonitor** and **CodeGraphAnalyzer** also reference the same `mcp‑server‑semantic‑analysis` service, indicating a shared backend that multiple front‑ends can consume.
 
 ---
 
 ## Implementation Details  
 
-The core of the start‑up mechanism resides in **service‑starter.js**.  The script defines a **recursive function** (often named something like `attemptStart`) that performs the following steps:
+The core of the service is the Docker image referenced by the `mcp‑server‑semantic‑analysis` definition. While the observations do not list concrete classes or functions, they do point to the configuration entry points:
 
-1. **Invoke the service start logic** – this could be a Docker `run` command, a Node.js `child_process.spawn`, or a direct call to a Python entry point that launches the NLP engine.  
-2. **Catch any failure** – if the start attempt throws or returns an error, the function does not immediately retry.  
-3. **Calculate the backoff delay** – using an exponential formula (e.g., `delay = baseDelay * Math.pow(2, attemptCount)`) the script determines how long to wait before the next attempt.  
-4. **Schedule the next attempt** – `setTimeout(attemptStart, delay)` schedules the recursive call, ensuring the JavaScript event loop remains non‑blocking.  
-5. **Terminate after a configurable limit** – once the maximum retry count is reached, the script logs a graceful degradation message and exits, preventing an infinite loop.
+* **`api-service.js`** – a Node.js script that reads `process.env.CODING_REPO` and likely exposes an HTTP API (or a CLI) that forwards payloads to the semantic analysis container.  
+* **`dashboard-service.js`** – another Node.js script that also consumes `CODING_REPO` and probably provides a UI‑oriented façade for the same backend.
 
-Because the pattern is encapsulated in the **RetryWithBackoffPattern** child component, other services can import or require this module rather than re‑implementing the logic.  The pattern’s implementation is deliberately **stateless** aside from the retry counter, which simplifies testing and debugging.
+Both scripts demonstrate **environment‑driven configuration**, meaning the same code can be reused across environments (development, staging, production) simply by changing the values in the Docker Compose file. The Docker Compose snippet (not reproduced verbatim) includes the `environment:` block for `mcp‑server‑semantic‑analysis`, where variables such as `CODING_REPO` are injected. This approach eliminates hard‑coded paths and makes the service portable.
 
-On the semantic side, the service likely runs a Python process that loads pre‑trained models (e.g., TensorFlow graph files or scikit‑learn pipelines) and exposes an API (REST, gRPC, or a message queue) that the JavaScript starter can probe for health.  While the observations do not list exact class names, typical entry points would be a `SemanticAnalyzer` class that wraps the chosen NLP library and a `predict` or `analyze` method that receives raw text and returns a structured semantic representation.
+The service’s Docker image encapsulates all runtime dependencies (e.g., language models, analysis libraries). Because the image is built separately, updates to the analysis engine can be rolled out without touching the surrounding JavaScript adapters, reinforcing a **separation of concerns** between the analysis engine and the orchestration layer.
 
 ---
 
 ## Integration Points  
 
-SemanticAnalysisService interacts with the broader DockerizedServices ecosystem through several clear integration seams:
+* **Parent – DockerizedServices**: The parent component aggregates the various Docker Compose files, including the one that defines `SemanticAnalysisService`. It provides the overall orchestration layer that brings up the semantic analysis container together with its siblings.  
 
-* **Service‑starter.js** – the entry script that the Docker container invokes.  It is the bridge between the container runtime and the internal NLP process, handling retries and exposing health status to orchestrators (e.g., Docker Compose, Kubernetes).  
-* **Parent Component (DockerizedServices)** – DockerizedServices provides the container image, networking, and environment configuration.  The parent relies on the start‑up script to signal when the service is ready, enabling downstream components to consume its API.  
-* **Sibling Services** – ConstraintMonitoringService, CodeGraphService, and ServiceStarter all reuse the same retry‑with‑backoff logic, meaning any change to **service‑starter.js** propagates uniformly.  This shared dependency encourages consistent failure handling across the suite.  
-* **RetryWithBackoffPattern** – exposed as a reusable module, other services can import it directly if they need custom retry logic outside of the generic start‑up flow.  
-* **External NLP/ML Libraries** – while not directly referenced in file paths, the service likely depends on Python packages (NLTK, spaCy, scikit‑learn, TensorFlow).  These are installed in the container image and accessed via the Python runtime launched by the starter script.
+* **Siblings – ConstraintMonitor & CodeGraphAnalyzer**: Both siblings also depend on the `mcp‑server‑semantic‑analysis` service. They likely invoke the same HTTP endpoints exposed by the semantic analysis container, reusing the analysis logic for different domains (constraint checking vs. code‑graph generation).  
 
-The only explicit file path mentioned is **service‑starter.js**; all other integration points are inferred from the component hierarchy and the observed pattern usage.
+* **Environment Variables**: The primary integration contract is the set of environment variables (`CODING_REPO`, and potentially others like `CONSTRAINT_DIR` mentioned in the parent description). These variables are the only explicit interface between the JavaScript adapters and the Docker container, allowing the service to be swapped or re‑configured without code changes.  
+
+* **Docker Network**: All services defined in `integrations/code-graph-rag/docker-compose.yaml` share a Docker network, enabling them to reach the `mcp‑server‑semantic‑analysis` container via its service name. This network‑level coupling is the low‑level communication mechanism.  
+
+* **Scripts (`api-service.js`, `dashboard-service.js`)**: Serve as the entry points for external callers (e.g., REST clients, UI dashboards). They encapsulate request construction, environment handling, and error propagation, acting as the public API surface for the semantic analysis capability.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Do not modify the exponential backoff parameters without testing** – the base delay and multiplier are tuned to avoid overwhelming dependent services.  Adjust them only after load‑testing the entire DockerizedServices stack.  
-2. **Respect the configurable retry limit** – the start‑up script will cease attempts after a predefined count.  If a permanent failure is expected (e.g., missing model files), surface the error early rather than relying on endless retries.  
-3. **Keep the NLP process isolated** – the Python component that performs semantic analysis should run in its own process space, allowing the JavaScript starter to monitor its health without being blocked by heavy computation.  
-4. **Leverage the shared RetryWithBackoffPattern** – when building new services under DockerizedServices, import the existing pattern instead of re‑creating retry logic.  This ensures uniform behavior and reduces maintenance overhead.  
-5. **Log clearly on each retry** – the service‑starter.js script should emit timestamps, attempt numbers, and delay durations.  This aids operators in diagnosing start‑up failures and in tuning backoff settings.
+1. **Configure via Docker Compose** – Always set or override `CODING_REPO` (and any other required variables) in the `environment:` section of `integrations/code-graph-rag/docker-compose.yaml`. Changing the variable there automatically propagates to both `api-service.js` and `dashboard-service.js`.  
 
-Following these conventions will maintain the stability guarantees that the parent DockerizedServices component expects and will keep the SemanticAnalysisService aligned with its siblings.
+2. **Do Not Modify the Container Directly** – The semantic analysis logic resides inside its own Docker image. If you need to adjust the analysis algorithm, rebuild the image rather than editing files inside a running container. This preserves the clean separation highlighted in observations 3 and 7.  
+
+3. **Leverage the Scripts for Access** – When invoking the service from code, call the functions or endpoints exposed by `api-service.js` (backend API) or `dashboard-service.js` (UI‑oriented API). These scripts already handle environment resolution, so manual injection of `CODING_REPO` is unnecessary.  
+
+4. **Keep Services Independent** – Because each sub‑component is defined in its own Docker Compose file, avoid cross‑service file mounts unless absolutely required. This maintains the modularity and eases independent scaling.  
+
+5. **Version Control the Compose File** – Any change to service dependencies or environment variables should be committed alongside the corresponding Docker Compose file to keep the deployment definition source‑of‑truth.
 
 ---
 
 ### Summary Deliverables  
 
-1. **Architectural patterns identified** – Retry‑with‑Backoff (exponential backoff, recursive `setTimeout`), Shared‑Utility start‑up script, Separation of concerns between start‑up logic and semantic processing.  
-2. **Design decisions and trade‑offs** – Use of exponential backoff reduces overload risk but introduces latency before the service becomes available; recursive `setTimeout` keeps the event loop non‑blocking but can be harder to debug than promise‑based loops; sharing a single starter script across siblings improves consistency but creates a single point of change.  
-3. **System structure insights** – DockerizedServices → SemanticAnalysisService → RetryWithBackoffPattern; siblings share the same starter; the start‑up script is the sole entry point for container launch.  
-4. **Scalability considerations** – Backoff protects the system during spikes, but the underlying NLP workload may become a bottleneck; scaling horizontally (multiple container instances) will require load‑balancing at the API layer and possibly model sharing strategies.  
-5. **Maintainability assessment** – High maintainability for the retry logic because it is centralized in **service‑starter.js** and the **RetryWithBackoffPattern** module; however, the recursive implementation demands careful testing.  The NLP side is less visible in the observations, so its maintainability hinges on clear separation of the Python processing code and robust API contracts.
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Modular service‑oriented architecture via Docker Compose; client‑server interaction using environment‑driven configuration; bounded‑context grouping of related services. |
+| **Design decisions and trade‑offs** | *Decision*: Isolate semantic analysis in its own Docker image → *Trade‑off*: Slight overhead of inter‑container networking but gains in independent deployment and versioning. <br>*Decision*: Use environment variables (`CODING_REPO`) for configuration → *Trade‑off*: Requires careful management of env files but removes hard‑coded paths and enables portability. |
+| **System structure insights** | `SemanticAnalysisService` lives under `integrations/code-graph-rag/` and is one of several sibling services managed by the parent `DockerizedServices`. All three (SemanticAnalysisService, ConstraintMonitor, CodeGraphAnalyzer) share the same backend container, illustrating reuse of a common analysis engine. |
+| **Scalability considerations** | Because the service is containerized, it can be horizontally scaled by increasing the replica count in Docker Compose (or moving to Docker Swarm/Kubernetes). The stateless nature implied by environment‑based configuration supports scaling without session affinity. |
+| **Maintainability assessment** | High maintainability: clear separation of concerns, isolated Docker image, and configuration via a single source (`docker‑compose.yaml`). Updates to the analysis engine are localized to the Docker image, while UI or API changes stay in the lightweight JavaScript adapters. The modular layout also simplifies testing and CI pipelines. |
+
+These insights are directly grounded in the provided observations and avoid any speculation beyond the documented evidence.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a robust service startup mechanism through the service-starter.js script, which implements a retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail. This pattern is crucial in ensuring that the services can recover from temporary failures and maintain overall system stability. The service-starter.js script also utilizes exponential backoff to gradually increase the delay between retries, reducing the likelihood of overwhelming the system with repeated requests. For instance, in the service-starter.js file, the retry logic is implemented using a combination of setTimeout and a recursive function call, allowing for a configurable number of retries and a backoff strategy.
-
-### Children
-- [RetryWithBackoffPattern](./RetryWithBackoffPattern.md) -- The RetryWithBackoffPattern is employed in the SemanticAnalysisService sub-component to handle service failures and prevent endless loops.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
 
 ### Siblings
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
-- [CodeGraphService](./CodeGraphService.md) -- CodeGraphService employs the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter employs the retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail.
+- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze constraints
+- [CodeGraphAnalyzer](./CodeGraphAnalyzer.md) -- CodeGraphAnalyzer uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

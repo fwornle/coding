@@ -2,171 +2,103 @@
 
 **Type:** Component
 
-The useWorkflowDefinitions hook, located in integrations/system-health-dashboard/src/components/workflow/hooks.ts, is implemented in the ConstraintSystem component to retrieve workflow definitions from Redux. This hook provides a standardized interface for accessing workflow definitions, allowing the system to use this data to inform its behavior. The useWorkflowDefinitions hook's implementation demonstrates a concrete example of how the system interacts with Redux, highlighting the importance of this component in the overall architecture.
+[LLM] The system's implementation of lazy initialization for the Large Language Model (LLM) in the ensureLLMInitialized() function (wave-controller.ts:234) is an important design decision. This approach ensures that the LLM is only initialized when it is actually needed, which can help to reduce memory usage and improve system performance. The use of a shared atomic index counter in the runWithConcurrency() function (wave-controller.ts:489) is another important implementation detail. This counter enables the system to efficiently utilize multiple cores and process large amounts of data in parallel. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) and hook manager (lib/agent-api/hooks/hook-manager.js) are also important implementation details, as they provide a centralized location for managing hooks and loading hook configurations.
 
 ## What It Is  
 
-The **ConstraintSystem** component lives at the heart of the `Coding` knowledge‑hierarchy and is realised through a collection of tightly‑focused modules. The most visible entry points are the source files that house its sub‑components:  
-
-* **ContentValidationAgent** – `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` – validates and refreshes entity content.  
-* **HookConfigLoader** – `lib/agent‑api/hooks/hook-config.js` – loads, merges and normalises hook configuration from several origins.  
-* **ViolationCaptureService** – `scripts/violation-capture-service.js` – bridges live‑session logging with the constraint‑monitor dashboard, persisting violation data in real time.  
-* **GraphDatabaseAdapter** – `storage/graph-database-adapter.js` – offers a uniform façade for all graph‑database interactions.  
-* **UnifiedHookManager** – `lib/agent‑api/hooks/hook-manager.js` – registers and dispatches hook events across the system.  
-* **Workflow hook** – `integrations/system-health-dashboard/src/components/workflow/hooks.ts` – a `useWorkflowDefinitions` hook that pulls workflow definitions from Redux.  
-
-Together these files implement the logical children of ConstraintSystem – `ContentValidator`, `HookManager`, `ViolationCapture`, `ConnectionHandler`, and `WorkflowManager` – each of which can be evolved in isolation while still participating in the overall constraint‑enforcement workflow.
-
----
+The **ConstraintSystem** component lives inside the `integrations/mcp-server-semantic-analysis` codebase and is realized through a collection of tightly‑focused modules. Key entry points are the **ContentValidationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`), the **HookConfigLoader** (`lib/agent-api/hooks/hook-config.js`), the **HookManager** (`lib/agent-api/hooks/hook-manager.js`), the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`), and the **ViolationCaptureService** (`scripts/violation-capture-service.js`). Together they form a constraint‑management pipeline that validates entity content, captures rule violations, and persists the results in a graph database. The component sits under the top‑level **Coding** parent, alongside siblings such as **LiveLoggingSystem**, **LLMAbstraction**, and **DockerizedServices**, and it exposes three child modules – **ContentValidationModule**, **HookConfigurationManager**, and **ViolationCaptureModule** – each of which maps directly to one of the core agents or services listed above.
 
 ## Architecture and Design  
 
-### Modular Architecture  
-All observations point to a **modular architecture**: every functional concern is encapsulated in its own module (e.g., content validation, hook configuration, violation capture). This mirrors the pattern used by sibling components such as **LiveLoggingSystem**, **LLMAbstraction**, and **DockerizedServices**, where separate directories host independent services. The benefit is clear – a change to the `ContentValidationAgent` does not ripple through the hook‑management code, and the `ViolationCaptureService` can be swapped for a different persistence layer without touching the validation logic.
+ConstraintSystem is built around a **modular architecture**. Each logical concern (validation, hook handling, persistence, violation capture) lives in its own file or directory, enabling developers to work on a single aspect without risking side‑effects elsewhere. This modularity is evident in the separation of the **ContentValidationAgent** (validation), **HookConfigLoader**/`hook-manager.js` (hook orchestration), and **GraphDatabaseAdapter** (storage).  
 
-### Centralised Hook Management (Adapter‑Facade)  
-The **UnifiedHookManager** (`lib/agent‑api/hooks/hook-manager.js`) acts as a **facade** over disparate hook sources. By registering handlers in a single place, the system decouples event producers (agents, UI components, external integrations) from consumers (the various ConstraintSystem children). This is the same mechanism employed by the parent **Coding** component to keep hook handling consistent across siblings.
+The component also adopts two runtime design patterns:
 
-### Retry‑With‑Backoff (Resilience Pattern)  
-The **ConnectionHandler** implements a **retry‑with‑backoff** strategy in its `connectViaHTTP` method (originally observed in the Trajectory component but reused here). Each failed attempt waits longer before the next retry, protecting the system from transient network glitches while avoiding a tight loop that could exhaust resources. This pattern is essential for reliable communication with external services such as the graph database or the live‑logging endpoint.
+1. **Work‑stealing concurrency** – implemented in `wave-controller.ts` via a shared atomic index counter (`runWithConcurrency()` at line 489). Workers pull the next work item from a common counter, allowing idle cores to “steal” work from busier threads and achieve high CPU utilization for large data sets.  
 
-### Adapter Pattern for Persistence  
-`GraphDatabaseAdapter` (`storage/graph-database-adapter.js`) is a classic **adapter**: it hides the specifics of the underlying graph store behind a stable API (`storeNode`, `fetchRelationship`, etc.). This enables the ConstraintSystem to evolve its storage strategy (e.g., switching from Neo4j to JanusGraph) without rewriting the higher‑level business logic.
+2. **Lazy initialization** – the Large Language Model (LLM) is instantiated only when required (`ensureLLMInitialized()` in `wave-controller.ts` at line 234). This reduces the memory footprint of the system during idle periods and speeds up start‑up.  
 
-### Bridge Pattern for Real‑Time Reporting  
-`ViolationCaptureService` (`scripts/violation-capture-service.js`) exemplifies a **bridge** between two otherwise independent subsystems: live session logging (produced by **LiveLoggingSystem**) and the constraint‑monitor dashboard (a UI component of the **SemanticAnalysis** sibling). By capturing violations as they occur and persisting them for dashboard consumption, the service keeps the two worlds loosely coupled yet synchronised.
-
-### Configuration‑Merging (Composite)  
-The **HookConfigLoader** merges configuration fragments from multiple sources, effectively implementing a **composite** configuration model. This allows the ConstraintSystem to adapt to different deployment environments (e.g., development vs production) without hard‑coding paths or values.
-
----
+A classic **Adapter pattern** is used for persistence: `GraphDatabaseAdapter` abstracts the underlying graph database (likely Neo4j or similar) behind a simple API, while also providing automatic JSON export sync. The **HookManager** acts as a **Facade**, offering a unified API for all agents to register, deregister, and invoke hooks, while `HookConfigLoader` merges configuration from multiple sources, embodying a **Configuration‑aggregation** approach.
 
 ## Implementation Details  
 
-### ContentValidator → ContentValidationAgent  
-`ContentValidator` delegates the heavy lifting to `ContentValidationAgent`. The agent exposes methods such as `validate(entity)` and `refresh(entityId)`. Because the agent lives under `integrations/mcp-server-semantic-analysis`, it can reuse shared semantic‑analysis utilities (e.g., ontology look‑ups) while remaining isolated from hook‑management concerns.
+The **ContentValidationAgent** (`content-validation-agent.ts`) receives an entity’s payload, loads the applicable rule set from the hook configuration, and runs each rule as a hook callback. Validation results are emitted as events that the **ViolationCaptureService** (`violation-capture-service.js`) listens to. The service enriches each violation with context (file location, rule identifier) and forwards it to the **GraphDatabaseAdapter** for storage.  
 
-### HookManager → HookConfigLoader & UnifiedHookManager  
-`HookManager` orchestrates the lifecycle of hook definitions. At start‑up it invokes `HookConfigLoader.load()` (found in `lib/agent‑api/hooks/hook-config.js`) which reads JSON/YAML files, environment variables, and possibly remote config services. The merged result is handed to `UnifiedHookManager.register(handler)` which stores handlers in an internal map keyed by hook type. When a hook event fires, `UnifiedHookManager.dispatch(event)` looks up the appropriate handler list and invokes each with a standardised payload.
+`hook-config.js` reads configuration files from several directories (e.g., project‑level, user‑level, and default configs), merges them respecting precedence rules, and produces a single JSON structure that the **HookManager** (`hook-manager.js`) consumes. The manager registers each hook under a namespaced key, allowing agents like the **ContentValidationAgent** to look up and invoke the correct validation callbacks without knowing the source of the hook.  
 
-### ConnectionHandler – retry‑with‑backoff  
-The `ConnectionHandler` class contains the method `connectViaHTTP(url, options)`. Its implementation follows the pattern:
+Persistence is handled by `graph-database-adapter.ts`. It exposes methods such as `saveNode()`, `saveRelationship()`, and `exportToJson()`. Internally it maintains a connection pool to the graph store and automatically triggers a JSON export after each write batch, guaranteeing that an up‑to‑date flat representation is always available for downstream tooling.  
 
-```ts
-let attempt = 0;
-while (attempt < MAX_RETRIES) {
-  try {
-    return await httpClient.request(url, options);
-  } catch (e) {
-    const delay = BASE_DELAY * Math.pow(2, attempt);
-    await sleep(delay);
-    attempt++;
-  }
-}
-throw new ConnectionError('Unable to connect after retries');
-```
-
-The exponential back‑off (`BASE_DELAY * 2^attempt`) prevents thundering‑herd scenarios and gives downstream services time to recover.
-
-### ViolationCapture → Bridge to Dashboard  
-`ViolationCaptureService` (`scripts/violation-capture-service.js`) subscribes to the `violationDetected` hook via the `UnifiedHookManager`. Upon receipt, it transforms the raw violation into a DTO and writes it to a persistence layer (currently a JSON file synced with the dashboard, but abstracted through a simple `saveViolation(dto)` function). The service also emits a WebSocket event so the dashboard can refresh instantly.
-
-### WorkflowManager → Redux Hook  
-The `useWorkflowDefinitions` hook (`integrations/system-health-dashboard/src/components/workflow/hooks.ts`) pulls the current workflow state from the Redux store (`store.getState().workflow.definitions`). It returns a memoised list of definitions, which `WorkflowManager` consumes to decide which constraints to enforce for a given session. This tight coupling to Redux ensures that any UI‑driven workflow change is immediately reflected in the constraint evaluation pipeline.
-
-### GraphDatabaseAdapter – Uniform Persistence API  
-`GraphDatabaseAdapter` implements methods like `createNode(label, properties)`, `createEdge(sourceId, targetId, type)`, and `query(cypher)`. Internally it decides whether to route the request through a direct driver or an HTTP API based on configuration loaded by `HookConfigLoader`. This dual‑routing capability gives the ConstraintSystem flexibility to operate in environments where the graph store may be co‑located (direct driver) or remote (REST endpoint).
-
----
+Concurrency is coordinated in `wave-controller.ts`. The `runWithConcurrency()` function spawns a pool of worker promises, each repeatedly reading the next index from an `AtomicInteger`. Because the index is shared, workers automatically balance the workload, which is especially useful when processing large collections of entities for validation. The `ensureLLMInitialized()` guard checks a module‑level flag before constructing the LLM client, preventing duplicate heavyweight initializations.  
 
 ## Integration Points  
 
-1. **Parent – Coding**  
-   The ConstraintSystem inherits the overarching modular philosophy of its parent `Coding`. It contributes constraint‑related events to the global hook bus managed by `UnifiedHookManager`, allowing other top‑level components (e.g., **LiveLoggingSystem**) to react to constraint violations.
+ConstraintSystem interacts with several other components in the **Coding** ecosystem. The **DockerizedServices** sibling provisions the `mcp-server-semantic-analysis` Docker image that runs the agents and services described above. The **KnowledgeManagement** component also uses the same `GraphDatabaseAdapter` (referenced in its own `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) to read and query the persisted constraint data for knowledge‑graph queries.  
 
-2. **Siblings**  
-   * **LiveLoggingSystem** – supplies the raw session transcripts that `ContentValidationAgent` may need for context‑aware validation.  
-   * **KnowledgeManagement** – shares the same `GraphDatabaseAdapter`, ensuring that constraint‑related entities are stored alongside broader knowledge‑graph data.  
-   * **Trajectory** – demonstrates the same retry‑with‑backoff logic in its own adapter, reinforcing a common resilience strategy across the codebase.
+The **LLMAbstraction** sibling supplies the LLM client that is lazily instantiated by `ensureLLMInitialized()`. This allows the validation rules to invoke LLM‑based checks when needed, without tying the ConstraintSystem to a specific provider.  
 
-3. **Children**  
-   * **ContentValidator** – uses the `ContentValidationAgent`.  
-   * **HookManager** – relies on `HookConfigLoader` and `UnifiedHookManager`.  
-   * **ViolationCapture** – bridges live logs to the dashboard via the `ViolationCaptureService`.  
-   * **ConnectionHandler** – provides resilient HTTP connectivity to external services (graph DB, remote config).  
-   * **WorkflowManager** – consumes Redux workflow definitions via the `useWorkflowDefinitions` hook.
-
-4. **External Interfaces**  
-   * **Graph Database** – accessed through `GraphDatabaseAdapter`.  
-   * **Dashboard UI** – receives real‑time violation updates via WebSocket events emitted by `ViolationCaptureService`.  
-   * **Redux Store** – read by the workflow hook to stay in sync with UI‑driven workflow changes.
-
----
+From the parent **Coding** perspective, the three child modules expose public entry points: the **ContentValidationModule** re‑exports the `ContentValidationAgent` class; the **HookConfigurationManager** re‑exports the `HookConfigLoader` and `HookManager`; the **ViolationCaptureModule** re‑exports the `ViolationCaptureService`. These modules can be imported by higher‑level orchestration code (e.g., the **SemanticAnalysis** component) to plug constraint validation into broader analysis pipelines.  
 
 ## Usage Guidelines  
 
-* **Register Hooks Early** – Initialise `HookManager` at application start‑up so that all handlers are available before any constraint‑related events fire. Use `UnifiedHookManager.register()` with clearly named handler functions to keep the event map readable.  
-* **Prefer the Adapter API** – All persistence interactions must go through `GraphDatabaseAdapter`. Direct driver calls bypass the routing logic and can cause inconsistencies between local and remote graph instances.  
-* **Handle Connection Errors Gracefully** – When invoking any method that internally uses `ConnectionHandler.connectViaHTTP`, wrap calls in a try/catch and surface a user‑friendly error after the retry limit is exhausted. Do not implement your own retry logic; reuse the built‑in exponential back‑off to avoid duplicate effort.  
-* **Keep Configuration Sources Declarative** – When adding a new hook configuration file, place it under the directory expected by `HookConfigLoader` and follow the existing JSON/YAML schema. The loader automatically merges the new file with the existing configuration set.  
-* **Update Workflow Definitions via Redux** – Any change to workflow definitions should be dispatched through Redux actions; the `useWorkflowDefinitions` hook will propagate the update to `WorkflowManager` without requiring a restart.  
-* **Testing** – Unit‑test each child component in isolation, mocking the `GraphDatabaseAdapter` and `UnifiedHookManager`. Integration tests should spin up a lightweight in‑memory graph store to verify end‑to‑end constraint enforcement.
+1. **Add or modify validation rules** by editing the hook configuration files that `HookConfigLoader` consumes. After changes, run the system’s configuration reload command (or simply restart the service) so the merged configuration is rebuilt.  
+2. **Register new hooks** through the `HookManager` API (`registerHook(namespace, callback)`). Keep the namespace unique to avoid collisions with existing agents.  
+3. **Do not instantiate the LLM directly**; always call `ensureLLMInitialized()` from `wave-controller.ts` before any LLM‑dependent rule. This guarantees that the lazy‑initialization guard is respected and memory usage stays bounded.  
+4. **When processing large batches**, rely on `runWithConcurrency()` rather than writing custom loops. The built‑in work‑stealing scheduler will automatically distribute work across available CPU cores.  
+5. **Persist custom violation metadata** by extending the payload passed to `ViolationCaptureService`. The service forwards the payload unchanged to `GraphDatabaseAdapter`, which will store it as node properties.  
 
 ---
 
-### Architectural patterns identified  
+### 1. Architectural patterns identified  
+- **Modular architecture / Separation of concerns** (distinct modules for validation, hooks, persistence, capture)  
+- **Work‑stealing concurrency** (shared atomic index in `runWithConcurrency()`)  
+- **Lazy initialization** (LLM creation guarded by `ensureLLMInitialized()`)  
+- **Adapter pattern** (`GraphDatabaseAdapter` abstracts graph‑DB details)  
+- **Facade / Centralized hook management** (`HookManager` provides a unified hook API)  
+- **Configuration aggregation** (`HookConfigLoader` merges multiple config sources)
 
-1. **Modular Architecture** – independent sub‑components (`ContentValidator`, `HookManager`, etc.).  
-2. **Retry‑With‑Backoff** – resilient connection handling in `ConnectionHandler`.  
-3. **Facade / Adapter** – `UnifiedHookManager` (facade) and `GraphDatabaseAdapter` (adapter).  
-4. **Bridge** – `ViolationCaptureService` linking live logging to the dashboard.  
-5. **Composite Configuration** – `HookConfigLoader` merges multiple config sources.  
+### 2. Design decisions and trade‑offs  
+- **Modularity** improves maintainability and allows independent deployment of child modules, but introduces runtime indirection (e.g., hooks must be looked up by name).  
+- **Work‑stealing** maximizes CPU usage for batch validation but adds complexity around atomic counters and error handling across workers.  
+- **Lazy LLM init** saves memory when LLM‑based rules are rare, at the cost of a potential latency spike on first use.  
+- **Graph‑DB persistence** offers rich relationship queries but requires a dedicated adapter and JSON export sync, adding operational overhead.
 
-### Design decisions and trade‑offs  
+### 3. System structure insights  
+- The component is organized around four primary directories: `agents/` (runtime logic), `hooks/` (configuration & management), `storage/` (persistence adapter), and `scripts/` (auxiliary services).  
+- Child modules map one‑to‑one with these directories, providing clean public interfaces for the parent **Coding** component.  
+- Sibling components share common infrastructure (Docker compose, LLM abstraction) but keep their own domain logic isolated.
 
-* **Modularity vs. Indirection** – The clear separation improves maintainability but introduces additional layers (e.g., adapters, managers) that add runtime overhead and require disciplined versioning.  
-* **Centralised Hook Management** – Simplifies event routing but creates a single point of failure; careful error handling in `UnifiedHookManager.dispatch` is essential.  
-* **Retry‑With‑Backoff** – Provides robustness against flaky networks but can increase latency for transient failures; the back‑off parameters must be tuned to the deployment environment.  
-* **Adapter for Graph DB** – Enables swapping storage back‑ends, yet the adapter must stay in sync with the underlying database’s feature set, potentially limiting use of vendor‑specific optimisations.  
+### 4. Scalability considerations  
+- **Horizontal scaling** can be achieved by running multiple instances of the Docker image; the shared graph database ensures a single source of truth for violations.  
+- **CPU‑bound scaling** benefits from the work‑stealing pool; adding more cores directly increases throughput for large validation batches.  
+- **Memory‑bound scaling** is mitigated by lazy LLM init, but if many LLM‑dependent rules are enabled simultaneously, instance sizing must be revisited.  
 
-### System structure insights  
-
-The ConstraintSystem sits as a **child** of the `Coding` root, mirroring the same modular philosophy seen across siblings. Its **children** (`ContentValidator`, `HookManager`, `ViolationCapture`, `ConnectionHandler`, `WorkflowManager`) each expose a narrow public API, making the overall system composable. The component’s public surface is essentially the hook registration API and the Redux workflow hook, while internal details (validation agents, adapters) remain encapsulated.
-
-### Scalability considerations  
-
-* **Horizontal scaling** – Because each child is stateless or uses external services (graph DB, dashboard), instances can be replicated behind a load balancer.  
-* **Back‑off limits** – In a large cluster, coordinated back‑off (jitter) may be needed to avoid simultaneous retry storms.  
-* **Graph DB throughput** – `GraphDatabaseAdapter` can be tuned to batch writes, which is critical when violation volume spikes.  
-* **ViolationCaptureService** – Persisting violations to a file is fine for development; production should replace it with a message queue or streaming sink to handle high‑velocity streams.  
-
-### Maintainability assessment  
-
-The **modular design** and **clear separation of concerns** give the ConstraintSystem a high maintainability rating. Adding a new validation rule only requires extending `ContentValidationAgent` or registering a new hook handler. The central configuration loader reduces duplication of config logic. However, the abundance of indirection layers (adapter, manager, bridge) mandates thorough documentation and consistent naming conventions to avoid “spaghetti” when onboarding new developers. Automated tests that mock the adapters and managers are essential to preserve confidence as the component evolves.
+### 5. Maintainability assessment  
+- The **modular design** and clear file boundaries make the codebase easy to navigate and extend.  
+- Centralized hook management reduces duplication but requires careful versioning of the hook configuration schema.  
+- The concurrency implementation is concise but relies on low‑level atomic primitives; future contributors should be familiar with JavaScript/TypeScript concurrency patterns to avoid race conditions.  
+- Overall, the combination of explicit adapters, lazy resources, and well‑defined entry points yields a maintainable system that can evolve alongside its sibling components in the **Coding** hierarchy.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts ; DockerizedServices: The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and man; Trajectory: The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maint; KnowledgeManagement: The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database; CodingPatterns: The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has ; ConstraintSystem: The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoade; SemanticAnalysis: The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassifica.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers.; LLMAbstraction: [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models wit; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code g; Trajectory: [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integra; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semanti; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph da; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClass.
 
 ### Children
-- [ContentValidator](./ContentValidator.md) -- ContentValidator uses a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-- [HookManager](./HookManager.md) -- HookManager is responsible for managing hook configurations and registrations, indicating a key role in the system's workflow
-- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture is responsible for capturing and persisting constraint violations, indicating a key role in the system's workflow
-- [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager is responsible for managing workflow definitions and interactions, indicating a key role in the system's workflow
+- [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule uses the ContentValidationAgent from integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts for entity content validation against configured rules
+- [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager uses the HookConfigLoader from lib/agent-api/hooks/hook-config.js for loading and merging hook configurations from multiple sources
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions, utilizing the ContentValidationAgent for entity content validation
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This is evident in the way the agent is instantiated and used within the LiveLoggingSystem's classification layer. The OntologyClassificationAgent's classify method is called with the session transcript as an argument, allowing the system to categorize the conversation based on predefined ontology rules. Furthermore, the use of the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, as an abstract base class for agent-specific transcript adapters, enables the system to handle transcripts from various agents in a unified manner. The TranscriptAdapter's adaptTranscript method is responsible for converting agent-specific transcripts into a standardized format, which is then passed to the OntologyClassificationAgent for classification.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts and lib/llm/providers/anthropic-provider.ts), allows for easy maintenance and extension of the system. This is further facilitated by the use of a registry (lib/llm/provider-registry.js) to manage providers, enabling the addition or removal of providers without modifying the core logic of the LLMService class (lib/llm/llm-service.ts). The registry pattern helps to decouple the provider implementations from the service class, making it easier to swap out or add new providers as needed.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and management. This is evident in the directory structure, where each service has its own subdirectory, such as semantic analysis, constraint monitoring, and code graph construction. The lib/llm/llm-service.ts file, which contains the LLMService class, provides a high-level facade for LLM operations, handling mode routing, caching, and circuit breaking. This design decision enables loose coupling between services and promotes scalability. Furthermore, the use of docker-compose for service orchestration, as seen in the docker-compose.yml file, provides a robust framework for integrating multiple services.
-- [Trajectory](./Trajectory.md) -- The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maintenance and scalability. For instance, the SpecstoryAdapter (lib/integrations/specstory-adapter.js) is used to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a flexible approach to integrations. This adapter implements a retry-with-backoff pattern in the connectViaHTTP method (lib/integrations/specstory-adapter.js:123) to establish a connection with the Specstory extension, showcasing a robust approach to handling potential connection issues.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database. This adapter enables the component to perform tasks such as entity storage and relationship management, while also providing automatic JSON export sync. The use of this adapter allows for a flexible and scalable solution for knowledge graph management. Furthermore, the intelligent routing implemented in the GraphDatabaseAdapter enables the component to efficiently route requests for API or direct database access, ensuring optimal performance. The code in storage/graph-database-adapter.ts demonstrates how the adapter is used to handle concurrent access and provide a robust solution for graph database interactions.
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has its own directory and configuration, allowing for easier maintenance and extension of the system. For instance, the lib/llm/provider-registry.js file defines a provider registry that manages different providers and enables provider switching based on mode and availability. This modular design enables developers to add or remove language models without affecting the overall system.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassificationAgent, which utilizes the ontology system to classify observations. This agent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and follows the BaseAgent pattern defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of a standardized agent structure, as seen in the BaseAgent class, allows for easier development and maintenance of new agents. For instance, the SemanticAnalysisAgent, responsible for analyzing code files, is implemented in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts and leverages the LLMService from lib/llm/dist/index.js for language model-based analysis.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers. This is evident in the 'session_windowing.py' and 'file_routing.py' files, which contain functions such as 'window_session' and 'route_file' that handle these specific tasks. The 'classification_layers.py' file contains classes such as 'Classifier' that handle the classification of logs.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models without affecting the overall system. This is evident in the LLMService class (lib/llm/llm-service.ts), which acts as the single public entry point for all LLM operations and handles mode routing, caching, and circuit breaking. The use of a ProviderRegistry to manage different providers, including mock, local, and public providers, further reinforces this modular design.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph database. This adapter provides a standardized interface for interacting with the database, ensuring consistency and modularity in the component's architecture. For instance, the GraphDatabaseAdapter's 'createNode' method is used to persist new entities in the database, while the 'getNode' method retrieves existing nodes based on their IDs. This modular approach enables easy switching between different database implementations if needed, as seen in lib/llm/provider-registry.js, where various providers are managed and registered.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This is evident in the classifyObservations method of the OntologyClassificationAgent class, which takes in a list of observations and returns a list of classified observations. The use of separate modules for different agents and utilities, such as the storage and logging modules, also contributes to the overall modularity of the component. This modular design allows for easier maintenance and updates, as changes to one agent do not affect the others.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

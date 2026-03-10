@@ -2,65 +2,37 @@
 
 **Type:** Project
 
-Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts ; DockerizedServices: The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and man; Trajectory: The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maint; KnowledgeManagement: The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database; CodingPatterns: The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has ; ConstraintSystem: The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoade; SemanticAnalysis: The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassifica.
-
-**Technical Insight Document – Coding (Project)**  
-
----
+Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers.; LLMAbstraction: [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models wit; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code g; Trajectory: [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integra; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semanti; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph da; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClass.
 
 ## What It Is  
 
-The **Coding** project is a composite system that brings together eight first‑level components – LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, and SemanticAnalysis – to deliver a full‑stack environment for intelligent code‑centric workflows.  
+The **Coding** project is a multi‑component system whose top‑level knowledge hierarchy is anchored in a single root node that aggregates eight first‑level (L1) modules: **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis**.  
 
-All of the source material lives under a single repository, with the most visible implementation artefacts spread across a handful of clearly‑named directories:  
-
-* **LiveLoggingSystem** – uses the ontology‑driven classifier located at  
-  `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  
-
-* **LLMAbstraction** – houses provider‑specific modules such as  
-  `lib/llm/providers/dmr-provider.ts` and `lib/llm/providers/anthropic-provider.ts`, together with a central registry at `lib/llm/provider-registry.js` and the façade service in `lib/llm/llm-service.ts`.  
-
-* **DockerizedServices** – each service lives in its own sub‑directory (e.g., *semantic‑analysis*, *constraint‑monitoring*, *code‑graph‑construction*) and is orchestrated by the top‑level `docker-compose.yml`.  
-
-* **Trajectory** – contains per‑model directories and an integration adapter `lib/integrations/specstory-adapter.js`.  
-
-* **KnowledgeManagement** – interacts with the graph store through `storage/graph-database-adapter.ts`.  
-
-* **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis** follow the same modular, agent‑oriented conventions (e.g., the ContentValidationAgent, HookConfigLoader, and other agents referenced in the observations).  
-
-Together these pieces form a **project‑level** “Coding” entity that coordinates live logging, large‑language‑model (LLM) abstraction, containerised services, model‑specific trajectories, knowledge‑graph management, reusable coding patterns, constraint enforcement, and semantic analysis.  
+Each module lives in its own source tree and is exposed through clearly‑named entry points. For example, the **LLMAbstraction** service is implemented in `lib/llm/llm-service.ts`, while the **LiveLoggingSystem** logic is split across `session_windowing.py`, `file_routing.py`, and `classification_layers.py`. Docker‑based services are declared in files such as `integrations/code-graph-rag/docker-compose.yaml`, and the semantic‑analysis back‑end resides under `integrations/mcp-server-semantic-analysis/src/…`. The overall system therefore constitutes a **modular, container‑ready code‑base** that supports live logging, large‑language‑model (LLM) orchestration, graph‑based knowledge storage, and constraint‑driven code analysis.
 
 ---
 
 ## Architecture and Design  
 
-### Modular, Component‑Based Organization  
+### Modular Architecture  
 
-All eight L1 components adopt a **modular architecture**: each functional area lives in its own directory hierarchy, exposing a thin public API while keeping implementation details private. This is evident in the separate provider modules for LLMAbstraction (`lib/llm/providers/*`), the per‑service folders under DockerizedServices, and the per‑model directories inside Trajectory. The modularity enables independent versioning, targeted testing, and the ability to add or replace a module without rippling changes across the whole codebase.  
+All eight L1 components follow a **modular architecture**: each functional concern is isolated in its own directory and exposed through a thin public API. The observations repeatedly cite “separate modules for …” (e.g., session windowing, file routing, classification layers in **LiveLoggingSystem**, or adapters and services in **Trajectory**). This reflects a **module‑per‑concern** pattern that reduces coupling and makes the codebase navigable.
 
-### Registry / Facade Pattern (LLMAbstraction)  
+### Dependency Injection & Provider Registry  
 
-LLMAbstraction uses a **registry pattern** (`lib/llm/provider-registry.js`) to map provider identifiers to concrete implementations (`dmr-provider.ts`, `anthropic-provider.ts`). The `LLMService` class in `lib/llm/llm-service.ts` acts as a **facade**, delegating calls to the appropriate provider retrieved from the registry. This decouples the service layer from provider specifics and makes it trivial to plug in a new LLM vendor.  
+The **LLMAbstraction** component demonstrates explicit **dependency injection**. `LLMService` (in `lib/llm/llm-service.ts`) receives its concrete LLM implementation from a `ProviderRegistry`. The registry holds entries for mock, local, and public providers, enabling the system to swap models without touching the service logic. This is a classic **Service Locator / Provider** pattern that supports extensibility and testability.
 
-### Adapter Pattern (LiveLoggingSystem & KnowledgeManagement)  
+### Adapter / Agent Pattern  
 
-* **TranscriptAdapter** (`lib/agent-api/transcript-api.js`) defines an abstract base for converting raw transcripts from any agent into a normalized format. The LiveLoggingSystem component instantiates this adapter before passing data to the `OntologyClassificationAgent`.  
+Both **KnowledgeManagement** and **SemanticAnalysis** rely on **adapters** and **agents**. The `GraphDatabaseAdapter` (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) abstracts persistence to a graph database, while `PersistenceAgent` and `CodeGraphAgent` (`src/agents/*.ts`) encapsulate higher‑level operations such as ontology classification and code‑graph construction. This matches the **Adapter** pattern (wrapping external storage) and an **Agent** (or worker) pattern for background processing.
 
-* **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) abstracts the underlying graph database (e.g., Neo4j, JanusGraph) behind a well‑defined interface that handles entity storage, relationship management, concurrent access, and automatic JSON export sync.  
+### Containerization & Service Isolation  
 
-Both adapters embody the **Adapter pattern**, allowing heterogeneous external systems to be consumed through a stable internal contract.  
+**DockerizedServices** uses Docker Compose to spin up isolated services: `mcp-server-semantic-analysis`, `constraint-monitor`, and `code-graph-rag`. Each service has its own Docker image and environment variables (e.g., `CODING_REPO`, `CONSTRAINT_DIR` used in `api-service.js` and `dashboard-service.js`). This reflects a **micro‑service‑style deployment** (even if the source code lives in a monorepo) that provides clear separation of concerns at runtime.
 
-### Multi‑Agent Architecture (SemanticAnalysis)  
+### Shared Logging Infrastructure  
 
-SemanticAnalysis is described as a **multi‑agent system**, where each agent (e.g., `OntologyClassificationAgent`, `ContentValidationAgent`, `HookConfigLoader`) performs a single, well‑scoped responsibility. Agents are orchestrated by higher‑level coordinators within the component, mirroring the classic **pipeline** or **chain‑of‑responsibility** style.  
-
-### Containerisation & Service Orchestration  
-
-DockerizedServices leverages **Docker Compose** (`docker-compose.yml`) to spin up each service in an isolated container while preserving network connectivity. The directory‑per‑service layout maps naturally to individual Dockerfiles, allowing developers to rebuild or scale a single service without touching the others. This design reflects a **micro‑service‑like** deployment model, though the observations do not explicitly call it “micro‑services.”  
-
-### Shared Concerns Across Siblings  
-
-All siblings share common cross‑cutting concerns: logging (via LiveLoggingSystem), LLM access (via LLMAbstraction), and knowledge‑graph interaction (via KnowledgeManagement). By centralising these capabilities, the system reduces duplication and ensures consistent behaviour across the project.  
+The **Trajectory** component imports a logger via `createLogger` from `../logging/Logger.js`. By reusing a common logging module across components, the project enforces a **cross‑cutting concern** implementation that aids observability and debugging throughout the system.
 
 ---
 
@@ -68,130 +40,106 @@ All siblings share common cross‑cutting concerns: logging (via LiveLoggingSyst
 
 ### LiveLoggingSystem  
 
-* **Agent Instantiation** – The `OntologyClassificationAgent` is imported from `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. Its `classify(sessionTranscript)` method receives a transcript that has been normalised by a concrete implementation of `TranscriptAdapter` (found in `lib/agent-api/transcript-api.js`).  
-
-* **Classification Flow** – 1) Raw transcript → `TranscriptAdapter.adaptTranscript()` → 2) Normalised transcript → `OntologyClassificationAgent.classify()` → 3) Ontology tags are attached to the live logging record. This flow enables real‑time semantic tagging of developer conversations.  
+- **File layout** – `session_windowing.py` defines `window_session`, which slices incoming log streams into time‑bounded windows.  
+- `file_routing.py` provides `route_file`, responsible for directing log files to appropriate downstream processors based on file type or source.  
+- `classification_layers.py` houses a `Classifier` class that applies rule‑based or ML‑based classification to each log entry. The three modules together enable a pipeline that ingests raw logs, partitions them, and tags them for downstream analytics.
 
 ### LLMAbstraction  
 
-* **Provider Modules** – Each provider implements a common interface (e.g., `ILLMProvider`) defined implicitly by the registry. The `dmr-provider.ts` and `anthropic-provider.ts` files expose `generate(prompt, options)` and `stream(prompt, options)` methods.  
-
-* **Provider Registry** – `provider-registry.js` registers providers under keys such as `"dmr"` and `"anthropic"`. The registry is a simple map that `LLMService` queries at runtime.  
-
-* **LLMService Facade** – Located in `lib/llm/llm-service.ts`, the class provides high‑level methods (`invoke`, `invokeWithCache`, `invokeWithCircuitBreaker`) that encapsulate routing, caching, and resilience. Internally it looks up the provider, forwards the request, and applies cross‑cutting concerns.  
+- **Core class** – `LLMService` (in `lib/llm/llm-service.ts`) implements a façade over multiple language‑model providers. It handles **mode routing** (e.g., chat vs. completion), **caching**, and **circuit breaking** to protect downstream services from provider failures.  
+- **ProviderRegistry** – a singleton that registers concrete providers (mock, local, public). Adding a new LLM only requires implementing the provider interface and adding it to the registry, thanks to the DI design.
 
 ### DockerizedServices  
 
-* **Service Directories** – Each sub‑directory contains its own Dockerfile, source code, and configuration. For example, the *semantic‑analysis* service may contain a `src/` folder with its own entry point, while *constraint‑monitoring* holds a different set of agents.  
-
-* **Orchestration** – `docker-compose.yml` defines services, networks, and volumes. The file references the built images (`docker build -t semantic-analysis .`) and sets environment variables that point to the graph database (used by KnowledgeManagement) and LLM endpoints (used by LLMAbstraction).  
-
-* **Resilience Features** – The `LLMService` facade implements circuit‑breaking; DockerizedServices inherits this behaviour because each container imports `llm-service.ts`.  
+- The Docker Compose file `integrations/code-graph-rag/docker-compose.yaml` declares three primary services:  
+  1. `mcp-server-semantic-analysis` – runs the semantic analysis agents.  
+  2. `constraint-monitor` – watches constraint files and triggers re‑evaluation.  
+  3. `code-graph-rag` – builds and serves the code‑graph for Retrieval‑Augmented Generation.  
+- Environment variables (`CODING_REPO`, `CONSTRAINT_DIR`) are read by JavaScript entry points (`api-service.js`, `dashboard-service.js`) to locate source code and constraint definitions at runtime.
 
 ### Trajectory  
 
-* **Model‑Specific Directories** – Each language model (e.g., “Specstory”) has a dedicated folder containing configuration (`model-config.yaml`) and an adapter implementation (`specstory-adapter.js`).  
+- The **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`) encapsulates three connection strategies—HTTP, IPC, and file‑watch—allowing the component to integrate with the Specstory extension regardless of the host environment.  
+- Logging is standardized through `createLogger` from `../logging/Logger.js`, ensuring that every adapter action is traceable.
 
-* **SpecstoryAdapter** – Implements a **retry‑with‑backoff** strategy in `connectViaHTTP` (line 123) to tolerate transient network failures when communicating with the Specstory extension via HTTP, IPC, or file‑watch mechanisms.  
+### KnowledgeManagement & SemanticAnalysis  
 
-### KnowledgeManagement  
+- **Persistence Layer** – `GraphDatabaseAdapter` (`src/storage/graph-database-adapter.ts`) abstracts CRUD operations against a graph database (likely Neo4j or similar).  
+- **Agents** – `PersistenceAgent` (`src/agents/persistence-agent.ts`) orchestrates entity storage and ontology classification; `CodeGraphAgent` (`src/agents/code-graph-agent.ts`) builds a knowledge graph from source code and exposes semantic search APIs.  
+- **Utility** – `ukb-trace-report.ts` (`src/utils/ukb-trace-report.ts`) generates detailed trace reports for UKB workflow runs, aiding debugging and auditability.
 
-* **GraphDatabaseAdapter** – Implemented in `storage/graph-database-adapter.ts`. The adapter offers methods such as `upsertEntity(entity)`, `createRelationship(sourceId, targetId, type)`, and `exportJsonSync()`.  
+### ConstraintSystem & CodingPatterns  
 
-* **Intelligent Routing** – The adapter decides whether a request should hit the GraphQL API layer or a direct database driver based on request metadata, balancing latency and throughput.  
-
-* **Concurrency Handling** – The code employs a read‑write lock (or similar mechanism) to protect concurrent mutations, ensuring consistency when multiple services (e.g., ConstraintSystem or SemanticAnalysis) write to the graph simultaneously.  
-
-### CodingPatterns, ConstraintSystem, SemanticAnalysis  
-
-* **YAML‑Driven Configuration** – `llm-providers.yaml` (referenced by CodingPatterns) enumerates each LLM model, its capabilities, and default parameters. This file is parsed at startup to populate the provider registry.  
-
-* **ContentValidationAgent** – Part of ConstraintSystem, validates generated code snippets against style rules before they are persisted.  
-
-* **HookConfigLoader** – Loads hook definitions that allow external tools to inject custom behaviour into the processing pipeline.  
+Although specific files are not listed, the observations state that each module follows the same modular principle, with each sub‑module handling a distinct aspect of constraint management or pattern storage. The **CodingPatterns** component re‑uses the `GraphDatabaseAdapter` for pattern persistence, reinforcing a shared data‑access strategy across siblings.
 
 ---
 
 ## Integration Points  
 
-1. **LiveLoggingSystem ↔ OntologyClassificationAgent** – The classification agent consumes transcripts normalised by `TranscriptAdapter`. This creates a tight coupling between logging and semantic analysis.  
+1. **LLMAbstraction ↔ LiveLoggingSystem** – The `LLMService` can be called from the **LiveLoggingSystem** classification layer to enrich log entries with LLM‑generated insights. The dependency is mediated through the public `LLMService` API.  
+2. **DockerizedServices ↔ KnowledgeManagement** – The `mcp-server-semantic-analysis` container runs the agents (`PersistenceAgent`, `CodeGraphAgent`) that depend on the `GraphDatabaseAdapter`. The container mounts the same graph‑DB credentials as the host code, ensuring a consistent persistence contract.  
+3. **Trajectory ↔ Logging** – `SpecstoryAdapter` imports the shared logger, allowing its events to be correlated with logs produced by **LiveLoggingSystem** and **ConstraintSystem**.  
+4. **ConstraintSystem ↔ SemanticAnalysis** – Constraints are evaluated by agents in **SemanticAnalysis**; any violation is reported back to the **ConstraintSystem** through a defined interface (e.g., a REST endpoint exposed by the constraint‑monitor service).  
+5. **CodingPatterns ↔ KnowledgeManagement** – Both components use the same `GraphDatabaseAdapter`, meaning pattern definitions are stored alongside other knowledge graph entities, enabling cross‑entity queries (e.g., “find all code snippets that match pattern X”).  
 
-2. **LLMAbstraction ↔ DockerizedServices** – All containerised services that require LLM calls import `llm-service.ts`. The registry (`provider-registry.js`) is shared across containers via a mounted configuration volume, ensuring a single source of truth for provider selection.  
-
-3. **Trajectory ↔ SpecstoryAdapter** – The adapter acts as a bridge between the Trajectory component and the external Specstory extension, exposing a uniform API that other services can call without knowing the transport details.  
-
-4. **KnowledgeManagement ↔ GraphDatabaseAdapter** – Every component that needs to persist or query knowledge (e.g., ConstraintSystem’s validation results, SemanticAnalysis’s ontology tags) goes through the adapter, guaranteeing consistent graph semantics.  
-
-5. **SemanticAnalysis ↔ Multiple Agents** – Agents such as `OntologyClassificationAgent`, `ContentValidationAgent`, and `HookConfigLoader` are wired together via a simple orchestrator (not explicitly named) that respects a defined execution order, enabling a pipeline of validation → classification → hook execution.  
-
-6. **Docker Compose** – The `docker-compose.yml` file declares service dependencies (e.g., `semantic-analysis` depends_on `graph-db`), ensuring that the KnowledgeManagement component’s database is up before any agent attempts to write.  
-
-7. **Parent‑Child Relationships** – All eight components are children of the top‑level **Coding** project. Siblings share common utilities (e.g., the provider registry, adapters, and logging infrastructure), which reduces duplication and simplifies cross‑component coordination.  
+All components share the same environment variables (`CODING_REPO`, `CONSTRAINT_DIR`) and the common logger, which act as **global integration contracts** across the project.
 
 ---
 
 ## Usage Guidelines  
 
-* **Register New LLM Providers** – Add a TypeScript file under `lib/llm/providers/` implementing the same public methods as existing providers, then update `provider-registry.js` (or the `llm-providers.yaml` if you prefer declarative registration). Do **not** modify `llm-service.ts`; the façade will automatically pick up the new entry.  
+- **Add a new LLM**: Implement the provider interface, register it in `ProviderRegistry`, and update any configuration files that map model names to providers. Because `LLMService` performs mode routing and circuit breaking, no changes are required elsewhere.  
+- **Extend logging**: When adding a new log source, create a dedicated function in `session_windowing.py` or `file_routing.py` that respects the existing windowing and routing conventions. Use the `Classifier` class to keep classification logic centralized.  
+- **Deploy a new service**: Add a service definition to `integrations/code-graph-rag/docker-compose.yaml`, expose required environment variables, and ensure the service’s Dockerfile follows the same base image and health‑check patterns used by existing services.  
+- **Persist new graph entities**: Use `GraphDatabaseAdapter` rather than raw driver calls. Follow the pattern shown in `PersistenceAgent` for transaction handling and error reporting.  
+- **Write adapters**: Follow the example of `SpecstoryAdapter`—encapsulate external communication (HTTP, IPC, file) behind a single class and inject the shared logger. This keeps external dependencies isolated and testable.  
 
-* **Add a New Service** – Create a dedicated sub‑directory under the DockerizedServices root, include a Dockerfile, and reference the service in `docker-compose.yml`. Ensure the service’s environment variables point to the shared `GRAPH_DB_URL` and `LLM_PROVIDER` so it can reuse KnowledgeManagement and LLMAbstraction without extra wiring.  
-
-* **Extend Ontology Classification** – When expanding the ontology, modify `ontology-classification-agent.ts` to include new rule sets, and update any downstream agents that rely on the classification tags. Keep the `TranscriptAdapter` unchanged; it already normalises input for any future ontology changes.  
-
-* **Write a New Agent** – Follow the single‑responsibility principle demonstrated by existing agents: each agent should expose a single public method (e.g., `process(input): output`). Register the agent in the orchestration configuration used by SemanticAnalysis, and ensure it consumes and produces the standard data contract (JSON with `metadata` and `payload`).  
-
-* **Graph Interactions** – All reads/writes to the knowledge graph must go through `GraphDatabaseAdapter`. Direct driver calls are discouraged because they bypass the intelligent routing and concurrency safeguards. Use the adapter’s async methods and handle promise rejections gracefully; the adapter already implements retry logic for transient failures.  
-
-* **Testing & CI** – Because each component lives in its own directory, unit tests can be scoped to that directory. Integration tests should spin up the Docker Compose stack (using `docker-compose up -d`) to validate cross‑component interactions, especially for agents that depend on the graph database or LLM services.  
+Consistently adhere to the modular boundaries; avoid importing across sibling modules unless a shared abstraction (e.g., the graph adapter or logger) already exists. This preserves the clean separation that the architecture relies on.
 
 ---
 
-### Summary Deliverables  
+### Summary of Architectural Insights  
 
 1. **Architectural patterns identified**  
-   * Modular component architecture  
-   * Registry pattern (LLM provider registry)  
-   * Facade pattern (`LLMService`)  
-   * Adapter pattern (`TranscriptAdapter`, `GraphDatabaseAdapter`)  
-   * Multi‑agent / pipeline (SemanticAnalysis)  
-   * Container‑based service orchestration (Docker Compose)  
+   - Modular / component‑based architecture  
+   - Dependency injection with a Provider Registry (service‑locator style)  
+   - Adapter pattern for storage and external integrations  
+   - Agent/worker pattern for background processing  
+   - Container‑based service isolation via Docker Compose  
 
 2. **Design decisions and trade‑offs**  
-   * **Modularity** provides isolation and independent deployment but introduces runtime wiring complexity (registry, adapters).  
-   * **Registry‑facade** decouples providers from consumers, enabling easy addition of new LLMs at the cost of an extra indirection layer.  
-   * **Adapter abstraction** shields the core from external API changes, yet each adapter must be kept in sync with evolving external contracts.  
-   * **Docker per‑service** offers scalability and fault isolation; however, it increases operational overhead (container management, network configuration).  
-   * **Multi‑agent pipeline** simplifies reasoning about processing steps, but strict ordering can become a bottleneck if a single agent is slow.  
+   - **Modularity** improves maintainability and allows independent evolution of components, at the cost of additional indirection (e.g., adapters, registries).  
+   - **Dependency injection** enables easy swapping of LLM providers but introduces a runtime registry that must be kept in sync with configuration.  
+   - **Dockerization** provides deployment isolation and horizontal scalability, though it adds operational overhead (image builds, networking).  
 
 3. **System structure insights**  
-   * The project is a hierarchy: **Coding** (root) → eight L1 components (siblings) → each component may contain sub‑modules (e.g., providers, agents, adapters).  
-   * Shared utilities (registry, adapters, logging) sit at the top of the hierarchy and are imported by all siblings, enforcing a common contract.  
-   * Service boundaries are defined by directory structure and Docker Compose service definitions, making the physical layout an explicit architectural map.  
+   - A clear hierarchy: **Coding** (root) → eight L1 modules → sub‑modules (adapters, agents, utilities).  
+   - Shared cross‑cutting concerns (logging, environment configuration, graph‑DB adapter) are centralized, reducing duplication.  
 
 4. **Scalability considerations**  
-   * Adding more LLM providers or language‑model directories does not affect existing code thanks to the registry and modular directories.  
-   * Docker Compose allows horizontal scaling of any service (e.g., `replicas: 3` can be added for the semantic‑analysis container) without code changes.  
-   * The GraphDatabaseAdapter’s intelligent routing and concurrency controls enable the knowledge graph to handle higher write throughput as more agents produce data.  
-   * Retry‑with‑backoff in adapters (e.g., SpecstoryAdapter) prevents cascading failures under load.  
+   - Each Docker service can be scaled independently (e.g., multiple instances of `mcp-server-semantic-analysis` for higher query throughput).  
+   - The provider‑registry design allows adding more powerful LLM back‑ends without touching consumer code, supporting future load growth.  
+   - Graph‑DB persistence is abstracted; scaling the underlying database (clustering, sharding) does not affect calling code.  
 
 5. **Maintainability assessment**  
-   * **High** – clear separation of concerns, explicit adapters, and a central registry make the codebase approachable for new contributors.  
-   * **Medium** – the multi‑agent orchestration relies on configuration files; any drift between agent contracts and orchestrator expectations must be monitored.  
-   * **Low technical debt** – no evidence of tightly‑coupled monolith code; most changes are localized to a single module.  
-   * Ongoing maintenance will focus on keeping provider implementations, adapter contracts, and ontology rules in sync, as well as version‑pinning Docker images to avoid incompatibilities.
+   - Strong module boundaries and explicit adapters make the codebase approachable for new developers.  
+   - Centralized registries and shared utilities reduce duplication but require disciplined versioning.  
+   - Documentation should emphasize the contract of each adapter/agent to prevent accidental coupling between siblings.  
+
+By staying faithful to the observed file structures and design cues, the **Coding** project presents a well‑organized, extensible platform ready for further feature growth and production‑grade scaling.
 
 
 ## Hierarchy Context
 
 ### Children
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This is evident in the way the agent is instantiated and used within the LiveLoggingSystem's classification layer. The OntologyClassificationAgent's classify method is called with the session transcript as an argument, allowing the system to categorize the conversation based on predefined ontology rules. Furthermore, the use of the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, as an abstract base class for agent-specific transcript adapters, enables the system to handle transcripts from various agents in a unified manner. The TranscriptAdapter's adaptTranscript method is responsible for converting agent-specific transcripts into a standardized format, which is then passed to the OntologyClassificationAgent for classification.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts and lib/llm/providers/anthropic-provider.ts), allows for easy maintenance and extension of the system. This is further facilitated by the use of a registry (lib/llm/provider-registry.js) to manage providers, enabling the addition or removal of providers without modifying the core logic of the LLMService class (lib/llm/llm-service.ts). The registry pattern helps to decouple the provider implementations from the service class, making it easier to swap out or add new providers as needed.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and management. This is evident in the directory structure, where each service has its own subdirectory, such as semantic analysis, constraint monitoring, and code graph construction. The lib/llm/llm-service.ts file, which contains the LLMService class, provides a high-level facade for LLM operations, handling mode routing, caching, and circuit breaking. This design decision enables loose coupling between services and promotes scalability. Furthermore, the use of docker-compose for service orchestration, as seen in the docker-compose.yml file, provides a robust framework for integrating multiple services.
-- [Trajectory](./Trajectory.md) -- The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maintenance and scalability. For instance, the SpecstoryAdapter (lib/integrations/specstory-adapter.js) is used to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a flexible approach to integrations. This adapter implements a retry-with-backoff pattern in the connectViaHTTP method (lib/integrations/specstory-adapter.js:123) to establish a connection with the Specstory extension, showcasing a robust approach to handling potential connection issues.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database. This adapter enables the component to perform tasks such as entity storage and relationship management, while also providing automatic JSON export sync. The use of this adapter allows for a flexible and scalable solution for knowledge graph management. Furthermore, the intelligent routing implemented in the GraphDatabaseAdapter enables the component to efficiently route requests for API or direct database access, ensuring optimal performance. The code in storage/graph-database-adapter.ts demonstrates how the adapter is used to handle concurrent access and provide a robust solution for graph database interactions.
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has its own directory and configuration, allowing for easier maintenance and extension of the system. For instance, the lib/llm/provider-registry.js file defines a provider registry that manages different providers and enables provider switching based on mode and availability. This modular design enables developers to add or remove language models without affecting the overall system.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassificationAgent, which utilizes the ontology system to classify observations. This agent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and follows the BaseAgent pattern defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of a standardized agent structure, as seen in the BaseAgent class, allows for easier development and maintenance of new agents. For instance, the SemanticAnalysisAgent, responsible for analyzing code files, is implemented in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts and leverages the LLMService from lib/llm/dist/index.js for language model-based analysis.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers. This is evident in the 'session_windowing.py' and 'file_routing.py' files, which contain functions such as 'window_session' and 'route_file' that handle these specific tasks. The 'classification_layers.py' file contains classes such as 'Classifier' that handle the classification of logs.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models without affecting the overall system. This is evident in the LLMService class (lib/llm/llm-service.ts), which acts as the single public entry point for all LLM operations and handles mode routing, caching, and circuit breaking. The use of a ProviderRegistry to manage different providers, including mock, local, and public providers, further reinforces this modular design.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph database. This adapter provides a standardized interface for interacting with the database, ensuring consistency and modularity in the component's architecture. For instance, the GraphDatabaseAdapter's 'createNode' method is used to persist new entities in the database, while the 'getNode' method retrieves existing nodes based on their IDs. This modular approach enables easy switching between different database implementations if needed, as seen in lib/llm/provider-registry.js, where various providers are managed and registered.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is used for entity content validation against configured rules. This modular design allows for easy maintenance and scalability of the system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is another example of this modularity, as it is responsible for loading and merging hook configurations from multiple sources. This separation of concerns enables developers to focus on specific aspects of the system without affecting other parts.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This is evident in the classifyObservations method of the OntologyClassificationAgent class, which takes in a list of observations and returns a list of classified observations. The use of separate modules for different agents and utilities, such as the storage and logging modules, also contributes to the overall modularity of the component. This modular design allows for easier maintenance and updates, as changes to one agent do not affect the others.
 
 
 ---
