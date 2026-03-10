@@ -443,67 +443,23 @@ Use Skill tool with command: "documentation-style"
 # ==============================================================================
 # STATUSLINE CONFIG
 # ==============================================================================
-# Ensure statusLine config is present in target project
-# This allows Claude Code to display system health in the status bar
+# Claude Code's native statusLine is owned by GSD (context window display).
+# The coding project's combined-status-line.js is used for tmux only.
+# This function ensures project settings.local.json does NOT override the
+# global GSD statusline by removing any stale statusLine entries.
 ensure_statusline_config() {
   local target_project="$1"
   local coding_repo="$2"
   local claude_dir="$target_project/.claude"
   local settings_file="$claude_dir/settings.local.json"
 
-  # Skip native statusLine when tmux handles the status bar
-  if [ -n "$TMUX" ] || [ "$CODING_TMUX_MODE" = "true" ]; then
-    return 0
-  fi
-
-  # Skip if we're in the coding repo itself (already has config)
-  if [ "$target_project" = "$coding_repo" ]; then
-    return 0
-  fi
-
-  # Create .claude directory if it doesn't exist
-  if [ ! -d "$claude_dir" ]; then
-    mkdir -p "$claude_dir"
-    log "Created .claude directory in project"
-  fi
-
-  # Check if settings file exists
-  if [ ! -f "$settings_file" ]; then
-    # Create minimal settings file with statusLine config
-    cat > "$settings_file" << EOF
-{
-  "permissions": {
-    "allow": [
-      "CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js"
-    ],
-    "additionalDirectories": []
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js"
-  }
-}
-EOF
-    log "Created .claude/settings.local.json with statusLine config"
-  else
-    # Check if statusLine is missing and add it
-    if ! grep -q '"statusLine"' "$settings_file" 2>/dev/null; then
-      # Use jq to add statusLine config if jq is available
-      if command -v jq >/dev/null 2>&1; then
-        local temp_file=$(mktemp)
-        jq ". + {\"statusLine\": {\"type\": \"command\", \"command\": \"CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js\"}}" "$settings_file" > "$temp_file"
-        mv "$temp_file" "$settings_file"
-        log "Added statusLine config to existing settings"
-      else
-        # Fallback: add statusLine before the closing brace
-        sed -i.backup 's/}$/,\n  "statusLine": {\n    "type": "command",\n    "command": "CODING_REPO='"$coding_repo"' node '"$coding_repo"'\/scripts\/combined-status-line.js"\n  }\n}/' "$settings_file"
-        log "Added statusLine config to existing settings (fallback method)"
-      fi
-    fi
-
-    # Ensure the permission is present
-    if ! grep -q "CODING_REPO.*combined-status-line.js" "$settings_file" 2>/dev/null; then
-      log "Warning: statusLine permission may need to be added manually to .claude/settings.local.json"
+  # Remove any statusLine from project settings — GSD owns the Claude status line,
+  # tmux owns the terminal status bar via combined-status-line.js
+  if [ -f "$settings_file" ] && grep -q '"statusLine"' "$settings_file" 2>/dev/null; then
+    if command -v jq >/dev/null 2>&1; then
+      local temp_file=$(mktemp)
+      jq 'del(.statusLine)' "$settings_file" > "$temp_file" && mv "$temp_file" "$settings_file"
+      log "Removed statusLine from project settings (GSD owns Claude status line)"
     fi
   fi
 }

@@ -1838,11 +1838,7 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    // Trailing padding: overwrite stale characters left by previous (longer) renders.
-    // Emoji width is ambiguous in tmux — some emoji render as 2 columns but tmux
-    // counts them as 1, causing leftover chars from prior output at the right edge.
-    const TRAILING_PAD = '   ';
-    const statusText = parts.join(' ') + TRAILING_PAD;
+    const statusText = parts.join(' ');
 
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details

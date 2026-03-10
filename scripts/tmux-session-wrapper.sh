@@ -45,7 +45,7 @@ tmux_session_wrapper() {
     tmux set-option -t "$target_session" status-interval 5
     tmux set-option -t "$target_session" status-right-length 200
     tmux set-option -t "$target_session" status-style "bg=default,fg=default"
-    tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')  "
+    tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')"
     tmux set-option -t "$target_session" mouse on
   }
 
