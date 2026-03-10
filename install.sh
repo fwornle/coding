@@ -3177,13 +3177,11 @@ create_project_local_settings() {
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "CODING_REPO=CODING_REPO_PLACEHOLDER node CODING_REPO_PLACEHOLDER/scripts/combined-status-line.js"
   }
 }
 EOF
+    # NOTE: statusLine is NOT set here — tmux provides the status bar for all
+    # coding sessions. See tmux-session-wrapper.sh and status-line-fast.cjs.
 
     # Replace placeholders with actual paths
     sed -i.bak "s|CODING_REPO_PLACEHOLDER|$CODING_REPO|g" "$project_settings_file"
@@ -3290,10 +3288,6 @@ install_constraint_monitor_hooks() {
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "$status_line_cmd"
   }
 }
 EOF
@@ -3376,22 +3370,17 @@ EOF
                 "command": $prompt_cmd,
                 "timeout": 5
             }]
-        }] |
-        # Set up status line (replaces any existing statusLine)
-        .statusLine = {
-            "type": "command",
-            "command": $status_line_cmd
-        }
+        }]
     ' "$settings_file" > "$temp_file"
 
     # Validate JSON
     if jq empty "$temp_file" 2>/dev/null; then
         mv "$temp_file" "$settings_file"
-        success "Hooks and status line installed to ~/.claude/settings.json"
+        success "Hooks installed to ~/.claude/settings.json"
         info "  - PreToolUse: Constraint monitoring (blocks violations)"
         info "  - PostToolUse: LSL logging (captures interactions)"
         info "  - UserPromptSubmit: System health verification"
-        info "  - StatusLine: Real-time system status display"
+        info "  - StatusLine: provided by tmux (see tmux-session-wrapper.sh)"
     else
         rm -f "$temp_file"
         warning "Failed to update settings file - JSON validation failed"
