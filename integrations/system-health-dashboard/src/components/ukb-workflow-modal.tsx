@@ -317,9 +317,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     for (const [stepName, agentId] of Object.entries(stepToAgent)) {
       const runtimeSubsteps = agentToRuntimeSubsteps.get(agentId) || []
       // The step has substeps if:
-      // 1. It's NOT itself a runtime substep (i.e., not in stepToSubStep), AND
-      // 2. Its agent has runtime substeps
-      if (!stepToSubStep[stepName] && runtimeSubsteps.length > 0) {
+      // 1. Its agent has runtime substeps, AND
+      // 2. Either it's NOT itself a runtime substep, OR its agent has OTHER substeps beyond itself
+      const isSubstep = !!stepToSubStep[stepName]
+      const hasOtherSubsteps = runtimeSubsteps.some(s => s !== stepName)
+      if (runtimeSubsteps.length > 0 && (!isSubstep || hasOtherSubsteps)) {
         steps.add(stepName)
       }
     }

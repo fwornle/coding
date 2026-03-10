@@ -84,8 +84,8 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
   // === BATCH PROCESSING AGENTS ===
   {
     id: 'batch_scheduler',
-    name: 'Batch Scheduler',
-    shortName: 'Batch',
+    name: 'Scheduler',
+    shortName: 'Sched',
     icon: Calendar,
     description: 'Plans and tracks chronological batch windows. Divides git history into 50-commit batches for incremental processing with checkpoint-based resumption.',
     usesLLM: false,
