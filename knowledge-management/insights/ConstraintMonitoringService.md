@@ -2,90 +2,95 @@
 
 **Type:** SubComponent
 
-The service-starter.js script provides a robust service startup mechanism, ensuring that the ConstraintMonitoringService can recover from temporary failures and maintain overall system stability.
+The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
 
 ## What It Is  
 
-**ConstraintMonitoringService** is a sub‑component that lives inside the **DockerizedServices** container.  Its primary responsibility is to *monitor constraints*—rules that define the permissible state of the system—and to trigger the appropriate actions when those constraints are violated.  The service is started by the shared **service‑starter.js** script, which lives at the root of the DockerizedServices code base (the exact path is not enumerated in the observations but is the same file used by the sibling services).  The starter script equips the service with a *retry‑with‑backoff* launch sequence, ensuring that the service can recover gracefully from transient failures of optional downstream dependencies.  In addition, the service is expected to persist constraint definitions and violation events in a database or other data‑storage system, enabling efficient queries and historical analysis.
-
-## Architecture and Design  
-
-The architecture that emerges from the observations is a **robust startup orchestration** layered on top of a **constraint‑monitoring core**.  The startup layer is embodied by **service‑starter.js**, which implements a *retry‑with‑backoff* pattern using an exponential backoff algorithm.  This pattern is deliberately shared across the parent **DockerizedServices** component and its siblings—**SemanticAnalysisService**, **CodeGraphService**, and **ServiceStarter**—indicating a common orchestration strategy for all Docker‑hosted services.  
-
-Within the monitoring core, the design hints at a **rules‑engine / decision‑table** approach: the service “monitors constraints and triggers actions based on constraint violations, potentially using a rules engine or a decision table.”  This suggests a separation between *constraint definition* (data) and *constraint evaluation* (logic), a classic **separation‑of‑concerns** design that makes the system extensible.  The optional use of a database for constraint storage further points to a **data‑driven** architecture where new constraints can be added without code changes.
-
-## Implementation Details  
-
-The **service‑starter.js** script is the keystone of the launch process.  It implements a **recursive function** that calls itself via `setTimeout`.  Each recursion represents a retry attempt; the delay passed to `setTimeout` is calculated using an **exponential backoff** formula, gradually increasing the wait time after each failure.  The recursion terminates either when the service successfully starts or when a configurable maximum‑retry count is reached, preventing an endless loop.  This mechanism provides *graceful degradation*—if an optional dependency (for example, a downstream database) is unavailable, the service will back off rather than hammer the dependency, preserving overall system stability.  
-
-Although no concrete class names are listed, the monitoring logic likely consists of:  
-
-1. **Constraint Loader** – reads constraint definitions from the database or configuration files.  
-2. **Evaluator** – runs the constraints against incoming data or system state, possibly using a rules‑engine API.  
-3. **Action Dispatcher** – maps detected violations to concrete actions (e.g., alerts, remediation scripts).  
-
-The backoff logic lives entirely in **service‑starter.js**, while the evaluation loop is expected to run continuously after startup, polling or listening for events that need validation.
-
-## Integration Points  
-
-* **Parent – DockerizedServices**: The parent component supplies the Docker container environment and the shared **service‑starter.js** script.  All services, including ConstraintMonitoringService, inherit the same startup resilience guarantees.  
-
-* **Sibling Services** – **SemanticAnalysisService**, **CodeGraphService**, **ServiceStarter**: These siblings also rely on the same retry‑with‑backoff logic, meaning that any change to **service‑starter.js** (e.g., tweaking backoff parameters) will affect all of them uniformly.  
-
-* **Data Store**: The observation that the service “may use a database or a data storage system” indicates a direct dependency on a persistence layer for constraint definitions and violation logs.  The exact database technology is not specified, but the integration point is the storage client used by the Constraint Loader.  
-
-* **Optional Downstream Services**: Because the startup script is designed to handle optional service failures, ConstraintMonitoringService may depend on external APIs (e.g., notification services) that are not strictly required for the service to start, but are used during normal operation.
-
-## Usage Guidelines  
-
-1. **Do not modify the backoff parameters in service‑starter.js without reviewing sibling impact** – since the same script is shared, any change propagates to SemanticAnalysisService, CodeGraphService, and ServiceStarter.  Adjust the maximum retry count or the exponential factor only after system‑wide testing.  
-
-2. **Persist constraints in the designated database** – add, update, or retire constraints through the approved data‑access layer rather than editing code.  This keeps the evaluation engine stateless and enables hot‑reloading of rules.  
-
-3. **Handle violation actions idempotently** – because the startup script may restart the service after a failure, actions triggered by constraint violations should be safe to repeat or should include deduplication logic.  
-
-4. **Monitor the startup logs** – the recursive backoff loop writes diagnostic messages on each retry; these logs are the primary source for diagnosing why the service failed to start (e.g., unavailable DB).  
-
-5. **Respect the configurable retry limit** – if the service reaches the maximum number of retries, it will abort startup.  In production, configure a monitoring alert to capture this event and trigger a manual investigation.
+The **ConstraintMonitoringService** is a sub‑component that lives inside the **DockerizedServices** suite. Its runtime definition is tied to the Docker Compose configuration (`docker-compose.yaml`) where it declares a dependency on the **mcp‑server‑semantic‑analysis** service. The service’s lifecycle is controlled by the **Service Starter** implementation found in `lib/service-starter.js`. This starter wraps the service’s boot‑up logic in a **retry‑with‑backoff** routine, giving the service a resilient start‑up sequence even when the underlying semantic‑analysis container is slow to become healthy. In practice, the ConstraintMonitoringService watches coding services and enforces pre‑defined constraints by delegating the heavy‑lifting of semantic analysis to the `mcp‑server‑semantic‑analysis` container.
 
 ---
 
-### Architectural patterns identified  
-* **Retry‑with‑backoff** (exponential backoff) implemented in **service‑starter.js**  
-* **Recursive retry loop** using `setTimeout`  
-* **Data‑driven rule evaluation** (potential rules engine / decision table)  
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* Centralising the startup logic in a single script reduces duplication across services but creates a tight coupling; a change affects all siblings.  
-* Exponential backoff protects downstream resources at the cost of longer recovery times under persistent failure.  
-* Storing constraints externally enables dynamic updates but introduces a runtime dependency on the database’s availability.  
+The architecture that emerges from the observations is a **Docker‑Compose‑orchestrated, modular service mesh**. Each functional unit (e.g., `ConstraintMonitoringService`, `SemanticAnalysisService`, `CodeGraphAnalysisService`) is packaged as an individual Docker service, and the `docker-compose.yaml` file provides a single source of truth for their inter‑dependencies. This yields a **standardized and reproducible environment** for service orchestration, as noted in observations 1, 5, and the parent component description.
 
-### System structure insights  
-* **DockerizedServices** acts as the container and orchestrator, providing a shared resilience layer.  
-* Each sub‑service (including ConstraintMonitoringService) follows the same launch contract, promoting uniform operational behavior.  
+A key design pattern is the **retry‑with‑backoff** strategy implemented in `lib/service-starter.js`. The Service Starter encapsulates start‑up logic with configurable retry limits and timeout protection, allowing the ConstraintMonitoringService to tolerate transient failures of its dependent `mcp‑server‑semantic‑analysis` service. This pattern promotes **robust service initialization** and aligns the service with its sibling **ServiceStarterManager**, which oversees the same start‑up discipline for other components.
 
-### Scalability considerations  
-* The exponential backoff algorithm scales well under bursty failure conditions because it throttles retry traffic automatically.  
-* If constraint evaluation becomes CPU‑intensive, the stateless evaluation loop can be horizontally scaled by running multiple instances behind a load balancer, provided the underlying data store can handle concurrent reads.  
+The service follows a **modular and adaptable** design: it does not embed its own semantic analysis engine but instead **delegates** that responsibility to the external `mcp‑server‑semantic‑analysis` service. This separation of concerns keeps the monitoring logic lightweight and makes the constraint‑enforcement capability interchangeable – a design decision that mirrors the approach taken by the sibling **SemanticAnalysisService**, which also relies on the same semantic‑analysis container.
 
-### Maintainability assessment  
-* High maintainability for startup behavior thanks to a single, well‑documented **service‑starter.js** script.  
-* Constraint logic is decoupled from code, which simplifies updates; however, the lack of explicit class or interface definitions in the observations suggests that documentation and clear API contracts for the data‑access layer are essential to avoid drift.  
+---
 
-Overall, **ConstraintMonitoringService** inherits a proven, resilient startup pattern from its parent and siblings while focusing on a data‑driven constraint evaluation model that can evolve without code changes.  Adhering to the guidelines above will keep the service reliable, extensible, and easy to operate within the DockerizedServices ecosystem.
+## Implementation Details  
+
+* **Service Startup – `lib/service-starter.js`**  
+  The Service Starter exports a routine that attempts to launch the ConstraintMonitoringService. It wraps the launch call in a loop that respects a **retry count** and an **exponential back‑off delay** (the exact algorithm is not listed, but the observations emphasize “configurable retry limits and timeout protection”). If the `mcp‑server‑semantic‑analysis` container is not yet ready, the starter will pause, increase the wait time, and retry until either the service starts or the retry budget is exhausted. This logic is shared across all services managed by the **ServiceStarterManager**, ensuring a uniform start‑up policy.
+
+* **Dependency on `mcp‑server‑semantic‑analysis`**  
+  The Docker Compose file declares the semantic‑analysis service as a required service for ConstraintMonitoringService. Environment variables (as highlighted in observations 5 and the parent context) are used to pass configuration such as endpoint URLs, authentication tokens, or analysis modes into the container. The ConstraintMonitoringService reads these variables at runtime to locate and communicate with the semantic‑analysis API.
+
+* **Constraint Enforcement Flow**  
+  Although no concrete code symbols are listed, the functional description indicates the following flow:  
+  1. The monitoring component receives events or state snapshots from “coding services”.  
+  2. For each event, it calls the `mcp‑server‑semantic‑analysis` API (via HTTP or RPC) to obtain a semantic representation of the code.  
+  3. It then applies its set of constraints (e.g., naming conventions, dependency rules) against the returned analysis and raises alerts or blocks actions when violations are detected.  
+
+* **Configuration Management**  
+  All runtime parameters are injected through Docker Compose environment blocks, ensuring that the same configuration can be reproduced across development, staging, and production environments. This mirrors the approach used by sibling components such as **LLMServiceManager**, which also relies on environment‑driven configuration.
+
+---
+
+## Integration Points  
+
+1. **Docker Compose (`docker-compose.yaml`)** – The primary integration surface. It defines the network, shared volumes, and environment variables that connect ConstraintMonitoringService with `mcp‑server‑semantic‑analysis`. Any change to the semantic‑analysis service (e.g., image version, exposed ports) must be reflected here.  
+
+2. **Service Starter (`lib/service-starter.js`)** – Acts as the entry point for the service process. It is invoked by the **ServiceStarterManager** and shares its retry‑with‑backoff implementation with sibling services.  
+
+3. **Coding Services** – These are the upstream producers of code artefacts that the ConstraintMonitoringService monitors. While the observations do not name specific classes, the service likely subscribes to event streams or polls APIs exposed by those services.  
+
+4. **Sibling Services** –  
+   * **SemanticAnalysisService**: Shares the same semantic‑analysis backend, suggesting that both services could be co‑located on the same Docker network for low‑latency communication.  
+   * **CodeGraphAnalysisService**: Provides a complementary analysis capability (graph‑based) that could be combined with constraint checks for richer validation.  
+   * **LLMServiceManager** and **ServiceStarterManager**: Provide orchestration and lifecycle management that the ConstraintMonitoringService inherits through the common Service Starter.  
+
+5. **Environment Variables** – Serve as the contract for configuration (e.g., `SEMANTIC_ANALYSIS_ENDPOINT`, `CONSTRAINT_RULESET_PATH`). Changing these variables influences how the service discovers and talks to its dependencies without requiring code changes.
+
+---
+
+## Usage Guidelines  
+
+* **Deploy via Docker Compose** – Always start the full stack with `docker-compose up`. Do not run the ConstraintMonitoringService in isolation; the retry‑with‑backoff logic expects the `mcp‑server‑semantic‑analysis` container to become healthy shortly after launch.  
+
+* **Configure through Environment** – All tunable parameters (retry limits, back‑off intervals, endpoint URLs, rule set locations) should be supplied as environment variables in the Compose file. Avoid hard‑coding values inside the service code to preserve the reproducible environment promised by the parent **DockerizedServices** component.  
+
+* **Observe Startup Logs** – The Service Starter emits log entries for each retry attempt. If the service repeatedly fails to start, inspect the `mcp‑server‑semantic‑analysis` logs and verify that the required environment variables are correctly set.  
+
+* **Extending Constraints** – New constraint rules should be added to the rule‑set artifact referenced by an environment variable (e.g., `CONSTRAINT_RULESET_PATH`). Because the service delegates semantic analysis, you do not need to modify the monitoring logic to support new language features—only the rule definitions.  
+
+* **Testing in Isolation** – For unit‑style tests, you can mock the semantic‑analysis API endpoint. However, integration tests should spin up the full Docker Compose stack to validate the end‑to‑end constraint enforcement flow, mirroring how sibling services are tested.  
+
+---
+
+### Summary of Architectural Insights  
+
+1. **Architectural patterns identified** – Docker‑Compose orchestration, retry‑with‑backoff start‑up pattern, modular delegation to a shared semantic‑analysis service.  
+2. **Design decisions and trade‑offs** – Off‑loading semantic analysis keeps the monitoring component lightweight and easier to evolve, at the cost of a runtime dependency on an external container. The retry‑with‑backoff starter improves resilience but introduces configurable latency during start‑up.  
+3. **System structure insights** – ConstraintMonitoringService sits within the **DockerizedServices** parent, sharing the same Docker network and environment‑driven configuration as its siblings. The Service Starter provides a common lifecycle hook across the suite.  
+4. **Scalability considerations** – Because the service is containerized, horizontal scaling can be achieved by increasing the replica count in Docker Compose (or Swarm/Kubernetes) provided the semantic‑analysis backend can handle the additional load. The retry‑with‑backoff logic remains effective under scaled‑out scenarios as each replica independently handles its own start‑up.  
+5. **Maintainability assessment** – High maintainability stems from clear separation of concerns (monitoring vs. analysis), centralized configuration via environment variables, and a shared, well‑documented Service Starter. The primary maintenance burden lies in keeping the Docker Compose definitions synchronized and ensuring the semantic‑analysis service’s API contract remains stable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a robust service startup mechanism through the service-starter.js script, which implements a retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail. This pattern is crucial in ensuring that the services can recover from temporary failures and maintain overall system stability. The service-starter.js script also utilizes exponential backoff to gradually increase the delay between retries, reducing the likelihood of overwhelming the system with repeated requests. For instance, in the service-starter.js file, the retry logic is implemented using a combination of setTimeout and a recursive function call, allowing for a configurable number of retries and a backoff strategy.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService employs the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
-- [CodeGraphService](./CodeGraphService.md) -- CodeGraphService employs the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter employs the retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
+- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
+- [ServiceStarterManager](./ServiceStarterManager.md) -- The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

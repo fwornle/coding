@@ -2,130 +2,91 @@
 
 **Type:** SubComponent
 
-CodeGraphAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route code graph analysis requests to different modes, such as training or inference, based on input parameters.
+The service relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
 
 ## What It Is  
 
-**CodeGraphAnalysisService** is a sub‑component that lives in the source tree at  
-
-```
-lib/llm/code-graph-analysis-service.ts
-```  
-
-The class defined in this file is responsible for performing “code‑graph analysis” for the broader **DockerizedServices** component (the parent).  Its core job is to take a request that describes a code base (e.g., the API server or the dashboard) and obtain the appropriate analysis result from a large‑language‑model (LLM) backend.  To do so, it does not implement the LLM interaction itself; instead it delegates every LLM‑related operation to the **LLMService** class found in  
-
-```
-lib/llm/llm-service.ts
-```  
-
-Through this delegation the service gains access to three key capabilities that are explicitly mentioned in the observations: **mode routing** (training vs. inference), **in‑memory caching**, and a **circuit‑breaker** that protects the system from cascading failures.  The service also owns an **LLMRouter** child component (implemented inside the same `llm-service.ts` file) that encapsulates the routing logic.
-
----
+The **CodeGraphAnalysisService** is a sub‑component that lives inside the **DockerizedServices** suite.  Its entry point and lifecycle are controlled by the **Service Starter** implementation found in `lib/service-starter.js`.  The service’s core responsibility is to analyse code‑graph structures by delegating the heavy‑lifting to the **CodeGraphAnalyzer** component and by invoking the external **mcp‑server‑semantic‑analysis** service that is defined in the repository’s `docker-compose.yaml`.  Because the service is launched inside a Docker Compose environment, all required runtime configuration (e.g., service URLs, authentication tokens) is supplied through environment variables that Docker Compose propagates to the container.
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **centralized LLM façade** pattern.  The parent component **DockerizedServices** treats `LLMService` as the single entry point for all LLM interactions, and each sibling service (e.g., `SemanticAnalysisService`, `ConstraintMonitoringService`) as well as `CodeGraphAnalysisService` rely on that façade.  This yields a **Facade** pattern: complex LLM concerns (routing, caching, resilience) are hidden behind a simple, well‑defined API surface.
+The observations reveal a **modular, container‑oriented architecture**.  Each functional unit—CodeGraphAnalysisService, SemanticAnalysisService, ConstraintMonitoringService, etc.—is packaged as an independent Docker service described in `docker-compose.yaml`.  This promotes isolation and reproducibility, a pattern that is explicitly noted in the description of the parent **DockerizedServices** component.  
 
-Inside the façade, the **Router** role is played by the `LLMRouter` child.  The router inspects request parameters (e.g., a flag indicating “training” or “inference”) and forwards the call to the appropriate mode implementation.  This is a classic **Router** (or **Strategy**) pattern, allowing new modes to be added without touching the callers.
+A key design pattern employed by the service is the **Retry‑With‑Backoff** strategy, implemented in `lib/service-starter.js`.  The Service Starter wraps the service’s startup sequence in a loop that retries a configurable number of times, exponentially increasing the wait interval between attempts while respecting an overall timeout.  This pattern provides resilience against transient failures such as network hiccups when the **mcp‑server‑semantic‑analysis** service is not yet ready.  
 
-The **Cache** capability is implemented directly in `LLMService`.  By keeping frequently accessed analysis data in memory, the service reduces round‑trip latency for repeated graph‑analysis queries.  This is an **in‑memory cache** (a simple key‑value store) that is shared across all services that use the façade.
-
-Finally, the **Circuit Breaker** logic lives in the same `LLMService`.  It monitors the health of downstream LLM endpoints and, once a failure threshold is crossed, short‑circuits further calls to protect the rest of the system.  This is a textbook **Circuit Breaker** pattern that prevents cascading failures.
-
-All of these patterns are **co‑located** in the `lib/llm` package, which encourages reuse but also creates a tight coupling between the façade and its consumers.  The design decision to place the routing, caching, and resilience concerns in a single class simplifies the call‑graph (each sub‑component has only one dependency) but makes the façade a critical piece of infrastructure.
-
----
+The **CodeGraphAnalysisService** itself follows a **Facade**‑like approach: it presents a simple public API for callers while internally orchestrating two collaborators—`CodeGraphAnalyzer` (the algorithmic engine) and the external semantic analysis service.  The service does not embed the analysis logic; instead, it delegates to these specialised components, making the overall design **adaptable** (e.g., swapping out the analyzer or the semantic service without touching the service‑starter code).
 
 ## Implementation Details  
 
-### Core Classes  
+* **Service Starter (`lib/service-starter.js`)** – This module exports a starter function that reads configuration (retry limit, back‑off parameters, timeout) from environment variables.  It then attempts to launch the CodeGraphAnalysisService process.  On failure, it logs the error, waits for the back‑off interval, and retries until the limit is hit or the service starts successfully.  The back‑off logic is configurable, allowing developers to tune resilience based on deployment environments.  
 
-| File | Class | Responsibility |
-|------|-------|----------------|
-| `lib/llm/llm-service.ts` | `LLMService` | Central façade that exposes methods for “runLLMRequest”, handles mode routing via `LLMRouter`, caches results, and enforces circuit‑breaker checks. |
-| `lib/llm/llm-service.ts` | `LLMRouter` (child of `LLMService`) | Examines request metadata (e.g., `mode: 'training' | 'inference'`) and dispatches the call to the correct internal handler. |
-| `lib/llm/code-graph-analysis-service.ts` | `CodeGraphAnalysisService` | Orchestrates the code‑graph analysis workflow for services such as the API server and dashboard. It builds the request payload, forwards it to `LLMService`, and post‑processes the LLM response. |
+* **CodeGraphAnalyzer** – Though the source file is not listed, the observations make clear that the service *utilises* this analyzer to process code‑graph data.  The analyzer is likely exposed as a class or module that accepts a graph representation and returns analysis results (e.g., dependency metrics, cyclomatic complexity).  Because the service treats the analyzer as a pluggable component, the implementation can evolve independently.  
 
-### Request Flow  
+* **Interaction with `mcp-server-semantic-analysis`** – The Docker Compose file (`docker-compose.yaml`) declares the semantic analysis service, which the CodeGraphAnalysisService contacts over the network (most probably via HTTP/REST).  Environment variables supplied by Docker Compose (service host, port, authentication) are consumed by the service at runtime, enabling a **standardised and reproducible** connection strategy across all sibling services that also depend on this semantic analysis backend.  
 
-1. **Entry** – A consumer (e.g., the API server) creates a `CodeGraphAnalysisService` instance or calls its static method.  
-2. **Payload Construction** – The service gathers the source‑code representation (AST, dependency graph, etc.) and packages it into a request object.  
-3. **Facade Call** – The request is handed to `LLMService.runLLMRequest(request)`.  
-4. **Routing** – Inside `LLMService`, the `LLMRouter` inspects `request.mode`. If the mode is `training`, it forwards to the training handler; if `inference`, it forwards to the inference handler.  
-5. **Cache Lookup** – Before invoking the downstream LLM endpoint, `LLMService` checks its in‑memory cache for a matching key (often a hash of the graph). A cache hit returns the stored result immediately, bypassing network latency.  
-6. **Circuit‑Breaker Check** – If the cache misses, the circuit‑breaker state is examined. When the breaker is **closed**, the call proceeds; if **open**, the request is rejected early with a fallback error.  
-7. **LLM Invocation** – The appropriate LLM client (training or inference) is called. The raw response is cached for future identical requests.  
-8. **Result Return** – `CodeGraphAnalysisService` receives the LLM output, extracts the graph‑analysis insights (e.g., dependency cycles, hot‑spot modules) and returns them to the caller.
-
-### Shared Infrastructure  
-
-All sibling services (`SemanticAnalysisService`, `ConstraintMonitoringService`, etc.) follow the identical flow, reusing the same `LLMRouter`, cache store, and circuit‑breaker logic.  This uniformity is evident from the sibling observations, which explicitly state that each leverages `LLMService` for mode routing and caching.
-
----
+* **Configuration Management** – All runtime parameters—retry limits, back‑off factors, service endpoints—are externalised as environment variables.  This keeps the codebase free of hard‑coded values and aligns with the container‑first philosophy of the parent DockerizedServices component.
 
 ## Integration Points  
 
-1. **Parent – DockerizedServices**  
-   - `DockerizedServices` includes `CodeGraphAnalysisService` as one of its internal services. The parent component orchestrates the lifecycle of the service (instantiation, dependency injection) and expects the façade to provide a stable API for LLM calls.  
+1. **Docker Compose (`docker-compose.yaml`)** – The service is declared alongside its peers (SemanticAnalysisService, ConstraintMonitoringService, etc.) and shares the same network namespace.  The compose file also defines the `mcp-server-semantic-analysis` service that both CodeGraphAnalysisService and its siblings consume.  
 
-2. **Sibling Services**  
-   - `SemanticAnalysisService`, `ConstraintMonitoringService`, `ModeRouter`, and `CacheManager` all depend on the same `LLMService`. This creates a **shared‑dependency** graph where any change to routing, caching, or circuit‑breaker behavior propagates to all siblings.  
+2. **ServiceStarterManager (Sibling)** – The sibling manager oversees the lifecycle of all service starters.  It likely invokes the starter defined in `lib/service-starter.js` for each sub‑component, ensuring a uniform startup policy across the suite.  
 
-3. **Child – LLMRouter**  
-   - Implemented inside `lib/llm/llm-service.ts`, `LLMRouter` is the internal routing engine used exclusively by `CodeGraphAnalysisService` (and its siblings). It is not exposed publicly; instead it is invoked through the façade’s public methods.  
+3. **LLMServiceManager (Sibling)** – While not directly used by CodeGraphAnalysisService, the presence of a dedicated manager for large‑language‑model services hints at a broader ecosystem where services can be composed.  CodeGraphAnalysisService could be extended to call LLM APIs for advanced code‑graph interpretation, leveraging the same environment‑driven configuration model.  
 
-4. **External LLM Back‑ends**  
-   - The actual LLM providers (training clusters, inference endpoints) are abstracted behind the mode handlers inside `LLMService`. The service’s circuit‑breaker monitors these external calls, and the cache stores their responses.  
+4. **External Semantic Analysis Service** – The service’s primary external dependency is the `mcp-server-semantic-analysis` container.  Communication is mediated through well‑defined endpoints (e.g., `/analyze`) and governed by the environment variables injected by Docker Compose.  
 
-5. **Data Stores**  
-   - The in‑memory cache lives within the process that hosts `LLMService`. No persistent store is mentioned, so the cache is volatile and scoped to the service’s runtime.  
-
-These integration points indicate a **tight coupling** between `CodeGraphAnalysisService` and the LLM façade, but a **loose coupling** between the façade and the concrete LLM providers (thanks to the routing abstraction).
-
----
+5. **CodeGraphAnalyzer** – Internally, the service depends on this library/module.  Because the analyzer is a distinct component, it can be unit‑tested in isolation and potentially reused by other services that need graph‑level insights.
 
 ## Usage Guidelines  
 
-1. **Prefer the Facade API** – Callers should never interact directly with the routing or caching logic. All requests must go through `LLMService.runLLMRequest` (or the higher‑level wrapper methods exposed by `CodeGraphAnalysisService`). This guarantees that caching and circuit‑breaker protections are applied.  
+* **Start the Service via the Service Starter** – Developers should never invoke the CodeGraphAnalysisService binary directly.  Instead, they should run the service through the `lib/service-starter.js` entry point, which guarantees the retry‑with‑backoff behaviour.  This can be done locally with `docker compose up codegraphanalysisservice` or programmatically by calling the starter function.  
 
-2. **Specify the Mode Explicitly** – When constructing a request, include a `mode` field (`'training'` or `'inference'`). The router relies on this flag to select the correct downstream path; omitting it may cause the request to default to an undesired mode.  
+* **Configure Retry Parameters Explicitly** – The default retry limit and back‑off intervals may be suitable for most environments, but production deployments with higher latency networks should adjust `RETRY_LIMIT`, `BACKOFF_INITIAL_MS`, and `BACKOFF_MAX_MS` via environment variables to avoid premature termination.  
 
-3. **Design for Cacheability** – Because the cache key is derived from the request payload (typically a hash of the code graph), identical analysis requests will be served from memory. Re‑using the same payload structure across calls maximizes cache hits and reduces latency.  
+* **Supply Correct Semantic Service Endpoint** – Ensure that the environment variables `SEMANTIC_SERVICE_HOST` and `SEMANTIC_SERVICE_PORT` (or the equivalents defined in `docker-compose.yaml`) point to the running `mcp-server-semantic-analysis` container.  Mismatched values will cause the service to fail during its analysis phase, triggering the retry logic.  
 
-4. **Handle Circuit‑Breaker Errors** – If the circuit breaker is open, `LLMService` will reject the request early. Callers should be prepared to catch a specific `CircuitBreakerOpenError` (or similar) and implement a fallback strategy (e.g., retry after a back‑off or return a graceful degradation message).  
+* **Treat the Analyzer as a Black Box** – When extending the service, interact with the `CodeGraphAnalyzer` through its public API only.  Do not rely on internal implementation details, as the analyzer may be swapped out in future releases.  
 
-5. **Avoid Tight Coupling to Implementation Details** – Do not import `LLMRouter` or manipulate the internal cache directly. Those internals are considered private to `LLMService`. Future refactors may move routing or caching to separate modules, and relying on them would break the contract.  
-
-6. **Testing Considerations** – When unit‑testing `CodeGraphAnalysisService`, mock `LLMService` rather than the underlying LLM providers. This isolates the service logic from external network calls and lets you verify that the correct mode flag is passed.  
+* **Monitor Startup Logs** – Because the retry‑with‑backoff loop logs each attempt, operators should watch the container logs (`docker logs <container>`) for messages indicating why a start failed (e.g., network timeout, authentication error).  This aids rapid troubleshooting without needing to modify the service code.  
 
 ---
 
-### Summary of Requested Items  
+### Architectural Patterns Identified  
+1. **Retry‑With‑Backoff** (robust startup) – implemented in `lib/service-starter.js`.  
+2. **Facade / Adapter** (service delegates to CodeGraphAnalyzer and external semantic service).  
+3. **Container‑Oriented Modularity** (Docker Compose orchestration).  
+4. **Configuration‑as‑Environment** (environment variables drive behaviour).  
 
-| Item | Insight |
-|------|---------|
-| **Architectural patterns identified** | Facade (`LLMService` as a unified LLM entry point), Router (`LLMRouter` for mode selection), In‑memory Cache, Circuit Breaker. |
-| **Design decisions and trade‑offs** | Centralizing routing, caching, and resilience simplifies the call graph and encourages reuse across siblings, but creates a single point of failure and tight coupling. In‑memory caching improves latency at the cost of memory usage and volatility. Circuit‑breaker adds robustness but may increase latency for fallback handling. |
-| **System structure insights** | `DockerizedServices` → contains `CodeGraphAnalysisService` (and other analysis services). Each analysis service → depends on `LLMService` (facade) → internally uses `LLMRouter`, cache, and circuit‑breaker. Sibling services share the same façade, reinforcing a common infrastructure layer. |
-| **Scalability considerations** | Cache scalability is bounded by process memory; large graphs could exhaust memory, suggesting a future move to a distributed cache. The router’s simple switch on `mode` scales well, but adding many new modes may warrant a more extensible strategy pattern. Circuit‑breaker thresholds must be tuned for the expected request volume to avoid premature tripping under load. |
-| **Maintainability assessment** | High maintainability for common concerns (routing, caching, resilience) because they reside in a single, well‑named class. However, any change to `LLMService` impacts all dependent services, so thorough regression testing is required. Clear separation of concerns (facade vs. specific analysis logic) aids readability and future extension. |
+### Design Decisions & Trade‑offs  
+* **Resilience vs. Startup Latency** – The retry‑with‑backoff approach improves reliability but can delay service availability if the dependent semantic service is slow to start.  
+* **Loose Coupling via External Service** – Relying on `mcp-server-semantic-analysis` keeps the analysis logic simple but introduces a network dependency; failures propagate to the CodeGraphAnalysisService unless mitigated by retries.  
+* **Pluggable Analyzer** – Delegating to `CodeGraphAnalyzer` makes the service adaptable but requires a stable public API to avoid breaking changes.  
 
-*All statements above are directly derived from the provided observations; no external assumptions have been introduced.*
+### System Structure Insights  
+* All analysis‑related services (CodeGraphAnalysisService, SemanticAnalysisService, ConstraintMonitoringService) share the same Docker Compose definition and the same external semantic analysis backend, indicating a **shared‑service** pattern within the DockerizedServices parent.  
+* The **ServiceStarterManager** sibling centralises startup logic, ensuring a uniform lifecycle across the suite.  
+
+### Scalability Considerations  
+* Because each service runs in its own container, horizontal scaling can be achieved by increasing the replica count in Docker Compose (or Swarm/Kubernetes) without code changes.  
+* The external `mcp-server-semantic-analysis` service may become a bottleneck; scaling it independently and configuring load‑balancing endpoints would be necessary for high‑throughput scenarios.  
+
+### Maintainability Assessment  
+* **High** – Clear separation of concerns (starter, analyzer, external service) and reliance on configuration reduce code churn.  
+* **Moderate Risk** – The service’s health is tightly coupled to the availability of the semantic analysis container; any breaking change in that service’s API would require coordinated updates.  
+* **Documentation Friendly** – The explicit use of environment variables and the observable retry logic make operational behaviour transparent, aiding future developers in debugging and extending the component.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This design decision allows for a centralized management of mode routing, caching, and circuit breaking. For instance, the LLMService class in lib/llm/llm-service.ts handles the routing of LLM requests to different modes, such as training or inference, based on the input parameters. The caching mechanism in LLMService also ensures that frequently accessed data is stored in memory, reducing the latency of subsequent requests. Furthermore, the circuit breaking feature in LLMService prevents cascading failures by detecting and preventing requests to faulty services. The implementation of these features in LLMService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.
-
-### Children
-- [LLMRouter](./LLMRouter.md) -- The LLMRouter is implemented in the lib/llm/llm-service.ts file, which suggests that it is a key component of the CodeGraphAnalysisService.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route semantic analysis requests to different modes, such as training or inference, based on input parameters.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService leverages the LLMService class in lib/llm/llm-service.ts to route constraint monitoring requests to different modes, such as training or inference, based on input parameters.
-- [ModeRouter](./ModeRouter.md) -- ModeRouter utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.
-- [CacheManager](./CacheManager.md) -- CacheManager utilizes the lib/llm/llm-service.ts file to handle the caching of frequently accessed data.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
+- [ServiceStarterManager](./ServiceStarterManager.md) -- The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization.
 
 
 ---

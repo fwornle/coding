@@ -2,121 +2,97 @@
 
 **Type:** SubComponent
 
-The ServiceStarterManager uses a microservices architecture, with multiple services such as semantic analysis, constraint monitoring, and code graph analysis, which are containerized using Docker.
+The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization, and manages the startup of services.
 
 ## What It Is  
 
-**ServiceStarterManager** is a sub‑component that lives inside the **DockerizedServices** component (see the hierarchy description). Its implementation is centred around the Docker Compose definition located at  
-
-```
-integrations/code-graph-rag/docker-compose.yaml
-```  
-
-and the configuration file that supplies environment variables  
-
-```
-config/graph-database-config.json
-```  
-
-The manager’s responsibility is to orchestrate the start‑up of the various containerised services that make up the code‑graph‑RAG system – services such as *semantic analysis*, *constraint monitoring*, and *code‑graph analysis*. It does this by invoking Docker Compose, applying a retry policy for any services that fail to start, and performing health‑check verification before reporting success. The manager also exposes a child component, **ServiceInitializer**, which encapsulates the low‑level Docker‑Compose interactions.
-
----
+The **ServiceStarterManager** is a sub‑component that lives inside the *DockerizedServices* hierarchy.  Its implementation is centred around the **service starter** logic found in **`lib/service-starter.js`**.  The manager’s sole responsibility is to orchestrate the start‑up of Docker‑compose‑managed services—most notably the **`mcp-server-semantic-analysis`** service—by invoking the retry‑with‑back‑off routine supplied by the service starter.  All configuration that drives the manager (service names, ports, credentials, etc.) is supplied through **environment variables** and the **`docker‑compose.yaml`** file that defines the Dockerised ecosystem.
 
 ## Architecture and Design  
 
-The observations reveal a **microservices architecture** that is realised through Docker containers. Each logical service (semantic analysis, constraint monitoring, code‑graph analysis, LLMService, etc.) is defined as an independent service entry in the `docker‑compose.yaml` file, allowing them to be started, stopped, and scaled independently. This design follows the **Docker‑Compose orchestration pattern**, where a single declarative YAML file describes service dependencies, network topology, and environment variables.
+The design follows a **centralised start‑up orchestration** pattern.  The **ServiceStarterManager** acts as a thin façade that delegates the heavy lifting to the reusable **Service Starter** module (`lib/service-starter.js`).  The key architectural choices evident from the observations are:
 
-Key design choices evident from the file:
+1. **Retry‑with‑Back‑Off** – The service starter implements a classic retry‑with‑back‑off algorithm, exposing configurable limits (max retries) and timeout protection.  This pattern is deliberately chosen to make service initialization **resilient** to transient failures (e.g., network hiccups, slow container boot).  
+2. **Environment‑Driven Configuration** – By pulling values from environment variables and Docker Compose, the manager remains **environment‑agnostic** and can be reused across development, CI, or production clusters without code changes.  
+3. **Modular Docker Compose Integration** – The manager is one of several sibling sub‑components (e.g., `SemanticAnalysisService`, `ConstraintMonitoringService`, `CodeGraphAnalysisService`, `LLMServiceManager`) that all rely on Docker Compose definitions.  This shared reliance creates a **uniform orchestration surface** while allowing each sibling to specialise in its own domain logic.
 
-1. **Declarative Service Definition** – All service images, ports, volumes, and inter‑service links are expressed in `docker‑compose.yaml`. This makes the system’s topology explicit and version‑controlled.  
-2. **Retry Mechanism** – The manager reads a retry policy from the same compose file (e.g., `restart: on-failure` or custom health‑check retries) and applies it when a container fails to become healthy. This introduces resilience without additional code.  
-3. **Health Verification** – After Docker Compose reports that containers are up, ServiceStarterManager runs health checks (likely via Docker’s built‑in health‑check or custom scripts) to ensure each service is operational before proceeding.  
-4. **Environment‑Variable‑Driven Configuration** – The `config/graph-database-config.json` file supplies values that are injected into the containers as environment variables, promoting portability across environments (local, CI, production).  
-
-The component hierarchy shows **ServiceStarterManager** containing **ServiceInitializer**, which suggests a *Facade* pattern: ServiceStarterManager presents a high‑level API (start all services, verify health) while delegating the concrete Docker‑Compose commands to ServiceInitializer. The parent **DockerizedServices** aggregates multiple managers (ServiceStarterManager, LLMServiceManager, GraphDatabaseManager), indicating a *Composite* organization where each manager is responsible for a distinct domain but shares the same Docker‑Compose foundation.
-
----
+Interaction flow: when the Dockerised system boots, **DockerizedServices** triggers the **ServiceStarterManager**.  The manager reads the required service identifiers from the environment, then calls the exported start‑up function in `lib/service-starter.js`.  That function attempts to launch the target container, applying the back‑off policy until either the service becomes healthy or the retry limit is hit.
 
 ## Implementation Details  
 
-Although no concrete code symbols were listed, the observations give us a clear picture of the implementation flow:
+Although the source contains **no explicit symbols**, the observations give a clear picture of the implementation contract:
 
-1. **Compose File Parsing** – ServiceStarterManager reads `integrations/code-graph-rag/docker-compose.yaml` to discover service definitions, dependencies, and any retry directives.  
-2. **Environment Injection** – Prior to invoking Docker Compose, it loads `config/graph-database-config.json` and maps its key‑value pairs to environment variables that are passed to the containers (e.g., `GRAPH_DB_URL`, `GRAPH_DB_USER`).  
-3. **Service Startup** – It calls Docker Compose (likely via a child process or a Docker SDK) with the `up` command, optionally using flags such as `--detach` and `--scale` to enable independent scaling as noted in observation 6.  
-4. **Retry Logic** – If Docker reports a service failure, ServiceStarterManager respects the retry policy defined in the compose file, re‑issuing the `up` command for the failing service up to the configured number of attempts.  
-5. **Health Verification** – After containers report a “healthy” state, ServiceStarterManager performs additional checks—perhaps HTTP endpoint probes or CLI health commands—to confirm functional readiness. Only when all checks pass does it signal that the system is ready for use.  
+* **`lib/service-starter.js`** – Exposes a start‑up routine (likely an async function) that accepts parameters such as `serviceName`, `maxRetries`, and `timeoutMs`.  Internally it:
+  * Initiates the Docker Compose command to bring the service up.  
+  * Polls the service health endpoint (or checks container status) after each attempt.  
+  * If the check fails, it waits for an exponentially increasing delay before retrying, respecting the configured `maxRetries`.  
+  * Provides timeout protection to abort attempts that exceed a global deadline, preventing indefinite hangs.
 
-The child component **ServiceInitializer** is likely responsible for the low‑level interactions: constructing the Docker‑Compose command line, handling process output, and exposing status callbacks to its parent. This separation keeps the higher‑level orchestration logic clean and testable.
+* **ServiceStarterManager** – Probably a class or module that:
+  * Reads **environment variables** (e.g., `SEMANTIC_ANALYSIS_HOST`, `SEMANTIC_ANALYSIS_PORT`) to discover which services to start.  
+  * Constructs the configuration object passed to the service starter (including retry limits derived from env vars such as `STARTUP_MAX_RETRIES`).  
+  * Handles the promise returned by the starter, logging success or propagating errors up to the parent **DockerizedServices** component.
 
----
+The manager’s reliance on Docker Compose means that the actual container lifecycle commands (`docker-compose up`, `docker-compose logs`, etc.) are encapsulated inside the starter, keeping the manager’s codebase lightweight and focused on orchestration logic.
 
 ## Integration Points  
 
-- **Parent – DockerizedServices**: ServiceStarterManager is one of several managers under DockerizedServices. All managers share the same Docker‑Compose file, so changes to service definitions affect the whole suite. The parent component provides a common context for orchestrating the full microservice stack.  
-- **Siblings – LLMServiceManager & GraphDatabaseManager**: These managers also rely on the same Docker‑Compose infrastructure and configuration files. For instance, LLMServiceManager uses `lib/llm/llm-service.ts` to define the LLM service, while GraphDatabaseManager consumes `config/graph-database-config.json`. Coordination between these managers is implicit via Docker Compose service dependencies (e.g., the code‑graph analysis service may depend on the LLM service).  
-- **Child – ServiceInitializer**: All Docker‑Compose commands, environment variable injection, and health‑check orchestration are delegated to ServiceInitializer. It acts as the technical bridge between the high‑level manager and the Docker runtime.  
-- **External Config – graph-database-config.json**: This JSON file is the source of environment variables for the graph database container, and possibly for other services that need DB credentials. Any updates to this file propagate automatically when ServiceStarterManager re‑starts the stack.  
+* **Parent – DockerizedServices** – The manager is a child of the `DockerizedServices` component, which owns the overall Docker Compose file.  DockerizedServices invokes the manager during its own initialization phase, ensuring that all required services are up before higher‑level components start interacting.
 
-No explicit APIs or library imports are mentioned, but the reliance on Docker Compose implies that the integration surface is the command‑line interface or Docker SDK, and the health‑check contracts are likely HTTP endpoints exposed by each service.
+* **Sibling Services** – `SemanticAnalysisService`, `ConstraintMonitoringService`, `CodeGraphAnalysisService`, and `LLMServiceManager` all depend on the same Docker Compose environment.  While they each have domain‑specific responsibilities, they share the **same start‑up reliability mechanism** provided by the ServiceStarterManager.  This commonality reduces duplication and ensures consistent behaviour across the stack.
 
----
+* **External Configuration** – The manager reads **environment variables** that are typically defined in the `docker-compose.yaml` `environment:` section.  Changing a variable (e.g., adjusting `STARTUP_MAX_RETRIES`) immediately influences the back‑off behaviour without code changes.
+
+* **Service‑Specific Hooks** – For the `mcp-server-semantic-analysis` service, the manager may also listen for health‑check callbacks or log streams to confirm readiness, integrating tightly with that service’s startup contract.
 
 ## Usage Guidelines  
 
-1. **Maintain the Compose File as Source of Truth** – All service additions, dependency changes, or scaling parameters should be made directly in `integrations/code-graph-rag/docker-compose.yaml`. ServiceStarterManager will automatically honour these definitions.  
-2. **Keep Configuration in JSON** – Environment‑specific values (e.g., graph database URLs, credentials) must be stored in `config/graph-database-config.json`. Do not hard‑code them in the compose file; instead, reference them via `${VAR_NAME}` syntax so that ServiceStarterManager can inject the values at start‑up.  
-3. **Leverage the Retry Settings** – When defining a service that may be flaky (e.g., a database container that takes time to initialise), specify appropriate restart policies or health‑check retry counts in the compose file. ServiceStarterManager will respect these settings and avoid premature failure.  
-4. **Validate Health Checks Locally** – Before committing a new service, ensure that its Docker‑file includes a `HEALTHCHECK` directive or that a custom script is available for ServiceStarterManager to call. This guarantees that the manager’s verification step will succeed.  
-5. **Scale Independently** – If a particular service needs more replicas, use Docker Compose’s `scale` option (e.g., `docker-compose up --scale semantic-analysis=3`). ServiceStarterManager’s design supports independent scaling, so adjust the command or compose overrides accordingly.  
-6. **Coordinate with Sibling Managers** – When modifying a service that is also used by LLMServiceManager or GraphDatabaseManager, verify that the change does not break the other managers’ expectations. Since they share the same Docker Compose environment, cross‑service compatibility is essential.  
+1. **Define All Required Env Vars** – Before invoking DockerizedServices, ensure that every variable the ServiceStarterManager expects (service names, ports, retry limits, timeout values) is present in the Docker Compose `environment:` block or the host environment.  Missing variables will cause the manager to abort early.  
+
+2. **Tune Retry Parameters Thoughtfully** – The back‑off algorithm protects against transient failures, but overly aggressive limits (`STARTUP_MAX_RETRIES` too high or `STARTUP_TIMEOUT_MS` too long) can mask real start‑up problems and delay failure detection.  Adjust these values based on the expected start‑up time of the underlying container (e.g., a heavy Java service may need a longer timeout).  
+
+3. **Monitor Logs for Back‑Off Activity** – The service starter emits logs on each retry attempt.  Developers should watch these logs during CI runs or local development to understand whether a service is repeatedly failing and why.  
+
+4. **Avoid Direct Docker Commands Inside Application Code** – All container lifecycle actions should be funneled through the ServiceStarterManager and its underlying `lib/service-starter.js`.  Bypassing this layer would break the uniform retry‑with‑back‑off guarantee.  
+
+5. **Graceful Shutdown** – When stopping the system, let DockerizedServices issue a `docker-compose down` before the manager attempts any further start‑up calls.  This prevents race conditions where a service is being torn down while the manager is still retrying.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
+* Retry‑with‑exponential‑back‑off for resilient start‑up  
+* Environment‑driven configuration (12‑factor style)  
+* Centralised orchestration façade within a Docker‑Compose ecosystem  
 
-1. **Microservices Architecture** – Independent, containerised services communicating over defined interfaces.  
-2. **Docker‑Compose Orchestration** – Declarative infrastructure‑as‑code for service lifecycle management.  
-3. **Facade (ServiceStarterManager → ServiceInitializer)** – Simplifies complex Docker interactions behind a clean API.  
-4. **Composite (DockerizedServices aggregating multiple managers)** – Organises related orchestration components under a common parent.
+### Design decisions and trade‑offs  
+* **Robustness vs. start‑up latency** – Back‑off improves reliability but can increase overall boot time.  
+* **Single point of start‑up logic** – Simplifies maintenance but creates a dependency on the manager’s correctness.  
+* **Configurable limits** – Provides flexibility but requires disciplined configuration management.  
 
-### Design Decisions and Trade‑offs  
+### System structure insights  
+* ServiceStarterManager sits under **DockerizedServices** and is a sibling to other service‑specific managers, all sharing the same Docker Compose foundation.  
+* The manager delegates all container interactions to **`lib/service-starter.js`**, keeping orchestration thin and reusable.  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Use Docker Compose as the sole orchestrator | Simple, file‑driven, no external orchestrator required | Limited to single‑host deployments; scaling beyond a host requires additional tooling (e.g., Swarm, Kubernetes) |
-| Encode retry and health policies in the compose file | Keeps resilience configuration close to service definition | Less flexibility for dynamic retry strategies that might depend on runtime metrics |
-| Externalise configuration to `graph-database-config.json` | Promotes portability across environments | Requires careful handling of secrets; JSON file must be kept secure |
+### Scalability considerations  
+* The back‑off algorithm scales linearly with the number of services; adding many services will proportionally increase total start‑up time.  
+* Because configuration is externalised, the manager can handle new services simply by adding env vars and Docker Compose entries, without code changes.  
 
-### System Structure Insights  
-
-- **Top‑Level**: `DockerizedServices` groups together all Docker‑Compose‑based managers.  
-- **Mid‑Level**: `ServiceStarterManager` focuses on orchestrating the start‑up sequence, health verification, and scaling of the core services.  
-- **Leaf**: `ServiceInitializer` encapsulates the low‑level Docker‑Compose command execution and status handling.  
-- **Shared Artifacts**: `docker-compose.yaml` (service topology) and `graph-database-config.json` (environment variables) are the primary artefacts that all managers consume.
-
-### Scalability Considerations  
-
-- **Horizontal Scaling** – The compose file supports the `scale` directive, allowing each microservice to be replicated as needed. ServiceStarterManager’s design already anticipates independent scaling (observation 6).  
-- **Resource Isolation** – Because each service runs in its own container, resource limits (CPU, memory) can be applied per service in the compose file, aiding predictable scaling.  
-- **Single‑Host Limitation** – Docker Compose does not natively provide multi‑host clustering; scaling beyond the resources of a single host would require migrating to a full orchestrator (e.g., Docker Swarm or Kubernetes).  
-
-### Maintainability Assessment  
-
-The reliance on a single declarative file (`docker-compose.yaml`) for service definitions, dependencies, and retry policies makes the system **highly maintainable**: developers can add, remove, or modify services without touching code. The separation of concerns—high‑level orchestration in ServiceStarterManager and low‑level Docker interactions in ServiceInitializer—further isolates changes. However, maintainability could be challenged if the number of services grows dramatically, as the compose file may become large and harder to navigate. In that scenario, splitting the compose definition into multiple files or adopting a more sophisticated orchestrator would improve readability and modularity. Overall, the current design offers a clear, version‑controlled, and environment‑agnostic foundation that aligns well with the microservices approach described in the parent component.
+### Maintainability assessment  
+* High maintainability: the core start‑up logic lives in a single module (`lib/service-starter.js`), and the manager is a thin wrapper.  
+* Centralised configuration reduces duplication but places importance on clear documentation of required environment variables.  
+* The pattern encourages reuse across sibling components, fostering consistency and easing future refactors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with multiple services such as semantic analysis, constraint monitoring, and code graph analysis, which are containerized using Docker and managed through Docker Compose, as seen in the docker-compose.yaml file located at integrations/code-graph-rag/docker-compose.yaml. This approach enables loose coupling between services and facilitates easier maintenance, scaling, and deployment. For instance, the LLMService, defined in lib/llm/llm-service.ts, can be updated or replaced without affecting other services. The use of environment variables for configuration, as seen in the Graph Database configuration file config/graph-database-config.json, further enhances the flexibility and portability of the services.
-
-### Children
-- [ServiceInitializer](./ServiceInitializer.md) -- The ServiceStarterManager sub-component uses the docker-compose.yaml file to define the services and their dependencies, as indicated by the parent context.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager utilizes the lib/llm/llm-service.ts file to define the LLM service, which can be updated or replaced without affecting other services.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the config/graph-database-config.json file to configure the graph database, enhancing flexibility and portability.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
+- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
 
 
 ---

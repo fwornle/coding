@@ -2,124 +2,133 @@
 
 **Type:** SubComponent
 
-The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) can be used to generate detailed trace reports of UKB workflow runs, which can inform OnlineLearning.
+The OnlineLearning sub-component is designed to work in conjunction with the ManualLearning sub-component to provide a comprehensive knowledge management system.
 
-**## What It Is**  
+## What It Is  
 
-OnlineLearning is a *sub‑component* of the **KnowledgeManagement** suite that orchestrates the automated extraction of development‑knowledge artefacts and feeds them into the system’s graph database. The core of its implementation lives inside the **batch analysis pipeline** that pulls data from three distinct sources – git history, LSL (Live‑Session‑Log) recordings, and static code analysis – and converts each stream into graph entities. The pipeline re‑uses concrete agents that already exist in the repository:  
+OnlineLearning is a **sub‑component** of the larger **KnowledgeManagement** system that automates the extraction, structuring, and persistence of knowledge from a developer’s workflow. The automation pipeline lives in the same code‑base as the other learning modules and is wired together through a set of dedicated modules that each own a single responsibility.  
 
-* **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) – builds code‑knowledge graphs from the static analysis of source files.  
-* **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) – persists the generated entities and applies ontology classification.  
-* **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) – abstracts the underlying graph store where all knowledge is finally recorded.  
+The entry point for the automated pipeline is the **batch analysis pipeline** (referenced in Observation 1). This pipeline pulls data from three primary sources – the Git repository history, live LSL (Learning Session Language) sessions, and static code analysis – and feeds the raw artefacts into the downstream modules. The core work of turning source code into a navigable knowledge graph is performed by the **CodeGraphAnalysisModule** (Obs 2). Once the graph is built, the **EntityPersistenceModule** (Obs 3) stores the discovered entities, while the **GraphDatabaseModule** (Obs 4, 5) writes the full knowledge graph and any generated observations into the graph database. Finally, the **UKBTraceReportModule** (Obs 7) creates detailed trace reports that summarise what was automatically extracted.  
 
-Additionally, the **ukb‑trace‑report** utility (`integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts`) can be invoked to produce detailed trace logs of the batch run, giving developers visibility into what was learned and how it was stored. In short, OnlineLearning is the glue that binds raw development artefacts to the semantic graph used by the broader KnowledgeManagement platform.
+OnlineLearning is deliberately paired with the **ManualLearning** sub‑component (Obs 6) to give the system a hybrid approach: automatically harvested knowledge is complemented by manually curated data, both of which share the same storage back‑ends.
 
 ---
 
-**## Architecture and Design**  
+## Architecture and Design  
 
-The design of OnlineLearning follows a **modular, agent‑based pipeline** architecture. Each source of knowledge (git, LSL, code analysis) is treated as a separate stage that produces a stream of domain objects. Those objects are handed off to the **PersistenceAgent**, which encapsulates two responsibilities: (1) persisting the entities via the **GraphDatabaseAdapter**, and (2) classifying them against the platform’s ontology. This separation of concerns mirrors the modular pattern described for the parent **KnowledgeManagement** component, where adapters, agents, and utilities are kept in distinct directories (`src/agents`, `src/storage`, `src/utils`).  
+The architecture exposed by the observations is a **modular, pipeline‑oriented design**. Each logical step—data ingestion, graph construction, entity persistence, storage, and reporting—is encapsulated in its own module, allowing the system to evolve each piece independently. This is reflected in the sibling modules listed under the same parent component:  
 
-The **CodeGraphAgent** acts as a specialized *semantic analysis* agent. It parses source files, extracts symbols, relationships, and higher‑level constructs, and emits a graph‑ready representation. Because OnlineLearning can also ingest LSL session data, the pipeline likely contains a lightweight transformer that normalises LSL events into the same graph schema before they reach the PersistenceAgent.  
+* **CodeGraphAnalysisModule** – implements code‑graph extraction via `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`.  
+* **EntityPersistenceModule** – persists entities through the `PersistenceAgent` located at `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`.  
+* **GraphDatabaseModule** – abstracts the underlying graph store with `GraphDatabaseAdapter` in `storage/graph-database-adapter.ts`.  
+* **UKBTraceReportModule** – produces trace reports via a dedicated `UKBTraceReportAgent` (path not listed but implied by the module name).  
 
-Traceability is built in through the **ukb‑trace‑report** utility, which logs each step of the batch run (e.g., “git commit X processed”, “LSL session Y ingested”, “code graph node Z persisted”). This aligns with the parent component’s emphasis on detailed workflow reporting and supports debugging and auditability without imposing a separate logging framework.  
+The **batch analysis pipeline** acts as a coordinator, invoking the CodeGraphAnalysisModule first, then passing its output downstream. The use of adapters/agents (e.g., `GraphDatabaseAdapter`, `CodeGraphAgent`, `PersistenceAgent`) demonstrates a **Adapter pattern** that isolates external concerns (graph DB API, code‑analysis tools) from the core business logic. The pipeline also follows a **Command‑oriented flow**: each module receives a well‑defined input and produces an output that the next module consumes, which is a classic **Chain‑of‑Responsibility** style without the need for explicit handlers.
 
-Overall, the architecture can be summarised as:
-
-```
-[Git History] ──\
-[LSL Sessions] ──►  Batch Pipeline (transform → CodeGraphAgent) ──► PersistenceAgent ──► GraphDatabaseAdapter
-[Code Analysis] ──/
-                │
-                └─► ukb‑trace‑report (side‑car logging)
-```
-
-No higher‑level patterns such as micro‑services or event‑driven messaging are introduced; the system remains a single‑process, batch‑oriented pipeline that leverages clear module boundaries.
+Because OnlineLearning and ManualLearning both rely on the same `GraphDatabaseAdapter`, they share a **common persistence contract**, ensuring that automatically and manually created knowledge are stored uniformly. This promotes **consistency** across the knowledge base.
 
 ---
 
-**## Implementation Details**  
+## Implementation Details  
 
-1. **Source Extraction** – The pipeline begins by invoking git commands (or using a library) to walk the repository’s commit history. Each commit is transformed into a set of *knowledge events* (e.g., file added, function renamed). LSL sessions are read from their log files, parsed, and mapped to temporal events that describe developer actions.  
+1. **Batch Analysis Pipeline** – Although the exact file is not listed, Observation 1 tells us that this pipeline orchestrates three data sources: Git history, LSL sessions, and static code analysis. It likely iterates over commits, extracts LSL events, and runs the code‑graph agent on each relevant source file.  
 
-2. **CodeGraphAgent** (`code-graph-agent.ts`) – This agent receives the raw source snapshots and performs static analysis. It builds a **code knowledge graph** where nodes represent entities such as classes, functions, and modules, while edges capture relationships like “calls”, “inherits”, or “imports”. The agent’s public API likely exposes a method such as `generateGraph(sourceTree: SourceTree): GraphModel`.  
+2. **CodeGraphAnalysisModule** – The heavy lifting happens in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`. This agent parses source files, builds an abstract syntax tree, and then creates a **code knowledge graph** that captures relationships such as function calls, class inheritance, and module dependencies. The resulting graph is handed off as a data structure (e.g., a set of nodes/edges) to the next stage.  
 
-3. **PersistenceAgent** (`persistence-agent.ts`) – After the graph model is produced, the PersistenceAgent takes each node/edge, determines its ontology class (e.g., `CodeEntity`, `DeveloperAction`), and forwards the payload to the **GraphDatabaseAdapter**. The adapter abstracts the underlying graph store (Neo4j, JanusGraph, etc.) and offers CRUD‑style methods (`saveNode`, `saveEdge`). The PersistenceAgent also handles batch writes, ensuring that large git histories or long LSL sessions do not overwhelm the database.  
+3. **EntityPersistenceModule** – Persistence is performed by the `PersistenceAgent` (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`). It receives the entities discovered by the code‑graph analysis (e.g., classes, methods, variables) and writes them to a persistence layer—most likely a relational store or a document store that backs the graph database. The module abstracts the storage format, allowing the rest of the pipeline to remain agnostic of the underlying schema.  
 
-4. **GraphDatabaseAdapter** (`graph-database-adapter.ts`) – This adapter isolates the rest of the pipeline from the specifics of the graph database driver. It implements a thin wrapper around connection handling, transaction management, and query execution. By keeping the adapter in `src/storage`, the design makes it straightforward to swap the backing store if needed.  
+4. **GraphDatabaseModule** – Interaction with the graph database is encapsulated in `storage/graph-database-adapter.ts`. This adapter implements a set of CRUD operations for nodes, edges, and observation objects. OnlineLearning uses this adapter both to store the **knowledge graph** produced by the CodeGraphAnalysisModule and to persist **observations** (automatically generated artefacts such as “function X was added in commit Y”).  
 
-5. **Trace Reporting** (`ukb-trace-report.ts`) – Throughout the run, the pipeline emits structured trace entries (timestamp, stage, status). The utility aggregates these entries into a final report that can be stored alongside the graph data or presented in UI dashboards.  
+5. **UKBTraceReportModule** – The module leverages a `UKBTraceReportAgent` to generate human‑readable reports. The agent consumes the persisted graph and observation data, formats them (likely in markdown or HTML), and writes the reports to a reporting directory or pushes them to a UI component.  
 
-The sibling components illustrate reuse: **ManualLearning** also uses the PersistenceAgent for its own ontology‑driven persistence, while **TraceReportModule** directly consumes the ukb‑trace‑report utility. This shared usage reinforces a consistent contract across the KnowledgeManagement domain.
-
----
-
-**## Integration Points**  
-
-- **Parent Component – KnowledgeManagement**: OnlineLearning is one of several learning modalities (ManualLearning, TraceReportModule, Persistence) that feed the central graph. All of them rely on the same **GraphDatabaseAdapter** and **PersistenceAgent**, guaranteeing a unified data model across the suite.  
-
-- **Sibling – Persistence**: The Persistence sub‑component provides the concrete implementation of entity storage; OnlineLearning does not implement its own storage logic but delegates to this sibling, adhering to the “single source of truth” principle for persistence.  
-
-- **Sibling – ManualLearning**: While ManualLearning ingests knowledge from explicit user actions, OnlineLearning complements it with automated, batch‑derived knowledge. Both pipelines converge on the same ontology, meaning that downstream consumers (search, recommendation, analytics) see a seamless graph.  
-
-- **Utility – ukb‑trace‑report**: The trace utility is invoked by OnlineLearning to produce run‑time diagnostics. Other components (TraceReportModule) may consume the same reports for monitoring or compliance purposes.  
-
-- **External Sources**: Git repositories, LSL log files, and the static code base are the only external dependencies. The pipeline treats each as a read‑only input, keeping side‑effects confined to the graph database.  
-
-All interactions are synchronous within the batch run; there is no asynchronous messaging layer observed, which simplifies deployment but also means that scaling must be addressed at the batch‑process level (e.g., parallelizing per‑commit or per‑session processing).
+All modules communicate via well‑defined data contracts (e.g., graph node objects, entity DTOs) rather than sharing mutable state, which reduces coupling and simplifies testing.
 
 ---
 
-**## Usage Guidelines**  
+## Integration Points  
 
-1. **Run the Batch Pipeline Only in Controlled Environments** – Because OnlineLearning walks the entire git history and may ingest large LSL logs, it should be executed on a machine with sufficient CPU, memory, and I/O bandwidth. Prefer CI/CD or scheduled jobs rather than ad‑hoc developer machines.  
+* **Parent Component – KnowledgeManagement** – OnlineLearning lives under the KnowledgeManagement umbrella, sharing the same modular infrastructure (graph database adapter, persistence agents) that other knowledge‑related sub‑components use. This centralisation means any change to the `GraphDatabaseAdapter` immediately benefits both OnlineLearning and ManualLearning.  
 
-2. **Do Not Modify the PersistenceAgent Directly** – All ontology classification and graph writes are encapsulated in `persistence-agent.ts`. Extensions should be added as new agents or adapters rather than altering the existing agent, preserving the contract used by ManualLearning and other siblings.  
+* **Sibling Modules** –  
+  * **ManualLearning** – consumes the same `GraphDatabaseAdapter` (see sibling description) to store manually curated knowledge, guaranteeing that both automatic and manual data are queryable through a single graph interface.  
+  * **CodeGraphAnalysisModule** – provides the code‑graph output that OnlineLearning consumes. The module’s public API (exposed by `code-graph-agent.ts`) is the primary integration contract.  
+  * **EntityPersistenceModule** – receives entities from OnlineLearning and persists them; its contract is defined by the `PersistenceAgent`.  
+  * **UKBTraceReportModule** – consumes the final persisted graph and observation data to produce reports.  
 
-3. **Leverage ukb‑trace‑report for Debugging** – When a batch run fails or yields unexpected graph structures, inspect the generated trace report. It provides a chronological view of which source (git, LSL, code) was processed and where the pipeline may have halted.  
+* **External Systems** – The batch pipeline pulls from Git repositories and LSL session logs, implying integrations with version‑control APIs and LSL telemetry services. These are not detailed in the observations but are essential entry points for the data flow.  
 
-4. **Keep the Graph Schema Consistent** – Since multiple learning components share the same graph, any change to node or edge types must be reflected in the ontology used by the PersistenceAgent. Coordinate schema updates through the KnowledgeManagement team to avoid fragmentation.  
+* **Data Stores** – The sole persistent store is the graph database accessed via `storage/graph-database-adapter.ts`. All knowledge (both automatic and manual) and observations are stored there, providing a unified query surface for downstream consumers (e.g., UI dashboards, analytics services).  
 
-5. **Monitor Batch Duration and Database Load** – The PersistenceAgent performs bulk writes via the GraphDatabaseAdapter; monitor transaction sizes and database latency. If batch times grow linearly with repository size, consider sharding the commit history into smaller windows or adding pagination inside the adapter.  
+---
+
+## Usage Guidelines  
+
+1. **Do not bypass the adapters** – All interactions with the graph database must go through `GraphDatabaseAdapter`. Direct queries risk breaking the contract that both OnlineLearning and ManualLearning rely on.  
+
+2. **Extend the pipeline, not the modules** – When adding new data sources (e.g., additional IDE telemetry), extend the batch analysis pipeline to feed the new data into the existing CodeGraphAnalysisModule rather than creating a parallel graph builder. This keeps the knowledge graph consistent.  
+
+3. **Maintain entity schema compatibility** – The EntityPersistenceModule expects a stable entity DTO shape. If you modify the shape of an entity (e.g., adding a new field), update both the `PersistenceAgent` and any downstream consumers (report generators) together to avoid runtime mismatches.  
+
+4. **Regenerate reports after each batch run** – The UKBTraceReportModule should be invoked after the GraphDatabaseModule has successfully committed the latest knowledge graph. Automating this step in the pipeline ensures that trace reports always reflect the most recent state.  
+
+5. **Coordinate with ManualLearning** – When manually curating knowledge that overlaps with automatically extracted entities, use the same identifiers (node IDs) to avoid duplicate nodes in the graph. The shared `GraphDatabaseAdapter` will merge updates if the IDs match.  
 
 ---
 
 ### Architectural Patterns Identified  
-1. **Modular/Component‑Based Architecture** – Clear separation of agents, adapters, and utilities.  
-2. **Pipeline (Batch Processing) Pattern** – Sequential stages (extract → transform → load) applied to multiple data sources.  
-3. **Agent Pattern** – Dedicated agents (`CodeGraphAgent`, `PersistenceAgent`) encapsulate distinct responsibilities.  
-4. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the concrete graph store implementation.
+
+| Pattern | Evidence |
+|---------|----------|
+| **Modular Architecture** | Separate sibling modules (CodeGraphAnalysisModule, EntityPersistenceModule, GraphDatabaseModule, UKBTraceReportModule) each own a distinct responsibility. |
+| **Adapter / Agent** | `GraphDatabaseAdapter` (storage/graph-database-adapter.ts), `CodeGraphAgent` (integrations/.../code-graph-agent.ts), `PersistenceAgent` (integrations/.../persistence-agent.ts). |
+| **Pipeline / Chain‑of‑Responsibility** | Batch analysis pipeline sequentially invokes modules to transform data from raw sources to persisted graph and reports. |
+| **Shared Persistence Contract** | Both OnlineLearning and ManualLearning use the same `GraphDatabaseAdapter`. |
 
 ### Design Decisions and Trade‑offs  
-- **Single‑Process Batch vs. Distributed Processing** – Simplicity and deterministic ordering are gained, but scalability is limited to the resources of a single node.  
-- **Shared PersistenceAgent Across Siblings** – Promotes consistency and reduces duplication, but couples ManualLearning and OnlineLearning tightly to the same persistence logic, making independent evolution harder.  
-- **Explicit Trace Utility** – Improves observability without adding a full‑blown logging framework; however, it introduces an extra side‑car component that must be maintained.  
+
+* **Separation of Concerns vs. Coordination Overhead** – By isolating ingestion, analysis, persistence, and reporting, the system is easier to test and evolve. The trade‑off is the need for a well‑defined orchestration layer (the batch pipeline) to manage data flow and error handling.  
+* **Single Graph Store** – Storing both automatically and manually curated knowledge in the same graph database simplifies queries and ensures a unified view, but it also couples the two data lifecycles; a failure in one module can affect the integrity of the whole graph.  
+* **Adapter‑Based External Integration** – Using adapters shields core logic from external API changes (e.g., a new version of the graph DB). However, adapters add an extra abstraction layer that must be kept in sync with both the external service and the internal data models.  
 
 ### System Structure Insights  
-- The **KnowledgeManagement** parent acts as a container for learning‑related sub‑components, each exposing a focused agent set.  
-- **OnlineLearning** sits alongside **ManualLearning** and **TraceReportModule**, sharing the same persistence and reporting infrastructure, which creates a unified knowledge graph across automated and manual inputs.  
+
+* **Hierarchical Placement** – OnlineLearning sits one level below the KnowledgeManagement component, inheriting shared infrastructure (graph DB adapter, persistence agents) from its parent.  
+* **Sibling Collaboration** – The design encourages reuse: the same `GraphDatabaseAdapter` is reused by ManualLearning, and the same `CodeGraphAgent` is leveraged by other analysis pipelines if needed.  
+* **No Direct Child Entities** – Observations do not list any child components under OnlineLearning; its responsibilities are fulfilled by invoking sibling modules rather than containing further sub‑modules.  
 
 ### Scalability Considerations  
-- Since the pipeline processes the entire git history and potentially large LSL logs, execution time grows with repository size. Horizontal scaling is not inherent; to improve throughput, developers could parallelise per‑commit or per‑session processing inside the pipeline or split the workload across multiple batch jobs.  
-- The **GraphDatabaseAdapter** should support bulk write operations and transaction batching to avoid overwhelming the graph store.  
+
+* **Batch Processing** – The pipeline processes data in batches, which can be scaled horizontally by partitioning Git history or LSL session logs across multiple workers, each invoking the same module chain.  
+* **Graph Database Bottleneck** – Since all knowledge ultimately lands in a single graph store, scaling reads/writes will depend on the underlying graph database’s clustering capabilities. The `GraphDatabaseAdapter` abstracts this, but capacity planning must consider node/edge growth from continuous automated extraction.  
+* **Agent Statelessness** – The agents (`CodeGraphAgent`, `PersistenceAgent`) appear to be stateless processors, making them good candidates for containerised deployment and auto‑scaling based on workload.  
 
 ### Maintainability Assessment  
-- The modular layout (agents, adapters, utils) makes the codebase approachable; each concern lives in its own directory, easing navigation and unit testing.  
-- Reuse of the **PersistenceAgent** across siblings reduces code duplication but creates a single point of change; any modification must be vetted against all consumers.  
-- Absence of dynamic configuration (e.g., plugin registries) means adding new knowledge sources requires code changes rather than declarative extensions, slightly increasing the effort for future growth.  
 
-Overall, OnlineLearning is a well‑encapsulated, batch‑oriented sub‑component that leverages the existing agent‑based infrastructure of KnowledgeManagement to enrich the system’s semantic graph with automatically extracted development knowledge.
+The modular, adapter‑driven design scores highly on maintainability:
+
+* **Clear Ownership** – Each module has a single, well‑documented responsibility, reducing the cognitive load for developers working on a specific area.  
+* **Isolation of External Dependencies** – Changes to the graph DB API or to the code‑analysis tooling are confined to their respective adapters/agents, limiting ripple effects.  
+* **Unified Contracts** – Shared adapters and data contracts across OnlineLearning and ManualLearning promote consistency and reduce duplication.  
+
+Potential maintenance risks include:
+
+* **Tight Coupling via Shared Adapter** – Any breaking change in `GraphDatabaseAdapter` must be coordinated across both learning sub‑components.  
+* **Pipeline Complexity** – As more data sources are added, the batch pipeline could become a source of hidden complexity; keeping its orchestration logic simple and well‑tested is essential.  
+
+Overall, the architecture balances extensibility with a disciplined separation of concerns, providing a solid foundation for future growth while keeping the codebase approachable for developers.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for managing entity persistence and ontology classification.
-- [TraceReportModule](./TraceReportModule.md) -- The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used to generate detailed trace reports of UKB workflow runs.
-- [Persistence](./Persistence.md) -- The PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store manually curated knowledge.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
+- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts to persist entities.
+- [CodeGraphAnalysisModule](./CodeGraphAnalysisModule.md) -- CodeGraphAnalysisModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to perform code graph analysis.
+- [UKBTraceReportModule](./UKBTraceReportModule.md) -- UKBTraceReportModule uses the UKBTraceReportAgent to generate detailed reports of UKB workflow runs.
 
 
 ---

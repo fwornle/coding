@@ -2,91 +2,143 @@
 
 **Type:** SubComponent
 
-The ViolationCaptureModule integrates with other components, such as the ContentValidationModule, to ensure seamless violation capture and reporting
+ViolationCaptureModule can be used in conjunction with the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) to retrieve workflow definitions from Redux
 
 ## What It Is  
 
-The **ViolationCaptureModule** lives inside the **ConstraintSystem** component and is the dedicated sub‑component responsible for catching constraint‑violation events that arise when tools interact with the system.  Although the source tree does not contain a dedicated file for the module itself, the surrounding documentation makes it clear that the module is implemented alongside the other constraint‑management pieces that live under the *ConstraintSystem* hierarchy (e.g., the `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` and the `HookConfigLoader` in `lib/agent-api/hooks/hook-config.js`).  Its primary role is to listen for validation failures reported by the **ContentValidationModule** and to expose a **unified interface** that downstream code can query for detailed violation data such as error messages, offending entity identifiers, and contextual information.
+The **ViolationCaptureModule** lives inside the **ConstraintSystem** and is responsible for recording constraint‑violation events that arise when tools interact with the platform. Its core implementation is spread across three concrete files that the observations call out directly:
 
-## Architecture and Design  
+* `scripts/violation-capture-service.js` – the **ViolationCaptureService** that contains the actual capture logic.  
+* `lib/agent-api/hooks/hook-manager.js` – the **HookManager** that provides a unified hook orchestration layer used by the module to subscribe to and emit violation‑related hook events.  
+* `integrations/system-health-dashboard/src/components/workflow/hooks.ts` – the `useWorkflowDefinitions` hook, which the module can call to pull workflow definitions from Redux when it needs contextual information for a violation.
 
-The observations point to a **modular architecture**: each concern (validation, hook configuration, violation capture) lives in its own module and communicates through well‑defined interfaces.  The **ViolationCaptureModule** follows this principle by being a self‑contained unit that can be swapped or extended without touching the rest of the constraint stack.  
-
-A key design pattern evident in the module is **event‑listener based capture**.  The module “utilizes a specific capture mechanism, such as event listeners, to capture constraint violations.”  In practice this means that when the **ContentValidationAgent** (the class that actually validates entity content) discovers a rule breach, it emits a violation event.  The **ViolationCaptureModule** registers an event listener for these emissions, records the payload, and makes it available through its unified API.  This loosely‑coupled, publish‑subscribe style interaction keeps the validation logic independent from the reporting logic while still guaranteeing that every violation is observed.
-
-Another implicit pattern is the **Facade (Unified Interface)** pattern.  By “providing a unified interface for accessing violation data, simplifying development and maintenance,” the module abstracts away the underlying event handling, storage, and formatting details.  Callers—whether they are UI components, logging services, or external audit tools—interact with a single, stable API rather than dealing with multiple event streams or raw violation objects.
-
-## Implementation Details  
-
-Even though no concrete symbols were listed, the module’s responsibilities can be inferred from the surrounding codebase:
-
-* **Event Listener Registration** – At initialization the module likely obtains a reference to the **ContentValidationAgent** (found at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`).  It then subscribes to a violation‑emitted event, for example `onViolationDetected`.  The listener callback captures the event payload, which contains the error message, the rule that was broken, and any contextual data (e.g., the entity ID, the operation that triggered the check).
-
-* **Violation Store** – To “provide detailed violation information,” the module must retain the captured events in a structured store.  This could be an in‑memory collection (e.g., a Map keyed by entity ID) or a lightweight persistence layer if the system needs to survive process restarts.  The store is the source of truth for the unified interface.
-
-* **Unified Interface** – The module exposes methods such as `getViolations()`, `getViolationsByEntity(id)`, and `clearViolations()`.  These methods return a normalized data shape that includes the error message, rule identifier, and any additional context supplied by the validation agent.  By normalizing the data, the module shields callers from the internal event schema used by the **ContentValidationAgent**.
-
-* **Hook Configuration Integration** – The module “integrates with the HookConfigurationManager to ensure correct configuration and validation.”  The **HookConfigurationManager** (which relies on `lib/agent-api/hooks/hook-config.js`) is responsible for loading hook definitions that determine which validation events should be listened to.  During startup, the **ViolationCaptureModule** queries the manager for the active hook set, ensuring that it only registers listeners for the hooks that are currently enabled.  This dynamic wiring lets administrators enable or disable specific violation‑capture hooks without code changes.
-
-* **Error Context Enrichment** – The observation that the module “provides detailed violation information, including error messages and context” suggests that the listener may augment the raw event with extra diagnostics (e.g., stack traces, timestamps, user session data) before storing it.  This enrichment supports downstream debugging and audit trails.
-
-## Integration Points  
-
-The **ViolationCaptureModule** sits at the intersection of three major subsystems:
-
-1. **ContentValidationModule** – The primary producer of violation events.  The module consumes events emitted by the `ContentValidationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`).  Any change in the validation agent’s event contract would directly affect the capture logic, so the two remain tightly coupled through the event interface.
-
-2. **HookConfigurationManager** – Supplies the list of enabled hooks and the configuration that dictates which validation events are relevant.  By consulting the manager (which itself loads configurations via `HookConfigLoader` in `lib/agent-api/hooks/hook-config.js`), the capture module can dynamically adjust its listeners, supporting runtime reconfiguration without a restart.
-
-3. **ConstraintSystem (Parent)** – The overall container that orchestrates the lifecycle of its child modules.  The parent likely instantiates the **ViolationCaptureModule**, passes in dependencies (validation agent, hook manager), and exposes the unified violation API to higher‑level services such as reporting dashboards, external audit pipelines, or automated remediation scripts.
-
-Because the module offers a single, stable API, any consumer—whether inside the **ConstraintSystem** or external—does not need to know about the event‑listener mechanics or the hook configuration details.  This decoupling simplifies testing: unit tests can mock the validation agent’s events, while integration tests can verify that the module correctly registers with the hook manager.
-
-## Usage Guidelines  
-
-* **Initialize Early** – Register the capture module during system boot before any validation logic runs.  Early registration guarantees that no violation event is missed, especially during the first user interactions after a restart.
-
-* **Respect Hook Configuration** – When adding new validation hooks, update the `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`) so that the **HookConfigurationManager** propagates the change.  The capture module will automatically pick up the new hook without code changes.
-
-* **Query via the Unified Interface** – Consume violations through the provided methods (`getViolations`, `getViolationsByEntity`, etc.).  Avoid reaching into the internal store or listening directly to validation events; doing so bypasses the abstraction and can lead to duplicated logic.
-
-* **Clear or Archive Wisely** – If the system needs to reset the violation state (e.g., after a successful remediation), use the module’s `clearViolations` method.  For audit purposes, consider exporting the stored violations before clearing them.
-
-* **Performance Considerations** – Because the module stores every captured event, high‑throughput environments should monitor memory usage.  If the violation volume becomes large, consider configuring the module to batch‑persist older entries to a database or to prune entries after a configurable TTL.
+The module is a **SubComponent** of the larger **ConstraintSystem**. It works side‑by‑side with sibling subcomponents such as **ContentValidator** (which uses `ContentValidationAgent`) and **HookManager** (which also relies on the same unified hook manager). The design goal is to keep the capture logic isolated, replaceable, and easy to maintain while still being tightly integrated with the hook‑driven event flow that the rest of the constraint‑validation stack uses.
 
 ---
 
-### Architectural patterns identified
-1. **Modular architecture** – each concern (validation, hook loading, violation capture) lives in its own module.  
-2. **Event‑listener / Publish‑Subscribe** – violations are emitted as events and captured via listeners.  
-3. **Facade (Unified Interface)** – a single API abstracts the underlying event handling and storage.
+## Architecture and Design  
 
-### Design decisions and trade‑offs
-* **Loose coupling via events** – simplifies adding new validators but introduces reliance on a stable event contract.  
-* **Dynamic hook configuration** – enables runtime flexibility at the cost of additional indirection through the HookConfigurationManager.  
-* **In‑memory violation store** – offers fast access for developers but may require scaling mechanisms (e.g., persistence or pruning) for large workloads.
+The observations point to a **modular architecture** that treats each concern of constraint handling as an independent module. The key architectural traits are:
 
-### System structure insights
-* **ViolationCaptureModule** is a child of **ConstraintSystem**, sharing the same modular design principles as its siblings **ContentValidationModule** and **HookConfigurationManager**.  
-* It bridges the validation side (ContentValidationAgent) and the configuration side (HookConfigurationManager), acting as the “glue” that turns raw validation failures into consumable data.
+1. **Modular Service Layer** – `scripts/violation-capture-service.js` implements **ViolationCaptureService** as a self‑contained unit. Because it “is designed to be modular, allowing for easier maintenance and updates of capture logic” and “independent, allowing for modification or replacement without affecting the overall system,” the system follows a **service‑isolation pattern**. The service can be swapped out or extended without ripple effects on the rest of the ConstraintSystem.
 
-### Scalability considerations
-* The event‑listener model scales horizontally as more validation agents can emit events without changing the capture logic.  
-* Memory consumption of the violation store must be managed; introducing a configurable retention policy or external persistence can keep the module performant under high violation rates.
+2. **Central Hook Orchestration** – Both the module and its siblings rely on `lib/agent-api/hooks/hook-manager.js`. This file provides a **unified hook manager** that centralises registration, dispatch, and lifecycle handling of hook events. The pattern here is a **hook‑manager orchestration** approach: rather than each module wiring its own event bus, they all delegate to a single manager, simplifying coordination and guaranteeing a consistent ordering of events.
 
-### Maintainability assessment
-* The clear separation of concerns (validation, configuration, capture) and the unified façade make the module easy to understand, test, and extend.  
-* Maintaining the event contract between **ContentValidationAgent** and **ViolationCaptureModule** is the primary maintenance hotspot; any change to the event payload requires coordinated updates in both modules.
+3. **Integration via Redux‑backed Hook** – The `useWorkflowDefinitions` hook (found in `integrations/system-health-dashboard/src/components/workflow/hooks.ts`) is a concrete integration point that pulls workflow definitions from the Redux store. This demonstrates a **state‑driven integration** where the ViolationCaptureModule can enrich violation data with the current workflow context.
+
+Overall, the architecture avoids monolithic coupling. The **ConstraintSystem** acts as a container that aggregates independent modules (ViolationCaptureModule, ContentValidator, HookManager) each exposing a well‑defined interface (service functions, hook subscriptions). The design leans heavily on **separation of concerns** and **dependency inversion**: the module depends on abstractions provided by the hook manager rather than concrete event emitters.
+
+---
+
+## Implementation Details  
+
+### Core Service (`scripts/violation-capture-service.js`)  
+The **ViolationCaptureService** encapsulates all logic required to listen for violation events, format the payload, and persist or forward the data. Because the observations repeatedly stress its modularity, the service likely exports a small public API such as:
+
+```js
+export function initialize(hookManager) { … }
+export function captureViolation(event) { … }
+export function shutdown() { … }
+```
+
+The service registers its interest in specific hook names (e.g., `onConstraintViolation`) through the **HookManager** passed during initialization. By keeping the registration logic inside the service, the module can later replace the implementation (e.g., switch from local logging to remote telemetry) without touching the hook manager.
+
+### Hook Manager (`lib/agent-api/hooks/hook-manager.js`)  
+The **HookManager** provides a registry of hook names to listener arrays and a dispatch routine that executes listeners in a deterministic order. The ViolationCaptureModule uses this manager to:
+
+* **Subscribe** – during service initialization, it adds a listener for violation‑related hooks.  
+* **Emit** – if the module itself generates secondary events (e.g., “violation‑captured” notifications), it pushes them through the same manager, ensuring other components (such as analytics or UI dashboards) can react.
+
+Because the same manager is shared with **ContentValidator** and the generic **HookManager** sibling, any change to hook semantics propagates uniformly, reducing duplication.
+
+### Workflow Hook (`integrations/system-health-dashboard/src/components/workflow/hooks.ts`)  
+The `useWorkflowDefinitions` hook is a React‑style custom hook that reads workflow definitions from the Redux store. When the ViolationCaptureService processes an event, it can invoke this hook (or a utility derived from it) to augment the violation record with the active workflow ID, step name, or other contextual metadata. This tight coupling to Redux ensures that violation data reflects the exact state of the system at the moment of capture.
+
+### Interaction with Parent (`ConstraintSystem`)  
+The **ConstraintSystem** orchestrates the lifecycle of its children. It likely calls a bootstrap routine that:
+
+1. Instantiates the **ViolationCaptureService**.  
+2. Passes the shared **HookManager** instance to it.  
+3. Optionally supplies the `useWorkflowDefinitions` hook or a wrapper that provides workflow context.
+
+Because the parent component also hosts **ContentValidator** and **HookManager**, the ViolationCaptureModule benefits from already‑initialized infrastructure (e.g., the hook manager is guaranteed to be ready before the service registers its listeners).
+
+---
+
+## Integration Points  
+
+1. **Hook Manager Dependency** – The module cannot function without `lib/agent-api/hooks/hook-manager.js`. All violation events flow through this manager, making it the primary integration contract. Any change to hook naming or dispatch semantics must be coordinated with the manager.
+
+2. **Workflow Context** – By leveraging `integrations/system-health-dashboard/src/components/workflow/hooks.ts`, the module obtains workflow definitions from Redux. This is an optional but recommended integration because it enriches violation payloads with operational context that downstream consumers (e.g., dashboards, alerting pipelines) rely on.
+
+3. **Parent ConstraintSystem** – The parent is responsible for initializing the service and providing the hook manager instance. It also determines the order in which subcomponents are started; for example, the HookManager must be ready before the ViolationCaptureService registers its listeners.
+
+4. **Sibling Interaction** – While the ViolationCaptureModule does not directly call **ContentValidator**, both share the same hook manager. If **ContentValidator** emits a validation‑failure hook, the ViolationCaptureService could optionally listen to it, allowing a unified view of both validation and violation events. This is an implicit integration enabled by the common manager.
+
+5. **External Consumers** – Any downstream system that subscribes to the violation hook (e.g., telemetry pipelines, UI dashboards) will receive the events emitted by the service. Because the service’s output format is encapsulated, external consumers only need to understand the hook payload contract, not the internal capture mechanics.
+
+---
+
+## Usage Guidelines  
+
+* **Initialize via ConstraintSystem** – Developers should never instantiate the ViolationCaptureService in isolation. Instead, rely on the parent **ConstraintSystem** bootstrap sequence, which guarantees that the shared HookManager is injected correctly.
+
+* **Register Hooks Early** – If additional custom listeners need to be added (e.g., a custom logger), they should be registered **before** the ViolationCaptureService calls its `initialize` method. This ensures the service’s listeners are placed appropriately in the dispatch order.
+
+* **Do Not Bypass the Hook Manager** – Directly emitting violation events without using `hook-manager.js` defeats the central orchestration guarantee and can cause missed or out‑of‑order processing. All event emission must go through the manager’s `emit` or equivalent API.
+
+* **Leverage Workflow Context** – When capturing a violation, always enrich the payload with the current workflow definition obtained via `useWorkflowDefinitions`. This practice yields richer analytics and aligns with the design intent expressed in the observations.
+
+* **Treat the Service as Replaceable** – Because the service is intentionally modular, teams are encouraged to replace the default implementation with a custom one (e.g., sending violations to a third‑party monitoring service) as long as the new implementation respects the same initialization signature and hook subscriptions.
+
+* **Testing** – Unit tests should mock the HookManager to verify that the service correctly registers listeners and formats events. Integration tests should spin up the full ConstraintSystem stack to ensure end‑to‑end propagation of violation events through the manager to downstream consumers.
+
+---
+
+### Architectural Patterns Identified  
+
+1. **Modular Service Isolation** – ViolationCaptureService is a self‑contained module that can be swapped independently.  
+2. **Hook‑Manager Orchestration** – Centralised event registration and dispatch via `hook-manager.js`.  
+3. **State‑Driven Integration** – Use of `useWorkflowDefinitions` to pull Redux state into violation handling.
+
+### Design Decisions and Trade‑offs  
+
+* **Independence vs. Coupling** – Making the service independent improves replaceability but introduces a runtime dependency on the hook manager. The trade‑off is acceptable because the manager is already a shared infrastructure component.  
+* **Central Hook Manager** – Provides uniform event handling and reduces duplication, but it becomes a single point of failure; careful error handling within the manager is essential.  
+* **Redux‑Based Context** – Enriching violations with workflow data yields better observability, yet it ties the module to the Redux store shape, requiring coordination when the store schema evolves.
+
+### System Structure Insights  
+
+* The **ConstraintSystem** is a container component that aggregates multiple modular subcomponents (ViolationCaptureModule, ContentValidator, HookManager).  
+* Each subcomponent follows a “module‑with‑service + hook‑subscription” pattern, sharing the same `hook-manager.js`.  
+* Sibling modules do not directly call each other; instead, they communicate indirectly through hooks, preserving loose coupling.
+
+### Scalability Considerations  
+
+* **Horizontal Scaling** – Because violation capture is event‑driven and decoupled via the hook manager, multiple instances of the ViolationCaptureService can run in parallel if the hook manager supports multi‑listener broadcasting.  
+* **Throughput** – The unified hook manager must be able to handle high‑frequency hook emissions without becoming a bottleneck; this suggests that the manager should implement efficient listener queues or async dispatch.  
+* **Extensibility** – Adding new violation‑type listeners merely requires registering additional hooks; no changes to existing services are needed, supporting scalable feature growth.
+
+### Maintainability Assessment  
+
+The design scores highly on maintainability:
+
+* **Clear Separation** – Capture logic lives in a single file (`violation-capture-service.js`), making it easy to locate and modify.  
+* **Modular Replacement** – The service can be swapped without touching the rest of the system, reducing regression risk.  
+* **Centralized Event Management** – Changes to hook semantics are confined to `hook-manager.js`, avoiding scattered event‑handling code.  
+* **Explicit Integration Points** – The use of `useWorkflowDefinitions` provides a well‑defined contract for contextual data, limiting hidden dependencies.
+
+Potential maintenance risks include the reliance on the hook manager’s stability and the need to keep the Redux‑derived workflow hook in sync with any store changes. Regular reviews of the hook manager’s API and automated tests around hook registration will mitigate these risks.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is used for entity content validation against configured rules. This modular design allows for easy maintenance and scalability of the system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is another example of this modularity, as it is responsible for loading and merging hook configurations from multiple sources. This separation of concerns enables developers to focus on specific aspects of the system without affecting other parts.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
 
 ### Siblings
-- [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule uses the ContentValidationAgent from integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts for entity content validation against configured rules
-- [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager uses the HookConfigLoader from lib/agent-api/hooks/hook-config.js for loading and merging hook configurations from multiple sources
+- [ContentValidator](./ContentValidator.md) -- ContentValidator uses the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content
+- [HookManager](./HookManager.md) -- HookManager uses a unified hook manager (lib/agent-api/hooks/hook-manager.js) to enable central orchestration of hook events
 
 
 ---

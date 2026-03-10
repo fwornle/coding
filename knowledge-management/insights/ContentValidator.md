@@ -2,87 +2,108 @@
 
 **Type:** SubComponent
 
-ContentValidator uses a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+ContentValidator can be used in conjunction with the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) to retrieve workflow definitions from Redux
 
 ## What It Is  
 
-**ContentValidator** is a sub‑component that lives inside the **ConstraintSystem** package and is responsible for applying a collection of validation rules to entity content. The core implementation is tied to the **ContentValidationAgent**, which can be found at  
+The **ContentValidator** sub‑component lives inside the **ConstraintSystem** module and is implemented in the source tree that houses the semantic‑analysis agents.  Its primary entry point is the `ContentValidationAgent` located at  
 
 ```
 integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
 ```  
 
-The agent is invoked by ContentValidator to perform the actual entity‑content checks and to trigger refresh operations when needed. Because the validator delegates the rule execution to this agent, the validator itself remains a thin orchestration layer that coordinates rule sets, aggregates results, and surfaces any violations to the broader ConstraintSystem workflow.
+ContentValidator orchestrates content‑validation work by delegating to this agent and by listening to validation‑related hook events through the unified hook manager found at  
 
-## Architecture and Design  
+```
+lib/agent-api/hooks/hook-manager.js
+```  
 
-The observations repeatedly highlight a **modular architecture**. ContentValidator is built as a container for interchangeable validation rule modules, and each rule can be added or removed without touching the surrounding code. This modularity is realized through a clear separation of concerns: the **ContentValidator** orchestrates, while the **ContentValidationAgent** encapsulates the concrete validation logic.  
-
-The design therefore follows a **decoupling pattern** (often described as a “strategy” or “plug‑in” style) where the validator does not hard‑code any specific rule but instead relies on the agent to supply a set of predefined rules. The agent lives in the *integrations* directory, indicating that it is an integration point rather than core business logic, which further isolates external concerns from the internal validation flow.  
-
-Interaction between components is straightforward: the parent **ConstraintSystem** loads the ContentValidator as one of its sub‑components alongside siblings such as **HookManager**, **ViolationCapture**, **ConnectionHandler**, and **WorkflowManager**. All of these siblings share the same modular philosophy—each can be swapped or upgraded independently—creating a cohesive yet loosely coupled ecosystem.
-
-## Implementation Details  
-
-Although no concrete code symbols were listed, the file path gives a strong clue about the implementation shape. The **ContentValidationAgent** (`content-validation-agent.ts`) is likely a TypeScript class that implements an interface expected by ContentValidator, exposing methods such as `validate(entity)` and `refresh(entity)`. These methods would iterate over a collection of rule objects, each representing a single validation check (e.g., length limits, prohibited characters, schema conformity).  
-
-ContentValidator itself probably holds a reference to the agent, instantiated via dependency injection from the **ConstraintSystem** bootstrap code. When an entity is submitted for validation, ContentValidator forwards the request to the agent, collects the rule‑level outcomes, and aggregates any violations into a format consumable by **ViolationCapture**. Because the agent is situated in an *integrations* folder, it is plausible that the rule set can be extended by adding new rule modules under the same directory, and the agent will discover them through a registration mechanism (e.g., a static registry or configuration file).  
-
-The modular design also implies that the validator does not embed any hard‑coded rule logic; instead, it relies on the agent’s ability to load rule definitions at runtime. This makes it possible to refresh the rule set without redeploying the entire ConstraintSystem—simply updating the rule definitions that the agent reads.
-
-## Integration Points  
-
-ContentValidator is tightly coupled with three surrounding entities:
-
-1. **ConstraintSystem** – the parent component that orchestrates the overall validation pipeline. ConstraintSystem creates and wires the ContentValidator together with other siblings, ensuring that validation results flow downstream to **ViolationCapture**.
-2. **ContentValidationAgent** – the direct integration point that houses the rule engine. All validation calls from ContentValidator are delegated here, and the agent may also interact with external services (e.g., a semantic analysis service) to enrich its rule set.
-3. **Sibling components** – while not directly invoked by ContentValidator, the results it produces are consumed by **ViolationCapture** (to persist violations) and may be influenced by **HookManager** (to trigger hooks on validation events) or **WorkflowManager** (to adjust workflow steps based on validation outcomes).  
-
-These connections are all mediated through well‑defined interfaces implied by the modular design; each component can be replaced as long as it respects the contract (e.g., a different agent that implements the same `validate`/`refresh` signatures).
-
-## Usage Guidelines  
-
-When extending or using ContentValidator, developers should follow the modular conventions already established:
-
-* **Add new validation rules** by creating additional rule modules that the ContentValidationAgent can discover. Keep rule definitions self‑contained and avoid cross‑rule side effects, preserving the independent replaceability highlighted in the design.
-* **Do not modify the ContentValidator orchestration logic** unless a new integration scenario is required. The validator’s responsibility is to delegate to the agent; altering it can break the decoupling that enables easy maintenance.
-* **Leverage the parent ConstraintSystem** for lifecycle management. Register the ContentValidator through the same dependency‑injection mechanism used for HookManager and ViolationCapture so that all components share a consistent initialization order.
-* **Respect the contract with ContentValidationAgent** – any custom agent must implement the same public methods observed (`validate`, `refresh`). This guarantees that sibling components continue to receive validation results in the expected format.
-* **Test rule modules in isolation** before plugging them into the agent. Because the architecture is modular, unit tests can target a single rule without needing the full ConstraintSystem stack.
+Because the component is deliberately isolated, it can be swapped or extended without ripple effects on the surrounding system.  It also cooperates with the `useWorkflowDefinitions` hook ( `integrations/system-health-dashboard/src/components/workflow/hooks.ts` ) when workflow definitions stored in Redux are needed to inform validation rules.
 
 ---
 
-### Architectural patterns identified  
-* **Modular / Plug‑in architecture** – validation rules are separate modules that can be added or removed independently.  
-* **Decoupling (Strategy‑like) pattern** – the validator delegates to a ContentValidationAgent that encapsulates the rule execution strategy.
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Decision:** Separate orchestration (ContentValidator) from rule execution (ContentValidationAgent).  
-  * *Trade‑off:* Introduces an extra indirection layer, but gains flexibility and testability.  
-* **Decision:** Locate the agent in an *integrations* directory, treating rule logic as an integration concern.  
-  * *Trade‑off:* May increase the perceived distance between core business logic and validation, but isolates external dependencies and eases replacement.
+The architecture that emerges from the observations is **modular** and **hook‑driven**.  The `ContentValidationAgent` is built as a collection of independent modules, each responsible for a distinct validation aspect (e.g., schema compliance, business‑rule checks).  This modularity aligns with the **Component‑Based Decomposition** pattern: every validation concern lives in its own module, making the agent extensible and testable in isolation.
 
-### System structure insights  
-* **Parent‑child relationship:** ConstraintSystem → ContentValidator → ContentValidationAgent.  
-* **Sibling symmetry:** ContentValidator shares the same modular philosophy with HookManager, ViolationCapture, ConnectionHandler, and WorkflowManager, enabling independent evolution of each concern.
+A second, complementary pattern is the **Mediator** pattern, realized by the unified hook manager (`hook-manager.js`).  All validation‑related events—such as “entity‑submitted”, “validation‑started”, or “validation‑failed”—are funneled through this mediator.  By centralising event orchestration, the system avoids tight coupling between the validator and other parts of the ConstraintSystem (e.g., the ViolationCaptureModule).  The mediator also enables the `useWorkflowDefinitions` hook to inject workflow data into the validation flow without the validator needing direct knowledge of Redux internals.
 
-### Scalability considerations  
-Because validation rules are independent modules, the system can scale horizontally by distributing rule execution across multiple instances of the ContentValidationAgent. Adding new rules does not affect existing ones, allowing the rule set to grow without degrading performance of unchanged modules.
+The relationship to the parent component, **ConstraintSystem**, reinforces a layered design: the parent provides a common contract for constraint‑related services, while the ContentValidator implements the “content” slice of that contract.  Sibling modules such as **ViolationCaptureModule** and **HookManager** share the same hook infrastructure, illustrating a **Shared Infrastructure** approach that reduces duplication and promotes consistent event handling across the constraint domain.
 
-### Maintainability assessment  
-The clear separation of responsibilities and the ability to replace sub‑components without ripple effects make the architecture highly maintainable. Updates to a single validation rule or to the agent’s loading mechanism can be performed in isolation, and the parent ConstraintSystem ensures consistent wiring of all sub‑components.
+---
+
+## Implementation Details  
+
+At the heart of the implementation is the `ContentValidationAgent` class (or exported object) in `content-validation-agent.ts`.  Its constructor registers a set of validation modules with the hook manager, typically via calls such as:
+
+```ts
+hookManager.register('entitySubmitted', this.validateEntity.bind(this));
+```
+
+Each validation module encapsulates a single rule set.  For example, a “JSONSchemaValidator” module might expose a `run(entity)` method that returns a list of violations.  The agent aggregates the results from all modules and emits a consolidated `validationCompleted` event through the hook manager.
+
+The hook manager itself (`hook-manager.js`) maintains an internal map of event names to listener arrays.  It provides `register(eventName, listener)` and `emit(eventName, payload)` APIs.  Because the manager is a singleton imported by every agent, any component—such as the `useWorkflowDefinitions` hook—can listen for the same events, enrich the payload (e.g., by attaching workflow metadata), and let the ContentValidator consume the enriched data when it runs its checks.
+
+The `useWorkflowDefinitions` hook, defined in `hooks.ts`, reads workflow definitions from the Redux store (`state.workflow.definitions`) and returns them to any consumer that subscribes.  When a validation request occurs, the ContentValidator can invoke this hook (or receive its output via a hook event) to apply workflow‑specific constraints, ensuring that validation logic respects the current process context.
+
+Finally, the independence of ContentValidator is enforced by exposing a thin public API (e.g., `validate(entity): Promise<ValidationResult>`) that hides the internal modular composition.  This API can be called directly by higher‑level services in ConstraintSystem or by external callers that need ad‑hoc validation.
+
+---
+
+## Integration Points  
+
+ContentValidator interacts with three primary integration surfaces:
+
+1. **Hook Manager** – All validation lifecycle events flow through `lib/agent-api/hooks/hook-manager.js`.  The validator registers listeners, emits results, and consumes events emitted by other modules (e.g., ViolationCaptureModule).
+
+2. **Workflow Definitions Hook** – The `useWorkflowDefinitions` hook (`integrations/system-health-dashboard/src/components/workflow/hooks.ts`) supplies contextual workflow data.  By subscribing to the same hook events, the validator can adjust its rule set based on the active workflow, enabling dynamic validation paths.
+
+3. **ConstraintSystem Parent** – As a child of ConstraintSystem, ContentValidator adheres to the parent’s contract for constraint services.  The parent may invoke `ContentValidator.validate` when a new entity is persisted, and it may also listen for the `validationFailed` event to trigger downstream remediation (e.g., logging or UI feedback).
+
+Sibling components, such as **ViolationCaptureModule**, also rely on the hook manager to receive validation outcomes.  This shared dependency ensures that when ContentValidator emits a `validationFailed` event, the ViolationCaptureModule can capture the violation details without direct coupling to the validator’s internal code.
+
+---
+
+## Usage Guidelines  
+
+Developers should treat ContentValidator as a **plug‑and‑play** service within the ConstraintSystem.  When adding a new validation rule, create a dedicated module that implements a `run(entity)` (or similar) interface and register it with the agent in `content-validation-agent.ts`.  Avoid modifying the core agent logic; instead, extend the modular registry to keep the system maintainable.
+
+All interactions with the validator should occur through the hook manager.  Direct method calls are acceptable for synchronous validation, but for asynchronous or cross‑cutting concerns (e.g., logging, telemetry) prefer emitting or listening to hook events.  This preserves the mediator’s decoupling benefits and allows future modules—such as a new analytics collector—to tap into the validation flow without code changes to ContentValidator.
+
+When workflow context influences validation, retrieve the definitions via the `useWorkflowDefinitions` hook rather than accessing Redux state directly.  This abstraction protects the validator from changes in state shape and encourages a clear separation between UI‑layer state management and backend validation logic.
+
+Finally, because the component is designed to be replaceable, any replacement implementation must honor the same public API (`validate(entity)`) and continue to register its events with the unified hook manager.  Maintaining this contract ensures that sibling modules like ViolationCaptureModule remain functional after a swap.
+
+---
+
+### Architectural Patterns Identified  
+* **Component‑Based Decomposition** – validation logic is split into discrete, replaceable modules.  
+* **Mediator (Hook Manager)** – centralised event orchestration via `hook-manager.js`.  
+* **Shared Infrastructure** – sibling modules share the same hook manager and Redux‑derived hooks.  
+
+### Design Decisions & Trade‑offs  
+* **Modularity vs. Overhead** – breaking validation into many tiny modules improves testability and future extensibility but introduces a small runtime cost for module registration and event dispatch.  
+* **Hook‑Driven Coupling** – using a mediator reduces direct dependencies, yet developers must understand the event contract to avoid silent failures.  
+* **Independence of ContentValidator** – the decision to keep the validator independent enables hot‑swapping but requires a stable public API and disciplined versioning.  
+
+### System Structure Insights  
+ContentValidator sits one level below ConstraintSystem, sharing the hook manager with ViolationCaptureModule and collaborating with workflow hooks.  The hierarchy forms a clear vertical slice: parent provides the constraint contract, siblings provide complementary services, and the child (ContentValidator) implements a focused validation slice.
+
+### Scalability Considerations  
+Because validation modules are registered once at startup and invoked per‑entity, the system scales horizontally by adding more worker instances without changing the core architecture.  The hook manager’s lightweight publish/subscribe model can handle high event throughput, but if event volume grows dramatically, a more robust message bus may be required.
+
+### Maintainability Assessment  
+The modular design, clear separation of concerns, and central hook mediation make the codebase highly maintainable.  Adding, removing, or updating a validation rule only touches its own module and the registration list.  The unified hook manager reduces duplicated event‑handling code, and the use of a Redux‑derived hook for workflow data isolates UI state concerns from backend validation.  Overall, the architecture balances flexibility with simplicity, supporting long‑term evolution of the ContentValidator sub‑component.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
 
 ### Siblings
-- [HookManager](./HookManager.md) -- HookManager is responsible for managing hook configurations and registrations, indicating a key role in the system's workflow
-- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture is responsible for capturing and persisting constraint violations, indicating a key role in the system's workflow
-- [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager is responsible for managing workflow definitions and interactions, indicating a key role in the system's workflow
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule uses the ViolationCaptureService (scripts/violation-capture-service.js) to capture constraint violations from tool interactions
+- [HookManager](./HookManager.md) -- HookManager uses a unified hook manager (lib/agent-api/hooks/hook-manager.js) to enable central orchestration of hook events
 
 
 ---

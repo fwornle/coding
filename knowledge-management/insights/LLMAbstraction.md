@@ -2,165 +2,174 @@
 
 **Type:** Component
 
-[LLM] The LLMAbstraction component utilizes a consistent naming convention and follows a modular architecture, integrating multiple sub-components such as the LLMService, ProviderRegistry, and CircuitBreaker. The use of a ProviderRegistry to manage different providers, including mock, local, and public providers, allows for easy addition or removal of language models without affecting the overall system. The getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) gets the LLM mode for a specific agent, prioritizing per-agent overrides, global mode, and agent default from YAML, which ensures that the component can handle different modes and configurations.
+[LLM] The LLMAbstraction component incorporates a mock service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes. This mock service enables the simulation of LLM responses without actual API calls, allowing for faster and more efficient testing of the system. The mock service is implemented using a simple API that mimics the real LLM provider API, but returns pre-defined responses instead of making actual API calls. In the integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts file, the MockLLMService class is used to create a mock instance of the LLM service, which can be used to test the system without actually calling the LLM provider.
 
 ## What It Is  
 
-The **LLMAbstraction** component lives under the `lib/llm/` directory and is the façade through which the rest of the code‑base talks to language‑model back‑ends. Its public gateway is the `LLMService` class defined in **`lib/llm/llm-service.ts`**. From this single entry point callers obtain completions, embeddings, or any other LLM operation without needing to know which provider is actually servicing the request.  
+The **LLMAbstraction** component is the central hub that mediates every interaction with large‑language‑model (LLM) services across the code‑base. Its implementation lives primarily under the `lib/llm/` directory:
 
-The component is deliberately **modular**: a `ProviderRegistry` (also in `lib/llm/`) holds concrete provider implementations such as `DMRProvider` (`lib/llm/providers/dmr-provider.ts`), `AnthropicProvider` (`lib/llm/providers/anthropic-provider.ts`), and a mock provider used by the integration tests (`integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`).  Mode selection (e.g., “mock”, “local”, “public”) is performed by the helper `getLLMMode` found in the same mock service file, which consults per‑agent overrides, a global mode flag, and defaults stored in YAML configuration.  The component also stores runtime state in a progress file via the `LLMState` and `MockLLMConfig` interfaces defined alongside the mock service.
+* **Facade** – `lib/llm/llm-service.ts` defines the `LLMService` class, which presents a single, high‑level API to the rest of the system.  
+* **Provider Registry** – `lib/llm/provider-registry.js` hosts the `ProviderRegistry` class that records and retrieves concrete provider implementations.  
+* **Concrete Providers** – examples include `lib/llm/providers/dmr-provider.ts` (Docker Desktop Model Runner) and `lib/llm/providers/anthropic-provider.ts` (Anthropic API).  
+* **Reliability Helpers** – `lib/llm/circuit-breaker.js` supplies a `CircuitBreaker` that guards calls to any provider.  
+* **Testing Support** – a lightweight mock lives in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`, exposing `MockLLMService` for fast, deterministic unit‑tests.
 
-Because **LLMAbstraction** sits directly under the root **Coding** component, it is a shared service for sibling components such as **LiveLoggingSystem**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis**.  All of those modules can request LLM operations through `LLMService` without coupling to any specific vendor SDK.
+Together these files give the system a **single source of truth** for LLM operations while allowing the underlying provider to be swapped, cached, or bypassed without rippling changes through callers.  
 
 ---
 
 ## Architecture and Design  
 
-### Modular, Provider‑Agnostic Architecture  
-The core architectural stance is **modularity** achieved through a **Provider Registry** pattern. `ProviderRegistry` acts as a simple service‑locator that maps a logical “mode” (mock, local, public) to a concrete provider class.  Each provider implements a common interface (implied by the way `LLMService` invokes them), allowing the rest of the system to remain agnostic to the underlying API shape—e.g., Anthropic’s SDK differs from OpenAI’s, yet both are accessed through the same `LLMService` methods.
+### Core Patterns  
 
-### Dependency Injection (DI)  
-`LLMService` receives its collaborators—budget trackers, sensitivity classifiers, quota trackers—via constructor injection.  This DI approach isolates concerns: the service can enforce quota limits, flag sensitive content, or enforce cost budgets without hard‑coding any particular implementation.  The DI container is not named in the observations, but the pattern is evident from the wording “dependency injection to manage budget trackers, sensitivity classifiers, and quota trackers”.
+| Pattern | Where It Appears | What It Achieves |
+|---------|------------------|------------------|
+| **Facade** | `LLMService` in `lib/llm/llm-service.ts` | Provides a uniform, mode‑aware API (`getProvider`, request routing, caching) that hides provider‑specific details from callers. |
+| **Registry** | `ProviderRegistry` in `lib/llm/provider-registry.js` | Centralises registration (`registerProvider`) and lookup (`getProvider`) of providers, enabling dynamic addition/removal of providers at runtime. |
+| **Provider (Strategy‑like) ** | Individual provider classes (`DMRProvider`, `AnthropicProvider`, etc.) | Encapsulates each external LLM service’s protocol, authentication, request/response transformation, and health‑check logic. |
+| **Circuit Breaker** | `CircuitBreaker` in `lib/llm/circuit-breaker.js` | Monitors provider health (`isOpen`, `close`) and short‑circuits calls when a provider is known to be unavailable, protecting the system from cascading failures. |
+| **Mock / Test Double** | `MockLLMService` in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` | Supplies a deterministic, network‑free implementation for unit‑ and integration‑testing, mirroring the real provider API but returning canned responses. |
+| **Health‑Check** | `healthCheck` method of `DMRProvider` (and likely other providers) | Periodically validates that the underlying service (e.g., Docker Desktop Model Runner) is reachable, feeding the circuit‑breaker state. |
 
-### Circuit Breaker & Caching  
-Both **circuit breaking** and **caching** are baked into `LLMService`.  The circuit‑breaker shields downstream providers (especially public APIs) from cascading failures; when a provider repeatedly errors, the breaker trips and `LLMService` can fall back to a mock or cached response.  Caching reduces duplicate calls for identical prompts, improving latency and cost.  These cross‑cutting concerns are encapsulated inside `LLMService`, keeping provider code clean.
+These patterns are **explicitly mentioned** in the observations; no additional architectural concepts are inferred beyond what the source files demonstrate.
 
-### Configuration‑Driven Mode Routing  
-The function `getLLMMode` (in `integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`) implements a three‑tier resolution strategy:
-1. **Per‑agent override** – a developer can pin a specific agent to a particular provider via the DMR config.
-2. **Global mode** – a system‑wide flag (set via `setGlobalLLMMode`) that switches all agents together.
-3. **Agent default** – the fallback defined in the static YAML configuration.
+### Interaction Flow  
 
-This deterministic hierarchy enables both fine‑grained testing (per‑agent mock) and large‑scale operational switches (global mode) without code changes.
+1. **Caller → LLMService** – Any component that needs an LLM (e.g., agents in the *SemanticAnalysis* sibling) invokes a method on `LLMService`.  
+2. **Mode Routing & Caching** – Inside `LLMService`, the request’s *mode* (e.g., “default”, “override”, “mock”) determines which provider name to request from `ProviderRegistry`. A built‑in cache may store recent responses to reduce latency.  
+3. **Provider Retrieval** – `ProviderRegistry.getProvider(nameOrMode)` returns the concrete provider instance (`DMRProvider`, `AnthropicProvider`, or the mock).  
+4. **Circuit‑Breaker Guard** – Before the provider is called, `CircuitBreaker.isOpen(providerId)` is consulted. If the circuit is open, the request is short‑circuited and either a fallback provider is selected or an error is thrown, as dictated by configuration.  
+5. **Provider Execution** – The provider’s `sendRequest` (or equivalent) formats the payload for its external API, sends it, and then `handleResponse` normalises the result back into the shape expected by `LLMService`.  
+6. **Health‑Check Loop** – Providers like `DMRProvider` run `healthCheck` on a timer; a failure flips the circuit breaker, influencing step 4.  
 
-### Consistent Naming & Shared Conventions  
-All files adopt a `*-provider.ts` naming scheme, the central service is called `LLMService`, and state interfaces are prefixed with `LLM`.  This uniformity mirrors the conventions used across sibling components (e.g., `GraphDatabaseAdapter` in **CodingPatterns**, `session_windowing.py` in **LiveLoggingSystem**), reinforcing a shared architectural language across the entire **Coding** parent.
+This flow embodies **loose coupling**: callers never import a provider directly, and providers can be added, removed, or swapped without touching the rest of the codebase.  
 
 ---
 
 ## Implementation Details  
 
-### `LLMService` (`lib/llm/llm-service.ts`)  
-- **Public API** – exposes methods such as `complete`, `embed`, and possibly `chat`.  
-- **Mode Routing** – on each call it invokes `getLLMMode` (via the mock service) to decide which provider instance to delegate to.  
-- **Caching Layer** – maintains an in‑memory (or file‑backed) cache keyed by prompt + model parameters.  
-- **CircuitBreaker** – wraps provider calls; on repeated failures it opens the circuit and returns a fallback or throws a controlled error.  
+### LLMService (`lib/llm/llm-service.ts`)  
 
-### `ProviderRegistry` (implicit path `lib/llm/provider-registry.ts` or similar)  
-- Registers providers under string keys (`'mock'`, `'dmr'`, `'anthropic'`, etc.).  
-- Offers a `getProvider(mode: string)` method used by `LLMService`.  
+* **Facade Role** – Exposes methods such as `invoke`, `getProvider`, and internal caching utilities.  
+* **Mode Routing** – Uses the `mode` argument (or configuration) to decide which provider name to request from the registry.  
+* **Caching** – While the observation only mentions “caching,” the service likely stores recent request/response pairs keyed by request hash to avoid duplicate external calls.  
 
-### `DMRProvider` (`lib/llm/providers/dmr-provider.ts`)  
-- Executes local inference via Docker Desktop’s Model Runner (DMR).  
-- Reads per‑agent overrides from the DMR configuration file, enabling developers to spin up a custom model for a single agent without affecting others.  
+### ProviderRegistry (`lib/llm/provider-registry.js`)  
 
-### `AnthropicProvider` (`lib/llm/providers/anthropic-provider.ts`)  
-- Wraps the Anthropic SDK, translating the generic LLM request shape into Anthropic’s specific fields (e.g., handling `temperature` and system messages differently from OpenAI).  
-- Demonstrates the provider‑agnostic contract: despite differing payloads, the provider still implements the same interface expected by `LLMService`.  
+* **Singleton‑ish** – Acts as a global catalogue; `registerProvider(name, providerInstance)` is called during application bootstrap (e.g., when the DockerizedServices component starts).  
+* **Lookup** – `getProvider(nameOrMode)` returns the concrete provider; the method also supports “mode” based resolution, enabling the fallback logic described in the LLMService observation.  
 
-### Mock Infrastructure (`integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`)  
-- **State Interfaces** – `LLMState` captures the current mode and progress; `MockLLMConfig` stores mock‑specific options.  
-- **Mode Mutators** – `setGlobalLLMMode` writes the chosen mode to the progress file and toggles a legacy `mockLLM` flag for backward compatibility.  
-- **Mode Resolver** – `getLLMMode` implements the three‑tier resolution described earlier.  
+### Concrete Providers  
 
-### DI Collaborators  
-Although not listed as concrete files, the observations note that **budget trackers**, **sensitivity classifiers**, and **quota trackers** are injected into `LLMService`.  Their responsibilities are:
-- **BudgetTracker** – monitors monetary cost of API calls, possibly aborting if a budget ceiling is reached.  
-- **SensitivityClassifier** – inspects prompts/responses for PII or policy‑violating content.  
-- **QuotaTracker** – enforces per‑agent or per‑user request limits.  
+| Provider | File | Key Responsibilities |
+|----------|------|----------------------|
+| **DMRProvider** | `lib/llm/providers/dmr-provider.ts` | - Executes local inference via Docker Desktop’s Model Runner.<br>- Supports per‑agent model overrides (agents can specify a custom model name).<br>- Implements `healthCheck` to ping the DMR service; on failure it either falls back or throws per config. |
+| **AnthropicProvider** | `lib/llm/providers/anthropic-provider.ts` | - Handles Anthropic‑specific authentication and request formatting.<br>- `sendRequest` builds the HTTP payload, `handleResponse` normalises Anthropic’s JSON into the internal response shape. |
+| **MockLLMService** | `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` | - Provides a stubbed API that mirrors the real provider’s contract.<br>- Returns predefined responses, enabling fast unit tests for agents in *SemanticAnalysis* and other siblings. |
 
-All of these collaborators are interchangeable thanks to DI, making it trivial to swap a mock quota tracker for a production implementation.
+### CircuitBreaker (`lib/llm/circuit-breaker.js`)  
+
+* **State Machine** – Tracks consecutive failures, opens the circuit after a threshold, and automatically attempts to close after a cooldown period.  
+* **API** – `isOpen(providerId)` checks current status; `close(providerId)` manually resets the circuit (used after a successful health‑check).  
+
+### Health‑Check Mechanism  
+
+* Implemented in each provider (e.g., `DMRProvider.healthCheck`).  
+* Periodically invoked (likely via `setInterval` or a scheduled job) to verify service liveness.  
+* Failure triggers the circuit breaker and may cause the `LLMService` to select a fallback provider, as described in observation 2.  
 
 ---
 
 ## Integration Points  
 
-1. **Progress / State Files** – `LLMState` is persisted to a progress file that other components (e.g., the **SemanticAnalysis** agents) read to understand the current LLM mode.  
-2. **Agent Layer** – agents under `integrations/mcp‑server‑semantic‑analysis/src/agents/` request completions via `LLMService`.  The per‑agent mode overrides allow a single agent to run against a local DMR model while the rest use a public provider.  
-3. **Budget & Quota Systems** – the DI‑injected trackers are likely defined in the **ConstraintSystem** component, which already handles limits and policies across the platform.  By injecting them, `LLMService` participates in the global constraint enforcement strategy.  
-4. **Logging & Monitoring** – sibling **LiveLoggingSystem** provides session‑windowing and classification; it can consume the circuit‑breaker events emitted by `LLMService` to surface health dashboards.  
-5. **Dockerized Services** – the Docker Compose definition for `mcp-server-semantic-analysis` (under **DockerizedServices**) spins up the environment where the mock service and the DMR container live, ensuring the provider implementations have the necessary runtime dependencies.  
+1. **Parent – Coding**  
+   * As a child of the top‑level *Coding* component, LLMAbstraction supplies the only public LLM API for the entire project. All other components (LiveLoggingSystem, Trajectory, KnowledgeManagement, etc.) depend on it for any language‑model interaction.  
 
-Overall, `LLMAbstraction` is a **core service** that other components call into, while it itself depends on lower‑level utilities (registry, DI collaborators) and external runtime services (Docker Desktop Model Runner, Anthropic API).
+2. **Sibling Components**  
+   * **LiveLoggingSystem** – Agents such as `OntologyClassificationAgent` likely call `LLMService` to classify text.  
+   * **DockerizedServices** – The Docker Compose orchestration defined elsewhere spins up the DMR service that `DMRProvider` talks to.  
+   * **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, **SemanticAnalysis** – Each of these modules contains agents or adapters that request LLM completions via the facade, benefitting from the same provider‑fallback and circuit‑breaker guarantees.  
+
+3. **Provider Registry Consumers**  
+   * During application start‑up, each concrete provider registers itself with `ProviderRegistry`. For example, the DockerizedServices bootstrap code likely does `ProviderRegistry.registerProvider('dmr', new DMRProvider())`.  
+
+4. **Testing Infrastructure**  
+   * The mock service located in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` is swapped in during CI or unit‑test runs, replacing the real `LLMService` implementation through dependency injection or a test‑only registry entry (`registerProvider('mock', new MockLLMService())`).  
+
+5. **Configuration & Mode Selection**  
+   * Configuration files (not listed but implied) dictate the default mode (e.g., “production”, “test”, “override”). The `LLMService` reads this configuration to decide whether to route to a real provider, a per‑agent override, or the mock.  
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through `LLMService`** – Directly instantiating a provider bypasses caching, circuit breaking, and mode routing, and will break the unified contract.  
-* **Prefer configuration over code** – To change which model an agent uses, edit the per‑agent override in the DMR config or adjust the global mode via `setGlobalLLMMode`.  No source‑code changes are required.  
-* **Respect the DI contracts** – When extending the system (e.g., adding a new quota strategy), implement the same interface expected by `LLMService` and register the implementation in the DI container used by the parent **Coding** component.  
-* **Mock for tests** – Use the mock provider (selected by setting the global mode to `"mock"` or by per‑agent override) to achieve deterministic unit tests.  The mock respects the legacy `mockLLM` flag, so existing test suites will continue to function.  
-* **Handle circuit‑breaker states** – Calls to `LLMService` may throw a `CircuitOpenError` when a provider is unhealthy.  Consumers should catch this and either fallback to a cached response or surface a user‑friendly message.  
+1. **Always go through LLMService** – Direct imports of a concrete provider (e.g., `import { DMRProvider }`) bypass the facade, the registry, and the circuit‑breaker, and should be avoided except in very low‑level integration tests.  
+
+2. **Prefer named modes over hard‑coded provider names** – When invoking the service, specify the desired mode (e.g., `{ mode: 'default' }` or `{ mode: 'override', model: 'gpt‑4' }`). This lets the registry handle fallback and fallback‑provider selection automatically.  
+
+3. **Register new providers during bootstrap** – To add a new LLM vendor, create a provider class that implements `sendRequest`/`handleResponse` (mirroring `AnthropicProvider`), then call `ProviderRegistry.registerProvider('newVendor', new NewVendorProvider())`. No other code changes are required.  
+
+4. **Leverage the mock for unit tests** – In test suites, replace the real provider by registering `MockLLMService` under the same name or by configuring the mode to “mock”. Ensure that the mock’s response shape matches the real provider’s contract to avoid false positives.  
+
+5. **Observe circuit‑breaker state** – When a provider repeatedly fails, the circuit will open. Applications should be prepared to handle the fallback error (e.g., by retrying with a secondary provider or surfacing a graceful degradation message).  
+
+6. **Use per‑agent model overrides responsibly** – The DMR provider supports per‑agent overrides; only agents that truly need a custom model should set this to avoid unnecessary model loading overhead.  
 
 ---
 
-## Architectural Patterns Identified  
+### 1. Architectural patterns identified  
 
-| Pattern | Where It Appears | Purpose |
-|---------|------------------|---------|
-| **Modular Architecture** | `LLMService`, `ProviderRegistry`, individual `*Provider` classes | Isolates concerns, enables independent evolution of providers. |
-| **Dependency Injection** | Constructor of `LLMService` (budget tracker, sensitivity classifier, quota tracker) | Allows swapping implementations (e.g., mock vs. production) without touching service code. |
-| **Provider Registry / Service Locator** | `ProviderRegistry` (implicit) | Maps logical modes to concrete provider instances. |
-| **Circuit Breaker** | Inside `LLMService` (observed behavior) | Protects the system from cascading failures of external LLM APIs. |
-| **Cache‑Aside** | Caching layer in `LLMService` | Reduces latency and cost for repeated identical prompts. |
-| **Configuration‑Driven Mode Resolution** | `getLLMMode`, `setGlobalLLMMode` (mock service) | Enables per‑agent, global, and default selection without code changes. |
-| **Adapter (Provider) Pattern** | `AnthropicProvider`, `DMRProvider` | Normalizes divergent external SDKs to a common internal contract. |
+* Facade (`LLMService`)  
+* Registry (`ProviderRegistry`)  
+* Provider/Strategy (individual provider classes)  
+* Circuit Breaker (`CircuitBreaker`)  
+* Mock/Test Double (`MockLLMService`)  
+* Health‑Check (implemented in each provider)  
 
----
+### 2. Design decisions and trade‑offs  
 
-## Design Decisions & Trade‑offs  
+* **Loose coupling via facade & registry** – simplifies provider swaps but adds an indirection layer that developers must understand.  
+* **Provider fallback & mode routing** – improves resilience but requires careful configuration to avoid unintended provider selection.  
+* **Circuit breaker** – protects the system from cascading failures at the cost of added state management and potential latency when circuits open/close.  
+* **Caching inside LLMService** – reduces external calls, but cache invalidation logic must be kept in sync with model updates.  
+* **Mock service** – accelerates testing but must be kept up‑to‑date with the real API contract.  
 
-* **Single Entry Point vs. Direct Provider Calls** – Centralising all LLM interactions in `LLMService` simplifies consumer code and guarantees cross‑cutting concerns (caching, circuit breaking) are uniformly applied. The trade‑off is an additional indirection layer that can add latency and complexity to debugging.  
-* **Provider Registry vs. Hard‑Coded Switch** – Using a registry makes adding a new vendor a matter of implementing a provider class and registering it, preserving open‑closed principle. However, the registry must be kept in sync with the mode strings used throughout configuration files, which introduces a small maintenance overhead.  
-* **Dependency Injection for Trackers** – DI decouples `LLMService` from concrete budgeting or sensitivity logic, facilitating testing and future extensions. The downside is the need for a DI container or manual wiring, which can be a source of runtime errors if mis‑configured.  
-* **Circuit Breaker Granularity** – The breaker appears to be scoped per provider. This protects the system from a single flaky API but may also mask transient errors that could be retried quickly. Tuning thresholds is therefore a runtime operational decision.  
-* **Mock Provider for Legacy Compatibility** – Maintaining the `mockLLM` flag ensures older scripts continue to work, but it adds a legacy path that must be kept alive until the entire code‑base migrates.  
+### 3. System structure insights  
 
----
+* The LLMAbstraction component sits directly under the root *Coding* component, acting as the **single point of entry** for all LLM interactions.  
+* Its child, `LLMService`, is the façade; the sibling components (LiveLoggingSystem, Trajectory, etc.) are **consumers** that remain agnostic of provider specifics.  
+* Provider implementations live in `lib/llm/providers/`, each self‑contained and registered centrally, enabling **plug‑and‑play extensibility**.  
 
-## System Structure Insights  
+### 4. Scalability considerations  
 
-* **Hierarchical Placement** – `LLMAbstraction` is a child of the top‑level **Coding** component, making it a foundational service. Its sibling components share the same modular philosophy, which suggests a deliberately consistent architectural language across the project.  
-* **Clear Separation of Concerns** – Providers handle only the vendor‑specific request/response translation; `LLMService` handles orchestration, state, and resilience; the mock service handles test‑time state persistence.  
-* **State Management** – Runtime mode and progress are persisted in a file (via `LLMState`), enabling external tools (e.g., DockerizedServices) to inspect or modify the current LLM configuration without restarting the process.  
-* **Extensibility Path** – To add a new vendor (e.g., Google Gemini), a developer would: (1) create `GeminiProvider` implementing the same internal interface, (2) register it in `ProviderRegistry`, (3) optionally expose a new mode string in configuration. No changes to `LLMService` or other consumers are required.  
+* Adding new providers scales horizontally – only a new class and a registration call are required.  
+* Mode‑based routing and caching allow the system to handle higher request volumes without proportionally increasing external LLM calls.  
+* The circuit‑breaker prevents a surge of failures from overwhelming downstream services, preserving overall system throughput.  
 
----
+### 5. Maintainability assessment  
 
-## Scalability Considerations  
-
-* **Horizontal Scaling** – Because the provider selection and caching are encapsulated in `LLMService`, multiple instances of the service can run behind a load balancer. The cache can be made shared (e.g., Redis) if needed, but the current design appears to use an in‑process cache, which is fine for a single node but would need externalization for true horizontal scaling.  
-* **Provider Load Management** – The injected **quota tracker** and **budget tracker** give the system the ability to throttle requests per‑agent or per‑service, preventing runaway usage as the number of agents grows.  
-* **Circuit Breaker Effectiveness** – In a high‑traffic scenario, the circuit breaker prevents a failing public API from exhausting thread pools or exhausting request quotas across all instances.  
-* **Docker Desktop Model Runner** – The DMR provider runs locally in a Docker container; scaling this provider would require orchestrating multiple DMR containers and load‑balancing across them, which the current architecture does not explicitly address.  
-
----
-
-## Maintainability Assessment  
-
-* **High Cohesion, Low Coupling** – Each provider is isolated; `LLMService` depends only on the abstract provider interface and a few well‑defined collaborators. This makes the codebase easy to understand and modify.  
-* **Consistent Naming & File Layout** – The `*-provider.ts` convention, the central `llm-service.ts`, and the mock service under `integrations/.../mock/` mirror patterns used in other components (e.g., `GraphDatabaseAdapter` in **CodingPatterns**). New team members can quickly locate relevant files.  
-* **Configuration‑Driven Behavior** – Mode changes happen via YAML or the progress file, reducing the need for code changes when switching environments (development, CI, production).  
-* **Backward Compatibility Layer** – The legacy `mockLLM` flag adds a small maintenance burden, but it is encapsulated in the mock service and does not affect the core logic.  
-* **Potential Technical Debt** – The circuit‑breaker and caching logic are hidden inside `LLMService`; if they become complex, they may need to be extracted into their own utilities to keep the service class readable. Also, the in‑process cache may become a bottleneck as the system scales.  
-
-Overall, **LLMAbstraction** exhibits a clean, modular design that aligns with the architectural style of its siblings and the parent **Coding** component. Its use of DI, provider registries, and resilience patterns positions it well for future expansion while keeping the current codebase maintainable.
+* **High maintainability** – The façade isolates callers from provider changes; the registry provides a single place to audit which providers are active.  
+* **Clear separation of concerns** – Health checks, circuit logic, and request formatting are each encapsulated in their own modules.  
+* **Testing friendliness** – The mock service encourages fast, deterministic unit tests, reducing reliance on flaky external APIs.  
+* **Potential technical debt** – If the caching strategy or circuit‑breaker thresholds are hard‑coded, tuning them later may require coordinated updates across the component. Regular reviews of the mock’s response schema are also needed to keep test coverage accurate.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers.; LLMAbstraction: [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models wit; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code g; Trajectory: [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integra; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semanti; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph da; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClass.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging p; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class in; DockerizedServices: [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible enviro; Trajectory: [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter cl; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and kno; CodingPatterns: [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-data; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a wor.
+
+### Children
+- [LLMService](./LLMService.md) -- LLMService class in lib/llm/llm-service.ts utilizes the facade pattern to loosely couple LLM providers with the rest of the system.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers. This is evident in the 'session_windowing.py' and 'file_routing.py' files, which contain functions such as 'window_session' and 'route_file' that handle these specific tasks. The 'classification_layers.py' file contains classes such as 'Classifier' that handle the classification of logs.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph database. This adapter provides a standardized interface for interacting with the database, ensuring consistency and modularity in the component's architecture. For instance, the GraphDatabaseAdapter's 'createNode' method is used to persist new entities in the database, while the 'getNode' method retrieves existing nodes based on their IDs. This modular approach enables easy switching between different database implementations if needed, as seen in lib/llm/provider-registry.js, where various providers are managed and registered.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is used for entity content validation against configured rules. This modular design allows for easy maintenance and scalability of the system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is another example of this modularity, as it is responsible for loading and merging hook configurations from multiple sources. This separation of concerns enables developers to focus on specific aspects of the system without affecting other parts.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This is evident in the classifyObservations method of the OntologyClassificationAgent class, which takes in a list of observations and returns a list of classified observations. The use of separate modules for different agents and utilities, such as the storage and logging modules, also contributes to the overall modularity of the component. This modular design allows for easier maintenance and updates, as changes to one agent do not affect the others.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides a connection to the Specstory extension via HTTP, IPC, or file watch, and is a key part of the component's functionality. The use of separate modules for different functionalities, such as logging and data persistence, allows for a clear separation of concerns and makes the codebase easier to understand and maintain. For example, the createLogger function from ../logging/Logger.js is used in SpecstoryAdapter to implement logging functionality.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-database-adapter.ts file. This adapter enables the component to leverage Graphology+LevelDB persistence, with automatic JSON export sync. The PersistenceAgent, implemented from integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts, plays a crucial role in handling persistence tasks. For instance, the PersistenceAgent's handlePersistenceTask function, defined in the persistence-agent.ts file, is responsible for orchestrating the persistence workflow. This modular design allows for seamless integration of various coding patterns and practices, ensuring consistency and quality in the project's codebase.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a workflow-based execution model. This is evident in the way the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent are implemented as separate classes in the integrations/mcp-server-semantic-analysis/src/agents directory. For instance, the OntologyClassificationAgent class in ontology-classification-agent.ts extends the BaseAgent abstract base class, which standardizes agent behavior and response formats. The execute method in ontology-classification-agent.ts demonstrates how the agent classifies observations against an ontology system, showcasing the component's ability to extract and persist structured knowledge entities.
 
 
 ---
