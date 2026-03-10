@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
 status: executing
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-10T21:13:00Z"
-last_activity: 2026-03-10 — Completed plan 15-01 (type definitions)
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-10T21:19:00Z"
+last_activity: 2026-03-10 — Completed plan 15-02 (transitions and derivation)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,22 +26,23 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 15 of 19 (Type Definitions)
-Plan: 1 of 2 complete
+Plan: 2 of 2 complete
 Status: Executing
-Last activity: 2026-03-10 — Completed plan 15-01 (type definitions)
+Last activity: 2026-03-10 — Completed plan 15-02 (transitions and derivation)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100% (Phase 15 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 3min
-- Total execution time: 3min
+- Total plans completed: 2
+- Average duration: 3.5min
+- Total execution time: 7min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 15    | 01   | 3min     | 2     | 6     |
+| 15    | 02   | 4min     | 2     | 6     |
 
 ## Accumulated Context
 
@@ -55,6 +56,8 @@ Progress: [█████░░░░░] 50%
 - [15-01]: Zod-first schemas as single source of truth, TS types derived via z.infer<>
 - [15-01]: Single RunningStateSchema with subStatus enum (not nested discriminatedUnion)
 - [15-01]: Migration preprocess at boundaries for old format compatibility
+- [15-02]: Added nextStep field to step-complete event for explicit step advancement
+- [15-02]: TransitionMap type for compile-time enforcement alongside runtime validation
 
 ### Critical Pitfalls
 
@@ -68,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T21:13:00Z
-Stopped at: Completed 15-01-PLAN.md
-Resume with: `/gsd:execute-phase 15` (plan 15-02 next)
+Last session: 2026-03-10T21:19:00Z
+Stopped at: Completed 15-02-PLAN.md
+Resume with: `/gsd:execute-phase 16` (Phase 15 complete, Phase 16 next)
