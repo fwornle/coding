@@ -348,6 +348,18 @@ class GlobalProcessSupervisor {
     try {
       this.log(`Restarting transcript monitor for ${projectPath}`);
 
+      // CRITICAL: Clear any stop marker BEFORE spawning new process.
+      // This prevents a race where a dying monitor's stop() handler sets the marker
+      // AFTER we spawn the replacement, blocking all future supervision.
+      try {
+        const cleared = await this.psm.clearProjectStop(projectPath);
+        if (cleared) {
+          this.log(`Cleared stale stop marker for ${path.basename(projectPath)} before restart`);
+        }
+      } catch {
+        // Non-fatal: proceed with restart even if clear fails
+      }
+
       // Clean up dead PSM entry first
       await this.psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
 

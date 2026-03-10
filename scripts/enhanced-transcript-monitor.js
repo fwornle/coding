@@ -2553,13 +2553,14 @@ class EnhancedTranscriptMonitor {
       const idleTime = Date.now() - this.lastActivityTime;
       if (idleTime > this.idleTimeout) {
         const idleMinutes = Math.round(idleTime / 60000);
-        console.log(`⏰ Idle timeout reached: no transcript activity for ${idleMinutes} minutes`);
-        console.log(`   Auto-exiting to prevent orphaned monitor process...`);
+        process.stderr.write(`[EnhancedTranscriptMonitor] ${new Date().toISOString()} Idle timeout reached: no transcript activity for ${idleMinutes} minutes. Auto-exiting.\n`);
 
-        // Graceful shutdown
+        // Graceful shutdown WITHOUT stop marker — PSM should be free to restart
+        // this monitor when a new Claude session starts. Only user-initiated
+        // stops (SIGINT/SIGTERM) should set the stop marker.
         if (this.intervalId) clearInterval(this.intervalId);
         if (this.healthIntervalId) clearInterval(this.healthIntervalId);
-        await this.stop();
+        await this.stop({ setStopMarker: false });
         process.exit(0);
       }
 
@@ -2639,8 +2640,13 @@ class EnhancedTranscriptMonitor {
 
   /**
    * Stop monitoring
+   * @param {Object} [options]
+   * @param {boolean} [options.setStopMarker=true] - Whether to set stop marker in PSM.
+   *   Set to false for idle timeout exits so PSM can restart the monitor.
+   *   Set to true for intentional stops (SIGINT/SIGTERM) to prevent restart loops.
    */
-  async stop() {
+  async stop(options = {}) {
+    const { setStopMarker = true } = options;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -2663,7 +2669,8 @@ class EnhancedTranscriptMonitor {
     }
 
     // Mark project as intentionally stopped BEFORE unregistering (closes race window)
-    if (this.serviceRegistered) {
+    // Skip stop marker for idle timeout exits — PSM should be free to restart
+    if (this.serviceRegistered && setStopMarker) {
       try {
         await this.processStateManager.stopProject(this.config.projectPath, {
           reason: 'graceful_shutdown',
@@ -2674,6 +2681,8 @@ class EnhancedTranscriptMonitor {
       } catch (error) {
         this.debug(`Failed to set stop marker: ${error.message}`);
       }
+    } else if (!setStopMarker) {
+      this.debug('⏰ Idle timeout exit — skipping stop marker so PSM can restart');
     }
 
     // Unregister service from Process State Manager
