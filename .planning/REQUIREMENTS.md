@@ -59,7 +59,28 @@
 
 ## Traceability
 
-Updated during roadmap creation.
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SM-01 | Phase 15 | Pending |
+| SM-02 | Phase 15 | Pending |
+| SM-03 | Phase 15 | Pending |
+| SM-04 | Phase 15 | Pending |
+| SM-05 | Phase 15 | Pending |
+| BE-01 | Phase 16 | Pending |
+| BE-02 | Phase 16 | Pending |
+| BE-03 | Phase 16 | Pending |
+| BE-04 | Phase 16 | Pending |
+| SSE-01 | Phase 17 | Pending |
+| SSE-02 | Phase 17 | Pending |
+| SSE-03 | Phase 17 | Pending |
+| UI-01 | Phase 18 | Pending |
+| UI-02 | Phase 18 | Pending |
+| UI-03 | Phase 18 | Pending |
+| UI-04 | Phase 18 | Pending |
+| UI-05 | Phase 18 | Pending |
+| MIG-01 | Phase 19 | Pending |
+| MIG-02 | Phase 19 | Pending |
+| MIG-03 | Phase 19 | Pending |
 
 ---
 *Requirements defined: 2026-03-10*
