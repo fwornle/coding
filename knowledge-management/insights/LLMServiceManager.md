@@ -2,95 +2,108 @@
 
 **Type:** SubComponent
 
-The LLMServiceManager utilizes the directory structure, with separate directories for each service, to organize and manage the LLM services.
+The LLMServiceManager is managed through the Service Starter, implemented in lib/service-starter.js, which utilizes a retry-with-backoff approach to ensure robust service startup.
 
 ## What It Is  
 
-The **LLMServiceManager** is a sub‑component that lives inside the **DockerizedServices** container. Its implementation is anchored in the source tree under `lib/llm/`, most notably by leveraging the `LLMService` class defined in `lib/llm/llm-service.ts`. The manager acts as the coordination layer that registers LLM providers, selects the appropriate operational mode, and forwards calls to the underlying `LLMService`. By sitting alongside other services (e.g., semantic‑analysis, constraint‑monitoring) that each occupy their own directory, the manager benefits from the same directory‑per‑service layout that the parent **DockerizedServices** component promotes. Service orchestration for the whole stack, including the LLMServiceManager, is described in the top‑level `docker-compose.yml`, which defines how the manager’s container is launched and linked with its peers such as **ServiceOrchestrator**.
-
-## Architecture and Design  
-
-The design of the LLMServiceManager follows a **modular, loosely‑coupled architecture**. The manager does not embed any concrete LLM implementation; instead it relies on the `LLMService` façade (found in `lib/llm/llm-service.ts`) to expose a stable API for mode routing, caching, and circuit‑breaking. This separation implements a **Facade pattern**—the manager presents a simple registration and mode‑selection interface while delegating the heavy‑lifting to the service class.
-
-Provider integration is handled through a **Provider Registry** approach: the manager maintains a collection of registered LLM providers, allowing new providers to be added without changing existing routing logic. This registry, together with the mode‑selection logic, resembles a **Strategy pattern**, where each mode (e.g., “chat”, “completion”, “embedding”) can be swapped at runtime based on configuration or request context.
-
-The overall system is orchestrated by Docker Compose (`docker-compose.yml`). The presence of this file indicates an **Infrastructure‑as‑Code** stance, where service boundaries are defined declaratively. The manager therefore participates in a **service‑oriented layout** (each service lives in its own directory) but the observations do not explicitly call this “microservices”; we simply note the directory‑per‑service organization that the parent **DockerizedServices** component enforces.
-
-## Implementation Details  
-
-* **LLMService (lib/llm/llm-service.ts)** – This class provides the core LLM operations. Its responsibilities include:
-  * **Mode routing** – selecting the correct LLM workflow based on a supplied mode identifier.
-  * **Caching** – storing recent LLM responses to reduce redundant calls.
-  * **Circuit breaking** – protecting downstream LLM providers from overload or failure by temporarily halting requests when error thresholds are exceeded.
-
-* **LLMServiceManager** – Though the source file is not listed, the manager’s behavior is described in the observations:
-  * **Provider registration** – exposes an API (e.g., `registerProvider(name, providerInstance)`) that adds a provider to an internal map. This map is consulted by `LLMService` when routing a request.
-  * **Mode management** – offers methods to enable, disable, or switch operational modes. Internally it likely updates a configuration object that `LLMService` reads on each request.
-  * **Directory‑based organization** – the manager respects the project’s convention of placing each service in its own sub‑directory, which simplifies discovery and deployment.
-
-* **docker-compose.yml** – Defines the container that runs the LLMServiceManager alongside other services. The file’s role is to ensure that the manager’s network, volume mounts, and environment variables are correctly provisioned, enabling seamless communication with peers such as **ServiceOrchestrator**.
-
-## Integration Points  
-
-The LLMServiceManager sits at the intersection of three major system layers:
-
-1. **Parent – DockerizedServices** – The manager inherits the parent’s modular layout. Because each service lives in its own directory, the manager can be built, tested, and deployed independently while still being part of the overall Dockerized stack.
-
-2. **Sibling – ServiceOrchestrator** – Both components read from the same `docker-compose.yml`. While the ServiceOrchestrator focuses on defining service dependencies and startup order, the LLMServiceManager supplies the runtime LLM capabilities that the orchestrator may invoke when coordinating higher‑level workflows.
-
-3. **External LLM Providers** – Through its registration API, the manager integrates third‑party LLM back‑ends (e.g., OpenAI, Anthropic). These providers are abstracted behind the `LLMService` façade, allowing the rest of the system to remain agnostic of the concrete provider implementation.
-
-The manager also interacts with internal caching layers and circuit‑breaker logic embedded in `LLMService`. These interactions are purely internal but are crucial for maintaining reliability when the manager forwards requests to external providers.
-
-## Usage Guidelines  
-
-* **Register providers early** – During application bootstrap, invoke the manager’s registration methods before any LLM request is issued. This guarantees that mode routing can resolve to a concrete provider.
-
-* **Prefer named modes** – When calling the manager, use the predefined mode identifiers (as documented in `LLMService`) rather than ad‑hoc strings. This aligns with the Strategy‑style mode management and avoids mismatches.
-
-* **Respect caching semantics** – Cache keys are derived from request payloads. If a request must bypass the cache (e.g., for fresh data), use the manager’s explicit “no‑cache” flag if provided; otherwise, the default caching behavior will apply.
-
-* **Monitor circuit‑breaker state** – The manager surfaces circuit‑breaker metrics (open/closed state). Integrate these signals into health‑check endpoints or observability dashboards to react to provider outages promptly.
-
-* **Deploy via Docker Compose** – Do not start the manager in isolation; always use the `docker-compose.yml` entry that belongs to **DockerizedServices**. This ensures that required network aliases, environment variables, and volume mounts are correctly configured.
+The **LLMServiceManager** is a sub‑component that lives inside the *DockerizedServices* hierarchy.  Its source code is not listed directly, but its behaviour is exercised through the **Service Starter** implementation found at `lib/service-starter.js`.  The manager is responsible for the full lifecycle of Large‑Language‑Model (LLM) services: it reads provider‑specific configuration from environment variables, selects the appropriate operating mode (e.g., “local”, “remote”, “fallback”), and wires the required dependencies into the running service instance.  All of this is orchestrated in a Docker‑Compose‑driven environment, where the LLM services (including the `mcp‑server‑semantic‑analysis` service) are defined in `docker‑compose.yaml`.  In short, LLMServiceManager is the glue that turns declarative Docker‑Compose and environment settings into a live, correctly‑configured LLM service ready for consumption by sibling components such as **SemanticAnalysisService**, **ConstraintMonitoringService**, and **CodeGraphAnalysisService**.  
 
 ---
 
-### Architectural patterns identified  
-1. **Facade** – `LLMService` abstracts mode routing, caching, and circuit breaking.  
-2. **Provider Registry** – LLMServiceManager maintains a map of registered LLM providers.  
-3. **Strategy (Mode Management)** – Different operational modes are selected at runtime.  
-4. **Infrastructure‑as‑Code (Docker Compose)** – Service orchestration is declaratively defined.
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Loose coupling** (via façade and registry) improves extensibility but adds an indirection layer that can marginally increase latency.  
-* **Mode‑centric routing** enables flexible feature toggles but requires disciplined naming of modes to avoid runtime mismatches.  
-* **Caching + circuit breaking** boost reliability and cost‑efficiency, yet they introduce state that must be invalidated or tuned per provider.
+### Design patterns that surface  
 
-### System structure insights  
-* The project follows a **directory‑per‑service** convention, making each component—including LLMServiceManager—self‑contained.  
-* All LLM‑related logic lives under `lib/llm/`, while orchestration lives in the root `docker-compose.yml`.  
-* Parent **DockerizedServices** provides the overarching modular scaffold; siblings like **ServiceOrchestrator** share the same orchestration file but focus on different responsibilities.
+1. **Retry‑with‑Backoff** – The manager is started via the *Service Starter* (`lib/service‑starter.js`), which implements a configurable retry‑with‑backoff loop.  This pattern protects the system from transient start‑up failures (e.g., a container not yet ready) by repeatedly attempting initialization with increasing delays, bounded by a retry limit and a global timeout.  
 
-### Scalability considerations  
-* Adding new LLM providers is a matter of registering them with the manager—no code changes to routing logic are required.  
-* Mode routing and caching allow horizontal scaling of the manager container; each instance can share a distributed cache (if configured) to keep cache coherence.  
-* Circuit breaking protects downstream providers, enabling the system to sustain high request volumes without cascading failures.
+2. **Dependency Injection (DI)** – Observations describe “dependency injection” as part of the manager’s responsibilities.  The LLMServiceManager does not hard‑code concrete provider implementations; instead it injects the selected provider (e.g., OpenAI, Anthropic) based on environment variables.  This keeps the component loosely coupled to any particular LLM vendor.  
 
-### Maintainability assessment  
-* The clear separation between registration, mode management, and the underlying service façade makes the codebase approachable for new contributors.  
-* Because the manager relies on explicit registration and mode identifiers, the risk of “magic strings” is low, aiding readability.  
-* The reliance on Docker Compose for orchestration centralizes deployment configuration, reducing drift between environments.  
-* However, the absence of visible code symbols in the observations suggests that documentation (e.g., API contracts for registration and mode selection) should be kept up‑to‑date to avoid ambiguity as the component evolves.
+3. **Environment‑driven Configuration** – All provider credentials, mode flags, and service‑specific options are supplied through environment variables.  Combined with Docker‑Compose, this yields a *declarative configuration* model that can be altered without code changes.  
+
+### Interaction model  
+
+- **Parent → Child**: DockerizedServices supplies the container orchestration layer (Docker‑Compose) and the generic start‑up harness (`lib/service‑starter.js`).  LLMServiceManager consumes this harness to launch its LLM containers and to apply the retry logic.  
+
+- **Sibling ↔ LLMServiceManager**: The **SemanticAnalysisService**, **ConstraintMonitoringService**, and **CodeGraphAnalysisService** all depend on a correctly‑initialized LLM service.  They retrieve the running instance (or its client endpoint) via the DI container that LLMServiceManager populates.  Because the siblings share the same start‑up strategy, they all benefit from the same back‑off resilience.  
+
+- **External Service**: The manager is explicitly designed to work with the `mcp‑server‑semantic‑analysis` service, whose Docker‑Compose definition and environment variables are coordinated with LLMServiceManager.  This tight coupling is intentional: the semantic‑analysis service expects a ready LLM backend before it can process requests.  
+
+Overall, the architecture favours **modularity** (each LLM provider lives behind a DI boundary) and **resilience** (retry‑with‑backoff at start‑up).  No evidence of event‑driven or micro‑service patterns beyond the Docker‑Compose orchestration is present in the observations.  
+
+---
+
+## Implementation Details  
+
+1. **Service Starter (`lib/service-starter.js`)**  
+   - Exposes a function (e.g., `startService`) that accepts a start‑up callback and a configuration object containing `maxRetries`, `initialDelay`, and `timeout`.  
+   - Implements a loop that calls the callback, catches any error, sleeps for an exponentially increasing delay, and repeats until the service reports “ready” or the retry budget is exhausted.  
+
+2. **LLMServiceManager (implicit implementation)**  
+   - **Provider Configuration**: Reads variables such as `LLM_PROVIDER`, `LLM_API_KEY`, and mode flags like `LLM_MODE`.  These values are parsed at start‑up and stored in a configuration object that the DI container later distributes.  
+   - **Mode Switching**: Based on `LLM_MODE`, the manager decides whether to launch a local container (e.g., a self‑hosted model) or to point the client at a remote API endpoint.  The decision logic lives inside the start‑up callback passed to the Service Starter.  
+   - **Dependency Injection**: After selecting the provider, the manager registers a concrete implementation (e.g., `OpenAIProvider`, `LocalModelProvider`) into a shared container (the exact container implementation is not named, but the pattern is evident).  Down‑stream services request the abstract `LLMClient` interface and receive the injected concrete instance.  
+
+3. **Docker‑Compose Integration**  
+   - The `docker-compose.yaml` file defines the LLM service containers (including `mcp‑server‑semantic‑analysis`).  Environment variables declared in the compose file are automatically propagated to the containers, ensuring that the LLMServiceManager sees the same configuration values at runtime.  
+
+4. **Lifecycle Management**  
+   - The manager monitors the health of its LLM containers via Docker health‑checks (implied by the need for retry‑with‑backoff).  If a container crashes after start‑up, the Service Starter can be re‑invoked, allowing the manager to re‑inject a fresh provider instance.  
+
+Because the observations do not list concrete class names, the description stays at the functional level while still grounding every claim in the observed files and behaviours.  
+
+---
+
+## Integration Points  
+
+- **DockerizedServices (Parent)** – Provides the orchestration platform (Docker‑Compose) and the generic Service Starter.  LLMServiceManager relies on the parent to spin up containers and to expose environment variables.  
+
+- **ServiceStarterManager (Sibling)** – Oversees the overall start‑up sequence for the entire suite of services.  It invokes the Service Starter for each child, including LLMServiceManager, ensuring a coordinated boot order (e.g., LLM before semantic analysis).  
+
+- **SemanticAnalysisService & ConstraintMonitoringService (Siblings)** – Consume the LLM client that LLMServiceManager registers.  They do not need to know about provider specifics; they simply request the abstract `LLMClient` from the DI container.  
+
+- **CodeGraphAnalysisService (Sibling)** – While not directly dependent on LLM, it shares the same modular design ethos (e.g., uses its own analyzer component).  The parallel design indicates a consistent architectural language across the DockerizedServices suite.  
+
+- **External Configuration (Env + Docker‑Compose)** – All integration is mediated through environment variables defined in `docker-compose.yaml`.  Changing a provider or mode requires only updating these variables and restarting the Docker stack, without touching code.  
+
+---
+
+## Usage Guidelines  
+
+1. **Configure via Environment** – Always set `LLM_PROVIDER`, `LLM_API_KEY`, and `LLM_MODE` in the Docker‑Compose file or the host environment before launching the stack.  Changing these values after containers are running will not automatically re‑configure the manager; a restart of the LLM service (or the whole stack) is required.  
+
+2. **Respect the Retry Limits** – The default retry configuration in `lib/service-starter.js` is tuned for typical start‑up latency of LLM containers.  If you anticipate longer warm‑up times (e.g., large model loading), increase `maxRetries` or `initialDelay` via the Service Starter’s configuration object.  
+
+3. **Do Not Hard‑Code Provider Details** – Rely on the DI abstraction.  When extending the system with a new LLM vendor, implement a new provider class that conforms to the existing `LLMClient` interface and register it via the manager’s configuration logic.  Avoid modifying sibling services to call the provider directly.  
+
+4. **Monitor Health Checks** – Leverage Docker health‑check logs to verify that the LLM container is healthy before dependent services start.  The Service Starter’s back‑off will automatically pause dependent initialization until the health check passes.  
+
+5. **Version Compatibility** – Keep the Docker images for the LLM service and `mcp‑server‑semantic‑analysis` in sync.  Incompatible API versions can cause the manager’s injection to fail, leading to repeated retries and eventual start‑up timeout.  
+
+---
+
+### Summary of Architectural Insights  
+
+| Aspect | Observation‑Based Insight |
+|--------|---------------------------|
+| **Architectural patterns identified** | Retry‑with‑backoff (service‑starter), Dependency Injection (provider abstraction), Environment‑driven configuration (Docker‑Compose + env vars) |
+| **Design decisions & trade‑offs** | *Resilience* via back‑off vs. longer start‑up time; *Flexibility* via DI and env vars vs. runtime re‑configuration complexity |
+| **System structure insights** | LLMServiceManager sits under DockerizedServices, shares start‑up logic with ServiceStarterManager, and supplies a DI‑provided LLM client to sibling analysis services |
+| **Scalability considerations** | Because each LLM provider runs in its own container, scaling horizontally (multiple replicas) is feasible by adjusting Docker‑Compose replica counts; however, the retry‑with‑backoff logic must be tuned to avoid cascading delays when many instances start simultaneously |
+| **Maintainability assessment** | High maintainability: configuration lives outside code, provider implementations are interchangeable, and the centralised Service Starter isolates start‑up complexity.  The main maintenance burden is keeping environment variables and Docker images aligned across services. |
+
+These insights are fully grounded in the provided observations and reference the concrete file paths (`lib/service-starter.js`) and configuration artefacts (`docker-compose.yaml`) that define the LLMServiceManager’s role within the DockerizedServices ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and management. This is evident in the directory structure, where each service has its own subdirectory, such as semantic analysis, constraint monitoring, and code graph construction. The lib/llm/llm-service.ts file, which contains the LLMService class, provides a high-level facade for LLM operations, handling mode routing, caching, and circuit breaking. This design decision enables loose coupling between services and promotes scalability. Furthermore, the use of docker-compose for service orchestration, as seen in the docker-compose.yml file, provides a robust framework for integrating multiple services.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
 
 ### Siblings
-- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the docker-compose.yml file to define the services and their dependencies.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
+- [ServiceStarterManager](./ServiceStarterManager.md) -- The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization.
 
 
 ---

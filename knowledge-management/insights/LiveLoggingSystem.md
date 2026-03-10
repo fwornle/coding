@@ -2,158 +2,141 @@
 
 **Type:** Component
 
-[LLM] The classification layers in the LiveLoggingSystem are implemented using a layered approach, with each layer building on top of the previous one. This is evident in the 'classification_layers.py' file, which contains classes such as 'Classifier' and 'LayeredClassifier' that handle the classification of logs. The 'LayeredClassifier' class uses a list of 'Classifier' objects to classify logs in a layered manner, allowing for more accurate classification of logs.
+[LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format. This abstraction enables the LiveLoggingSystem component to support multiple agent formats, making it more versatile and adaptable to different use cases. The TranscriptAdapter class works in conjunction with the LSLConverter class in lib/agent-api/transcripts/lsl-converter.js, which is responsible for converting between agent-specific transcript formats and the unified LSL format.
 
 ## What It Is  
 
-The **LiveLoggingSystem** lives in the source tree under a handful of clearly‑named Python modules. The core orchestration class is defined in **`live_logging_system.py`**, which imports the configuration alias **`LSL`** from **`lsl_config.py`** and pulls in three functional sub‑modules:
+The **LiveLoggingSystem** lives primarily inside the *integrations/mcp‑server‑semantic‑analysis* tree.  Its core code is spread across a handful of clearly‑named files:  
 
-* **`session_windowing.py`** – provides the `window_session` function.  
-* **`file_routing.py`** – provides the `route_file` function.  
-* **`classification_layers.py`** – defines `Classifier` and `LayeredClassifier`.  
+* `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` – the classification engine that maps observations and entities onto the shared ontology.  
+* `integrations/mcp-server-semantic-analysis/src/logging.ts` – the low‑level logging façade that defines the `LogLevel` type and implements an asynchronous log‑buffer.  
+* `integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts` – the queue‑based wrapper that drives the buffered logger.  
+* `lib/agent-api/transcript-api.js` and `lib/agent-api/transcripts/lsl-converter.js` – the transcript‑adaptation layer that normalises disparate agent transcript formats into the LSL (Live‑Session‑Log) canonical form.  
+* `scripts/validate-lsl-config.js` – a validator that guarantees the LSL configuration adheres to the expected schema.  
 
-Additional support code lives in **`transcript_capture.py`** (the `TranscriptCapture` class) and **`specstory_handler.py`** (the `SpecStoryHandler` class). Together these pieces implement a pipeline that receives a live session, slices it into windows, captures the transcript for each window, classifies the resulting log entries, and finally routes the processed files to their configured destinations. The component is a child of the top‑level **Coding** component and shares the same “modular” philosophy as its siblings (e.g., **LLMAbstraction**, **DockerizedServices**).
+Together these files constitute a **component** that continuously ingests raw observations from various agents, normalises them into LSL, enriches them via ontology‑based classification, and persists the resulting graph‑structured log entries through a `GraphDatabaseAdapter`.  The component is a child of the top‑level **Coding** node and sits alongside siblings such as *LLMAbstraction*, *DockerizedServices*, *Trajectory*, *KnowledgeManagement*, *CodingPatterns*, and *SemanticAnalysis*.  Its own children—*LoggingModule*, *TranscriptManager*, *ClassificationEngine*, and *SessionWindowingModule*—expose the functional responsibilities that make the system both extensible and maintainable.
 
 ---
 
 ## Architecture and Design  
 
-The observations point to a **modular, layered architecture**. Each concern—windowing, transcript capture, classification, and routing—is isolated in its own Python file, exposing a small public API (e.g., `window_session`, `route_file`, `Classifier`). The main `LiveLoggingSystem` class acts as the *orchestrator*, wiring these modules together at runtime.  
+LiveLoggingSystem follows a **modular, layered architecture** that is evident from the separation of concerns across its file hierarchy.  The top layer (e.g., `TranscriptAdapter` in `lib/agent-api/transcript-api.js`) abstracts away the heterogeneity of incoming agent data, presenting a uniform LSL contract to the rest of the system.  Beneath that, the **ClassificationEngine** (implemented by `OntologyClassificationAgent`) enriches the LSL payload with semantic tags drawn from a shared ontology, keeping classification logic isolated from transport and persistence concerns.  
 
-* **Sliding‑window session handling** – implemented in `session_windowing.window_session`. The function receives a `session` object and a `window_size`, then returns a list of windowed slices. This algorithmic choice enables the system to process continuous streams in bounded chunks, which is essential for real‑time log analysis.  
+The **LoggingModule** introduces a queue‑based, non‑blocking logging pipeline (`integrations/mcp-server-semantic-analysis/src/logging.ts`).  It defines a `LogLevel` type that enumerates `debug`, `info`, `warning`, and `error`, allowing each level to be routed through its own handling path if needed.  The async log buffer writes to disk using non‑blocking file I/O, ensuring the event loop remains free for real‑time processing.  This design mirrors a classic *producer‑consumer* pattern: producers (agents, classification agents, session managers) push log entries onto the queue, while a dedicated consumer drains the queue and persists entries.  
 
-* **Routing‑table approach** – encapsulated in `file_routing.route_file`. By passing a file object together with a routing table (likely a dict or similar structure), the function decides the final storage path. This decouples destination logic from the processing pipeline, making it easy to add new sinks without touching the core.  
+Persistence is delegated to the **GraphDatabaseAdapter** (referenced indirectly through configuration files).  By storing logs in a graph database, the system can model relationships between observations, entities, and sessions naturally, supporting complex queries without schema migrations.  The adapter is a thin façade that hides the underlying graph‑engine (e.g., Graphology + LevelDB) from the rest of the component, a clear example of the *Adapter* pattern.  
 
-* **Layered classification** – `classification_layers.LayeredClassifier` holds a list of `Classifier` instances and applies them sequentially. This “stacked” design lets the system progressively refine log categories, improving accuracy without committing to a monolithic classifier.  
-
-* **SpecStory integration** – `specstory_handler.SpecStoryHandler` is imported by `live_logging_system.py`. It loads SpecStory configuration and reacts to SpecStory events, suggesting that LiveLoggingSystem can be driven by external story‑driven specifications.  
-
-Overall, the design follows **separation of concerns** and **single‑responsibility** principles, with each module focusing on one well‑defined task. The orchestration class (`LiveLoggingSystem`) does not embed business logic; it merely sequences calls, which keeps the high‑level flow readable and testable.
+Finally, the **LSLConfigValidator** (`scripts/validate-lsl-config.js`) provides a validation layer that runs early in the start‑up sequence.  It checks that configuration objects conform to a predefined JSON schema, preventing mis‑configuration from propagating downstream.  This early‑fail approach is a lightweight *Guard* pattern that improves reliability.
 
 ---
 
 ## Implementation Details  
 
-### Core Orchestrator (`live_logging_system.py`)  
-* Imports `LSL` from `lsl_config.py` for global settings (e.g., default window size, routing tables).  
-* Instantiates `SpecStoryHandler` to load SpecStory configuration and subscribe to events.  
-* For each incoming live session, it calls `session_windowing.window_session(session, LSL.WINDOW_SIZE)` to obtain windowed data.  
+### Logging Pipeline  
+`integrations/mcp-server-semantic-analysis/src/logging.ts` exports a `LogLevel` union type and an async `log` function that pushes messages onto an in‑memory buffer.  The buffer is flushed periodically (or when it reaches a threshold) using `fs.promises.appendFile`, guaranteeing that file writes never block the main thread.  Because the buffer is asynchronous, log entries survive short‑lived crashes; the flush routine can be hooked into process shutdown hooks to drain any remaining items.  
 
-### Session Windowing (`session_windowing.py`)  
-* `window_session(session, window_size)` iterates over the raw session stream, slicing it into overlapping or non‑overlapping chunks depending on implementation (the observation only mentions “sliding window”).  
-* Returns a list of window objects that are fed into the transcript capture stage.  
+The higher‑level `LoggingModule` (`src/modules/logging-module.ts`) wraps this buffer in a **queue** object.  Producers call `LoggingModule.enqueue(entry)`, where `entry` includes a timestamp, `LogLevel`, and the LSL payload.  The module runs a background worker that continuously dequeues entries and forwards them to the low‑level logger.  This separation permits future extensions such as remote log shipping or conditional routing based on log level without touching the core buffer implementation.
 
-### Transcript Capture (`transcript_capture.py`)  
-* The `TranscriptCapture` class exposes `capture_transcript(window)` which internally uses the `session_windowing` module (likely to re‑apply window logic or to reference the original session).  
-* After obtaining raw text, it imports `classification_layers` to hand the transcript off for classification.  
+### Transcript Normalisation  
+`lib/agent-api/transcript-api.js` defines the `TranscriptAdapter` class.  Its constructor receives a map of *agent format* → *converter* objects.  When `readTranscript(source)` is invoked, the adapter detects the source’s format, selects the appropriate converter (e.g., `LslConverter` from `lib/agent-api/transcripts/lsl-converter.js`), and returns a canonical LSL object.  The `LslConverter` implements `toLsl(raw)` and `fromLsl(lsl)` methods, handling the bidirectional transformation.  By centralising this logic, the LiveLoggingSystem can ingest new agent types simply by registering a new converter, leaving the rest of the pipeline untouched.
 
-### Classification Layers (`classification_layers.py`)  
-* `Classifier` – a base class that implements a single classification strategy (e.g., regex, ML model).  
-* `LayeredClassifier` – composes multiple `Classifier` instances in a list (`self.layers`). Its `classify(log_entry)` method runs each layer sequentially, possibly short‑circuiting on a confident result or aggregating votes.  
+### Ontology Classification  
+`ontology-classification-agent.ts` houses the `OntologyClassificationAgent`.  It receives an LSL observation, queries the shared ontology service (likely via HTTP or a local graph query), and annotates the observation with ontology identifiers.  The agent is deliberately isolated: it does not perform any I/O beyond the ontology lookup, making it easy to replace with a mock during testing or to swap in a more sophisticated ML‑based classifier later.
 
-### File Routing (`file_routing.py`)  
-* `route_file(file_obj, routing_table)` looks up the appropriate destination based on file metadata (type, classification, timestamps) and returns the resolved path.  
-* The returned path is then used by the orchestrator to persist the processed log file.  
+### Persistence via GraphDatabaseAdapter  
+Although the concrete file for the adapter is not listed, the observations state that LiveLoggingSystem “relies on the GraphDatabaseAdapter for persistence.”  The adapter abstracts the underlying graph store, exposing methods such as `saveLog(lslEntry)` and `queryLogs(criteria)`.  This abstraction decouples the logging component from any particular graph engine, enabling the system to evolve its storage backend without rewriting classification or transcript code.
 
-### SpecStory Handler (`specstory_handler.py`)  
-* `SpecStoryHandler` loads configuration (likely from a JSON/YAML spec) and provides callbacks for SpecStory events such as “new session started” or “session ended”.  
-* These callbacks can trigger the LiveLoggingSystem pipeline or adjust runtime parameters (e.g., window size).  
-
-All modules are pure Python and communicate via explicit function arguments and return values, avoiding hidden global state. The configuration file (`lsl_config.py`) centralizes constants, making it straightforward to adjust behavior without code changes.
+### Configuration Validation  
+`scripts/validate-lsl-config.js` defines the `LSLConfigValidator` class.  It loads a JSON schema (likely bundled with the repo) and uses a validation library (e.g., AJV) to assert that the supplied configuration matches required fields, types, and constraints.  The validator is invoked early in the service start‑up (e.g., from a Docker entrypoint or a `service-starter.js` script) and aborts launch if validation fails, thereby enforcing a **fail‑fast** stance.
 
 ---
 
 ## Integration Points  
 
-1. **Configuration (`lsl_config.py`)** – Supplies constants like `WINDOW_SIZE`, default routing tables, and possibly log‑level settings. Any change here propagates to all sub‑modules that import `LSL`.  
+LiveLoggingSystem interacts with several sibling components.  The **LLMAbstraction** sibling supplies the `LLMService` façade, which may be consulted by the `OntologyClassificationAgent` when the ontology lookup requires language‑model inference.  The **DockerizedServices** sibling provides the Docker Compose environment (`docker-compose.yaml`) that spins up the `mcp-server-semantic-analysis` container; its `service-starter.js` implements retry‑with‑backoff logic that also guards the start‑up of LiveLoggingSystem’s own background workers.  
 
-2. **SpecStory (`specstory_handler.py` & `specstory` module)** – LiveLoggingSystem depends on the external **SpecStory** ecosystem for story‑driven triggers. The handler imports the `specstory` package, meaning the system must be deployed alongside the SpecStory runtime or have it available on the Python path.  
+The **KnowledgeManagement** sibling houses the concrete implementation of the `GraphDatabaseAdapter` (see `storage/graph-database-adapter.ts`).  LiveLoggingSystem imports this adapter to persist LSL entries, thereby sharing the same graph‑persistence layer used by other components such as *CodingPatterns*.  Because the adapter follows a common interface, LiveLoggingSystem can read back historic logs for session‑windowing or analytics without bespoke code.  
 
-3. **Parent Component – Coding** – As a child of the root **Coding** component, LiveLoggingSystem shares the same repository layout and may rely on shared utilities (e.g., a common logger, error handling utilities) that are defined at the Coding level.  
+Internally, the child modules coordinate through well‑defined interfaces:  
 
-4. **Sibling Components** – While not directly referenced, the sibling **LLMAbstraction** provides a pattern of dependency injection for language models. If future extensions require LLM‑based classification, LiveLoggingSystem could adopt a similar injection mechanism, reusing the `ProviderRegistry` concept.  
+* `LoggingModule` exposes `enqueue(entry: LogEntry): void`.  
+* `TranscriptManager` (implemented by `transcript-manager.ts`) offers `transcriptConverter(raw, format): LSL`.  
+* `ClassificationEngine` provides `classify(lslEntry): ClassifiedEntry`.  
+* `SessionWindowingModule` (`session-windowing-module.ts`) consumes classified entries to open, close, or merge session windows.  
 
-5. **Output Consumers** – The routed file paths returned by `route_file` are likely consumed by downstream services (e.g., a log aggregation service, analytics pipeline). The routing table therefore acts as the contract between LiveLoggingSystem and any downstream component.  
-
-6. **Testing Harnesses** – Because each functional piece is isolated (e.g., `window_session` is a pure function), unit tests can target them individually, and integration tests can focus on the orchestrator’s sequencing logic.
+These interfaces are all pure TypeScript/JavaScript contracts, making them easy to mock in unit tests and to replace in future refactors.
 
 ---
 
 ## Usage Guidelines  
 
-* **Configure via `lsl_config.py`** – Adjust `WINDOW_SIZE` and routing tables here rather than hard‑coding values. This keeps the system flexible across environments (dev, staging, prod).  
+1. **Always initialise the configuration first** – invoke `new LSLConfigValidator().validate(configPath)` before starting any other subsystem.  A failed validation should abort the process; this prevents downstream components from operating with incomplete settings.  
 
-* **Prefer the orchestrator API** – Developers should instantiate `LiveLoggingSystem` and call its high‑level `process_session(session)` (or similar) method rather than invoking `window_session` or `route_file` directly. This guarantees that all steps (windowing → transcript capture → classification → routing) are executed in the correct order.  
+2. **Submit logs through the LoggingModule queue** – never call the low‑level async logger directly.  Use `LoggingModule.enqueue({timestamp, level, payload})` so that back‑pressure handling and buffer flushing remain consistent.  Respect the `LogLevel` enumeration defined in `logging.ts`; custom levels should be added only by extending that type and updating the consumer logic.  
 
-* **Extend classification by adding `Classifier` subclasses** – To introduce a new classification strategy, create a subclass of `Classifier`, implement the `classify` method, and register it in the `LayeredClassifier` list (typically done in the orchestrator’s initialization).  
+3. **Convert incoming transcripts via TranscriptAdapter** – instantiate the adapter with the required converters and call `adapter.readTranscript(source)`.  The returned LSL object can be handed straight to the ClassificationEngine; this guarantees that all downstream modules see a uniform data shape.  
 
-* **Maintain routing tables as declarative data structures** – Keep the routing table in a JSON/YAML file referenced by `lsl_config.py`. When adding a new destination, update the table rather than modifying `route_file`.  
+4. **Do not bypass the GraphDatabaseAdapter** – persistence must go through the adapter’s `saveLog` method.  Direct file writes or ad‑hoc database queries will break the abstraction and may cause schema drift.  
 
-* **Handle SpecStory events carefully** – If a SpecStory event changes runtime parameters (e.g., window size), ensure the orchestrator reads the latest values from `LSL` before processing the next window.  
+5. **When adding a new agent format, register a converter** – create a new class in `lib/agent-api/transcripts/` that implements `toLsl`/`fromLsl`, then add it to the `TranscriptAdapter` map.  No changes to logging, classification, or persistence are required.  
 
-* **Testing** – Unit‑test each module in isolation: `session_windowing.window_session` with synthetic sessions, `classification_layers.LayeredClassifier` with mock `Classifier` objects, and `file_routing.route_file` with a mock routing table. Use integration tests to verify that a full live session flows through the pipeline without data loss.  
+6. **Graceful shutdown** – hook into Node’s `process.on('SIGTERM')` to call `LoggingModule.flush()` and `GraphDatabaseAdapter.close()` so that any buffered log entries are persisted before the container stops.  
+
+Following these conventions keeps the component’s asynchronous pipelines stable, preserves the integrity of the graph store, and maintains the clean separation between adaptation, classification, and persistence.
 
 ---
 
 ### Architectural patterns identified  
 
-1. **Modular decomposition** – Separate files for distinct responsibilities (windowing, routing, classification).  
-2. **Layered (stacked) classification** – `LayeredClassifier` composes multiple `Classifier` instances.  
-3. **Sliding‑window algorithm** – `window_session` implements a time‑based or count‑based sliding window over session data.  
-4. **Routing‑table pattern** – `route_file` decides destinations based on a declarative table.  
-5. **Specification‑driven integration** – `SpecStoryHandler` connects the system to external SpecStory specifications.
+* **Modular layering** – distinct modules for adaptation, classification, logging, and persistence.  
+* **Producer‑consumer (queue) pattern** – asynchronous log buffering via `LoggingModule`.  
+* **Adapter pattern** – `TranscriptAdapter`, `GraphDatabaseAdapter` hide external format/details.  
+* **Guard/validation pattern** – `LSLConfigValidator` enforces configuration correctness early.  
 
 ### Design decisions and trade‑offs  
 
-* **Explicit function‑based modules vs. monolithic class** – Improves testability and readability but may introduce slight overhead from passing objects between functions.  
-* **Sliding‑window preprocessing** – Enables real‑time handling of unbounded streams but requires careful tuning of `WINDOW_SIZE` to balance latency and context completeness.  
-* **Layered classification** – Increases classification accuracy and flexibility; however, each additional layer adds processing time and complexity in error handling.  
-* **Routing table indirection** – Provides extensibility for new sinks without code changes, at the cost of needing a reliable configuration source and validation logic.  
+* **Async log buffer** trades a small amount of memory (the in‑memory queue) for non‑blocking I/O, improving responsiveness at the cost of potential log loss if the process crashes before a flush.  The validator mitigates this by catching mis‑configurations early.  
+* **Graph database persistence** offers rich relationship queries but introduces a dependency on a specialized storage engine; the adapter abstracts this, but operational complexity (backup, scaling) is higher than a simple relational store.  
+* **Unified LSL format** simplifies downstream processing but requires upfront effort to write converters for each new agent type.  The modular adapter design keeps that effort isolated.  
 
 ### System structure insights  
 
-* The component is a **pipeline**: `LiveLoggingSystem → window_session → TranscriptCapture → LayeredClassifier → route_file`.  
-* Configuration (`lsl_config.py`) sits at the top, feeding constants downstream.  
-* SpecStory integration sits alongside the pipeline, acting as an *event source* that can trigger or modify pipeline execution.  
+LiveLoggingSystem is a **child component** of the overarching *Coding* hierarchy, sharing the same graph‑persistence layer with *KnowledgeManagement* and *CodingPatterns*.  Its sibling components each provide orthogonal capabilities (LLM services, container orchestration, trajectory tracking) that can be leveraged without tight coupling.  The internal children—*LoggingModule*, *TranscriptManager*, *ClassificationEngine*, *SessionWindowingModule*—map cleanly to the four major responsibilities identified in the observations, enabling independent evolution of each concern.  
 
 ### Scalability considerations  
 
-* **Horizontal scaling** – Because each stage is pure and stateless (aside from configuration), multiple instances of `LiveLoggingSystem` can run in parallel, each processing distinct sessions.  
-* **Window size** – Larger windows increase memory usage per session; tuning is essential for high‑throughput environments.  
-* **Classification layers** – Adding computationally heavy classifiers (e.g., deep‑learning models) may become a bottleneck; consider offloading to async workers or GPU‑enabled services.  
-* **Routing** – If routing destinations involve network I/O (e.g., cloud storage), asynchronous I/O or batching can improve throughput.  
+* The queue‑based logger can be horizontally scaled by increasing the buffer size or by sharding logs across multiple files or remote log collectors.  
+* Graph database back‑ends typically support clustering; because LiveLoggingSystem interacts only through the `GraphDatabaseAdapter`, scaling the storage tier does not require code changes.  
+* Adding more transcript converters or classification agents incurs only linear CPU/memory overhead; the modular design ensures that each new agent runs in its own event‑loop tick, preserving overall throughput.  
 
 ### Maintainability assessment  
 
-The clear separation of concerns, small public APIs, and configuration‑driven behavior make the LiveLoggingSystem **highly maintainable**. Adding new classification strategies or routing destinations requires only localized changes. The reliance on explicit imports (e.g., `specstory`) keeps dependencies visible. Potential maintenance challenges include:
+The strong **modular separation**—clearly named files, single‑responsibility classes, and well‑defined interfaces—makes the codebase highly maintainable.  Changes to one area (e.g., introducing a new log level) are confined to the `LogLevel` definition and the logger’s dispatch logic, without rippling into classification or persistence.  The reliance on shared adapters (graph, transcript) reduces duplication across sibling components, fostering reuse.  The only maintenance risk lies in the **graph‑database dependency**: operational expertise is required to keep the underlying store performant and backed up, but the adapter shields most developers from those details.  
 
-* Keeping the routing table synchronized with actual storage endpoints.  
-* Managing the ordering and compatibility of `Classifier` layers as the list grows.  
-* Ensuring that changes in the SpecStory spec do not break event handling logic.
-
-Overall, the design choices favor readability, testability, and extensibility, aligning well with the broader modular philosophy observed across sibling components such as **LLMAbstraction** and **DockerizedServices**.
+Overall, LiveLoggingSystem presents a clean, extensible foundation for real‑time, ontology‑enhanced logging that can grow alongside the rest of the *Coding* ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers.; LLMAbstraction: [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models wit; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code g; Trajectory: [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integra; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semanti; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph da; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClass.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging p; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class in; DockerizedServices: [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible enviro; Trajectory: [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter cl; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and kno; CodingPatterns: [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-data; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a wor.
 
 ### Children
-- [SessionWindowing](./SessionWindowing.md) -- SessionWindowing uses the 'window_session' function in 'session_windowing.py' to handle session windowing tasks
-- [FileRouting](./FileRouting.md) -- FileRouting uses the 'route_file' function in 'file_routing.py' to handle file routing tasks
-- [ClassificationLayers](./ClassificationLayers.md) -- ClassificationLayers uses the 'Classifier' class in 'classification_layers.py' to handle log classification tasks
+- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
+- [TranscriptManager](./TranscriptManager.md) -- TranscriptManager utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
+- [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine utilizes the OntologyClassificationAgent class in ontology-classification-agent.ts for classifying observations and entities against the ontology system.
+- [SessionWindowingModule](./SessionWindowingModule.md) -- SessionWindowingModule utilizes the sessionWindowManager class in session-windowing-module.ts for managing session windows.
 
 ### Siblings
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models without affecting the overall system. This is evident in the LLMService class (lib/llm/llm-service.ts), which acts as the single public entry point for all LLM operations and handles mode routing, caching, and circuit breaking. The use of a ProviderRegistry to manage different providers, including mock, local, and public providers, further reinforces this modular design.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph database. This adapter provides a standardized interface for interacting with the database, ensuring consistency and modularity in the component's architecture. For instance, the GraphDatabaseAdapter's 'createNode' method is used to persist new entities in the database, while the 'getNode' method retrieves existing nodes based on their IDs. This modular approach enables easy switching between different database implementations if needed, as seen in lib/llm/provider-registry.js, where various providers are managed and registered.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is used for entity content validation against configured rules. This modular design allows for easy maintenance and scalability of the system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is another example of this modularity, as it is responsible for loading and merging hook configurations from multiple sources. This separation of concerns enables developers to focus on specific aspects of the system without affecting other parts.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This is evident in the classifyObservations method of the OntologyClassificationAgent class, which takes in a list of observations and returns a list of classified observations. The use of separate modules for different agents and utilities, such as the storage and logging modules, also contributes to the overall modularity of the component. This modular design allows for easier maintenance and updates, as changes to one agent do not affect the others.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class incorporates mode routing, caching, and provider fallback, allowing for efficient and flexible management of LLM providers. The LLMService class is responsible for routing requests to the appropriate provider based on the mode and configuration. For example, in the lib/llm/llm-service.ts file, the getProvider method is used to determine the provider based on the mode and configuration. The use of this facade pattern allows for loose coupling between the LLM providers and the rest of the system, making it easier to add or remove providers as needed.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides a connection to the Specstory extension via HTTP, IPC, or file watch, and is a key part of the component's functionality. The use of separate modules for different functionalities, such as logging and data persistence, allows for a clear separation of concerns and makes the codebase easier to understand and maintain. For example, the createLogger function from ../logging/Logger.js is used in SpecstoryAdapter to implement logging functionality.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-database-adapter.ts file. This adapter enables the component to leverage Graphology+LevelDB persistence, with automatic JSON export sync. The PersistenceAgent, implemented from integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts, plays a crucial role in handling persistence tasks. For instance, the PersistenceAgent's handlePersistenceTask function, defined in the persistence-agent.ts file, is responsible for orchestrating the persistence workflow. This modular design allows for seamless integration of various coding patterns and practices, ensuring consistency and quality in the project's codebase.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a workflow-based execution model. This is evident in the way the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent are implemented as separate classes in the integrations/mcp-server-semantic-analysis/src/agents directory. For instance, the OntologyClassificationAgent class in ontology-classification-agent.ts extends the BaseAgent abstract base class, which standardizes agent behavior and response formats. The execute method in ontology-classification-agent.ts demonstrates how the agent classifies observations against an ontology system, showcasing the component's ability to extract and persist structured knowledge entities.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

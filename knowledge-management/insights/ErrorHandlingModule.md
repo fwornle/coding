@@ -2,87 +2,82 @@
 
 **Type:** SubComponent
 
-The module interacts with the SpecstoryAdapterModule to handle errors and exceptions related to the Specstory extension.
+The ErrorHandlingModule is designed to be modular and extensible, allowing for easy addition of new error handling features.
 
 ## What It Is  
 
-The **ErrorHandlingModule** is a sub‑component of the **Trajectory** component that centralises the handling of errors and exceptions that arise when the system interacts with the *Specstory* extension.  Although the exact file path for the module is not enumerated in the observations, its placement is clearly within the Trajectory hierarchy alongside sibling modules such as **SpecstoryAdapterModule** (`lib/integrations/specstory-adapter.js`) and **LoggingModule** (`../logging/Logger.js`).  Its primary responsibility is to provide a **standardised error‑handling contract** for every part of the Trajectory component, ensuring that any failure in the Specstory integration surface is captured, classified, and reported in a uniform way.  By delegating the actual logging work to the shared **LoggingModule**, the ErrorHandlingModule isolates error‑processing logic from output concerns, which makes the codebase easier to reason about and maintain.
+The **ErrorHandlingModule** is a sub‑component of the **Trajectory** component that supplies a standardized, configurable interface for reporting, handling, and recovering from runtime problems.  All error‑related activity that originates in the Trajectory domain—such as exceptions raised by the **SpecstoryAdapter** (the integration point to the Specstory extension) or any internal processing—passes through this module.  It is tightly coupled with the sibling **LoggingModule**: every error or exception is first handed off to the logger (via the `createLogger` function from `../logging/Logger.js`) before any further handling occurs.  Although the source tree does not list concrete file paths for the module, the observations make clear that it lives alongside other Trajectory adapters and integrations, inheriting the same modular organization pattern used throughout the component.
 
 ## Architecture and Design  
 
-The observations describe a **modular architecture** for the ErrorHandlingModule.  The module is deliberately isolated from the rest of the system, which aligns with the *separation‑of‑concerns* principle: error detection, classification, and response live inside the module, while the act of persisting those events is handed off to the LoggingModule.  This division mirrors the classic **Facade** style—ErrorHandlingModule offers a simple, unified API for error handling while hiding the underlying coordination with the SpecstoryAdapterModule and LoggingModule.
+The design of the ErrorHandlingModule is **modular and extensible**.  Rather than hard‑coding a single error‑processing flow, the module supports *multiple error handling strategies and policies* (Observation 7).  This suggests an internal strategy‑or‑policy registry where different handlers can be plugged in at runtime, a classic **Strategy**‑style approach that enables the system to swap retry, fallback, or escalation logic without touching core code.  
 
-Interaction flows are straightforward:
+The module also follows a **separation‑of‑concerns** principle.  Logging is delegated to the sibling **LoggingModule**, keeping the error‑handling logic free of I/O concerns.  The retry and recovery capabilities (Observation 5) are encapsulated behind a dedicated mechanism, likely exposing a retry wrapper or helper that can be applied to any asynchronous operation.  Configuration is externalized to a **configuration file** (Observation 6), which means the module reads its policies, thresholds, and feature toggles at startup rather than embedding them in code.  This configuration‑driven design aligns with the broader Trajectory architecture that favors declarative setup for adapters and integrations.
 
-1. **SpecstoryAdapterModule** (implemented in `lib/integrations/specstory-adapter.js`) attempts to communicate with the Specstory extension.  
-2. When an exception or error occurs, the adapter forwards the failure to the **ErrorHandlingModule**.  
-3. The ErrorHandlingModule normalises the error (e.g., mapping raw exceptions to a set of internal error codes) and then calls the **LoggingModule** (via the `createLogger` function from `../logging/Logger.js`) to record the incident.
-
-Because the module is described as **extensible**, new error‑source adapters can be added without modifying the core error‑handling logic; they simply need to conform to the same interface expected by ErrorHandlingModule.  This extensibility is a direct consequence of the modular design and supports future growth of the Trajectory component.
+Interaction with other components is straightforward: the Trajectory component invokes the ErrorHandlingModule whenever an exception is caught, the module logs the incident via `createLogger`, consults its policy store (populated from the config file), and then decides whether to retry, propagate, or suppress the error.  The parent‑child relationship is explicit—Trajectory owns the module, while sibling modules such as **SpecstoryIntegration** rely on it for robust connectivity handling.
 
 ## Implementation Details  
 
-Although no concrete symbols were listed, the observations give us enough to infer the key implementation pieces:
+Although no concrete symbols were enumerated, the observations allow us to infer the internal composition:
 
-* **Error handling entry point** – a function (e.g., `handleError(error, context)`) that receives an error object and optional contextual metadata.  
-* **Error normalisation** – a mapping layer that translates raw exceptions from the SpecstoryAdapter into a canonical error model used throughout Trajectory. This may involve assigning an error type, severity, and a user‑friendly message.  
-* **Logging integration** – the module creates a logger instance by invoking `createLogger` from `../logging/Logger.js`.  The logger is then used to emit structured logs (e.g., `logger.error({errorCode, message, stack, context})`).  
-* **Extensibility hooks** – the module likely exposes a registration API (`registerErrorSource(sourceName, handler)`) that allows additional adapters or services to plug in their own error‑generation logic while still benefiting from the same handling pipeline.
+1. **Configuration Loader** – A small utility reads a JSON/YAML file (the “configuration file”) that defines enabled strategies (e.g., exponential back‑off, circuit‑breaker), retry limits, and policy identifiers.  
+2. **Strategy Registry** – A map of strategy names to handler objects.  Each handler implements a common interface (e.g., `handle(error, context)`) so the module can invoke them uniformly.  
+3. **Retry Engine** – A reusable function or class that wraps a target operation, applies the selected retry policy, and returns a promise that either resolves on success or rejects after exhausting attempts.  The engine likely respects the configuration‑driven limits.  
+4. **Error Reporter** – A thin façade that formats error objects, attaches contextual metadata (such as the originating component name—here, *Trajectory* or *SpecstoryAdapter*), and forwards the formatted payload to the **LoggingModule** via the `createLogger` instance.  
+5. **Policy Selector** – When an error occurs, the module determines which policy applies based on error type, source, or configuration tags.  This selector enables the “multiple error handling strategies” capability.
 
-Because the ErrorHandlingModule is a **sub‑component** of Trajectory, it probably lives in a directory alongside other Trajectory services (e.g., `lib/trajectory/error-handling.js`).  Its code is deliberately lightweight: it does not perform any I/O itself, delegating all persistence to LoggingModule and all source‑specific logic to adapters such as SpecstoryAdapterModule.
+All of these pieces cooperate without direct file‑system or network I/O; the only external dependency is the **LoggingModule**, which supplies the `createLogger` function referenced in the parent component’s description.
 
 ## Integration Points  
 
-The ErrorHandlingModule sits at the nexus of three primary integration points:
+- **LoggingModule** – The sole explicit dependency.  Every error path calls `createLogger` from `../logging/Logger.js`, ensuring consistent log formatting and destination handling across the system.  
+- **Trajectory (Parent)** – The parent component orchestrates the use of ErrorHandlingModule.  For example, the **SpecstoryAdapter** (found in `lib/integrations/specstory-adapter.js`) catches connection‑level exceptions and forwards them to the error‑handling façade.  This keeps the adapter’s code focused on transport concerns while delegating resilience to the module.  
+- **SpecstoryIntegration (Sibling)** – While not directly calling the module, this integration benefits from the shared retry and recovery mechanisms when establishing or maintaining its connection to the Specstory extension.  
+- **Configuration File** – Acts as a contract between the module and the deployment environment.  Changing retry counts, toggling a circuit‑breaker, or adding a new strategy is performed by editing this file, without recompiling code.  
 
-1. **SpecstoryAdapterModule** – The adapter directly calls into the error‑handling API whenever an HTTP request fails, an IPC channel disconnects, or a file‑watch event throws.  The contract is simple: pass the caught exception and a minimal context (e.g., operation name, payload).  
-2. **LoggingModule** – By using the `createLogger` utility, the error‑handling code writes to a common logging pipeline that may feed into console output, file logs, or external observability platforms.  This ensures that all error logs share the same format and metadata schema across the Trajectory component.  
-3. **Trajectory (parent component)** – The parent component can invoke the ErrorHandlingModule’s public API from any of its internal services, guaranteeing that every part of Trajectory adheres to the same error‑handling policy.  Because the module is part of the same component boundary, it can also be imported without circular dependencies.
-
-No other direct dependencies are mentioned, and the design intentionally avoids tight coupling: the ErrorHandlingModule does not need to know *how* the LoggingModule writes logs, nor does it need to understand the internal mechanics of the SpecstoryAdapter beyond the error objects it receives.
+The module’s public interface is likely a set of functions such as `report(error, context)`, `retry(operation, options)`, and `registerStrategy(name, handler)`.  These functions expose a clean API to both parent and sibling components, allowing them to plug in custom behavior if needed.
 
 ## Usage Guidelines  
 
-* **Always route errors through the module** – Whenever code in Trajectory (including the SpecstoryAdapter) catches an exception, it should call the central `handleError` (or similarly named) function rather than logging or re‑throwing directly.  This guarantees that errors are normalised and recorded consistently.  
-* **Provide rich context** – Supplying contextual metadata (operation name, input parameters, user identifiers) when invoking the error handler enables the LoggingModule to produce actionable logs and eases downstream debugging.  
-* **Do not embed logging logic** – Developers should avoid calling `logger` directly inside business logic; instead, rely on the ErrorHandlingModule to delegate logging.  This keeps the separation of concerns intact and simplifies future changes to the logging backend.  
-* **Register new error sources** – When adding a new adapter or service that may emit errors, register it with the ErrorHandlingModule’s extensibility API.  Follow the same error‑object shape used by the SpecstoryAdapter to keep the normalisation layer simple.  
-* **Respect the module’s contract** – The ErrorHandlingModule is designed to be lightweight and synchronous where possible.  Long‑running recovery actions (e.g., retries, circuit breaking) should be handled outside the module, after the error has been logged and classified.
+1. **Always route errors through the module** – Instead of logging or handling exceptions locally, developers should call the module’s `report` (or equivalent) method.  This guarantees that the configured policies and the centralized logger are applied uniformly.  
+2. **Leverage the retry helper for external calls** – When invoking network‑bound adapters like **SpecstoryAdapter**, wrap the call with the module’s retry mechanism rather than writing ad‑hoc loops.  This ensures consistency with the configured back‑off strategy and avoids duplicate code.  
+3. **Configure before deployment** – Adjust the error‑handling configuration file to match the target environment (e.g., more aggressive retries in a dev environment, stricter circuit‑breaker thresholds in production).  Because the module reads this file at startup, changes take effect without code modifications.  
+4. **Register custom strategies when needed** – If a new error domain emerges (e.g., database throttling), developers can implement a handler that conforms to the module’s strategy interface and register it via `registerStrategy`.  The module will then automatically consider it during policy selection.  
+5. **Do not bypass the logger** – Direct console writes or external logging frameworks should be avoided; the module’s reliance on `createLogger` centralizes log output and makes log analysis tools more effective.
 
 ---
 
 ### Architectural patterns identified
-1. **Modular architecture / Separation of concerns** – distinct modules for error handling, logging, and external integration.  
-2. **Facade (error‑handling façade)** – a unified API that abstracts away the details of logging and error normalisation.  
-3. **Adapter interaction** – the SpecstoryAdapterModule acts as an adapter, funneling its errors into the ErrorHandlingModule.
+* **Strategy pattern** – multiple interchangeable error‑handling policies.
+* **Configuration‑driven design** – behavior is defined in an external file.
+* **Separation of concerns** – logging delegated to LoggingModule; retry logic isolated.
 
 ### Design decisions and trade‑offs
-* **Centralised error handling** improves consistency but introduces a single point of failure; the module must be robust and lightweight.  
-* **Delegating logging** keeps the error module pure, but adds a dependency on the LoggingModule’s availability and contract.  
-* **Extensibility** allows new adapters without code changes in the core module, at the cost of a slightly more complex registration API.
+* **Modularity vs. overhead** – a pluggable strategy registry adds flexibility but introduces a small indirection cost.
+* **Centralized logging** – improves observability but creates a hard dependency on the LoggingModule’s availability.
+* **Config‑file control** – enables runtime tuning without code changes, at the expense of needing robust validation of the config schema.
 
 ### System structure insights
-* The Trajectory component is organised as a collection of focused sub‑components (ErrorHandlingModule, SpecstoryAdapterModule, LoggingModule), each residing in its own directory (e.g., `lib/integrations/`, `../logging/`).  
-* Shared utilities such as `createLogger` are reused across siblings, reinforcing a common infrastructure layer.
+* ErrorHandlingModule sits under the **Trajectory** component, acting as a bridge between Trajectory’s adapters (e.g., SpecstoryAdapter) and cross‑cutting concerns (logging, retry).
+* Sibling modules share the same logging infrastructure, reinforcing a consistent cross‑component diagnostic surface.
 
 ### Scalability considerations
-* Because the ErrorHandlingModule only normalises and forwards errors, it scales horizontally with the number of services that use it; the real bottleneck would be the underlying LoggingModule or log storage backend.  
-* Adding new error sources does not increase the module’s complexity, thanks to its registration‑based extensibility.
+* Because strategies are lightweight objects and retries are performed asynchronously, the module scales with the number of concurrent operations.  The only bottleneck could be the logger if it writes synchronously; using an async logger mitigates this.
+* Adding new strategies does not affect existing paths, allowing the system to grow error‑handling capabilities without performance penalties.
 
 ### Maintainability assessment
-* The clear separation between error detection (adapters), error processing (ErrorHandlingModule), and error persistence (LoggingModule) makes the codebase easy to understand and modify.  
-* Uniform logging and error‑code conventions reduce duplication and simplify troubleshooting.  
-* The modular layout, as highlighted in the parent component’s description, supports independent updates and testing of each sub‑component, leading to high maintainability.
+* High maintainability: clear separation, external configuration, and a small, well‑defined public API make the module easy to understand and evolve.
+* The reliance on a single configuration file requires disciplined versioning and validation, but overall the design encourages low‑risk updates and straightforward testing of individual strategies.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides a connection to the Specstory extension via HTTP, IPC, or file watch, and is a key part of the component's functionality. The use of separate modules for different functionalities, such as logging and data persistence, allows for a clear separation of concerns and makes the codebase easier to understand and maintain. For example, the createLogger function from ../logging/Logger.js is used in SpecstoryAdapter to implement logging functionality.
 
 ### Siblings
-- [SpecstoryAdapterModule](./SpecstoryAdapterModule.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js encapsulates the logic for connecting to the Specstory extension.
-- [LoggingModule](./LoggingModule.md) -- The createLogger function from ../logging/Logger.js is used to create logger instances for standardized logging.
+- [LoggingModule](./LoggingModule.md) -- The createLogger function from ../logging/Logger.js is used to implement logging functionality.
+- [SpecstoryIntegration](./SpecstoryIntegration.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js provides a connection to the Specstory extension via HTTP, IPC, or file watch.
 
 
 ---

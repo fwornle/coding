@@ -2,109 +2,177 @@
 
 **Type:** SubComponent
 
-The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format.
+The module's error handling is implemented through the transcriptErrorHandler function, which provides a standardized way of handling transcript processing errors.
 
 ## What It Is  
 
-**TranscriptManager** is a sub‑component of the **LiveLoggingSystem** that orchestrates the end‑to‑end handling of conversation transcripts.  The code that implements this responsibility lives alongside the other modular pieces of the logging stack – it is not directly listed in the file tree, but the observations make clear that it *leverages* the **TranscriptAdapter** class found in `lib/agent-api/transcript-api.js` and works together with the **LSLConverterModule** (`lib/agent-api/transcripts/lsl-converter.js`).  In practice, TranscriptManager receives raw transcript data from a variety of agents, uses the adapter to normalise that data into the Live Session Logging (LSL) format, persists the result through the **GraphDatabaseModule**, and surfaces a clean API for downstream components that need to read or manipulate those transcripts.  It also incorporates the **LoggingModule** for error reporting, ensuring that any failure in the conversion or storage pipeline is captured consistently.
+**TranscriptManager** is a sub‑component that lives inside the **LiveLoggingSystem**. Its core implementation resides in the `integrations/mcp-server-semantic-analysis/src/modules/transcript-manager/` folder (e.g., `transcript-manager.ts`, `transcript-manager-config.ts`). The component is responsible for the full lifecycle of a transcript: validation, conversion, processing, storage, and retrieval. All of the concrete behaviour is expressed through a small set of well‑named functions and classes that are exported from the module:
+
+* `transcriptConverter` – converts a transcript from one format to another.  
+* `transcriptProcessor` – the class that carries out the main processing pipeline.  
+* `transcriptValidator` – checks that incoming transcript data meets required schema/quality rules.  
+* `transcriptErrorHandler` – centralises error handling for any step in the pipeline.  
+* `transcriptStorage` – encapsulates persistence of processed transcripts.  
+* `transcriptRetriever` – provides read‑only access to stored transcripts.  
+
+Configuration options that tune the behaviour of these pieces are defined in `transcript-manager-config.ts`, allowing callers to customise aspects such as supported formats, validation strictness, or storage back‑ends without changing the core code.
+
+---
 
 ## Architecture and Design  
 
-The design of TranscriptManager follows a **modular, layered architecture** that is explicitly called out in the parent **LiveLoggingSystem** description.  The most visible pattern is the **Adapter pattern**: `TranscriptAdapter` (in `lib/agent-api/transcript-api.js`) abstracts the heterogeneity of agent‑specific transcript formats behind a uniform interface.  TranscriptManager consumes this adapter, which isolates the rest of the system from format‑specific details and makes the addition of new agents a matter of implementing a new adapter class rather than touching core logic.
+The observations reveal a **modular, separation‑of‑concerns architecture**. Each responsibility—conversion, validation, processing, storage, retrieval, and error handling—is isolated in its own function or class. This mirrors a **layered design** where the outer API (the `TranscriptManager` façade) orchestrates the inner services.  
 
-Beyond the adapter, the system uses a **Conversion façade** via the **LSLConverterModule** (`lib/agent-api/transcripts/lsl-converter.js`).  The façade hides the intricacies of mapping agent‑specific fields to the canonical LSL schema, allowing TranscriptManager to request “convert to LSL” without needing to understand the conversion rules.  The storage concern is delegated to the **GraphDatabaseModule**, which provides a graph‑oriented persistence layer; this separation of concerns follows the **Single‑Responsibility Principle** and keeps TranscriptManager focused on orchestration rather than data access.
+* **Functional decomposition** is evident: pure functions (`transcriptConverter`, `transcriptValidator`, `transcriptErrorHandler`, `transcriptRetriever`) perform stateless transformations or checks, making them easy to test and reuse.  
+* **Class‑based encapsulation** appears for stateful work: `transcriptProcessor` and `transcriptStorage` hold processing context and persistence handles, respectively. This split suggests a **Processor‑Repository pattern**—the processor drives the workflow while the storage class abstracts the underlying data store.  
+* Configuration is externalised in `transcript-manager-config.ts`, indicating a **configuration‑driven design** that decouples runtime behaviour from compile‑time code.  
 
-Interaction flow can be summarised as:  
-1. **Input** – raw transcript arrives from an agent.  
-2. **Adapter** – `TranscriptAdapter` reads the raw payload and produces an intermediate representation.  
-3. **Converter** – `LSLConverterModule` transforms the intermediate representation into the LSL format.  
-4. **Persistence** – `GraphDatabaseModule` stores the LSL transcript.  
-5. **Exposure** – TranscriptManager offers methods for other components (e.g., UI viewers, analytics services) to retrieve or update stored transcripts.  
+Interaction flow (as inferred from the file names) follows a clear pipeline:  
 
-Logging is woven throughout via the **LoggingModule**, ensuring that any exception in steps 2‑4 is recorded with context.
+1. **Input** → `transcriptValidator` (ensures validity).  
+2. **Conversion** (if needed) → `transcriptConverter`.  
+3. **Processing** → `transcriptProcessor`.  
+4. **Persistence** → `transcriptStorage`.  
+5. **Retrieval** → `transcriptRetriever`.  
+
+Any error raised at any stage is funneled through `transcriptErrorHandler`, providing a single, standardized error surface.  
+
+Because **LiveLoggingSystem** contains **TranscriptManager**, the manager inherits the system‑wide logging and monitoring facilities, while sibling modules such as **LoggingModule**, **ClassificationEngine**, and **SessionWindowingModule** each follow a comparable modular pattern—each exposing a focused API and relying on shared infrastructure from the parent.
+
+---
 
 ## Implementation Details  
 
-Although the source symbols for TranscriptManager are not listed, the observations give a clear picture of its internal collaborators:
+### Core Functions  
 
-* **TranscriptAdapter (`lib/agent-api/transcript-api.js`)** – Exposes methods such as `read(agentPayload)` and `toUnifiedFormat()`.  TranscriptManager likely creates an instance of this adapter (or receives one via dependency injection) and calls these methods to obtain a normalized transcript object.
+* **`transcriptConverter` (transcript-manager.ts)** – A pure function that accepts a transcript object and a target format identifier, returning a newly‑formatted transcript. Its placement in `transcript-manager.ts` suggests it is the primary entry point for format translation and is likely used by both the processor and external callers.  
 
-* **LSLConverter (`lib/agent-api/transcripts/lsl-converter.js`)** – Provides a function like `convertToLSL(normalizedTranscript)` that returns a JSON document adhering to the LSL schema.  TranscriptManager invokes this after the adapter step, handling any conversion errors that bubble up.
+* **`transcriptValidator` (transcript-manager.ts)** – Performs schema checks (e.g., required fields, timestamp ordering) and returns a boolean or throws a validation error. Because validation precedes conversion, it guards the pipeline against malformed data early on.  
 
-* **GraphDatabaseModule** – Supplies CRUD‑style APIs (`saveTranscript(lslDoc)`, `getTranscript(id)`, `updateTranscript(id, changes)`).  TranscriptManager acts as a façade over these calls, possibly adding transactional semantics or validation before persisting.
+* **`transcriptErrorHandler` (transcript-manager.ts)** – Wraps any thrown exception from the pipeline, translating it into a uniform error object (perhaps with error codes, messages, and context). Centralising this logic prevents duplicated try/catch blocks across the module.  
 
-* **LoggingModule** – Offers `logInfo`, `logError`, and possibly `logDebug`.  Throughout the processing pipeline, TranscriptManager logs start/end of conversion, success/failure of persistence, and any unexpected exceptions.
+* **`transcriptRetriever` (transcript-manager.ts)** – Provides read‑only access to stored transcripts, likely exposing methods such as `getById(id)` or `listBySession(sessionId)`. Being a function rather than a class suggests it delegates to the underlying `transcriptStorage` instance.  
 
-Given the modular layout, TranscriptManager is probably implemented as a class or a set of functions that receive its dependencies (adapter, converter, database, logger) through constructor parameters or a service‑locator pattern.  This design enables unit testing by swapping real modules with mocks.
+### Core Classes  
+
+* **`transcriptProcessor` (transcript-manager.ts)** – Implements the main processing algorithm. It probably receives a validated, possibly converted transcript and enriches it (e.g., timestamps normalisation, speaker diarisation, metadata attachment). Because it is a class, it can maintain processing state, cache intermediate results, or manage async workflows.  
+
+* **`transcriptStorage` (transcript-manager.ts)** – Abstracts persistence. The class likely encapsulates a database client or file‑system writer, exposing `save(transcript)` and `delete(id)` methods. By isolating storage, the manager can swap implementations (SQL, NoSQL, cloud blob) through the configuration defined in `transcript-manager-config.ts`.  
+
+### Configuration  
+
+`transcript-manager-config.ts` defines a TypeScript interface (e.g., `TranscriptManagerConfig`) that enumerates options such as `supportedFormats`, `validationMode`, `storageBackend`, and `errorReportingLevel`. Consumers import this config to initialise the manager, enabling environment‑specific tuning without code changes.  
+
+### Interaction Flow  
+
+A typical usage sequence (derived from the file layout) would be:
+
+```ts
+import {
+  transcriptValidator,
+  transcriptConverter,
+  transcriptProcessor,
+  transcriptStorage,
+  transcriptRetriever,
+  transcriptErrorHandler,
+} from './transcript-manager';
+import { TranscriptManagerConfig } from './transcript-manager-config';
+
+function handleIncoming(raw) {
+  try {
+    const valid = transcriptValidator(raw);
+    const converted = transcriptConverter(valid, config.targetFormat);
+    const processed = new transcriptProcessor(config).process(converted);
+    new transcriptStorage(config).save(processed);
+    return processed;
+  } catch (e) {
+    transcriptErrorHandler(e);
+  }
+}
+```
+
+While the exact code is not shown, the above pattern follows directly from the observed symbols and their described responsibilities.
+
+---
 
 ## Integration Points  
 
-TranscriptManager sits at the nexus of several sibling modules:
+* **Parent – LiveLoggingSystem** – As a child of **LiveLoggingSystem**, `TranscriptManager` receives logging, monitoring, and possibly authentication services from its parent. Errors emitted by `transcriptErrorHandler` are likely propagated to the LiveLoggingSystem’s central log aggregator.  
 
-* **Parent – LiveLoggingSystem** – The LiveLoggingSystem component aggregates TranscriptManager with other subsystems (e.g., real‑time log streaming).  TranscriptManager supplies the persistent transcript store that the LiveLoggingSystem can query when assembling a complete session view.
+* **Sibling Modules** – `LoggingModule` (queue‑based buffering) may feed raw transcript data into `TranscriptManager` via a shared event bus or message queue. `ClassificationEngine` could later consume processed transcripts for semantic analysis, while `SessionWindowingModule` might segment transcripts into session windows before they reach the manager. The consistent modular style across these siblings simplifies cross‑module wiring.  
 
-* **Sibling – LoggingModule** – All logging calls made by TranscriptManager are routed through this module, ensuring a consistent log format across the system.
+* **Child – TranscriptConverter** – Although the converter is exposed as a function (`transcriptConverter`), it is conceptually treated as a child component. Other parts of the system (e.g., an external API layer) can invoke the converter directly if they need format translation without the full processing pipeline.  
 
-* **Sibling – LSLConverterModule** – The conversion step is a direct dependency; any change to the LSL schema will be reflected here, and TranscriptManager must adapt accordingly.
+* **External Dependencies** – The configuration file hints at pluggable storage back‑ends, suggesting that `transcriptStorage` may depend on a database driver (e.g., TypeORM, Mongoose) or cloud SDK. The error handler may integrate with a monitoring service (e.g., Sentry) supplied by the parent.  
 
-* **Sibling – GraphDatabaseModule** – This module provides the persistence backend.  If the underlying graph database changes (e.g., from Neo4j to JanusGraph), only the GraphDatabaseModule needs to be updated; TranscriptManager’s contract remains stable.
+* **Public API** – The module likely exports a façade object (e.g., `TranscriptManager`) that aggregates the functions and classes, providing a single entry point for other components. This façade would be imported by higher‑level services that orchestrate logging workflows.
 
-* **Sibling – TranscriptAdapter** – New agent formats are integrated by adding a new adapter implementation under `lib/agent-api/transcript-api.js`.  Because TranscriptManager interacts with the adapter through a stable interface, it does not require code changes for each new format.
-
-External components that need transcript data (e.g., analytics dashboards, export utilities) call the public API exposed by TranscriptManager.  Those calls are likely asynchronous (Promise‑based) to accommodate I/O with the graph database.
+---
 
 ## Usage Guidelines  
 
-1. **Dependency Injection** – When constructing a TranscriptManager instance, always inject concrete implementations of the adapter, converter, database, and logger.  This keeps the component testable and decoupled from specific libraries.
+1. **Validate First** – Always run incoming data through `transcriptValidator` before any conversion or processing. This prevents downstream errors and keeps the error handler focused on operational failures rather than malformed payloads.  
 
-2. **Adapter Selection** – Choose the appropriate `TranscriptAdapter` based on the originating agent type.  If a new agent is introduced, implement its adapter in `lib/agent-api/transcript-api.js` and register it with the manager’s factory.
+2. **Leverage Configuration** – Initialise the manager with a `TranscriptManagerConfig` that matches the deployment environment (e.g., development may use an in‑memory storage, production a persistent DB). Changing behaviour should be done via this config, not by editing internal logic.  
 
-3. **Error Handling** – Wrap calls to the adapter and converter in try/catch blocks and forward any caught exceptions to the `LoggingModule` via `logError`.  Do not swallow errors; propagate them to callers so that transaction roll‑backs can be performed if needed.
+3. **Prefer Stateless Functions for Simple Tasks** – Use `transcriptConverter`, `transcriptValidator`, `transcriptErrorHandler`, and `transcriptRetriever` for one‑off transformations or reads. Their functional nature means they are safe to call from any thread or async context without side‑effects.  
 
-4. **Transactional Consistency** – Persist the LSL transcript only after a successful conversion.  If the `GraphDatabaseModule.saveTranscript` operation fails, ensure that the error is logged and that any partial state is cleaned up to avoid orphaned records.
+4. **Encapsulate Stateful Work in Classes** – When you need to maintain processing state (e.g., incremental enrichment, caching), instantiate `transcriptProcessor` or `transcriptStorage`. Dispose of instances appropriately to avoid resource leaks, especially if they hold DB connections.  
 
-5. **Read‑Only Access** – When exposing transcript retrieval methods, return deep‑cloned objects or immutable views to prevent callers from unintentionally mutating the stored LSL document.
+5. **Centralised Error Handling** – Wrap any manager‑level call in a try/catch that forwards the exception to `transcriptErrorHandler`. Do not duplicate error‑logging logic; rely on the handler to standardise error codes and integrate with LiveLoggingSystem’s monitoring.  
 
-6. **Performance** – For high‑throughput scenarios, batch multiple transcript conversions before persisting, if the GraphDatabaseModule supports bulk writes.  This respects the modular design while improving scalability.
+6. **Do Not Bypass the Pipeline** – Even if a downstream component only needs a converted transcript, invoke the full pipeline (or at least validation) to guarantee data integrity. Directly calling `transcriptConverter` without validation is discouraged.  
+
+7. **Testing** – Because most functions are pure, unit tests should target them in isolation. For `transcriptProcessor` and `transcriptStorage`, employ integration tests that exercise the configured storage backend.  
 
 ---
 
 ### Architectural patterns identified  
-* **Adapter pattern** – `TranscriptAdapter` normalises diverse agent formats.  
-* **Facade/Conversion façade** – `LSLConverterModule` hides conversion complexity.  
-* **Modular layering** – Clear separation between adaptation, conversion, persistence, and logging.  
+
+* **Modular / Layered architecture** – clear separation of conversion, validation, processing, storage, retrieval.  
+* **Functional decomposition** – pure functions for stateless tasks.  
+* **Processor‑Repository pattern** – `transcriptProcessor` (business logic) paired with `transcriptStorage` (persistence).  
+* **Configuration‑driven design** – behaviour controlled via `transcript-manager-config.ts`.  
 
 ### Design decisions and trade‑offs  
-* **Flexibility vs. indirection** – Introducing adapters and converters adds an extra call stack, but it isolates format‑specific logic and simplifies future extensions.  
-* **Graph database for storage** – Enables rich relationship queries on transcripts (e.g., linking messages to agents) at the cost of requiring a graph‑oriented query language and potentially higher operational overhead.  
+
+* **Stateless vs. stateful** – Choosing pure functions for simple steps reduces side‑effects and improves testability, while classes handle stateful operations (e.g., DB connections).  
+* **Centralised error handling** – Simplifies debugging and logging but adds a single point of failure; the handler must be robust.  
+* **Configurable storage backend** – Increases flexibility and portability but requires careful validation of config to avoid runtime mismatches.  
 
 ### System structure insights  
-* TranscriptManager is a coordinator that does **no direct file or format parsing**; it delegates to dedicated sibling modules.  
-* The parent **LiveLoggingSystem** orchestrates multiple such coordinators (e.g., logging, transcript handling) in a plug‑in‑friendly way.  
+
+* `TranscriptManager` sits one level below `LiveLoggingSystem`, mirroring the parent’s modular approach.  
+* Sibling modules share a common design philosophy (queue‑based buffering, agent‑based classification, window management), indicating a cohesive architectural language across the system.  
+* The child `TranscriptConverter` is exposed as a function, reinforcing the functional style for lightweight transformations.  
 
 ### Scalability considerations  
-* Adding new agent formats scales horizontally: only a new adapter class is needed.  
-* Persistence can be horizontally scaled by sharding the underlying graph database; TranscriptManager’s interface remains unchanged.  
-* Concurrency is manageable because each transcript conversion is stateless; the manager can process many transcripts in parallel, limited only by the database write throughput.  
+
+* **Horizontal scaling** – Stateless functions (`transcriptConverter`, `transcriptValidator`) can be invoked concurrently across multiple instances.  
+* **Stateful components** – `transcriptProcessor` and `transcriptStorage` must be designed for concurrency (e.g., thread‑safe DB clients) to support scaling out.  
+* **Configurable storage** – Allows the system to switch to a more scalable backend (e.g., distributed NoSQL) without code changes.  
 
 ### Maintainability assessment  
-* High maintainability stems from **single‑responsibility modules** and **clear interfaces**.  
-* Unit tests can target each layer independently (adapter, converter, manager, database wrapper).  
-* The main risk is version drift between the LSL schema and the converter; keeping the schema definition centralized and version‑controlled mitigates this.  
 
-Overall, TranscriptManager embodies a clean, modular approach that balances extensibility with clear separation of concerns, fitting neatly into the broader LiveLoggingSystem architecture.
+* **High maintainability** – Clear separation of concerns, small focused functions, and a single configuration file make the codebase easy to understand and modify.  
+* **Extensibility** – Adding new transcript formats only requires extending `transcriptConverter` and updating the config, without touching the processor or storage logic.  
+* **Potential risk** – The central error handler must be kept up‑to‑date with all possible error types; otherwise, new errors may bypass standardized reporting.  
+
+Overall, **TranscriptManager** demonstrates a well‑structured, modular design that aligns with the broader architectural patterns of the **LiveLoggingSystem** and its sibling components, facilitating scalability, testability, and future extension.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component's architecture is designed with modularity in mind, as evident from the separate modules for TranscriptAdapter, LSLConverter, and logging utilities. The TranscriptAdapter class, located in lib/agent-api/transcript-api.js, provides a unified abstraction for reading and converting transcripts from different agent formats into the Live Session Logging (LSL) format. This design decision allows for easy integration of new agent formats by simply creating a new adapter, without modifying the existing codebase. The LSLConverter class, found in lib/agent-api/transcripts/lsl-converter.js, is responsible for converting between agent-specific transcript formats and the unified LSL format, ensuring consistency across the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
+
+### Children
+- [TranscriptConverter](./TranscriptConverter.md) -- The TranscriptManager sub-component utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
 
 ### Siblings
-- [LoggingModule](./LoggingModule.md) -- The LoggingModule may utilize a logging framework to handle log messages and exceptions.
-- [LSLConverterModule](./LSLConverterModule.md) -- The LSLConverter class in lib/agent-api/transcripts/lsl-converter.js is responsible for converting between agent-specific transcript formats and the unified LSL format.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- The GraphDatabaseModule may utilize a graph database framework to handle data storage and retrieval.
-- [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format.
+- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
+- [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine utilizes the OntologyClassificationAgent class in ontology-classification-agent.ts for classifying observations and entities against the ontology system.
+- [SessionWindowingModule](./SessionWindowingModule.md) -- SessionWindowingModule utilizes the sessionWindowManager class in session-windowing-module.ts for managing session windows.
 
 
 ---
