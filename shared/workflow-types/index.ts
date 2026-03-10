@@ -41,3 +41,15 @@ export {
   type StepStatus,
   type StepDefinition,
 } from './schemas';
+
+// Typed state transitions
+export {
+  WorkflowTransitionEventSchema,
+  InvalidTransitionError,
+  transition,
+  type WorkflowTransitionEvent,
+  type TransitionMap,
+} from './transitions';
+
+// Step status derivation (pure functions)
+export { deriveStepStatuses, deriveSubstepStatuses } from './derived';
