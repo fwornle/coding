@@ -516,17 +516,19 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
     setStepAdvanceLoading(true)
     try {
-      // If we're currently viewing a substep (sidebar shows substep details),
-      // we want to step to the next substep, not skip to the next major step
-      const shouldStepInto = selectedSubStep !== null
+      // Determine step behavior based on where we're paused:
+      // - At a main step (has substeps): "Step" = step over (stepInto: false)
+      // - At a substep: "Step" = advance to next pause point, preserve current mode (no stepInto field)
+      const isAtMainStep = pausedAtStep && stepsWithSubsteps.has(pausedAtStep)
+      const body: Record<string, boolean> = isAtMainStep ? { stepInto: false } : {}
 
-      Logger.info(LogCategories.UKB, shouldStepInto
-        ? 'Advancing to next sub-step (inside substeps)'
-        : 'Advancing to next step (step over)')
+      Logger.info(LogCategories.UKB, isAtMainStep
+        ? 'Step over: skipping sub-steps'
+        : 'Advancing to next pause point (preserving substep mode)')
       const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepInto: shouldStepInto })
+        body: JSON.stringify(body)
       })
       const data = await response.json()
       if (data.status === 'success') {
