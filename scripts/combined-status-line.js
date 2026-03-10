@@ -1753,7 +1753,7 @@ class CombinedStatusLine {
 
       // Build constraint section: shield + score + optional violations + trajectory
       // These are independent concepts that should BOTH be visible
-      let constraintPart = `[🛡️ ${score}`;
+      let constraintPart = `[🔒 ${score}`;
       if (violationsCount > 0) {
         constraintPart += ` ⚠️ ${violationsCount}`;
         overallColor = 'yellow';
@@ -1781,7 +1781,7 @@ class CombinedStatusLine {
         parts.push(`[📚${stateIcon}]`);
       }
     } else if (knowledge.status === 'disabled') {
-      parts.push('[📚⏸️ ]'); // Disabled - extra space compensates for emoji width (FE0F renders 2-cols)
+      parts.push('[📚🔇]'); // Disabled
     } else {
       parts.push('[📚❌]'); // Offline
       if (overallColor === 'green') overallColor = 'yellow';
