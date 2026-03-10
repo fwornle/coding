@@ -51,7 +51,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
 
 ### Phases
 
-- [ ] **Phase 15: Type Definitions** - Discriminated union states, typed transitions, RunConfig/RunProgress separation, Zod schemas
+- [x] **Phase 15: Type Definitions** - Discriminated union states, typed transitions, RunConfig/RunProgress separation, Zod schemas (completed 2026-03-10)
 - [ ] **Phase 16: Backend State Machine** - Wave-controller typed events, health API state transitions, progress file as subscriber
 - [ ] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state
 - [ ] **Phase 18: Dashboard Consumer** - Dashboard renders from typed SSE only, correct substep coloring, typed commands, no inference
@@ -69,7 +69,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
   3. RunConfig (singleStepMode, mockLLM, llmMode, stepIntoSubsteps) is a readonly type set once at workflow start; RunProgress is a separate mutable type tracking current position
   4. Step and substep status values are derived from the state machine position via a pure function -- no separate mutable status fields exist
   5. Zod schemas exist for WorkflowState and can parse/reject JSON at runtime (e.g., reading progress file, receiving SSE event)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 15-01-PLAN.md -- Core Zod schemas: WorkflowState discriminated union, RunConfig/RunProgress separation, migration preprocess
 - [ ] 15-02-PLAN.md -- Typed transitions, step status derivation, file-copy build script
@@ -123,7 +123,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. Type Definitions | 1/2 | In Progress|  | - |
+| 15. Type Definitions | 2/2 | Complete   | 2026-03-10 | - |
 | 16. Backend State Machine | v3.0 | 0/? | Not started | - |
 | 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |

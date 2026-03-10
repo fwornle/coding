@@ -8,9 +8,9 @@
 ### State Machine Core
 
 - [x] **SM-01**: Workflow state is a TypeScript discriminated union with state-specific data (idle/running/paused/completed/failed/cancelled)
-- [ ] **SM-02**: State transitions are typed — only valid transitions compile
+- [x] **SM-02**: State transitions are typed — only valid transitions compile
 - [x] **SM-03**: RunConfig (singleStepMode, mockLLM, llmMode, stepIntoSubsteps) is immutable after workflow start, separated from RunProgress
-- [ ] **SM-04**: Step/substep status derived from state machine position — not stored as separate mutable fields
+- [x] **SM-04**: Step/substep status derived from state machine position — not stored as separate mutable fields
 - [x] **SM-05**: Zod schemas validate state at system boundaries
 
 ### Backend Integration
@@ -62,9 +62,9 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SM-01 | Phase 15 | Complete |
-| SM-02 | Phase 15 | Pending |
+| SM-02 | Phase 15 | Complete |
 | SM-03 | Phase 15 | Complete |
-| SM-04 | Phase 15 | Pending |
+| SM-04 | Phase 15 | Complete |
 | SM-05 | Phase 15 | Complete |
 | BE-01 | Phase 16 | Pending |
 | BE-02 | Phase 16 | Pending |
