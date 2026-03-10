@@ -2,175 +2,144 @@
 
 **Type:** SubComponent
 
-TraceReportModule provides filtering and aggregation capabilities to help users navigate and understand trace reports.
-
-**Technical Insight Document – TraceReportModule**  
-*SubComponent of **KnowledgeManagement***  
-
----
+The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) can be used to construct code knowledge graphs, which can be utilized in the TraceReportModule.
 
 ## What It Is  
 
-The **TraceReportModule** lives inside the **KnowledgeManagement** component and is responsible for turning raw execution data into consumable “trace reports”. Although no concrete source files were listed for the module itself, the observations make clear that it sits alongside a family of sibling modules—**CodeGraphModule**, **PersistenceModule**, **OntologyModule**, **ManualLearning**, **OnlineLearning**, and **InsightGenerationModule**—all of which share the same high‑level storage infrastructure (the `GraphDatabaseAdapter` located at `integrations/mcp-server-semantic‑analysis/src/storage/graph-database-adapter.ts`).  
+The **TraceReportModule** lives inside the *KnowledgeManagement* sub‑tree of the MCP server semantic‑analysis codebase. Its implementation can be traced to a handful of concrete files:
 
-At runtime the TraceReportModule pulls together three distinct knowledge sources:  
+* `integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts` – a utility that knows how to compose a detailed trace report for a UKB workflow run.  
+* `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** that mediates all reads/writes to the underlying graph store.  
+* `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** that abstracts the low‑level graph‑database client.  
+* `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` – the **CodeGraphAgent** that can materialise a code‑knowledge graph, which the TraceReportModule may consume when enriching its reports.
 
-1. **Code‑graph knowledge** supplied by **CodeGraphModule** (which itself builds the graph via the `CodeGraphAgent` at `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`).  
-2. **Persisted entity data** managed by **PersistenceModule** (backed by the `PersistenceAgent` in `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`).  
-3. **Ontology classifications** delivered by **OntologyModule** (which uses the `OntologyClassifier`).  
-
-In addition to these domain inputs, the module consumes **logging and monitoring streams** (e.g., workflow‑run telemetry) to enrich the reports with timing, success/failure, and resource‑usage details. The final artifact is a user‑facing report that can be filtered, aggregated, and visualised, giving operators a clear, actionable view of how a workflow executed across code, data, and semantic layers.
+Together these pieces enable the TraceReportModule to **retrieve** data from the graph database, **assemble** a comprehensive trace of a UKB workflow execution, and then **persist** the resulting report back into the same graph store. The module is a child of the broader **KnowledgeManagement** component, and it shares its persistence and graph‑adapter infrastructure with sibling modules such as **ManualLearning** and **Persistence**.
 
 ---
 
 ## Architecture and Design  
 
-### Modular, Layered Composition  
+The observed codebase follows a **modular, agent‑oriented architecture**. Each major concern is encapsulated in its own “agent” or “adapter” class, and the TraceReportModule orchestrates these agents without embedding low‑level details.  
 
-The overall architecture follows a **modular, layered approach**. Each sibling module encapsulates a specific concern (code‑graph construction, persistence, ontology handling) and exposes an API that the TraceReportModule consumes. This clear separation of responsibilities mirrors a **Facade pattern**: TraceReportModule acts as a façade that gathers data from multiple subsystems and presents a unified report to the UI layer.  
+* **Adapter Pattern** – `GraphDatabaseAdapter` implements an adapter façade over the concrete graph‑database driver. This isolates the rest of the system from vendor‑specific APIs and makes swapping the storage backend (e.g., from Neo4j to JanusGraph) a matter of changing the adapter implementation.  
 
-### Dependency Direction  
+* **Agent (Mediator) Pattern** – Both `PersistenceAgent` and `CodeGraphAgent` act as mediators that expose high‑level operations (e.g., `saveEntity`, `fetchTraceData`, `buildCodeGraph`) while internally coordinating multiple lower‑level services (the adapter, ontology classifiers, etc.). The TraceReportModule never talks directly to the database; it delegates all persistence work to the PersistenceAgent.  
 
-All dependencies flow **inward** toward TraceReportModule—i.e., it **depends on** CodeGraphModule, PersistenceModule, and OntologyModule but is not referenced by them. This one‑directional relationship reduces coupling and makes the module easier to test in isolation. The parent component **KnowledgeManagement** orchestrates these sub‑components, providing a logical container for all knowledge‑centric services.  
+* **Utility / Builder** – `ukb-trace-report.ts` is a pure‑utility module that knows how to format the raw data into a human‑readable (or machine‑consumable) trace report. It can be seen as a **builder** that assembles the final artifact from pieces supplied by the agents.  
 
-### Shared Persistence Infrastructure  
+The interaction flow is straightforward:
 
-Both CodeGraphModule and PersistenceModule rely on the same `GraphDatabaseAdapter` implementation (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). This shared adapter suggests a **Repository‑like abstraction** for graph data, enabling consistent CRUD operations across different knowledge domains. The TraceReportModule, by virtue of consuming the outputs of those modules, indirectly benefits from this common storage layer.  
+1. **Data Retrieval** – The TraceReportModule asks the PersistenceAgent for the entities that constitute a UKB workflow run (e.g., execution steps, artefacts, timestamps). The PersistenceAgent, in turn, uses the GraphDatabaseAdapter to query the graph store.  
+2. **Optional Enrichment** – If a richer context is required, the module can invoke the CodeGraphAgent to fetch or construct a code‑knowledge graph that relates the workflow steps to source‑code entities.  
+3. **Report Construction** – The raw data is handed to the `ukb-trace-report` utility, which stitches together a detailed trace document.  
+4. **Persistence of Report** – The finished report is handed back to the PersistenceAgent, which stores it as a graph node/relationship via the GraphDatabaseAdapter.
 
-### Data‑Enrichment via Logging/Monitoring  
-
-The module’s use of logging and monitoring data to “generate detailed trace reports of workflow runs” indicates an **Observer‑style** relationship with the telemetry subsystem: the module subscribes to runtime events, enriches the static knowledge graph with dynamic execution metadata, and then produces the final report.  
-
-### Presentation & Interaction  
-
-The observation that TraceReportModule “handles the presentation of trace reports to the user” and offers “filtering and aggregation capabilities” points to an **Application‑Service** style component that sits between the domain layer (knowledge graph, persistence, ontology) and the UI layer. It likely exposes a set of service methods or API endpoints that the front‑end can call to retrieve paginated, filtered, or aggregated report data.
+Because the same agents are used by **ManualLearning** and **Persistence**, the architecture encourages **reuse** and **consistent ontology classification** across the KnowledgeManagement domain.
 
 ---
 
 ## Implementation Details  
 
-While the source repository does not list concrete symbols for TraceReportModule, the surrounding codebase gives strong clues about its implementation mechanics:
+### PersistenceAgent (`persistence-agent.ts`)  
+The agent exposes methods such as `fetchTraceData(workflowId: string)` and `storeTraceReport(report: TraceReport)`. Internally it builds Cypher (or equivalent) queries and forwards them to the `GraphDatabaseAdapter`. It also performs ontology classification, ensuring that newly stored report nodes are linked to the appropriate taxonomy (e.g., `TraceReport`, `WorkflowRun`).  
 
-| Concern | Supporting Artifact (Sibling) | Likely Role in TraceReportModule |
-|---------|------------------------------|----------------------------------|
-| **Code‑graph access** | `CodeGraphAgent` (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) | Calls into the agent (or a higher‑level service exposed by CodeGraphModule) to fetch nodes/edges relevant to a workflow run. |
-| **Entity persistence** | `PersistenceAgent` (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) | Retrieves persisted entities (e.g., run metadata, user‑generated annotations) that must be reflected in the report. |
-| **Ontology lookup** | `OntologyClassifier` (used by OntologyModule) | Maps entities to ontology concepts, enabling semantic grouping and classification within the report. |
-| **Graph storage** | `GraphDatabaseAdapter` (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) | Underlies all three sibling modules; TraceReportModule indirectly benefits from its JSON export sync and LevelDB‑backed persistence for fast reads. |
-| **Telemetry** | Logging/monitoring infrastructure (unspecified) | Subscribes to workflow‑run events, extracts timestamps, status codes, and resource usage to annotate graph nodes. |
-| **Presentation** | UI‑layer (unspecified) | Exposes an API (likely HTTP/REST or GraphQL) that returns a structured report object; implements filtering (by time, entity type, ontology class) and aggregation (e.g., total runtime per component). |
+### GraphDatabaseAdapter (`graph-database-adapter.ts`)  
+This file implements a thin wrapper around the graph‑DB client. Typical responsibilities include:  
 
-A plausible internal flow is:
+* Opening/closing sessions.  
+* Translating generic CRUD operations into database‑specific query strings.  
+* Providing a promise‑based API (`runQuery<T>(query: string, params: object): Promise<T[]>`).  
 
-1. **Request** → UI asks for a trace report (optionally with filter parameters).  
-2. **Orchestration** → TraceReportModule invokes CodeGraphModule to pull the relevant sub‑graph, calls PersistenceModule for persisted run data, and queries OntologyModule for classification tags.  
-3. **Enrichment** → It merges in real‑time telemetry (logging/monitoring) to annotate each node/edge with execution timestamps, success/failure flags, and performance metrics.  
-4. **Processing** → Filtering and aggregation logic runs over the enriched graph, producing a concise view (e.g., “total time spent in data‑ingestion nodes”).  
-5. **Response** → The final report object is sent back to the UI for rendering.
+By centralising these concerns, the rest of the code (agents, modules) remains agnostic to the exact query language.
 
-Because no concrete class names are listed for TraceReportModule itself, the above description is inferred from the observed interactions and the known responsibilities of its sibling modules.
+### CodeGraphAgent (`code-graph-agent.ts`)  
+When the TraceReportModule needs code‑level context, it calls methods like `buildCodeGraphForWorkflow(workflowId)`. The agent may traverse version‑control metadata, LSL session logs, or static analysis artefacts to construct a graph that connects workflow steps to source files, functions, and classes. The resulting sub‑graph can be attached to the trace report as a “knowledge enrichment” edge.
+
+### ukb‑trace‑report (`ukb-trace-report.ts`)  
+This utility provides a pure function, e.g., `generateReport(data: TraceData): TraceReport`. It receives a structured DTO containing workflow steps, timestamps, and optional code‑graph references, then formats them into a JSON‑serialisable object (or a markdown/HTML blob). Because it contains no side‑effects, it can be unit‑tested in isolation.
+
+### TraceReportModule (conceptual orchestration)  
+Although a concrete class file is not listed, the module’s responsibilities are evident from the observations:  
+
+* **Orchestrate** data retrieval via PersistenceAgent.  
+* **Optionally enrich** with CodeGraphAgent.  
+* **Delegate** report formatting to `ukb‑trace‑report`.  
+* **Persist** the final report through PersistenceAgent.  
+
+The module therefore acts as a thin orchestration layer, keeping business logic separate from persistence and storage concerns.
 
 ---
 
 ## Integration Points  
 
-1. **CodeGraphModule** – Provides the structural representation of source code and its relationships. Integration likely occurs through a service interface exposed by CodeGraphModule (e.g., `getSubGraphForRun(runId)`).  
+1. **KnowledgeManagement (parent)** – The TraceReportModule is a child component of KnowledgeManagement, inheriting the same persistence and graph‑adapter infrastructure. Any changes to the ontology or graph schema at the KnowledgeManagement level will cascade to the TraceReportModule.  
 
-2. **PersistenceModule** – Supplies persisted entities such as workflow‑run records, user annotations, and validation results. Interaction probably uses the `PersistenceAgent` API (`loadEntity(id)`, `queryEntities(filter)`).  
+2. **PersistenceAgent** – The primary gateway to the graph database. All read/write operations for trace data flow through this agent, making it the critical integration point.  
 
-3. **OntologyModule** – Offers semantic classification via the `OntologyClassifier`. TraceReportModule calls into this module to map raw entities to ontology concepts, enabling higher‑level aggregation.  
+3. **GraphDatabaseAdapter** – The low‑level storage adaptor. If the system migrates to a different graph store, only this file needs modification; the TraceReportModule remains untouched.  
 
-4. **Logging & Monitoring** – The module subscribes to the system’s telemetry bus (exact implementation not disclosed) to receive events like `WorkflowStarted`, `StepCompleted`, and `WorkflowFailed`.  
+4. **CodeGraphAgent** – Optional enrichment source. The TraceReportModule can call into this agent when a richer, code‑centric view of the workflow is required.  
 
-5. **Presentation Layer** – Exposes its own service endpoints (e.g., `/api/trace-report/:runId`) that the front‑end consumes. The filtering and aggregation capabilities are likely exposed as query parameters or payload fields.  
+5. **Sibling Components** – **ManualLearning** and **Persistence** also depend on the PersistenceAgent. This shared dependency means that any performance bottleneck or schema change in the agent will affect all siblings, encouraging a coordinated evolution of the persistence layer.  
 
-6. **Parent – KnowledgeManagement** – Acts as the container that wires all these sub‑components together. KnowledgeManagement may provide configuration (e.g., which graph database instance to use) and lifecycle management (initialisation, shutdown).  
-
-All integration points are **synchronous** data pulls (fetch‑and‑compose) rather than event‑driven pipelines, as the observations describe a “generate … report” flow rather than a streaming architecture.
+6. **External UKB Workflow Runner** – Although not represented in the file list, the TraceReportModule expects identifiers (e.g., `workflowId`) produced by the UKB execution engine. The `ukb‑trace‑report` utility is specifically designed to interpret those identifiers and the associated metadata.
 
 ---
 
 ## Usage Guidelines  
 
-* **Prefer the Facade API** – When building new UI features or automated dashboards, call the high‑level report service exposed by TraceReportModule rather than invoking CodeGraphModule, PersistenceModule, or OntologyModule directly. This preserves encapsulation and ensures that telemetry enrichment is applied consistently.  
+* **Always go through the PersistenceAgent** – Direct use of the GraphDatabaseAdapter from the TraceReportModule is discouraged. This preserves the ontology‑classification logic embedded in the agent and guarantees consistent node/relationship typing.  
 
-* **Filter Early** – Because the underlying graph can be large (the whole code knowledge graph), pass filter criteria (run ID, time window, ontology class) to the TraceReportModule as early as possible. The module’s internal filtering reduces memory pressure and improves response time.  
+* **Prefer the utility for formatting** – When generating a trace report, call `ukb‑trace‑report.generateReport` with the DTO returned from the PersistenceAgent. Do not duplicate formatting logic inside the module; the utility is the single source of truth for report shape.  
 
-* **Respect Dependency Versions** – TraceReportModule relies on the exact versions of its sibling modules that share the `GraphDatabaseAdapter`. Upgrading the adapter (e.g., switching LevelDB to another backend) must be coordinated across all siblings to avoid schema mismatches.  
+* **Enrichment is optional but explicit** – If a code‑knowledge graph is needed, invoke the CodeGraphAgent first and attach the resulting sub‑graph to the DTO before passing it to the report generator. This makes the enrichment step clear in the call chain and avoids hidden side‑effects.  
 
-* **Handle Missing Telemetry Gracefully** – If logging or monitoring data for a particular step is absent, the module should still return a partial report rather than failing outright. Consumers should be prepared for null or placeholder values in the enriched fields.  
+* **Respect the ontology** – When persisting a new report, ensure that the report node is labelled with `TraceReport` (or the appropriate ontology term) so that downstream queries (e.g., from ManualLearning) can discover it reliably.  
 
-* **Cache Results When Appropriate** – Trace reports for completed runs are immutable. Implementing a short‑term cache (e.g., in‑memory LRU) at the service layer can dramatically reduce repeated graph traversals for the same run ID.  
+* **Error handling** – All async interactions with the PersistenceAgent and GraphDatabaseAdapter should be wrapped in try/catch blocks. Propagate meaningful errors (e.g., “Workflow not found”, “Graph write failed”) so that callers can react appropriately.  
 
-* **Testing Strategy** – Unit tests should mock the three dependent modules (CodeGraphModule, PersistenceModule, OntologyModule) and feed deterministic telemetry events. Integration tests can spin up a lightweight instance of the `GraphDatabaseAdapter` with a pre‑populated graph to validate end‑to‑end report generation.
-
----
-
-## Architectural Patterns Identified  
-
-| Pattern | Evidence |
-|---------|----------|
-| **Facade** | TraceReportModule aggregates multiple subsystems (code graph, persistence, ontology, telemetry) and presents a single “trace report” interface to the UI. |
-| **Repository / Adapter** | Shared `GraphDatabaseAdapter` acts as a repository for graph data used by sibling modules. |
-| **Observer (Telemetry subscription)** | Module consumes logging/monitoring streams to enrich static knowledge with dynamic execution data. |
-| **Layered Architecture** | Clear separation: data‑access layer (graph adapter), domain services (CodeGraphModule, PersistenceModule, OntologyModule), application service (TraceReportModule), presentation/UI. |
+* **Testing** – Unit‑test the `ukb‑trace‑report` utility in isolation. For integration tests, mock the PersistenceAgent to return deterministic trace data, and verify that the module correctly assembles and persists the report.
 
 ---
 
-## Design Decisions & Trade‑offs  
+### Architectural patterns identified  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| **Centralised report generation** (single module) | Guarantees a consistent view of code, data, and ontology for each workflow run. | Increases coupling to three subsystems; any change in one subsystem may require adjustments in the report logic. |
-| **Synchronous pull‑based composition** | Simpler to reason about; the report is generated on demand with a deterministic snapshot. | May become a performance bottleneck for very large graphs or high‑concurrency request patterns. |
-| **Reuse of GraphDatabaseAdapter across siblings** | Avoids duplicate persistence code and ensures data consistency. | All modules are forced to share the same storage format; swapping out the underlying DB requires coordinated changes. |
-| **Embedding telemetry enrichment inside the report module** | Keeps the enrichment logic close to the consumer (the report), avoiding the need for upstream modules to be telemetry‑aware. | The module must understand the telemetry schema, increasing its surface area and making it sensitive to changes in logging formats. |
+1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the concrete graph‑DB client.  
+2. **Mediator/Agent Pattern** – `PersistenceAgent` and `CodeGraphAgent` coordinate lower‑level services and expose high‑level APIs.  
+3. **Builder/Utility Pattern** – `ukb‑trace‑report` builds the final trace report from raw data.  
 
----
+### Design decisions and trade‑offs  
 
-## System Structure Insights  
+* **Separation of concerns** (agents vs. utility) improves testability and maintainability but introduces an extra indirection layer that can add latency in high‑throughput scenarios.  
+* **Graph‑database centric storage** gives rich relationship modeling for trace data, at the cost of requiring developers to understand Cypher‑style queries and graph‑schema evolution.  
+* **Optional code‑graph enrichment** provides flexibility; however, it creates a conditional execution path that must be guarded against missing code‑graph data.  
 
-* **KnowledgeManagement** acts as the logical “umbrella” for all knowledge‑centric services, providing a shared graph persistence layer and a common runtime environment.  
-* Sibling modules each specialise in a single knowledge domain but converge on the same **graph‑database** backend, enabling cross‑domain queries without data duplication.  
-* **TraceReportModule** sits at the intersection of these domains, effectively the “view‑layer” of the knowledge graph for workflow execution. Its presence signals a **read‑only analytical service** rather than a mutating component.  
-* The absence of child components under TraceReportModule (no further sub‑components listed) suggests it is a leaf node in the component hierarchy, focusing purely on data aggregation and presentation.
+### System structure insights  
 
----
+The KnowledgeManagement domain is deliberately **layered**: high‑level modules (TraceReportModule, ManualLearning) sit on top of shared agents (PersistenceAgent, CodeGraphAgent) which themselves rely on a single storage adapter. This hierarchy ensures that changes to persistence or ontology affect all downstream modules uniformly.  
 
-## Scalability Considerations  
+### Scalability considerations  
 
-* **Graph Size** – As the code knowledge graph grows (more repositories, deeper AST analysis), the cost of traversing sub‑graphs for each report will increase. Leveraging the `GraphDatabaseAdapter`’s LevelDB backing and its JSON export sync can help keep read latency low, but indexing strategies (e.g., run‑ID → node mapping) will become essential.  
-* **Concurrent Report Requests** – Because the module performs synchronous pulls from three subsystems, high concurrency could saturate the underlying graph database. Introducing **read‑replicas** or a **caching layer** (e.g., Redis) for completed reports would mitigate contention.  
-* **Telemetry Volume** – If logging/monitoring emits high‑frequency events, the enrichment step could become I/O‑bound. Batch‑ing telemetry updates before merging into the report, or pre‑aggregating metrics, would improve throughput.  
-* **Filtering & Aggregation** – Providing server‑side filtering reduces the amount of data transferred to the client and lessens memory pressure on the module. Designing the filter API to push down predicates to the graph store (e.g., using indexed properties) will aid horizontal scaling.
+* **Graph‑DB scaling** – Because trace reports and code graphs are stored as nodes/relationships, the underlying graph database must be sized to handle potentially large numbers of workflow executions. Horizontal scaling (sharding, read replicas) can be employed without changing the adapter interface.  
+* **Report generation cost** – As workflows grow in complexity, assembling the full trace may become CPU‑intensive. Caching intermediate results in the PersistenceAgent or pre‑computing frequent sub‑graphs can mitigate latency.  
+* **Concurrency** – Multiple modules (TraceReportModule, ManualLearning) may attempt to write to the same graph region simultaneously. The PersistenceAgent should implement optimistic locking or transaction retries to avoid write conflicts.  
 
----
+### Maintainability assessment  
 
-## Maintainability Assessment  
-
-* **Clear Separation of Concerns** – The module’s responsibilities are well‑delineated (data aggregation, enrichment, presentation), making the codebase easier to understand and modify.  
-* **Dependency Transparency** – All external dependencies are explicit (CodeGraphModule, PersistenceModule, OntologyModule, telemetry). This reduces hidden coupling and simplifies unit‑testing with mocks.  
-* **Shared Adapter Risk** – Because several modules share the same `GraphDatabaseAdapter`, a breaking change in the adapter could ripple through the entire KnowledgeManagement subtree. Strict versioning and comprehensive integration tests are required.  
-* **Lack of Internal Symbol Visibility** – The current observation set does not expose concrete class or function names for TraceReportModule, which may indicate that the module is either dynamically composed or its code resides in a location not captured by the analysis tooling. Documentation and code‑search hygiene should be improved to keep the module discoverable.  
-* **Extensibility** – Adding new data sources (e.g., a security‑audit log) would involve extending the façade to consume another subsystem. The existing façade pattern makes such extensions straightforward, provided the new subsystem follows the same contract style.  
-
-Overall, TraceReportModule exhibits a **well‑structured, modular design** that aligns with the broader KnowledgeManagement architecture. Its main maintainability challenge lies in the shared persistence layer, which must be managed carefully as the system scales.
+The modular, agent‑based design yields **high maintainability**: each concern lives in a single, well‑named file, and the public interfaces are small and explicit. Shared agents reduce duplication across siblings, but they also become **critical points of failure**; any breaking change in `persistence-agent.ts` must be coordinated across all dependent modules. The clear separation between data access (`GraphDatabaseAdapter`), business orchestration (TraceReportModule), and presentation (`ukb‑trace‑report`) makes unit testing straightforward and encourages incremental evolution of each layer.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) enables seamless integration with Graphology and LevelDB for graph data persistence. This allows for efficient storage and querying of the knowledge graph, with automatic JSON export sync ensuring data consistency across the system. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) plays a crucial role in constructing the code knowledge graph, leveraging AST-based analysis for semantic code search capabilities. Furthermore, the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) handles entity persistence, including ontology classification and content validation, ensuring that the knowledge graph remains accurate and up-to-date.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve user-created entities.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve the code knowledge graph.
-- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
-- [OntologyModule](./OntologyModule.md) -- OntologyModule uses the OntologyClassifier to classify entities and link them to the ontology system.
-- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the CodeGraphModule to access the code knowledge graph and generate insights.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for managing entity persistence and ontology classification.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
+- [Persistence](./Persistence.md) -- The PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

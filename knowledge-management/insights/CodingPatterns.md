@@ -2,200 +2,126 @@
 
 **Type:** Component
 
-The CodingPatterns component's modular architecture and provider registry enable it to support multiple language models and providers, making it a highly extensible and flexible system. The lib/llm/provider-registry.js file provides a clear example of how this registry is implemented, demonstrating how developers can add or remove providers and language models as needed. This flexibility is crucial for the system's long-term maintenance and development, as it allows developers to easily adapt the system to changing requirements and technologies.
+[LLM] The LLMService class (lib/llm/llm-service.ts) plays a crucial role in the CodingPatterns component, providing language model-based analysis and mode routing capabilities. The 'LLMService' class utilizes caching to optimize performance, reducing the overhead of repeated computations and improving response times. The 'analyze' method in llm-service.ts serves as the primary entry point for language model-based analysis, while the 'getMode' method determines the appropriate mode for a given input. The caching mechanism, implemented using the 'CacheManager' class, ensures that frequently accessed data is stored in memory, minimizing the need for redundant computations and enhancing the overall efficiency of the component.
 
 ## What It Is  
 
-The **CodingPatterns** component lives at the heart of the *Coding* knowledge hierarchy. Its concrete artefacts are scattered across a handful of well‑named files:
+The **CodingPatterns** component lives at the heart of the *Coding* knowledge hierarchy and is implemented across several well‑defined modules. Its core persistence layer is the **GraphDatabaseAdapter** located in `storage/graph-database-adapter.ts`, which offers the `createNode` and `getNode` methods for writing and reading pattern‑related entities in a graph database. Business‑level orchestration is performed by the **WaveController** (`wave-controller.ts`), which supplies a work‑stealing task scheduler via `submitTask` and `getTaskResult`. Language‑model‑driven analysis is provided by the **LLMService** (`lib/llm/llm-service.ts`), while provider management is centralised in the **ProviderRegistry** (`lib/llm/provider-registry.js`). External integration with the Specstory extension is encapsulated in the **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`). All classes follow a strict PascalCase naming convention, reinforcing readability throughout the component.
 
-* **`llm‑providers.yaml`** – the declarative catalogue that enumerates each language‑model provider and its configuration.  
-* **`lib/llm/provider‑registry.js`** – the runtime registry that loads the providers defined in the YAML, decides which one to use based on the current *mode* and provider *availability*, and exposes a simple lookup API.  
-* **`wave‑controller.ts`** – the orchestrator for “wave agents”.  It follows a three‑step pattern (constructor → lazy LLM init → execute) that guarantees agents are only materialised when required.  
-* **`storage/graph‑database‑adapter.ts`** – the persistence façade for the Knowledge Management subsystem.  It automatically synchronises the in‑memory graph to a JSON export, keeping the external graph database current.  
-* **`code‑graph‑rag/assets/…`** – a collection of Tree‑sitter‑derived AST samples that the **`CodeGraphConstructor`** class consumes to build knowledge‑graphs.  
-
-Together these files give CodingPatterns the ability to **switch language‑model providers on the fly**, **construct and persist rich code knowledge graphs**, and **run specialised wave agents** that leverage the selected LLM.  The component sits under the parent **Coding** node, shares the provider‑registry implementation with its sibling **LLMAbstraction**, re‑uses the **GraphDatabaseAdapter** that belongs to the sibling **KnowledgeManagement**, and exposes child artefacts (**DesignPatterns**, **CodingConventions**, **ArchitectureGuidelines**) that document the very patterns it implements.
+Together, these modules deliver a cohesive set of *DesignPatterns*, *CodingConventions*, and *BestPractices* artefacts that are stored, queried, and analysed within the broader **Coding** system. The component therefore acts as the authoritative source of reusable coding knowledge, exposing it to sibling components such as **LiveLoggingSystem**, **LLMAbstraction**, and **KnowledgeManagement** through shared adapters and service contracts.
 
 ---
 
 ## Architecture and Design  
 
-### Modular Provider Architecture  
-The most visible architectural decision is a **modular, plug‑in style architecture** for language‑model providers.  Each provider lives in its own directory (e.g., `lib/llm/providers/anthropic-provider.ts`, `lib/llm/providers/dmr-provider.ts`) and is declared in **`llm‑providers.yaml`**.  The **Provider Registry** (`lib/llm/provider‑registry.js`) embodies the *Registry* pattern: it maintains a map of provider identifiers → provider instances, and supplies `getProvider(mode)` logic that selects the appropriate implementation based on runtime mode (e.g., *development*, *production*) and health checks.  This design decouples the rest of the system from concrete provider classes, enabling **zero‑impact addition or removal** of models.
+The observations reveal a **modular architecture** built around well‑defined adapters and registries. The **GraphDatabaseAdapter** abstracts the underlying graph store, presenting a stable API (`createNode`, `getNode`) that isolates the rest of the component from database‑specific concerns. This adapter‑centric approach mirrors the pattern used in the sibling **KnowledgeManagement** component, where a similar graph‑database adapter underpins persistence.
 
-### Wave‑Agent Execution Pattern  
-Wave agents are orchestrated by **`wave‑controller.ts`**.  The file demonstrates a **lazy‑initialisation + command pattern**: the controller’s constructor records configuration, the LLM client is instantiated only when `execute()` is called, and the actual work is delegated to a concrete *wave* object that implements a known interface (`run(input): output`).  This pattern reduces start‑up cost and isolates side‑effects (LLM network calls) to the execution phase.
+Provider management follows the **Registry pattern**: `ProviderRegistry` acts as a central catalogue for LLM providers, exposing `registerProvider` and `getProvider`. This enables the **LLMService** to remain agnostic of concrete provider implementations, a design decision echoed in the **LLMAbstraction** sibling that also relies on provider registration for dependency injection.
 
-### Retry‑With‑Backoff for Resilience  
-Both the **`ConnectionHandler`** (used for generic external services) and the **`SpecstoryAdapter.connectViaHTTP`** method implement a **retry‑with‑backoff** strategy.  The algorithm retries a failed request a bounded number of times, waiting an exponentially increasing interval (e.g., 100 ms → 200 ms → 400 ms).  By embedding this logic in the connection layer, the component shields higher‑level code from transient network glitches, improving overall reliability.
+Concurrency is addressed through a **work‑stealing scheduler** embodied by `WaveController`. By distributing tasks among a pool of worker threads and allowing idle workers to “steal” work from busy peers, the component achieves higher throughput without tightly coupling task producers and consumers. This design choice aligns with the performance‑focused goals of the **Trajectory** sibling, which also leverages parallelism for integration adapters.
 
-### Graph Persistence & Knowledge Construction  
-The **`GraphDatabaseAdapter`** (`storage/graph-database-adapter.ts`) acts as a **Facade** over the underlying graph store.  Its responsibilities include:
+Integration with external tools is handled via the **Adapter pattern** again: `SpecstoryAdapter` offers `connect`, `disconnect`, and `getData`, presenting a uniform façade to the Specstory extension while keeping the component decoupled from the extension’s internal protocol. This mirrors the integration strategy used in the **DockerizedServices** sibling, where each external service is wrapped in its own adapter.
 
-* Translating in‑memory graph objects to the storage format.  
-* Performing an **automatic JSON export sync** after each mutation, guaranteeing that the persisted graph mirrors the latest state.  
-
-The **`CodeGraphConstructor`** (referenced from `code‑graph‑rag/assets/`) consumes **Tree‑sitter** AST nodes to produce a domain‑specific knowledge graph (nodes for functions, classes, imports, etc., edges for call‑relations).  The constructor pushes the resulting graph into the adapter, completing the *extract‑transform‑load* pipeline.
-
-### Shared Infrastructure Across Siblings  
-Because the **Provider Registry** lives in `lib/llm/provider-registry.js`, both **CodingPatterns** and its sibling **LLMAbstraction** reuse the same registry instance, ensuring a single source of truth for provider availability.  Likewise, **CodingPatterns** leverages the **GraphDatabaseAdapter** that is also the cornerstone of the **KnowledgeManagement** sibling, fostering a unified persistence strategy across the codebase.
+Overall, the architecture favours **separation of concerns**, **interface‑driven contracts**, and **extensibility** through registries and adapters, allowing new providers, databases, or extensions to be introduced with minimal ripple effect.
 
 ---
 
 ## Implementation Details  
 
-### Provider Registry (`lib/llm/provider-registry.js`)  
-* **Data structures** – a plain JavaScript `Map<string, Provider>` keyed by provider name.  
-* **API** – `registerProvider(name, providerClass)`, `getProvider(mode)`, `listAvailable()`.  
-* **Mode handling** – reads the current mode from a global config, then selects the first provider whose `isAvailable()` returns true.  If none match, it falls back to a default (often a mock provider used in tests).  
+At the persistence layer, `storage/graph-database-adapter.ts` defines the `GraphDatabaseAdapter` class. Its `createNode(entity)` method serialises a domain object (e.g., a design‑pattern instance) into a graph node, while `getNode(id)` performs a lookup by node identifier. Because the adapter is the sole entry point to the graph store, any future switch from, say, Neo4j to JanusGraph would only require changes inside this file.
 
-### Wave Controller (`wave-controller.ts`)  
-```ts
-export class WaveController {
-  private llm?: LLMClient;          // lazily created
-  constructor(private readonly config: WaveConfig) {}
-  private async initLLM() {
-    if (!this.llm) {
-      const provider = ProviderRegistry.getProvider(this.config.mode);
-      this.llm = await provider.createClient(this.config);
-    }
-  }
-  async execute(input: WaveInput): Promise<WaveOutput> {
-    await this.initLLM();
-    const wave = new SpecificWave(this.llm);
-    return wave.run(input);
-  }
-}
-```  
-The three‑step flow guarantees that the heavy LLM client is only instantiated when the wave actually runs, keeping the controller lightweight for scenarios where waves are conditionally triggered.
+The **ProviderRegistry** (`lib/llm/provider-registry.js`) maintains an internal map keyed by provider name. `registerProvider(name, providerInstance)` inserts a new provider, and `getProvider(name)` retrieves it for use by callers. This registry is populated at start‑up, enabling the **LLMService** (`lib/llm/llm-service.ts`) to request the appropriate language model without hard‑coded imports. `LLMService.analyze(request)` first checks the `CacheManager` (also referenced in the observation) for a cached result; if absent, it forwards the request to the selected provider, stores the outcome, and returns it. The caching layer reduces redundant model invocations, improving latency.
 
-### Retry‑With‑Backoff (ConnectionHandler & SpecstoryAdapter)  
-Both classes expose a `retry(fn, attempts = 5, baseDelay = 100)` helper.  The algorithm:
+Concurrency is orchestrated by `WaveController` in `wave-controller.ts`. The class initialises a pool of worker threads and implements a work‑stealing queue. When `submitTask(task)` is called, the task is placed on a local queue; idle workers periodically probe other workers’ queues and “steal” tasks, ensuring balanced utilisation. Results are collected via `getTaskResult(taskId)`, which blocks or polls until the worker finishes. This mechanism allows the component to process large batches of pattern‑generation or analysis jobs without saturating any single thread.
 
-```js
-async function retry(fn, attempts, baseDelay) {
-  for (let i = 0; i < attempts; i++) {
-    try { return await fn(); }
-    catch (e) {
-      if (i === attempts - 1) throw e;
-      await sleep(baseDelay * 2 ** i); // exponential back‑off
-    }
-  }
-}
-```  
+External integration is encapsulated by `SpecstoryAdapter` (`lib/integrations/specstory-adapter.js`). It abstracts connection details (HTTP, IPC, file‑watch) behind `connect()` and `disconnect()`. The `getData()` method fetches specification stories, which can then be transformed into graph nodes via the `GraphDatabaseAdapter`. Because the adapter adheres to a simple interface, swapping Specstory for another specification source would only involve implementing a new adapter that respects the same contract.
 
-`SpecstoryAdapter.connectViaHTTP` wraps the HTTP call with this helper, ensuring that temporary outages do not cause permanent failures.
-
-### Graph Database Adapter (`storage/graph-database-adapter.ts`)  
-* **Constructor** – accepts a low‑level driver (e.g., Neo4j, JanusGraph) and a path for the JSON export file.  
-* **CRUD methods** – `addNode(node)`, `addEdge(source, target, type)`, `removeNode(id)`, each of which invokes the driver and then calls `syncExport()`.  
-* **`syncExport()`** – serialises the whole graph to JSON and writes it atomically to the configured location.  This guarantees that any downstream consumer that reads the JSON file always sees a consistent snapshot.
-
-### Code Graph Construction (`CodeGraphConstructor`)  
-* **AST ingestion** – uses Tree‑sitter to parse source files into a concrete syntax tree.  
-* **Visitor pattern** – walks the AST, mapping node types (function, class, import) to graph nodes, and establishing edges for call‑relationships, inheritance, and module dependencies.  
-* **Persistence** – after the in‑memory graph is built, the constructor calls `graphAdapter.addNode/Edge` for each element, triggering the automatic JSON sync described above.
+All classes and functions follow a **PascalCase** naming convention, as highlighted in observation 6, which provides immediate visual cues about the role of each symbol (e.g., `GraphDatabaseAdapter`, `ProviderRegistry`, `WaveController`).
 
 ---
 
 ## Integration Points  
 
-1. **LLM Provider Ecosystem** – The same `provider‑registry.js` is consumed by **LLMAbstraction** (which houses the high‑level `LLMService` façade) and by **CodingPatterns**’ wave agents.  Any new provider added to `llm‑providers.yaml` instantly becomes visible to both components.  
+The **CodingPatterns** component interacts with the rest of the system through several clearly defined interfaces:
 
-2. **Knowledge Management** – The **GraphDatabaseAdapter** is a shared persistence contract.  **CodingPatterns** builds knowledge graphs via `CodeGraphConstructor`, while **KnowledgeManagement** reads, queries, and updates those graphs for downstream tasks (e.g., semantic search, RAG).  
+1. **GraphDatabaseAdapter** – shared with the **KnowledgeManagement** sibling, enabling both components to read/write the same underlying graph. Any entity created by `CodingPatterns` (design patterns, best‑practice nodes) becomes immediately queryable by other components that rely on the graph store.
 
-3. **External Integrations** – The **SpecstoryAdapter** (found in the sibling **Trajectory** component) demonstrates how CodingPatterns can reach out to external services using the retry‑with‑backoff logic.  This pattern is reused by the **ConnectionHandler** for any other HTTP/IPC endpoints that wave agents might need (e.g., code‑review APIs).  
+2. **ProviderRegistry & LLMService** – these are also used by **LLMAbstraction**, allowing that sibling to reuse the same provider discovery and caching mechanisms. The registry’s public methods (`registerProvider`, `getProvider`) serve as the contract for any component that wishes to plug in a new language‑model provider.
 
-4. **Parent‑Level Coordination** – The **Coding** root component aggregates the outputs of all child components.  CodingPatterns contributes its *design‑time* artefacts (provider configurations, wave definitions) to the overall project scaffolding, while also feeding runtime artefacts (knowledge graphs) to the **SemanticAnalysis** sibling, which runs multi‑agent pipelines that may invoke wave agents as sub‑tasks.  
+3. **WaveController** – while primarily internal, the task submission API could be exposed to other components that need bulk processing (e.g., the **SemanticAnalysis** component could off‑load large‑scale pattern extraction jobs to the wave scheduler).
 
-5. **Child Documentation** – The **DesignPatterns**, **CodingConventions**, and **ArchitectureGuidelines** children expose the same registry and wave‑agent conventions as documentation assets, ensuring that developers downstream have a single source of truth for the patterns implemented in CodingPatterns.
+4. **SpecstoryAdapter** – this integration point mirrors the pattern employed by **Trajectory**, which also uses adapters for external extensions. The adapter’s `connect`/`disconnect` lifecycle fits naturally into the system’s startup/shutdown sequence, ensuring that external resources are managed consistently.
+
+5. **Naming Convention** – the uniform PascalCase style is a cross‑component convention that eases code navigation and tooling (e.g., IDE auto‑completion) across all siblings.
+
+These integration surfaces are deliberately thin, relying on interfaces rather than concrete implementations, which preserves decoupling and facilitates independent evolution of each component.
 
 ---
 
 ## Usage Guidelines  
 
-* **Adding a New LLM Provider** – Create a provider directory under `lib/llm/providers/`, implement the required interface (`createClient`, `isAvailable`), add an entry to `llm‑providers.yaml` with the provider’s name and configuration, then register it in `provider‑registry.js` via `registerProvider`.  No changes to wave agents or other consumers are required.  
+Developers working with **CodingPatterns** should adhere to the following practices, all of which are derived from the observed design:
 
-* **Writing a Wave Agent** – Follow the three‑step pattern demonstrated in `wave‑controller.ts`:  
-  1. **Constructor** – accept configuration but do not instantiate the LLM.  
-  2. **Lazy LLM Init** – call `ProviderRegistry.getProvider(mode)` inside an async `initLLM()` helper.  
-  3. **Execute** – perform the agent’s core logic in a `run()` method that receives input and returns output.  Keep side‑effects (network calls, file writes) inside `run` so they are only triggered on explicit execution.  
+* **Persist via the GraphDatabaseAdapter** – always create or retrieve pattern nodes through `createNode` and `getNode`. Direct database queries bypass the adapter’s abstraction and risk breaking future database swaps.
 
-* **Persisting Knowledge Graphs** – Use the `GraphDatabaseAdapter` directly or via the `CodeGraphConstructor`.  Never write directly to the JSON export file; always go through the adapter so that automatic sync is honoured.  
+* **Register providers early** – during application bootstrap, invoke `ProviderRegistry.registerProvider(name, instance)` for each LLM provider you intend to use. This guarantees that `LLMService.analyze` can resolve the correct provider without runtime errors.
 
-* **Handling External Connections** – Wrap any HTTP/IPC call with the provided `retry` helper (or call `ConnectionHandler.connect()`) to benefit from exponential back‑off.  Adjust the `attempts` and `baseDelay` parameters only after measuring latency in the target environment.  
+* **Leverage caching** – trust the built‑in `CacheManager` used by `LLMService`. Avoid manual caching of analysis results; instead, let the service handle it to keep cache keys consistent and avoid duplication.
 
-* **Naming & Conventions** – Follow the **PascalCase** naming style highlighted in the **CodingConventions** child component.  Provider names, wave classes, and graph node types should all respect this convention to keep the codebase searchable and consistent.  
+* **Submit long‑running work to WaveController** – for batch analyses or pattern generation, call `WaveController.submitTask(task)` rather than spawning ad‑hoc threads. This ensures the work‑stealing scheduler can balance load and prevents thread‑leak issues.
 
-* **Testing** – Because providers are decoupled via the registry, unit tests can inject a mock provider by calling `ProviderRegistry.registerProvider('mock', MockProvider)`.  Wave agents can then be exercised without real LLM calls, and the GraphDatabaseAdapter can be swapped for an in‑memory stub during CI runs.
+* **Interact with external extensions through adapters** – when integrating a new specification source, implement an adapter that mirrors the `SpecstoryAdapter` interface (`connect`, `disconnect`, `getData`). Register the new adapter where the component expects it, keeping the core component unchanged.
+
+* **Follow the PascalCase convention** – name all new classes, methods, and exported symbols using PascalCase, as demonstrated by `GraphDatabaseAdapter`, `ProviderRegistry`, and `WaveController`. This maintains the project‑wide readability standard highlighted in observation 6.
+
+By respecting these guidelines, developers will preserve the component’s modularity, performance characteristics, and ease of maintenance.
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural patterns identified  
+* **Adapter pattern** – `GraphDatabaseAdapter`, `SpecstoryAdapter` abstract external systems.  
+* **Registry pattern** – `ProviderRegistry` centralises provider lookup.  
+* **Work‑stealing concurrency** – implemented by `WaveController` for scalable task execution.  
+* **Caching layer** – `CacheManager` used by `LLMService` to avoid redundant LLM calls.  
 
-* **Modular / Plug‑in Architecture** – per‑provider directories and a central registry.  
-* **Registry Pattern** – `lib/llm/provider‑registry.js` maintains a runtime map of providers.  
-* **Facade Pattern** – `storage/graph-database-adapter.ts` hides the details of the underlying graph store.  
-* **Lazy‑initialisation + Command Pattern** – wave agents are instantiated only when `execute()` runs.  
-* **Retry‑With‑Backoff (Resilience) Pattern** – used in `ConnectionHandler` and `SpecstoryAdapter`.  
-* **Visitor / AST Traversal Pattern** – Tree‑sitter AST walk inside `CodeGraphConstructor`.  
+### Design decisions and trade‑offs  
+* **Abstraction over concrete storage** trades a small amount of runtime indirection for the ability to swap graph databases without code churn.  
+* **Provider registry** decouples LLMService from specific providers, at the cost of requiring careful registration order and potential runtime errors if a provider is missing.  
+* **Work‑stealing** improves throughput on multi‑core machines but adds complexity in debugging and requires thread‑safe data structures.  
+* **Adapter‑based external integration** keeps the core component lightweight, yet each new integration demands a dedicated adapter implementation.  
 
-### 2. Design decisions and trade‑offs  
+### System structure insights  
+The component is layered: adapters → services (LLMService, WaveController) → registries → domain entities (design patterns, best practices). This mirrors the structure of sibling components, promoting a consistent mental model across the **Coding** hierarchy. Child modules (*DesignPatterns*, *CodingConventions*, *BestPractices*) rely on the same persistence and analysis services, reinforcing reuse.
 
-| Decision | Benefit | Trade‑off |
-|----------|---------|-----------|
-| Separate provider directories & YAML config | Clear separation, easy addition/removal, environment‑specific configs | Slight runtime overhead for registry lookup; must keep YAML and code in sync |
-| Provider Registry centralised in `lib/llm/provider-registry.js` | Single source of truth, shared across siblings (LLMAbstraction, CodingPatterns) | Tight coupling of all components to the same registry; a breaking change in the registry affects many consumers |
-| Lazy LLM creation in wave agents | Reduces memory/CPU at start‑up, avoids unnecessary API keys usage | First execution incurs latency; developers must ensure `await initLLM()` is called before any LLM‑dependent call |
-| Automatic JSON export sync in GraphDatabaseAdapter | Guarantees external consumers always see the latest graph, simplifies backup | Extra I/O on every mutation; may become a bottleneck under very high write throughput |
-| Retry‑with‑backoff at connection layer | Improves resilience without littering business logic with retry code | Increases overall latency for transient failures; needs careful tuning to avoid overwhelming the target service |
+### Scalability considerations  
+* The work‑stealing scheduler enables horizontal scaling of CPU‑bound tasks, making the component suitable for large‑scale pattern generation.  
+* Caching in `LLMService` reduces load on language‑model APIs, allowing the system to handle higher request volumes.  
+* Adapter isolation means that scaling the underlying graph database (e.g., clustering) can be performed independently of the component’s code.
 
-### 3. System structure insights  
-
-* **Hierarchical organization** – The component sits under the *Coding* root, shares infrastructure with siblings, and exposes child artefacts that document its own patterns.  
-* **Shared libraries** – `lib/llm/` is a common ground for both **CodingPatterns** and **LLMAbstraction**, reinforcing the “don’t duplicate provider logic” principle.  
-* **Cross‑component contracts** – `GraphDatabaseAdapter` is the contract between **CodingPatterns**, **KnowledgeManagement**, and any future analytics component.  
-* **Extensibility hotspots** – Adding a new provider or a new wave agent requires changes only in the provider directory or in a new wave class; no core files need to be touched.
-
-### 4. Scalability considerations  
-
-* **Provider scaling** – Because each provider is isolated, horizontal scaling of LLM calls can be achieved by deploying multiple instances of a provider client behind a load balancer, without touching the registry.  
-* **Graph persistence** – The automatic JSON export is simple and works well for modest graph sizes. For very large knowledge graphs, the sync could become I/O‑bound; a future iteration might replace the JSON export with incremental change logs or a streaming export mechanism.  
-* **Wave agent concurrency** – Wave controllers are lightweight; spawning many concurrent wave agents is feasible, but each will lazily create its own LLM client. Pooling LLM clients or sharing a singleton per provider could improve throughput.  
-* **Retry policy** – Exponential back‑off mitigates thundering‑herd problems during outages, but the max‑attempt count should be configurable per integration to avoid long stalls in high‑traffic scenarios.
-
-### 5. Maintainability assessment  
-
-* **High** – The modular directory layout, explicit YAML config, and central registry make it straightforward for a newcomer to locate the code responsible for a given language model.  
-* **Clear conventions** – Consistent PascalCase naming (as enforced by the **CodingConventions** child) and the repeated pattern in `wave‑controller.ts` provide a predictable mental model.  
-* **Potential technical debt** – The automatic JSON sync in the GraphDatabaseAdapter could become a hidden performance bottleneck; monitoring and possibly refactoring it into a batched write system would preserve maintainability as data volume grows.  
-* **Documentation synergy** – The child components (**DesignPatterns**, **ArchitectureGuidelines**) already capture the same patterns, ensuring that documentation and implementation stay aligned, which further reduces maintenance friction.  
-
----  
-
-*In summary, CodingPatterns exemplifies a clean, extensible architecture built around a provider registry, lazy‑initialized wave agents, resilient connection handling, and a unified graph persistence layer.  Its design choices foster flexibility and reuse across the broader **Coding** ecosystem while providing a solid foundation for future scaling and evolution.*
+### Maintainability assessment  
+The strict modular boundaries, consistent naming convention, and thin interfaces result in high maintainability. Changes to a single provider, database, or external extension are confined to their respective adapter or registry file, minimizing ripple effects. The reuse of patterns across siblings (registry, adapters, work‑stealing) further simplifies onboarding and cross‑component refactoring. The only maintenance overhead lies in ensuring that the registry remains correctly populated and that worker‑thread lifecycles are managed during application shutdown.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-cla; LLMAbstraction: The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts ; DockerizedServices: The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and man; Trajectory: The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maint; KnowledgeManagement: The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database; CodingPatterns: The CodingPatterns component utilizes a modular architecture for language models, as observed in the llm-providers.yaml file. Each language model has ; ConstraintSystem: The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoade; SemanticAnalysis: The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassifica.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers.; LLMAbstraction: [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models wit; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code g; Trajectory: [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integra; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semanti; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving data in a graph da; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClass.
 
 ### Children
-- [DesignPatterns](./DesignPatterns.md) -- The lib/llm/provider-registry.js file defines a provider registry that manages different providers, enabling provider switching based on mode and availability.
-- [CodingConventions](./CodingConventions.md) -- The use of a consistent naming convention, such as PascalCase, is evident throughout the project, as seen in the lib/llm/provider-registry.js file.
-- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The use of a modular architecture enables developers to add or remove language models without affecting the overall system, as seen in the directory structure of the project.
+- [DesignPatterns](./DesignPatterns.md) -- GraphDatabaseAdapter's 'createNode' method is used to persist new design pattern instances in the database, as seen in storage/graph-database-adapter.ts
+- [CodingConventions](./CodingConventions.md) -- CodingConventions module outlines the rules for naming conventions, such as using PascalCase for class names
+- [BestPractices](./BestPractices.md) -- BestPractices module outlines guidelines for testing, including unit testing and integration testing
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This is evident in the way the agent is instantiated and used within the LiveLoggingSystem's classification layer. The OntologyClassificationAgent's classify method is called with the session transcript as an argument, allowing the system to categorize the conversation based on predefined ontology rules. Furthermore, the use of the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, as an abstract base class for agent-specific transcript adapters, enables the system to handle transcripts from various agents in a unified manner. The TranscriptAdapter's adaptTranscript method is responsible for converting agent-specific transcripts into a standardized format, which is then passed to the OntologyClassificationAgent for classification.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component's modular architecture, as seen in the separate modules for different providers (e.g., lib/llm/providers/dmr-provider.ts and lib/llm/providers/anthropic-provider.ts), allows for easy maintenance and extension of the system. This is further facilitated by the use of a registry (lib/llm/provider-registry.js) to manage providers, enabling the addition or removal of providers without modifying the core logic of the LLMService class (lib/llm/llm-service.ts). The registry pattern helps to decouple the provider implementations from the service class, making it easier to swap out or add new providers as needed.
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and management. This is evident in the directory structure, where each service has its own subdirectory, such as semantic analysis, constraint monitoring, and code graph construction. The lib/llm/llm-service.ts file, which contains the LLMService class, provides a high-level facade for LLM operations, handling mode routing, caching, and circuit breaking. This design decision enables loose coupling between services and promotes scalability. Furthermore, the use of docker-compose for service orchestration, as seen in the docker-compose.yml file, provides a robust framework for integrating multiple services.
-- [Trajectory](./Trajectory.md) -- The Trajectory component utilizes a modular architecture, with each language model having its own directory and configuration, allowing for easy maintenance and scalability. For instance, the SpecstoryAdapter (lib/integrations/specstory-adapter.js) is used to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a flexible approach to integrations. This adapter implements a retry-with-backoff pattern in the connectViaHTTP method (lib/integrations/specstory-adapter.js:123) to establish a connection with the Specstory extension, showcasing a robust approach to handling potential connection issues.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, to interact with the graph database. This adapter enables the component to perform tasks such as entity storage and relationship management, while also providing automatic JSON export sync. The use of this adapter allows for a flexible and scalable solution for knowledge graph management. Furthermore, the intelligent routing implemented in the GraphDatabaseAdapter enables the component to efficiently route requests for API or direct database access, ensuring optimal performance. The code in storage/graph-database-adapter.ts demonstrates how the adapter is used to handle concurrent access and provide a robust solution for graph database interactions.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a multi-agent architecture, with each agent designed to perform a specific task, such as the OntologyClassificationAgent, which utilizes the ontology system to classify observations. This agent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and follows the BaseAgent pattern defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of a standardized agent structure, as seen in the BaseAgent class, allows for easier development and maintenance of new agents. For instance, the SemanticAnalysisAgent, responsible for analyzing code files, is implemented in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts and leverages the LLMService from lib/llm/dist/index.js for language model-based analysis.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers. This is evident in the 'session_windowing.py' and 'file_routing.py' files, which contain functions such as 'window_session' and 'route_file' that handle these specific tasks. The 'classification_layers.py' file contains classes such as 'Classifier' that handle the classification of logs.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a modular design with dependency injection, allowing for easy addition or removal of language models without affecting the overall system. This is evident in the LLMService class (lib/llm/llm-service.ts), which acts as the single public entry point for all LLM operations and handles mode routing, caching, and circuit breaking. The use of a ProviderRegistry to manage different providers, including mock, local, and public providers, further reinforces this modular design.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture, as seen in the organization of its adapters and services in separate modules (e.g., lib/integrations/specstory-adapter.js), enables easy maintenance, updates, and integration with other components. This is evident in the use of the SpecstoryAdapter class, which encapsulates the logic for connecting to the Specstory extension via HTTP, IPC, or file watch. The createLogger function from ../logging/Logger.js is also utilized to create a logger instance, allowing for standardized logging across the component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint management. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is used for entity content validation against configured rules. This modular design allows for easy maintenance and scalability of the system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is another example of this modularity, as it is responsible for loading and merging hook configurations from multiple sources. This separation of concerns enables developers to focus on specific aspects of the system without affecting other parts.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This is evident in the classifyObservations method of the OntologyClassificationAgent class, which takes in a list of observations and returns a list of classified observations. The use of separate modules for different agents and utilities, such as the storage and logging modules, also contributes to the overall modularity of the component. This modular design allows for easier maintenance and updates, as changes to one agent do not affect the others.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*
