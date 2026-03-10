@@ -1832,8 +1832,18 @@ class CombinedStatusLine {
       parts.push(`[→${target}]`);
     }
     
-    const statusText = parts.join(' ');
-    
+    // Append current time (HH:MM) so tmux doesn't need a separate %H:%M token
+    // which would misalign due to emoji width miscalculation
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    parts.push(timeStr);
+
+    // Trailing padding: overwrite stale characters left by previous (longer) renders.
+    // Emoji width is ambiguous in tmux — some emoji render as 2 columns but tmux
+    // counts them as 1, causing leftover chars from prior output at the right edge.
+    const TRAILING_PAD = '   ';
+    const statusText = parts.join(' ') + TRAILING_PAD;
+
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details
     return {
@@ -2100,9 +2110,9 @@ async function main() {
     }
 
     const timeout = setTimeout(() => {
-      console.error('⚠️ SYS:TIMEOUT - Status line generation took >4s');
+      console.error('⚠️ SYS:TIMEOUT - Status line generation took >8s');
       process.stdout.write('⚠️ SYS:TIMEOUT\n', () => process.exit(1));
-    }, 4000);
+    }, 8000);
 
     const statusLine = new CombinedStatusLine();
     const status = await statusLine.generateStatus();
