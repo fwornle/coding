@@ -5,6 +5,7 @@
 - v1.0 -- UKB Pipeline Fix & Improvement (shipped 2026-03-03) -> [archive](milestones/v1.0-ROADMAP.md)
 - v2.0 -- Wave-Based Hierarchical Semantic Analysis (Phases 5-8, shipped 2026-03-07)
 - v2.1 -- Wave Pipeline Quality Restoration (Phases 9-14, shipped 2026-03-10)
+- v3.0 -- Workflow State Machine (Phases 15-19, in progress)
 
 ---
 
@@ -28,133 +29,99 @@
 
 </details>
 
+<details>
+<summary>v2.1 Wave Pipeline Quality Restoration -- Phases 9-14, SHIPPED 2026-03-10</summary>
+
+- [x] **Phase 9: Agent Pipeline Integration** (3/3 plans) -- completed 2026-03-07
+- [x] **Phase 10: KG Operations Restoration** (5/5 plans) -- completed 2026-03-08
+- [x] **Phase 11: Content Quality Gate** (3/3 plans) -- completed 2026-03-09
+- [x] **Phase 12: Pipeline Observability** (4/4 plans) -- completed 2026-03-09
+- [x] **Phase 13: Code Graph Agent Integration** (3/3 plans) -- completed 2026-03-09
+- [~] **Phase 14: Documentation Generation** (2/3 plans) -- 14-03 deferred to v3.0
+
+</details>
+
 ---
 
-## v2.1 -- Wave Pipeline Quality Restoration
+## v3.0 -- Workflow State Machine
 
 ### Overview
 
-Four phases that restore the full multi-agent pipeline into the wave-based architecture. v2.0 built the hierarchical wave structure but dropped the rich agent pipeline -- agents do lightweight LLM calls instead of deep semantic analysis, KG operators are completely skipped, there is no QA validation gate, and trace reporting is broken. Phase 9 re-integrates all five agents into the wave pipeline. Phase 10 restores the six KG operators that refine, deduplicate, and enrich persisted entities. Phase 11 adds content validation and the QA agent as a continuous quality gate with coordinator feedback loops. Phase 12 fixes the trace modal to show LLM counts, timing, model info, and data flow per agent and wave.
+Five phases that replace the ad-hoc workflow state management with a typed state machine. The current system tracks state via an untyped JSON progress file, has dashboard "fallback inference" that guesses substep status, uses boolean flags that get stuck between runs, and has multiple competing state sources. Phase 15 defines the type foundation (discriminated union states, typed transitions, Zod validation). Phase 16 integrates the state machine into the backend (wave-controller, health API, progress file as subscriber). Phase 17 types the SSE event layer so every transition emits a full state snapshot. Phase 18 rewrites the dashboard as a pure consumer of typed events with no inference. Phase 19 runs old and new side-by-side, validates, then removes all legacy inference code.
 
 ### Phases
 
-- [x] **Phase 9: Agent Pipeline Integration** - Route wave agents through the full agent pipeline (semantic analysis, persistence, insight generation, ontology classification) (completed 2026-03-07)
-- [x] **Phase 10: KG Operations Restoration** - Re-enable all six KG operators (conv, aggr, embed, dedup, pred, merge) in wave persistence (completed 2026-03-07)
-- [x] **Phase 11: Content Quality Gate** - Content validation enforcement and QA agent as continuous gate with coordinator feedback (completed 2026-03-09)
-- [x] **Phase 12: Pipeline Observability** - Trace modal with LLM counts, timing, model info, and data flow per agent and wave (completed 2026-03-09)
-- [x] **Phase 13: Code Graph Agent Integration** - Wire code-graph-rag into wave pipeline as code-evidence source (completed 2026-03-09)
-- [~] **Phase 14: Documentation Generation** - Docs agent generating PlantUML/PNG diagrams, constraint agent validation, KB markdown enrichment (14-03 deferred to v3.0)
+- [ ] **Phase 15: Type Definitions** - Discriminated union states, typed transitions, RunConfig/RunProgress separation, Zod schemas
+- [ ] **Phase 16: Backend State Machine** - Wave-controller typed events, health API state transitions, progress file as subscriber
+- [ ] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state
+- [ ] **Phase 18: Dashboard Consumer** - Dashboard renders from typed SSE only, correct substep coloring, typed commands, no inference
+- [ ] **Phase 19: Migration & Cleanup** - Parallel path validation, backward-compatible progress reader, legacy code removal
 
 ### Phase Details
 
-#### Phase 9: Agent Pipeline Integration
-**Goal**: Wave agents produce entities through the full agent pipeline -- deep semantic analysis, proper persistence, insight documents, and ontology classification -- instead of lightweight standalone LLM calls
-**Depends on**: Phase 7 (v2.0, shipped)
-**Requirements**: AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05
+#### Phase 15: Type Definitions
+**Goal**: All workflow states, transitions, and configuration are expressed as TypeScript types that make invalid states unrepresentable
+**Depends on**: Nothing (foundation phase)
+**Requirements**: SM-01, SM-02, SM-03, SM-04, SM-05
 **Success Criteria** (what must be TRUE):
-  1. Running `ukb full` produces entities where each observation shows evidence of deep semantic analysis (multi-paragraph, code-grounded) rather than one-liner stubs
-  2. The persistence agent handles entity storage for all three waves, with hierarchy fields (parentId, level, hierarchyPath) preserved through the persistence path
-  3. Each entity in the knowledge graph has an associated insight document generated by the insight generation agent (not hardcoded templates)
-  4. Every entity has an ontology classification (Component, SubComponent, Detail, etc.) assigned by the ontology agent, not auto-derived from hierarchy level
-**Plans:** 3 plans
+  1. WorkflowState is a discriminated union where each variant (idle/running/paused/completed/failed/cancelled) carries only the data relevant to that state -- accessing running-only fields on an idle state is a compile error
+  2. Attempting to code a transition from idle directly to paused (or any other invalid transition) produces a TypeScript compiler error
+  3. RunConfig (singleStepMode, mockLLM, llmMode, stepIntoSubsteps) is a readonly type set once at workflow start; RunProgress is a separate mutable type tracking current position
+  4. Step and substep status values are derived from the state machine position via a pure function -- no separate mutable status fields exist
+  5. Zod schemas exist for WorkflowState and can parse/reject JSON at runtime (e.g., reading progress file, receiving SSE event)
+**Plans**: TBD
 
-Plans:
-- [ ] 09-01-PLAN.md -- Foundation: type contracts, SemanticAnalysisAgent method, persistence hierarchy fix
-- [ ] 09-02-PLAN.md -- Wave agent integration: multi-step Wave 1, SemanticAnalysisAgent in Wave 2+3, per-entity ontology
-- [ ] 09-03-PLAN.md -- Insight enhancement: analysis artifact passthrough, L3 diagrams, end-to-end verification
-
-#### Phase 10: KG Operations Restoration
-**Goal**: Persisted entities are refined through the full KG operator pipeline -- converted, aggregated, embedded, deduplicated, scored, and merged -- producing a clean, enriched knowledge graph
-**Depends on**: Phase 9 (persistence agent must be restored first)
-**Requirements**: KGOP-01, KGOP-02, KGOP-03, KGOP-04, KGOP-05, KGOP-06
+#### Phase 16: Backend State Machine
+**Goal**: The wave-controller and health API operate through typed state transitions instead of ad-hoc progress updates
+**Depends on**: Phase 15
+**Requirements**: BE-01, BE-02, BE-03, BE-04
 **Success Criteria** (what must be TRUE):
-  1. After `ukb full`, entities have embedding vectors (visible via KG export or API) enabling semantic similarity queries
-  2. Running the pipeline twice on the same codebase does not create duplicate entities -- dedup operator with fuzzy name matching merges them
-  3. The merge operator preserves parentId during entity merging (no null-coalesce overwrites that break hierarchy)
-  4. Aggregation and prediction operators produce derived metadata (e.g., importance scores, relationship predictions) visible on entities
-**Plans:** 5/5 plans complete
+  1. Wave-controller emits typed WorkflowEvent objects (e.g., StepStarted, StepCompleted, SubstepAdvanced) instead of calling updateProgress() with ad-hoc field objects
+  2. The health API step-advance endpoint calls a state machine transition function that validates the transition is legal before applying it
+  3. The progress file is written by a single subscriber function that serializes the current WorkflowState -- neither wave-controller nor health API write to it directly
+  4. Cancelling a workflow triggers a typed Cancel transition that moves the state machine to the cancelled state, cleaning up in-flight work
+**Plans**: TBD
 
-Plans:
-- [ ] 10-01-PLAN.md -- Embedding infrastructure: Python script, batch generateEmbeddings(), mergeEntities hierarchy fix
-- [ ] 10-02-PLAN.md -- Operator logic fixes: hierarchy-aware dedup, cross-branch edge prediction, conv adaptation
-- [ ] 10-03-PLAN.md -- Wave-controller integration: wire all 6 operators, Dockerfile update, end-to-end verification
-- [ ] 10-04-PLAN.md -- Gap closure: persist operator-enriched fields, preserve ontology metadata, SSE progress flush
-- [ ] 10-05-PLAN.md -- Gap closure: propagate operator-enriched fields through persistence-agent to GraphDB
-
-#### Phase 11: Content Quality Gate
-**Goal**: Every agent output passes through content validation and QA review before persistence, with the coordinator able to reject and retry outputs that fail quality checks
-**Depends on**: Phase 9 (agents must be integrated first)
-**Requirements**: QUAL-06, QUAL-07, QUAL-08, QUAL-09
+#### Phase 17: SSE Event Typing
+**Goal**: Every workflow state transition is broadcast to connected clients as a typed SSE event carrying the full current state
+**Depends on**: Phase 16
+**Requirements**: SSE-01, SSE-02, SSE-03
 **Success Criteria** (what must be TRUE):
-  1. Entities with insufficient observations (fewer than 3) or generic content are caught by content validation and rejected before persistence
-  2. The QA agent reviews every agent output (not just a final pipeline stage) -- visible in logs as QA validation entries after each agent step
-  3. When QA rejects an agent output, the coordinator retries the agent with feedback -- visible in logs as retry attempts with QA feedback included in the prompt
-  4. L3 detail nodes are capped per parent, code-evidence filtering is active, and prompts include hardened anti-hallucination instructions
-**Plans:** 3/3 plans complete
+  1. Every state machine transition emits an SSE event containing the complete WorkflowState snapshot -- clients never need to compute derived state
+  2. SSE event types are discriminated unions (WorkflowStarted, StepAdvanced, WorkflowPaused, etc.) shared between backend and dashboard via copied type file
+  3. When a new SSE client connects (or reconnects after disconnect), it immediately receives the full current WorkflowState as its first event
+**Plans**: TBD
 
-Plans:
-- [ ] 11-01-PLAN.md -- Content validation gate in persistWaveResult + QA agent wired after each wave analyze step
-- [ ] 11-02-PLAN.md -- Coordinator retry-with-feedback loop when QA rejects wave output
-- [ ] 11-03-PLAN.md -- Anti-hallucination hardening: L3 caps, code-evidence filter, prompt strengthening
-
-#### Phase 12: Pipeline Observability
-**Goal**: The trace modal provides full visibility into pipeline execution -- how many LLM calls each agent made, how long each wave and agent took, which model was used, and what data flowed between agents
-**Depends on**: Phase 9 (agents must be integrated to have trace data)
-**Requirements**: OBSV-01, OBSV-02, OBSV-03, OBSV-04
+#### Phase 18: Dashboard Consumer
+**Goal**: The dashboard displays workflow state purely from typed SSE events with zero fallback inference or guessing
+**Depends on**: Phase 17
+**Requirements**: UI-01, UI-02, UI-03, UI-04, UI-05
 **Success Criteria** (what must be TRUE):
-  1. After `ukb full`, the trace modal shows LLM call counts broken down by wave (Wave 1: N calls, Wave 2: M calls) and by agent type (SemanticAnalyzer: X, InsightGen: Y)
-  2. The trace modal shows wall-clock timing for each wave and each agent invocation, enabling identification of bottlenecks
-  3. The trace modal displays which LLM model and provider were used for each agent call
-  4. The trace modal includes a data flow view showing what input each agent received and what output it produced, enabling diagnosis of information loss between pipeline stages
-**Plans:** 4/4 plans complete
+  1. The dashboard renders step/substep status, progress, and timing exclusively from SSE events -- grep for "fallback" and "infer" in dashboard source returns zero hits in workflow-related code
+  2. Substep coloring matches the state machine state: active substep is blue, completed is green, pending is gray -- never green-when-should-be-blue or stuck-in-wrong-color
+  3. Step/Into buttons in single-step mode dispatch typed command events and are disabled while a transition is in flight -- no double-click race conditions
+  4. The workflow label reads "Wave Analysis" (not "Batch") everywhere in the dashboard
+  5. The Redux store receives typed SSE events and stores them directly as WorkflowState -- no transformation, inference, or status derivation in the reducer
+**Plans**: TBD
 
-Plans:
-- [ ] 12-01-PLAN.md -- Backend trace instrumentation: type contracts, per-LLM-call capture, entity flow, trace history
-- [ ] 12-02-PLAN.md -- Data transport: StepInfo extension, constants, trace history REST endpoint
-- [ ] 12-03-PLAN.md -- TraceModal rewrite: 3-level nesting, context-aware detail panels, entity flow, parallel bars
-- [ ] 12-04-PLAN.md -- Historical traces: comparison view, anomaly detection, history tab integration
-
-#### Phase 13: Code Graph Agent Integration
-**Goal**: Wave agents use code-graph-rag as a primary evidence source -- querying call graphs, dependencies, and code snippets -- so entities are grounded in actual code structure rather than purely LLM-generated text
-**Depends on**: Phase 9 (agents must be integrated), CGR infrastructure (already running on port 3850)
-**Requirements**: CGR-01, CGR-02, CGR-03, CGR-04
+#### Phase 19: Migration & Cleanup
+**Goal**: Legacy state management code is fully removed after validated parallel operation proves the new state machine is correct
+**Depends on**: Phase 18
+**Requirements**: MIG-01, MIG-02, MIG-03
 **Success Criteria** (what must be TRUE):
-  1. After `ukb full`, entity observations include code-grounded evidence from CGR (call graph references, dependency info, code snippets)
-  2. Wave agents query CGR for each entity they analyze, visible in trace logs as CGR API calls
-  3. CGR index is automatically refreshed at wave1_init before analysis begins
-  4. Entities have a mix of LLM-generated and code-grounded observations distinguishable by source tag
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 13-01-PLAN.md -- Foundation: type contracts, CgrQueryCache, CgrObservationBuilder, wave1_init index refresh
-- [x] 13-02-PLAN.md -- Wave agent CGR integration: all 3 agents query CGR, SAA cgrContext injection, observation tagging
-- [ ] 13-03-PLAN.md -- Dashboard indicators: trace modal CGR section, freshness indicators, observation source breakdown
-
-#### Phase 14: Documentation Generation
-**Goal**: A docs agent generates PlantUML architecture diagrams for entities, compiles them to PNG, and embeds them in insight markdown documents. The constraint agent validates pipeline outputs before persistence.
-**Depends on**: Phase 13 (CGR evidence enriches diagrams), Phase 11 (quality gate framework)
-**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04
-**Success Criteria** (what must be TRUE):
-  1. After `ukb full`, Component and SubComponent entities have PlantUML diagrams (.puml files) generated by the docs agent
-  2. PlantUML diagrams are compiled to PNG and embedded (as image links) in the entity's insight markdown document
-  3. The constraint agent validates entity naming, observation count, and content quality before persistence -- rejections visible in logs
-  4. Insight documents include relationship diagrams showing connections to parent/child/sibling entities
-**Plans:** 2/3 plans executed
-
-Plans:
-- [ ] 14-01-PLAN.md -- Relationship diagrams, CGR evidence sections, new diagram storage paths in InsightGenerationAgent
-- [ ] 14-02-PLAN.md -- Unified constraint validation gate in wave-controller persistWaveResult
-- [ ] 14-03-PLAN.md -- Wire Wave 4 diagram scope, Docker build, end-to-end verification
+  1. During migration, the old updateProgress path and new state machine run side-by-side, with a comparison log that flags any state divergence between old and new
+  2. The progress file reader can parse both old-format (untyped) and new-format (WorkflowState) progress files without crashing -- enabling rollback if needed
+  3. After validation, all old inference code, fallback logic, and updateProgress calls are deleted -- the codebase has exactly one state management path
+**Plans**: TBD
 
 ### Progress
 
-**Execution Order:** Phases execute sequentially: 9 -> 10 -> 11 -> 12 -> 13 -> 14
+**Execution Order:** Phases execute sequentially: 15 -> 16 -> 17 -> 18 -> 19
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Agent Pipeline Integration | v2.1 | 3/3 | Verified | 2026-03-07 |
-| 10. KG Operations Restoration | v2.1 | 5/5 | Runtime verification | 2026-03-08 |
-| 11. Content Quality Gate | 3/3 | Complete    | 2026-03-09 | - |
-| 12. Pipeline Observability | 4/4 | Complete    | 2026-03-09 | - |
-| 13. Code Graph Agent Integration | 3/3 | Complete    | 2026-03-09 | - |
-| 14. Documentation Generation | 2/3 | In Progress|  | - |
+| 15. Type Definitions | v3.0 | 0/? | Not started | - |
+| 16. Backend State Machine | v3.0 | 0/? | Not started | - |
+| 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
+| 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
+| 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
