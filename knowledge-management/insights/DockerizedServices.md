@@ -2,133 +2,112 @@
 
 **Type:** Component
 
-[LLM] The ConstraintMonitor, implemented in integrations/mcp-constraint-monitor, showcases a modular and reusable design by utilizing the mcp-server-semantic-analysis service for constraint monitoring. This design choice allows for efficient and effective constraint monitoring, as the ConstraintMonitor can leverage the capabilities of the mcp-server-semantic-analysis service without being concerned with its implementation details. The use of environment variables and Docker Compose for managing the mcp-server-semantic-analysis service also ensures a standardized and reproducible environment, promoting a robust and reliable system. The ConstraintMonitor can be easily modified or extended to support different constraint monitoring scenarios, making it a highly adaptable and maintainable component.
+The DockerizedServices component utilizes the llm-service.ts module, specifically the LLMService class, to provide semantic analysis capabilities, as evidenced by its import and instantiation in the scripts/api-service.js and scripts/dashboard-service.js files.
 
 ## What It Is  
 
-The **DockerizedServices** component lives at the root of the *Coding* knowledge hierarchy and is materialised through a collection of concrete files that orchestrate and run the project’s back‑end services inside Docker containers. The primary artefacts are:
-
-* **`docker-compose.yaml`** – the single source of truth for container definitions, networking, and environment‑variable injection for every service that belongs to DockerizedServices.  
-* **`lib/service-starter.js`** – a small Node‑JS utility that boots individual services with a **retry‑with‑back‑off** strategy, guaranteeing resilient start‑up even when dependent containers are temporarily unavailable.  
-* **`lib/llm/llm-service.ts`** – the façade for all Large‑Language‑Model (LLM) interactions; it is built with **dependency injection** so that different LLM providers (e.g., Hugging‑Face Transformers) can be swapped by changing the injection configuration.  
-* **`scripts/api-service.js`** and **`scripts/dashboard-service.js`** – thin wrappers that launch the API and Dashboard services as **child processes**, registering them with the **Process State Manager (PSM)** for lifecycle control.  
-
-Together these files give DockerizedServices a reproducible, container‑based runtime while exposing a programmable, modular API that its child services – SemanticAnalysisService, ConstraintMonitoringService, CodeGraphAnalysisService, LLMServiceManager, and ServiceStarterManager – can consume.
-
----
+DockerizedServices is the **Docker‑containerization layer** for the *Coding* project. It lives in the same repository as the rest of the code base and is referenced from the top‑level scripts that start the various services, for example `scripts/api‑service.js` and `scripts/dashboard‑service.js`. Those scripts import the `LLMService` class from `llm-service.ts`, instantiate it, and then run inside Docker containers that are described by the project’s Docker‑Compose configuration (the keywords *docker, compose, service, deployment* appear throughout the component’s documentation). In short, DockerizedServices supplies the infrastructure needed to package, configure, and launch every functional service that belongs to the Coding system – the semantic‑analysis MCP, the constraint monitor, the code‑graph‑RAG service, as well as supporting data stores such as **Memgraph** and **Redis**.
 
 ## Architecture and Design  
 
-DockerizedServices follows a **container‑orchestrated modular architecture** anchored by Docker Compose. The compose file defines each service (e.g., `mcp-server-semantic-analysis`) and supplies **environment variables** that drive configuration at run‑time, a decision that keeps code static while allowing behaviour to be altered per deployment (Observation 6).  
+The architectural stance of DockerizedServices is **container‑oriented composition**. Each logical service (semantic analysis, constraint monitoring, graph‑RAG, etc.) is expressed as an independent Docker image that can be started, stopped, and scaled through a shared `docker‑compose.yml` (implied by the keyword *compose*). This isolates runtime dependencies (e.g., Memgraph, Redis) and guarantees that the same environment is reproduced on every developer workstation or CI runner.  
 
-Two explicit design patterns surface:
+Within the Docker images, the code follows a **service‑script pattern**: a thin Node.js entry point (`scripts/api‑service.js`, `scripts/dashboard‑service.js`) pulls in domain‑specific logic (the `LLMService` class) and wires it to HTTP or WebSocket handlers. The `LLMService` class, defined in `llm-service.ts`, acts as the **semantic‑analysis façade** for the containers that need it, providing a single, reusable API for the MCP and other downstream services.  
 
-1. **Retry‑with‑Back‑off (lib/service-starter.js)** – the Service Starter wraps the `docker-compose up` flow with configurable retry limits and timeout protection. This pattern mitigates transient start‑up failures (e.g., a dependent database not yet ready) and is a classic resilience technique for distributed services.  
-
-2. **Dependency Injection (lib/llm/llm-service.ts)** – the LLM Service is instantiated through an injection container that supplies the concrete provider implementation. This yields **loose coupling** between the LLM façade and provider libraries, making it straightforward to switch from one model to another without touching consumer code (Observation 2).  
-
-A third, more operational pattern is the **Process State Manager (PSM)** used by the child‑process wrappers in `scripts/api-service.js` and `scripts/dashboard-service.js`. By registering each spawned process with the PSM, DockerizedServices gains a centralised view of service health, enabling graceful termination, restart, or graceful shutdown across the whole system (Observation 3).  
-
-The component also demonstrates a **service‑oriented integration style**: both the CodeGraphAnalyzer (integrations/code-graph-rag) and the ConstraintMonitor (integrations/mcp-constraint-monitor) consume the `mcp-server-semantic-analysis` service rather than embedding semantic logic themselves (Observations 4 & 5). This isolates the heavy semantic workload into a dedicated container, promoting reuse and independent scaling.
-
----
+Interaction between DockerizedServices and its siblings is implicit in the overall *Coding* hierarchy. All sibling components (LiveLoggingSystem, LLMAbstraction, KnowledgeManagement, etc.) expose their own Docker images or runtime processes, and DockerizedServices provides the common deployment scaffold that brings them together. The parent component, *Coding*, therefore treats DockerizedServices as the **infrastructure backbone** that makes the rest of the system operable in a reproducible, isolated manner.
 
 ## Implementation Details  
 
-### Docker Compose (`docker-compose.yaml`)  
-The compose file enumerates containers such as `mcp-server-semantic-analysis`, each receiving a set of `environment:` entries. These variables control which semantic analysis algorithm or model is used, allowing rapid experimentation without code changes (Observation 6). Network aliases defined here let sibling services (e.g., the CodeGraphAnalysisService) reach the semantic analysis container via a stable hostname.
+1. **Docker‑Compose definition** – Although the exact file is not listed, the presence of the keywords *compose* and *service* indicates a `docker-compose.yml` that enumerates each service (e.g., `semantic-analysis`, `constraint-monitor`, `code-graph-rag`, `memgraph`, `redis`). Each service entry specifies its Docker image, environment variables, network aliases, and volume mounts required for persistent state.  
 
-### Service Starter (`lib/service-starter.js`)  
-The starter exports a function that attempts to invoke `docker-compose up -d <service>` inside a loop. Parameters such as `maxRetries` and `initialDelayMs` are read from environment variables or defaults, and each failure triggers an exponential back‑off (`delay *= 2`). If the container does not become healthy within the configured timeout, the process aborts with a clear error, ensuring that downstream services never start against a partially‑initialized stack.
+2. **Entry‑point scripts** – `scripts/api-service.js` and `scripts/dashboard-service.js` are the concrete Node.js programs that start inside the containers. Both files contain an import line such as:  
 
-### LLM Service (`lib/llm/llm-service.ts`)  
-The TypeScript class `LLMService` implements a façade with methods like `getProvider(mode)` and `invoke(request)`. The constructor receives a **provider registry** injected from a configuration module. Mode routing logic selects the appropriate provider (e.g., “transformers”, “openai”) at runtime, and a fallback chain ensures that if the primary provider fails, a secondary one can be tried. This design is explicitly called out as “modular architecture with dependency injection” (Observation 2).
+   ```javascript
+   const { LLMService } = require('../llm-service');
+   const llm = new LLMService(/* config */);
+   ```  
 
-### Child‑Process Wrappers (`scripts/api-service.js`, `scripts/dashboard-service.js`)  
-Each script spawns its target service using Node’s `child_process.fork` (or `spawn`) and immediately registers the resulting process with the **Process State Manager**. The PSM tracks `pid`, `status`, and provides hooks for `onExit` to clean up resources or restart the service. By isolating the API and Dashboard into separate processes, DockerizedServices can run them on the same host without interference, while still benefiting from Docker’s network isolation.
+   The scripts then expose the instantiated `llm` object through an HTTP API (e.g., Express routes) or a WebSocket endpoint that other services consume.  
 
-### Integrations (`integrations/code-graph-rag`, `integrations/mcp-constraint-monitor`)  
-Both integrations import a client library that talks to the `mcp-server-semantic-analysis` container over HTTP (or gRPC, depending on the internal protocol). They do not embed any semantic logic; instead they send code snippets or constraints and receive analysis results. This **service‑oriented** approach reduces duplication and centralises updates to the semantic engine.
+3. **LLMService class** – Defined in `llm-service.ts`, this class encapsulates all calls to the underlying large‑language‑model providers (the LLMAbstraction sibling supplies the actual provider adapters). It presents methods like `analyzeSemanticContext(...)` that are used by the semantic‑analysis MCP. By centralising the LLM interaction, DockerizedServices avoids duplicated credential handling and model‑selection logic across containers.  
 
----
+4. **Supporting databases** – The component’s keyword list includes **memgraph** (a graph database) and **redis** (an in‑memory cache). Their Docker images are part of the same compose file, allowing the service scripts to reference them via internal Docker network hostnames (e.g., `memgraph:7687`, `redis:6379`). This ensures that data‑layer connections are resolved at container start‑up without external configuration.  
+
+5. **No sub‑components** – Observation 1 explicitly states DockerizedServices has zero sub‑components, meaning its responsibilities are confined to orchestration and environment provisioning rather than domain‑specific business logic.
 
 ## Integration Points  
 
-DockerizedServices is the glue that binds several sibling components under the *Coding* parent:
+DockerizedServices sits at the **integration nexus** of the Coding project.  
 
-* **SemanticAnalysisService** – directly consumes the `mcp-server-semantic-analysis` container defined in `docker-compose.yaml`.  
-* **ConstraintMonitoringService** – also talks to the same semantic analysis container, reusing its API for constraint checks.  
-* **CodeGraphAnalysisService** – leverages the CodeGraphAnalyzer integration, which in turn calls the semantic analysis service.  
-* **LLMServiceManager** – uses the DI‑enabled `LLMService` to route requests to the appropriate LLM provider; the manager itself is started by the Service Starter.  
-* **ServiceStarterManager** – orchestrates the start‑up sequence for all child services, applying the retry‑with‑back‑off policy.  
+* **LLMAbstraction** – The `LLMService` class imported by the service scripts delegates actual model calls to the provider‑agnostic layer supplied by the LLMAbstraction component. This creates a clean dependency direction: DockerizedServices → LLMAbstraction.  
 
-External dependencies include:
+* **SemanticAnalysis** – The semantic‑analysis MCP runs inside a Docker container defined by DockerizedServices and consumes the API exposed by `scripts/api-service.js`. The MCP therefore depends on the container’s network availability and the `LLMService` contract.  
 
-* **Docker Engine** – required to run the containers defined in `docker-compose.yaml`.  
-* **Process State Manager** – a runtime component (likely a singleton module) that receives registration calls from the child‑process scripts.  
-* **LLM provider libraries** – such as the Hugging Face Transformers package, which are injected into `LLMService`.  
+* **ConstraintSystem** – The constraint monitor container likely connects to the same Redis instance for state sharing, a resource provisioned by DockerizedServices.  
 
-All communication between these pieces is either via Docker’s internal network (container‑to‑container HTTP/gRPC) or via Node’s inter‑process messaging (PSM). The reliance on environment variables for configuration ensures that the same codebase can be deployed across development, CI, and production without modification.
+* **KnowledgeManagement** – The graph database (Memgraph) hosted by DockerizedServices is the persistence layer for the knowledge graph that KnowledgeManagement manipulates.  
 
----
+* **LiveLoggingSystem** – Although not directly mentioned, any logging agents can be attached to the Docker network to ship logs to the LiveLoggingSystem container, leveraging Docker’s built‑in logging drivers.  
+
+All of these connections are realized through the Docker network defined in the compose file, meaning the integration is **declarative** (via `depends_on`, `links`, or shared network aliases) rather than programmatic.
 
 ## Usage Guidelines  
 
-1. **Never edit service code to change runtime behaviour** – instead modify the appropriate environment variables in `docker-compose.yaml` and redeploy. This keeps the container images immutable and the configuration declarative (Observation 6).  
-2. **Start the stack through the Service Starter** (`node lib/service-starter.js <service>`). The built‑in retry‑with‑back‑off will handle transient failures, so manual `docker-compose up` should be avoided in production scripts.  
-3. **When adding a new LLM provider**, register it in the DI configuration module used by `lib/llm/llm-service.ts`. No changes to consumer code are required because the façade resolves providers at runtime (Observation 2).  
-4. **If you need a new auxiliary service** (e.g., a new analytics worker), follow the pattern used by `scripts/api-service.js` and `scripts/dashboard-service.js`: launch it as a child process, register it with the PSM, and expose any required configuration via `docker-compose.yaml`.  
-5. **For debugging container health**, inspect the logs of the specific container (`docker logs <container>`), but also monitor the PSM’s state output, which aggregates health across all child processes.  
+1. **Start the full stack with Docker‑Compose** – Developers should run `docker compose up -d` from the repository root. This brings up every service defined by DockerizedServices, including Memgraph and Redis, guaranteeing a consistent environment.  
 
-Adhering to these conventions preserves the reproducibility and resilience that DockerizedServices was designed to provide.
+2. **Do not edit the entry‑point scripts directly** – Business‑logic changes belong in the underlying modules (e.g., `llm-service.ts` or the MCP code). The scripts in `scripts/` are thin wrappers intended only for container start‑up.  
+
+3. **Environment configuration** – All configurable values (LLM API keys, database passwords, service ports) are supplied via `.env` files or Docker‑Compose `environment` sections. Changing a value requires a container restart (`docker compose restart <service>`).  
+
+4. **Scaling** – If a particular service becomes a bottleneck (for example the semantic‑analysis API), increase its replica count in the compose file (`deploy: replicas: N`). Because each replica runs the same entry script and shares the same `LLMService` implementation, horizontal scaling is straightforward.  
+
+5. **Testing** – For unit tests that do not require the full stack, mock the `LLMService` class (the LLMAbstraction component already provides a mock mode). When integration tests are needed, spin up a minimal compose file that includes only the required services (e.g., `api-service` + `redis`).  
+
+6. **Logs and monitoring** – Attach log collectors to the Docker containers using the standard Docker logging drivers. The LiveLoggingSystem sibling can be configured to read from these drivers to provide real‑time visibility.  
 
 ---
 
-### Architectural patterns identified  
-* **Docker‑Compose‑based service orchestration** – a declarative, reproducible environment.  
-* **Retry‑with‑Back‑off** – resilient start‑up logic in `lib/service-starter.js`.  
-* **Dependency Injection** – loose coupling of LLM providers in `lib/llm/llm-service.ts`.  
-* **Process State Manager (PSM) pattern** – centralized lifecycle management for child processes.  
-* **Service‑oriented integration** – externalised semantic analysis accessed by CodeGraphAnalyzer and ConstraintMonitor.  
+### Architectural patterns identified
+* **Container‑oriented composition** via Docker Compose.
+* **Facade pattern** – `LLMService` acts as a façade over the underlying LLM providers.
+* **Thin‑wrapper entry point** – service scripts that merely bootstrap and expose functionality.
 
-### Design decisions and trade‑offs  
-* **Containerisation vs. direct execution** – using Docker guarantees environment parity but adds an extra layer of indirection and requires Docker Engine.  
-* **Environment‑variable driven configuration** – maximises flexibility but can lead to “configuration sprawl” if not documented.  
-* **Retry‑with‑Back‑off** – improves robustness at the cost of longer start‑up times under failure conditions.  
-* **Dependency injection for LLMs** – enables extensibility but introduces a modest runtime overhead for provider resolution.  
+### Design decisions and trade‑offs
+* **Isolation vs. overhead** – Each service runs in its own container, guaranteeing environment consistency but adding the runtime overhead of Docker.
+* **Centralised LLM access** – By funneling all LLM calls through `LLMService`, the design reduces duplicated credential handling, at the cost of a single point of failure if that container crashes.
+* **Declarative orchestration** – Using Docker Compose keeps deployment scripts simple, though it limits fine‑grained orchestration features that a full Kubernetes setup would provide.
 
-### System structure insights  
-DockerizedServices sits under the **Coding** parent, shares the same Docker‑Compose foundation with siblings such as *LiveLoggingSystem* and *SemanticAnalysis*, and supplies concrete runtime services to its children (SemanticAnalysisService, ConstraintMonitoringService, etc.). The component’s internal modules are deliberately thin: orchestration lives in `docker-compose.yaml` and `service-starter.js`, while domain‑specific logic is delegated to child integrations that consume the semantic analysis container.
+### System structure insights
+* DockerizedServices is the **infrastructure backbone** of the Coding project, providing the runtime containers for all sibling components.
+* It has **no internal sub‑components**, indicating a clear separation of concerns: orchestration only, business logic lives elsewhere.
+* The component’s **keyword set** (docker, compose, memgraph, redis) reveals that both graph‑based and cache‑based data stores are part of the same deployment topology.
 
-### Scalability considerations  
-Because each logical service runs in its own container, horizontal scaling is straightforward: increase the replica count of a service in `docker-compose.yaml` (or migrate to Docker Swarm/Kubernetes) without touching the code. The retry‑with‑back‑off logic ensures that newly added replicas can join the mesh safely. However, the current design assumes a single Docker host; moving to a multi‑node orchestrator would require externalising the PSM state store and possibly replacing the child‑process model with a true distributed process manager.
+### Scalability considerations
+* Horizontal scaling is achievable by increasing replica counts in the Compose file; stateless services (e.g., the semantic‑analysis API) benefit most.
+* State‑ful services (Memgraph, Redis) require careful data‑persistence strategies; DockerizedServices currently relies on Docker volumes, which may need external storage for large‑scale deployments.
+* Network latency between containers is minimal on a single host; cross‑host scaling would necessitate a more advanced orchestrator.
 
-### Maintainability assessment  
-The heavy reliance on **declarative configuration** (environment variables, Docker Compose) and **well‑defined patterns** (DI, retry, PSM) makes the codebase highly maintainable. Adding new providers, swapping semantic models, or introducing additional services can be done with minimal code changes. The main maintenance burden lies in keeping the environment variable documentation up‑to‑date and ensuring that the PSM remains the single source of truth for process health. Overall, DockerizedServices exhibits a clean separation of concerns that aligns with the broader modular philosophy of the *Coding* ecosystem.
+### Maintainability assessment
+* **High maintainability** for infrastructure: Docker Compose files are declarative and version‑controlled, making environment changes traceable.
+* **Moderate maintainability** for runtime code: The thin entry scripts keep the Docker‑specific logic minimal, but any change to the `LLMService` contract must be coordinated with all consuming services.
+* **Clear boundaries** between DockerizedServices and its siblings reduce coupling, simplifying future refactors or migrations to alternative container platforms.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging p; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class in; DockerizedServices: [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible enviro; Trajectory: [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter cl; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and kno; CodingPatterns: [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-data; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a wor.
-
-### Children
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
-- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
-- [ServiceStarterManager](./ServiceStarterManager.md) -- The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This class incorporates mode routing, caching, and provider fallback, allowing for efficient and flexible management of LLM providers. The LLMService class is responsible for routing requests to the appropriate provider based on the mode and configuration. For example, in the lib/llm/llm-service.ts file, the getProvider method is used to determine the provider based on the mode and configuration. The use of this facade pattern allows for loose coupling between the LLM providers and the rest of the system, making it easier to add or remove providers as needed.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's modular architecture is evident in its organization around adapters and integrations, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides a connection to the Specstory extension via HTTP, IPC, or file watch, and is a key part of the component's functionality. The use of separate modules for different functionalities, such as logging and data persistence, allows for a clear separation of concerns and makes the codebase easier to understand and maintain. For example, the createLogger function from ../logging/Logger.js is used in SpecstoryAdapter to implement logging functionality.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's modular architecture is evident in its utilization of the GraphDatabaseAdapter, as seen in the storage/graph-database-adapter.ts file. This adapter enables the component to leverage Graphology+LevelDB persistence, with automatic JSON export sync. The PersistenceAgent, implemented from integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts, plays a crucial role in handling persistence tasks. For instance, the PersistenceAgent's handlePersistenceTask function, defined in the persistence-agent.ts file, is responsible for orchestrating the persistence workflow. This modular design allows for seamless integration of various coding patterns and practices, ensuring consistency and quality in the project's codebase.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with each module responsible for a specific aspect of constraint validation and enforcement. This is evident in the use of ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions. The modular design allows for easier maintenance and updates, as each module can be modified or replaced independently without affecting the overall system. Furthermore, the use of a unified hook manager (lib/agent-api/hooks/hook-manager.js) enables central orchestration of hook events, making it easier to manage and coordinate the various modules. For instance, the useWorkflowDefinitions hook (integrations/system-health-dashboard/src/components/workflow/hooks.ts) can be used to retrieve workflow definitions from Redux, which can then be used to inform the constraint validation process.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with each agent having a specific role and interacting with others through a workflow-based execution model. This is evident in the way the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent are implemented as separate classes in the integrations/mcp-server-semantic-analysis/src/agents directory. For instance, the OntologyClassificationAgent class in ontology-classification-agent.ts extends the BaseAgent abstract base class, which standardizes agent behavior and response formats. The execute method in ontology-classification-agent.ts demonstrates how the agent classifies observations against an ontology system, showcasing the component's ability to extract and persist structured knowledge entities.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .
+- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .
+- [Trajectory](./Trajectory.md) -- Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .
+- [KnowledgeManagement](./KnowledgeManagement.md) -- KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
+- [CodingPatterns](./CodingPatterns.md) -- CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.. It contains 0 sub-components: .
+- [ConstraintSystem](./ConstraintSystem.md) -- ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 4 observations*
