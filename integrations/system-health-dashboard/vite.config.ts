@@ -11,7 +11,17 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true, // Enable source maps for production builds (debugging)
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-redux': ['@reduxjs/toolkit', 'react-redux'],
+          'vendor-charts': ['recharts'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
   },
   server: {
     port: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032'),
