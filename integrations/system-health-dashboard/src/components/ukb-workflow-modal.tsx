@@ -92,6 +92,8 @@ import {
   syncLLMStateFromServer,
   selectLLMState,
   selectGlobalLLMMode,
+  // Phase 18: WorkflowState selector
+  selectWorkflowState,
   type LLMMode,
   type HistoricalWorkflow,
   type UKBProcess,
@@ -99,6 +101,7 @@ import {
   type StepInfo,
   type WorkflowTimingStats,
 } from '@/store/slices/ukbSlice'
+import { useWorkflowWebSocket } from '@/hooks/useWorkflowWebSocket'
 
 interface UKBWorkflowModalProps {
   open: boolean
@@ -400,12 +403,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Cancel workflow state
   const [cancelLoading, setCancelLoading] = useState(false)
 
+  // Phase 18: WorkflowState + WebSocket command dispatch
+  const workflowState = useSelector(selectWorkflowState)
+  const { sendCommand, isTransitionInFlight } = useWorkflowWebSocket()
+
   // Single-step debugging mode state (MVI: from Redux store)
   const singleStepMode = useSelector(selectSingleStepMode)
   const singleStepModeExplicit = useSelector(selectSingleStepModeExplicit)
   const stepPaused = useSelector(selectStepPaused)
   const pausedAtStep = useSelector(selectPausedAtStep)
-  const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)  // Local UI state only
+  // stepAdvanceLoading replaced by isTransitionInFlight from useWorkflowWebSocket
 
   // LLM Mock mode state (MVI: from Redux store)
   const mockLLM = useSelector(selectMockLLM)
@@ -508,125 +515,31 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  // Advance to next step when paused (MVI: dispatches Redux action)
-  // After advancing, poll rapidly to catch the new pause state faster
-  // CRITICAL FIX: If we're inside substeps (selectedSubStep is set), send stepInto: true
-  // to advance to the NEXT substep, not skip to the next major step
-  const handleStepAdvance = async (e: React.MouseEvent) => {
+  // Phase 18: Step advance via typed WebSocket command (no REST polling)
+  // "Step" advances to the next major step, exiting substep mode if active
+  const handleStepAdvance = (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
 
-    setStepAdvanceLoading(true)
-    try {
-      // "Step" always exits substep mode — it advances to the next major step.
-      // Whether we're at a main step or inside substeps, stepInto: false ensures
-      // remaining substeps are auto-completed without pausing.
-      const body: Record<string, boolean> = { stepInto: false }
+    const workflowId = workflowState?.status === 'running' ? workflowState.workflowId
+      : workflowState?.status === 'paused' ? workflowState.workflowId
+      : 'current'
 
-      Logger.info(LogCategories.UKB, 'Step: advancing to next major step (exiting substep mode if active)')
-      const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      const data = await response.json()
-      if (data.status === 'success') {
-        dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
-        Logger.info(LogCategories.UKB, 'Step advanced', data.data)
-
-        // Rapidly poll for new pause state (every 500ms, up to 8 times = 4 seconds)
-        // This catches the new pause state much faster than waiting for the 5s polling interval
-        const pollForNewPause = async (attempts: number = 0) => {
-          if (attempts >= 8) {
-            Logger.trace(LogCategories.UKB, 'Step advance poll timeout, regular polling will continue')
-            return
-          }
-          try {
-            await new Promise(resolve => setTimeout(resolve, 500))
-            const progressResponse = await fetch(`${apiBaseUrl}/api/ukb/processes`)
-            const progressData = await progressResponse.json()
-            if (progressData.status === 'success' && progressData.data?.processes?.length > 0) {
-              const activeProcess = progressData.data.processes.find((p: any) => p.status === 'running')
-              if (activeProcess?.stepPaused && activeProcess?.pausedAtStep) {
-                Logger.info(LogCategories.UKB, 'Detected new pause state', {
-                  pausedAt: activeProcess.pausedAtStep,
-                  attempts: attempts + 1
-                })
-                dispatch(syncStepPauseFromServer({
-                  paused: true,
-                  pausedAt: activeProcess.pausedAtStep
-                }))
-                return // Found new pause state
-              }
-            }
-            // Continue polling if not yet paused
-            pollForNewPause(attempts + 1)
-          } catch (pollError) {
-            Logger.trace(LogCategories.UKB, 'Step advance poll error', pollError)
-            pollForNewPause(attempts + 1)
-          }
-        }
-        // Start rapid polling in background (don't await)
-        pollForNewPause()
-      } else {
-        Logger.error(LogCategories.UKB, 'Failed to advance step', data)
-      }
-    } catch (error) {
-      Logger.error(LogCategories.UKB, 'Error advancing step', error)
-    } finally {
-      setStepAdvanceLoading(false)
-    }
+    Logger.info(LogCategories.UKB, 'Step: advancing to next major step via WebSocket command')
+    sendCommand({ type: 'STEP_ADVANCE', payload: { workflowId } })
   }
 
-  // Step into sub-steps: advances and enables sub-step pausing
-  const handleStepInto = async (e: React.MouseEvent) => {
+  // Phase 18: Step into sub-steps via typed WebSocket command (no REST polling)
+  const handleStepInto = (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
 
-    setStepAdvanceLoading(true)
-    try {
-      Logger.info(LogCategories.UKB, 'Stepping into sub-steps')
-      const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepInto: true })
-      })
-      const data = await response.json()
-      if (data.status === 'success') {
-        dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
-        Logger.info(LogCategories.UKB, 'Stepped into sub-steps', data.data)
+    const workflowId = workflowState?.status === 'running' ? workflowState.workflowId
+      : workflowState?.status === 'paused' ? workflowState.workflowId
+      : 'current'
 
-        // Rapidly poll for new pause state at sub-step level
-        const pollForNewPause = async (attempts: number = 0) => {
-          if (attempts >= 12) return // Sub-steps may be quick, poll a bit longer
-          try {
-            await new Promise(resolve => setTimeout(resolve, 400))
-            const progressResponse = await fetch(`${apiBaseUrl}/api/ukb/processes`)
-            const progressData = await progressResponse.json()
-            if (progressData.status === 'success' && progressData.data?.processes?.length > 0) {
-              const activeProcess = progressData.data.processes.find((p: any) => p.status === 'running')
-              if (activeProcess?.stepPaused && activeProcess?.pausedAtStep) {
-                dispatch(syncStepPauseFromServer({
-                  paused: true,
-                  pausedAt: activeProcess.pausedAtStep
-                }))
-                return
-              }
-            }
-            pollForNewPause(attempts + 1)
-          } catch {
-            pollForNewPause(attempts + 1)
-          }
-        }
-        pollForNewPause()
-      } else {
-        Logger.error(LogCategories.UKB, 'Failed to step into', data)
-      }
-    } catch (error) {
-      Logger.error(LogCategories.UKB, 'Error stepping into sub-steps', error)
-    } finally {
-      setStepAdvanceLoading(false)
-    }
+    Logger.info(LogCategories.UKB, 'Step into: advancing into sub-steps via WebSocket command')
+    sendCommand({ type: 'STEP_INTO', payload: { workflowId } })
   }
 
   // Toggle LLM mock mode (MVI: dispatches Redux action)
@@ -1254,7 +1167,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         // Batch phase: progress = batch completion × 85%
         stepBasedProgress = Math.round((currentBatch / totalBatches) * BATCH_WEIGHT * 100)
       } else {
-        // Fallback: simple step percentage
+        // Simple step percentage (no batch weighting available)
         stepBasedProgress = Math.round((completedSteps / totalSteps) * 100)
       }
 
@@ -1292,7 +1205,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           }, 0)
         }
 
-        // Fallback to stored averages if computed medians are 0
+        // Use stored averages when computed medians are 0
         if (medianBatchMs === 0) medianBatchMs = workflowStats.avgBatchDurationMs || 0
         if (medianFinalizationMs === 0) medianFinalizationMs = workflowStats.avgFinalizationDurationMs || 0
 
@@ -2155,11 +2068,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           variant="outline"
                           size="sm"
                           onClick={handleStepAdvance}
-                          disabled={stepAdvanceLoading}
+                          disabled={isTransitionInFlight}
                           className="flex items-center gap-1 h-7 px-2 text-xs bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
                           title={`Step over: ${pausedAtStep || 'unknown'}`}
                         >
-                          {stepAdvanceLoading ? (
+                          {isTransitionInFlight ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <ChevronRight className="h-3 w-3" />
@@ -2171,11 +2084,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                             variant="outline"
                             size="sm"
                             onClick={handleStepInto}
-                            disabled={stepAdvanceLoading}
+                            disabled={isTransitionInFlight}
                             className="flex items-center gap-1 h-7 px-2 text-xs bg-blue-50 border-blue-300 hover:bg-blue-100"
                             title={`Step into sub-steps of: ${pausedAtStep}`}
                           >
-                            {stepAdvanceLoading ? (
+                            {isTransitionInFlight ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
                               <ChevronsRight className="h-3 w-3" />
@@ -2421,7 +2334,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         })
                       }
                     } else {
-                      // Fallback: Create summary steps from batch stats (old format, backwards compatible)
+                      // Old format (pre-stepOutputs): Create summary steps from batch stats for display
                       allSteps.push({
                         name: `[${batch.batchId}] git history`,
                         status: 'completed',
