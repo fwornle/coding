@@ -15,7 +15,7 @@
 
 ### Backend Integration
 
-- [ ] **BE-01**: Wave-controller dispatches typed events instead of ad-hoc updateProgress() calls
+- [x] **BE-01**: Wave-controller dispatches typed events instead of ad-hoc updateProgress() calls
 - [x] **BE-02**: Health API step-advance endpoint operates on the state machine
 - [x] **BE-03**: Progress file written by subscriber — not directly by wave-controller or health API
 - [x] **BE-04**: Workflow cancel operates via state machine transition
@@ -66,7 +66,7 @@
 | SM-03 | Phase 15 | Complete |
 | SM-04 | Phase 15 | Complete |
 | SM-05 | Phase 15 | Complete |
-| BE-01 | Phase 16 | Pending |
+| BE-01 | Phase 16 | Complete |
 | BE-02 | Phase 16 | Complete |
 | BE-03 | Phase 16 | Complete |
 | BE-04 | Phase 16 | Complete |
