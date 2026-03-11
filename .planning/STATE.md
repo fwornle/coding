@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
-status: completed
-stopped_at: Completed 17-02 (deploy and verify SSE event pipeline)
-last_updated: "2026-03-11T06:48:37.329Z"
-last_activity: 2026-03-11 — Completed plan 17-02 (deploy and verify SSE event pipeline)
+status: in-progress
+stopped_at: Completed 18-01 (dashboard Redux consumer pipeline)
+last_updated: "2026-03-11T11:15:07Z"
+last_activity: 2026-03-11 — Completed plan 18-01 (dashboard Redux consumer pipeline)
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 8
+  completed_plans: 7
+  percent: 87
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Typed state machine for workflow orchestration -- single source of truth, typed transitions, dashboard as pure consumer
-**Current focus:** v3.0 Phase 17 — SSE Event Typing
+**Current focus:** v3.0 Phase 18 — Dashboard Consumer
 
 ## Current Position
 
-Phase: 17 of 19 (SSE Event Typing) -- COMPLETE
-Plan: 2 of 2 complete
-Status: Phase Complete
-Last activity: 2026-03-11 — Completed plan 17-02 (deploy and verify SSE event pipeline)
+Phase: 18 of 19 (Dashboard Consumer)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-03-11 — Completed plan 18-01 (dashboard Redux consumer pipeline)
 
-Progress: [██████████] 100% (6/6 plans complete)
+Progress: [████████░░] 87% (7/8 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 6min
-- Total execution time: 28min
+- Total plans completed: 7
+- Average duration: 7min
+- Total execution time: 48min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -47,6 +47,7 @@ Progress: [██████████] 100% (6/6 plans complete)
 | 16    | 02   | 8min     | 3     | 5     |
 | 17    | 01   | 4min     | 2     | 7     |
 | 17    | 02   | 15min    | 2     | 10    |
+| 18    | 01   | 5min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Progress: [██████████] 100% (6/6 plans complete)
 - [17-02]: Minimal SSE client via http.get() -- no eventsource dependency, ~30 lines with exponential backoff reconnect
 - [17-02]: STATE_SNAPSHOT envelope for typed state forwarding over WebSocket
 - [17-02]: Legacy event types mapped from status transitions for backward compat (removed in Phase 18)
+- [18-01]: Single setWorkflowState action replaces 12 granular event handlers -- no event-by-event reconstruction
+- [18-01]: Backward-compat sync in setWorkflowState writes to legacy execution fields for unmigrated components
+- [18-01]: deriveStepStatuses uses backend step names from stepMappings, reverse-mapped to agent IDs for UI
 
 ### Critical Pitfalls
 
@@ -87,6 +91,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T06:42:53Z
-Stopped at: Completed 17-02 (deploy and verify SSE event pipeline)
-Resume with: Phase 17 complete. All v3.0 milestone plans executed.
+Last session: 2026-03-11T11:10:21Z
+Stopped at: Completed 18-01 (dashboard Redux consumer pipeline)
+Resume with: Execute 18-02 (component migration to use WorkflowState selectors directly).

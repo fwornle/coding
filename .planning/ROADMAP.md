@@ -111,7 +111,7 @@ Plans:
   3. Step/Into buttons in single-step mode dispatch typed command events and are disabled while a transition is in flight -- no double-click race conditions
   4. The workflow label reads "Wave Analysis" (not "Batch") everywhere in the dashboard
   5. The Redux store receives typed SSE events and stores them directly as WorkflowState -- no transformation, inference, or status derivation in the reducer
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 18-01-PLAN.md -- WebSocket STATE_SNAPSHOT handling, Redux store with direct WorkflowState, derived selectors
 - [ ] 18-02-PLAN.md -- Substep coloring from state machine, typed command buttons, Wave Analysis renaming, inference removal
@@ -135,5 +135,5 @@ Plans:
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
 | 17. SSE Event Typing | 2/2 | Complete    | 2026-03-11 | - |
-| 18. Dashboard Consumer | v3.0 | 0/2 | Not started | - |
+| 18. Dashboard Consumer | 1/2 | In Progress|  | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
