@@ -685,7 +685,9 @@ class SystemHealthAPIServer {
                 // They will appear in the History tab instead
                 const isTerminalState = ['cancelled', 'completed', 'failed'].includes(inferredStatus);
                 const isActiveState = inferredStatus === 'running' || inferredStatus === 'starting' || inferredStatus === 'cancelling';
-                const isRelevant = !isTerminalState && (isActiveState || (age < 1800000 && !isTerminalState));
+                // Include terminal states for 30 minutes so dashboard can show final step statuses
+                const isRecentTerminal = isTerminalState && age < 1800000;
+                const isRelevant = isActiveState || isRecentTerminal || (age < 1800000 && !isTerminalState);
 
                 if (isRelevant && !alreadyRegistered) {
                     // Compute totalSteps and completedSteps from stepsDetail if top-level fields are missing
@@ -921,13 +923,17 @@ class SystemHealthAPIServer {
             // Check for terminal states that lack a progress object
             if (state && state.status === 'completed' && state.workflowId) {
                 const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4'];
+                // Use enriched stepsDetail if available from state machine accumulation
+                const completedStepsDetail = (state.stepsDetail && Array.isArray(state.stepsDetail) && state.stepsDetail.length > 0)
+                    ? state.stepsDetail.map(s => ({ ...s, status: s.status || 'completed' }))
+                    : WAVE_STEPS.map(name => ({ name, status: 'completed' }));
                 return {
                     status: 'completed',
                     workflowName: state.workflowName || 'wave-analysis',
                     team: 'coding',
                     completedSteps: state.completedSteps || 4,
                     totalSteps: 4,
-                    stepsDetail: WAVE_STEPS.map(name => ({ name, status: 'completed' })),
+                    stepsDetail: completedStepsDetail,
                     stepsCompleted: WAVE_STEPS,
                     stepsFailed: [],
                     duration: state.duration,
@@ -1011,19 +1017,42 @@ class SystemHealthAPIServer {
         const completedStepNames = new Set(progress.completedSteps || []);
 
         // Build stepsDetail array matching wave-analysis structure
-        const stepsDetail = WAVE_STEPS.map((waveName, idx) => {
-            let status = 'pending';
-            if (completedStepNames.has(waveName)) {
-                status = 'completed';
-            } else if (progress.currentWave === idx + 1) {
-                status = 'running';
+        let stepsDetail;
+        if (state.stepsDetail && Array.isArray(state.stepsDetail) && state.stepsDetail.length > 0) {
+            // State machine has enriched stepsDetail from step-complete events — use directly
+            const enrichedSteps = state.stepsDetail.map(step => ({
+                ...step,
+                status: step.status || 'completed',
+            }));
+            // Add any remaining pending waves not yet in stepsDetail
+            const completedNames = new Set(enrichedSteps.map(s => s.name));
+            for (const waveName of WAVE_STEPS) {
+                if (!completedNames.has(waveName)) {
+                    const waveIdx = WAVE_STEPS.indexOf(waveName);
+                    enrichedSteps.push({
+                        name: waveName,
+                        status: progress.currentWave === waveIdx + 1 ? 'running' : 'pending',
+                        startTime: progress.currentWave === waveIdx + 1 ? progress.startTime : null,
+                    });
+                }
             }
-            return {
-                name: waveName,
-                status,
-                startTime: status !== 'pending' ? progress.startTime : null,
-            };
-        });
+            stepsDetail = enrichedSteps;
+        } else {
+            // Fallback: build minimal stepsDetail from progress fields (backward compat)
+            stepsDetail = WAVE_STEPS.map((waveName, idx) => {
+                let status = 'pending';
+                if (completedStepNames.has(waveName)) {
+                    status = 'completed';
+                } else if (progress.currentWave === idx + 1) {
+                    status = 'running';
+                }
+                return {
+                    name: waveName,
+                    status,
+                    startTime: status !== 'pending' ? progress.startTime : null,
+                };
+            });
+        }
 
         return {
             status: state.status === 'paused' ? 'running' : state.status,
