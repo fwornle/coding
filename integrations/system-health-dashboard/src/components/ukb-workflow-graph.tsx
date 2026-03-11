@@ -7,6 +7,7 @@ import {
   selectAgentLLMMode,
   selectAgentHasOverride,
   selectGlobalLLMMode,
+  selectNodeStatus,
   setAgentLLMMode,
   clearAgentLLMOverride,
   type LLMMode,
@@ -795,7 +796,7 @@ function StepResultSummary({ agentId, outputs: rawOutputs, aggregatedSteps, stat
       }
     }
 
-    // Fallback to per-step outputs (for active workflows or if no aggregated data)
+    // Per-step outputs (for active workflows or if no aggregated data)
     switch (agentId) {
       case 'git_history':
         // Check all possible property names: commitsCount (coordinator summary), commitsAnalyzed (agent), commits array
@@ -1383,22 +1384,6 @@ export default function UKBWorkflowGraph({
     // For batch workflows: ensure kg_operators uses current batch status (same as other multi-step agents)
     if (isBatchWorkflow && currentBatchStepMap['kg_operators']) {
       map['kg_operators'] = currentBatchStepMap['kg_operators']
-    }
-
-    // Infer current step from process.currentStep
-    // Only override to 'running' if step hasn't already completed/failed (prevents resetting completed steps)
-    if (process.currentStep) {
-      const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
-      const existingStatus = map[currentAgentId]?.status
-      // Don't override completed/failed steps - they should retain their final status
-      if (existingStatus !== 'completed' && existingStatus !== 'failed') {
-        if (map[currentAgentId]) {
-          // Create a new object with updated status to avoid mutating frozen state
-          map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
-        } else {
-          map[currentAgentId] = { name: process.currentStep, status: 'running' }
-        }
-      }
     }
 
     return map
@@ -3196,8 +3181,11 @@ export function UKBNodeDetailsSidebar({
     )
   }, [agentId, isBatchWorkflow, currentBatch, process.steps])
 
-  // Use same fallback logic as getNodeStatus in the graph
-  const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused' => {
+  // Phase 18: Use selectNodeStatus selector for status (no inference/guessing)
+  const { status: nodeStatus } = useSelector((state: RootState) => selectNodeStatus(state, agentId, false))
+
+  // Determine display status: check for paused state, then use derived status, then stepInfo
+  const resolvedStatus: string = (() => {
     // Check if this agent's step is currently paused in single-step mode
     if (process.stepPaused && process.pausedAtStep) {
       const pausedAgentId = STEP_TO_AGENT[process.pausedAtStep] || process.pausedAtStep
@@ -3205,27 +3193,12 @@ export function UKBNodeDetailsSidebar({
         return 'paused'
       }
     }
-
-    if (stepInfo?.status) return stepInfo.status as any
-
-    // For batch workflows, check if we have aggregated data for this agent - means it was processed
-    if (aggregatedSteps) {
-      const agentHasData =
-        (agentId === 'git_history' && aggregatedSteps.git_history?.totalCommits) ||
-        (agentId === 'vibe_history' && aggregatedSteps.vibe_history?.totalSessions !== undefined) ||
-        (agentId === 'semantic_analysis' && aggregatedSteps.semantic_analysis?.totalEntities) ||
-        (agentId === 'kg_operators' && aggregatedSteps.kg_operators?.totalProcessed) ||
-        (agentId === 'quality_assurance' && aggregatedSteps.kg_operators?.totalProcessed) ||
-        (agentId === 'content_validation' && aggregatedSteps.content_validation?.validationComplete)
-      if (agentHasData) return 'completed'
-    }
-
-    // If workflow is complete but agent has no step info or aggregated data, it wasn't part of this workflow
-    const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
-    return isWorkflowComplete ? 'skipped' : 'pending'
-  }
-
-  const inferredStatus = getInferredStatus()
+    // Use derived status from state machine when available
+    if (nodeStatus && nodeStatus !== 'pending') return nodeStatus
+    // Fall back to stepInfo status (for polling-only mode before WorkflowState arrives)
+    if (stepInfo?.status) return stepInfo.status
+    return nodeStatus || 'pending'
+  })()
 
   // Log when agent sidebar is displayed - useEffect must be called unconditionally (Rules of Hooks)
   useEffect(() => {
@@ -3234,7 +3207,7 @@ export function UKBNodeDetailsSidebar({
     Logger.info(LogCategories.AGENT, `Agent sidebar opened: ${agent.name} (${agentId})`, {
       agentId,
       agentName: agent.name,
-      status: inferredStatus,
+      status: resolvedStatus,
       hasStepInfo: !!stepInfo,
       stepDuration: stepInfo?.duration ? `${stepInfo.duration}ms` : '-',
       tokensUsed: stepInfo?.tokensUsed || 0,
@@ -3259,7 +3232,7 @@ export function UKBNodeDetailsSidebar({
         error: stepInfo.error,
       })
     }
-  }, [agentId, agent?.name, inferredStatus, stepInfo, agent?.llmModel, agent?.techStack, process.workflowName])
+  }, [agentId, agent?.name, resolvedStatus, stepInfo, agent?.llmModel, agent?.techStack, process.workflowName])
 
   // Handle orchestrator node specially - after hooks
   if (agentId === 'orchestrator') {
@@ -3296,7 +3269,7 @@ export function UKBNodeDetailsSidebar({
             <Icon className="h-5 w-5" />
             <CardTitle className="text-lg">{agent.name}</CardTitle>
           </div>
-          {getStatusBadge(inferredStatus)}
+          {getStatusBadge(resolvedStatus)}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -3447,13 +3420,13 @@ export function UKBNodeDetailsSidebar({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status</span>
               <span className={
-                inferredStatus === 'completed' ? 'text-green-600 font-medium' :
-                inferredStatus === 'failed' ? 'text-red-600 font-medium' :
-                inferredStatus === 'running' ? 'text-blue-600 font-medium' :
-                inferredStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
+                resolvedStatus === 'completed' ? 'text-green-600 font-medium' :
+                resolvedStatus === 'failed' ? 'text-red-600 font-medium' :
+                resolvedStatus === 'running' ? 'text-blue-600 font-medium' :
+                resolvedStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
                 'text-muted-foreground'
               }>
-                {(inferredStatus || 'pending').charAt(0).toUpperCase() + (inferredStatus || 'pending').slice(1)}
+                {(resolvedStatus || 'pending').charAt(0).toUpperCase() + (resolvedStatus || 'pending').slice(1)}
               </span>
             </div>
 
@@ -3520,7 +3493,7 @@ export function UKBNodeDetailsSidebar({
             )}
 
             {/* Show message if no timing data yet */}
-            {!stepInfo?.duration && inferredStatus === 'completed' && (
+            {!stepInfo?.duration && resolvedStatus === 'completed' && (
               <div className="text-xs text-muted-foreground italic">
                 Timing data will be available in next workflow run
               </div>
@@ -3571,7 +3544,7 @@ export function UKBNodeDetailsSidebar({
                 Results
               </h4>
               {/* Semantic Summary based on agent type - uses aggregated totals for historical workflows */}
-              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} status={inferredStatus} />
+              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} status={resolvedStatus} />
               {/* Only show detailed results if we DON'T have aggregated data (which would contradict it) */}
               {!aggregatedSteps && <StepResultDetails outputs={stepInfo.outputs} />}
             </div>
