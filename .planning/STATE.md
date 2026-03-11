@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
-status: completed
-stopped_at: Phase 19 context gathered
-last_updated: "2026-03-11T13:37:44.976Z"
-last_activity: "2026-03-11 — Completed plan 18-02 (component migration: substep coloring, typed commands, inference removal)"
+status: in-progress
+stopped_at: Completed 19.1-01-PLAN.md
+last_updated: "2026-03-11T17:16:40Z"
+last_activity: "2026-03-11 — Completed plan 19.1-01 (step-complete dispatches + bridge layer)"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_plans: 12
+  completed_plans: 10
+  percent: 92
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Typed state machine for workflow orchestration -- single source of truth, typed transitions, dashboard as pure consumer
-**Current focus:** v3.0 Phase 18 complete — Dashboard Consumer
+**Current focus:** v3.0 Phase 19.1 — Dashboard State Machine Integration
 
 ## Current Position
 
-Phase: 19 of 19 (Migration Cleanup)
-Plan: 19-01 — BLOCKED at checkpoint (validation failed)
-Status: Phase Blocked
-Last activity: 2026-03-11 — Phase 19 execution attempted, discovered state machine ↔ dashboard integration gaps
+Phase: 19.1 (Dashboard State Machine Integration)
+Plan: 19.1-01 complete, 19.1-02 next
+Status: In Progress
+Last activity: 2026-03-11 — Completed plan 19.1-01 (step-complete dispatches + bridge layer)
 
-Progress: [█████████░] 90% (8/10 plans, phase 19 blocked)
+Progress: [█████████░] 92% (10/12 plans)
 
 ### Phase 19 Blocker: State Machine Dashboard Integration Incomplete
 
@@ -61,6 +61,7 @@ Plan 19-01 (parallel validation) reached checkpoint but validation revealed the 
 | 17    | 02   | 15min    | 2     | 10    |
 | 18    | 01   | 5min     | 2     | 2     |
 | 18    | 02   | 10min    | 2     | 4     |
+| 19.1  | 01   | 3min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Plan 19-01 (parallel validation) reached checkpoint but validation revealed the 
 - [18-02]: deriveSubstepStatuses called with backend step name from stepToAgent reverse lookup
 - [18-02]: Step/Into buttons use WebSocket sendCommand with isTransitionInFlight -- replaces REST fetch+poll
 - [18-02]: resolvedStatus in sidebar typed as DisplayStatus union using selectNodeStatus selector
+- [19.1-01]: stepName/nextStep/duration fields per StepCompleteEventSchema (plan examples used wrong 'step' field)
+- [19.1-01]: bridgeStateMachineToLegacy returns null for non-state-machine format (passthrough for legacy data)
+- [19.1-01]: Terminal states detected via workflowId presence, not progress array
 
 ### Critical Pitfalls
 
@@ -111,6 +115,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T13:37:44.967Z
-Stopped at: Phase 19 context gathered
-Resume with: Phase 18 complete. Phase 19 (migration cleanup) is next if planned.
+Last session: 2026-03-11T17:16:40Z
+Stopped at: Completed 19.1-01-PLAN.md
+Resume with: Plan 19.1-02 next (trace modal and single-step control migration).

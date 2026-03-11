@@ -140,7 +140,7 @@ Plans:
   3. Single-step mode pause/resume works through the state machine with correct field mapping
   4. Graph visualization shows Wave Controller identity (not old SmartOrchestrator)
   5. Trace modal shows wave1/wave2/wave3/wave4 steps (not old 14-step coordinator pipeline)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 19.1-01-PLAN.md -- Wave-controller step-complete dispatches + server.js bridge layer
@@ -156,5 +156,5 @@ Plans:
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
 | 17. SSE Event Typing | 2/2 | Complete    | 2026-03-11 | - |
 | 18. Dashboard Consumer | 2/2 | Complete    | 2026-03-11 | - |
-| 19.1. Dashboard SM Integration | v3.0 | 0/2 | Planned | - |
+| 19.1. Dashboard SM Integration | 1/2 | In Progress|  | - |
 | 19. Migration & Cleanup | v3.0 | 0/2 | Blocked (needs 19.1) | - |
