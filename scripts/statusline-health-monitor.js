@@ -995,6 +995,26 @@ class StatusLineHealthMonitor {
         age = Math.max(age, healthFileAge);
       }
 
+      // If monitor is running but can't find transcripts, it's a broken state
+      // (e.g. getProjectDirName() mismatch). Restart the monitor to pick up fixes.
+      if (healthData.transcriptInfo?.status === 'not_found' &&
+          healthData.streamingActive &&
+          healthData.metrics?.uptimeSeconds > 120) {
+        this.log(`⚠️ Monitor for ${path.basename(projectPath)} running ${healthData.metrics.uptimeSeconds}s but transcriptPath=null — restarting`, 'WARN');
+        try {
+          const pid = healthData.metrics?.processId;
+          if (pid) {
+            process.kill(pid, 'SIGTERM');
+            // GPS will auto-restart the monitor
+          }
+        } catch (e) { /* process may already be gone */ }
+        return {
+          status: 'warning',
+          icon: '🟡',
+          details: 'Transcript discovery failed — restarting monitor'
+        };
+      }
+
       // If no active transcript/session, show as inactive regardless of monitor state
       // (streamingActive only means the transcript monitor is running, not that a coding agent is active)
       if (healthData.transcriptInfo?.status === 'not_found' ||

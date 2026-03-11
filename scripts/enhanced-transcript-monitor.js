@@ -916,7 +916,8 @@ class EnhancedTranscriptMonitor {
    * Convert project path to Claude's directory naming
    */
   getProjectDirName() {
-    const normalized = this.config.projectPath.replace(/\//g, '-');
+    // Claude Code encodes project paths by replacing both / and _ with -
+    const normalized = this.config.projectPath.replace(/[/_]/g, '-');
     return normalized.startsWith('-') ? normalized : '-' + normalized;
   }
 
