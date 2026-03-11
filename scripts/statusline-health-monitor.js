@@ -249,15 +249,19 @@ class StatusLineHealthMonitor {
     const agentSessions = new Set();
 
     // Helper: extract project name from cwd via lsof
+    // For nested dirs like /Agentic/_work/adaptive-learning-path-generator,
+    // use the leaf directory (basename) to match how transcript monitors register.
     const extractProjectFromPid = (pid) => {
       try {
         const lsofOutput = execSync(`lsof -p ${pid} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
         if (lsofOutput && lsofOutput.trim()) {
           const parts = lsofOutput.trim().split(/\s+/);
           const cwdPath = parts[parts.length - 1];
-          const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
+          const agenticMatch = cwdPath.match(/\/Agentic\/(.+)/);
           if (agenticMatch) {
-            agentSessions.add(agenticMatch[1]);
+            // Use basename to handle nested paths (e.g. _work/project → project)
+            const projectName = path.basename(agenticMatch[1]);
+            agentSessions.add(projectName);
           }
         }
       } catch (e) { /* process may have exited */ }
