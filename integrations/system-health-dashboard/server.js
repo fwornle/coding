@@ -2345,7 +2345,7 @@ class SystemHealthAPIServer {
 
             writeFileSync(progressPath, JSON.stringify(progress, null, 2));
 
-            console.log('⏸️ Batch processing pause requested');
+            console.log('🔇 Batch processing pause requested');
 
             res.json({
                 status: 'success',

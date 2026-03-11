@@ -1585,7 +1585,7 @@ class HealthVerifier extends EventEmitter {
     // Install signal handlers for Docker mode transition
     process.on('SIGUSR2', () => {
       this.monitoringPaused = true;
-      this.log('⏸️  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
+      this.log('🔇  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
     });
 
     process.on('SIGUSR1', () => {

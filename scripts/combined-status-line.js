@@ -369,7 +369,7 @@ class CombinedStatusLine {
       
       // Extract actual compliance score from the text if possible
       let actualCompliance = 8.5;
-      const complianceMatch = constraintData.text.match(/🛡️\s*(\d+\.?\d*)/);
+      const complianceMatch = constraintData.text.match(/🔒\s*(\d+\.?\d*)/);
       if (complianceMatch) {
         actualCompliance = parseFloat(complianceMatch[1]);
       }
@@ -1761,10 +1761,10 @@ class CombinedStatusLine {
       constraintPart += `${trajectoryIcon}]`;
       parts.push(constraintPart);
     } else if (constraint.status === 'degraded') {
-      parts.push('[🛡️ ⚠️]');
+      parts.push('[🔒 ⚠️]');
       overallColor = 'yellow';
     } else {
-      parts.push('[🛡️ ❌]');
+      parts.push('[🔒 ❌]');
       overallColor = 'red';
     }
 
@@ -2002,7 +2002,7 @@ class CombinedStatusLine {
     lines.push('━'.repeat(30));
 
     // Constraint Monitor Section
-    lines.push('🛡️  CONSTRAINT MONITOR');
+    lines.push('🔒  CONSTRAINT MONITOR');
     if (constraint.status === 'operational') {
       lines.push(`   ✅ Status: Operational`);
       lines.push(`   📊 Compliance: ${constraint.compliance}/10.0`);
@@ -2050,7 +2050,7 @@ class CombinedStatusLine {
         lines.push(`   ⚠️  Errors: ${knowledge.errorCount}`);
       }
     } else if (knowledge.status === 'disabled') {
-      lines.push(`   ⏸️  Status: Disabled`);
+      lines.push(`   🔇  Status: Disabled`);
       lines.push(`   💡 Enable in config`);
     } else {
       lines.push(`   ❌ Status: Offline`);

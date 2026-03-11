@@ -481,7 +481,7 @@ echo "✅ Knowledge base consistent"
 │ │ Critical Services (auto-start Docker if needed):  │  │
 │ │  🐳 Docker Desktop (macOS auto-start)             │  │
 │ │  📊 Knowledge Base Qdrant (port 6334)             │  │
-│ │  🛡️  Constraint Monitor Qdrant (port 6333)        │  │
+│ │  🔒  Constraint Monitor Qdrant (port 6333)        │  │
 │ │                                                     │  │
 │ │ Optional Services:                                 │  │
 │ │  📡 VKB Server (port 8080)                        │  │

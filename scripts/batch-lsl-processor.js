@@ -1138,7 +1138,7 @@ class BatchLSLProcessor {
               });
               // No diff = file unchanged from HEAD = immutable historical record
               if (process.env.DEBUG_LSL_CLEANUP === 'true') {
-                console.log(`🛡️  Skipping ${filename} - unchanged in git (immutable historical record)`);
+                console.log(`🔒  Skipping ${filename} - unchanged in git (immutable historical record)`);
               }
               continue;
             } catch (diffError) {
