@@ -29,9 +29,9 @@
 ### Dashboard Consumer
 
 - [x] **UI-01**: Dashboard renders from typed SSE events only — zero fallback inference
-- [ ] **UI-02**: Substep coloring derived from state machine state (SUBSTEP_COLORS from constants)
-- [ ] **UI-03**: Step/Into buttons dispatch typed commands, disabled during transitions
-- [ ] **UI-04**: "Batch" label replaced with correct workflow name
+- [x] **UI-02**: Substep coloring derived from state machine state (SUBSTEP_COLORS from constants)
+- [x] **UI-03**: Step/Into buttons dispatch typed commands, disabled during transitions
+- [x] **UI-04**: "Batch" label replaced with correct workflow name
 - [x] **UI-05**: Redux store receives typed SSE events directly — no inference
 
 ### Migration
@@ -74,9 +74,9 @@
 | SSE-02 | Phase 17 | Complete |
 | SSE-03 | Phase 17 | Complete |
 | UI-01 | Phase 18 | Complete |
-| UI-02 | Phase 18 | Pending |
-| UI-03 | Phase 18 | Pending |
-| UI-04 | Phase 18 | Pending |
+| UI-02 | Phase 18 | Complete |
+| UI-03 | Phase 18 | Complete |
+| UI-04 | Phase 18 | Complete |
 | UI-05 | Phase 18 | Complete |
 | MIG-01 | Phase 19 | Pending |
 | MIG-02 | Phase 19 | Pending |
