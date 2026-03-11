@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
 status: in-progress
-stopped_at: Completed 17-01 (SSE event types and broadcaster)
-last_updated: "2026-03-11T06:24:33Z"
-last_activity: 2026-03-11 — Completed plan 17-01 (SSE event types and broadcaster)
+stopped_at: Completed 17-02 (deploy and verify SSE event pipeline)
+last_updated: "2026-03-11T06:42:53Z"
+last_activity: 2026-03-11 — Completed plan 17-02 (deploy and verify SSE event pipeline)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 17 of 19 (SSE Event Typing)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-03-11 — Completed plan 17-01 (SSE event types and broadcaster)
+Phase: 17 of 19 (SSE Event Typing) -- COMPLETE
+Plan: 2 of 2 complete
+Status: Phase Complete
+Last activity: 2026-03-11 — Completed plan 17-02 (deploy and verify SSE event pipeline)
 
-Progress: [████████░░] 83% (5/6 plans complete)
+Progress: [██████████] 100% (6/6 plans complete)
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [████████░░] 83% (5/6 plans complete)
 | 16    | 01   | 9min     | 2     | 8     |
 | 16    | 02   | 8min     | 3     | 5     |
 | 17    | 01   | 4min     | 2     | 7     |
+| 17    | 02   | 15min    | 2     | 10    |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Progress: [████████░░] 83% (5/6 plans complete)
 - [17-01]: Two SSE event types (state-change, initial-state) with full state snapshot -- no client-side reconstruction
 - [17-01]: SSEBroadcaster uses minimal SSEWritable interface for testability without Express dependency
 - [17-01]: Broadcaster subscribed at module load to capture all transitions from server start
+- [17-02]: Minimal SSE client via http.get() -- no eventsource dependency, ~30 lines with exponential backoff reconnect
+- [17-02]: STATE_SNAPSHOT envelope for typed state forwarding over WebSocket
+- [17-02]: Legacy event types mapped from status transitions for backward compat (removed in Phase 18)
 
 ### Critical Pitfalls
 
@@ -83,6 +87,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T06:24:33Z
-Stopped at: Completed 17-01 (SSE event types and broadcaster)
-Resume with: `/gsd:execute-phase 17` (Plan 17-02 -- deploy and verify)
+Last session: 2026-03-11T06:42:53Z
+Stopped at: Completed 17-02 (deploy and verify SSE event pipeline)
+Resume with: Phase 17 complete. All v3.0 milestone plans executed.

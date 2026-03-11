@@ -53,7 +53,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
 
 - [x] **Phase 15: Type Definitions** - Discriminated union states, typed transitions, RunConfig/RunProgress separation, Zod schemas (completed 2026-03-10)
 - [x] **Phase 16: Backend State Machine** - Wave-controller typed events, health API state transitions, progress file as subscriber (completed 2026-03-11)
-- [ ] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state
+- [x] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state (completed 2026-03-11)
 - [ ] **Phase 18: Dashboard Consumer** - Dashboard renders from typed SSE only, correct substep coloring, typed commands, no inference
 - [ ] **Phase 19: Migration & Cleanup** - Parallel path validation, backward-compatible progress reader, legacy code removal
 
@@ -96,7 +96,7 @@ Plans:
   1. Every state machine transition emits an SSE event containing the complete WorkflowState snapshot -- clients never need to compute derived state
   2. SSE event types are discriminated unions (WorkflowStarted, StepAdvanced, WorkflowPaused, etc.) shared between backend and dashboard via copied type file
   3. When a new SSE client connects (or reconnects after disconnect), it immediately receives the full current WorkflowState as its first event
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 17-01-PLAN.md -- SSE event types (discriminated union), broadcaster subscriber, /workflow-events endpoint
 - [ ] 17-02-PLAN.md -- Dashboard server SSE client, WebSocket forwarding, reconnection state
@@ -131,6 +131,6 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
-| 17. SSE Event Typing | 1/2 | In Progress|  | - |
+| 17. SSE Event Typing | 2/2 | Complete   | 2026-03-11 | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
