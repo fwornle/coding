@@ -3185,7 +3185,8 @@ export function UKBNodeDetailsSidebar({
   const { status: nodeStatus } = useSelector((state: RootState) => selectNodeStatus(state, agentId, false))
 
   // Determine display status: check for paused state, then use derived status, then stepInfo
-  const resolvedStatus: string = (() => {
+  type DisplayStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused'
+  const resolvedStatus: DisplayStatus = (() => {
     // Check if this agent's step is currently paused in single-step mode
     if (process.stepPaused && process.pausedAtStep) {
       const pausedAgentId = STEP_TO_AGENT[process.pausedAtStep] || process.pausedAtStep
@@ -3194,10 +3195,10 @@ export function UKBNodeDetailsSidebar({
       }
     }
     // Use derived status from state machine when available
-    if (nodeStatus && nodeStatus !== 'pending') return nodeStatus
-    // Fall back to stepInfo status (for polling-only mode before WorkflowState arrives)
-    if (stepInfo?.status) return stepInfo.status
-    return nodeStatus || 'pending'
+    if (nodeStatus && nodeStatus !== 'pending') return nodeStatus as DisplayStatus
+    // Use stepInfo status (for polling-only mode before WorkflowState arrives)
+    if (stepInfo?.status) return stepInfo.status as DisplayStatus
+    return (nodeStatus || 'pending') as DisplayStatus
   })()
 
   // Log when agent sidebar is displayed - useEffect must be called unconditionally (Rules of Hooks)

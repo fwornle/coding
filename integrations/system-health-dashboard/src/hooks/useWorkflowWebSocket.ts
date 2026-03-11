@@ -95,6 +95,8 @@ interface UseWorkflowWebSocketResult {
   disconnect: () => void
   /** Reconnect attempt count */
   reconnectAttempts: number
+  /** Whether a step transition command is in flight (waiting for STATE_SNAPSHOT response) */
+  isTransitionInFlight: boolean
 }
 
 /**
@@ -133,6 +135,7 @@ export function useWorkflowWebSocket(
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const [isTransitionInFlight, setIsTransitionInFlight] = useState(false)
 
   // Handle incoming messages and dispatch to Redux
   const handleMessage = useCallback((message: { type: string; payload?: unknown }) => {
@@ -147,6 +150,8 @@ export function useWorkflowWebSocket(
             state: payload.state,
             transition: payload.transition,
           }))
+          // Reset in-flight flag: transition completed (new state arrived)
+          setIsTransitionInFlight(false)
         }
         break
       }
@@ -248,6 +253,10 @@ export function useWorkflowWebSocket(
     try {
       wsRef.current.send(JSON.stringify(command))
       Logger.debug(LogCategories.UKB, 'Sent WebSocket command:', command.type)
+      // Track in-flight state for step transitions (prevents double-click)
+      if (command.type === 'STEP_ADVANCE' || command.type === 'STEP_INTO') {
+        setIsTransitionInFlight(true)
+      }
       return true
     } catch (sendError) {
       Logger.error(LogCategories.UKB, 'Failed to send WebSocket command:', sendError)
@@ -273,6 +282,7 @@ export function useWorkflowWebSocket(
     connect,
     disconnect,
     reconnectAttempts,
+    isTransitionInFlight,
   }
 }
 
