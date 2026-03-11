@@ -98,6 +98,42 @@ ensure_data_directory_ignored() {
   fi
 }
 
+# Ensure coding infrastructure runtime files are gitignored in target projects
+# These are created by coding services and should never be committed
+ensure_coding_runtime_ignored() {
+  local project_dir="$1"
+  local gitignore_file="$project_dir/.gitignore"
+
+  # Create .gitignore if it doesn't exist
+  if [ ! -f "$gitignore_file" ]; then
+    touch "$gitignore_file"
+  fi
+
+  # Entries that coding services create in target projects
+  local entries=(
+    ".specstory/"
+    ".constraint-monitor.yaml"
+    ".claude/settings.local.json"
+  )
+
+  local added=false
+  for entry in "${entries[@]}"; do
+    if ! grep -qF "$entry" "$gitignore_file" 2>/dev/null; then
+      if [ "$added" = false ]; then
+        echo "" >> "$gitignore_file"
+        echo "# Coding infrastructure runtime files (auto-added by coding startup)" >> "$gitignore_file"
+        added=true
+      fi
+      echo "$entry" >> "$gitignore_file"
+    fi
+  done
+
+  if [ "$added" = true ]; then
+    log "✅ Added coding runtime entries to .gitignore"
+  fi
+}
+export -f ensure_coding_runtime_ignored
+
 # ==============================================================================
 # SESSION REMINDER
 # ==============================================================================
@@ -515,6 +551,7 @@ agent_common_init() {
 
   # Ensure .data/ directory is ignored (MCP Memory LevelDB runtime data)
   ensure_data_directory_ignored "$target_project_dir"
+  ensure_coding_runtime_ignored "$target_project_dir"
 
   # Start robust transcript monitoring for target project
   if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then
