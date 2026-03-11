@@ -124,7 +124,10 @@ Plans:
   1. During migration, the old updateProgress path and new state machine run side-by-side, with a comparison log that flags any state divergence between old and new
   2. The progress file reader can parse both old-format (untyped) and new-format (WorkflowState) progress files without crashing -- enabling rollback if needed
   3. After validation, all old inference code, fallback logic, and updateProgress calls are deleted -- the codebase has exactly one state management path
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 19-01-PLAN.md -- Parallel validation infrastructure: writeProgressFile redirect, comparison utility, dashboard warning banner, 3 validation runs
+- [ ] 19-02-PLAN.md -- Legacy code removal: coordinator writeProgressFile deletion, dashboard legacy fields, deprecated constants, schema migration code
 
 ### Progress
 
@@ -136,4 +139,4 @@ Plans:
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
 | 17. SSE Event Typing | 2/2 | Complete    | 2026-03-11 | - |
 | 18. Dashboard Consumer | 2/2 | Complete    | 2026-03-11 | - |
-| 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
+| 19. Migration & Cleanup | v3.0 | 0/2 | Not started | - |
