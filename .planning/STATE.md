@@ -25,12 +25,24 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 18 of 19 (Dashboard Consumer)
-Plan: 2 of 2 complete
-Status: Phase Complete
-Last activity: 2026-03-11 — Completed plan 18-02 (component migration: substep coloring, typed commands, inference removal)
+Phase: 19 of 19 (Migration Cleanup)
+Plan: 19-01 — BLOCKED at checkpoint (validation failed)
+Status: Phase Blocked
+Last activity: 2026-03-11 — Phase 19 execution attempted, discovered state machine ↔ dashboard integration gaps
 
-Progress: [██████████] 100% (8/8 plans complete)
+Progress: [█████████░] 90% (8/10 plans, phase 19 blocked)
+
+### Phase 19 Blocker: State Machine Dashboard Integration Incomplete
+
+Plan 19-01 (parallel validation) reached checkpoint but validation revealed the state machine format is structurally incompatible with the dashboard. The migration cleanup cannot proceed until these gaps are closed:
+
+1. **Progress format mismatch** — State machine writes `{progress: {completedSteps: ['wave1','wave2'], currentStepName: '...'}}` but dashboard reads flat `{completedSteps: 0, totalSteps: 14, currentStep: '...'}`
+2. **Wave step tracking** — Wave-controller dispatches `substep-update` but never `step-complete`, so completedSteps stays empty
+3. **Trace modal** — Reads old DAG workflow definitions (14 steps), not wave-analysis (4 waves)
+4. **Single-step controls** — Pause/resume field naming differs between formats
+5. **Graph visualization** — Still coordinator-centric, not wave-clustered
+
+**Resolution:** Need a "dashboard state machine integration" phase before migration cleanup can proceed. This is new scope not covered by phase 19's plans.
 
 ## Performance Metrics
 

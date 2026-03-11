@@ -110,9 +110,7 @@ function getWebSocketUrl(): string {
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const host = window.location.hostname
-
-  // In development, the API server is on port 3033
-  const port = process.env.NODE_ENV === 'development' ? '3033' : window.location.port || '3033'
+  const port = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 
   return `${protocol}//${host}:${port}/api/ukb/ws`
 }
