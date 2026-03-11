@@ -216,6 +216,18 @@ coding --restart-services
 
 The health verifier runs every 60 seconds with auto-healing enabled.
 
+### Transcript Discovery Auto-Heal
+
+The statusline-health-monitor detects **broken transcript monitors** — monitors that are running but cannot find their project's Claude JSONL transcript file (e.g., due to path encoding mismatches).
+
+**Detection**: If a monitor has been running >2 minutes with `transcriptPath: null`, the health monitor identifies it as a broken state.
+
+**Remediation**: The broken monitor is killed via `SIGTERM`. The Global Process Supervisor automatically restarts it, picking up any fixes to the transcript discovery logic.
+
+**Status Line**: Affected sessions show `🟡` (warning) with "Transcript discovery failed — restarting monitor" instead of silently disappearing.
+
+**Path Encoding**: Claude Code encodes project paths by replacing both `/` and `_` with `-`. For example, `/Users/foo/Agentic/_work/my-project` becomes `-Users-foo-Agentic--work-my-project`. The transcript monitor's `getProjectDirName()` must match this encoding exactly.
+
 ### Trajectory States
 
 - `🔍 EX` (Exploring) - Information gathering and analysis
