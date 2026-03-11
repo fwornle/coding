@@ -51,5 +51,15 @@ export {
   type TransitionMap,
 } from './transitions';
 
+// SSE event types (discriminated union on 'event' field)
+export {
+  StateChangeEventSchema,
+  InitialStateEventSchema,
+  WorkflowSSEEventSchema,
+  type WorkflowSSEEvent,
+  type StateChangeEvent,
+  type InitialStateEvent,
+} from './events';
+
 // Step status derivation (pure functions)
 export { deriveStepStatuses, deriveSubstepStatuses } from './derived';
