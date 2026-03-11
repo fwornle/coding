@@ -78,7 +78,7 @@ export const CompletedStateSchema = z.object({
   /** Total workflow duration in seconds */
   duration: z.number(),
   /** Optional summary data from the workflow run */
-  summary: z.record(z.unknown()).optional(),
+  summary: z.record(z.string(), z.unknown()).optional(),
 });
 export type CompletedState = z.infer<typeof CompletedStateSchema>;
 

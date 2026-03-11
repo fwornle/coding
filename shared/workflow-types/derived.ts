@@ -84,12 +84,18 @@ export function deriveStepStatuses(
     }
 
     case 'cancelled': {
-      const completed = new Set(state.progress.completedSteps);
+      // CancelledState doesn't carry progress -- mark steps up to lastStep as completed,
+      // rest as pending. This is a best-effort derivation since cancelled state loses
+      // the full completed steps list.
+      let reachedLast = false;
       for (const step of stepDefinitions) {
-        if (completed.has(step.name)) {
-          result.set(step.name, 'completed');
-        } else {
+        if (reachedLast) {
           result.set(step.name, 'pending');
+        } else {
+          result.set(step.name, 'completed');
+          if (step.name === state.lastStep) {
+            reachedLast = true;
+          }
         }
       }
       break;
