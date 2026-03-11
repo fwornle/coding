@@ -101,6 +101,10 @@ Plan 19-01 (parallel validation) reached checkpoint but validation revealed the 
 - **Docker rebuild**: Pipeline changes require submodule build + Docker rebuild
 - **Progress file migration**: Must support both old and new format during transition (MIG-02)
 
+### Roadmap Evolution
+
+- Phase 19.1 inserted after Phase 19: Dashboard state machine integration (URGENT)
+
 ### Blockers/Concerns
 
 None.
