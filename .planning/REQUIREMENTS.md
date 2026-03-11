@@ -22,9 +22,9 @@
 
 ### SSE Events
 
-- [ ] **SSE-01**: Every state transition emits typed SSE event with full WorkflowState snapshot
-- [ ] **SSE-02**: SSE events use discriminated union types shared between backend and dashboard
-- [ ] **SSE-03**: SSE reconnection sends full current state on connect
+- [x] **SSE-01**: Every state transition emits typed SSE event with full WorkflowState snapshot
+- [x] **SSE-02**: SSE events use discriminated union types shared between backend and dashboard
+- [x] **SSE-03**: SSE reconnection sends full current state on connect
 
 ### Dashboard Consumer
 
@@ -70,9 +70,9 @@
 | BE-02 | Phase 16 | Complete |
 | BE-03 | Phase 16 | Complete |
 | BE-04 | Phase 16 | Complete |
-| SSE-01 | Phase 17 | Pending |
-| SSE-02 | Phase 17 | Pending |
-| SSE-03 | Phase 17 | Pending |
+| SSE-01 | Phase 17 | Complete |
+| SSE-02 | Phase 17 | Complete |
+| SSE-03 | Phase 17 | Complete |
 | UI-01 | Phase 18 | Pending |
 | UI-02 | Phase 18 | Pending |
 | UI-03 | Phase 18 | Pending |
