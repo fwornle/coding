@@ -36,7 +36,7 @@
 
 ### Migration
 
-- [ ] **MIG-01**: Parallel path — old updateProgress and new state machine run side-by-side
+- [x] **MIG-01**: Parallel path — old updateProgress and new state machine run side-by-side
 - [ ] **MIG-02**: Backward-compatible progress file reader
 - [ ] **MIG-03**: All old inference/fallback code removed after validation
 
@@ -78,7 +78,7 @@
 | UI-03 | Phase 18 | Complete |
 | UI-04 | Phase 18 | Complete |
 | UI-05 | Phase 18 | Complete |
-| MIG-01 | Phase 19 | Pending |
+| MIG-01 | Phase 19 | Complete |
 | MIG-02 | Phase 19 | Pending |
 | MIG-03 | Phase 19 | Pending |
 
