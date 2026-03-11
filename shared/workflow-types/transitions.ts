@@ -94,7 +94,7 @@ const CancelEventSchema = z.object({
 
 const CompleteEventSchema = z.object({
   type: z.literal('complete'),
-  summary: z.record(z.unknown()).optional(),
+  summary: z.record(z.string(), z.unknown()).optional(),
 });
 
 const ResetEventSchema = z.object({
