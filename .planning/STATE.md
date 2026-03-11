@@ -4,7 +4,7 @@ milestone: v3.0
 milestone_name: -- Workflow State Machine
 status: completed
 stopped_at: Completed 16-02 (wave-controller migration)
-last_updated: "2026-03-11T06:01:12Z"
+last_updated: "2026-03-11T06:07:49.259Z"
 last_activity: 2026-03-11 — Completed plan 16-02 (wave-controller dispatch migration)
 progress:
   total_phases: 5

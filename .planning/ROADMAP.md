@@ -127,7 +127,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
-| 16. Backend State Machine | 2/2 | Complete   | 2026-03-11 | - |
+| 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
 | 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
