@@ -56,6 +56,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
 - [x] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state (completed 2026-03-11)
 - [x] **Phase 18: Dashboard Consumer** - Dashboard renders from typed SSE only, correct substep coloring, typed commands, no inference (completed 2026-03-11)
 - [ ] **Phase 19: Migration & Cleanup** - Parallel path validation, backward-compatible progress reader, legacy code removal
+- [ ] **Phase 19.1: Dashboard State Machine Integration** - Bridge state machine format to dashboard, fix step tracking and single-step controls (INSERTED - unblocks Phase 19)
 
 ### Phase Details
 
@@ -118,7 +119,7 @@ Plans:
 
 #### Phase 19: Migration & Cleanup
 **Goal**: Legacy state management code is fully removed after validated parallel operation proves the new state machine is correct
-**Depends on**: Phase 18
+**Depends on**: Phase 18, Phase 19.1
 **Requirements**: MIG-01, MIG-02, MIG-03
 **Success Criteria** (what must be TRUE):
   1. During migration, the old updateProgress path and new state machine run side-by-side, with a comparison log that flags any state divergence between old and new
@@ -129,9 +130,25 @@ Plans:
 - [ ] 19-01-PLAN.md -- Parallel validation infrastructure: writeProgressFile redirect, comparison utility, dashboard warning banner, 3 validation runs
 - [ ] 19-02-PLAN.md -- Legacy code removal: coordinator writeProgressFile deletion, dashboard legacy fields, deprecated constants, schema migration code
 
+#### Phase 19.1: Dashboard State Machine Integration (INSERTED)
+**Goal:** Bridge the state machine's WorkflowState format to the dashboard's expected flat format, add missing step-complete dispatches, fix single-step controls, and update graph visualization
+**Depends on:** Phase 18
+**Requirements**: MIG-01, MIG-02
+**Success Criteria** (what must be TRUE):
+  1. Dashboard shows wave progress as N/4 (not 0/0 or 0/14) -- no "Race condition detected" errors
+  2. Wave-controller dispatches step-complete after each wave, so completedSteps tracks progress
+  3. Single-step mode pause/resume works through the state machine with correct field mapping
+  4. Graph visualization shows Wave Controller identity (not old SmartOrchestrator)
+  5. Trace modal shows wave1/wave2/wave3/wave4 steps (not old 14-step coordinator pipeline)
+**Plans:** 2 plans
+
+Plans:
+- [ ] 19.1-01-PLAN.md -- Wave-controller step-complete dispatches + server.js bridge layer
+- [ ] 19.1-02-PLAN.md -- Dashboard SSE middleware bridge + constants update + end-to-end verification
+
 ### Progress
 
-**Execution Order:** Phases execute sequentially: 15 -> 16 -> 17 -> 18 -> 19
+**Execution Order:** Phases execute sequentially: 15 -> 16 -> 17 -> 18 -> 19.1 -> 19
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -139,4 +156,5 @@ Plans:
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
 | 17. SSE Event Typing | 2/2 | Complete    | 2026-03-11 | - |
 | 18. Dashboard Consumer | 2/2 | Complete    | 2026-03-11 | - |
-| 19. Migration & Cleanup | v3.0 | 0/2 | Not started | - |
+| 19.1. Dashboard SM Integration | v3.0 | 0/2 | Planned | - |
+| 19. Migration & Cleanup | v3.0 | 0/2 | Blocked (needs 19.1) | - |
