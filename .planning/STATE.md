@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
-status: completed
-stopped_at: Completed 16-02 (wave-controller migration)
-last_updated: "2026-03-11T06:07:49.259Z"
-last_activity: 2026-03-11 — Completed plan 16-02 (wave-controller dispatch migration)
+status: in-progress
+stopped_at: Completed 17-01 (SSE event types and broadcaster)
+last_updated: "2026-03-11T06:24:33Z"
+last_activity: 2026-03-11 — Completed plan 17-01 (SSE event types and broadcaster)
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 6
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Typed state machine for workflow orchestration -- single source of truth, typed transitions, dashboard as pure consumer
-**Current focus:** v3.0 Phase 16 — Backend State Machine
+**Current focus:** v3.0 Phase 17 — SSE Event Typing
 
 ## Current Position
 
-Phase: 16 of 19 (Backend State Machine)
-Plan: 2 of 2 complete
-Status: Phase Complete
-Last activity: 2026-03-11 — Completed plan 16-02 (wave-controller dispatch migration)
+Phase: 17 of 19 (SSE Event Typing)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-03-11 — Completed plan 17-01 (SSE event types and broadcaster)
 
-Progress: [██████████] 100% (4/4 plans complete)
+Progress: [████████░░] 83% (5/6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 6min
-- Total execution time: 24min
+- Total execution time: 28min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -45,6 +45,7 @@ Progress: [██████████] 100% (4/4 plans complete)
 | 15    | 02   | 4min     | 2     | 6     |
 | 16    | 01   | 9min     | 2     | 8     |
 | 16    | 02   | 8min     | 3     | 5     |
+| 17    | 01   | 4min     | 2     | 7     |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ Progress: [██████████] 100% (4/4 plans complete)
 - [16-02]: substep-update is a self-loop on running state -- progress tracking without state transition
 - [16-02]: updateProgress and writeProgress fully deleted -- state machine subscriber is sole progress writer
 - [16-02]: Cooperative cancel checks at 6 strategic points between major substeps
+- [17-01]: Two SSE event types (state-change, initial-state) with full state snapshot -- no client-side reconstruction
+- [17-01]: SSEBroadcaster uses minimal SSEWritable interface for testability without Express dependency
+- [17-01]: Broadcaster subscribed at module load to capture all transitions from server start
 
 ### Critical Pitfalls
 
@@ -79,6 +83,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T06:01:12Z
-Stopped at: Completed 16-02 (wave-controller migration)
-Resume with: `/gsd:execute-phase 17` (Phase 17 -- SSE events)
+Last session: 2026-03-11T06:24:33Z
+Stopped at: Completed 17-01 (SSE event types and broadcaster)
+Resume with: `/gsd:execute-phase 17` (Plan 17-02 -- deploy and verify)

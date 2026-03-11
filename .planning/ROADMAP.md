@@ -96,7 +96,7 @@ Plans:
   1. Every state machine transition emits an SSE event containing the complete WorkflowState snapshot -- clients never need to compute derived state
   2. SSE event types are discriminated unions (WorkflowStarted, StepAdvanced, WorkflowPaused, etc.) shared between backend and dashboard via copied type file
   3. When a new SSE client connects (or reconnects after disconnect), it immediately receives the full current WorkflowState as its first event
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 17-01-PLAN.md -- SSE event types (discriminated union), broadcaster subscriber, /workflow-events endpoint
 - [ ] 17-02-PLAN.md -- Dashboard server SSE client, WebSocket forwarding, reconnection state
@@ -131,6 +131,6 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
 | 16. Backend State Machine | 2/2 | Complete    | 2026-03-11 | - |
-| 17. SSE Event Typing | v3.0 | 0/2 | Not started | - |
+| 17. SSE Event Typing | 1/2 | In Progress|  | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
