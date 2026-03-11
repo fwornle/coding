@@ -38,7 +38,7 @@ RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Copy and install each integration's dependencies separately
 COPY integrations/mcp-server-semantic-analysis/package*.json ./integrations/mcp-server-semantic-analysis/
-RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts 2>/dev/null || true
+RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
 
 COPY integrations/mcp-constraint-monitor/package*.json ./integrations/mcp-constraint-monitor/
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
