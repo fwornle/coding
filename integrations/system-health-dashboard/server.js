@@ -616,6 +616,14 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Bridge state machine format to legacy flat format
+            if (workflowProgress) {
+                const bridged = this.bridgeStateMachineToLegacy(workflowProgress);
+                if (bridged) {
+                    workflowProgress = bridged;
+                }
+            }
+
             // Check for active abort signal - if present, force cancelled status
             const abortPath = join(codingRoot, '.data', 'workflow-abort.json');
             let forceCancelled = false;
@@ -859,8 +867,11 @@ class SystemHealthAPIServer {
                     if (content !== lastContent) {
                         lastContent = content;
                         const progress = JSON.parse(content);
-                        console.log(`[SSE-TX] ${new Date().toISOString().slice(11,23)} step=${progress.currentStep} details=${progress.stepsDetail?.length || 0}`);
-                        res.write(`data: ${JSON.stringify(progress)}\n\n`);
+                        // Bridge state machine format to legacy flat format
+                        const bridged = this.bridgeStateMachineToLegacy(progress);
+                        const dataToSend = bridged || progress;
+                        process.stderr.write(`[SSE-TX] ${new Date().toISOString().slice(11,23)} step=${dataToSend.currentStep} details=${dataToSend.stepsDetail?.length || 0}\n`);
+                        res.write(`data: ${JSON.stringify(dataToSend)}\n\n`);
                     }
                 } else {
                     // No workflow running
@@ -898,11 +909,162 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Bridge state machine WorkflowState format to legacy flat format.
+     * The state machine writes typed discriminated union states. The dashboard
+     * expects a flat object with numeric completedSteps, stepsDetail array, etc.
+     *
+     * Returns null if the input is not in state machine format (already legacy).
+     */
+    bridgeStateMachineToLegacy(state) {
+        // Detect state machine format: has nested 'progress' object with 'completedSteps' as array
+        if (!state || !state.progress || !Array.isArray(state.progress?.completedSteps)) {
+            // Check for terminal states that lack a progress object
+            if (state && state.status === 'completed' && state.workflowId) {
+                const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4'];
+                return {
+                    status: 'completed',
+                    workflowName: state.workflowName || 'wave-analysis',
+                    team: 'coding',
+                    completedSteps: state.completedSteps || 4,
+                    totalSteps: 4,
+                    stepsDetail: WAVE_STEPS.map(name => ({ name, status: 'completed' })),
+                    stepsCompleted: WAVE_STEPS,
+                    stepsFailed: [],
+                    duration: state.duration,
+                    elapsedSeconds: state.duration || 0,
+                    startTime: null,
+                    lastUpdate: null,
+                    currentStep: null,
+                    singleStepMode: false,
+                    stepPaused: false,
+                    pausedAtStep: null,
+                    mockLLM: false,
+                    mockLLMDelay: 500,
+                    batchProgress: null,
+                    batchIterations: null,
+                };
+            }
+            if (state && state.status === 'failed' && state.workflowId) {
+                const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4'];
+                const failedStep = state.failedStep || 'unknown';
+                return {
+                    status: 'failed',
+                    workflowName: state.workflowName || 'wave-analysis',
+                    team: 'coding',
+                    completedSteps: state.progress?.completedSteps?.length || 0,
+                    totalSteps: 4,
+                    stepsDetail: WAVE_STEPS.map(name => ({
+                        name,
+                        status: name === failedStep ? 'failed' : 'pending',
+                    })),
+                    stepsCompleted: state.progress?.completedSteps || [],
+                    stepsFailed: [failedStep],
+                    error: state.error,
+                    elapsedSeconds: 0,
+                    startTime: state.progress?.startTime || null,
+                    lastUpdate: state.progress?.lastUpdate || null,
+                    currentStep: failedStep,
+                    singleStepMode: state.config?.singleStepMode === true,
+                    stepPaused: false,
+                    pausedAtStep: null,
+                    mockLLM: state.config?.mockLLM === true,
+                    mockLLMDelay: state.config?.mockLLMDelay || 500,
+                    batchProgress: null,
+                    batchIterations: null,
+                };
+            }
+            if (state && state.status === 'cancelled' && state.workflowId) {
+                const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4'];
+                return {
+                    status: 'cancelled',
+                    workflowName: state.workflowName || 'wave-analysis',
+                    team: 'coding',
+                    completedSteps: 0,
+                    totalSteps: 4,
+                    stepsDetail: WAVE_STEPS.map(name => ({ name, status: 'pending' })),
+                    stepsCompleted: [],
+                    stepsFailed: [],
+                    cancelledAt: state.cancelledAt,
+                    lastStep: state.lastStep,
+                    elapsedSeconds: 0,
+                    startTime: null,
+                    lastUpdate: null,
+                    currentStep: state.lastStep || null,
+                    singleStepMode: state.config?.singleStepMode === true,
+                    stepPaused: false,
+                    pausedAtStep: null,
+                    mockLLM: state.config?.mockLLM === true,
+                    mockLLMDelay: state.config?.mockLLMDelay || 500,
+                    batchProgress: null,
+                    batchIterations: null,
+                };
+            }
+            // Not state machine format and not a recognized terminal state
+            return null;
+        }
+
+        const progress = state.progress;
+        const config = state.config || {};
+
+        // Wave-analysis has 4 waves as top-level steps
+        const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4'];
+        const completedStepNames = new Set(progress.completedSteps || []);
+
+        // Build stepsDetail array matching wave-analysis structure
+        const stepsDetail = WAVE_STEPS.map((waveName, idx) => {
+            let status = 'pending';
+            if (completedStepNames.has(waveName)) {
+                status = 'completed';
+            } else if (progress.currentWave === idx + 1) {
+                status = 'running';
+            }
+            return {
+                name: waveName,
+                status,
+                startTime: status !== 'pending' ? progress.startTime : null,
+            };
+        });
+
+        return {
+            status: state.status === 'paused' ? 'running' : state.status,
+            workflowName: state.workflowName || 'wave-analysis',
+            team: 'coding',
+            startTime: progress.startTime,
+            lastUpdate: progress.lastUpdate,
+            currentStep: progress.currentSubstepId || progress.currentStepName,
+            completedSteps: progress.completedSteps.length,
+            totalSteps: WAVE_STEPS.length,
+            stepsDetail,
+            stepsCompleted: progress.completedSteps,
+            stepsFailed: [],
+            elapsedSeconds: progress.elapsedSeconds || 0,
+            repositoryPath: null,
+            // Single-step mode fields
+            singleStepMode: config.singleStepMode === true,
+            stepPaused: state.status === 'paused',
+            pausedAtStep: state.status === 'paused' && state.pausedAt ? state.pausedAt.step : null,
+            mockLLM: config.mockLLM === true,
+            mockLLMDelay: config.mockLLMDelay || 500,
+            // Wave-specific data for the trace modal
+            currentWave: progress.currentWave,
+            totalWaves: progress.totalWaves || 4,
+            currentSubstepId: progress.currentSubstepId,
+            batchProgress: null,
+            batchIterations: null,
+        };
+    }
+
+    /**
      * Build step info array from workflow progress for visualization
      * Uses stepsDetail if available (new format with timing), falls back to basic info
      * Now includes ALL known workflow steps with their actual status
      */
     buildStepInfo(progress) {
+        // Detect wave-analysis format (has currentWave or wave step names)
+        if (progress.currentWave || progress.stepsCompleted?.some(s => s.startsWith('wave'))) {
+            return progress.stepsDetail || [];
+        }
+
         // If we have detailed step info, use it directly
         if (progress.stepsDetail && Array.isArray(progress.stepsDetail)) {
             return progress.stepsDetail;
