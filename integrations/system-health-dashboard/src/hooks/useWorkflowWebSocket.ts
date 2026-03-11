@@ -4,6 +4,9 @@
  * Connects to the server's WebSocket endpoint to receive real-time workflow events
  * and dispatch commands back to the coordinator.
  *
+ * Phase 18 rewrite: Handles STATE_SNAPSHOT events from the server and dispatches
+ * a single setWorkflowState action to Redux. No granular event reconstruction.
+ *
  * Usage:
  *   const { sendCommand, isConnected, error } = useWorkflowWebSocket()
  *
@@ -14,44 +17,41 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Logger, LogCategories } from '@/utils/logging'
+import type { WorkflowState } from '@/shared/workflow-types/state'
 import {
-  handleWorkflowStarted,
-  handleStepStarted,
-  handleStepCompleted,
-  handleStepFailed,
-  handleSubstepStarted,
-  handleSubstepCompleted,
-  handleBatchStarted,
-  handleBatchCompleted,
-  handleWorkflowPaused,
-  handleWorkflowResumed,
-  handleWorkflowCompleted,
-  handleWorkflowFailed,
+  setWorkflowState,
   handlePreferencesUpdated,
   resetExecutionState,
 } from '@/store/slices/ukbSlice'
 
-// Event types (must match coordinator's event types)
-type WorkflowEventType =
-  | 'WORKFLOW_STARTED'
-  | 'STEP_STARTED'
-  | 'STEP_COMPLETED'
-  | 'STEP_FAILED'
-  | 'SUBSTEP_STARTED'
-  | 'SUBSTEP_COMPLETED'
-  | 'BATCH_STARTED'
-  | 'BATCH_COMPLETED'
-  | 'WORKFLOW_PAUSED'
-  | 'WORKFLOW_RESUMED'
-  | 'WORKFLOW_COMPLETED'
-  | 'WORKFLOW_FAILED'
+// Message types from the server WebSocket
+// STATE_SNAPSHOT carries the full WorkflowState (from SSE event pipeline)
+// PREFERENCES_UPDATED carries LLM mode sync (not state machine related)
+// HEARTBEAT is a connection keepalive (no-op)
+type ServerMessageType =
+  | 'STATE_SNAPSHOT'
   | 'PREFERENCES_UPDATED'
   | 'HEARTBEAT'
 
-interface WorkflowEvent {
-  type: WorkflowEventType
+interface StateSnapshotMessage {
+  type: 'STATE_SNAPSHOT'
+  payload: {
+    state: WorkflowState
+    transition?: string
+  }
+}
+
+interface PreferencesUpdatedMessage {
+  type: 'PREFERENCES_UPDATED'
   payload: Record<string, unknown>
 }
+
+interface HeartbeatMessage {
+  type: 'HEARTBEAT'
+  payload?: Record<string, unknown>
+}
+
+type ServerMessage = StateSnapshotMessage | PreferencesUpdatedMessage | HeartbeatMessage
 
 // Command types (must match coordinator's command types)
 type WorkflowCommandType =
@@ -134,56 +134,34 @@ export function useWorkflowWebSocket(
   const [error, setError] = useState<string | null>(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
-  // Handle incoming events and dispatch to Redux
-  const handleEvent = useCallback((event: WorkflowEvent) => {
-    const { type, payload } = event
+  // Handle incoming messages and dispatch to Redux
+  const handleMessage = useCallback((message: { type: string; payload?: unknown }) => {
+    const { type } = message
 
     switch (type) {
-      case 'WORKFLOW_STARTED':
-        dispatch(handleWorkflowStarted(payload as any))
+      case 'STATE_SNAPSHOT': {
+        // Primary event: full WorkflowState snapshot from SSE pipeline
+        const payload = (message as StateSnapshotMessage).payload
+        if (payload?.state) {
+          dispatch(setWorkflowState({
+            state: payload.state,
+            transition: payload.transition,
+          }))
+        }
         break
-      case 'STEP_STARTED':
-        dispatch(handleStepStarted(payload as any))
-        break
-      case 'STEP_COMPLETED':
-        dispatch(handleStepCompleted(payload as any))
-        break
-      case 'STEP_FAILED':
-        dispatch(handleStepFailed(payload as any))
-        break
-      case 'SUBSTEP_STARTED':
-        dispatch(handleSubstepStarted(payload as any))
-        break
-      case 'SUBSTEP_COMPLETED':
-        dispatch(handleSubstepCompleted(payload as any))
-        break
-      case 'BATCH_STARTED':
-        dispatch(handleBatchStarted(payload as any))
-        break
-      case 'BATCH_COMPLETED':
-        dispatch(handleBatchCompleted(payload as any))
-        break
-      case 'WORKFLOW_PAUSED':
-        dispatch(handleWorkflowPaused(payload as any))
-        break
-      case 'WORKFLOW_RESUMED':
-        dispatch(handleWorkflowResumed(payload as any))
-        break
-      case 'WORKFLOW_COMPLETED':
-        dispatch(handleWorkflowCompleted(payload as any))
-        break
-      case 'WORKFLOW_FAILED':
-        dispatch(handleWorkflowFailed(payload as any))
-        break
+      }
+
       case 'PREFERENCES_UPDATED':
-        dispatch(handlePreferencesUpdated(payload as any))
+        // LLM mode sync from coordinator (not state machine related)
+        dispatch(handlePreferencesUpdated((message as PreferencesUpdatedMessage).payload as any))
         break
+
       case 'HEARTBEAT':
-        // Heartbeat events don't need Redux dispatch
-        // They just keep the connection alive
+        // Connection keepalive -- no Redux dispatch needed
         break
+
       default:
-        Logger.warn(LogCategories.UKB, 'Unknown WebSocket event type:', type)
+        Logger.warn(LogCategories.UKB, 'Unknown WebSocket message type:', type)
     }
   }, [dispatch])
 
@@ -210,7 +188,7 @@ export function useWorkflowWebSocket(
         try {
           const data = JSON.parse(event.data)
           if (data && typeof data.type === 'string') {
-            handleEvent(data as WorkflowEvent)
+            handleMessage(data)
           }
         } catch (parseError) {
           Logger.warn(LogCategories.UKB, 'Failed to parse WebSocket message:', event.data)
@@ -242,7 +220,7 @@ export function useWorkflowWebSocket(
       Logger.error(LogCategories.UKB, 'Failed to create WebSocket:', connectError)
       setError('Failed to create WebSocket connection')
     }
-  }, [serverUrl, autoReconnect, reconnectDelay, maxReconnectAttempts, reconnectAttempts, handleEvent])
+  }, [serverUrl, autoReconnect, reconnectDelay, maxReconnectAttempts, reconnectAttempts, handleMessage])
 
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {

@@ -1,5 +1,8 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import { STEP_TO_AGENT as FALLBACK_STEP_TO_AGENT } from '@/components/workflow/constants'
+import type { WorkflowState } from '@/shared/workflow-types/state'
+import type { StepDefinition } from '@/shared/workflow-types/schemas'
+import { deriveStepStatuses } from '@/shared/workflow-types/derived'
 
 // LLM Mode types for per-agent control
 export type LLMMode = 'mock' | 'local' | 'public'
@@ -500,9 +503,16 @@ interface UKBState {
   selectedNode: string | null
 
   // ============================================
-  // Event-Driven Execution State (NEW)
+  // Typed WorkflowState from SSE pipeline (Phase 18)
   // Single source of truth for active workflow state
-  // Populated by WebSocket events from coordinator
+  // Set by STATE_SNAPSHOT WebSocket messages
+  // ============================================
+  workflowState: WorkflowState | null
+  lastTransition: string | null
+
+  // ============================================
+  // Event-Driven Execution State (LEGACY - backward compat)
+  // Synced from workflowState for components not yet migrated
   // ============================================
   execution: WorkflowExecutionState
   preferences: WorkflowPreferencesState
@@ -580,7 +590,11 @@ const initialState: UKBState = {
   selectedProcessIndex: 0,
   selectedNode: null,
 
-  // Event-driven execution state (NEW)
+  // Typed WorkflowState from SSE pipeline (Phase 18)
+  workflowState: null,
+  lastTransition: null,
+
+  // Event-driven execution state (LEGACY - backward compat)
   execution: { ...initialExecutionState },
   preferences: { ...initialPreferencesState },
 
@@ -872,8 +886,70 @@ const ukbSlice = createSlice({
     },
 
     // ========================================
-    // Event-Driven Workflow Actions (NEW)
-    // These handle WebSocket events from the coordinator
+    // STATE_SNAPSHOT Action (Phase 18)
+    // Single action to store typed WorkflowState from SSE pipeline
+    // ========================================
+
+    setWorkflowState(state, action: PayloadAction<{ state: WorkflowState; transition?: string }>) {
+      const ws = action.payload.state
+      state.workflowState = ws as any // Immer draft compatibility
+      state.lastTransition = action.payload.transition || null
+
+      // Backward-compat sync: update legacy execution fields so unmigrated components still work
+      if (ws.status === 'running') {
+        state.execution.status = 'running'
+        state.execution.workflowId = ws.workflowId
+        state.execution.workflowName = ws.workflowName
+        state.execution.currentStep = ws.progress.currentStepName
+        state.execution.currentSubstep = ws.progress.currentSubstepId || null
+        state.execution.startTime = ws.progress.startTime
+        state.execution.lastUpdate = ws.progress.lastUpdate
+        state.stepPaused = false
+      } else if (ws.status === 'paused') {
+        state.execution.status = 'paused'
+        state.execution.workflowId = ws.workflowId
+        state.execution.workflowName = ws.workflowName
+        state.execution.currentStep = ws.pausedAt.step
+        state.execution.currentSubstep = ws.pausedAt.substep || null
+        state.execution.lastUpdate = ws.progress.lastUpdate
+        state.stepPaused = true
+        state.pausedAtStep = ws.pausedAt.step
+      } else if (ws.status === 'completed') {
+        state.execution.status = 'completed'
+        state.execution.workflowId = ws.workflowId
+        state.execution.workflowName = ws.workflowName
+        state.execution.lastUpdate = new Date().toISOString()
+        state.stepPaused = false
+        // Reset explicit flags when workflow ends
+        state.preferences.singleStepModeExplicit = false
+        state.preferences.mockLLMExplicit = false
+      } else if (ws.status === 'failed') {
+        state.execution.status = 'failed'
+        state.execution.workflowId = ws.workflowId
+        state.execution.workflowName = ws.workflowName
+        state.execution.lastUpdate = ws.progress.lastUpdate
+        state.stepPaused = false
+      } else if (ws.status === 'idle') {
+        state.execution.status = 'idle'
+        state.execution.workflowId = null
+        state.execution.workflowName = null
+        state.execution.currentStep = null
+        state.execution.currentSubstep = null
+        state.stepPaused = false
+      } else if (ws.status === 'cancelled') {
+        state.execution.status = 'idle'
+        state.execution.workflowId = null
+        state.execution.workflowName = null
+        state.execution.currentStep = null
+        state.execution.currentSubstep = null
+        state.stepPaused = false
+      }
+    },
+
+    // ========================================
+    // Event-Driven Workflow Actions (LEGACY - kept for backward compat)
+    // These are no longer dispatched by useWorkflowWebSocket (Phase 18)
+    // but kept temporarily for any direct callers
     // ========================================
 
     // Handle WORKFLOW_STARTED event
@@ -1251,7 +1327,9 @@ export const {
   // Sub-step UI actions (MVI)
   setExpandedSubStepsAgent,
   setSelectedSubStep,
-  // Event-driven workflow actions (NEW)
+  // STATE_SNAPSHOT action (Phase 18)
+  setWorkflowState,
+  // Event-driven workflow actions (LEGACY)
   handleWorkflowStarted,
   handleStepStarted,
   handleStepCompleted,
