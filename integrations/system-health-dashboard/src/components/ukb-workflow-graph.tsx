@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { DivergenceBanner, type DivergenceEntry } from './workflow/DivergenceBanner'
 import {
   GitBranch,
   MessageSquare,
@@ -1240,6 +1241,39 @@ export default function UKBWorkflowGraph({
   // Pass workflow name to load correct edges for the current workflow
   const { agents: WORKFLOW_AGENTS, orchestrator: ORCHESTRATOR_NODE, edges: WORKFLOW_EDGES, stepToAgent: STEP_TO_AGENT, isLoading: definitionsLoading } = useWorkflowDefinitions(process.workflowName)
 
+  // Migration divergence tracking
+  const [divergences, setDivergences] = useState<DivergenceEntry[]>([])
+  const prevStatusRef = useRef<string | undefined>(undefined)
+
+  // Fetch divergence data on mount and when workflow reaches terminal state
+  useEffect(() => {
+    const fetchDivergences = () => {
+      fetch('/api/ukb/migration-divergences')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data.divergences)) {
+            setDivergences(data.divergences)
+          }
+        })
+        .catch(() => {
+          // Silently ignore fetch errors
+        })
+    }
+
+    // Fetch on mount
+    fetchDivergences()
+
+    // Fetch when workflow transitions to completed or failed
+    const currentStatus = process.status
+    if (
+      prevStatusRef.current !== currentStatus &&
+      (currentStatus === 'completed' || currentStatus === 'failed')
+    ) {
+      fetchDivergences()
+    }
+    prevStatusRef.current = currentStatus
+  }, [process.status])
+
   // Track which node is currently wiggling
   const [wigglingNode, setWigglingNode] = useState<string | null>(null)
   const wiggleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -1589,7 +1623,9 @@ export default function UKBWorkflowGraph({
 
   return (
     <TooltipProvider>
-      <div className="flex gap-4 w-full h-full">
+      <div className="flex flex-col gap-0 w-full h-full">
+        <DivergenceBanner divergences={divergences} />
+        <div className="flex gap-4 w-full h-full">
         {/* Graph Container - contains scrollable SVG, fills available height */}
         <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border overflow-auto h-full">
           <svg
@@ -2607,6 +2643,7 @@ export default function UKBWorkflowGraph({
             </div>
           </div>
         </div>
+      </div>
       </div>
     </TooltipProvider>
   )
