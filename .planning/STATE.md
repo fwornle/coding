@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
-status: executing
-stopped_at: Completed 16-01 (state machine singleton)
-last_updated: "2026-03-11T05:49:45Z"
-last_activity: 2026-03-11 — Completed plan 16-01 (state machine singleton + integration)
+status: completed
+stopped_at: Completed 16-02 (wave-controller migration)
+last_updated: "2026-03-11T06:01:12Z"
+last_activity: 2026-03-11 — Completed plan 16-02 (wave-controller dispatch migration)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -26,24 +26,25 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 16 of 19 (Backend State Machine)
-Plan: 1 of 2 complete
-Status: Executing
-Last activity: 2026-03-11 — Completed plan 16-01 (state machine singleton + integration)
+Plan: 2 of 2 complete
+Status: Phase Complete
+Last activity: 2026-03-11 — Completed plan 16-02 (wave-controller dispatch migration)
 
-Progress: [███████░░░] 75% (3/4 plans complete)
+Progress: [██████████] 100% (4/4 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5.3min
-- Total execution time: 16min
+- Total plans completed: 4
+- Average duration: 6min
+- Total execution time: 24min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 15    | 01   | 3min     | 2     | 6     |
 | 15    | 02   | 4min     | 2     | 6     |
 | 16    | 01   | 9min     | 2     | 8     |
+| 16    | 02   | 8min     | 3     | 5     |
 
 ## Accumulated Context
 
@@ -62,6 +63,9 @@ Progress: [███████░░░] 75% (3/4 plans complete)
 - [16-01]: Cross-process state -- MCP server and workflow-runner have separate singleton instances; progress file is bridge
 - [16-01]: Legacy writeProgress kept @deprecated for backward compat until phase-19
 - [16-01]: Heartbeat intervals removed -- subscriber writes on every transition serve as natural heartbeats
+- [16-02]: substep-update is a self-loop on running state -- progress tracking without state transition
+- [16-02]: updateProgress and writeProgress fully deleted -- state machine subscriber is sole progress writer
+- [16-02]: Cooperative cancel checks at 6 strategic points between major substeps
 
 ### Critical Pitfalls
 
@@ -75,6 +79,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T05:49:45Z
-Stopped at: Completed 16-01 (state machine singleton)
-Resume with: `/gsd:execute-phase 16` (Plan 16-02 next -- wave-controller migration)
+Last session: 2026-03-11T06:01:12Z
+Stopped at: Completed 16-02 (wave-controller migration)
+Resume with: `/gsd:execute-phase 17` (Phase 17 -- SSE events)

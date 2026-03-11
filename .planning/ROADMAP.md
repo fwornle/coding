@@ -52,7 +52,7 @@ Five phases that replace the ad-hoc workflow state management with a typed state
 ### Phases
 
 - [x] **Phase 15: Type Definitions** - Discriminated union states, typed transitions, RunConfig/RunProgress separation, Zod schemas (completed 2026-03-10)
-- [ ] **Phase 16: Backend State Machine** - Wave-controller typed events, health API state transitions, progress file as subscriber
+- [x] **Phase 16: Backend State Machine** - Wave-controller typed events, health API state transitions, progress file as subscriber (completed 2026-03-11)
 - [ ] **Phase 17: SSE Event Typing** - Typed SSE events with full state snapshots, discriminated union event types, reconnection state
 - [ ] **Phase 18: Dashboard Consumer** - Dashboard renders from typed SSE only, correct substep coloring, typed commands, no inference
 - [ ] **Phase 19: Migration & Cleanup** - Parallel path validation, backward-compatible progress reader, legacy code removal
@@ -83,7 +83,7 @@ Plans:
   2. The health API step-advance endpoint calls a state machine transition function that validates the transition is legal before applying it
   3. The progress file is written by a single subscriber function that serializes the current WorkflowState -- neither wave-controller nor health API write to it directly
   4. Cancelling a workflow triggers a typed Cancel transition that moves the state machine to the cancelled state, cleaning up in-flight work
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 16-01-PLAN.md -- State machine singleton, progress file subscriber, health API integration
 - [ ] 16-02-PLAN.md -- Wave-controller migration (30 updateProgress calls to typed dispatch), legacy cleanup
@@ -127,7 +127,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. Type Definitions | 2/2 | Complete    | 2026-03-10 | - |
-| 16. Backend State Machine | 1/2 | In Progress|  | - |
+| 16. Backend State Machine | 2/2 | Complete   | 2026-03-11 | - |
 | 17. SSE Event Typing | v3.0 | 0/? | Not started | - |
 | 18. Dashboard Consumer | v3.0 | 0/? | Not started | - |
 | 19. Migration & Cleanup | v3.0 | 0/? | Not started | - |
