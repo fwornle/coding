@@ -97,6 +97,39 @@ class HealthRefreshManager {
   private handleSSEWorkflowUpdate(progress: any) {
     if (!this.store || !progress) return
 
+    // Bridge state machine format to legacy flat format (safety fallback)
+    // Server.js should bridge this, but handle it here too for robustness
+    if (progress.progress && Array.isArray(progress.progress?.completedSteps)) {
+      const sm = progress
+      const p = sm.progress
+      const config = sm.config || {}
+      const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4']
+      const completedSet = new Set(p.completedSteps || [])
+
+      progress = {
+        status: sm.status === 'paused' ? 'running' : sm.status,
+        workflowName: sm.workflowName || 'wave-analysis',
+        completedSteps: p.completedSteps.length,
+        totalSteps: WAVE_STEPS.length,
+        currentStep: p.currentSubstepId || p.currentStepName,
+        stepsDetail: WAVE_STEPS.map((name: string, idx: number) => ({
+          name,
+          status: completedSet.has(name) ? 'completed'
+            : p.currentWave === idx + 1 ? 'running' : 'pending',
+        })),
+        startTime: p.startTime,
+        lastUpdate: p.lastUpdate,
+        elapsedSeconds: p.elapsedSeconds || 0,
+        singleStepMode: config.singleStepMode === true,
+        stepPaused: sm.status === 'paused',
+        pausedAtStep: sm.status === 'paused' && sm.pausedAt ? sm.pausedAt.step : null,
+        mockLLM: config.mockLLM === true,
+        mockLLMDelay: config.mockLLMDelay || 500,
+        currentWave: p.currentWave,
+        totalWaves: p.totalWaves || 4,
+      }
+    }
+
     // Build a synthetic process object similar to what the REST API returns
     // This allows the Redux slice to handle it the same way
     const isTerminalState = ['cancelled', 'completed', 'failed'].includes(progress.status)
@@ -157,6 +190,12 @@ class HealthRefreshManager {
       paused: progress.stepPaused === true,
       pausedAt: progress.pausedAtStep || null
     }))
+
+    // Bridge config.llmMode to llmState format (handles edge cases where
+    // state machine format leaks through without llmState field)
+    if (!progress.llmState && progress.config?.llmMode) {
+      progress.llmState = { globalMode: progress.config.llmMode }
+    }
 
     // CRITICAL: Sync llmState for Mock/Local/Public mode selection in dashboard
     // When "ukb full debug" sets llmState.globalMode='mock', dashboard needs to reflect this

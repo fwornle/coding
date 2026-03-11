@@ -51,13 +51,13 @@ export const ICON_MAP: Record<string, typeof GitBranch> = {
 // Orchestrator node - central hub that manages ALL agents
 export const ORCHESTRATOR_NODE: AgentDefinition = {
   id: 'orchestrator',
-  name: 'SmartOrchestrator',
-  shortName: 'Coordinator',
+  name: 'Wave Controller',
+  shortName: 'Waves',
   icon: Play,
-  description: 'Central coordinator that manages ALL agents. Can start, stop, and retry any agent. Uses LLM-powered routing decisions with confidence scoring. Handles parallel execution, dependencies, and semantic retry guidance.',
+  description: 'Wave-based orchestrator that executes 4 waves sequentially: L0/L1 entities, L2 components, L3 details, then insights/KG-ops. Each wave runs analyze-classify-persist in sequence.',
   usesLLM: true,
   llmModel: 'Groq: llama-3.3-70b-versatile',
-  techStack: 'Multi-Agent Orchestrator',
+  techStack: 'Wave Orchestrator (4 waves)',
   row: 0,
   col: 0,  // Center position in hub layout
   isOrchestrator: true,
