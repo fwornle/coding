@@ -2,131 +2,131 @@
 
 **Type:** SubComponent
 
-EntityPersistenceManager employs the ensureLLMInitialized() method, likely defined in the Wave agent classes, to ensure that the LLM instance is properly initialized before entity persistence
+EntityPersistenceManager uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
 
 ## What It Is  
 
-**EntityPersistenceManager** is a sub‑component that lives inside the **KnowledgeManagement** module.  Its implementation hinges on three concrete artifacts that appear in the code base:  
+**EntityPersistenceManager** is a sub‑component that lives inside the **KnowledgeManagement** module. Its concrete implementation is referenced from the code‑base through the `PersistenceAgent` located at  
 
-* The **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`, which provides low‑level CRUD operations against a graph‑oriented persistence layer (Graphology + LevelDB).  
-* The **ensureLLMInitialized()** helper that is shared with the Wave‑agent family of classes; this method guarantees that a large language model (LLM) instance is ready before any persistence work is performed.  
-* The **DataLossTracker** component, which records any loss of entity data that occurs during persistence operations.  
+```
+integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts
+```  
 
-EntityPersistenceManager therefore acts as the orchestrator that receives high‑level entity objects, guarantees that the LLM is available, persists the entities through the GraphDatabaseAdapter, and records any anomalies with DataLossTracker.  It follows the same lazy‑initialisation contract used by the Wave agents: a constructor that receives a repository path and a team identifier, a call to `ensureLLMInitialized()`, and an `execute(input)` entry point that carries out the actual work.
+All entity‑level write operations—whether they originate from **ManualLearning** or **OnlineLearning**—are funneled through this manager. Its primary responsibility is to persist entities into the underlying graph store and to keep the knowledge‑graph metadata (such as `entityType` and `metadata.ontologyClass`) correctly populated. By doing so, it guarantees data consistency and integrity across the whole knowledge‑graph layer.
 
 ---
 
 ## Architecture and Design  
 
-The design of EntityPersistenceManager is a clear example of **composition over inheritance** and **factory‑based lazy initialization**.  The component does not embed LLM creation logic itself; instead it relies on the **factory pattern** that the parent KnowledgeManagement component (and the Wave agents) expose.  By deferring LLM construction until `ensureLLMInitialized()` is invoked, the system avoids the heavy cost of loading a model when the persistence manager is instantiated but never used.
+The design of **EntityPersistenceManager** follows a **delegation/composition** pattern. Rather than embedding persistence logic directly, it delegates the actual storage work to the **PersistenceAgent**. This agent, in turn, works with the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) that provides the low‑level graph‑database operations. The manager therefore acts as a thin façade that orchestrates higher‑level concerns (metadata pre‑population, consistency checks) while re‑using the generic persistence capabilities of the agent.
 
-EntityPersistenceManager also employs the **adapter pattern** through `GraphDatabaseAdapter`.  All interactions with the underlying graph store are funneled through this adapter, which abstracts away the specifics of Graphology and LevelDB.  This creates a clean separation between domain‑level entity handling and storage mechanics, making it straightforward to swap the persistence backend if needed.
+Because both **ManualLearning** and **OnlineLearning** depend on the same manager, the component embodies a **shared service** within the KnowledgeManagement subtree. The sibling components—**GraphDatabaseManager**, **CodeKnowledgeGraphConstructor**, and **IntelligentRoutingManager**—also rely on the same underlying adapters (graph‑database and code‑graph agents), which creates a consistent data‑access contract across the domain. This uniformity reduces duplication and makes it easier to evolve the persistence layer without touching the learning modules.
 
-A third architectural concern is **observability for data integrity**.  The component integrates the **DataLossTracker** to monitor and log any entity loss that occurs during create, update, or delete cycles.  This mirrors the pattern used by its sibling DataLossTracker component, reinforcing a system‑wide strategy for tracking reliability issues.
-
-The overall interaction flow can be visualised as:
-
-```
-[EntityPersistenceManager] ──► ensureLLMInitialized() (LLM factory)  
-          │  
-          ├─► GraphDatabaseAdapter (storage/graph-database-adapter.ts)  
-          │        ├─ createEntity()  
-          │        ├─ updateEntity()  
-          │        └─ deleteEntity()  
-          │  
-          └─► DataLossTracker (records anomalies)
-```
+The manager’s responsibility for pre‑populating ontology metadata (`entityType`, `metadata.ontologyClass`) is an explicit **data‑enrichment** step that prevents downstream Large Language Model (LLM) calls from having to re‑classify the same entity. This design decision reflects a **caching‑or‑pre‑compute** mindset: compute once, store once, reuse everywhere.
 
 ---
 
 ## Implementation Details  
 
-1. **Constructor contract** – EntityPersistenceManager is instantiated with two arguments, `repoPath` and `team`.  These values are stored for later use when constructing the LLM via the factory and when forming graph keys that are scoped to a particular repository and team context.
+Although the source file for **EntityPersistenceManager** itself is not listed, the observations make clear how it operates:
 
-2. **Lazy LLM initialization** – The `ensureLLMInitialized()` method (inherited from the Wave agent hierarchy) checks an internal LLM reference.  If the reference is `null`, it calls the shared LLM factory to obtain an instance.  This method is always called before any persistence operation, guaranteeing that downstream logic (e.g., entity embedding or validation that might rely on the LLM) has a ready model.
+1. **Entry point** – The manager receives an entity object from either **ManualLearning** or **OnlineLearning**.  
+2. **Metadata pre‑population** – Before any persistence call, it injects two fields:
+   * `entityType` – a high‑level classification (e.g., *class*, *function*, *document*).  
+   * `metadata.ontologyClass` – the precise ontology node that the entity belongs to.  
+   This step is performed locally, eliminating the need for an LLM to recompute the classification each time the entity is stored.
 
-3. **Persistence via GraphDatabaseAdapter** – All CRUD actions are delegated to the adapter found at `storage/graph-database-adapter.ts`.  The adapter exposes methods such as `createNode`, `updateNode`, and `deleteNode` (the exact method names are not listed in the observations but are implied by “creating, updating, and deleting entities”).  EntityPersistenceManager translates high‑level entity objects into the adapter’s expected payloads, handling any necessary serialization of entity attributes.
+3. **Delegation to PersistenceAgent** – The enriched entity is handed off to the `PersistenceAgent` (found at `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`). The agent encapsulates the logic for:
+   * Translating the entity into the graph‑database schema.  
+   * Issuing create / update / upsert operations via the `GraphDatabaseAdapter`.  
 
-4. **Data loss tracking** – After each persistence call, EntityPersistenceManager inspects the result.  If the operation fails or returns an incomplete state, it forwards details to the **DataLossTracker** component.  The tracker persists its own records using the same GraphDatabaseAdapter, ensuring that loss‑related metadata lives alongside regular entity data.
+4. **Consistency & integrity checks** – The manager ensures that any update respects existing relationships and constraints. While the exact validation routines are not enumerated, the observation that the manager “ensures data consistency and integrity” implies checks such as duplicate detection, relationship validation, and possibly transactional boundaries provided by the adapter.
 
-5. **Execution entry point** – The `execute(input)` method receives a structured request (typically an entity payload plus optional metadata).  Inside `execute`, the component first invokes `ensureLLMInitialized()`, then decides whether the request is a create, update, or delete operation, calls the corresponding adapter method, and finally reports any issues to DataLossTracker before returning a success/failure response.
+5. **Knowledge‑graph update** – After the persistence call succeeds, the manager may trigger additional graph‑updates (e.g., linking the new entity to its parent ontology nodes). These updates are again performed through the `PersistenceAgent`, guaranteeing that all graph mutations follow a single, well‑tested path.
 
-Because the observations do not expose concrete class names beyond the adapter and the factory helper, the implementation is described in terms of these responsibilities rather than specific method signatures.
+Because the manager is used by both manual and automated learning pipelines, its API is deliberately **stateless**—each call receives a full entity payload and returns a success/failure indicator, making it safe for concurrent invocations.
 
 ---
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement** – EntityPersistenceManager is a child of KnowledgeManagement, inheriting the same LLM‑factory strategy described for the parent.  KnowledgeManagement’s responsibility for orchestrating LLM creation means that EntityPersistenceManager does not need to manage model lifecycles directly, reducing duplication.
+| Integration | Path / Component | Role in Interaction |
+|-------------|------------------|---------------------|
+| **PersistenceAgent** | `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` | Receives enriched entities from the manager and performs low‑level graph writes. |
+| **GraphDatabaseAdapter** | `storage/graph-database-adapter.ts` | Provides the concrete CRUD operations against the underlying graph database (e.g., Neo4j, JanusGraph). |
+| **ManualLearning** | sibling component | Calls the manager when a user manually creates or edits an entity; relies on the same metadata pre‑population logic. |
+| **OnlineLearning** | sibling component | Invokes the manager as part of automated batch pipelines; benefits from the same consistency guarantees. |
+| **KnowledgeManagement** (parent) | – | Hosts the manager and coordinates its use across learning modules; also contains other managers that share the same adapters. |
+| **GraphDatabaseManager**, **CodeKnowledgeGraphConstructor**, **IntelligentRoutingManager** (siblings) | – | Share the `GraphDatabaseAdapter` and, indirectly, the persistence conventions established by the manager. |
 
-* **Sibling – ManualLearning & KnowledgeGraphQueryEngine** – Both ManualLearning and KnowledgeGraphQueryEngine also rely on `storage/graph-database-adapter.ts`.  This shared dependency means that any change to the adapter’s API (e.g., a new version of Graphology) must be coordinated across all three components, but it also guarantees consistent data semantics across manual knowledge ingestion, automated persistence, and query execution.
-
-* **Sibling – DataLossTracker** – The DataLossTracker component is both a consumer (EntityPersistenceManager reports to it) and a producer (it persists its own loss‑records using the same adapter).  This tight coupling enables a unified view of data health across the KnowledgeManagement domain.
-
-* **Sibling – OnlineLearning** – While OnlineLearning does not directly use the GraphDatabaseAdapter, it feeds knowledge into the system that eventually becomes entities persisted by EntityPersistenceManager.  Therefore, the output contract of OnlineLearning (entity shape, identifiers) must align with what EntityPersistenceManager expects.
-
-* **External – Wave agents** – The lazy‑initialisation pattern (`constructor → ensureLLMInitialized → execute`) is a convention established by the Wave agents.  EntityPersistenceManager mirrors this contract, allowing developers to treat it interchangeably with other Wave‑style agents when building pipelines.
-
-All of these integration points are mediated through well‑defined interfaces: the LLM factory, the GraphDatabaseAdapter, and the DataLossTracker API.  No direct file‑system or network calls are observed outside these abstractions.
+The manager does not expose its own persistence API; instead, it is a **consumer** of the `PersistenceAgent` and a **producer** of enriched entity objects. All communication is synchronous function calls within the same process space, as no inter‑process messaging is mentioned.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate with repository context** – Always provide a valid `repoPath` and `team` when constructing EntityPersistenceManager.  These values are used for namespacing graph nodes and for selecting the appropriate LLM configuration.
+1. **Always let the manager handle metadata** – Do not manually set `entityType` or `metadata.ontologyClass` before calling the manager. The manager’s pre‑population step guarantees a single source of truth and avoids redundant LLM classification.  
 
-2. **Never bypass `ensureLLMInitialized()`** – Even if an LLM instance appears to be cached elsewhere, call `ensureLLMInitialized()` before any `execute` call.  The method encapsulates lazy loading logic and guards against uninitialized model usage.
+2. **Pass a complete entity payload** – Because the manager is stateless, each invocation must include every field that should be persisted. Partial updates risk bypassing the integrity checks baked into the manager.  
 
-3. **Prefer the `execute` entry point** – All persistence actions (create, update, delete) should be routed through `execute(input)`.  This guarantees that the LLM is ready, that the GraphDatabaseAdapter is used uniformly, and that any data‑loss events are captured by DataLossTracker.
+3. **Do not call the PersistenceAgent directly** – All graph writes should be routed through **EntityPersistenceManager**. This ensures that the pre‑population, consistency validation, and any future business rules are uniformly applied.  
 
-4. **Handle DataLossTracker responses** – After `execute` returns, inspect any diagnostic information supplied by DataLossTracker.  If loss events are reported, follow the remediation workflow defined in the KnowledgeManagement documentation (e.g., re‑ingest the entity or trigger an alert).
+4. **Handle the manager’s response** – The manager returns a success indicator (or throws an exception) after the `PersistenceAgent` completes. Consumers (ManualLearning, OnlineLearning) should treat failures as fatal to the current learning step and trigger appropriate rollback or retry logic.  
 
-5. **Stay aligned with sibling adapters** – When extending the schema of stored entities, coordinate changes with ManualLearning, KnowledgeGraphQueryEngine, and DataLossTracker, because they all share the same `storage/graph-database-adapter.ts` contract.
+5. **Concurrency considerations** – Since the manager is stateless, multiple threads or async tasks can safely invoke it in parallel. However, developers should be aware of any database‑level transaction limits imposed by the `GraphDatabaseAdapter`.  
 
-6. **Testing** – Unit tests should mock the GraphDatabaseAdapter and DataLossTracker to verify that EntityPersistenceManager correctly delegates CRUD operations and logs failures.  Integration tests can spin up an in‑memory LevelDB instance to validate end‑to‑end persistence.
+6. **Extending the manager** – If new ontology fields are required, add them to the pre‑population step inside the manager rather than scattering the logic across learning modules. This keeps the enrichment policy centralized.
 
 ---
 
 ### Architectural patterns identified  
 
-1. **Factory pattern** – LLM instances are created lazily via a shared factory used by KnowledgeManagement and Wave agents.  
-2. **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB storage behind a uniform CRUD interface.  
-3. **Lazy initialization** – The `ensureLLMInitialized()` step defers heavyweight model loading until it is actually needed.  
-4. **Composition** – EntityPersistenceManager composes the adapter, the LLM factory, and the DataLossTracker rather than inheriting from them.  
+* **Facade / Façade‑like manager** – EntityPersistenceManager provides a simplified, high‑level interface for persisting entities while hiding the complexities of the underlying agents.  
+* **Delegation / Composition** – Core persistence work is delegated to `PersistenceAgent`, which itself composes the `GraphDatabaseAdapter`.  
+* **Shared Service** – The manager is a common service used by sibling learning components, promoting reuse and consistency.  
 
 ### Design decisions and trade‑offs  
 
-* **Lazy LLM loading** reduces startup latency and memory pressure, at the cost of a possible first‑call pause when the model is materialized.  
-* **Centralised GraphDatabaseAdapter** ensures data‑format consistency across multiple components, but creates a single point of change; any adapter refactor must be coordinated across all siblings.  
-* **Explicit data‑loss tracking** improves observability but adds extra write paths (tracking records) that could marginally increase storage overhead.  
+* **Centralised metadata enrichment** – Guarantees uniform ontology classification but introduces a single point where classification logic resides; any change affects all learners.  
+* **Stateless manager** – Improves scalability and testability, at the cost of requiring full entity payloads on each call (no incremental state).  
+* **Synchronous delegation** – Simplicity and immediate consistency, but may limit throughput if the underlying graph database becomes a bottleneck.  
 
 ### System structure insights  
 
-The KnowledgeManagement hierarchy follows a **vertical slice** where each sub‑component (EntityPersistenceManager, ManualLearning, KnowledgeGraphQueryEngine, DataLossTracker) operates on the same graph store but fulfills distinct responsibilities (persistence, ingestion, querying, health monitoring).  The shared factory and adapter layers act as **horizontal cross‑cutting concerns** that enforce consistent resource handling and storage access across the slice.
+* The KnowledgeManagement subtree is organised around **agents** (PersistenceAgent, CodeGraphAgent) that encapsulate domain‑specific operations, while **adapters** (GraphDatabaseAdapter) abstract the storage technology.  
+* EntityPersistenceManager sits at the intersection of learning (Manual/Online) and storage, acting as the “gateway” that enforces data contracts before data reaches the graph layer.  
 
 ### Scalability considerations  
 
-* Because persistence is delegated to LevelDB via Graphology, the system inherits LevelDB’s on‑disk scalability limits (single‑process, limited concurrent writes).  Scaling out would require sharding the graph or swapping the adapter for a distributed store.  
-* Lazy LLM initialization helps scale the number of concurrent EntityPersistenceManager instances, as only the actively used agents will load the model.  
-* DataLossTracker adds modest write amplification; in high‑throughput scenarios, batching its writes or off‑loading to a separate logging pipeline could mitigate contention.
+* Because the manager is stateless, horizontal scaling is straightforward: multiple instances can run behind a load balancer or be invoked concurrently in a serverless fashion.  
+* The primary scalability constraint is the throughput of the `GraphDatabaseAdapter`. If batch ingestion from OnlineLearning grows, the underlying graph database must support high‑rate writes, possibly requiring write‑optimised configurations or sharding.  
+* Pre‑populating ontology metadata reduces the number of LLM calls, indirectly improving overall system scalability by lowering compute load.  
 
 ### Maintainability assessment  
 
-The clear separation of concerns (LLM factory, graph adapter, loss tracker) makes the codebase **highly modular**.  Adding new entity types or changing persistence semantics is confined to the adapter and the mapping logic inside EntityPersistenceManager.  However, the tight coupling to a single adapter implementation means that any major storage overhaul will ripple through all siblings, demanding coordinated updates and comprehensive regression testing.  Overall, the design favours **readability and testability**, with predictable interaction patterns that align with the rest of the Wave‑agent ecosystem.
+* **High cohesion** – The manager focuses solely on entity persistence and metadata preparation, making it easy to locate and modify related logic.  
+* **Low coupling** – Interaction is limited to well‑defined agents and adapters; changes to the graph‑database implementation are isolated within `GraphDatabaseAdapter`.  
+* **Clear ownership** – All learning modules rely on a single manager, reducing duplicated code and simplifying future refactors (e.g., changing ontology schema).  
+* **Potential risk** – Since the manager is the sole place for metadata enrichment, any bugs there propagate system‑wide; thorough unit testing and integration tests are essential.  
+
+---  
+
+By grounding the analysis in the observed file paths and component relationships, this document captures the essential architectural intent, design rationale, and practical guidance for developers working with **EntityPersistenceManager**.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a factory pattern for creating LLM instances, as seen in the Wave agents, which follow the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern allows for efficient initialization of LLM instances only when required, reducing unnecessary resource allocation. The ensureLLMInitialized() method, likely defined in the Wave agent classes, ensures that the LLM instance is properly initialized before execution. This approach enables the component to manage resources effectively and optimize performance. The GraphDatabaseAdapter, employed for Graphology+LevelDB persistence, also plays a crucial role in storing and retrieving knowledge graph data, as defined in storage/graph-database-adapter.ts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which enables efficient querying capabilities and handles large amounts of data. This is evident in the way the component employs the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates. The GraphDatabaseAdapter's automatic JSON export sync ensures data consistency, which is crucial for maintaining the integrity of the knowledge graphs. Furthermore, the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is used for AST-based code knowledge graph construction and semantic code search, demonstrating the component's ability to handle complex data structures and provide intelligent routing for data storage and retrieval.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve manual knowledge entities
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information
-- [KnowledgeGraphQueryEngine](./KnowledgeGraphQueryEngine.md) -- KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline for automatic knowledge extraction from various data sources.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing the graph database connection.
+- [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction.
+- [IntelligentRoutingManager](./IntelligentRoutingManager.md) -- IntelligentRoutingManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing intelligent routing.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

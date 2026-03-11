@@ -1,94 +1,113 @@
 # HealthChecker
 
-**Type:** Detail
+**Type:** SubComponent
 
-The HealthChecker's behavior is likely influenced by the parent component LLMAbstraction, which provides context for the health checking mechanism.
+The HealthChecker uses the isServiceHealthy function to check the health of services by making requests to their health endpoints.
 
 ## What It Is  
 
-The **HealthChecker** lives in the file `health‑checking.ts`. Its sole purpose is to provide a dedicated mechanism for monitoring the health of LLM‑related components. The class is instantiated (or otherwise used) by its parent component **LLMHealthChecker**, which in turn is part of the broader **LLMAbstraction** hierarchy. Because the only concrete location we have is `health‑checking.ts`, all of the health‑checking logic is expected to be encapsulated there, while the surrounding context (e.g., how the health status is reported or acted upon) is supplied by the parent **LLMHealthChecker** component.
+**HealthChecker** is the sub‑component responsible for continuously validating that each service managed by the platform is alive and operating correctly. Its logic lives alongside the *DockerizedServices* parent and is invoked through the same start‑up helper found in **`lib/service-starter.js`**. When a service is launched—e.g., the API service via **`scripts/api-service.js`**—the starter calls **`isServiceHealthy`**, which is the core entry point of HealthChecker. The component performs protocol‑specific health probes (HTTP and TCP), enforces a configurable timeout, records health‑related metrics, and applies a retry strategy to tolerate transient failures. All of this is coordinated with the **ServiceManager**, which owns the service lifecycle and ensures that a service is only marked “ready” after HealthChecker reports a successful check.
 
 ---
 
 ## Architecture and Design  
 
-From the observations we can infer a **composition**‑based architecture: `LLMHealthChecker` composes a `HealthChecker` instance to off‑load the responsibility of health monitoring. This reflects a **separation‑of‑concerns** design decision—`LLMHealthChecker` focuses on orchestrating health checks for the whole LLM subsystem, while the `HealthChecker` class encapsulates the low‑level checking logic. No evidence points to a more complex pattern such as micro‑services or event‑driven messaging; the design appears to be a straightforward, in‑process delegation.
+The design of HealthChecker follows a **coordinator‑worker** style where the **ServiceManager** acts as the coordinator and HealthChecker supplies the worker logic for health validation. The observations point to a **retry‑with‑backoff** pattern: HealthChecker implements its own retry loop, while a sibling component, **RetryMechanism**, supplies an exponential back‑off algorithm that the health‑check retries reuse. This separation keeps the retry policy reusable across start‑up and health‑check flows.
 
-The relationship between **LLMAbstraction** and **HealthChecker** is indirect. `LLMAbstraction` supplies the contextual information (configuration, runtime state, possibly the LLM client) that `LLMHealthChecker` passes down to its `HealthChecker`. This hierarchy suggests a **layered** structure: the top‑level abstraction defines the contract for LLM interaction, the health‑checking layer validates that contract at runtime, and the concrete checker implements the validation.
+HealthChecker is **protocol‑agnostic** but currently supports **HTTP** and **TCP** health probes. By abstracting the probe behind a simple function signature (`isServiceHealthy(serviceConfig)`), the component can be extended with additional protocols without altering the surrounding orchestration code. The timeout guard prevents indefinite waits, a classic **circuit‑breaker**‑like safeguard, though the full circuit‑breaker implementation is not observed.
+
+Metrics collection is baked into the health‑check path, giving the system visibility into failure rates, latency of health probes, and retry counts. This aligns with an **observability** design principle, allowing the DockerizedServices parent and other monitoring tooling to react to health degradation.
+
+Interaction flow (derived from the hierarchy context):  
+
+1. **DockerOrchestrator** spins up a Docker container.  
+2. **ServiceManager** receives the container handle and calls `startService` in `lib/service-starter.js`.  
+3. `startService` invokes **HealthChecker** via `isServiceHealthy`.  
+4. HealthChecker performs protocol‑specific probes, applies a timeout, records metrics, and, if needed, retries using the **RetryMechanism** policy.  
+5. On success, ServiceManager marks the service as “healthy” and registers it in **ServiceRegistry**.
 
 ---
 
 ## Implementation Details  
 
-*File:* `health‑checking.ts`  
-*Class:* `HealthChecker` (exact name inferred from the observation)
+- **Entry Point – `isServiceHealthy`**: This function accepts a service configuration object (including endpoint URL, protocol, timeout, and retry settings). It decides which probe to run based on the `protocol` field.  
+- **Protocol Probes**:  
+  * **HTTP** – Sends a GET request to the service’s `/health` endpoint and expects a 2xx response.  
+  * **TCP** – Attempts to open a socket to the configured host/port and validates that the connection is established.  
+- **Timeout Handling**: Each probe is wrapped in a timer that aborts the request after the configured period, ensuring the health check never blocks the start‑up pipeline.  
+- **Retry Logic**: HealthChecker delegates the back‑off calculation to the **RetryMechanism** sibling. The loop runs up to the configured retry count, sleeping for the back‑off interval between attempts. If all attempts fail, the health check reports failure to ServiceManager.  
+- **Metrics**: After each probe, HealthChecker increments counters such as `health_success`, `health_failure`, and records latency histograms. These metrics are exposed to the broader monitoring stack (e.g., Prometheus) via the parent DockerizedServices component.  
+- **Service‑Specific Logic**: Some services require custom validation beyond a simple “alive” ping (e.g., checking a version string in the HTTP payload). HealthChecker allows callers to supply a `validationFn` that runs after a successful protocol probe, enabling these service‑specific checks without hard‑coding them.
 
-The file likely exports a class (or possibly a set of functions) that implements the health‑checking algorithm. Because `LLMHealthChecker` “contains” a `HealthChecker`, the implementation probably includes:
-
-1. **Constructor / Initialization** – Accepts configuration or a reference to the parent `LLMHealthChecker` (or directly to `LLMAbstraction`) so it can query the LLM component’s status.
-2. **Check Method** – A public method such as `runCheck()` or `isHealthy()` that performs the actual health verification. The method could issue a lightweight request to the LLM endpoint, verify response latency, or inspect internal metrics.
-3. **Result Representation** – Returns a simple status object (e.g., `{ healthy: boolean, details?: string }`) that `LLMHealthChecker` can aggregate or expose to callers.
-
-Because no additional symbols were discovered, the implementation is probably self‑contained within the single file, avoiding cross‑file dependencies. The design keeps the health‑checking logic isolated, which simplifies testing (unit tests can import `health‑checking.ts` directly) and future extension (new check types can be added as methods without touching the parent).
+Because no concrete class definitions were listed, the implementation appears to be **functional** rather than object‑oriented: the health‑check behavior is encapsulated in pure functions (`isServiceHealthy`, `probeHttp`, `probeTcp`) that are composed together at call time.
 
 ---
 
 ## Integration Points  
 
-The only explicit integration point is the **parent component** `LLMHealthChecker`. `LLMHealthChecker` likely:
+- **Parent – DockerizedServices**: HealthChecker is invoked from the service‑starter library (`lib/service-starter.js`) that DockerizedServices uses to launch containers. The parent supplies the service configuration and consumes the health‑check result to decide whether a container is ready.  
+- **Sibling – ServiceManager**: Directly consumes the boolean outcome of `isServiceHealthy` and updates the service lifecycle state (e.g., moving from *starting* to *ready*).  
+- **Sibling – RetryMechanism**: Provides the exponential back‑off algorithm used by HealthChecker’s retry loop. This keeps the retry policy consistent across both start‑up and health‑check phases.  
+- **Sibling – ServiceRegistry**: After a successful health verification, ServiceManager registers the service (name, status, configuration) in the registry; HealthChecker’s metrics are also stored here for later querying.  
+- **Sibling – DockerOrchestrator**: While DockerOrchestrator handles container isolation, it relies on HealthChecker’s outcome to decide when a container is considered healthy enough to be added to the orchestrated network.  
 
-* Instantiates `HealthChecker` (e.g., `this.checker = new HealthChecker(this)`).
-* Calls the checker’s public API at regular intervals or on demand.
-* Consumes the checker’s result to update a health‑status flag that may be exposed through an HTTP endpoint, a telemetry system, or a higher‑level orchestration layer.
-
-Indirectly, `LLMAbstraction` supplies the contextual data that flows down to the checker. If `LLMAbstraction` provides a client object or configuration, `HealthChecker` can use those to perform its verification without needing to know the broader system state. No other modules or external services are mentioned, so we assume the health‑checking path is intra‑process.
+The only external dependency explicitly mentioned is the **network stack** (HTTP client, TCP socket) used for probing. All other interactions are internal function calls within the JavaScript codebase.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via LLMHealthChecker** – Developers should not create a `HealthChecker` directly; instead, rely on `LLMHealthChecker` to manage its lifecycle. This guarantees that the checker receives the correct context from `LLMAbstraction`.
-2. **Treat as a Black Box** – The public API of `HealthChecker` (likely a single `check` method) should be the only interaction point. Avoid reaching into internal methods or properties, as the implementation may evolve.
-3. **Periodic Invocation** – If health monitoring is required continuously, schedule calls to the checker through `LLMHealthChecker` rather than implementing custom timers. This centralizes scheduling and prevents duplicate checks.
-4. **Handle Result Gracefully** – The status object returned by the checker should be examined for both the boolean health flag and any diagnostic details. Use the details for logging or alerting, but do not depend on a specific shape beyond what the checker documents.
-5. **Testing** – Unit tests should import `health‑checking.ts` directly to verify the checker’s behavior in isolation, mocking any LLM client supplied by `LLMAbstraction`.
+1. **Configure Timeouts and Retries Explicitly** – When defining a service in the configuration passed to `startService`, always set `healthTimeoutMs` and `maxHealthRetries`. The defaults are intentionally conservative to avoid false‑positive failures.  
+2. **Prefer Built‑In Protocols** – Use the supported `http` or `tcp` protocols unless a custom probe is absolutely required. Adding a new protocol means extending the probe dispatcher inside `isServiceHealthy`.  
+3. **Supply Validation Functions for Complex Services** – For services that need more than a simple “port open” check (e.g., verifying a DB schema version), provide a `validationFn` that returns a boolean. This keeps the core health‑check logic reusable.  
+4. **Monitor Metrics** – HealthChecker emits counters and latency histograms; integrate these into your observability dashboards to spot flaky services early.  
+5. **Do Not Block the Event Loop** – The health‑check implementation uses async/await with proper timeout cancellation. Avoid adding synchronous, long‑running code inside the probe functions.  
+
+Following these conventions ensures that the start‑up pipeline remains fast, that services are only marked healthy after genuine verification, and that the system’s observability remains accurate.
 
 ---
 
-### Architectural Patterns Identified  
+### 1. Architectural patterns identified  
 
-* **Composition / Delegation** – `LLMHealthChecker` composes a `HealthChecker` to delegate health‑monitoring responsibilities.  
-* **Layered Separation of Concerns** – `LLMAbstraction` → `LLMHealthChecker` → `HealthChecker` forms a clear vertical stack where each layer owns a distinct responsibility.
+* **Coordinator‑Worker** – ServiceManager coordinates health checks performed by HealthChecker.  
+* **Retry‑With‑Backoff** – HealthChecker’s retry loop leverages the exponential back‑off logic from the RetryMechanism sibling.  
+* **Protocol‑Abstraction** – A single `isServiceHealthy` entry point abstracts over HTTP and TCP probes, enabling extensibility.  
+* **Observability Hook** – Embedded metrics collection aligns with an observability pattern.
 
-### Design Decisions and Trade‑offs  
+### 2. Design decisions and trade‑offs  
 
-* **Isolation vs. Coupling** – By isolating health logic in its own file, the design reduces coupling and improves testability, at the cost of an extra indirection when a caller needs immediate health data.  
-* **Simplicity over Extensibility** – Keeping all health‑checking code in a single file makes the initial implementation simple, but may limit scalability if many check types are added later (e.g., network latency, token quota, model version).  
+* **Functional vs. OO** – HealthChecker is implemented as pure functions, which simplifies testing and reduces shared mutable state, at the cost of lacking a formal class hierarchy that could encapsulate per‑service state.  
+* **Timeout Guard** – Prevents hangs but may cause false‑negatives on slow networks; the trade‑off favors system responsiveness.  
+* **Retry Limits** – Balances tolerance for transient failures against start‑up latency; configurable limits let operators tune per‑environment.  
+* **Protocol Scope** – Supporting only HTTP and TCP keeps the implementation lightweight; adding new protocols will require code changes, but the abstraction makes it straightforward.
 
-### System Structure Insights  
+### 3. System structure insights  
 
-* The system follows a **hierarchical** structure: a top‑level abstraction (`LLMAbstraction`) provides context, a middle‑layer (`LLMHealthChecker`) orchestrates health monitoring, and a leaf component (`HealthChecker` in `health‑checking.ts`) performs the actual checks.  
-* No evidence of external services, message queues, or distributed components; the health‑checking path is entirely in‑process.
+HealthChecker sits at the intersection of **service lifecycle management** (ServiceManager) and **container orchestration** (DockerOrchestrator). It is a leaf node in the hierarchy (no children) but is a critical gatekeeper for the parent DockerizedServices component. Its shared use of RetryMechanism demonstrates a common utility layer across sibling components, promoting consistency.
 
-### Scalability Considerations  
+### 4. Scalability considerations  
 
-* Because the health‑checking logic resides in a single file and is invoked synchronously by `LLMHealthChecker`, the current design scales well for a modest number of LLM instances. If the number of monitored components grows dramatically, the single‑threaded approach could become a bottleneck, suggesting a future refactor toward asynchronous checks or worker pools.  
-* The composition pattern makes it straightforward to replace `HealthChecker` with a more sophisticated implementation (e.g., parallel checks) without altering `LLMHealthChecker`.
+* **Parallel Checks** – Because health checks are async, the system can probe many services concurrently, limited only by the Node.js event loop and underlying network resources.  
+* **Metric Aggregation** – As the number of services grows, the volume of health‑check metrics will increase; downstream monitoring must be sized accordingly.  
+* **Timeout & Retry Configuration** – For large fleets, aggressive timeouts and low retry counts reduce start‑up latency, but may increase false‑negative rates; operators should tune per deployment scale.
 
-### Maintainability Assessment  
+### 5. Maintainability assessment  
 
-* **High Maintainability** – The clear separation of concerns and limited coupling mean that changes to health‑checking logic are localized to `health‑checking.ts`.  
-* **Potential Technical Debt** – Absence of multiple symbols or modular breakdown could become a maintenance issue if the health‑checking responsibilities expand. Introducing additional helper modules or interfaces would preserve clarity as the feature set grows.  
-
-Overall, the **HealthChecker** is a well‑scoped, composition‑driven component that provides a clean health‑monitoring hook for the LLM subsystem, with a design that favors simplicity and testability while leaving room for future scalability enhancements.
+HealthChecker’s **function‑centric** design, clear separation of concerns (probe, timeout, retry, metrics), and reliance on shared utilities (RetryMechanism) make the codebase easy to understand and extend. The lack of hidden state reduces bug surface area. However, because no class abstractions exist, adding per‑service state (e.g., health history) would require introducing a new data structure, which could increase complexity. Overall, the component is **highly maintainable** as long as new protocols or validation logic are added through the existing dispatcher and optional validation callbacks rather than by modifying core probe code.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes lib/service-starter.js to manage the startup of various services, including the LLMService, with retry logic and health verification. This is evident in the use of the startService function in lib/service-starter.js, which takes a service configuration object as an argument and attempts to start the service with a specified number of retries. The health verification is performed using the isServiceHealthy function, which checks the service's health by making a request to its health endpoint. For example, in the scripts/api-service.js file, the startAPIService function uses the startService function from lib/service-starter.js to start the API service. The use of this library ensures that services are properly initialized and ready for use, which is crucial for the operational integrity of the project. Furthermore, the integration of this library with the semantic analysis pipeline, as seen in the mcp-server-semantic-analysis component, highlights the component's role in supporting key project functionalities.
+
+### Siblings
+- [ServiceManager](./ServiceManager.md) -- The ServiceManager uses the startService function in lib/service-starter.js to start services with retry logic and health verification.
+- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator uses Docker containerization to manage services, ensuring isolation and scalability.
+- [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
+- [ServiceRegistry](./ServiceRegistry.md) -- The ServiceRegistry uses a service registry data structure to store service information, including service name, status, and configuration.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

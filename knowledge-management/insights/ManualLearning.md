@@ -2,128 +2,135 @@
 
 **Type:** SubComponent
 
-Handles Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.
+ManualLearning relies on the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct the AST-based code knowledge graph for semantic code search capabilities.
 
 ## What It Is  
 
-**ManualLearning** is a **sub‑component** of the **KnowledgeManagement** component that lives inside the overall *Coding* project.  Its sole responsibility, as described in the observations, is to **manage knowledge that originates from human activity** – manual authoring, direct edits, and hand‑crafted observations.  In other words, any piece of knowledge that does not flow automatically from an online learning pipeline is routed through ManualLearning.  The component sits alongside its sibling **OnlineLearning**, together forming the two primary knowledge‑ingestion pathways that KnowledgeManagement exposes to the rest of the system.  Because the observations do not list concrete file paths or symbols, the exact location in the repository is currently undocumented, but its logical placement is under the `KnowledgeManagement/ManualLearning` namespace (or an equivalent folder that mirrors the component hierarchy).
-
----
+**ManualLearning** is a *SubComponent* that lives inside the **KnowledgeManagement** component. Its concrete implementation can be found in the files that interact with the graph‑storage layer, most notably `storage/graph-database-adapter.ts`, `src/agents/persistence-agent.ts` and `src/agents/code-graph-agent.ts`. The sub‑component is responsible for ingesting **human‑curated knowledge** – direct edits, hand‑crafted observations, and other manually created entities – and persisting them into the system‑wide knowledge graph. Because ManualLearning is part of KnowledgeManagement, every piece of manually curated data becomes available to the broader ecosystem (e.g., online learning pipelines, trace reporting, and code‑search services).
 
 ## Architecture and Design  
 
-The architecture of **ManualLearning** follows a **clear separation‑of‑concerns** pattern within the larger KnowledgeManagement domain.  By carving out a dedicated sub‑component for human‑curated knowledge, the system isolates **manual data‑flow** from the **automated, algorithm‑driven flow** handled by the sibling **OnlineLearning** component.  This separation is an explicit design decision reflected in the component hierarchy:
+The architecture that emerges from the observations is a **layered, adapter‑driven design** anchored on a single graph‑database abstraction.  
 
-* **KnowledgeManagement** – the parent component that owns the overall knowledge graph, persistence, decay tracking, and query services.  
-* **ManualLearning** – handles *manual* knowledge creation and curation.  
-* **OnlineLearning** – handles *automated* knowledge generation (e.g., model‑inferred entities).
+1. **Adapter Layer** – `GraphDatabaseAdapter` (located at `storage/graph-database-adapter.ts`) implements the *Adapter* pattern, encapsulating the concrete storage technology (Graphology + LevelDB) behind a uniform API. All components that need to read or write graph data, including ManualLearning, rely on this adapter instead of coupling directly to LevelDB.  
 
-The pattern resembles a **modular decomposition** where each sub‑component implements a distinct *ingestion* contract with the parent.  The parent likely defines a common interface (e.g., `IKnowledgeIngestor`) that both ManualLearning and OnlineLearning implement, enabling KnowledgeManagement to treat them uniformly when persisting or indexing new entities.  This modularity supports **independent evolution**: changes to the manual workflow (UI tweaks, editorial policies) do not ripple into the online learning pipeline, and vice‑versa.
+2. **Agent Layer** – Two agents sit on top of the adapter:  
+   * `PersistenceAgent` (`src/agents/persistence-agent.ts`) provides CRUD‑style services for *entities* in the graph. ManualLearning delegates creation, update, and deletion of its manually curated entities to this agent, ensuring that the same validation, indexing and transaction logic used by the sibling **EntityPersistence** component is reused.  
+   * `CodeGraphAgent` (`src/agents/code-graph-agent.ts`) builds the AST‑based code knowledge graph. ManualLearning calls this agent when a manually added code snippet needs to be woven into the semantic code‑search index, sharing the same pipeline that the sibling **CodeKnowledgeGraph** component uses.  
 
-Because no concrete code symbols are present, we cannot point to specific classes or functions, but the design implies the existence of:
+3. **Sub‑Component Boundary** – Within KnowledgeManagement, ManualLearning is a distinct *SubComponent* that collaborates with the **EntityPersistence** sub‑component (its own child) to manage entity lifecycle. This separation clarifies responsibilities: ManualLearning focuses on *what* is being added (human‑curated content), while EntityPersistence handles *how* those entities are persisted.  
 
-* **Domain objects** representing manually authored entities (e.g., `ManualEntity`, `Observation`).  
-* **Service classes** that accept edits and translate them into the graph storage format used by KnowledgeManagement.  
-* **Validation or moderation hooks** that may be invoked before the knowledge is persisted, ensuring human‑entered quality controls.
-
-The interaction model is therefore **parent‑driven orchestration**: KnowledgeManagement invokes the appropriate sub‑component based on the source of the knowledge, and each sub‑component returns a canonical representation that the parent can store, query, and decay‑track uniformly.
-
----
+The overall pattern is a **clear separation of concerns**: storage concerns are isolated in the adapter, business‑logic concerns in agents, and domain‑specific concerns (manual curation) in the ManualLearning sub‑component. The sibling components (OnlineLearning, GraphDatabaseStorage, UKBTraceReporting, etc.) all share the same adapter, reinforcing a **single source of truth** for graph data.
 
 ## Implementation Details  
 
-The observations do not expose any concrete source files, class names, or function signatures, so the implementation description must stay at a high level.  Based on the stated responsibilities, the **ManualLearning** sub‑component is expected to provide the following logical pieces:
+* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Exposes methods such as `getNode`, `addNode`, `updateNode`, and `removeNode`. It hides the underlying Graphology API and LevelDB file handling, providing a stable contract for all higher‑level services.  
 
-1. **Entry Points for Human Input** – UI‑oriented APIs (e.g., REST endpoints, GraphQL mutations, or command‑line tools) that accept manually authored content.  These entry points likely perform basic syntactic validation before delegating to internal services.
+* **PersistenceAgent (`src/agents/persistence-agent.ts`)** – Wraps the adapter with domain‑level logic. Typical functions include `createEntity(entityDto)`, `updateEntity(id, patch)`, and `deleteEntity(id)`. The agent also triggers any indexing or event hooks required by the knowledge graph (e.g., updating reverse lookup tables). ManualLearning calls these functions whenever a user edits an entity through the UI or an import script.  
 
-2. **Transformation Layer** – A set of functions or classes that map raw human input into the internal knowledge‑graph schema.  For example, a `ManualEntityBuilder` could take a free‑form description, extract required fields (type, identifier, relationships), and construct a graph node that complies with the VKB server’s expectations.
+* **CodeGraphAgent (`src/agents/code-graph-agent.ts`)** – Parses source code into an abstract syntax tree (AST), then maps AST nodes to graph nodes and edges. The agent uses the adapter to persist the resulting sub‑graph. ManualLearning invokes this agent when a manually entered code fragment must be searchable via the semantic code‑search feature.  
 
-3. **Persistence Coordination** – Calls into the parent KnowledgeManagement’s storage layer (graph database, entity persistence service).  Because KnowledgeManagement already handles decay tracking and versioning, ManualLearning probably does not implement its own persistence logic but instead forwards the transformed entities to a shared repository API.
+* **EntityPersistence Sub‑Component** – Though not a separate file in the observations, it is explicitly mentioned as “crucial for ManualLearning.” It likely consists of a thin façade over `PersistenceAgent`, exposing a higher‑level API such as `addManualEntity`, `modifyManualEntity`, and `removeManualEntity`. This façade isolates ManualLearning from the broader persistence contract, allowing future changes to the underlying agent without breaking ManualLearning’s callers.  
 
-4. **Edit and Observation Management** – Since ManualLearning also handles *direct edits* and *hand‑crafted observations*, there must be mechanisms for **update** and **annotation** operations.  This could be realized through a `ManualEditService` that fetches an existing node, applies a diff, and writes the updated version back, preserving history for auditability.
+* **Interaction Flow** – A typical manual edit follows this path:  
+  1. UI/CLI captures a human‑curated observation.  
+  2. ManualLearning receives the raw payload and forwards it to **EntityPersistence**.  
+  3. EntityPersistence calls `PersistenceAgent.createEntity`, which in turn uses `GraphDatabaseAdapter.addNode`.  
+  4. If the payload contains code, ManualLearning also triggers **CodeGraphAgent** to enrich the graph with AST‑derived nodes.  
 
-5. **Policy Enforcement** – Human‑generated knowledge often requires additional checks (e.g., editorial approval, duplicate detection).  While not explicitly mentioned, the design of a separate sub‑component makes it natural to embed such policies without contaminating the online learning pipeline.
-
-All of these logical pieces would be wired together through Dependency Injection (or a similar composition mechanism) so that ManualLearning can be tested in isolation from the rest of KnowledgeManagement.
-
----
+All file paths and class names are preserved exactly as observed, ensuring traceability from the design document to the source.
 
 ## Integration Points  
 
-**ManualLearning** integrates with the rest of the system primarily through its parent, **KnowledgeManagement**.  The key integration seams are:
+ManualLearning sits at the nexus of several system modules:  
 
-* **Knowledge Graph Storage** – ManualLearning hands off transformed entities to the graph database that KnowledgeManagement manages.  This ensures that manually curated knowledge is stored alongside automatically inferred knowledge, allowing unified queries.
+* **Parent – KnowledgeManagement** – The parent component orchestrates the overall knowledge graph. ManualLearning contributes the “human‑curated” slice, which KnowledgeManagement aggregates with automatically extracted knowledge (e.g., from **OnlineLearning**).  
 
-* **Decay Tracking & Lifecycle Services** – Once persisted, the parent’s decay‑tracking subsystem will treat manual entities the same way as online ones, applying the same lifecycle policies (e.g., aging, pruning).  ManualLearning therefore does not need its own decay logic.
+* **Sibling – EntityPersistence** – Both ManualLearning and the sibling **EntityPersistence** component rely on the same `PersistenceAgent`. This shared dependency guarantees consistent handling of entity identifiers, schema validation, and indexing across manual and automated pipelines.  
 
-* **Query API** – Consumers of the knowledge graph (search services, recommendation engines) retrieve entities without needing to know their origin.  ManualLearning’s contribution is therefore invisible at query time, reinforcing the **origin‑agnostic** design.
+* **Sibling – CodeKnowledgeGraph** – When ManualLearning adds code snippets, it uses the same `CodeGraphAgent` that **CodeKnowledgeGraph** uses to construct the AST‑based graph. This ensures that manually added code is indistinguishable from code harvested automatically, enabling uniform semantic search.  
 
-* **User‑Facing Interfaces** – Although not part of the code observations, ManualLearning is the natural target for UI components such as an editorial dashboard, a CLI for knowledge entry, or integration with external authoring tools.  These front‑ends would call the ManualLearning entry points described above.
+* **Sibling – GraphDatabaseStorage & UKBTraceReporting** – These components also consume `GraphDatabaseAdapter`. Any change to the adapter’s contract (e.g., a new method signature) must be coordinated across all siblings, reinforcing the importance of the adapter as a stable integration contract.  
 
-* **Sibling Coordination** – Since **OnlineLearning** occupies the same parent, there may be shared contracts (e.g., a common `IKnowledgeIngestor` interface).  Both sub‑components must respect the same data‑validation rules to keep the graph consistent.
-
-No external libraries or third‑party services are mentioned in the observations, so we limit the integration discussion to the internal KnowledgeManagement ecosystem.
-
----
+* **External Consumers** – Downstream services (e.g., LLM‑driven query engines, UI dashboards) query the knowledge graph via the adapter indirectly. Because ManualLearning’s data resides in the same graph, no special routing is required; the same query endpoints serve both manual and automated knowledge.  
 
 ## Usage Guidelines  
 
-1. **Submit Knowledge Through the ManualLearning API** – All human‑generated entities should be routed via the designated entry points (REST/GraphQL/CLI) that belong to ManualLearning.  Directly writing to the graph database bypasses validation and policy enforcement.
+1. **Always go through the PersistenceAgent** – Direct calls to `GraphDatabaseAdapter` from ManualLearning code should be avoided. The agent encapsulates validation, indexing, and transaction semantics that are essential for graph consistency.  
 
-2. **Respect the Parent’s Schema** – When constructing manual entities, follow the schema definitions prescribed by KnowledgeManagement.  This ensures that the downstream query layer can treat manual and online entities uniformly.
+2. **Leverage EntityPersistence for lifecycle ops** – When adding, updating, or deleting a manually curated entity, use the façade provided by the EntityPersistence sub‑component. This isolates ManualLearning from future changes in the agent’s API.  
 
-3. **Leverage Edit Operations for Corrections** – Use the provided edit services rather than deleting and recreating entities.  This preserves version history, which is important for decay tracking and audit trails.
+3. **Invoke CodeGraphAgent only for code‑related payloads** – If a manual entry includes source code that needs to be searchable, route it through `CodeGraphAgent`. Do not attempt to manually construct AST nodes; let the agent handle parsing and graph mapping.  
 
-4. **Observe Policy Hooks** – If the system exposes approval workflows or duplicate‑detection services, invoke them before finalizing a manual insertion.  Skipping these steps can lead to inconsistent knowledge and extra cleanup work later.
+4. **Respect the shared schema** – All entities stored via ManualLearning must conform to the same schema used by automated pipelines (e.g., required `type`, `createdAt`, `source` fields). Divergence will break downstream queries that assume a uniform shape.  
 
-5. **Coordinate With OnlineLearning When Overlapping** – In scenarios where a manually authored observation may later be reproduced by an online algorithm, ensure that identifiers are reconciled to avoid duplication.  The shared ingestion contract in KnowledgeManagement should help detect such collisions.
+5. **Batch writes when possible** – While manual edits are typically low‑volume, grouping multiple create/update operations into a single transaction (via the agent’s batch API, if available) reduces write amplification on LevelDB and improves overall throughput.  
+
+6. **Test against the adapter contract** – Because many components depend on `GraphDatabaseAdapter`, any modification to its interface should be covered by integration tests that exercise ManualLearning, EntityPersistence, and the other siblings.  
+
+## Architectural Patterns Identified  
+
+| Pattern | Where It Appears | Rationale |
+|---------|------------------|-----------|
+| **Adapter** | `storage/graph-database-adapter.ts` | Abstracts Graphology + LevelDB behind a stable API used by all components. |
+| **Agent (Service) Layer** | `src/agents/persistence-agent.ts`, `src/agents/code-graph-agent.ts` | Encapsulates domain‑specific operations (CRUD, AST construction) and provides a reusable service surface. |
+| **Facade (Sub‑Component)** | EntityPersistence sub‑component (used by ManualLearning) | Offers a thin, purpose‑specific interface over the PersistenceAgent, shielding ManualLearning from implementation details. |
+| **Layered Architecture** | Overall stack (UI → ManualLearning → EntityPersistence → PersistenceAgent → GraphDatabaseAdapter) | Enforces separation of concerns and promotes independent evolution of each layer. |
+
+## Design Decisions and Trade‑offs  
+
+* **Single Graph Store vs. Multiple Stores** – The decision to centralize all knowledge (manual, online, trace data) in one graph database simplifies query semantics and guarantees referential integrity, but it can become a performance bottleneck if write volume spikes. ManualLearning’s low‑frequency writes mitigate this risk.  
+
+* **Agent‑Centric Business Logic** – Placing CRUD and AST‑generation logic in agents avoids duplication across siblings. The trade‑off is that agents become a critical point of failure; they must be well‑tested and versioned carefully.  
+
+* **Explicit Sub‑Component (EntityPersistence)** – Introducing a dedicated sub‑component for entity lifecycle isolates ManualLearning’s responsibilities, improving readability. However, it adds an extra indirection layer, which can slightly increase call‑stack depth and debugging complexity.  
+
+* **No Direct Storage Calls in ManualLearning** – By forbidding direct use of `GraphDatabaseAdapter` inside ManualLearning, the design enforces consistency but limits flexibility for edge‑case optimizations that might bypass the agent.  
+
+## System Structure Insights  
+
+* **Vertical Integration** – ManualLearning is vertically integrated from the UI/CLI (input) down to the low‑level storage (LevelDB) through a well‑defined chain of components.  
+
+* **Horizontal Reuse** – Siblings share the same adapters and agents, demonstrating a high degree of horizontal code reuse. This reduces duplication and ensures that any improvement to, say, the indexing logic in `PersistenceAgent` instantly benefits ManualLearning and all other consumers.  
+
+* **Clear Ownership** – KnowledgeManagement owns the graph; ManualLearning owns the “human‑curated” slice; EntityPersistence owns the entity‑lifecycle slice. This clear ownership model aids both mental mapping and future refactoring.  
+
+## Scalability Considerations  
+
+* **Write Scaling** – ManualLearning’s write pattern is sporadic, so LevelDB’s single‑process write lock is not a limiting factor under normal operation. If manual contributions were to increase (e.g., crowd‑sourced curation), a sharding strategy or migration to a multi‑writer graph store would be required.  
+
+* **Read Scaling** – Since all knowledge resides in a single graph, read traffic from downstream services (semantic search, LLM queries) is shared across manual and automated data. Indexes built by `PersistenceAgent` and `CodeGraphAgent` must be kept up‑to‑date; otherwise, query latency could degrade as the graph grows.  
+
+* **Horizontal Scaling via Adapter** – The `GraphDatabaseAdapter` abstracts the storage backend, meaning the system could swap LevelDB for a distributed graph store (e.g., Neo4j, Dgraph) with minimal changes to ManualLearning, provided the adapter’s contract remains stable.  
+
+## Maintainability Assessment  
+
+* **High Cohesion, Low Coupling** – ManualLearning’s responsibilities are narrowly focused, and its dependencies (agents, adapter) are injected via well‑defined interfaces. This yields high cohesion and low coupling, facilitating independent evolution.  
+
+* **Testability** – Because ManualLearning interacts with agents rather than the storage layer directly, unit tests can mock `PersistenceAgent` and `CodeGraphAgent`, achieving fast, deterministic test suites. Integration tests that spin up the real adapter provide confidence that the graph schema remains consistent.  
+
+* **Documentation Footprint** – The explicit naming of files and classes (`graph-database-adapter.ts`, `persistence-agent.ts`, `code-graph-agent.ts`) aids discoverability. However, the lack of visible code symbols in the observation set suggests that additional inline documentation (e.g., JSDoc) would be valuable for future maintainers.  
+
+* **Risk Areas** – The shared `GraphDatabaseAdapter` is a single point of failure; any breaking change ripples across all siblings. Strict versioning and backward‑compatible extensions are essential. Additionally, the manual nature of the data entry process introduces the risk of schema drift; validation logic inside `PersistenceAgent` must be robust.  
 
 ---
 
-### Architectural Patterns Identified  
-
-* **Modular Decomposition** – ManualLearning and OnlineLearning are separate modules under a common parent, each handling a distinct ingestion path.  
-* **Interface‑Based Contract** – Implicit use of a shared ingestion interface (`IKnowledgeIngestor`‑style) that enables the parent to treat both sub‑components uniformly.  
-* **Parent‑Orchestrated Composition** – KnowledgeManagement orchestrates persistence, decay, and query, while sub‑components focus on source‑specific transformation.
-
-### Design Decisions and Trade‑offs  
-
-* **Explicit Separation of Manual vs. Automated Knowledge** – Improves clarity and allows independent scaling, but introduces the need for duplicate‑detection across the two pipelines.  
-* **Delegating Persistence to the Parent** – Reduces duplication of storage logic, at the cost of tighter coupling to KnowledgeManagement’s data model.  
-* **No Direct Code Exposure** – The current lack of concrete symbols suggests either a very thin wrapper around shared services or that the implementation resides in a higher‑level configuration layer; this can simplify maintenance but may obscure where business rules live.
-
-### System Structure Insights  
-
-* The system follows a **tree‑like hierarchy**: *Coding* → *KnowledgeManagement* → { *ManualLearning*, *OnlineLearning* }.  
-* All knowledge, regardless of origin, converges in the **graph database** managed by KnowledgeManagement, enabling a single source of truth.  
-* ManualLearning likely contains **validation, transformation, and edit services**, while OnlineLearning contains **model inference and batch ingestion** services.
-
-### Scalability Considerations  
-
-* **ManualLearning** is expected to have lower throughput than OnlineLearning because human authorship is naturally slower.  Therefore, it can be provisioned with modest resources, but must still be horizontally scalable to support bursts (e.g., bulk imports).  
-* Because persistence is delegated to the parent, scaling the graph database automatically benefits ManualLearning without additional effort.  
-* If the manual ingestion pipeline includes heavyweight validation (e.g., NLP checks), those components should be isolated so they can be scaled independently.
-
-### Maintainability Assessment  
-
-* The **clear boundary** between manual and online ingestion simplifies maintenance: changes to editorial workflows stay within ManualLearning, while algorithmic upgrades remain in OnlineLearning.  
-* The lack of visible code symbols means that current documentation is sparse; adding explicit class/interface definitions and file paths would greatly improve traceability.  
-* By reusing the parent’s storage and lifecycle services, ManualLearning avoids code duplication, enhancing maintainability.  However, this also means that any breaking change in KnowledgeManagement’s data contract could ripple into ManualLearning, so versioned interfaces are advisable.  
-
----  
-
-*All analysis above is strictly grounded in the provided observations.  No speculative file paths, class names, or patterns beyond those explicitly implied by the component hierarchy have been introduced.*
+**In summary**, ManualLearning is a well‑encapsulated sub‑component that leverages a common graph‑database adapter and two purpose‑built agents to integrate human‑curated knowledge into the broader KnowledgeManagement ecosystem. Its architecture emphasizes reuse, clear separation of concerns, and a stable storage contract, positioning it for reliable operation while still leaving room for future scaling or storage‑backend evolution.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval in the Graphology + LevelDB knowledge graph. This adapter enables the component to handle data persistence, graph database storage, and query capabilities seamlessly. For instance, the PersistenceAgent (src/agents/persistence-agent.ts) leverages the GraphDatabaseAdapter to store and retrieve entities from the graph database, demonstrating a clear example of how the component's architecture supports data management. Furthermore, the CodeGraphAgent (src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter to construct the AST-based code knowledge graph, facilitating semantic code search capabilities.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning is a sub-component of KnowledgeManagement
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history and LSL sessions.
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities.
+- [GraphDatabaseStorage](./GraphDatabaseStorage.md) -- GraphDatabaseStorage utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve graph data.
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct the AST-based code knowledge graph.
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
 
 
 ---
 
-*Generated from 2 observations*
+*Generated from 6 observations*

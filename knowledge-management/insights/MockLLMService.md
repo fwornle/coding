@@ -2,131 +2,92 @@
 
 **Type:** SubComponent
 
-MockLLMService handles mock LLM errors using MockErrorHandler.class, preventing errors from propagating to the application
+MockLLMService is used in conjunction with the DMRProviderIntegration component to test the integration with Docker Model Runner (DMR) for local LLM inference.
 
 ## What It Is  
 
-MockLLMService is a **sub‑component** that lives inside the **DockerizedServices** containerization layer.  It provides a fully‑controlled, programmable stand‑in for real large‑language‑model (LLM) providers, allowing downstream services—such as the **LLMFacade**, **ConstraintMonitor**, and any test harnesses—to exercise LLM‑dependent logic without incurring external API calls or cost.  The service is instantiated from the files that belong to the *MockLLMService* directory (the exact file‑system path is not enumerated in the observations, but it is packaged together with its sibling services under DockerizedServices).  Configuration is driven by two JSON artefacts:  
-
-* **MockLLMService.config.json** – global toggles that tailor the overall mock behaviour (e.g., latency injection, response size limits).  
-* **ScenarioConfig.json** – a catalogue of named mock scenarios that define the exact response patterns the service should emit for a given test case.  
-
-Together with a small set of supporting classes—**MockLLMResponseGenerator**, **MockErrorHandler**, **LoggingAgent**, and **TestAdapter**—MockLLMService delivers deterministic, observable, and isolated LLM simulations for the broader system.
-
----
+**MockLLMService** is a concrete implementation of the `LLMService` interface that lives in the *MockLLM* sub‑component of the LLM stack.  The source code that defines the service is registered through the **ProviderRegistry** located at `lib/llm/provider-registry.js`.  By conforming to the contract expressed in `lib/llm/llm-service.ts`, MockLLMService offers the same public methods (completion, initialization, and mode resolution) as any real LLM provider, but it returns deterministic, fabricated data instead of invoking an external model.  This makes the service a first‑class participant in the **LLMAbstraction** component, which aggregates all available providers—real or mock—through the registry.
 
 ## Architecture and Design  
 
-The architecture of MockLLMService follows a **composition‑based modular design**.  The core service delegates distinct responsibilities to dedicated helper classes, each encapsulated behind a well‑defined interface:
+The design of MockLLMService revolves around two well‑established architectural ideas that are directly observable in the codebase:
 
-1. **Response generation** is performed by **MockLLMResponseGenerator**.  This class reads the active scenario from *ScenarioConfig.json* and builds a synthetic LLM payload that mimics the shape of a real provider response.  
-2. **Error handling** is isolated in **MockErrorHandler**, which intercepts any simulated failure (e.g., time‑outs, malformed payloads) and converts them into controlled exceptions that never leak into the calling application.  
-3. **Observability** is provided by **LoggingAgent.logMockLLMInteraction()**, a dedicated logger that records every request/response pair, scenario selection, and any injected latency.  
-4. **Testing integration** is achieved through **TestAdapter**, an adapter‑style façade that presents the mock service through the same entry points used by production LLM clients (e.g., the same request objects expected by **LLMFacade**).  
+1. **Registry (or Service Locator) Pattern** – The `ProviderRegistry` class (`lib/llm/provider-registry.js`) maintains a map of provider identifiers to concrete provider instances.  MockLLMService registers itself with this registry, allowing the rest of the system to request a “mock” provider by name without hard‑coding any import statements.  This decouples provider discovery from provider usage and enables dynamic addition or removal of providers at runtime.
 
-Because MockLLMService lives inside DockerizedServices, it shares the same container lifecycle and resource constraints as its siblings (**ServiceStarter**, **LLMFacade**, **ConstraintMonitor**, **DatabaseManager**).  This co‑location enables rapid in‑process calls without network hops, while still preserving the isolation guarantees that Docker provides.  The design does not introduce a separate micro‑service or event‑driven pipeline; instead, it follows a **library‑style** approach that can be swapped in place of a real LLM client at runtime.
+2. **Interface‑Based Polymorphism (Strategy‑like)** – All LLM providers, including MockLLMService, implement the `LLMService` interface defined in `lib/llm/llm-service.ts`.  By sharing a common contract, the system can swap between real providers (e.g., `DMRProvider` in `lib/llm/providers/dmr-provider.ts`) and the mock implementation without changing the calling code.  The abstraction is leveraged by the parent **LLMAbstraction** component, which treats every registered provider as an interchangeable strategy for completing a request.
 
----
+These patterns give the overall LLM stack a plug‑in architecture: new providers can be dropped into the `lib/llm/providers/` directory, registered in `ProviderRegistry`, and immediately become usable by any consumer that depends on `LLMService`.
 
 ## Implementation Details  
 
-### Core Configuration  
-* **MockLLMService.config.json** supplies top‑level switches (e.g., `enableLatency`, `maxTokens`).  The service reads this file at startup and caches the settings for the lifetime of the container.  
+MockLLMService’s core responsibilities are threefold:
 
-* **ScenarioConfig.json** is a map of scenario identifiers to response templates.  Each template may include placeholders for dynamic fields (e.g., timestamps, request IDs) that **MockLLMResponseGenerator** resolves on the fly.
+* **Completion Mocking** – When the `completion` method (as defined by `LLMService`) is invoked, MockLLMService generates a static or configurable response payload that mimics the shape of a real LLM completion.  The payload includes fields such as `text`, `tokens`, and any metadata required by downstream components.
 
-### Response Generation  
-The **MockLLMResponseGenerator** class exposes a method such as `generateResponse(request, scenarioId)`.  Internally it:
+* **Initialization Mocking** – The `initialize` method pretends to perform any warm‑up or model‑loading steps that a real provider would need.  Instead of loading a model, it simply resolves immediately, optionally logging that the mock provider has been “initialized”.
 
-* Looks up the scenario definition in *ScenarioConfig.json*.  
-* Applies any runtime substitutions (e.g., inserting the user prompt into a predefined answer).  
-* Wraps the result in the same envelope (status code, headers, JSON body) that the real LLM provider would return, ensuring downstream parsers see no difference.
+* **Mode Resolution Mocking** – For calls that query the available modes or capabilities of a provider, MockLLMService returns a hard‑coded list (e.g., `["completion", "chat"]`).  This satisfies the expectations of the **LLMAbstraction** component, which may perform feature checks before routing a request.
 
-### Error Handling  
-When a scenario is marked as “error” or when the generator encounters an unexpected condition, **MockErrorHandler** creates a controlled exception (e.g., `MockLLMTimeoutException`).  The handler guarantees that the exception hierarchy mirrors that of the real provider, allowing callers such as **LLMFacade** to trigger the same circuit‑breaker logic already present in the parent component.
-
-### Logging  
-Every interaction passes through **LoggingAgent.logMockLLMInteraction()**, which records:
-
-* Timestamp, request payload, selected scenario, and generated response.  
-* Any injected latency or error flags.  
-
-These logs are emitted to the container’s standard output, making them visible to Docker’s logging drivers and any centralized log aggregation tooling used by the platform.
-
-### Test Adapter  
-**TestAdapter** implements the same interface that production code uses to talk to an LLM (e.g., a `callLLM(request)` method).  It internally forwards the request to **MockLLMService**, selects the appropriate scenario (often based on test metadata), and returns the mock response.  Because the adapter adheres to the production contract, test suites can replace the real LLM client with the mock with a single configuration change.
-
----
+The registration flow is straightforward: during application bootstrap, `ProviderRegistry.register('mock', MockLLMService)` is executed (observed in `lib/llm/provider-registry.js`).  The registry then stores the class reference, and any consumer can retrieve it via `ProviderRegistry.get('mock')`.  Because MockLLMService also **uses** the `LLMService` class (the interface definition) it stays in lockstep with any future method additions to the contract.
 
 ## Integration Points  
 
-MockLLMService is tightly coupled with several surrounding components:
+MockLLMService sits at the intersection of several sibling components:
 
-* **DockerizedServices (parent)** – provides the container runtime, shared environment variables, and the overall orchestration that starts and stops the mock alongside other services.  
-* **LLMFacade (sibling)** – when the system is in “mock mode”, LLMFacade routes its calls through **TestAdapter**, thereby invoking MockLLMService instead of a live provider.  The same circuit‑breaker and caching layers that protect real LLM calls remain active, because the mock mimics the provider’s error surface.  
-* **ConstraintMonitor and DatabaseManager (siblings)** – may consume mock LLM outputs during integration tests to verify constraint evaluation logic or persistence pipelines without external dependencies.  
-* **MockLLMResponseGenerator (child)** – is the only concrete child component; its implementation is the engine that turns scenario definitions into realistic payloads.  
+* **DMRProviderIntegration** – This integration test harness invokes the mock service to verify that the Docker Model Runner (DMR) plumbing works correctly without launching an actual container.  By swapping the real `DMRProvider` with MockLLMService, developers can exercise the same code paths (initialization, completion) in a deterministic environment.
 
-The only external dependencies are the JSON configuration files and the standard logging framework.  No network sockets, third‑party SDKs, or database connections are required, which keeps the mock lightweight and fast to start.
+* **AnthropicAPIAdapter** – The Anthropic adapter normally forwards requests to the external Anthropic API.  In unit tests, the adapter is pointed at the mock provider, allowing verification of request‑building logic and error handling without incurring network latency or API costs.
 
----
+* **ProviderRegistry** – As the central registry, it is the sole dependency that both MockLLMService and all other providers share.  The registry’s API (`register`, `get`, `list`) defines the contract for how providers are discovered and instantiated.
+
+* **LLMAbstraction** – This parent component aggregates the registry’s entries and presents a unified façade to the rest of the system.  Because MockLLMService conforms to `LLMService`, LLMAbstraction can treat it exactly like any production provider when performing mode resolution or routing completions.
+
+No additional external services are required for MockLLMService; its only runtime dependency is the in‑process registry.
 
 ## Usage Guidelines  
 
-1. **Select a Scenario Explicitly** – Test code should reference a scenario name defined in *ScenarioConfig.json* via the **TestAdapter**.  This makes the expected behaviour clear and prevents accidental reliance on a default scenario.  
+1. **Register Early** – Ensure that MockLLMService is registered with `ProviderRegistry` before any component attempts to resolve a provider.  The typical place is the application’s initialization script or test setup file.
 
-2. **Configure Global Behaviour** – Adjust *MockLLMService.config.json* to reflect the performance characteristics you wish to emulate (e.g., enable artificial latency to test timeout handling).  Remember that changes require a container restart to take effect.  
+2. **Select via Identifier** – When configuring a test environment, set the provider identifier to `"mock"` (the key used in the registry).  All calls to `ProviderRegistry.get('mock')` will return the mock instance.
 
-3. **Do Not Mix Real and Mock Calls** – Ensure that the environment variable or configuration flag that toggles mock mode is applied consistently across all services.  Mixing real LLM calls with mock responses can lead to nondeterministic test results.  
+3. **Do Not Use in Production** – Because the service returns fabricated data, it should be limited to unit tests, integration tests, and local development scenarios.  Production code should reference a real provider such as `DMRProvider` or an external API adapter.
 
-4. **Leverage Logging** – Review the output of **LoggingAgent.logMockLLMInteraction()** when debugging failing tests.  The logs contain the exact request, scenario, and response, making it easy to pinpoint mismatches.  
+4. **Extend with Caution** – If additional mock behaviours are needed (e.g., error injection, latency simulation), extend the existing class rather than creating a new provider type.  Maintaining a single mock implementation keeps the registry tidy and reduces the surface area for divergent behaviour.
 
-5. **Handle Simulated Errors** – When a scenario is designed to raise an error, write test assertions that expect the same exception types that the real LLM client would surface.  This validates that higher‑level error‑recovery paths (e.g., the circuit‑breaker in **LLMFacade**) function correctly.  
+5. **Stay Synchronized with LLMService** – Any change to the `LLMService` interface (new methods, altered signatures) must be reflected in MockLLMService.  Because the mock is used in many test suites, mismatches will surface quickly as compile‑time or test failures.
 
 ---
 
 ### Architectural Patterns Identified  
-
-* **Adapter Pattern** – embodied by **TestAdapter**, which presents the mock service through the same interface as a real LLM client.  
-* **Strategy / Configuration‑Driven Behavior** – the use of *ScenarioConfig.json* and *MockLLMService.config.json* to swap response generation strategies at runtime.  
-* **Composition over Inheritance** – the service composes distinct helper classes (response generator, error handler, logger) rather than inheriting a monolithic implementation.  
+* Registry / Service Locator (via `ProviderRegistry`)  
+* Interface‑based polymorphism (implementation of `LLMService`) – a Strategy‑like approach  
 
 ### Design Decisions and Trade‑offs  
-
-* **Deterministic Testing vs. Real‑World Fidelity** – By generating responses from static JSON scenarios, tests become repeatable, but they may miss nuances of a live LLM (e.g., stochastic token sampling).  The trade‑off favours speed and predictability for CI pipelines.  
-* **In‑Process Mock vs. Separate Service** – Keeping the mock inside the DockerizedServices container eliminates network latency and simplifies deployment, but it also means the mock shares the same resource pool as other services, potentially affecting isolation under heavy load.  
-* **Explicit Error Simulation** – Providing a dedicated **MockErrorHandler** allows fine‑grained control over failure modes, at the cost of requiring test authors to maintain a catalogue of error scenarios.  
+* **Pluggable Provider Model** – Enables easy addition of new providers but introduces a runtime lookup cost (negligible in this context).  
+* **Mock‑First Testing** – Guarantees deterministic tests; however, it requires diligent synchronization with the real provider contract to avoid false positives.  
 
 ### System Structure Insights  
-
-MockLLMService sits as a leaf node under **DockerizedServices**, with a single child (**MockLLMResponseGenerator**) that does the heavy lifting.  Its sibling services each address a different cross‑cutting concern (service startup, LLM façade, constraint evaluation, database access), and all of them can be exercised against the same mock LLM to achieve end‑to‑end test coverage without external dependencies.
+The LLM stack is organized around a central abstraction (`LLMAbstraction`) that delegates all provider‑specific work to entries in `ProviderRegistry`.  MockLLMService is a sibling to real providers such as `DMRProvider` and sits one level below the abstraction, providing the same API surface.  
 
 ### Scalability Considerations  
-
-Because the mock runs in‑process and does not perform I/O beyond reading JSON files, it scales linearly with the number of concurrent test threads.  The primary limitation is the container’s CPU and memory allocation; if a test suite spawns a very large number of parallel LLM calls, artificial latency injection may become a bottleneck.  Scaling horizontally (running multiple DockerizedServices containers) is straightforward, as the mock has no state that must be shared across instances.
+Because providers are resolved by name from a simple in‑memory map, the registry scales linearly with the number of providers.  Adding more mock or real providers does not affect request latency; the primary scalability factor is the underlying provider’s performance, not the registry itself.  
 
 ### Maintainability Assessment  
-
-The separation of concerns—configuration, response generation, error handling, logging, and test adaptation—makes the codebase easy to extend.  Adding a new scenario is a matter of editing *ScenarioConfig.json*; introducing a new error type only requires a small addition to **MockErrorHandler**.  The reliance on plain JSON for configuration keeps the surface area low and approachable for non‑engineers (e.g., QA teams).  However, the lack of a formal schema for the JSON files could lead to malformed scenarios slipping through; introducing validation would improve robustness without significant overhead.  
-
-Overall, MockLLMService provides a lightweight, well‑encapsulated mock layer that aligns with the architectural goals of DockerizedServices—fast, isolated, and observable testing of LLM‑driven features.
+The clear separation between the registry, the service interface, and concrete implementations (including the mock) yields high maintainability.  The mock implementation is lightweight, with no external dependencies, making it easy to update alongside the interface.  The only maintenance risk is divergence between the mock and real providers, mitigated by the shared `LLMService` contract and the fact that the mock is exercised in the same test suites as the real adapters.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint monitoring, and code-graph-rag, along with supporting databases. Its architecture involves a multi-agent system, utilizing a range of classes and functions to manage the different services and their interactions. The component is built around a high-level facade for interacting with LLM providers, implementing circuit breaking, caching, and budget checks to ensure efficient and controlled operation.
-
-### Children
-- [MockLLMResponseGenerator](./MockLLMResponseGenerator.md) -- The MockLLMResponseGenerator is mentioned in the parent context as a key component of the MockLLMService, indicating its importance in the overall architecture.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the ProviderRegistry class (lib/llm/provider-registry.js) to manage a registry of available LLM providers, enabling dynamic provider registration and initialization. This design decision allows for flexibility and scalability, as new providers can be added or removed without modifying the existing codebase. The LLMService class (lib/llm/llm-service.ts) serves as a unified interface for LLM operations, including completion, initialization, and mode resolution, which helps to abstract away the underlying provider-specific implementation details. For instance, the DMRProvider class (lib/llm/providers/dmr-provider.ts) integrates with Docker Model Runner (DMR) for local LLM inference, supporting per-agent model overrides and health checks.
 
 ### Siblings
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes a retry mechanism with exponential backoff in ServiceStarter.py, handling transient service start failures
-- [LLMFacade](./LLMFacade.md) -- LLMFacade uses CircuitBreaker.pattern to prevent cascading failures when interacting with LLM providers, protecting the system from overload
-- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses ConstraintEvaluator.class to evaluate code against defined constraints, detecting violations
-- [DatabaseManager](./DatabaseManager.md) -- DatabaseManager uses DatabaseConnector.class to connect to databases, handling database interactions
+- [DMRProviderIntegration](./DMRProviderIntegration.md) -- DMRProviderIntegration uses the DMRProvider class (lib/llm/providers/dmr-provider.ts) to integrate with Docker Model Runner (DMR) for local LLM inference.
+- [AnthropicAPIAdapter](./AnthropicAPIAdapter.md) -- AnthropicAPIAdapter uses the Anthropic API to handle model resolution, completion requests, and error handling.
+- [LLMService](./LLMService.md) -- LLMService provides a unified interface for LLM operations, including completion, initialization, and mode resolution.
+- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage a registry of available LLM providers.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

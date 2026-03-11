@@ -2,89 +2,85 @@
 
 **Type:** SubComponent
 
-The AgentFramework component follows a pattern of constructor initialization and execute method invocation, as seen in the SemanticAnalysisAgent and other agents.
+The AgentFramework sub-component uses the classify method in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts as an example of an agent's specific task
 
 ## What It Is  
 
-The **AgentFramework** lives inside the SemanticAnalysis component under the directory  
-
-```
-integrations/mcp-server-semantic-analysis/src/agents/
-```  
-
-Its core artifact is the abstract `BaseAgent` class (`base‑agent.ts`).  All concrete agents – for example `OntologyClassificationAgent` (`ontology-classification-agent.ts`) and `SemanticAnalysisAgent` – inherit from this base class, gaining a **standard response envelope** and a common life‑cycle that consists of constructor‑time initialization followed by an `execute()` call.  By centralising these behaviours, AgentFramework supplies a uniform programming model for any agent that participates in the SemanticAnalysis pipeline, while also exposing execution‑graph metadata (e.g., `depends_on` edges) that the surrounding batch‑analysis orchestration can consume.
+The **AgentFramework** sub‑component lives inside the **SemanticAnalysis** module and is implemented under the `integrations/mcp-server-semantic-analysis/src/agents/` directory. Its core abstraction is the `BaseAgent` abstract class defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. Every concrete agent—such as the `OntologyClassificationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`)—inherits from `BaseAgent` and supplies a task‑specific method (e.g., `classify`). The framework therefore provides a reusable scaffold for building agents that can be plugged into the larger **Pipeline** execution engine.  
 
 ## Architecture and Design  
 
-AgentFramework adopts a **lightweight, constructor‑initialisation + execute** pattern.  Each agent’s constructor receives its configuration and any required services, stores them as immutable fields, and then the orchestrator invokes `execute()` when the agent’s turn arrives.  This mirrors the execution model described in *batch‑analysis.yaml*, where agents are linked together with explicit `depends_on` edges; the orchestration engine performs a **topological sort** on those edges to guarantee that an agent only runs after all its declared prerequisites have completed.  
+AgentFramework follows a **modular, inheritance‑based architecture**. The central design pattern is **Template Method**: `BaseAgent` defines the common lifecycle (e.g., the `initialize` method at line 20 of `base-agent.ts`) that prepares dependencies, while subclasses implement the concrete work (e.g., `classify` in `ontology-classification-agent.ts`). This pattern guarantees that all agents share a consistent initialization sequence while still allowing each agent to focus on its domain‑specific logic.
 
-The framework also embeds a **work‑stealing scheduler** built around shared atomic counters.  Idle workers poll these counters and instantly “steal” pending tasks, which keeps the thread pool saturated without a central dispatcher.  This design is deliberately simple – it avoids heavyweight queue structures and leverages lock‑free primitives that are already present in the runtime.  
+The framework also exhibits **composition via dependency injection**. The `initialize` routine pulls in required services (persistence, ontology metadata, etc.) and stores them on the agent instance. For example, the `PersistenceAgent`—though not shown directly—relies on the ontology metadata fields supplied during initialization, illustrating that agents are composed of reusable services rather than hard‑coded implementations.
 
-To minimise unnecessary LLM calls, AgentFramework **pre‑populates** fields such as `entityType` and `metadata.ontologyClass`.  When an observation already carries the correct ontology metadata, downstream agents can skip re‑classification, reducing latency and cost.  This optimisation is tightly coupled to the Ontology component: the ontology‑classification agent writes those metadata fields, and any later agent (including those in the Insights component) can trust their presence.
+Interaction with other system parts is explicit. Agents are **children of SemanticAnalysis** and are **consumed by the Pipeline** component, which orchestrates their execution using a DAG‑based model (as described for the sibling Pipeline). The modularity enables each agent to be swapped or extended without affecting the pipeline’s scheduling logic, reinforcing loose coupling between the agent layer and the execution engine.
 
 ## Implementation Details  
 
-* **BaseAgent (`base-agent.ts`)** – an abstract class that defines the response envelope (status, payload, diagnostics) and declares the abstract `execute(): Promise<Response>` method.  It also provides helper utilities for logging and for accessing the shared work‑stealing counters.  
+1. **`BaseAgent` (abstract)** – Located in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. It declares the `initialize` method (line 20) that receives a dependency container and stores references such as persistence services, ontology clients, or logging utilities. Because it is abstract, it cannot be instantiated directly; instead, it forces concrete agents to implement their own public methods (e.g., `classify`).  
 
-* **Concrete agents** – each lives in its own file under the same directory (e.g., `ontology-classification-agent.ts`).  Their constructors call `super()` to register with the framework, set up any agent‑specific services (LLM client, ontology service, etc.), and optionally declare `depends_on` relationships via a static metadata object that the orchestrator reads.  
+2. **`OntologyClassificationAgent`** – Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. This class extends `BaseAgent` and provides a `classify` method (starting around line 35). The method accepts raw observation data, invokes the ontology client (injected during `initialize`), and returns a classification result that aligns the observation with the system’s ontology schema.  
 
-* **Execution graph** – the batch‑analysis YAML files enumerate agents and their `depends_on` edges.  At runtime the orchestrator reads these edges, builds a DAG, and runs a topological sort.  The sorted list drives the sequential `execute()` calls, while the work‑stealing scheduler allows parallel execution of independent branches.  
+3. **Task‑Specific Agents** – While only the OntologyClassificationAgent is explicitly mentioned, the observations note the existence of a `PersistenceAgent` that uses ontology metadata fields. By inheriting from `BaseAgent`, it also benefits from the shared initialization logic, ensuring that all agents have a uniform way to access required services.  
 
-* **Pre‑population logic** – before an LLM call, agents inspect `observation.metadata.ontologyClass`.  If the class matches the desired classification, the agent short‑circuits and returns the existing envelope.  This check is implemented as a small utility method in `BaseAgent`, ensuring every subclass benefits without duplicate code.  
-
-* **Work‑stealing counters** – a pair of `AtomicInteger` counters (`pendingTasks` and `completedTasks`) are stored in a shared module.  Workers atomically decrement `pendingTasks` to claim work; when a task finishes they increment `completedTasks`.  Because the counters are lock‑free, contention remains low even under high concurrency.
+4. **Modular Design** – The framework’s folder layout groups all agents together, making it straightforward to locate, add, or replace agents. Each agent file contains a single class that adheres to the `BaseAgent` contract, reinforcing the single‑responsibility principle.  
 
 ## Integration Points  
 
-AgentFramework sits directly beneath the **SemanticAnalysis** parent component.  SemanticAnalysis orchestrates the end‑to‑end flow: it loads observations, hands them to the AgentFramework DAG, and finally forwards classified observations to the **Insights** component for downstream processing.  The **Pipeline** sibling also re‑uses `BaseAgent`; its own agents follow the same constructor + execute contract, enabling the pipeline to plug into the same execution engine without additional adapters.  
+- **SemanticAnalysis (Parent)** – AgentFramework is a child of SemanticAnalysis, meaning that any semantic analysis workflow can instantiate agents via the `BaseAgent` contract. The parent component likely provides the dependency container that `initialize` consumes.  
 
-The **Ontology** sibling is the source of the metadata fields that AgentFramework checks to avoid redundant LLM work.  The OntologyClassificationAgent writes `entityType` and `metadata.ontologyClass`; subsequent agents (including those in Insights) read those fields to make fast decisions.  Because the dependencies are expressed through explicit `depends_on` edges, the system can safely assume that any agent that needs ontology data will only run after the OntologyClassificationAgent has completed.  
+- **Pipeline (Sibling)** – The Pipeline component executes agents as steps in its DAG‑based workflow. Because agents expose well‑defined methods (`classify`, `persist`, etc.) and share a common initialization contract, the Pipeline can treat them as interchangeable nodes, wiring `depends_on` edges without needing to know each agent’s internal details.  
 
-External services such as the LLM provider, database connectors, and logging infrastructure are injected via the agents’ constructors, keeping the framework agnostic to particular implementations.  This design enables the same AgentFramework codebase to be reused across different deployment environments (e.g., on‑prem vs. cloud) simply by swapping the injected dependencies.
+- **Ontology (Sibling)** – The Ontology sub‑component defines the schema against which agents like `OntologyClassificationAgent` operate. The agent’s `classify` method directly consumes ontology services, illustrating a tight but purposeful coupling: agents are the consumers of ontology definitions, while the ontology remains a stable provider.  
+
+- **Insights (Sibling)** – Though not directly referenced in the observations, the Insights sub‑component is expected to consume outputs from agents (e.g., classified observations) to generate higher‑level insights. This downstream relationship reinforces the pipeline‑to‑insights data flow.  
 
 ## Usage Guidelines  
 
-1. **Always extend `BaseAgent`.**  Do not duplicate response‑envelope logic; inherit the provided helpers for logging and metadata checks.  
-2. **Declare dependencies explicitly.**  Add a static `depends_on` array (or the equivalent YAML entry) so the orchestrator can correctly order execution.  Missing dependencies can lead to race conditions where an agent attempts to read ontology metadata that has not yet been written.  
-3. **Leverage pre‑population.**  Before invoking any LLM or heavy computation, inspect `observation.metadata.ontologyClass`.  If the required classification already exists, return early with the existing envelope.  This pattern is baked into `BaseAgent` as `skipIfClassified()`.  
-4. **Prefer work‑stealing over manual queuing.**  Submit tasks to the shared counter rather than creating per‑agent queues; this ensures the scheduler can balance load across all workers automatically.  
-5. **Keep constructors lightweight.**  Heavy initialisation should be deferred to `execute()` or to lazy‑loaded services, because the orchestrator may instantiate many agents upfront during DAG construction.  
+1. **Always call `initialize`** – Before invoking any task‑specific method, a concrete agent must be initialized with the appropriate dependency container. Skipping this step will leave required services (persistence, ontology client) undefined and cause runtime failures.  
 
-Following these conventions guarantees that new agents integrate seamlessly with the existing execution graph, benefit from the built‑in scalability mechanisms, and respect the metadata contracts that prevent redundant processing.
+2. **Extend `BaseAgent` for new tasks** – When adding a new agent, inherit from `BaseAgent` and implement only the methods that represent the agent’s purpose. Do not duplicate initialization logic; rely on the inherited `initialize` implementation.  
+
+3. **Keep agents single‑purpose** – The observations highlight that agents like `OntologyClassificationAgent` focus on a specific domain (classification). Maintaining this granularity simplifies testing, encourages reuse, and aligns with the modular design emphasized by the framework.  
+
+4. **Register agents with the Pipeline** – To have an agent participate in the overall analysis flow, declare it as a step in the Pipeline’s DAG configuration (e.g., in `batch-analysis.yaml`). Ensure that any `depends_on` edges respect the data dependencies (e.g., classification must precede persistence).  
+
+5. **Leverage injected services** – Use the services provided during `initialize` rather than importing modules directly. This practice preserves the decoupled nature of the framework and makes unit testing easier by allowing mocks to be injected.  
 
 ---
 
 ### Architectural patterns identified  
-* Constructor‑initialisation + execute method (simple command‑style pattern)  
-* Explicit DAG execution via `depends_on` edges (topological‑sort orchestration)  
-* Work‑stealing scheduler using shared atomic counters (lock‑free parallelism)  
-* Metadata‑driven short‑circuiting to avoid redundant LLM calls (cache‑aside style)
+1. **Template Method** – `BaseAgent` defines the lifecycle (`initialize`) while subclasses provide concrete behavior (`classify`).  
+2. **Dependency Injection / Composition** – Agents receive external services during initialization, avoiding hard‑coded dependencies.  
 
 ### Design decisions and trade‑offs  
-* **Uniform base class** – simplifies maintenance but couples all agents to a single response envelope format.  
-* **Explicit dependencies** – provides deterministic ordering but requires developers to maintain the `depends_on` list manually.  
-* **Work‑stealing via counters** – yields low‑overhead parallelism but limits task granularity to units that can be represented by a simple counter; more complex scheduling would need a richer work‑queue.  
-* **Pre‑populated ontology fields** – reduces LLM cost at the expense of tighter coupling between Ontology and downstream agents.
+- **Inheritance vs. composition** – Choosing an abstract base class enforces a uniform API but can limit multiple inheritance scenarios. The trade‑off favors consistency and easier onboarding over maximal flexibility.  
+- **Modular granularity** – Designing each agent for a single task improves testability and scalability but may increase the number of components to manage.  
 
 ### System structure insights  
-AgentFramework is the central execution engine for SemanticAnalysis, acting as a bridge between the Ontology classification step and the downstream Insights generation.  Its sibling components (Pipeline, Ontology) share the same base class, reinforcing a cohesive “agent” ecosystem across the codebase.
+- AgentFramework sits under **SemanticAnalysis**, serving as the functional core for domain‑specific processing.  
+- Sibling components (Pipeline, Ontology, Insights) interact through well‑defined contracts: agents consume ontology data, the pipeline schedules agents, and insights consume agent outputs.  
 
 ### Scalability considerations  
-The work‑stealing counter model scales linearly with the number of workers, provided the underlying hardware can support the atomic operations.  Because agents are independent once their `depends_on` constraints are satisfied, the DAG can be partitioned for massive parallelism.  The pre‑population of ontology metadata further caps the number of expensive LLM invocations, making the system cost‑effective at scale.
+- Because agents are independent units with injected dependencies, the system can horizontally scale by running multiple agent instances in parallel, provided the underlying services (e.g., persistence store) are also scalable.  
+- The DAG‑based Pipeline can add new agents without re‑architecting the execution engine, supporting growth in analysis capabilities.  
 
 ### Maintainability assessment  
-Having a single `BaseAgent` class centralises common logic, which eases bug fixes and feature roll‑outs.  However, any change to the base class propagates to every agent, so the API must remain stable.  The explicit dependency graph is human‑readable (YAML) and therefore easy to audit, though it does place a documentation burden on developers to keep it accurate.  Overall, the design strikes a good balance between simplicity, extensibility, and performance, making the AgentFramework component straightforward to extend and maintain.
+- **High maintainability** – The abstract `BaseAgent` centralizes common code, reducing duplication.  
+- Clear file organization and single‑responsibility agents simplify code navigation and future extensions.  
+- The reliance on explicit initialization and dependency injection makes unit testing straightforward, further supporting long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent having its own specific responsibilities and interfaces. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the BaseAgent class, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, as its abstract base class, providing common functionality and a standard response envelope. The use of this base class allows for a consistent interface across all agents, making it easier to develop and maintain new agents. Furthermore, the OntologyClassificationAgent follows a pattern of constructor initialization and execute method invocation, as seen in the SemanticAnalysisAgent and other agents, which helps to simplify the process of creating and executing new agents.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, allowing for flexibility and scalability in the system's architecture. This is evident in the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts), which is designed to classify observations against the ontology system. The agent's classify method (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts:35) demonstrates this modularity, as it takes in observation data and returns a classified result. Furthermore, the use of the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) abstract class provides common functionality for all agents, such as the initialize method (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts:20), which sets up the agent's dependencies.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses the BaseAgent class, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, as its abstract base class, providing common functionality and a standard response envelope.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, utilizes the BaseAgent class as its abstract base class.
-- [Insights](./Insights.md) -- The Insights component utilizes the classified observations from the Ontology system to generate insights.
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the classify method in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to classify observations against the ontology system
+- [Insights](./Insights.md) -- The Insights sub-component uses the generateInsights method in a hypothetical integrations/mcp-server-semantic-analysis/src/agents/insights-agent.ts to generate insights from the processed data
 
 
 ---

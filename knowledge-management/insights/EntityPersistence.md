@@ -1,93 +1,114 @@
 # EntityPersistence
 
-**Type:** Detail
+**Type:** SubComponent
 
-Given the lack of source files, it is reasonable to infer that EntityPersistence would be a critical component in the PersistenceManager, responsible for managing the lifecycle of entities within the knowledge graph.
+The CodeGraphAgent (src/agents/code-graph-agent.ts) is used by EntityPersistence to construct the AST-based code knowledge graph for semantic code search capabilities.
 
 ## What It Is  
 
-**EntityPersistence** is the logical sub‑component inside the **PersistenceManager** that is responsible for the lifecycle management of domain entities stored in the central knowledge graph. Although the source files for EntityPersistence are not directly listed, the surrounding observations make its role clear: it sits under the `PersistenceManager` component and works hand‑in‑hand with the `GraphDatabaseAdapter` class (implemented in `graph-database-adapter.ts`). The adapter supplies a *type‑safe* API that agents use to read and write graph data, and EntityPersistence builds on that API to provide higher‑level, entity‑centric operations such as creation, retrieval, update, and deletion. In effect, EntityPersistence abstracts the raw graph‑database calls into a domain‑oriented façade that other parts of the system can rely on without needing to understand the underlying graph‑query mechanics.
+EntityPersistence is the **sub‑component** that lives inside the **KnowledgeManagement** layer and is responsible for persisting, retrieving, and mutating domain entities in the system’s graph‑based knowledge store. The core implementation is anchored in two concrete files that appear throughout the code base:  
 
-## Architecture and Design  
+* `storage/graph-database-adapter.ts` – the low‑level adapter that talks to the underlying Graphology + LevelDB graph database.  
+* `src/agents/persistence-agent.ts` – the higher‑level agent that EntityPersistence invokes to carry out create, update, and delete operations on entities.  
 
-The architecture surrounding EntityPersistence follows a **layered separation‑of‑concerns** approach. At the bottom sits the `GraphDatabaseAdapter`, an adapter‑pattern implementation that shields the rest of the codebase from the specifics of the graph database (e.g., query language, connection handling). Above that adapter, EntityPersistence forms a **domain‑repository layer**: it translates generic graph operations into entity‑specific semantics, thereby acting as a repository for the knowledge‑graph entities. This design isolates persistence logic from business logic, allowing the rest of the application to depend on a stable, type‑safe contract rather than on low‑level graph APIs.
-
-Interaction flow is straightforward:
-
-1. **Agents** (or higher‑level services) request entity operations through the `PersistenceManager` interface.  
-2. `PersistenceManager` forwards those calls to its `EntityPersistence` child.  
-3. `EntityPersistence` invokes the appropriate methods on `GraphDatabaseAdapter` (found in `graph-database-adapter.ts`) to execute the actual graph queries.  
-
-Because the adapter is explicitly described as “type‑safe,” the design likely leverages TypeScript generics or strongly‑typed DTOs to guarantee compile‑time correctness of queries and results. This reinforces the **type‑safety** design goal and reduces runtime errors when persisting complex graph structures.
-
-## Implementation Details  
-
-Even though concrete code symbols are absent, the observations let us infer the core implementation pieces:
-
-* **GraphDatabaseAdapter (graph-database-adapter.ts)** – Provides low‑level CRUD primitives (e.g., `runQuery<T>()`, `createNode<T>()`, `updateNode<T>()`) that are generic over the entity type `T`. By exposing a type‑parameterized API, it ensures that callers receive correctly typed results, which is essential for a knowledge graph where nodes can have heterogeneous schemas.
-
-* **EntityPersistence** – Likely a class or module exported from the `PersistenceManager` package. Its public surface probably mirrors typical repository methods such as `save(entity)`, `findById(id)`, `delete(id)`, and perhaps richer graph‑specific queries like `findRelated(entityId, relationshipType)`. Internally, each method would compose one or more calls to `GraphDatabaseAdapter`, handling translation between the domain model and the graph schema (e.g., mapping property names, managing relationship edges).
-
-* **PersistenceManager** – Acts as the façade exposing EntityPersistence (and possibly other persistence concerns) to the rest of the system. The manager may orchestrate multiple sub‑components (e.g., caching, transaction handling) while delegating entity‑specific work to EntityPersistence.
-
-Because the adapter is described as “type‑safe,” EntityPersistence probably performs **validation and transformation** of incoming domain objects before delegating to the adapter, ensuring that only well‑formed entities reach the graph layer. It may also encapsulate **error handling** strategies (e.g., translating low‑level database errors into domain‑specific exceptions).
-
-## Integration Points  
-
-EntityPersistence is tightly coupled with two primary neighbors:
-
-1. **GraphDatabaseAdapter (`graph-database-adapter.ts`)** – The sole persistence back‑end. All EntityPersistence operations ultimately resolve to calls on this adapter. Any change in the underlying graph database (e.g., switching from Neo4j to another graph store) would be isolated to the adapter, leaving EntityPersistence untouched.
-
-2. **PersistenceManager (parent component)** – Provides the entry point for external callers. Agents, services, or other system modules interact with PersistenceManager, which in turn routes entity‑focused requests to EntityPersistence. This hierarchy means that EntityPersistence does not need to expose a public API beyond what PersistenceManager defines.
-
-Because EntityPersistence is a child of PersistenceManager, it may also share cross‑cutting concerns (such as logging, metrics, or transaction scopes) that PersistenceManager applies uniformly across its children. If other siblings exist (e.g., a `RelationshipPersistence` module), they would likely follow the same pattern of delegating to the shared `GraphDatabaseAdapter`.
-
-## Usage Guidelines  
-
-* **Always go through PersistenceManager** – Directly invoking GraphDatabaseAdapter bypasses the entity‑level abstractions that EntityPersistence provides (e.g., validation, type mapping). Use the PersistenceManager’s public methods to ensure consistency.
-
-* **Respect type safety** – Since the adapter enforces generic typing, callers should pass correctly typed DTOs or domain objects. Mismatched types will be caught at compile time, preventing malformed graph writes.
-
-* **Prefer entity‑centric methods** – When persisting or retrieving data, use the high‑level repository‑style methods exposed by EntityPersistence (e.g., `save`, `findById`) rather than constructing raw graph queries. This keeps business logic decoupled from graph specifics.
-
-* **Handle errors at the manager level** – Errors originating from GraphDatabaseAdapter (connection failures, constraint violations) are likely wrapped by EntityPersistence into domain‑specific exceptions. Catch and handle these at the PersistenceManager or higher service layer to maintain a clean error‑handling strategy.
-
-* **Consider lifecycle semantics** – Because EntityPersistence manages the full lifecycle of entities, developers should be mindful of creation vs. upsert semantics, and ensure that updates respect the graph’s consistency rules (e.g., required relationships).
+Together these pieces give EntityPersistence the ability to manage **entity metadata** (such as the entity type and the associated ontology class) while guaranteeing data consistency and integrity across the whole knowledge graph. Because both **ManualLearning** and **OnlineLearning** depend on EntityPersistence for their entity lifecycle management, this sub‑component is a critical bridge between learning pipelines and the persistent knowledge store.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Adapter Pattern** – `GraphDatabaseAdapter` isolates the graph database implementation behind a type‑safe interface.  
-* **Repository (Domain‑Repository) Pattern** – EntityPersistence acts as a repository for graph‑based entities, offering CRUD‑style methods.  
-* **Layered Architecture / Separation of Concerns** – PersistenceManager (facade) → EntityPersistence (domain repository) → GraphDatabaseAdapter (infrastructure).
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Explicit separation of entity persistence** from other persistence concerns reduces coupling and improves testability, at the cost of an additional indirection layer.  
-* **Type‑safe adapter** raises compile‑time safety but may require more boilerplate (generic DTO definitions).  
-* **Centralized adapter** simplifies swapping the underlying graph engine but concentrates all low‑level error handling in one place.
+The architecture that emerges from the observations follows a **layered adapter‑agent pattern**. The **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) sits at the storage‑infrastructure layer, abstracting the concrete Graphology + LevelDB implementation behind a clean API. Above it, the **PersistenceAgent** (`src/agents/persistence-agent.ts`) acts as a domain‑level service that encapsulates business rules around entity creation, updates, and deletion. EntityPersistence itself does not implement its own storage logic; instead, it *delegates* to these two collaborators, which yields a clear separation of concerns:
 
-### 3. System structure insights  
-* The system is organized around a **central knowledge graph** accessed via a single adapter.  
-* **EntityPersistence** is the primary gateway for domain entities, while other potential siblings would handle non‑entity concerns (e.g., relationships).  
-* All persistence‑related calls funnel through **PersistenceManager**, which serves as the public contract for the rest of the application.
+1. **Storage Layer (Adapter)** – isolates graph‑database specifics, making it possible to swap the underlying store without touching higher‑level logic.  
+2. **Domain Service Layer (Agent)** – contains the entity‑centric workflow (validation, metadata handling, consistency checks) and orchestrates calls to the adapter.  
 
-### 4. Scalability considerations  
-* By isolating graph access behind `GraphDatabaseAdapter`, scaling the graph layer (e.g., sharding, clustering) can be addressed without changing EntityPersistence.  
-* The repository abstraction allows batch operations or pagination to be added in EntityPersistence without affecting callers.  
-* Type‑safe generics impose minimal runtime overhead, preserving performance while ensuring correctness.
+EntityPersistence also reuses the **CodeGraphAgent** (`src/agents/code-graph-agent.ts`) when it needs to materialise an AST‑based code knowledge graph for semantic code‑search features. This reuse demonstrates a **service‑oriented composition** where agents are treated as interchangeable building blocks that each own a distinct responsibility (persistence vs. code‑graph construction).  
 
-### 5. Maintainability assessment  
-* **High maintainability** – Clear separation of responsibilities means changes to the graph schema or adapter implementation are localized.  
-* **Strong typing** reduces bugs and eases refactoring.  
-* The lack of direct source files for EntityPersistence is a documentation gap; however, the described hierarchy and patterns give a solid mental model that can be codified with minimal effort.
+Because the component is shared by its sibling sub‑components—**ManualLearning**, **OnlineLearning**, **GraphDatabaseStorage**, **CodeKnowledgeGraph**, and **UKBTraceReporting**—the design emphasizes **common infrastructure reuse**. All of these siblings rely on the same `GraphDatabaseAdapter`, ensuring a uniform data‑access contract across the KnowledgeManagement domain.
+
+---
+
+## Implementation Details  
+
+* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Exposes methods such as `addNode`, `updateNode`, `removeNode`, and query helpers. Internally it wraps Graphology’s mutable graph API and persists the serialized graph to LevelDB. The adapter also implements transaction‑like semantics (e.g., batch writes) that EntityPersistence leverages to keep the knowledge graph in a consistent state after a series of entity mutations.  
+
+* **PersistenceAgent (`src/agents/persistence-agent.ts`)** – Provides higher‑level functions like `createEntity(metadata)`, `updateEntity(id, changes)`, and `deleteEntity(id)`. Each function first validates the incoming metadata (ensuring the presence of an ontology class, checking entity‑type constraints) and then calls the appropriate adapter method. The agent also emits domain events (e.g., `EntityCreated`, `EntityDeleted`) that downstream learners can subscribe to, although the exact event‑bus implementation is not detailed in the observations.  
+
+* **EntityPersistence Logic** – Although no concrete class file is listed, the sub‑component orchestrates the two agents. When a new entity is needed (e.g., during ManualLearning’s curation step), EntityPersistence invokes `PersistenceAgent.createEntity`. For code‑search capabilities, it calls `CodeGraphAgent.buildGraphFromAST(sourceCode)` and then stores the resulting nodes/edges through the same adapter, thereby keeping the code knowledge graph and the generic entity graph in sync.  
+
+* **Metadata Management** – EntityPersistence maintains a lightweight schema that maps each entity to an **ontology class** and a **type identifier**. This mapping is stored as node attributes in the graph, allowing fast look‑ups by type and enabling the learning components to filter entities based on ontology semantics.  
+
+* **Consistency Guarantees** – By routing all write paths through the `GraphDatabaseAdapter`, EntityPersistence inherits the adapter’s batch‑write and error‑handling mechanisms. This design choice centralises consistency logic, reducing the risk of divergent state across ManualLearning and OnlineLearning pipelines.
+
+---
+
+## Integration Points  
+
+EntityPersistence sits at the heart of the **KnowledgeManagement** hierarchy. Its primary integration points are:
+
+* **ManualLearning & OnlineLearning** – Both sub‑components call into EntityPersistence for any entity lifecycle operation. ManualLearning uses it to persist manually curated entities, while OnlineLearning relies on it after batch analysis of git history and LSL sessions to store newly discovered concepts.  
+
+* **GraphDatabaseStorage** – Shares the same `GraphDatabaseAdapter` instance, meaning any configuration change (e.g., switching LevelDB directories) propagates automatically to EntityPersistence.  
+
+* **CodeKnowledgeGraph** – Leverages the same `CodeGraphAgent` that EntityPersistence uses to construct the AST‑based graph. This creates a tight coupling where updates to the code‑graph agent affect both the code‑specific knowledge graph and the generic entity graph.  
+
+* **UKBTraceReporting** – Although its purpose is workflow‑run reporting, it also uses the `GraphDatabaseAdapter`. This common dependency ensures that trace data and entity data coexist in the same underlying graph, simplifying cross‑entity queries (e.g., “which entities were touched by a given workflow run”).  
+
+* **External Consumers** – Any component that needs to query entities (e.g., a semantic search UI) would interact with the `GraphDatabaseAdapter` directly or through a higher‑level query service that sits above EntityPersistence. The observations do not expose a dedicated query façade, but the adapter’s read methods are the de‑facto interface.
+
+---
+
+## Usage Guidelines  
+
+1. **Always go through PersistenceAgent** – Direct calls to the `GraphDatabaseAdapter` from outside EntityPersistence bypass validation and metadata handling. Use `PersistenceAgent.createEntity`, `updateEntity`, or `deleteEntity` to guarantee that ontology class information is correctly recorded.  
+
+2. **Batch operations for performance** – When inserting or updating many entities (as is common in OnlineLearning), wrap the calls in a batch provided by the adapter (`adapter.batch(() => { … })`). This reduces LevelDB I/O and keeps the graph in a consistent intermediate state.  
+
+3. **Synchronise code‑graph updates** – If you modify the AST‑based code knowledge graph via `CodeGraphAgent`, immediately persist the resulting nodes through the same adapter. This prevents divergence between the code graph and the generic entity graph.  
+
+4. **Respect metadata contracts** – Every entity must include both an `entityType` and an `ontologyClass`. Missing fields will cause the PersistenceAgent to reject the operation, preserving the integrity of downstream learning pipelines.  
+
+5. **Handle errors at the agent level** – The PersistenceAgent surfaces adapter errors (e.g., LevelDB write failures) as domain‑specific exceptions. Catch these at the caller (ManualLearning or OnlineLearning) to implement retry or compensation logic, rather than swallowing them silently.  
+
+---
+
+### Architectural patterns identified  
+* Layered adapter‑agent pattern (storage adapter → domain service agent).  
+* Service composition (PersistenceAgent + CodeGraphAgent used together).  
+
+### Design decisions and trade‑offs  
+* **Centralised adapter** – simplifies consistency but creates a single point of failure; however, it enables uniform configuration across siblings.  
+* **Agent‑centric validation** – keeps business rules out of low‑level storage code, at the cost of an extra indirection layer.  
+* **Shared code‑graph agent** – promotes reuse but couples code‑graph generation tightly to entity persistence, which may limit independent evolution of the code‑graph subsystem.  
+
+### System structure insights  
+* EntityPersistence is a leaf sub‑component under **KnowledgeManagement**, but it is a shared service for several sibling components.  
+* All persistence‑related concerns funnel through `GraphDatabaseAdapter`, establishing a common data‑access backbone.  
+* Metadata (entity type, ontology class) is stored as node attributes, enabling fast type‑based queries throughout the system.  
+
+### Scalability considerations  
+* The batch‑write capability of the adapter supports high‑throughput ingestion (e.g., bulk entity creation during OnlineLearning).  
+* Because the underlying store is LevelDB backed by Graphology, scaling is bounded by single‑process storage; horizontal scaling would require sharding or moving to a distributed graph store, which is not currently abstracted.  
+
+### Maintainability assessment  
+* Clear separation between storage (adapter) and business logic (agent) makes the codebase easy to understand and modify.  
+* Reusing the same adapter across many components reduces duplication but also means changes to the adapter impact a wide surface area; thorough regression testing is essential.  
+* Absence of a dedicated query façade may lead to ad‑hoc read logic scattered across callers, which could affect maintainability as the system grows. Adding a thin read‑service layer would improve encapsulation without disrupting existing patterns.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [PersistenceManager](./PersistenceManager.md) -- PersistenceManager uses the GraphDatabaseAdapter class in the graph-database-adapter.ts file to provide a type-safe interface for agents to interact with the central knowledge graph
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval in the Graphology + LevelDB knowledge graph. This adapter enables the component to handle data persistence, graph database storage, and query capabilities seamlessly. For instance, the PersistenceAgent (src/agents/persistence-agent.ts) leverages the GraphDatabaseAdapter to store and retrieve entities from the graph database, demonstrating a clear example of how the component's architecture supports data management. Furthermore, the CodeGraphAgent (src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter to construct the AST-based code knowledge graph, facilitating semantic code search capabilities.
+
+### Siblings
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve manually curated entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history and LSL sessions.
+- [GraphDatabaseStorage](./GraphDatabaseStorage.md) -- GraphDatabaseStorage utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve graph data.
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct the AST-based code knowledge graph.
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

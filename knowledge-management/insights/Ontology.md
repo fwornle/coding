@@ -2,92 +2,148 @@
 
 **Type:** SubComponent
 
-Handles The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.
+The entity type resolution is performed using a validation mechanism, as implemented in the validateEntityTypes function in ontology-classification-agent.ts.
 
 ## What It Is  
 
-**Ontology** is a **sub‑component** of the **SemanticAnalysis** component in the Coding project. It lives inside the same logical package as the other SemanticAnalysis sub‑components – **Pipeline** and **Insights** – and its responsibility is to provide the *ontology classification system*. This system defines both **upper‑level** and **lower‑level** ontologies, resolves the concrete **entity types** that appear in the semantic analysis pipeline, and validates that the produced knowledge entities conform to the defined ontology constraints. Because the observation set does not list concrete file paths, the exact location on disk is not known, but it can be inferred that the code resides under the SemanticAnalysis source tree alongside its siblings.
+The **Ontology** sub‑component lives inside the SemanticAnalysis domain of the MCP server. Its source code is anchored in the repository under  
+
+```
+integrations/mcp-server-semantic-analysis/src/ontology
+integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts
+integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts
+integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts
+```  
+
+At its core, Ontology supplies a structured classification system for entities extracted from code, git history, and LSL sessions. The system stores the ontology definitions in the dedicated *ontology* directory, while the **OntologyClassificationAgent** consumes those definitions to resolve the concrete type of each entity. The resolved type information is attached as metadata to the entities and later persisted by the **PersistenceAgent**. Validation of the resolved types is performed by the `validateEntityTypes` function that lives in `ontology-classification-agent.ts`.  
+
+Thus, Ontology is the knowledge‑base that enables the rest of the SemanticAnalysis pipeline to reason about the semantics of code artifacts in a uniform, type‑safe manner.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **modular, sub‑component pattern** where the larger **SemanticAnalysis** component is decomposed into three focused units: **Pipeline**, **Ontology**, and **Insights**. Each unit encapsulates a distinct concern:
+The Ontology sub‑component follows a **layered, agent‑centric architecture** that is consistent with the broader SemanticAnalysis design. The base of the layer is the abstract **BaseAgent** class (`base-agent.ts`). All concrete agents—including **OntologyClassificationAgent**, **PersistenceAgent**, and the sibling **SemanticAnalysisAgent**, **CodeGraphAgent**, etc.—inherit from this base, guaranteeing a common lifecycle (`execute`, `initialize`, error handling) and allowing the coordinator (see the sibling *Pipeline* component) to treat every agent uniformly.
 
-* **Pipeline** – orchestrates the flow of data through the semantic analysis stages.  
-* **Ontology** – supplies the classification vocabulary and validation logic.  
-* **Insights** – consumes the processed knowledge to generate higher‑level observations.
+### Design patterns observed  
 
-This separation of concerns is evident from the observation that *Ontology* “handles the ontology classification system” while the sibling components address other aspects of the workflow. The design therefore promotes **loose coupling**: the Pipeline can request type‑resolution services from Ontology without needing to know the internal representation of the ontology definitions, and Insights can rely on the validated entities produced downstream.
+| Pattern | Evidence in code |
+|---------|-------------------|
+| **Template Method / Inheritance** | `OntologyClassificationAgent` extends `BaseAgent`, overriding its `execute` method while reusing the scaffolding provided by `BaseAgent`. |
+| **Separation of Concerns** | Ontology definitions are isolated in `integrations/mcp-server-semantic-analysis/src/ontology`; classification logic lives in `ontology-classification-agent.ts`; validation is a pure function `validateEntityTypes`; persistence is handled by `persistence-agent.ts`. |
+| **Coordinator (Mediator) pattern** | The sibling *Pipeline* component uses `coordinator.ts` to orchestrate batch processing of agents, keeping agents decoupled from each other. |
+| **Facade (OntologyManager)** | `ontology-manager.ts` centralises access to the ontology definitions and metadata provisioning, presenting a simple API to agents that need ontology data. |
 
-No explicit design patterns (e.g., factories, strategy) are mentioned in the observations, so we refrain from naming them. The only pattern that can be safely identified is the **component‑based decomposition** that allows each sub‑component to evolve independently while still participating in the overall semantic analysis pipeline.
+Interaction flow: the **SemanticAnalysis** parent component triggers the pipeline; the **OntologyClassificationAgent** reads the definitions from the ontology module, runs `validateEntityTypes` to ensure the resolved types are admissible, and annotates entities with metadata. The **PersistenceAgent** later consumes those annotated entities, persisting both the raw data and the attached ontology metadata. The **OntologyManager** acts as the single source of truth for the ontology definitions, exposing them to any consumer that requires them (e.g., InsightGenerationAgent for LLM‑driven insights).
 
 ---
 
 ## Implementation Details  
 
-The observations do not enumerate concrete classes, functions, or file names for the Ontology sub‑component, and the “0 code symbols found” entry confirms that the source view is currently empty. Consequently, the technical mechanics must be described at a conceptual level:
+### BaseAgent (`base-agent.ts`)  
+Provides the abstract contract for all agents: lifecycle hooks (`initialize`, `execute`, `shutdown`) and shared utilities such as logging and error handling. By inheriting from this class, each agent automatically conforms to the system’s execution contract, enabling the coordinator to schedule them without bespoke wiring.
 
-1. **Ontology Definitions** – The system likely maintains a data structure (e.g., a hierarchy of nodes) that captures *upper* and *lower* ontology levels. Upper ontologies provide abstract categories (e.g., “SoftwareArtifact”), while lower ontologies refine these into concrete types (e.g., “GitCommit”, “LSLSession”).
+### OntologyClassificationAgent (`ontology-classification-agent.ts`)  
+* Extends `BaseAgent`.  
+* In its `execute` method it loads ontology definitions from the `src/ontology` directory (the exact loader is not shown but the path is explicit).  
+* It iterates over incoming entities, determines their candidate types by matching against the ontology schema, and then calls the pure function `validateEntityTypes` to enforce type constraints.  
+* Successful resolution results in the attachment of a `metadata` field to each entity, containing the resolved ontology type and any auxiliary attributes defined in the ontology.
 
-2. **Entity Type Resolution** – When the Pipeline extracts raw entities from git history or LSL sessions, it forwards them to Ontology, which matches each entity against the ontology hierarchy to assign a definitive type. This step is essential for downstream components that need a stable, typed representation.
+### Validation (`validateEntityTypes` function)  
+Implemented as a pure, side‑effect‑free function inside `ontology-classification-agent.ts`. It receives an entity and a candidate type, checks the candidate against the ontology’s validation rules (e.g., required properties, allowed inheritance), and throws or returns an error object if the entity does not satisfy the constraints. Keeping validation isolated makes the classification logic easier to test and reuse.
 
-3. **Validation** – After a type is resolved, Ontology checks that the entity satisfies any constraints defined in the ontology (e.g., required attributes, allowed relationships). Invalid entities are either rejected or flagged for correction before they reach the Insights component.
+### OntologyManager (`ontology-manager.ts`)  
+Acts as a façade over the raw ontology files. It loads the definitions at startup (likely via a JSON/YAML parser) and offers methods such as `getEntitySchema(typeId)` and `listAllTypes()`. By centralising this logic, any future change to the storage format or source (e.g., moving to a database) can be confined to this module without touching the agents.
 
-Because no source files are listed, developers should look for directories or modules named `ontology`, `classification`, or similar under the SemanticAnalysis source tree to locate the concrete implementation.
+### PersistenceAgent (`persistence-agent.ts`)  
+Consumes the entities after they have been enriched with ontology metadata. It persists both the core entity data and the attached metadata to the downstream storage layer (the storage mechanism is not detailed in the observations). The agent’s reliance on the metadata underscores the contract that any entity entering persistence must have passed through OntologyClassificationAgent.
+
+### Relationship to Siblings  
+* **InsightGenerationAgent** can query the ontology via `OntologyManager` to enrich LLM prompts with type information.  
+* **CodeGraphConstructor** may use the same ontology definitions to label nodes in the knowledge graph, ensuring a consistent vocabulary across the system.  
+* **Pipeline**’s coordinator schedules OntologyClassificationAgent early in the batch so that downstream agents (e.g., PersistenceAgent, InsightGenerationAgent) receive fully typed entities.
 
 ---
 
 ## Integration Points  
 
-* **Pipeline → Ontology** – The Pipeline component invokes Ontology’s type‑resolution API for every raw entity it extracts. The interface is likely a function such as `resolve_type(entity)` or a service object that the Pipeline holds a reference to.
+1. **Parent – SemanticAnalysis**  
+   The SemanticAnalysis component orchestrates the overall flow. Its coordinator (`agents/coordinator.ts`) loads and runs the OntologyClassificationAgent as part of the multi‑agent pipeline. The parent expects the agent to conform to the `BaseAgent` contract and to emit entities with attached ontology metadata.
 
-* **Ontology → Insights** – Insights consumes the *validated* entities that Ontology produces. The contract here is that every entity passed forward has a confirmed ontology type and passes all validation rules, allowing Insights to focus on higher‑level reasoning without re‑checking type integrity.
+2. **Sibling – OntologyManager**  
+   All agents that need to understand the ontology (Classification, Persistence, InsightGeneration) retrieve definitions through `OntologyManager`. This creates a single dependency point, reducing duplication.
 
-* **Shared Configuration** – Since Ontology, Pipeline, and Insights belong to the same parent component, they probably share configuration files (e.g., a YAML or JSON file describing the ontology hierarchy). Any change to the ontology definitions will affect both the Pipeline’s extraction logic and the Insights’ consumption logic.
+3. **Sibling – PersistenceAgent**  
+   Directly consumes the output of OntologyClassificationAgent. The contract is implicit: any entity persisted must have passed `validateEntityTypes` and carry a `metadata` field.
 
-No external libraries or services are mentioned, so integration appears to be **in‑process** and tightly coupled within the SemanticAnalysis component.
+4. **Sibling – InsightGenerationAgent & CodeGraphConstructor**  
+   While not directly observed, the documentation notes that these agents “utilize metadata” – they likely read the same `metadata` field to generate LLM‑driven insights or to label graph nodes.
+
+5. **External – Ontology definitions**  
+   The raw ontology files reside in `integrations/mcp-server-semantic-analysis/src/ontology`. Any change to the schema (addition of new types, property changes) propagates automatically to all agents via the OntologyManager reload mechanism.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Treat Ontology as the Source of Truth for Types** – When extending the semantic analysis pipeline, always add new entity categories to the Ontology definitions first. This ensures that downstream components receive a consistent type.
-
-2. **Do Not Bypass Validation** – All entities must pass through Ontology’s validation step before they are handed to Insights. Directly feeding raw data into Insights will break the contract and can lead to inaccurate insights.
-
-3. **Synchronize Ontology Changes with Pipeline** – If the ontology hierarchy is altered (e.g., a new lower‑level type is introduced), update any Pipeline extraction rules that rely on the previous type set. Because the Pipeline and Ontology are separate sub‑components, mismatched expectations can cause resolution failures.
-
-4. **Keep Ontology Definitions Declarative** – Store ontology definitions in a declarative format (e.g., JSON/YAML) rather than hard‑coding them. This improves maintainability and makes it easier for both Pipeline and Insights to load the same definitions without code changes.
-
-5. **Document New Types Thoroughly** – When adding new upper or lower ontology entries, include clear documentation of the intended semantics, required attributes, and validation constraints. This practice aids future developers who will work on Pipeline extraction rules or Insight generation.
+* **Always route entities through OntologyClassificationAgent before persisting or feeding them to downstream agents.** The validation step (`validateEntityTypes`) guarantees that the entity conforms to the current ontology, preventing downstream type mismatches.  
+* **Do not modify ontology files directly from agents.** All reads should go through `OntologyManager`, which encapsulates loading and caching logic. If the ontology needs to be updated at runtime, extend `OntologyManager` with a reload API rather than editing files in place.  
+* **When adding a new entity type, update the ontology definition files under `src/ontology` and augment the validation rules in `validateEntityTypes` if additional constraints are required.** Because the validation function is pure, unit tests can be added without touching the agent’s execution flow.  
+* **Respect the BaseAgent lifecycle.** Implement `initialize` for any heavy‑weight setup (e.g., loading large ontology files) and keep `execute` focused on per‑batch processing. This ensures the coordinator can safely start, pause, or restart agents.  
+* **Log classification outcomes.** The BaseAgent already provides logging utilities; use them to emit the resolved type and any validation warnings. This aids debugging when entities are rejected by `validateEntityTypes`.  
 
 ---
 
-### Summary of Architectural Insights  
+### 1. Architectural patterns identified  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural pattern** | Component‑based decomposition of **SemanticAnalysis** into **Pipeline**, **Ontology**, and **Insights**. |
-| **Design decisions** | Clear separation of concerns; Ontology centralizes type definition, resolution, and validation. |
-| **Trade‑offs** | Tight coupling within the same parent component simplifies data flow but may limit independent deployment of Ontology. |
-| **System structure** | Ontology sits between Pipeline (producer) and Insights (consumer), acting as a validation gate. |
-| **Scalability** | Hierarchical ontology (upper/lower) supports growth of entity types without redesigning the pipeline. |
-| **Maintainability** | Modular placement improves readability; however, lack of visible code symbols suggests a need for better documentation of the actual implementation files. |
+* **Template Method / Inheritance** – `BaseAgent` defines the skeleton; concrete agents override `execute`.  
+* **Facade** – `OntologyManager` hides the details of ontology storage and retrieval.  
+* **Mediator / Coordinator** – The Pipeline’s `coordinator.ts` schedules agents without them directly invoking each other.  
+* **Separation of Concerns** – Distinct modules for definitions, classification, validation, and persistence.  
 
-These insights are derived strictly from the provided observations, without speculation beyond the stated facts.
+### 2. Design decisions and trade‑offs  
+
+* **Centralised ontology source** (single directory + manager) simplifies consistency but creates a single point of failure; any schema change impacts all agents.  
+* **Pure validation function** isolates business rules, making testing easy, at the cost of having to pass all required context explicitly.  
+* **Inheritance from BaseAgent** gives uniform behaviour and easier orchestration, yet ties agents to a specific lifecycle which may be restrictive if an agent needs a radically different execution model.  
+
+### 3. System structure insights  
+
+The Ontology sub‑component is a **vertical slice** within the SemanticAnalysis domain: definitions → classification → validation → metadata attachment → persistence. Each slice is implemented as an independent agent, enabling the coordinator to reorder or parallelise them in the future. The sibling components share the same ontology source via the manager, guaranteeing a unified vocabulary across code‑graph construction, insight generation, and persistence.
+
+### 4. Scalability considerations  
+
+* **Horizontal scaling of agents** – Because each agent follows the `BaseAgent` contract and works on batches of entities, multiple instances of OntologyClassificationAgent could be spawned to handle larger codebases, provided the underlying ontology data is read‑only or safely cached.  
+* **Ontology size** – Loading the entire ontology into memory (as likely done by OntologyManager) works for modest schemas; extremely large ontologies may require lazy loading or a backing store to avoid memory pressure.  
+* **Validation cost** – `validateEntityTypes` runs per entity; its complexity should remain linear in the number of validation rules to keep throughput high.  
+
+### 5. Maintainability assessment  
+
+The current design scores **high** on maintainability:  
+
+* **Clear separation** of responsibilities makes it straightforward to locate and modify a specific concern (e.g., adding a new validation rule).  
+* **Single source of truth** for ontology definitions reduces duplication and the risk of drift between agents.  
+* **Use of pure functions** (`validateEntityTypes`) and a façade (`OntologyManager`) encourages unit testing and isolates side effects.  
+
+Potential maintenance risks arise from the tight coupling to the file‑system location of ontology definitions; a future shift to a database or external service would require changes primarily in `OntologyManager`, but all agents would need to be verified against the new access pattern. Overall, the architecture is well‑structured for incremental evolution.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system to process git history and LSL sessions, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent working together to extract and persist structured knowledge entities. This is evident in the integrations/mcp-server-semantic-analysis/src/agents directory, where each agent has its own TypeScript file, such as ontology-classification-agent.ts, semantic-analysis-agent.ts, and code-graph-agent.ts. The BaseAgent class, defined in base-agent.ts, serves as an abstract base class for all agents in the system, providing a foundation for their implementation. For instance, the SemanticAnalysisAgent, which performs comprehensive semantic analysis of code files and git history, extends the BaseAgent class and overrides its execute method to perform the actual analysis.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
-- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
+- [Pipeline](./Pipeline.md) -- The Pipeline utilizes a coordinator to manage the batch processing workflow, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts file.
+- [Insights](./Insights.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
+- [OntologyManager](./OntologyManager.md) -- The OntologyManager in ontology-manager.ts manages the ontology system and provides metadata to entities.
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor in code-graph-constructor.ts constructs the code knowledge graph using AST parsing and Memgraph.
+- [InsightGenerationAgent](./InsightGenerationAgent.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
+- [PersistenceAgent](./PersistenceAgent.md) -- The PersistenceAgent in persistence-agent.ts handles entity persistence and retrieval from the graph database.
+- [GitHistoryAgent](./GitHistoryAgent.md) -- The GitHistoryAgent in git-history-agent.ts analyzes git history to extract relevant information for semantic analysis.
 
 
 ---
 
-*Generated from 2 observations*
+*Generated from 5 observations*

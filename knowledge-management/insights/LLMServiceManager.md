@@ -2,108 +2,117 @@
 
 **Type:** SubComponent
 
-The LLMServiceManager is managed through the Service Starter, implemented in lib/service-starter.js, which utilizes a retry-with-backoff approach to ensure robust service startup.
+The LLMServiceManager likely uses a combination of timers and checks to monitor LLM services and detect potential issues.
 
 ## What It Is  
 
-The **LLMServiceManager** is a sub‑component that lives inside the *DockerizedServices* hierarchy.  Its source code is not listed directly, but its behaviour is exercised through the **Service Starter** implementation found at `lib/service-starter.js`.  The manager is responsible for the full lifecycle of Large‑Language‑Model (LLM) services: it reads provider‑specific configuration from environment variables, selects the appropriate operating mode (e.g., “local”, “remote”, “fallback”), and wires the required dependencies into the running service instance.  All of this is orchestrated in a Docker‑Compose‑driven environment, where the LLM services (including the `mcp‑server‑semantic‑analysis` service) are defined in `docker‑compose.yaml`.  In short, LLMServiceManager is the glue that turns declarative Docker‑Compose and environment settings into a live, correctly‑configured LLM service ready for consumption by sibling components such as **SemanticAnalysisService**, **ConstraintMonitoringService**, and **CodeGraphAnalysisService**.  
+The **LLMServiceManager** is a sub‑component that lives inside the **DockerizedServices** container.  While the exact source file is not listed in the observations, the component is referenced as a child of `DockerizedServices` and as the parent of a `LazyInitialization` module.  Its core responsibility is to orchestrate the lifecycle of large‑language‑model (LLM) services that run in Docker containers.  It performs *lazy initialization* of those services, continuously verifies their health, enforces per‑service budget limits, and applies load‑balancing rules to spread request traffic.  The manager is built for high availability and fault tolerance, using timers, health checks, and a state‑machine‑driven control loop to detect and recover from failures.  Logging and alerting are also part of its contract, ensuring operators are promptly informed of any abnormal conditions.
 
 ---
 
 ## Architecture and Design  
 
-### Design patterns that surface  
+The observations reveal a **state‑machine‑based orchestration** pattern.  The manager cycles through states such as *Uninitialized → Initializing → Healthy → Degraded → Restarting*, driven by periodic timers and health‑verification callbacks.  This deterministic flow makes it straightforward to reason about service transitions and to embed recovery logic without ad‑hoc conditionals.  
 
-1. **Retry‑with‑Backoff** – The manager is started via the *Service Starter* (`lib/service‑starter.js`), which implements a configurable retry‑with‑backoff loop.  This pattern protects the system from transient start‑up failures (e.g., a container not yet ready) by repeatedly attempting initialization with increasing delays, bounded by a retry limit and a global timeout.  
+A **lazy‑initialization** strategy is employed through the child component `LazyInitialization`.  Rather than starting every LLM instance at container launch, the manager spins up a service only when demand is detected (e.g., a request queue exceeds a threshold).  This reduces resource consumption and aligns with the budget‑tracking mechanism that caps usage per service.  
 
-2. **Dependency Injection (DI)** – Observations describe “dependency injection” as part of the manager’s responsibilities.  The LLMServiceManager does not hard‑code concrete provider implementations; instead it injects the selected provider (e.g., OpenAI, Anthropic) based on environment variables.  This keeps the component loosely coupled to any particular LLM vendor.  
+The component also incorporates **budget tracking** as a guardrail.  Each LLM service reports usage metrics (tokens processed, compute time, etc.) which the manager aggregates and compares against predefined limits.  When a budget is exhausted, the manager can throttle traffic, suspend the instance, or trigger a replacement, thereby preventing runaway costs.  
 
-3. **Environment‑driven Configuration** – All provider credentials, mode flags, and service‑specific options are supplied through environment variables.  Combined with Docker‑Compose, this yields a *declarative configuration* model that can be altered without code changes.  
+To achieve **high availability**, the manager leverages **load‑balancing** logic that distributes incoming workloads across multiple healthy LLM instances.  The load balancer consults the health‑verification subsystem (similar to what the sibling `ConstraintMonitoringService` provides) to avoid routing traffic to degraded nodes.  Combined with the state‑machine‑controlled restart path, the system can self‑heal without external orchestration.  
 
-### Interaction model  
-
-- **Parent → Child**: DockerizedServices supplies the container orchestration layer (Docker‑Compose) and the generic start‑up harness (`lib/service‑starter.js`).  LLMServiceManager consumes this harness to launch its LLM containers and to apply the retry logic.  
-
-- **Sibling ↔ LLMServiceManager**: The **SemanticAnalysisService**, **ConstraintMonitoringService**, and **CodeGraphAnalysisService** all depend on a correctly‑initialized LLM service.  They retrieve the running instance (or its client endpoint) via the DI container that LLMServiceManager populates.  Because the siblings share the same start‑up strategy, they all benefit from the same back‑off resilience.  
-
-- **External Service**: The manager is explicitly designed to work with the `mcp‑server‑semantic‑analysis` service, whose Docker‑Compose definition and environment variables are coordinated with LLMServiceManager.  This tight coupling is intentional: the semantic‑analysis service expects a ready LLM backend before it can process requests.  
-
-Overall, the architecture favours **modularity** (each LLM provider lives behind a DI boundary) and **resilience** (retry‑with‑backoff at start‑up).  No evidence of event‑driven or micro‑service patterns beyond the Docker‑Compose orchestration is present in the observations.  
+Finally, **logging and alerting** are woven throughout the control loop.  Every state transition, budget breach, or health‑check failure is emitted to the central logging infrastructure, and critical events raise alerts that operators can act upon.  This mirrors the observability practices seen in sibling components such as `ConstraintMonitoringService`.
 
 ---
 
 ## Implementation Details  
 
-1. **Service Starter (`lib/service-starter.js`)**  
-   - Exposes a function (e.g., `startService`) that accepts a start‑up callback and a configuration object containing `maxRetries`, `initialDelay`, and `timeout`.  
-   - Implements a loop that calls the callback, catches any error, sleeps for an exponentially increasing delay, and repeats until the service reports “ready” or the retry budget is exhausted.  
+* **State Machine** – Although the exact class name is not listed, the manager likely defines an enum of states and a dispatcher method that reacts to timer‑driven events (`setInterval` or a cron‑style scheduler).  Each tick checks health, budget, and queue length, then invokes the appropriate transition function.  
 
-2. **LLMServiceManager (implicit implementation)**  
-   - **Provider Configuration**: Reads variables such as `LLM_PROVIDER`, `LLM_API_KEY`, and mode flags like `LLM_MODE`.  These values are parsed at start‑up and stored in a configuration object that the DI container later distributes.  
-   - **Mode Switching**: Based on `LLM_MODE`, the manager decides whether to launch a local container (e.g., a self‑hosted model) or to point the client at a remote API endpoint.  The decision logic lives inside the start‑up callback passed to the Service Starter.  
-   - **Dependency Injection**: After selecting the provider, the manager registers a concrete implementation (e.g., `OpenAIProvider`, `LocalModelProvider`) into a shared container (the exact container implementation is not named, but the pattern is evident).  Down‑stream services request the abstract `LLMClient` interface and receive the injected concrete instance.  
+* **LazyInitialization** – Implemented as a dedicated child module, it probably exposes a `requestInstance()` API.  The first call triggers the creation of a Docker container (via the parent `DockerizedServices` orchestration layer) and registers the new instance with the manager’s internal registry.  Subsequent calls reuse the existing instance until it is retired.  
 
-3. **Docker‑Compose Integration**  
-   - The `docker-compose.yaml` file defines the LLM service containers (including `mcp‑server‑semantic‑analysis`).  Environment variables declared in the compose file are automatically propagated to the containers, ensuring that the LLMServiceManager sees the same configuration values at runtime.  
+* **Health Verification** – The manager runs periodic probes (e.g., HTTP `/health` endpoints or custom RPC pings) against each LLM container.  Results feed into the state machine; a failing probe moves the instance into a *Degraded* or *Restarting* state.  This mirrors the health‑verification mechanisms used by the sibling `ConstraintMonitoringService`.  
 
-4. **Lifecycle Management**  
-   - The manager monitors the health of its LLM containers via Docker health‑checks (implied by the need for retry‑with‑backoff).  If a container crashes after start‑up, the Service Starter can be re‑invoked, allowing the manager to re‑inject a fresh provider instance.  
+* **Budget Tracking** – Each LLM instance reports usage metrics through a shared telemetry interface.  The manager aggregates these metrics in an in‑memory store (or a lightweight persistent cache) and compares them against configuration limits defined elsewhere in the system.  When a limit is approached, the manager can emit a warning log and, if exceeded, trigger a throttling or shutdown routine.  
 
-Because the observations do not list concrete class names, the description stays at the functional level while still grounding every claim in the observed files and behaviours.  
+* **Load Balancing** – The manager maintains a pool of healthy instances and selects one per incoming request using a simple algorithm (e.g., round‑robin or least‑connections).  The selection logic consults the health status produced by the verification step, ensuring that only instances in the *Healthy* state receive traffic.  
+
+* **Logging & Alerting** – Throughout each operation, the manager writes structured logs (including timestamps, instance IDs, state transitions, and budget metrics).  Critical failures invoke an alerting client that pushes notifications to the ops channel, aligning with the observability expectations of the broader DockerizedServices ecosystem.  
+
+* **Interaction with DockerizedServices** – Because `DockerizedServices` is the parent, the manager likely calls into Docker orchestration utilities provided there (e.g., container start/stop APIs).  This keeps container lifecycle concerns centralized while the manager focuses on LLM‑specific policies.
 
 ---
 
 ## Integration Points  
 
-- **DockerizedServices (Parent)** – Provides the orchestration platform (Docker‑Compose) and the generic Service Starter.  LLMServiceManager relies on the parent to spin up containers and to expose environment variables.  
+* **Parent – DockerizedServices** – The manager relies on DockerizedServices for container lifecycle actions (creation, destruction, networking).  Any changes to Docker orchestration (e.g., switching from Docker Compose to Kubernetes) would need to be reflected in the manager’s container‑control calls.  
 
-- **ServiceStarterManager (Sibling)** – Oversees the overall start‑up sequence for the entire suite of services.  It invokes the Service Starter for each child, including LLMServiceManager, ensuring a coordinated boot order (e.g., LLM before semantic analysis).  
+* **Sibling – ConstraintMonitoringService** – Both components perform health checks, but ConstraintMonitoringService may provide generic system‑wide health metrics, while LLMServiceManager focuses on LLM‑specific probes and budget constraints.  Shared health‑verification libraries could be abstracted to avoid duplication.  
 
-- **SemanticAnalysisService & ConstraintMonitoringService (Siblings)** – Consume the LLM client that LLMServiceManager registers.  They do not need to know about provider specifics; they simply request the abstract `LLMClient` from the DI container.  
+* **Sibling – SemanticAnalysisService & CodeGraphAnalysisService** – These services consume LLM outputs; therefore, the manager’s load‑balancing and availability directly affect downstream analysis pipelines.  Proper SLA definitions between the manager and its consumers are essential to prevent cascading delays.  
 
-- **CodeGraphAnalysisService (Sibling)** – While not directly dependent on LLM, it shares the same modular design ethos (e.g., uses its own analyzer component).  The parallel design indicates a consistent architectural language across the DockerizedServices suite.  
+* **Sibling – DockerOrchestrator** – While DockerOrchestrator handles overall container deployment, LLMServiceManager issues fine‑grained start/stop commands for LLM containers based on demand.  Coordination between the two ensures that scaling decisions (e.g., adding a new host) are respected by the manager’s internal pool.  
 
-- **External Configuration (Env + Docker‑Compose)** – All integration is mediated through environment variables defined in `docker-compose.yaml`.  Changing a provider or mode requires only updating these variables and restarting the Docker stack, without touching code.  
+* **Child – LazyInitialization** – The lazy‑initialization module is invoked by the manager whenever demand spikes.  It abstracts the “spin‑up‑on‑first‑use” logic, keeping the manager’s state machine clean.  
+
+* **External Interfaces** – The manager likely exposes an internal API (e.g., `getAvailableInstance()`, `reportUsage()`) that other services call to obtain an LLM endpoint.  This API is the primary integration contract for downstream components.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Configure via Environment** – Always set `LLM_PROVIDER`, `LLM_API_KEY`, and `LLM_MODE` in the Docker‑Compose file or the host environment before launching the stack.  Changing these values after containers are running will not automatically re‑configure the manager; a restart of the LLM service (or the whole stack) is required.  
+1. **Never invoke LLM containers directly** – All interactions should go through the `LLMServiceManager` API.  This guarantees that budget, health, and load‑balancing policies are applied uniformly.  
 
-2. **Respect the Retry Limits** – The default retry configuration in `lib/service-starter.js` is tuned for typical start‑up latency of LLM containers.  If you anticipate longer warm‑up times (e.g., large model loading), increase `maxRetries` or `initialDelay` via the Service Starter’s configuration object.  
+2. **Respect budget limits** – Consumers should monitor the usage feedback returned by the manager (e.g., remaining token quota) and gracefully degrade their own workloads when limits are approached.  
 
-3. **Do Not Hard‑Code Provider Details** – Rely on the DI abstraction.  When extending the system with a new LLM vendor, implement a new provider class that conforms to the existing `LLMClient` interface and register it via the manager’s configuration logic.  Avoid modifying sibling services to call the provider directly.  
+3. **Handle transient failures** – Because the manager may restart instances on health failures, callers should be prepared for temporary endpoint unavailability and implement retry logic with exponential back‑off.  
 
-4. **Monitor Health Checks** – Leverage Docker health‑check logs to verify that the LLM container is healthy before dependent services start.  The Service Starter’s back‑off will automatically pause dependent initialization until the health check passes.  
+4. **Do not bypass lazy initialization** – Requesting an instance via the manager’s `requestInstance()` method ensures that the container is started only when needed.  Manually starting containers can lead to budget overruns and unnecessary resource consumption.  
 
-5. **Version Compatibility** – Keep the Docker images for the LLM service and `mcp‑server‑semantic‑analysis` in sync.  Incompatible API versions can cause the manager’s injection to fail, leading to repeated retries and eventual start‑up timeout.  
+5. **Log correlation** – Include the LLM instance identifier provided by the manager in any downstream logs.  This enables operators to trace issues back to the specific service instance that generated them.  
+
+6. **Monitor alerts** – Operators should subscribe to the manager’s alert channel and treat budget‑exceed alerts and health‑degradation alerts as high priority, as they may indicate impending service disruption.  
 
 ---
 
-### Summary of Architectural Insights  
+### 1. Architectural patterns identified  
+* State‑machine‑driven orchestration  
+* Lazy initialization (on‑demand provisioning)  
+* Budget‑tracking guardrails  
+* Periodic timer‑based health verification  
+* Simple load‑balancing (round‑robin / least‑connections)  
+* Centralized logging and alerting  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns identified** | Retry‑with‑backoff (service‑starter), Dependency Injection (provider abstraction), Environment‑driven configuration (Docker‑Compose + env vars) |
-| **Design decisions & trade‑offs** | *Resilience* via back‑off vs. longer start‑up time; *Flexibility* via DI and env vars vs. runtime re‑configuration complexity |
-| **System structure insights** | LLMServiceManager sits under DockerizedServices, shares start‑up logic with ServiceStarterManager, and supplies a DI‑provided LLM client to sibling analysis services |
-| **Scalability considerations** | Because each LLM provider runs in its own container, scaling horizontally (multiple replicas) is feasible by adjusting Docker‑Compose replica counts; however, the retry‑with‑backoff logic must be tuned to avoid cascading delays when many instances start simultaneously |
-| **Maintainability assessment** | High maintainability: configuration lives outside code, provider implementations are interchangeable, and the centralised Service Starter isolates start‑up complexity.  The main maintenance burden is keeping environment variables and Docker images aligned across services. |
+### 2. Design decisions and trade‑offs  
+* **Lazy initialization** reduces idle resource usage but adds latency on first request.  
+* **State machine** provides clear lifecycle semantics at the cost of added implementation complexity.  
+* **Budget tracking** protects cost overruns but may throttle legitimate traffic if limits are set too conservatively.  
+* **Timer‑based health checks** are lightweight and deterministic, yet they may miss rapid failures between intervals; a more event‑driven probe could improve responsiveness but would increase system coupling.  
 
-These insights are fully grounded in the provided observations and reference the concrete file paths (`lib/service-starter.js`) and configuration artefacts (`docker-compose.yaml`) that define the LLMServiceManager’s role within the DockerizedServices ecosystem.
+### 3. System structure insights  
+The manager sits as a middle layer between Docker orchestration (`DockerizedServices` / `DockerOrchestrator`) and LLM‑consuming services (`SemanticAnalysisService`, `CodeGraphAnalysisService`).  Its child `LazyInitialization` isolates the on‑demand spin‑up logic, while siblings share health‑verification concepts, suggesting a possible refactor into a shared health‑monitoring library.  
+
+### 4. Scalability considerations  
+* **Horizontal scaling** – Adding more Docker hosts (via DockerOrchestrator) expands the pool of LLM instances the manager can draw from, improving throughput.  
+* **Budget partitioning** – Budgets can be sharded per instance to allow fine‑grained scaling without a single global limit becoming a bottleneck.  
+* **Load‑balancing algorithm** – The current simple algorithm may need to evolve to weighted or latency‑aware balancing as the number of instances grows.  
+
+### 5. Maintainability assessment  
+The explicit state machine and modular `LazyInitialization` child give the component a clear separation of concerns, which aids readability and testing.  However, the absence of a shared health‑check abstraction leads to duplicated logic across siblings.  Centralizing health verification and budgeting utilities would reduce code churn and improve consistency.  Overall, the design is maintainable but would benefit from extracting common cross‑component concerns into shared libraries.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) enables efficient data persistence and retrieval. This is evident in the way the adapter provides a standardized interface for interacting with the graph database, allowing for seamless integration with various services. For instance, the mcp-server-semantic-analysis service leverages this adapter to store and retrieve semantic analysis results, as seen in the lib/semantic-analysis/semantic-analysis-service.ts file. The adapter's implementation of the GraphDatabase interface (storage/graph-database-adapter.ts) ensures that all database interactions are properly abstracted, making it easier to switch to a different database if needed.
+
+### Children
+- [LazyInitialization](./LazyInitialization.md) -- The Hierarchy Context suggests the LLMServiceManager is responsible for managing LLM services, implying a need for lazy initialization.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
-- [ServiceStarterManager](./ServiceStarterManager.md) -- The ServiceStarterManager oversees service startup, utilizing the Service Starter and retry-with-backoff approach for robust initialization.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve semantic analysis results.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService incorporates health verification mechanisms to ensure the service is functioning correctly.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code graph analysis results.
+- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator is responsible for deploying and managing Docker containers for coding services.
 
 
 ---

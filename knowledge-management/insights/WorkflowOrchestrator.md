@@ -2,161 +2,97 @@
 
 **Type:** SubComponent
 
-WorkflowOrchestratorManager.loadOrchestrator() loads and initializes the orchestrator from configuration files
+The WorkflowOrchestrator likely integrates with other components, such as the ViolationCaptureModule, to provide a comprehensive view of workflow execution.
 
 ## What It Is  
 
-**WorkflowOrchestrator** is the concrete sub‑component that drives the execution of a defined workflow inside the **SemanticAnalysis** system. All of its public entry points are discovered in the observation set:  
-
-* `WorkflowOrchestrator.runWorkflow()` – the method that receives an input payload together with execution parameters and orchestrates the end‑to‑end run of the workflow.  
-* `WorkflowOrchestrator.getTask()` – a helper that, given the current configuration and the workflow definition, resolves the concrete *Task* instance that should be executed at a particular step.  
-
-The orchestrator’s behaviour is driven by a declarative description found in **`WorkflowConfiguration.yaml`**, which enumerates the tasks that compose the workflow and the dependency graph between them. Supporting infrastructure is provided by a manager (`WorkflowOrchestratorManager.loadOrchestrator()`), a utility class (`WorkflowOrchestratorUtils.getWorkflowResult()`), and a logger (`WorkflowOrchestratorLogger.logWorkflow()`). All of these live under the **SemanticAnalysis** component, which itself is a multi‑agent platform for processing git history, LSL sessions and other knowledge sources.
-
-No explicit file‑system paths are supplied in the observations, so the exact location of the source files cannot be stated; however, the naming conventions (`*.yaml`, `*Manager`, `*Utils`, `*Logger`) make it clear that the orchestrator follows a conventional package layout alongside its sibling sub‑components (Pipeline, Ontology, Insights, etc.).
-
----
+The **WorkflowOrchestrator** is the sub‑component within the **ConstraintSystem** that is responsible for defining, scheduling, executing, and monitoring the life‑cycle of workflows. Although the source repository does not expose a concrete file path for this module (the “Code Structure” observation reports *0 code symbols found*), the surrounding documentation makes it clear that the orchestrator is a logical layer that sits alongside the **ViolationCaptureModule** under the umbrella of **ConstraintSystem**. It consumes workflow definitions expressed in a declarative language such as **XML** or **JSON**, turning those specifications into runnable sequences of actions. The orchestrator also provides runtime services—including concurrency control, scheduling, notification, data filtering/aggregation, and logging—that together give the system a coherent view of workflow execution.
 
 ## Architecture and Design  
 
-The design that emerges from the observations is **configuration‑driven orchestration**. A static YAML file (`WorkflowConfiguration.yaml`) captures the workflow topology—tasks and their inter‑task dependencies—while the runtime code (`WorkflowOrchestrator`) interprets that model and executes the steps in the correct order. This separation of *definition* (YAML) from *execution* (Java/Kotlin/Scala‑style classes) is a classic **Declarative Configuration** pattern.
+From the observations we can infer a **layered orchestration architecture**. The top layer (the **ConstraintSystem**) supplies cross‑cutting concerns (e.g., the Observer‑based hook system described for the parent component) while the **WorkflowOrchestrator** focuses on workflow‑specific concerns. The design leans on **well‑known coordination mechanisms** rather than bespoke frameworks:
 
-A second, complementary pattern is **Separation of Concerns**:  
+* **Concurrency control** – The orchestrator may employ **locks or semaphores** to serialize access to shared resources when multiple agents interact with the same workflow instance. This choice favours deterministic execution at the cost of potential contention under high parallelism.  
+* **Scheduling** – A **timer or scheduler** component drives the progression of workflow steps, allowing time‑based triggers or periodic jobs to be expressed directly in the workflow definition. This aligns with a classic *cron‑style* scheduling model rather than an event‑driven pipeline.  
+* **Notification** – Built‑in support for **email or alert** delivery gives operators immediate feedback on workflow status, suggesting a push‑notification model that is orthogonal to the core execution path.  
+* **Data processing** – The orchestrator can **filter or aggregate** execution data, indicating that it contains a lightweight analytics layer for summarising run‑time metrics before they are persisted or displayed.  
+* **Logging** – Integration with a **logging framework or library** ensures that every state transition, error, and important decision point is recorded, supporting observability and post‑mortem analysis.
 
-* **Manager** (`WorkflowOrchestratorManager`) isolates the bootstrap logic. By loading the YAML, constructing the orchestrator instance, and performing any necessary dependency injection, it keeps the core `WorkflowOrchestrator` class focused on the “run” logic.  
-* **Utility** (`WorkflowOrchestratorUtils`) centralises result‑retrieval logic, allowing callers to obtain the final workflow outcome without needing to understand the internal state of the orchestrator.  
-* **Logger** (`WorkflowOrchestratorLogger`) provides a dedicated cross‑cutting concern for tracing execution and error handling, which mirrors the logging approach used by other siblings such as `PipelineController` and `EntityValidator`.
-
-Interaction with sibling components is implicit: the orchestrator is one of several agents that the **SemanticAnalysis** parent coordinates. Like the **Pipeline** component, which uses a DAG‑based execution model defined in `pipeline-configuration.yaml`, the orchestrator also works on a directed graph of tasks, suggesting a shared architectural vocabulary across the parent’s sub‑systems.
-
-No explicit event‑bus, message queue, or micro‑service boundary is mentioned, so the orchestrator appears to operate **in‑process**, invoked directly by higher‑level agents or by external callers via its public API.
-
----
+Because the parent **ConstraintSystem** uses the **Observer pattern** (via `UnifiedHookManager` in `lib/agent-api/hooks/hook-manager.js`) to dispatch hook events, it is reasonable to expect that the **WorkflowOrchestrator** re‑uses the same hook infrastructure to react to workflow milestones (e.g., *step‑started*, *step‑completed*, *workflow‑failed*). Likewise, the **Factory pattern** employed by `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`) may be leveraged to instantiate concrete workflow components (tasks, timers, notification handlers) based on the declarative definition.
 
 ## Implementation Details  
 
-### Core Execution (`runWorkflow`)  
-`WorkflowOrchestrator.runWorkflow(input, parameters)` is the entry point. The method likely performs the following steps, inferred from the observations:  
+The orchestrator’s implementation revolves around a **definition parser**, a **runtime engine**, and a set of **service adapters**:
 
-1. **Load Configuration** – It reads the already‑parsed `WorkflowConfiguration.yaml` (or receives a pre‑parsed model from the manager).  
-2. **Task Resolution** – For each node in the workflow graph, it calls `WorkflowOrchestrator.getTask(taskId)` to obtain a concrete task object. The `getTask` method consults the configuration and the workflow definition to map a logical task name to an implementation class, possibly via reflection or a registry.  
-3. **Dependency Management** – By walking the dependency edges defined in the YAML, the orchestrator determines a safe execution order (topological sort) before invoking tasks. This mirrors the DAG‑based ordering used by `PipelineController`.  
-4. **Execution Loop** – Each resolved task is executed with the supplied input and any intermediate results from predecessor tasks. Errors are caught and passed to `WorkflowOrchestratorLogger.logWorkflow()` for diagnostics.  
-5. **Result Aggregation** – Upon successful completion, the final output is stored in a result holder that `WorkflowOrchestratorUtils.getWorkflowResult()` can later retrieve.
+1. **Definition Parser** – A module reads **XML** or **JSON** workflow files, validates the schema, and constructs an in‑memory representation (e.g., a directed acyclic graph of steps). No concrete class names are provided, but the parser would expose an API such as `parseWorkflowDefinition(path)` that returns a `WorkflowModel` object.
 
-### Task Retrieval (`getTask`)  
-The `getTask` method abstracts the mapping from a configuration entry to a runnable component. It likely parses a section of `WorkflowConfiguration.yaml` such as:
+2. **Runtime Engine** – The engine walks the `WorkflowModel`, respecting dependencies and using the **scheduler** to trigger step execution at the appropriate time. Concurrency is guarded by a **lock manager** that allocates a lock per workflow instance or per shared resource. When a step is ready, the engine invokes the corresponding **task handler**, which may be a pluggable class instantiated via the parent’s Factory mechanism.
 
-```yaml
-tasks:
-  - id: extractEntities
-    type: EntityExtractionTask
-    config:
-      source: git
-  - id: classifyOntology
-    type: OntologyClassificationTask
-    depends_on: [extractEntities]
-```
+3. **Service Adapters** –  
+   * **Notification Adapter** – Wraps an email client or alerting service, exposing methods like `notify(status, details)`.  
+   * **Data Processor** – Provides filtering/aggregation functions (`filterEvents()`, `aggregateMetrics()`) that operate on the raw execution logs before they are persisted.  
+   * **Logging Adapter** – Connects to the system‑wide logging framework, ensuring that each engine event is emitted with appropriate severity.
 
-The method reads the `type` field, locates the corresponding class (e.g., `EntityExtractionTask`), instantiates it (possibly injecting configuration values), and returns the instance to the orchestrator.
-
-### Manager (`loadOrchestrator`)  
-`WorkflowOrchestratorManager.loadOrchestrator()` encapsulates the lifecycle:  
-
-* Reads `WorkflowConfiguration.yaml` from a known resources directory.  
-* Validates the structure (e.g., checks for cycles, missing task definitions).  
-* Instantiates `WorkflowOrchestrator`, wiring in the logger, utils, and any dependency injection containers used by the broader SemanticAnalysis platform.  
-
-By centralising this logic, the system can swap out orchestration strategies (e.g., a future “parallel executor”) without touching the core orchestrator code.
-
-### Utilities and Logging  
-`WorkflowOrchestratorUtils.getWorkflowResult()` offers a static‑style accessor that abstracts away internal state handling. This is useful for downstream agents that need the workflow outcome without coupling to the orchestrator’s internal fields.
-
-`WorkflowOrchestratorLogger.logWorkflow()` is invoked at key lifecycle moments: start of a workflow, each task start/completion, and any exception. The logger likely writes to a common logging framework shared across the parent component, enabling correlation with logs from `PipelineController`, `EntityValidator`, and other agents.
-
----
+The orchestrator also registers **hook listeners** with the `UnifiedHookManager` so that external components (e.g., the **ViolationCaptureModule**) can react to workflow events without tight coupling. This design mirrors the parent’s use of the Observer pattern to achieve loose coupling between the orchestrator’s core logic and ancillary concerns.
 
 ## Integration Points  
 
-* **Parent – SemanticAnalysis**: The orchestrator is a child of the SemanticAnalysis component. It is invoked by higher‑level agents that need to run a specific workflow (e.g., a “knowledge extraction” pipeline). The parent’s multi‑agent orchestration engine may schedule `runWorkflow` calls alongside other agents such as `InsightGenerator` or `CodeKnowledgeGraphBuilder`.  
+* **ConstraintSystem (Parent)** – The orchestrator is a child of **ConstraintSystem**, inheriting the hook infrastructure (`UnifiedHookManager`) and configuration factories (`HookConfigLoader`). It likely registers its own hooks (e.g., `onWorkflowStart`, `onWorkflowComplete`) with the parent’s manager, enabling other system parts to observe workflow life‑cycle events.  
 
-* **Sibling – Pipeline**: Both the orchestrator and the Pipeline share a DAG‑based execution philosophy, driven by YAML configuration files (`WorkflowConfiguration.yaml` vs. `pipeline-configuration.yaml`). It is plausible that the parent’s scheduler can treat a pipeline step as a “workflow” and delegate to the orchestrator, reusing the same logging and utility infrastructure.  
+* **ViolationCaptureModule (Sibling)** – The sibling module also uses `UnifiedHookManager` to capture violations. Because both components rely on the same hook bus, the **WorkflowOrchestrator** can emit events that the **ViolationCaptureModule** consumes (e.g., a step violation detected during execution). This shared mechanism reduces the need for direct API calls and promotes extensibility.  
 
-* **Sibling – Ontology, Insights, EntityValidator**: Tasks resolved by `getTask` may be implementations that belong to these sibling domains (e.g., an `OntologyClassificationTask` that uses `OntologyClassifier`). Consequently, the orchestrator indirectly depends on the APIs exposed by those sibling components.  
-
-* **External Services – GraphDatabaseAdapter / MemgraphAdapter**: If a workflow includes persistence steps, the concrete task classes will call into the graph adapters. The orchestrator itself does not embed persistence logic; it simply provides the execution context.  
-
-* **Configuration Files**: `WorkflowConfiguration.yaml` is the sole declarative artifact that the orchestrator consumes. Any change to task ordering, addition of new tasks, or modification of dependencies must be reflected here, making the file the primary integration contract with the rest of the system.
-
----
+* **External Services** – Notification adapters interface with email servers or alerting platforms; the scheduler may depend on a system timer library; the logging adapter hooks into the global logging configuration. Each of these dependencies is abstracted behind an interface, allowing the orchestrator to swap implementations without altering its core logic.
 
 ## Usage Guidelines  
 
-1. **Define Workflows Declaratively** – Always author or modify `WorkflowConfiguration.yaml` to describe the desired workflow. Ensure that each task entry includes a unique identifier, a concrete `type` that maps to an existing task class, and an explicit `depends_on` list if ordering matters.  
+1. **Define Workflows Declaratively** – Authors should supply workflow specifications in the supported **XML** or **JSON** format, adhering strictly to the schema validated by the parser. Keeping definitions pure and side‑effect‑free simplifies later maintenance.  
 
-2. **Load Through the Manager** – Never instantiate `WorkflowOrchestrator` directly. Use `WorkflowOrchestratorManager.loadOrchestrator()` so that configuration validation, dependency injection, and logger wiring are performed consistently.  
+2. **Leverage Hooks for Extensibility** – When extending the orchestrator (e.g., adding custom step types or post‑processing actions), register new listeners with `UnifiedHookManager` rather than modifying the engine directly. This preserves the loose coupling championed by the parent’s Observer pattern.  
 
-3. **Pass Immutable Input** – The `runWorkflow` method expects an input payload that will be handed to the first task(s). Treat this payload as immutable; tasks should produce new data objects rather than mutating the original, which simplifies reasoning about downstream task results.  
+3. **Mind Concurrency Limits** – Because the orchestrator uses **locks/semaphores**, developers must be aware of potential deadlocks. Long‑running tasks should release locks promptly, and any custom resource‑sharing logic should respect the orchestrator’s lock acquisition order.  
 
-4. **Handle Results via Utils** – After `runWorkflow` completes, retrieve the final outcome with `WorkflowOrchestratorUtils.getWorkflowResult()`. Avoid reaching into internal fields of the orchestrator; this utility shields callers from future internal refactoring.  
+4. **Configure Notifications Thoughtfully** – Notification payloads should be concise and relevant; excessive email alerts can overwhelm operators and degrade performance. Use the provided notification adapter’s severity levels to filter messages.  
 
-5. **Log and Monitor** – Rely on `WorkflowOrchestratorLogger.logWorkflow()` for traceability. When adding new tasks, ensure they emit appropriate log messages so that the orchestrator’s log stream remains a single source of truth for execution tracing.  
-
-6. **Validate Configuration** – Before deploying a new workflow, run the manager’s validation routine (implicitly executed in `loadOrchestrator`) to catch cycles, missing task implementations, or malformed YAML. This prevents runtime failures that would otherwise surface only during `runWorkflow`.  
-
-7. **Stay Within the Same Process** – Because the orchestrator is designed for in‑process execution, avoid calling it from separate JVMs or containers unless you wrap it in a service layer. If cross‑process orchestration becomes necessary, a new integration layer would be required—this is a deliberate trade‑off made for simplicity and low latency.
+5. **Instrument with Logging** – Ensure that any custom task handlers emit log entries using the same logging framework as the orchestrator. Consistent log formatting aids the orchestrator’s data‑filtering stage and downstream analysis tools.
 
 ---
 
-### Architectural patterns identified  
+### 1. Architectural patterns identified  
+* **Observer pattern** – via `UnifiedHookManager` (parent) and shared hook bus for workflow events.  
+* **Factory pattern** – via `HookConfigLoader` for creating concrete workflow components.  
+* **Layered orchestration** – separation of definition parsing, runtime execution, and service adapters.  
 
-* **Declarative Configuration (YAML‑driven workflow definition)**
-* **Separation of Concerns (Manager, Utils, Logger)**
-* **Directed Acyclic Graph (DAG) execution model** – shared with Pipeline
-* **Factory/Registry pattern** inside `getTask` for dynamic task instantiation
-* **Cross‑cutting Concern handling** via dedicated logger
+### 2. Design decisions and trade‑offs  
+* **Declarative workflow definitions** (XML/JSON) give readability and versionability but require a robust parser and schema maintenance.  
+* **Lock‑based concurrency** guarantees deterministic access but can limit scalability under high parallel load.  
+* **Built‑in scheduling** simplifies time‑based triggers but ties the orchestrator to a specific timer implementation, potentially reducing flexibility.  
+* **Embedded notification and logging** improve observability at the cost of added runtime overhead.  
 
-### Design decisions and trade‑offs  
+### 3. System structure insights  
+* The **WorkflowOrchestrator** sits as a child of **ConstraintSystem**, inheriting cross‑cutting concerns (hooks, factories).  
+* It shares the hook infrastructure with its sibling **ViolationCaptureModule**, enabling event‑driven collaboration without direct coupling.  
+* Internally it is composed of a parser, engine, and adapters, each encapsulated behind interfaces to support future extensions.  
 
-* **Configuration‑first vs. code‑first** – By externalising workflow structure to YAML, the system gains flexibility (workflows can be altered without recompiling) at the cost of runtime validation complexity.  
-* **In‑process orchestration** – Simpler to implement and debug, but limits horizontal scaling; the orchestrator cannot be distributed across nodes without additional abstraction.  
-* **Explicit manager bootstrap** – Centralises error handling and validation, but adds an extra layer developers must remember to use.  
-* **Utility‑centric result access** – Encourages loose coupling but may hide richer state that could be useful for advanced debugging.
+### 4. Scalability considerations  
+* **Lock contention** may become a bottleneck; evaluating lock granularity or moving to optimistic concurrency could improve throughput.  
+* **Scheduler throughput** should be profiled; if many workflows require fine‑grained timing, a more sophisticated scheduling library may be needed.  
+* **Notification volume** must be throttled to avoid overwhelming external alerting services.  
 
-### System structure insights  
-
-* The orchestrator sits at the leaf of the **SemanticAnalysis** hierarchy, acting as a concrete executor for declaratively defined workflows.  
-* Its sibling components follow a similar pattern of configuration‑driven execution (Pipeline) or classification (Ontology), suggesting a cohesive architectural language across the parent.  
-* All orchestrator‑related classes share a naming convention (`WorkflowOrchestrator*`) that makes discovery straightforward and supports future extension (e.g., `WorkflowOrchestratorScheduler`).  
-
-### Scalability considerations  
-
-* **Horizontal scaling** is not intrinsic; the current design assumes a single orchestrator instance per process. To scale, the system would need to externalise task execution (e.g., a worker pool or remote task service).  
-* **Task parallelism** could be introduced by extending the DAG executor to run independent branches concurrently, but this would require thread‑safety guarantees in each task implementation.  
-
-### Maintainability assessment  
-
-* **High maintainability** thanks to clear separation (manager, utils, logger) and declarative workflow definitions. Adding or modifying tasks rarely touches core orchestrator logic.  
-* **Potential fragility** lies in the YAML schema: a malformed configuration can cause runtime failures, so robust validation (already present in the manager) is essential.  
-* **Consistent naming and logging** across siblings aid developers in navigating the codebase and correlating logs, further improving long‑term maintainability.
+### 5. Maintainability assessment  
+* The reliance on **Observer** and **Factory** patterns promotes loose coupling, making it straightforward to add new workflow step types or external listeners.  
+* Declarative definitions keep business logic outside code, easing updates by non‑engineers.  
+* However, the absence of a concrete code base (0 symbols found) suggests that documentation and clear interface contracts are critical to prevent drift between intended design and actual implementation.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a combination of design patterns, including the Observer pattern and the Factory pattern, to achieve loose coupling and increased maintainability. For instance, the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) employs the Observer pattern to dispatch hook events and register handlers, allowing for a decoupling of the hook configuration from the specific implementation details. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) uses the Factory pattern to manage unified hook configurations, providing a flexible and extensible way to configure hooks. This design decision enables the system to easily add or remove hooks without affecting the overall architecture.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
-- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
-- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
-- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) dispatches hook events and registers handlers, allowing for decoupling of the hook configuration from the specific implementation details.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

@@ -2,113 +2,103 @@
 
 **Type:** SubComponent
 
-The execute() function of the PersistenceAgent (agents/persistence-agent.ts) handles code knowledge graph persistence using the GraphDatabaseAdapter.
+The CodeKnowledgeGraph sub-component is crucial for the KnowledgeManagement component as it provides a centralized solution for code knowledge management.
 
 ## What It Is  
 
-**CodeKnowledgeGraph** is the sub‑component that materialises the “code‑level” knowledge base of the system. It lives under the **KnowledgeManagement** umbrella and is implemented across several tightly‑coupled modules. The core storage primitive is the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`; every persistence operation performed by CodeKnowledgeGraph ultimately routes through this adapter. The execution entry point for persistence work is the `execute()` method of the **PersistenceAgent** (`agents/persistence-agent.ts`). Within its own boundary, CodeKnowledgeGraph composes two dedicated sub‑components – **EntityManagement** (which owns the lifecycle of code entities and their edges) and **OntologyClassification** (which tags those entities with type and category information). The **PersistenceService** acts as the façade that the rest of the system calls when it needs to store or retrieve graph data, and it too relies on the same GraphDatabaseAdapter. Together these pieces give CodeKnowledgeGraph the ability to keep a live, query‑able graph of code artefacts while automatically synchronising a JSON export for downstream consumers.
+**CodeKnowledgeGraph** is the sub‑component responsible for building, storing, and querying a *code‑centric* knowledge graph that captures AST‑derived entities and their relationships. The core logic lives in the **CodeGraphAgent** located at `src/agents/code-graph-agent.ts`. This agent parses source code into an abstract syntax tree (AST), extracts semantic entities (e.g., classes, functions, modules) and links them together, exposing an interface that downstream modules can use for “semantic code search”. The graph itself is persisted through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) which guarantees data consistency and integrity, while the **EntityPersistence** sub‑component handles the lifecycle (create, update, delete) of individual graph nodes and edges. CodeKnowledgeGraph sits inside the larger **KnowledgeManagement** component, which treats it as the authoritative source of code‑related knowledge for the whole system.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **shared‑adapter, service‑oriented** layout. The **GraphDatabaseAdapter** is the single source of truth for all graph‑related I/O; it abstracts the underlying Graphology + LevelDB stack and presents a uniform API to every sibling component (ManualLearning, OnlineLearning, EntityManagement, OntologyClassification, PersistenceService, PersistenceAgent). This is a classic **Adapter pattern** – the adapter shields the rest of the codebase from the concrete persistence technology while exposing the operations needed by the graph‑centric domain.
+The observed structure reveals a **layered architecture** built around a *graph‑database‑backed* storage layer. The **GraphDatabaseAdapter** acts as an **Adapter** that abstracts the underlying graph store (Graphology + LevelDB) from the business logic. All sibling components—**ManualLearning**, **OnlineLearning**, **EntityPersistence**, **GraphDatabaseStorage**, and **UKBTraceReporting**—also depend on this adapter, indicating a shared persistence contract across the KnowledgeManagement domain.
 
-On top of the adapter sits a **service layer** (PersistenceService) that bundles higher‑level operations such as “store entity”, “link entities”, and “export JSON”. The **PersistenceAgent** acts as an orchestrator that invokes the service during its `execute()` call, turning a high‑level persistence request into concrete adapter calls. Inside CodeKnowledgeGraph, the **EntityManagement** and **OntologyClassification** sub‑components are composed as collaborators; they each focus on a single concern (entity CRUD vs. classification) and delegate storage to the shared adapter via the service. This reflects a **Separation‑of‑Concerns** design: the graph data model, the classification logic, and the persistence mechanics are kept distinct but wired together through well‑defined interfaces.
+The **CodeGraphAgent** functions as an **Agent/Facade** that encapsulates two distinct responsibilities: (1) AST parsing and entity extraction, and (2) exposing query operations for semantic search. By keeping these responsibilities together, the design avoids scattering parsing logic throughout the code base and provides a single, well‑defined entry point for any consumer that needs code‑level insight.
 
-Because every sibling component also depends on the same adapter, the system exhibits a **shared‑infrastructure** pattern. The automatic JSON export sync, baked into the adapter, guarantees that any mutation performed by any sibling (e.g., ManualLearning inserting a manually created entity) is instantly reflected in the exported JSON representation, enabling downstream tools to stay consistent without additional coordination code.
+The **EntityPersistence** sub‑component is a dedicated **CRUD service** for graph entities. It is invoked by CodeKnowledgeGraph whenever a new code entity is discovered, an existing one is modified (e.g., after a refactor), or an entity is removed. This separation of concerns isolates persistence mechanics from the higher‑level graph construction performed by the CodeGraphAgent.
+
+Overall, the system follows a **dependency‑injection‑friendly** style: the higher‑level KnowledgeManagement component composes its children (CodeKnowledgeGraph, ManualLearning, etc.) by providing each with the same GraphDatabaseAdapter instance, ensuring consistent transaction semantics and simplifying testing.
 
 ---
 
 ## Implementation Details  
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – This file houses the concrete implementation that couples **Graphology** (the graph library) with **LevelDB** (the on‑disk key‑value store). Its public API includes methods for adding nodes, adding edges, querying sub‑graphs, and a built‑in routine that writes the current graph state to a JSON file after each mutation. The “automatic JSON export sync” mentioned in the observations is implemented here, ensuring that any component that mutates the graph automatically triggers a fresh export.
+* **`src/agents/code-graph-agent.ts`** – The primary class (likely `CodeGraphAgent`) implements methods such as `parseAST(source: string): ASTNode[]`, `extractEntities(ast: ASTNode[]): CodeEntity[]`, and `searchSemantic(query: string): CodeEntity[]`. Internally it invokes a parser (e.g., TypeScript’s compiler API) to produce an AST, walks the tree to identify entities, and then translates those entities into graph nodes using the GraphDatabaseAdapter’s API.
 
-2. **PersistenceAgent (`agents/persistence-agent.ts`)** – The `execute()` function is the orchestration entry point. Inside `execute()`, the agent retrieves the **PersistenceService** (likely via dependency injection), constructs a persistence request (e.g., “persist new function node with classification X”), and forwards it to the service. The agent does not touch the adapter directly; it relies on the service to translate the request into adapter calls. This indirection makes the agent lightweight and focused on workflow rather than storage details.
+* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Provides low‑level operations like `addNode(node)`, `addEdge(sourceId, targetId, type)`, `updateNode(node)`, `removeNode(id)`, and query helpers. Because every sibling component uses the same adapter, it likely wraps Graphology’s API and LevelDB persistence, exposing a consistent TypeScript interface.
 
-3. **PersistenceService** – Though the exact file path is not listed, the service acts as a façade over the GraphDatabaseAdapter. It exposes domain‑specific methods such as `saveEntity(entity)`, `linkEntities(sourceId, targetId, relationship)`, and `exportGraph()`. Internally it calls the adapter’s low‑level methods, handling error translation and transaction‑like semantics (e.g., batching multiple adapter calls before triggering the JSON export).
+* **EntityPersistence** – Though the exact file path isn’t listed, it is referenced as a sub‑component that “manages entity creation, updates, and deletion”. It probably offers higher‑level methods such as `createEntity(metadata)`, `updateEntity(id, changes)`, and `deleteEntity(id)`. These methods call through to the GraphDatabaseAdapter, ensuring that any graph mutation respects transactional rules enforced by the adapter.
 
-4. **EntityManagement Sub‑component** – This part of CodeKnowledgeGraph is responsible for CRUD operations on code entities (functions, classes, modules, etc.). It builds entity objects, assigns unique identifiers, and asks the PersistenceService to persist them. Because it shares the same adapter, any entity created here becomes instantly visible to OntologyClassification and other siblings.
-
-5. **OntologyClassification Sub‑component** – After an entity is created, this component determines its type (e.g., “utility function”, “API endpoint”) and category (e.g., “frontend”, “backend”). The classification data is also stored through the PersistenceService, again leveraging the shared adapter. The close coupling ensures that classification updates are persisted atomically with the entity creation.
-
-All of these pieces are orchestrated under the **KnowledgeManagement** parent component, which itself declares the dependency on the GraphDatabaseAdapter for “Graphology+LevelDB persistence”. The parent therefore provides the infrastructure configuration (e.g., database paths, export locations) that all children inherit.
+* **Interaction Flow** – When new source code is fed into the system (e.g., via a Git hook or batch pipeline), KnowledgeManagement triggers the CodeGraphAgent. The agent parses the code, builds a set of `CodeEntity` objects, and hands them to EntityPersistence, which persists them using the GraphDatabaseAdapter. Queries from other components (e.g., a semantic search UI) are routed back through the CodeGraphAgent, which translates the request into graph‑database queries via the adapter.
 
 ---
 
 ## Integration Points  
 
-- **Parent – KnowledgeManagement**: The parent component supplies the configuration for the GraphDatabaseAdapter (database location, export directory). It also defines the lifecycle of the adapter (initialisation, shutdown) that all children, including CodeKnowledgeGraph, share.
+* **Parent – KnowledgeManagement** – The parent component orchestrates the lifecycle of CodeKnowledgeGraph. It supplies the shared `GraphDatabaseAdapter` instance and may coordinate with other siblings (e.g., `OnlineLearning` for batch extraction or `ManualLearning` for curated edits) to keep the graph up‑to‑date.
 
-- **Siblings – ManualLearning, OnlineLearning, EntityManagement, OntologyClassification, PersistenceService, PersistenceAgent**: Each sibling interacts with the same adapter. For instance, ManualLearning writes manually entered entities directly via its own call to the PersistenceService, while OnlineLearning may feed batch‑extracted entities into the same service. The shared adapter guarantees that all these writes converge on a single, coherent graph.
+* **Siblings – ManualLearning, OnlineLearning, EntityPersistence, GraphDatabaseStorage, UKUTraceReporting** – All share the same persistence contract (`GraphDatabaseAdapter`). For example, `ManualLearning` can directly insert manually curated entities into the graph, while `OnlineLearning` can feed batch‑extracted entities that later become part of the CodeKnowledgeGraph. `EntityPersistence` is both a sibling and a child service used by CodeKnowledgeGraph, highlighting a reuse pattern.
 
-- **PersistenceAgent**: Acts as a bridge between higher‑level workflows (e.g., a scheduled job that needs to flush in‑memory changes) and the PersistenceService. Its `execute()` method is the hook used by orchestration scripts or task runners.
+* **External Consumers** – Any component that needs to perform “semantic code search” or retrieve code metadata will call the public interface of `CodeGraphAgent`. Because the agent abstracts away the underlying graph queries, consumers remain insulated from storage details.
 
-- **External Consumers**: The automatic JSON export produced by the adapter is the primary integration artifact. Downstream tools (visualisers, analytics pipelines, CI checks) can read the JSON file without needing to know about Graphology or LevelDB, achieving loose coupling.
-
-- **Configuration Interfaces**: Although not explicitly listed, the adapter likely exposes a configuration object (path to LevelDB store, JSON export location). All components that instantiate the adapter must agree on this contract, reinforcing a single source of configuration.
+* **Storage Layer** – The concrete storage implementation lives in `storage/graph-database-adapter.ts`, which in turn relies on Graphology (an in‑memory graph library) backed by LevelDB for durability. This adapter is the sole gateway to persistent state, making it a critical integration point for data integrity.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always go through PersistenceService** – Direct calls to the GraphDatabaseAdapter should be avoided outside of the service layer. This preserves the automatic JSON export behaviour and isolates future changes to the storage implementation.
-
-2. **Prefer EntityManagement for CRUD** – When creating, updating, or deleting code entities, use the EntityManagement API. It ensures identifiers are generated consistently and that any required classification hooks are invoked.
-
-3. **Classify via OntologyClassification** – After an entity exists, invoke the classification sub‑component to assign type and category. Do not manually write classification attributes into the graph; let the sub‑component handle persistence to keep the schema uniform.
-
-4. **Trigger persistence through PersistenceAgent** – For batch or scheduled persistence operations (e.g., after a large analysis run), call `execute()` on the PersistenceAgent rather than manually looping over service calls. This guarantees that any transactional semantics baked into the agent are honoured.
-
-5. **Do not modify the JSON export file** – The export is a read‑only artefact generated by the adapter. Any downstream process that needs to edit the graph should do so through the provided APIs, not by editing the JSON directly.
-
-6. **Configuration consistency** – Ensure that any component that creates an instance of the GraphDatabaseAdapter uses the same configuration object supplied by KnowledgeManagement. Divergent paths will break the automatic sync guarantee.
+1. **Always go through the CodeGraphAgent** when you need to add, update, or query code entities. Direct interaction with the GraphDatabaseAdapter should be limited to infrastructure code (e.g., migrations) to preserve encapsulation.  
+2. **Leverage EntityPersistence** for any CRUD operation on graph nodes. This ensures that all mutations pass through the same validation and consistency checks implemented in the adapter.  
+3. **Keep AST parsing isolated** to the agent; avoid re‑implementing parsing logic in sibling components. If you need a custom AST transformation, extend the agent rather than duplicating code.  
+4. **Coordinate with KnowledgeManagement** when initializing or tearing down the graph. The parent component may perform global transactions (e.g., bulk imports from OnlineLearning) that require the graph to be in a known state.  
+5. **Respect the shared GraphDatabaseAdapter** contract. If you need to change the underlying storage (e.g., switch from LevelDB to another backend), you only need to modify the adapter implementation; all dependent components, including CodeKnowledgeGraph, will continue to function unchanged.
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB behind a unified interface.  
-* **Service Façade** – `PersistenceService` offers domain‑specific persistence operations while hiding low‑level adapter calls.  
-* **Agent/Orchestrator** – `PersistenceAgent.execute()` coordinates persistence workflows.  
-* **Separation‑of‑Concerns / Composition** – CodeKnowledgeGraph composes `EntityManagement` and `OntologyClassification`, each handling a distinct responsibility.  
-* **Shared‑Infrastructure** – All sibling components rely on the same adapter instance, enabling consistent state and automatic JSON export sync.
+| Pattern | Where It Appears |
+|---------|-------------------|
+| **Adapter** | `GraphDatabaseAdapter` abstracts Graphology + LevelDB storage. |
+| **Agent / Facade** | `CodeGraphAgent` provides a unified interface for AST parsing and semantic search. |
+| **CRUD Service** | `EntityPersistence` encapsulates create/update/delete operations for graph entities. |
+| **Layered Architecture** | KnowledgeManagement (top layer) → CodeKnowledgeGraph (domain layer) → GraphDatabaseAdapter (infrastructure layer). |
+| **Dependency Injection** | Shared `GraphDatabaseAdapter` instance injected into all sibling components. |
 
-### 2. Design decisions and trade‑offs  
+### Design Decisions & Trade‑offs  
 
-* **Single source of persistence** (shared adapter) simplifies data consistency but creates a tight coupling: a failure in the adapter impacts every sibling.  
-* **Automatic JSON export** provides an easy integration point but may incur I/O overhead on every mutation; the trade‑off favours visibility over raw write performance.  
-* **Layered service + agent** adds indirection, improving testability and future extensibility, at the cost of a slightly deeper call stack.  
-* **Separate EntityManagement and OntologyClassification** enables independent evolution of entity CRUD logic and classification rules, but requires careful orchestration to keep them in sync (hence the need for the PersistenceAgent).
+* **Single Source of Persistence** – Using one adapter simplifies consistency but creates a single point of failure; any bug in the adapter propagates to all components.  
+* **Agent‑Centric Parsing** – Centralising AST work in `CodeGraphAgent` reduces duplication but can become a bottleneck if parsing large codebases concurrently; scaling may require sharding the agent’s workload.  
+* **Explicit EntityPersistence Layer** – Adds an extra indirection that improves testability and separation of concerns, at the cost of slightly more boilerplate for each CRUD operation.  
+* **Graph‑Database Choice (Graphology + LevelDB)** – Provides fast in‑memory graph operations with durable backing, but LevelDB’s single‑process model may limit horizontal scaling without additional sharding logic.
 
-### 3. System structure insights  
+### System Structure Insights  
 
-The system is organised as a **hierarchical component tree**: `KnowledgeManagement` (parent) → `CodeKnowledgeGraph` (sub‑component) → `EntityManagement` & `OntologyClassification` (children). All siblings at the same level share the `GraphDatabaseAdapter`, reinforcing a **common data‑layer** strategy. The persistence flow typically follows the path: *client code → PersistenceAgent → PersistenceService → GraphDatabaseAdapter → LevelDB* with an automatic side‑effect of writing a JSON snapshot.
+The system is organized around a **knowledge graph core** that is accessed uniformly by a suite of sibling services. All knowledge‑related persistence funnels through the same adapter, creating a tightly coupled but well‑defined data contract. The hierarchy (KnowledgeManagement → CodeKnowledgeGraph → CodeGraphAgent → EntityPersistence → GraphDatabaseAdapter) demonstrates clear responsibility boundaries: orchestration, domain logic, parsing/semantic services, CRUD, and storage.
 
-### 4. Scalability considerations  
+### Scalability Considerations  
 
-* **Horizontal scaling** is limited by the underlying LevelDB store, which is single‑process. If the graph grows substantially, a migration to a distributed graph store would be required; the adapter abstraction would ease that transition.  
-* **Write contention** could become a bottleneck because every mutation triggers a JSON export. Batching writes inside the PersistenceAgent or deferring export to a background worker could mitigate this.  
-* **Read‑heavy workloads** benefit from Graphology’s in‑memory representation; however, large graphs may exceed memory limits, suggesting the need for pagination or on‑demand loading strategies.
+* **Parsing Parallelism** – To handle large repositories, multiple instances of `CodeGraphAgent` could be spawned, each processing a subset of files and writing to the shared graph via the adapter. The adapter must therefore support concurrent writes (LevelDB provides atomic batch writes, but contention may need to be managed).  
+* **Graph Size** – As the number of code entities grows, in‑memory Graphology may consume significant RAM. Introducing pagination or on‑demand loading strategies in the adapter could mitigate memory pressure.  
+* **Read‑Heavy Workloads** – Semantic search queries are read‑only; caching frequently used query results at the agent level could improve latency without altering the underlying storage.
 
-### 5. Maintainability assessment  
+### Maintainability Assessment  
 
-The clear separation between storage (adapter), service façade, and domain sub‑components makes the codebase **moderately maintainable**. Adding new entity types or classification rules only touches `EntityManagement` or `OntologyClassification` without affecting the storage layer. The shared adapter introduces a **single point of failure**, so robust error handling and comprehensive tests around the adapter are essential. Because the JSON export is baked into the adapter, any change to export format must be coordinated across all consumers, which adds a coordination overhead but is mitigated by the export’s read‑only nature. Overall, the design’s modularity and explicit interfaces support incremental evolution, provided the underlying LevelDB constraints are kept in mind.
+The clear separation between **parsing (CodeGraphAgent)**, **persistence (EntityPersistence)**, and **storage (GraphDatabaseAdapter)** yields high modularity, making unit testing straightforward. Because all siblings share the same adapter, any change to persistence semantics is localized to a single file (`graph-database-adapter.ts`). However, this tight coupling also means that extensive changes to the storage backend require coordinated updates across many components. Documentation of the adapter’s contract and versioned interfaces will be essential to preserve maintainability as the system evolves.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence allows for automatic JSON export sync, ensuring data consistency across the system. This design decision enables efficient data storage and retrieval, leveraging the strengths of both Graphology and LevelDB. The automatic JSON export sync feature, in particular, facilitates seamless integration with other components, as seen in the execute() function of the PersistenceAgent (agents/persistence-agent.ts), which relies on the GraphDatabaseAdapter for entity persistence and ontology classification.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval in the Graphology + LevelDB knowledge graph. This adapter enables the component to handle data persistence, graph database storage, and query capabilities seamlessly. For instance, the PersistenceAgent (src/agents/persistence-agent.ts) leverages the GraphDatabaseAdapter to store and retrieve entities from the graph database, demonstrating a clear example of how the component's architecture supports data management. Furthermore, the CodeGraphAgent (src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter to construct the AST-based code knowledge graph, facilitating semantic code search capabilities.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing manually created entities and relationships.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline for extracting knowledge from git history, LSL sessions, and code analysis.
-- [EntityManagement](./EntityManagement.md) -- EntityManagement relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving entity data.
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving classification data.
-- [PersistenceService](./PersistenceService.md) -- PersistenceService relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter relies on the LevelDB database (storage/leveldb.ts) for storing and retrieving graph data.
-- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve manually curated entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history and LSL sessions.
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities.
+- [GraphDatabaseStorage](./GraphDatabaseStorage.md) -- GraphDatabaseStorage utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve graph data.
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
 
 
 ---
