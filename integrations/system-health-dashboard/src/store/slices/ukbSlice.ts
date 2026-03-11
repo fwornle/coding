@@ -946,257 +946,6 @@ const ukbSlice = createSlice({
       }
     },
 
-    // ========================================
-    // Event-Driven Workflow Actions (LEGACY - kept for backward compat)
-    // These are no longer dispatched by useWorkflowWebSocket (Phase 18)
-    // but kept temporarily for any direct callers
-    // ========================================
-
-    // Handle WORKFLOW_STARTED event
-    handleWorkflowStarted(state, action: PayloadAction<{
-      workflowId: string
-      workflowName: string
-      team: string
-      repositoryPath: string
-      startTime: string
-      batchPhaseSteps: string[]
-      preferences: {
-        singleStepMode: boolean
-        stepIntoSubsteps: boolean
-        mockLLM: boolean
-        mockLLMDelay: number
-      }
-    }>) {
-      const { workflowId, workflowName, startTime, batchPhaseSteps, preferences } = action.payload
-      state.execution = {
-        workflowId,
-        workflowName,
-        status: 'running',
-        currentStep: null,
-        currentSubstep: null,
-        stepStatuses: {},
-        substepStatuses: {},
-        batchProgress: null,
-        batchPhaseSteps,
-        startTime,
-        lastUpdate: startTime,
-      }
-      // Sync preferences from coordinator (only if not explicitly set by user)
-      if (!state.preferences.singleStepModeExplicit) {
-        state.preferences.singleStepMode = preferences.singleStepMode
-        state.preferences.stepIntoSubsteps = preferences.stepIntoSubsteps
-      }
-      if (!state.preferences.mockLLMExplicit) {
-        state.preferences.mockLLM = preferences.mockLLM
-        state.preferences.mockLLMDelay = preferences.mockLLMDelay
-      }
-    },
-
-    // Handle STEP_STARTED event
-    handleStepStarted(state, action: PayloadAction<{
-      workflowId: string
-      stepName: string
-      agent: string
-      timestamp: string
-    }>) {
-      const { stepName, agent, timestamp } = action.payload
-      state.execution.currentStep = stepName
-      state.execution.currentSubstep = null
-      state.execution.stepStatuses[stepName] = {
-        name: stepName,
-        status: 'running',
-        agent,
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle STEP_COMPLETED event
-    handleStepCompleted(state, action: PayloadAction<{
-      workflowId: string
-      stepName: string
-      agent: string
-      duration: number
-      tokensUsed?: number
-      llmProvider?: string
-      llmCalls?: number
-      outputs?: Record<string, unknown>
-      timestamp: string
-    }>) {
-      const { stepName, agent, duration, tokensUsed, llmProvider, llmCalls, outputs, timestamp } = action.payload
-      state.execution.stepStatuses[stepName] = {
-        name: stepName,
-        status: 'completed',
-        agent,
-        duration,
-        tokensUsed,
-        llmProvider,
-        llmCalls,
-        outputs,
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle STEP_FAILED event
-    handleStepFailed(state, action: PayloadAction<{
-      workflowId: string
-      stepName: string
-      agent: string
-      error: string
-      duration: number
-      timestamp: string
-    }>) {
-      const { stepName, agent, error, duration, timestamp } = action.payload
-      state.execution.stepStatuses[stepName] = {
-        name: stepName,
-        status: 'failed',
-        agent,
-        duration,
-        error,
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle SUBSTEP_STARTED event
-    handleSubstepStarted(state, action: PayloadAction<{
-      workflowId: string
-      stepName: string
-      substepId: string
-      timestamp: string
-    }>) {
-      const { stepName, substepId, timestamp } = action.payload
-      state.execution.currentSubstep = substepId
-      if (!state.execution.substepStatuses[stepName]) {
-        state.execution.substepStatuses[stepName] = {}
-      }
-      state.execution.substepStatuses[stepName][substepId] = {
-        substepId,
-        status: 'running',
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle SUBSTEP_COMPLETED event
-    handleSubstepCompleted(state, action: PayloadAction<{
-      workflowId: string
-      stepName: string
-      substepId: string
-      duration: number
-      tokensUsed?: number
-      llmProvider?: string
-      timestamp: string
-    }>) {
-      const { stepName, substepId, duration, tokensUsed, llmProvider, timestamp } = action.payload
-      if (!state.execution.substepStatuses[stepName]) {
-        state.execution.substepStatuses[stepName] = {}
-      }
-      state.execution.substepStatuses[stepName][substepId] = {
-        substepId,
-        status: 'completed',
-        duration,
-        tokensUsed,
-        llmProvider,
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle BATCH_STARTED event
-    handleBatchStarted(state, action: PayloadAction<{
-      workflowId: string
-      batchId: string
-      batchNumber: number
-      totalBatches: number
-      timestamp: string
-    }>) {
-      const { batchId, batchNumber, totalBatches, timestamp } = action.payload
-      state.execution.batchProgress = {
-        currentBatch: batchNumber,
-        totalBatches,
-        batchId,
-      }
-      // Reset batch-phase step statuses for new batch
-      for (const stepName of state.execution.batchPhaseSteps) {
-        if (state.execution.stepStatuses[stepName]) {
-          state.execution.stepStatuses[stepName] = {
-            ...state.execution.stepStatuses[stepName],
-            status: 'pending',
-          }
-        }
-        // Clear substep statuses for batch-phase steps
-        delete state.execution.substepStatuses[stepName]
-      }
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle BATCH_COMPLETED event
-    handleBatchCompleted(state, action: PayloadAction<{
-      workflowId: string
-      batchId: string
-      batchNumber: number
-      timestamp: string
-    }>) {
-      const { timestamp } = action.payload
-      state.execution.lastUpdate = timestamp
-    },
-
-    // Handle WORKFLOW_PAUSED event
-    handleWorkflowPaused(state, action: PayloadAction<{
-      workflowId: string
-      pausedAtStep: string
-      pausedAtSubstep?: string
-      reason: 'single_step' | 'manual' | 'error'
-      timestamp: string
-    }>) {
-      const { pausedAtStep, pausedAtSubstep, timestamp } = action.payload
-      state.execution.status = 'paused'
-      state.execution.currentStep = pausedAtStep
-      if (pausedAtSubstep) {
-        state.execution.currentSubstep = pausedAtSubstep
-      }
-      state.execution.lastUpdate = timestamp
-      // Also sync to legacy state for backward compatibility
-      state.stepPaused = true
-      state.pausedAtStep = pausedAtStep
-    },
-
-    // Handle WORKFLOW_RESUMED event
-    handleWorkflowResumed(state, action: PayloadAction<{
-      workflowId: string
-      resumedAtStep: string
-      timestamp: string
-    }>) {
-      const { timestamp } = action.payload
-      state.execution.status = 'running'
-      state.execution.lastUpdate = timestamp
-      // Also sync to legacy state for backward compatibility
-      state.stepPaused = false
-    },
-
-    // Handle WORKFLOW_COMPLETED event
-    handleWorkflowCompleted(state, action: PayloadAction<{
-      workflowId: string
-      duration: number
-      timestamp: string
-    }>) {
-      const { timestamp } = action.payload
-      state.execution.status = 'completed'
-      state.execution.lastUpdate = timestamp
-      // Reset explicit flags when workflow ends
-      state.preferences.singleStepModeExplicit = false
-      state.preferences.mockLLMExplicit = false
-    },
-
-    // Handle WORKFLOW_FAILED event
-    handleWorkflowFailed(state, action: PayloadAction<{
-      workflowId: string
-      error: string
-      failedAtStep?: string
-      timestamp: string
-    }>) {
-      const { timestamp } = action.payload
-      state.execution.status = 'failed'
-      state.execution.lastUpdate = timestamp
-    },
-
     // Handle PREFERENCES_UPDATED event (confirmation from coordinator)
     handlePreferencesUpdated(state, action: PayloadAction<{
       workflowId: string
@@ -1329,19 +1078,7 @@ export const {
   setSelectedSubStep,
   // STATE_SNAPSHOT action (Phase 18)
   setWorkflowState,
-  // Event-driven workflow actions (LEGACY)
-  handleWorkflowStarted,
-  handleStepStarted,
-  handleStepCompleted,
-  handleStepFailed,
-  handleSubstepStarted,
-  handleSubstepCompleted,
-  handleBatchStarted,
-  handleBatchCompleted,
-  handleWorkflowPaused,
-  handleWorkflowResumed,
-  handleWorkflowCompleted,
-  handleWorkflowFailed,
+  // Preferences sync (still used for LLM mode updates)
   handlePreferencesUpdated,
   resetExecutionState,
   setWorkflowPreferences,
@@ -1354,6 +1091,17 @@ export const {
 
 // Selectors
 const selectUkbState = (state: { ukb: UKBState }) => state.ukb
+
+// Phase 18: Typed WorkflowState selectors
+export const selectWorkflowState = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.workflowState
+)
+
+export const selectLastTransition = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.lastTransition
+)
 
 // Selector to get stepMappings from workflowConfig slice with fallback
 const selectStepMappings = (state: { workflowConfig?: { stepMappings: Record<string, string> } }) =>
@@ -1469,7 +1217,27 @@ export const selectHistoricalProcessInfo = createSelector(
   }
 )
 
-// Selector to get node status for any agent - single source of truth
+// Build StepDefinition[] from known workflow agents and step mappings
+// Used by deriveStepStatuses to compute step statuses from WorkflowState
+function buildStepDefinitions(stepMappings: Record<string, string>): StepDefinition[] {
+  // Build reverse map: agentId -> stepName(s)
+  // WORKFLOW_AGENTS are the canonical agent IDs used in the UI
+  return WORKFLOW_AGENTS.map(agentId => ({
+    name: agentId,
+    description: agentId,
+  }))
+}
+
+// Build reverse step mapping: agentId -> stepName for looking up in WorkflowState
+function buildAgentToStepName(stepMappings: Record<string, string>): Record<string, string> {
+  const reverse: Record<string, string> = {}
+  for (const [stepName, agentId] of Object.entries(stepMappings)) {
+    reverse[agentId] = stepName
+  }
+  return reverse
+}
+
+// Selector to get node status for any agent - uses deriveStepStatuses for live workflows
 export const selectNodeStatus = createSelector(
   [
     selectUkbState,
@@ -1478,60 +1246,78 @@ export const selectNodeStatus = createSelector(
     (_: any, __: string, isHistorical: boolean) => isHistorical
   ],
   (ukb, stepMappings, agentId, isHistorical): { status: StepStatus; stepInfo: StepInfo | null } => {
-    const process = isHistorical
-      ? (ukb.historicalWorkflowDetail ? {
-          completedSteps: ukb.historicalWorkflowDetail.completedSteps,
-          currentStep: null,
-          steps: ukb.historicalWorkflowDetail.steps.map(s => ({
-            name: s.agent || s.name,
-            status: s.status === 'success' ? 'completed' : s.status as StepStatus,
-            llmProvider: (s as any).llmProvider,
-            tokensUsed: (s as any).tokensUsed,
-            llmCalls: (s as any).llmCalls,
-            // Pass through LLM mode tracking
-            llmIntendedMode: (s as any).llmIntendedMode,
-            llmActualMode: (s as any).llmActualMode,
-            llmModeFallback: (s as any).llmModeFallback,
-            error: s.errors?.join('\n'),
-            outputs: s.outputs,
-          }))
-        } : null)
-      : ukb.processes[ukb.selectedProcessIndex]
+    // For historical workflows, use process.steps data directly (no WorkflowState)
+    if (isHistorical) {
+      const detail = ukb.historicalWorkflowDetail
+      if (!detail) return { status: 'pending', stepInfo: null }
 
-    if (!process) {
+      const stepInfo = detail.steps
+        .map(s => ({
+          name: s.agent || s.name,
+          status: (s.status === 'success' ? 'completed' : s.status) as StepStatus,
+          llmProvider: (s as any).llmProvider,
+          tokensUsed: (s as any).tokensUsed,
+          llmCalls: (s as any).llmCalls,
+          llmIntendedMode: (s as any).llmIntendedMode,
+          llmActualMode: (s as any).llmActualMode,
+          llmModeFallback: (s as any).llmModeFallback,
+          error: s.errors?.join('\n'),
+          outputs: s.outputs,
+        }))
+        .find(s => (stepMappings[s.name] || s.name) === agentId || s.name === agentId) as StepInfo | undefined
+
+      if (stepInfo?.status) {
+        return { status: stepInfo.status, stepInfo }
+      }
       return { status: 'pending', stepInfo: null }
     }
 
-    // Find step info for this agent
+    // For live workflows: use deriveStepStatuses if WorkflowState is available
+    if (ukb.workflowState) {
+      // Build StepDefinitions using step names from stepMappings (reverse mapped to agent IDs)
+      const agentToStep = buildAgentToStepName(stepMappings)
+      // The step names in WorkflowState.progress use backend step names (keys of stepMappings)
+      // deriveStepStatuses needs StepDefinitions with those backend step names
+      const backendStepDefs: StepDefinition[] = Object.keys(stepMappings).map(stepName => ({
+        name: stepName,
+        description: stepName,
+      }))
+
+      const derivedStatuses = deriveStepStatuses(ukb.workflowState, backendStepDefs)
+
+      // Find the backend step name for this agent ID
+      const backendStepName = agentToStep[agentId] || agentId
+      const derivedStatus = derivedStatuses.get(backendStepName) || 'pending'
+
+      // Find step info from process.steps if available
+      const process = ukb.processes[ukb.selectedProcessIndex]
+      const stepInfo = process?.steps?.find(
+        s => (stepMappings[s.name] || s.name) === agentId || s.name === agentId
+      ) as StepInfo | undefined
+
+      return {
+        status: derivedStatus as StepStatus,
+        stepInfo: stepInfo ? { ...stepInfo, status: derivedStatus as StepStatus } : null,
+      }
+    }
+
+    // No WorkflowState yet: fall back to process.steps data
+    const process = ukb.processes[ukb.selectedProcessIndex]
+    if (!process) return { status: 'pending', stepInfo: null }
+
     const stepInfo = process.steps?.find(
       s => (stepMappings[s.name] || s.name) === agentId || s.name === agentId
     ) as StepInfo | undefined
 
     if (stepInfo?.status) {
-      return { status: stepInfo.status, stepInfo: stepInfo as StepInfo }
+      return { status: stepInfo.status, stepInfo }
     }
 
-    // Fallback: infer from completedSteps
-    const agentIndex = WORKFLOW_AGENTS.indexOf(agentId as any)
-    if (agentIndex === -1) {
-      return { status: 'pending', stepInfo: null }
-    }
-
-    if (agentIndex < process.completedSteps) {
-      return { status: 'completed', stepInfo: stepInfo as StepInfo || null }
-    }
-    if (agentIndex === process.completedSteps && process.currentStep) {
-      const currentAgentId = stepMappings[process.currentStep] || process.currentStep
-      if (currentAgentId === agentId) {
-        return { status: 'running', stepInfo: stepInfo as StepInfo || null }
-      }
-    }
-
-    return { status: 'pending', stepInfo: stepInfo as StepInfo || null }
+    return { status: 'pending', stepInfo: null }
   }
 )
 
-// Selector to build step status map for graph rendering
+// Selector to build step status map for graph rendering - uses deriveStepStatuses for live workflows
 export const selectStepStatusMap = createSelector(
   [
     selectUkbState,
@@ -1539,31 +1325,63 @@ export const selectStepStatusMap = createSelector(
     (_: any, isHistorical: boolean) => isHistorical
   ],
   (ukb, stepMappings, isHistorical): Record<string, StepInfo> => {
-    const process = isHistorical
-      ? (ukb.historicalWorkflowDetail ? {
-          completedSteps: ukb.historicalWorkflowDetail.completedSteps,
-          currentStep: null,
-          steps: ukb.historicalWorkflowDetail.steps.map(s => ({
-            name: s.agent || s.name,
-            status: s.status === 'success' ? 'completed' : s.status as StepStatus,
-            duration: undefined,
-            llmProvider: (s as any).llmProvider,
-            tokensUsed: (s as any).tokensUsed,
-            llmCalls: (s as any).llmCalls,
-            // Pass through LLM mode tracking
-            llmIntendedMode: (s as any).llmIntendedMode,
-            llmActualMode: (s as any).llmActualMode,
-            llmModeFallback: (s as any).llmModeFallback,
-            error: s.errors?.join('\n'),
-            outputs: s.outputs,
-          }))
-        } : null)
-      : ukb.processes[ukb.selectedProcessIndex]
+    // For historical workflows, use process.steps data directly
+    if (isHistorical) {
+      const detail = ukb.historicalWorkflowDetail
+      if (!detail) return {}
 
+      const map: Record<string, StepInfo> = {}
+      for (const s of detail.steps) {
+        const agentId = stepMappings[s.agent || s.name] || s.agent || s.name
+        map[agentId] = {
+          name: s.agent || s.name,
+          status: (s.status === 'success' ? 'completed' : s.status) as StepStatus,
+          llmProvider: (s as any).llmProvider,
+          tokensUsed: (s as any).tokensUsed,
+          llmCalls: (s as any).llmCalls,
+          error: s.errors?.join('\n'),
+          outputs: s.outputs,
+        }
+      }
+      return map
+    }
+
+    // For live workflows: use deriveStepStatuses if WorkflowState is available
+    if (ukb.workflowState) {
+      const backendStepDefs: StepDefinition[] = Object.keys(stepMappings).map(stepName => ({
+        name: stepName,
+        description: stepName,
+      }))
+
+      const derivedStatuses = deriveStepStatuses(ukb.workflowState, backendStepDefs)
+
+      const map: Record<string, StepInfo> = {}
+      // Build map keyed by agent ID with derived statuses
+      for (const [backendStepName, status] of derivedStatuses) {
+        const agentId = stepMappings[backendStepName] || backendStepName
+        map[agentId] = { name: backendStepName, status: status as StepStatus }
+      }
+
+      // Merge any additional step info from process.steps (duration, tokens, etc.)
+      const process = ukb.processes[ukb.selectedProcessIndex]
+      if (process?.steps) {
+        for (const step of process.steps) {
+          const agentId = stepMappings[step.name] || step.name
+          if (map[agentId]) {
+            // Preserve derived status but add step details
+            map[agentId] = { ...step, status: map[agentId].status }
+          }
+        }
+      }
+
+      return map
+    }
+
+    // No WorkflowState yet: fall back to process.steps data
+    const process = ukb.processes[ukb.selectedProcessIndex]
     if (!process) return {}
 
     const map: Record<string, StepInfo> = {}
-
     if (process.steps) {
       for (const step of process.steps) {
         const agentId = stepMappings[step.name] || step.name
@@ -1571,16 +1389,6 @@ export const selectStepStatusMap = createSelector(
             (step.status === 'completed' && map[agentId].status !== 'running')) {
           map[agentId] = { ...step }
         }
-      }
-    }
-
-    // Infer current step from process.currentStep
-    if (process.currentStep) {
-      const currentAgentId = stepMappings[process.currentStep] || process.currentStep
-      if (map[currentAgentId]) {
-        map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
-      } else {
-        map[currentAgentId] = { name: process.currentStep, status: 'running' }
       }
     }
 
