@@ -124,6 +124,9 @@ class SystemHealthAPIServer {
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
 
+        // Migration divergence detection endpoint
+        this.app.get('/api/ukb/migration-divergences', this.handleGetMigrationDivergences.bind(this));
+
         // SSE endpoint for real-time workflow state updates (LEGACY - kept for backward compatibility)
         this.app.get('/api/ukb/stream', this.handleUKBStream.bind(this));
 
@@ -1678,6 +1681,33 @@ class SystemHealthAPIServer {
         }
 
         return projectPaths;
+    }
+
+    /**
+     * Get migration divergence data from comparison log.
+     * Returns the most recent comparison entry, or empty divergences if no log exists.
+     */
+    handleGetMigrationDivergences(req, res) {
+        try {
+            const logPath = join(codingRoot, '.data', 'comparison-log.json');
+            if (!existsSync(logPath)) {
+                return res.json({ divergences: [] });
+            }
+            const logData = JSON.parse(readFileSync(logPath, 'utf8'));
+            if (!Array.isArray(logData) || logData.length === 0) {
+                return res.json({ divergences: [] });
+            }
+            // Return the last (most recent) entry
+            const latest = logData[logData.length - 1];
+            return res.json({
+                divergences: latest.divergences || [],
+                timestamp: latest.timestamp,
+                legacyPath: latest.legacyPath,
+                newPath: latest.newPath,
+            });
+        } catch (error) {
+            return res.json({ divergences: [], error: error.message });
+        }
     }
 
     /**
