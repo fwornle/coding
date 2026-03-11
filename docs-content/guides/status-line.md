@@ -112,6 +112,15 @@ The statusline-health-monitor writes detailed health to `.logs/statusline-health
 | `Browser` | 3847 | Browser Automation | SSE server for parallel sessions |
 | `Dash` | 3032/3033 | System Health Dashboard | UI and API for health monitoring |
 
+### Transcript Discovery Auto-Heal
+
+The statusline-health-monitor detects **broken transcript monitors** — monitors running but unable to find their project's Claude JSONL transcript (e.g., path encoding mismatch).
+
+- **Detection**: Monitor running >2 min with `transcriptPath: null`
+- **Remediation**: Kills broken monitor; GPS auto-restarts it
+- **Display**: Session shows `🟡` warning instead of silently disappearing
+- **Path encoding**: Claude Code replaces both `/` and `_` with `-` (e.g., `/_work/` → `--work-`)
+
 ---
 
 ## API Quota Monitoring
