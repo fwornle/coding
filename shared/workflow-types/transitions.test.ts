@@ -278,3 +278,85 @@ describe('transition() invalid transitions', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// substep-update event tests
+// ---------------------------------------------------------------------------
+
+describe('transition() substep-update event', () => {
+  it('dispatch substep-update on running state returns state with status === running', () => {
+    const running = makeRunningState();
+    const event: WorkflowTransitionEvent = {
+      type: 'substep-update',
+      substepId: 'wave1_analyze',
+    };
+    const result = transition(running, event);
+    assert.equal(result.status, 'running');
+  });
+
+  it('dispatch substep-update sets progress.currentSubstepId to supplied substepId', () => {
+    const running = makeRunningState();
+    const event: WorkflowTransitionEvent = {
+      type: 'substep-update',
+      substepId: 'wave2_classify',
+    };
+    const result = transition(running, event);
+    assert.equal(result.status, 'running');
+    if (result.status === 'running') {
+      assert.equal(result.progress.currentSubstepId, 'wave2_classify');
+    }
+  });
+
+  it('dispatch substep-update with wave/totalWaves sets progress.currentWave and totalWaves', () => {
+    const running = makeRunningState();
+    const event: WorkflowTransitionEvent = {
+      type: 'substep-update',
+      substepId: 'wave2_analyze',
+      wave: 2,
+      totalWaves: 4,
+    };
+    const result = transition(running, event);
+    assert.equal(result.status, 'running');
+    if (result.status === 'running') {
+      assert.equal(result.progress.currentWave, 2);
+      assert.equal(result.progress.totalWaves, 4);
+    }
+  });
+
+  it('dispatch substep-update updates progress.lastUpdate timestamp', () => {
+    const running = makeRunningState();
+    const beforeUpdate = running.status === 'running' ? running.progress.lastUpdate : '';
+    const event: WorkflowTransitionEvent = {
+      type: 'substep-update',
+      substepId: 'wave1_persist',
+    };
+    const result = transition(running, event);
+    assert.equal(result.status, 'running');
+    if (result.status === 'running') {
+      assert.notEqual(result.progress.lastUpdate, beforeUpdate);
+    }
+  });
+
+  it('dispatch substep-update on idle state throws InvalidTransitionError', () => {
+    assert.throws(
+      () => transition(idleState, { type: 'substep-update', substepId: 'x' } as WorkflowTransitionEvent),
+      (err: unknown) => {
+        assert.ok(err instanceof InvalidTransitionError);
+        assert.equal(err.fromStatus, 'idle');
+        assert.equal(err.eventType, 'substep-update');
+        return true;
+      }
+    );
+  });
+
+  it('dispatch substep-update on completed state throws InvalidTransitionError', () => {
+    const completed = makeCompletedState();
+    assert.throws(
+      () => transition(completed, { type: 'substep-update', substepId: 'x' } as WorkflowTransitionEvent),
+      (err: unknown) => {
+        assert.ok(err instanceof InvalidTransitionError);
+        return true;
+      }
+    );
+  });
+});
