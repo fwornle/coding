@@ -692,7 +692,7 @@ class GlobalProcessSupervisor {
     // Docker mode transition signal handlers
     process.on('SIGUSR2', () => {
       this.monitoringPaused = true;
-      this.log('⏸️  Supervision PAUSED (Docker mode transition in progress)', 'WARN');
+      this.log('🔇  Supervision PAUSED (Docker mode transition in progress)', 'WARN');
     });
 
     process.on('SIGUSR1', () => {

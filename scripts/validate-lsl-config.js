@@ -817,7 +817,7 @@ class LSLConfigValidator {
   }
 
   async validateSecurityCompliance() {
-    console.log('🛡️  Analyzing security compliance...');
+    console.log('🔒  Analyzing security compliance...');
 
     const complianceChecks = [
       { name: 'Data Redaction', check: () => this.checkDataRedactionCompliance() },

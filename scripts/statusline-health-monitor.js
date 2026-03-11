@@ -1944,7 +1944,7 @@ class StatusLineHealthMonitor {
 
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
-      this.log('⏸️  Auto-healing SKIPPED for constraint-monitor - Docker mode transition in progress', 'INFO');
+      this.log('🔇  Auto-healing SKIPPED for constraint-monitor - Docker mode transition in progress', 'INFO');
       return false;
     }
 
@@ -2129,7 +2129,7 @@ class StatusLineHealthMonitor {
 
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
-      this.log('⏸️  Auto-healing SKIPPED for VKB server - Docker mode transition in progress', 'INFO');
+      this.log('🔇  Auto-healing SKIPPED for VKB server - Docker mode transition in progress', 'INFO');
       return false;
     }
 
@@ -2812,7 +2812,7 @@ class StatusLineHealthMonitor {
       } catch {
         this.transitionData = { fromMode: 'unknown', toMode: 'unknown' };
       }
-      this.log('⏸️  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
+      this.log('🔇  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
       // Update status to show transition
       await this.updateStatusLine();
     });

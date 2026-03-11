@@ -298,7 +298,7 @@ The Claude Code status line displays health status emojis (✅/⚠️/❌) for q
 
 **Status Line Indicators:**
 - 🏥 95% - Overall system health
-- 🛡️ 94% - Constraint compliance
+- 🔒 94% - Constraint compliance
 - ⚙️ IMP - Trajectory state (implementing)
 - [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] - API quota (Groq 95%, Anthropic, OpenAI, X.AI 85%)
 - 📋🟠2130-2230(3min) - LSL window
