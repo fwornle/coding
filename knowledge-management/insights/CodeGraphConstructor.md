@@ -2,114 +2,130 @@
 
 **Type:** SubComponent
 
-The CodeGraphConstructor supports the lazy LLM initialization feature, as seen in the SemanticAnalysisAgent class, integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
+The code graph constructor relies on the semantic-analysis-agent.ts to perform comprehensive semantic analysis of code files and git history.
 
 ## What It Is  
 
-The **CodeGraphConstructor** lives in the **SemanticAnalysis** sub‑tree of the MCP server and is implemented in the file  
-`integrations/mcp-server-semantic-analysis/src/agents/code-graph-constructor.ts`. It is a dedicated **agent** whose sole responsibility is to turn raw source‑code text into a **knowledge graph** that downstream agents can query. The class achieves this by invoking a **Tree‑sitter**‑based AST parser (the **AstParser** child component) and then feeding the resulting syntax tree into a **GraphBuilder** component, also owned by the constructor.  
+The **CodeGraphConstructor** is a TypeScript sub‑component that lives in  
+`integrations/mcp-server-semantic-analysis/src/agents/code-graph-constructor.ts`.  
+Its sole responsibility is to translate a set of source files (and their associated Git history) into a **code knowledge graph**. The graph is built by parsing the Abstract Syntax Tree (AST) of each file, enriching the extracted entities with semantic information supplied by the **SemanticAnalysisAgent** (`semantic-analysis-agent.ts`), and finally persisting the resulting nodes and relationships into a **Memgraph** database. The public entry point is the `buildCodeGraph` function, which orchestrates the end‑to‑end construction pipeline.
 
-Because the constructor implements the same abstract contract that all agents expose (see `BaseAgent` in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`), it can be instantiated and orchestrated by the same coordinator that drives the rest of the **SemanticAnalysis** pipeline. The graph it produces is subsequently consumed by the **PatternExtractor** (which pulls recurring code patterns), the **SemanticAnalyzer** (which performs deeper semantic reasoning), and the **SemanticAnalysisAgent** (which also benefits from the lazy LLM‑initialisation capability). In short, CodeGraphConstructor is the canonical bridge between raw code and the graph‑based reasoning layer of the system.  
+CodeGraphConstructor sits directly under the **SemanticAnalysis** parent component – a multi‑agent system that coordinates Git history processing, ontology classification, and insight generation. As a sibling to agents such as **Pipeline**, **Ontology**, **InsightGenerationAgent**, **PersistenceAgent**, and **GitHistoryAgent**, it shares the common infrastructure provided by the abstract `BaseAgent` class (defined in `base-agent.ts`) and the overall batch‑processing coordination logic located in `agents/coordinator.ts`.
 
 ---
 
 ## Architecture and Design  
 
-The surrounding **SemanticAnalysis** component follows an **agent‑oriented modular architecture**. Each agent inherits from the abstract `BaseAgent`, guaranteeing a **standardised interface** for configuration, execution, and result handling. CodeGraphConstructor adheres to this contract, making it interchangeable with other agents such as `OntologyClassificationAgent` or `ContentValidator`. This design encourages **loose coupling**: the constructor does not need to know which downstream agent will consume its graph; it merely publishes the graph via the base‑class API.  
+The observed implementation follows a **modular, agent‑centric architecture**. Each major capability (ontology classification, semantic analysis, code‑graph construction, persistence, etc.) is encapsulated in its own agent file that extends `BaseAgent`. This design encourages **separation of concerns**: the CodeGraphConstructor focuses exclusively on graph building, while the SemanticAnalysisAgent supplies the deeper semantic context required for accurate node annotation.
 
-Internally, the constructor follows a **two‑stage pipeline pattern**:  
+Two concrete design patterns emerge:
 
-1. **Parsing stage** – delegated to the **AstParser** child. The parser leverages **Tree‑sitter**, a fast incremental parser that yields a concrete syntax tree (CST) for a wide range of languages. By encapsulating Tree‑sitter behind AstParser, the system isolates the third‑party library and makes it easy to swap or extend parsing capabilities.  
+1. **Facade / Builder Pattern** – `CodeGraphConstructor` acts as a façade that hides the complexity of AST parsing, semantic enrichment, and database interaction behind the single `buildCodeGraph` method. Internally it builds the graph step‑by‑step, effectively implementing a builder that assembles a complex object (the Memgraph representation) from multiple data sources.
 
-2. **Graph‑building stage** – handled by the **GraphBuilder** child. This component walks the AST, extracts relevant entities (functions, classes, imports, etc.), and creates nodes and edges in a **knowledge graph** that reflects code structure and relationships.  
+2. **Repository / Persistence Pattern** – Persistence is delegated to the **PersistenceAgent** (`persistence-agent.ts`). By abstracting storage behind a dedicated agent, the constructor does not need to know the specifics of Memgraph’s query language, making the storage layer replaceable or mockable for testing.
 
-The constructor’s interaction with other agents demonstrates a **consumer‑producer relationship**: PatternExtractor calls `constructGraph()` to obtain a graph for pattern mining, while SemanticAnalyzer invokes the same method to enrich its semantic model. The **SemanticAnalysisAgent** further showcases **lazy LLM initialization** – the graph is built first, and the large language model is only spun up when the agent needs to run inference on that graph, reducing unnecessary resource consumption.  
+Interaction flow (as inferred from the observations):
+
+1. **SemanticAnalysisAgent** parses source files and Git history, producing a rich semantic model.  
+2. **CodeGraphConstructor** consumes this model, walks the AST, and creates graph entities.  
+3. The constructed graph is handed off to **PersistenceAgent**, which writes the data to Memgraph.  
+
+All agents are coordinated by the **Pipeline** (via `agents/coordinator.ts`), which schedules batch execution and ensures that dependencies (e.g., SemanticAnalysisAgent → CodeGraphConstructor → PersistenceAgent) are respected.
 
 ---
 
 ## Implementation Details  
 
-The **CodeGraphConstructor** class is defined in `code-graph-constructor.ts`. It extends `BaseAgent`, inheriting lifecycle hooks such as `initialize()`, `execute()`, and `shutdown()`. In its `execute()` method the constructor typically performs the following steps:  
+### Core Class & Function  
+- **File:** `integrations/mcp-server-semantic-analysis/src/agents/code-graph-constructor.ts`  
+- **Class/Export:** The module exports a class (or a set of functions) that implements `buildCodeGraph`. This function receives the semantic payload from `semantic-analysis-agent.ts` and iterates over each file’s AST nodes.
 
-1. **Load source files** – paths are supplied via the agent’s configuration payload (consistent with the BaseAgent contract).  
-2. **AST generation** – an instance of `AstParser` is created. The parser internally creates a Tree‑sitter `Parser` object, selects the appropriate language grammar (e.g., JavaScript, Python), and calls `parser.parse(sourceCode)`. The resulting tree is stored in a typed wrapper that the GraphBuilder can traverse.  
-3. **Graph construction** – a `GraphBuilder` instance receives the AST wrapper. Using a visitor pattern, the builder walks nodes, maps language constructs to graph node types (e.g., `FunctionDeclaration → FunctionNode`), and establishes edges for relationships like “calls”, “inherits”, or “imports”. The builder returns a graph object that conforms to the system‑wide knowledge‑graph interface used by the **KnowledgeManagement** component.  
-4. **Result publication** – the constructed graph is attached to the agent’s output payload, making it available to downstream agents.  
+### AST Parsing  
+The constructor leverages the TypeScript compiler API (or a similar parser) to generate an AST for every source file. For each node (e.g., classes, methods, imports), it extracts identifiers, type information, and hierarchical relationships. The parsing logic is encapsulated within helper methods (e.g., `parseFile`, `extractNodeDetails`), keeping the main `buildCodeGraph` flow readable.
 
-The class also respects the **lazy LLM initialization** pattern observed in `SemanticAnalysisAgent`. The constructor does **not** instantiate any LLM client; instead, it exposes a method `getGraph()` that downstream agents can call after the graph is ready, at which point the LLM service (from the sibling `LLMService` component) may be lazily started.  
+### Semantic Enrichment  
+Before persisting, the raw AST data is enriched using the output of **SemanticAnalysisAgent**. This includes:
+- **Git metadata** (author, commit timestamps) attached to nodes to enable change‑history queries.  
+- **Ontology tags** supplied by the Ontology subsystem, allowing later agents (e.g., InsightGenerationAgent) to reason about domain‑specific concepts.
+
+### Memgraph Interaction  
+The constructor does not embed raw Cypher queries; instead, it calls the **PersistenceAgent** (`persistence-agent.ts`) which wraps Memgraph client operations. The typical sequence is:
+```ts
+const graphElements = this.buildGraphElements(astData, semanticData);
+await persistenceAgent.persistGraphElements(graphElements);
+```
+This indirection isolates the constructor from the specifics of the graph database driver, facilitating future swaps (e.g., to Neo4j) without touching the construction logic.
+
+### Error Handling & Idempotency  
+While not explicitly detailed in the observations, the surrounding agent framework (BaseAgent) normally provides a standardized `execute` method with built‑in logging and retry semantics. By conforming to this contract, `CodeGraphConstructor` inherits consistent error handling and can be safely re‑executed in batch pipelines.
 
 ---
 
 ## Integration Points  
 
-- **BaseAgent (abstract)** – CodeGraphConstructor inherits from `BaseAgent` (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`), guaranteeing a uniform configuration schema and lifecycle management across the whole **SemanticAnalysis** suite.  
-- **PatternExtractor** – Calls the constructor to retrieve a graph for pattern mining; this creates a **producer‑consumer** link where the graph is the shared artifact.  
-- **SemanticAnalyzer** – Uses the graph as part of its broader semantic reasoning pipeline (`integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.ts`). The analyzer may augment the graph with inferred relationships before persisting it in the **KnowledgeManagement** store.  
-- **SemanticAnalysisAgent** – Leverages the lazy LLM init feature; after the graph is built, the agent may request LLM‑based annotations (e.g., summarisation) without having started the LLM client earlier.  
-- **KnowledgeManagement** – Holds the final knowledge graph; CodeGraphConstructor’s output is stored here, making the graph searchable by other components such as the **Insights** sibling.  
-- **Sibling agents** – The same coordinator that runs the `Pipeline` agent also schedules CodeGraphConstructor, ensuring that the graph is always built before any agent that depends on it.  
+1. **SemanticAnalysisAgent (`semantic-analysis-agent.ts`)** – Supplies the semantic model (code entities, Git history) that the constructor enriches. The contract is likely a TypeScript interface or DTO that includes file paths, AST snapshots, and commit metadata.
 
-All interactions are mediated through the **BaseAgent** contract and the shared knowledge‑graph interface, keeping dependencies explicit and bounded.  
+2. **PersistenceAgent (`persistence-agent.ts`)** – Receives the final graph payload and writes it to Memgraph. The constructor calls a method such as `persistGraphElements` or `saveGraph`. This separation means that any changes to Memgraph schema or connection handling are confined to PersistenceAgent.
+
+3. **Pipeline Coordinator (`agents/coordinator.ts`)** – Orchestrates execution order. The constructor registers itself as a dependent step that must run after SemanticAnalysisAgent completes and before InsightGenerationAgent consumes the graph.
+
+4. **Ontology & InsightGenerationAgent** – Though not direct callers, they rely on the persisted graph. Ontology classification may add additional labels to graph nodes, while InsightGenerationAgent queries the graph to produce higher‑level insights.
+
+5. **GitHistoryAgent** – Provides raw commit data that SemanticAnalysisAgent merges into the semantic model; indirectly influences the graph’s temporal dimension.
+
+All these integrations are file‑level imports within the `src/agents` directory, reinforcing a tight but well‑structured coupling through explicit TypeScript imports rather than runtime reflection.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Respect the BaseAgent contract** – When instantiating CodeGraphConstructor, supply configuration via the `BaseAgent` payload (e.g., `sourcePaths`, `languageHints`). Do not bypass the `initialize()` hook; it may set up the Tree‑sitter parser cache.  
-2. **Prefer lazy LLM usage** – If you need LLM‑driven enrichment, invoke it **after** the graph has been constructed. This aligns with the lazy‑initialisation pattern used by `SemanticAnalysisAgent` and avoids unnecessary model loading.  
-3. **Limit graph size per execution** – Because the GraphBuilder walks the entire AST, very large codebases can become memory‑intensive. Split large repositories into logical modules and run separate constructor instances, then merge the resulting sub‑graphs if needed.  
-4. **Do not modify AstParser or GraphBuilder directly** – These children encapsulate third‑party parsing logic and graph‑construction rules. Extend functionality by subclassing CodeGraphConstructor or by providing custom visitor callbacks through the configuration object, preserving the encapsulation guarantees.  
-5. **Version‑lock Tree‑sitter grammars** – The parser’s correctness depends on the language grammar version. Ensure that the `package.json` entry for `tree-sitter` is pinned, and update grammars in a coordinated release to avoid breaking existing graph structures.  
+- **Invoke via the Pipeline**: Developers should not call `buildCodeGraph` directly. Instead, schedule the `CodeGraphConstructor` as part of the overall semantic‑analysis pipeline using the coordinator (`agents/coordinator.ts`). This guarantees that required semantic data and persistence services are ready.
 
-Following these conventions ensures that the constructor remains interchangeable, testable, and performant within the broader **SemanticAnalysis** micro‑service.  
+- **Provide Complete Semantic Payload**: Ensure that the `SemanticAnalysisAgent` has successfully processed both the current codebase and its Git history before the constructor runs. Missing commit metadata will result in incomplete graph nodes.
+
+- **Do Not Bypass PersistenceAgent**: All graph writes must go through `PersistenceAgent`. Direct Memgraph queries from the constructor would break the repository abstraction and hinder future database migrations.
+
+- **Handle Large Repositories Incrementally**: For very large codebases, consider breaking the input into smaller batches (e.g., per package) and invoking `buildCodeGraph` multiple times. The underlying PersistenceAgent can merge incremental graph fragments safely.
+
+- **Testing**: Mock `PersistenceAgent` and feed a deterministic AST (e.g., from a fixture file) to unit‑test the constructor’s transformation logic. Because the constructor’s responsibilities are pure data mapping, tests can focus on node/relationship correctness without needing a live Memgraph instance.
 
 ---
 
 ### Architectural patterns identified  
-* **Agent‑oriented modular architecture** – each functional unit (including CodeGraphConstructor) is an agent inheriting from a common abstract base.  
-* **Two‑stage pipeline (Parse → Build)** – clear separation of concerns between AST parsing (AstParser) and graph construction (GraphBuilder).  
-* **Lazy initialization** – LLM resources are only created when needed, as demonstrated by the SemanticAnalysisAgent’s usage of the constructor’s output.  
+1. **Agent‑centric modular architecture** (each capability is an independent agent extending `BaseAgent`).  
+2. **Facade/Builder pattern** (`buildCodeGraph` hides AST parsing, enrichment, and persistence).  
+3. **Repository/Persistence abstraction** (graph storage delegated to `PersistenceAgent`).  
 
 ### Design decisions and trade‑offs  
-* **Standardised BaseAgent interface** simplifies orchestration but imposes a uniform lifecycle that may be overkill for very lightweight agents.  
-* **Encapsulating Tree‑sitter behind AstParser** isolates a third‑party dependency, improving replaceability at the cost of an extra abstraction layer.  
-* **Lazy LLM init** reduces start‑up cost and memory pressure, but requires downstream agents to handle the possibility that the LLM may not yet be available.  
+- **Separation of concerns** improves maintainability but introduces additional indirection (multiple agents).  
+- **Using Memgraph** gives native graph query performance; however, it ties the system to a specific graph DB unless the PersistenceAgent is refactored.  
+- **Relying on AST parsing** provides fine‑grained code insight but can be CPU‑intensive for large repositories; batching mitigates this.  
 
 ### System structure insights  
-* **Parent‑child relationship** – CodeGraphConstructor is a core child of the **SemanticAnalysis** component, while **AstParser** and **GraphBuilder** are its own children, forming a clear hierarchy.  
-* **Sibling collaboration** – It shares the BaseAgent contract with agents like `OntologyClassificationAgent`, `Pipeline`, and `ContentValidator`, enabling a plug‑and‑play ecosystem.  
-* **Cross‑component data flow** – The knowledge graph produced is consumed by **KnowledgeManagement**, **Insights**, and the **SemanticAnalyzer**, illustrating a data‑centric flow from code to insight.  
+The code‑graph construction sits in a clear vertical slice: `SemanticAnalysis` → `CodeGraphConstructor` → `PersistenceAgent`. Siblings share the same `BaseAgent` foundation, enabling uniform logging, error handling, and coordination via the `Pipeline`. The graph becomes the central data artifact consumed by downstream agents like `InsightGenerationAgent`.  
 
 ### Scalability considerations  
-* The **Tree‑sitter** parser is incremental and fast, supporting parallel parsing of multiple files, which aids horizontal scaling when processing large repositories.  
-* GraphBuilder’s in‑memory graph construction may become a bottleneck for massive codebases; sharding the input and merging sub‑graphs can mitigate this.  
-* Lazy LLM initialization prevents unnecessary scaling of the expensive LLM service, allowing the system to spin up inference resources only on demand.  
+- **Horizontal scaling** can be achieved by running multiple instances of the constructor in parallel on disjoint subsets of the repository (e.g., per module).  
+- **Memgraph** itself supports clustering; the PersistenceAgent can be configured to target a cluster endpoint, allowing the graph to grow without a single‑node bottleneck.  
+- **AST parsing** is the primary CPU hotspot; employing incremental parsing or caching previously parsed files can reduce repeated work across pipeline runs.  
 
 ### Maintainability assessment  
-* **High maintainability** – The clear separation between parsing and graph building, combined with the BaseAgent abstraction, makes the component easy to test and evolve independently.  
-* **Encapsulation of third‑party parsers** reduces the impact of upstream library changes.  
-* The only maintenance risk lies in the **AST‑to‑graph mapping rules** inside GraphBuilder; changes to language grammars may require updates to these rules, but the isolation of GraphBuilder confines the impact.  
-
-Overall, CodeGraphConstructor exemplifies a well‑encapsulated, modular building block that bridges raw source code with the graph‑driven reasoning engine of the MCP semantic analysis platform.
+The clear agent boundaries and the façade‑style `buildCodeGraph` method make the component easy to understand and modify. Because storage concerns are isolated in `PersistenceAgent`, changes to the graph schema or database driver require minimal updates to the constructor. The reliance on TypeScript’s static typing and explicit imports further aids refactoring. The main maintenance risk lies in keeping the semantic model contract in sync between `SemanticAnalysisAgent` and `CodeGraphConstructor`; versioned DTOs or interface definitions would mitigate this. Overall, the design promotes high maintainability while providing a solid foundation for future extensions.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's microservices architecture allows for a high degree of modularity and scalability, with each agent responsible for a specific task, such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This modular design enables easy extension and customization of the component, as new agents can be added or existing ones modified without affecting the overall system. For instance, the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) can be modified to support additional semantic analysis techniques, such as named entity recognition or dependency parsing, by leveraging the lazy LLM initialization feature. The use of abstract base classes for agents, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, further facilitates this modularity by providing a standardized interface for agent development.
-
-### Children
-- [AstParser](./AstParser.md) -- The CodeGraphConstructor class uses Tree-sitter AST parsing to construct the knowledge graph, as mentioned in the parent context.
-- [GraphBuilder](./GraphBuilder.md) -- The CodeGraphConstructor class constructs the knowledge graph from the parsed AST, which is facilitated by the GraphBuilder.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system to process git history and LSL sessions, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent working together to extract and persist structured knowledge entities. This is evident in the integrations/mcp-server-semantic-analysis/src/agents directory, where each agent has its own TypeScript file, such as ontology-classification-agent.ts, semantic-analysis-agent.ts, and code-graph-agent.ts. The BaseAgent class, defined in base-agent.ts, serves as an abstract base class for all agents in the system, providing a foundation for their implementation. For instance, the SemanticAnalysisAgent, which performs comprehensive semantic analysis of code files and git history, extends the BaseAgent class and overrides its execute method to perform the actual analysis.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a coordinator to manage the workflow, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the ontology system to classify observations, as seen in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.
-- [Insights](./Insights.md) -- The insight generation process uses the SemanticAnalyzer class to perform comprehensive semantic analysis, integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.ts.
-- [OntologyManager](./OntologyManager.md) -- The OntologyManager class loads and manages the ontology configurations, as seen in integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts.
-- [SemanticAnalyzer](./SemanticAnalyzer.md) -- The SemanticAnalyzer class performs comprehensive semantic analysis, integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.ts.
-- [ContentValidator](./ContentValidator.md) -- The ContentValidator class validates entity content, integrations/mcp-server-semantic-analysis/src/agents/content-validator.ts.
-- [LLMService](./LLMService.md) -- The LLMService class provides language model functionality, integrations/mcp-server-semantic-analysis/src/agents/llm-service.ts.
+- [Pipeline](./Pipeline.md) -- The Pipeline utilizes a coordinator to manage the batch processing workflow, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts file.
+- [Ontology](./Ontology.md) -- The ontology classification system relies on the BaseAgent class in base-agent.ts to provide a foundation for the implementation of ontology-related agents.
+- [Insights](./Insights.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
+- [OntologyManager](./OntologyManager.md) -- The OntologyManager in ontology-manager.ts manages the ontology system and provides metadata to entities.
+- [InsightGenerationAgent](./InsightGenerationAgent.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
+- [PersistenceAgent](./PersistenceAgent.md) -- The PersistenceAgent in persistence-agent.ts handles entity persistence and retrieval from the graph database.
+- [GitHistoryAgent](./GitHistoryAgent.md) -- The GitHistoryAgent in git-history-agent.ts analyzes git history to extract relevant information for semantic analysis.
 
 
 ---

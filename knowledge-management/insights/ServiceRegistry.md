@@ -2,101 +2,92 @@
 
 **Type:** SubComponent
 
-The ServiceRegistry utilizes a validation mechanism, as implemented in validator.ts, to ensure that registered services conform to the expected interface and metadata.
+The ServiceRegistry uses a service registry data structure to store service information, including service name, status, and configuration.
 
 ## What It Is  
 
-ServiceRegistry is the central **sub‑component** that lives inside the DockerizedServices package. Its core implementation resides in `service-registry.ts`, where a **registry‑based approach** is used to keep track of every service that participates in the system. The registry stores each service’s metadata (name, endpoint, version, etc.) and exposes a discovery API defined in `discovery.ts`. Service registration and lookup are driven by configuration files that are read by the startup script `scripts/api‑service.js`. To keep discovery fast, ServiceRegistry layers a lightweight cache implemented in `cache.ts` on top of the raw metadata store, and it validates every incoming registration through the rules codified in `validator.ts`. In addition, the registry collaborates with the sibling **ProcessManagementService** (see `process-management-service.ts`) to control the lifecycle of the services it knows about.  
-
-## Architecture and Design  
-
-The architecture of ServiceRegistry is built around a **Registry pattern** – a single authoritative source (`service‑registry.ts`) that holds service descriptors. This registry is split into two logical children: **ServiceMetadataManager** (responsible for persisting and updating the raw metadata) and **ServiceDiscoveryManager** (responsible for answering lookup requests). The discovery flow defined in `discovery.ts` reads from the metadata manager, applies the cache layer (`cache.ts`), and returns results to callers.  
-
-A **configuration‑driven** initialization is evident in `scripts/api‑service.js`. The script reads a configuration object that specifies registry settings (e.g., cache TTL, validation rules) and injects them into the ServiceRegistry at start‑up, allowing the same binary to be reused across environments without code changes.  
-
-The **validation mechanism** (`validator.ts`) acts as a guardrail, ensuring that any service attempting to register conforms to the expected interface (required fields, data types, etc.). This defensive design prevents malformed entries from polluting the registry and simplifies downstream discovery logic.  
-
-Finally, the **lifecycle integration** with ProcessManagementService (`process-management-service.ts`) demonstrates a clear separation of concerns: ServiceRegistry only knows *what* services exist, while ProcessManagementService knows *how* to start, stop, and monitor those processes. The two components communicate through well‑defined interfaces (e.g., “registerService”, “unregisterService”, “notifyTermination”), keeping the registry lightweight and focused on data management.  
-
-## Implementation Details  
-
-At the heart of the implementation is the `ServiceRegistry` class in `service-registry.ts`. Upon construction it creates instances of **ServiceMetadataManager** and **ServiceDiscoveryManager**. The metadata manager maintains an in‑memory map keyed by service name, persisting updates to a JSON file (or a simple DB, as implied by the file‑based nature of the project). When a service calls `register(serviceInfo)` the registry first routes the payload through `validator.validate(serviceInfo)` (from `validator.ts`). If validation succeeds, the metadata manager stores the entry and then notifies the discovery manager to refresh its cache.  
-
-The discovery manager (`discovery.ts`) exposes methods such as `find(serviceName)` and `listAll()`. Each lookup first checks the **cache layer** (`cache.ts`). The cache is a simple LRU store with a configurable TTL, which dramatically reduces the number of reads against the metadata manager when the same services are queried repeatedly. Cache invalidation occurs automatically when the metadata manager emits a “metadataChanged” event, ensuring stale entries are purged.  
-
-Configuration handling lives in `scripts/api-service.js`. The script parses a `registryConfig.json` (or environment variables) and passes the resulting object to `new ServiceRegistry(config)`. The configuration includes flags like `enableCache`, `cacheTTL`, and `validationSchemaPath`, making the registry flexible without recompilation.  
-
-Lifecycle coordination is performed via the ProcessManagementService module (`process-management-service.ts`). When a new service is registered, ServiceRegistry calls `ProcessManagementService.start(serviceInfo.id)`. Conversely, when a process exits, ProcessManagementService invokes `ServiceRegistry.unregister(serviceId)`, which removes the entry from the metadata manager and clears any cached references. This bidirectional contract keeps the registry’s view of the world consistent with the actual running processes.  
-
-## Integration Points  
-
-ServiceRegistry sits directly under the **DockerizedServices** parent component, inheriting the container orchestration context that Docker provides. All Docker containers that expose an API are expected to register themselves through the registry during container start‑up, typically via the bootstrap logic in `scripts/api-service.js`.  
-
-The **ProcessManagementService** sibling is the primary runtime collaborator: it supplies start/stop semantics and reports process health, while ServiceRegistry supplies the “who” and “where” information. This clear division enables each sibling to evolve independently – for example, swapping ProcessManagementService for a different orchestration engine would not require changes to the registry’s core logic.  
-
-The **LoggingMechanism** sibling (implemented in `logger.ts`) is not directly referenced in the observations, but it is reasonable to assume that both ServiceRegistry and ProcessManagementService emit structured logs through the shared logger, facilitating observability across the DockerizedServices ecosystem.  
-
-Child components **ServiceMetadataManager** and **ServiceDiscoveryManager** are encapsulated within the registry. Other parts of the system—such as client libraries or internal tooling—interact with the registry through the public API exposed by `discovery.ts`. Because the discovery API is decoupled from the storage details, future changes (e.g., moving metadata to a distributed store) can be made behind the manager interfaces without impacting callers.  
-
-## Usage Guidelines  
-
-1. **Always register through the official API** – call `ServiceRegistry.register(serviceInfo)` after your service has successfully started. Ensure the payload matches the schema enforced by `validator.ts`; missing fields will cause registration to fail and generate clear validation errors.  
-
-2. **Leverage the configuration script** – modify `scripts/api-service.js` or the accompanying `registryConfig.json` to tune cache behavior (`enableCache`, `cacheTTL`) and validation strictness. For development environments you may disable caching to see immediate metadata changes.  
-
-3. **Respect lifecycle hooks** – when a service is about to shut down, invoke `ServiceRegistry.unregister(serviceId)` so that ProcessManagementService can clean up the process and the cache can be invalidated. Relying on automatic process termination alone can leave stale entries in the registry.  
-
-4. **Do not bypass the cache** – callers should use the discovery methods in `discovery.ts` (`find`, `listAll`) rather than directly accessing the metadata manager. This guarantees that cached results are consistent and that any future cache‑aware optimizations are automatically applied.  
-
-5. **Monitor logs** – both ServiceRegistry and ProcessManagementService emit diagnostic messages via the shared logging mechanism. Reviewing these logs is essential for troubleshooting registration failures, cache misses, or unexpected process terminations.  
+The **ServiceRegistry** is a sub‑component that lives inside the **DockerizedServices** parent.  It provides a centralized data structure that records each service’s *name*, *status*, and *configuration* (Observation 1) together with richer *metadata* such as description and version (Observation 4).  The registry is the authoritative source for service discovery – clients query it to locate and access services (Observation 3).  To keep the registry responsive, a dedicated cache layer is employed (Observation 7), and the component actively monitors its own registry‑related metrics to spot anomalies (Observation 5).  The registry is protocol‑agnostic: it can speak both **HTTP** and **DNS**‑based service‑registry protocols (Observation 6).  Its lifecycle is coordinated by the sibling **ServiceManager**, which ensures that services are started, initialized, and kept healthy before they are entered into the registry (Observation 2).
 
 ---
 
-### 1. Architectural patterns identified  
-- **Registry Pattern** – central `ServiceRegistry` holds service descriptors.  
-- **Discovery Pattern** – `ServiceDiscoveryManager` provides lookup APIs.  
-- **Configuration‑Driven Initialization** – `scripts/api-service.js` injects settings.  
-- **Caching (Cache‑Aside)** – `cache.ts` layers a TTL‑based cache over metadata reads.  
-- **Validation (Guard Clause)** – `validator.ts` enforces schema compliance before registration.  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-- **In‑memory metadata with optional persistence** keeps lookups fast but limits horizontal scaling; the design favors simplicity over distributed consistency.  
-- **Separate metadata and discovery managers** isolates storage concerns from query logic, improving modularity at the cost of a slightly more complex initialization sequence.  
-- **Cache‑aside strategy** reduces registry load but introduces the need for explicit invalidation on metadata changes; this trade‑off was accepted to meet low‑latency discovery requirements.  
-- **Configuration‑driven behavior** allows the same binary to run in multiple environments without code changes, but relies on correct config files; misconfiguration can silently affect cache or validation behavior.  
+The architecture follows a **registry‑centric** style where the ServiceRegistry is the hub for all service‑related information.  The design leans on **separation of concerns**: the ServiceRegistry focuses on storage, discovery, and metadata, while the ServiceManager handles lifecycle concerns, and the HealthChecker (sibling) validates health status before entries become visible.  This division mirrors a **Facade** pattern – the ServiceRegistry presents a simple discovery API while delegating lifecycle and health responsibilities to its peers.  
 
-### 3. System structure insights  
-- ServiceRegistry is a child of **DockerizedServices**, meaning it is packaged alongside container orchestration scripts.  
-- It owns two child components: **ServiceMetadataManager** (stores raw descriptors) and **ServiceDiscoveryManager** (answers queries).  
-- It collaborates tightly with the sibling **ProcessManagementService** for lifecycle events, while sharing the common **LoggingMechanism** for observability.  
-- The overall hierarchy forms a clear vertical slice: DockerizedServices → ServiceRegistry → (MetadataManager, DiscoveryManager) → external services.  
+Multiple **protocol adapters** are built into the registry to support both HTTP and DNS registration flows (Observation 6).  This indicates an **Adapter**‑like approach where protocol‑specific logic is encapsulated behind a common interface, allowing the rest of the system to remain oblivious to the underlying transport.  The presence of a **service‑registry cache** (Observation 7) shows a classic **Cache‑Aside** strategy: callers read from the cache for speed, and the registry updates the cache when the authoritative store changes.  
 
-### 4. Scalability considerations  
-- Because the current registry stores data in‑memory (or a local file), scaling out to multiple Docker hosts would require a shared store or a distributed cache layer.  
-- The existing cache design (TTL‑based LRU) can be extended to a distributed cache (e.g., Redis) with minimal changes to `cache.ts`.  
-- Validation and discovery logic are lightweight; the main bottleneck would be metadata persistence under high registration churn, suggesting a future move to a dedicated metadata service if needed.  
+Metrics monitoring (Observation 5) is woven into the registry loop, suggesting an **Observer**‑style feedback channel where metric collectors can trigger remediation or alerting pathways.  The overall composition is a loosely‑coupled graph: DockerizedServices → ServiceRegistry ↔ ServiceManager ↔ HealthChecker ↔ RetryMechanism, with DockerOrchestrator providing the container‑level isolation underneath.
 
-### 5. Maintainability assessment  
-- **High modularity**: separating metadata handling, discovery, caching, and validation into distinct files (`service-registry.ts`, `discovery.ts`, `cache.ts`, `validator.ts`) makes the codebase easy to navigate and test.  
-- **Clear contracts** with ProcessManagementService reduce coupling, allowing independent evolution of process orchestration.  
-- **Configuration‑driven defaults** centralize tunable parameters, simplifying environment‑specific tweaks.  
-- Potential maintenance risk lies in the in‑memory persistence model; any future requirement for distributed consistency will necessitate a non‑trivial refactor. Overall, the current design is maintainable for the existing scope and provides clear extension points for scalability upgrades.
+---
+
+## Implementation Details  
+
+Even though the source tree does not expose concrete symbols, the observations outline the logical building blocks.  At its core the ServiceRegistry maintains a **service‑registry data structure** (likely a map or database table) that holds entries composed of *service name*, *status*, *configuration*, and *metadata* (Observations 1 & 4).  When a new service is started, the **ServiceManager** invokes the registry’s “register” operation after the **HealthChecker** confirms the service is healthy (Observation 2).  
+
+Discovery logic (Observation 3) is implemented as a query interface that can be called by clients; the interface abstracts the underlying protocol, delegating to either an HTTP‑based registrar or a DNS‑based registrar depending on the service’s registration request (Observation 6).  The **service‑registry cache** (Observation 7) is refreshed either on write‑through events from the registry or via periodic syncs, reducing lookup latency for high‑frequency discovery calls.  
+
+Metrics collection (Observation 5) likely hooks into key events—registration, deregistration, health state changes, cache hits/misses—and publishes them to a monitoring subsystem.  This enables automated detection of issues such as stale entries or sudden status flips, which can be acted upon by the **RetryMechanism** or external orchestration tools.
+
+---
+
+## Integration Points  
+
+The ServiceRegistry sits directly under **DockerizedServices**, which uses `lib/service‑starter.js` to spin up containers.  The **ServiceManager** sibling consumes the registry’s API to add or remove services as containers are started or stopped.  The **HealthChecker** validates each service’s `/health` endpoint (as described in the parent component) before the ServiceManager calls the registry, ensuring only healthy services appear in discovery results.  
+
+When a service needs to be discovered, client code reaches into the ServiceRegistry, which may forward the request to the appropriate protocol adapter (HTTP or DNS) based on the service’s registration metadata.  The **DockerOrchestrator** provides the runtime isolation but does not directly interact with the registry; instead it relies on the ServiceManager to keep the registry in sync with container state.  In failure scenarios, the **RetryMechanism** can be triggered by metric alerts emitted from the registry’s monitoring hooks, allowing exponential back‑off retries for problematic services.
+
+---
+
+## Usage Guidelines  
+
+1. **Register Only After Health Confirmation** – Follow the established flow: start a service via `lib/service‑starter.js`, let the **HealthChecker** confirm health, then let **ServiceManager** invoke the ServiceRegistry registration.  Skipping health verification can pollute the registry with unhealthy entries.  
+
+2. **Prefer the Cache for Discovery** – Client code should query the ServiceRegistry’s cache layer first; this reduces latency and off‑loads the underlying storage.  Ensure that any write‑through updates (e.g., service version bump) also invalidate or refresh the cache to avoid stale data.  
+
+3. **Choose the Correct Protocol Adapter** – When registering a service, specify the intended protocol (HTTP or DNS) in the service configuration.  The registry will route the registration to the matching adapter; mixing protocols inadvertently can lead to discovery failures.  
+
+4. **Monitor Registry Metrics** – Keep an eye on the metrics emitted by the registry (registration latency, cache hit ratio, error rates).  Use these signals to tune the **RetryMechanism** back‑off parameters or to trigger automated remediation scripts.  
+
+5. **Keep Metadata Up‑to‑Date** – Service description and version are part of the registry entry (Observation 4).  Updating these fields promptly when a service is upgraded helps downstream consumers make compatibility decisions.
+
+---
+
+### Architectural patterns identified  
+* Facade – ServiceRegistry presents a simple discovery API.  
+* Adapter – Protocol‑specific registration (HTTP, DNS) behind a common interface.  
+* Cache‑Aside – Service‑registry cache improves read performance.  
+* Observer – Metrics monitoring feeds back into system health loops.  
+
+### Design decisions and trade‑offs  
+* **Lifecycle delegation** to ServiceManager isolates startup concerns but adds a dependency chain.  
+* **Multi‑protocol support** adds flexibility at the cost of added adapter complexity.  
+* **Caching** boosts latency performance but introduces potential staleness; cache invalidation must be carefully managed.  
+* **Metric‑driven monitoring** enables proactive issue detection but requires a reliable telemetry pipeline.  
+
+### System structure insights  
+The ServiceRegistry is a central node in a loosely coupled graph of sibling components (ServiceManager, HealthChecker, RetryMechanism) under the DockerizedServices parent.  Its responsibilities are narrowly scoped to storage, discovery, and observability, while orchestration and container management are handled elsewhere (DockerOrchestrator).  
+
+### Scalability considerations  
+* Supporting both HTTP and DNS protocols allows the registry to scale across different networking environments.  
+* The cache layer reduces read load on the primary store, enabling the registry to handle high‑frequency discovery traffic.  
+* Metric collection must be lightweight to avoid becoming a bottleneck as the number of services grows.  
+
+### Maintainability assessment  
+The clear separation between lifecycle (ServiceManager), health verification (HealthChecker), and discovery (ServiceRegistry) promotes maintainability; changes to one area are unlikely to ripple across others.  However, the reliance on multiple adapters and cache synchronization introduces additional moving parts that require disciplined testing and documentation to keep the system coherent.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The component's implementation is spread across multiple files, including integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, lib/llm/llm-service.ts, and scripts/api-service.js, among others. These files contain various classes, functions, and modules that work together to provide the component's functionality. Overall, the DockerizedServices component plays a crucial role in the coding project's infrastructure, enabling the deployment and management of multiple services and tasks.
-
-### Children
-- [ServiceMetadataManager](./ServiceMetadataManager.md) -- ServiceRegistry (service-registry.ts) utilizes a registry-based approach to manage available services and their metadata, which is handled by the ServiceMetadataManager
-- [ServiceDiscoveryManager](./ServiceDiscoveryManager.md) -- The ServiceDiscoveryManager would need to interact with the ServiceMetadataManager to retrieve service metadata, such as service names and endpoints, to facilitate service discovery
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes lib/service-starter.js to manage the startup of various services, including the LLMService, with retry logic and health verification. This is evident in the use of the startService function in lib/service-starter.js, which takes a service configuration object as an argument and attempts to start the service with a specified number of retries. The health verification is performed using the isServiceHealthy function, which checks the service's health by making a request to its health endpoint. For example, in the scripts/api-service.js file, the startAPIService function uses the startService function from lib/service-starter.js to start the API service. The use of this library ensures that services are properly initialized and ready for use, which is crucial for the operational integrity of the project. Furthermore, the integration of this library with the semantic analysis pipeline, as seen in the mcp-server-semantic-analysis component, highlights the component's role in supporting key project functionalities.
 
 ### Siblings
-- [ProcessManagementService](./ProcessManagementService.md) -- ProcessManagementService utilizes the ProcessStateManager class in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts to manage child processes.
-- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism utilizes a logging framework, as seen in logger.ts, to handle log messages and levels.
+- [ServiceManager](./ServiceManager.md) -- The ServiceManager uses the startService function in lib/service-starter.js to start services with retry logic and health verification.
+- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator uses Docker containerization to manage services, ensuring isolation and scalability.
+- [HealthChecker](./HealthChecker.md) -- The HealthChecker uses the isServiceHealthy function to check the health of services by making requests to their health endpoints.
+- [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

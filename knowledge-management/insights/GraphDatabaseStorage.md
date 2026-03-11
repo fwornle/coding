@@ -1,107 +1,140 @@
 # GraphDatabaseStorage
 
-**Type:** Detail
+**Type:** SubComponent
 
-The GraphDatabaseStorage module, implemented in graph-database-storage.ts, utilizes the GraphDB class to handle storage and retrieval of knowledge graph data, providing methods such as storeGraph and queryGraph for the KnowledgeGraphManager.
+The PersistenceAgent (src/agents/persistence-agent.ts) is used by GraphDatabaseStorage to handle entity creation, updates, and deletion in the knowledge graph.
 
 ## What It Is  
 
-**GraphDatabaseStorage** is the concrete storage‑layer module that underpins the knowledge‑graph capabilities of the platform. It lives in the file **`graph-database-storage.ts`** and is the implementation point for persisting and retrieving graph‑structured data. The module is built around the **`GraphDB`** class, which encapsulates the low‑level interactions with the underlying graph database engine. Through a thin, purpose‑built API—most notably the **`storeGraph`** and **`queryGraph`** methods—`GraphDatabaseStorage` offers the rest of the system a predictable way to write a knowledge graph and to run queries against it.  
+**GraphDatabaseStorage** is the concrete sub‑component that lives inside the **KnowledgeManagement** component and is responsible for persisting the knowledge graph that powers the system.  The implementation resides in the *KnowledgeManagement* source tree (exact file names are not listed in the observations, but the component’s code references two concrete files):  
 
-The module is not a stand‑alone service; it is a child component of **`KnowledgeGraphManager`** (the parent that orchestrates higher‑level graph operations) and is also listed as a child of **`KnowledgeManagement`**, indicating that the broader knowledge‑management subsystem relies on this storage implementation for its persistence needs.
+* `storage/graph-database-adapter.ts` – the low‑level adapter that speaks directly to the underlying graph store (Graphology + LevelDB in the broader system).  
+* `src/agents/persistence-agent.ts` – the agent that orchestrates entity creation, updates and deletions on behalf of GraphDatabaseStorage.  
+
+GraphDatabaseStorage does not manage raw data itself; instead it delegates all read/write operations to the **GraphDatabaseAdapter** while adding a layer of metadata handling (node‑type and edge‑type catalogs) that is required by the KnowledgeManagement domain.  In short, it is the “centralized storage solution for graph data” for the whole KnowledgeManagement stack.  
 
 ---
 
 ## Architecture and Design  
 
-The architecture exposed by the observations follows a **layered, separation‑of‑concerns** approach. `GraphDatabaseStorage` sits in the **data‑access layer**, while `KnowledgeGraphManager` occupies the **domain‑logic layer**. This clear boundary is achieved through a **Facade‑style** wrapper: `GraphDatabaseStorage` presents a simplified interface (`storeGraph`, `queryGraph`) that hides the complexities of the underlying `GraphDB` class.  
+The observations reveal a **layered architecture** built around a shared **adapter**.  
 
-The only concrete design pattern that can be confidently identified is this **Facade/Wrapper** pattern, where `GraphDatabaseStorage` abstracts the graph database client (`GraphDB`) and offers a domain‑friendly contract to its callers. The interaction flow is straightforward:
+1. **Adapter Pattern** – The `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`) defines a clean, technology‑agnostic interface for node and edge management.  All higher‑level modules (GraphDatabaseStorage, ManualLearning, EntityPersistence, UKBTraceReporting, etc.) interact with the graph solely through this adapter, insulating them from the specifics of Graphology, LevelDB, or any future storage engine.  
 
-1. `KnowledgeGraphManager` invokes `storeGraph` or `queryGraph` on the `GraphDatabaseStorage` instance.  
-2. `GraphDatabaseStorage` forwards those calls to the encapsulated `GraphDB` object, which performs the actual persistence or query execution.  
+2. **Facade / Service Layer** – GraphDatabaseStorage acts as a façade that aggregates the low‑level adapter calls with additional responsibilities such as **graph metadata management** (node/edge type registries).  This keeps the rest of KnowledgeManagement (e.g., the PersistenceAgent) from having to know about metadata concerns.  
 
-Because the module is referenced from both **`KnowledgeGraphManager`** and **`KnowledgeManagement`**, it also serves as a **shared repository** for graph data, ensuring that all higher‑level components operate on a single source of truth.
+3. **Agent‑Oriented Coordination** – The `PersistenceAgent` (`src/agents/persistence-agent.ts`) is an orchestrator that invokes GraphDatabaseStorage for entity lifecycle operations.  This separation of concerns (agent vs storage) follows a simple **Command/Coordinator** style: the agent decides *what* to do, while GraphDatabaseStorage decides *how* to persist it.  
+
+4. **Shared Infrastructure Across Siblings** – All sibling components (ManualLearning, EntityPersistence, UKBTraceReporting, etc.) also rely on the same adapter, demonstrating a **single source of truth** for graph persistence across the KnowledgeManagement domain.  This reduces duplication and guarantees consistent data‑integrity rules.  
+
+The overall interaction flow can be visualized as:  
+
+`Agent (PersistenceAgent) → GraphDatabaseStorage (metadata + façade) → GraphDatabaseAdapter (raw node/edge CRUD) → Underlying Graphology/LevelDB store`.  
 
 ---
 
 ## Implementation Details  
 
-The implementation lives in **`graph-database-storage.ts`** and revolves around two primary artifacts:
+* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)**  
+  * Exposes an **interface** for node and edge operations (create, read, update, delete).  
+  * Encapsulates the concrete Graphology + LevelDB implementation, ensuring that callers never touch the database directly.  
 
-* **`GraphDB` class** – This class is the low‑level driver for the graph database. While the observations do not list its internal methods, it is the component that directly communicates with the database engine (e.g., opening connections, executing Cypher/Gremlin statements, handling transactions).  
+* **GraphDatabaseStorage (sub‑component)**  
+  * Holds **metadata structures** that describe allowed node types and edge types.  These structures are consulted before any adapter call to guarantee that only valid schema elements are persisted.  
+  * Provides higher‑level methods such as `storeEntity`, `updateEntity`, `removeEntity`, which internally invoke the adapter after metadata validation.  
+  * Guarantees **data consistency and integrity** by centralizing validation logic; this is explicitly mentioned in observations 3 and 5.  
 
-* **`GraphDatabaseStorage` module** – This module instantiates or receives a `GraphDB` instance and exposes the following public methods:  
+* **PersistenceAgent (`src/agents/persistence-agent.ts`)**  
+  * Acts as the entry point for the rest of the system when an entity must be persisted.  
+  * Calls GraphDatabaseStorage’s public methods, thereby abstracting the metadata handling from callers.  
+  * Because the agent is used by multiple components (e.g., CodeGraphAgent, ManualLearning), it reinforces a consistent workflow for entity lifecycle management.  
 
-  * **`storeGraph(graphData: any): Promise<void>`** – Accepts a representation of a knowledge graph (nodes, edges, properties) and delegates the creation or update logic to `GraphDB`. The method likely handles batch insertion, validation of schema constraints, and error propagation.  
+* **Parent‑Child Relationship**  
+  * The parent component, **KnowledgeManagement**, orchestrates the overall knowledge‑graph lifecycle and delegates storage duties to GraphDatabaseStorage.  The parent’s description (from the hierarchy context) mentions that the adapter also supports query capabilities, implying that GraphDatabaseStorage may expose query helpers built on top of the adapter.  
 
-  * **`queryGraph(query: string, parameters?: Record<string, any>): Promise<any>`** – Provides a generic query entry point. Callers supply a query string in the native language of the underlying graph engine together with optional parameters. `GraphDatabaseStorage` forwards the request to `GraphDB`, then returns the raw results (or a transformed view) to the caller.  
-
-Because no additional symbols were discovered, we infer that the module is deliberately minimal: it does not embed business rules, leaving those to `KnowledgeGraphManager`. This design keeps `GraphDatabaseStorage` focused on **CRUD‑style** operations and query forwarding, which aligns with the **Single Responsibility Principle**.
+* **Sibling Sharing**  
+  * ManualLearning, EntityPersistence, and UKBTraceReporting each directly use the same `GraphDatabaseAdapter`.  This indicates that GraphDatabaseStorage is the *canonical* place for metadata, while siblings may bypass it for simple CRUD if they only need raw storage.  The shared adapter ensures that all components adhere to the same low‑level contract.  
 
 ---
 
 ## Integration Points  
 
-`GraphDatabaseStorage` integrates with the system at two clearly defined junctions:
+1. **Upstream – KnowledgeManagement**  
+   * KnowledgeManagement consumes GraphDatabaseStorage to obtain a unified graph persistence layer.  Any new knowledge‑graph feature added to KnowledgeManagement will likely interact with GraphDatabaseStorage rather than the adapter directly, to benefit from metadata enforcement.  
 
-1. **Parent – `KnowledgeGraphManager`**  
-   The manager uses `storeGraph` and `queryGraph` to persist newly generated knowledge graphs and to retrieve sub‑graphs for reasoning or visualization. The manager likely translates domain objects (e.g., `KnowledgeNode`, `KnowledgeEdge`) into the raw structures expected by `storeGraph`.  
+2. **Downstream – PersistenceAgent**  
+   * The `PersistenceAgent` is the primary consumer of GraphDatabaseStorage.  Any change in GraphDatabaseStorage’s API will ripple to the agent, so the agent acts as a contract guard.  
 
-2. **Sibling – `KnowledgeManagement`**  
-   As a sibling component within the broader knowledge‑management domain, `KnowledgeManagement` may expose higher‑level APIs (such as “import knowledge base” or “export graph snapshot”) that internally rely on `GraphDatabaseStorage` for the actual data movement.  
+3. **Sibling Components**  
+   * ManualLearning, EntityPersistence, and UKBTraceReporting all import `storage/graph-database-adapter.ts`.  If they need to respect node/edge type rules, they should route through GraphDatabaseStorage; otherwise they can use the adapter for raw performance‑critical operations.  
 
-The only explicit dependency is on the **`GraphDB`** class, which is encapsulated inside `GraphDatabaseStorage`. No other external services or libraries are mentioned, so the module’s external contract is limited to the two public methods and the type of the `GraphDB` instance it wraps.
+4. **CodeGraphAgent**  
+   * While not directly mentioned as a consumer of GraphDatabaseStorage, the CodeGraphAgent builds the AST‑based code knowledge graph and stores it via the same adapter.  This shows a common data‑flow path: AST extraction → CodeGraphAgent → GraphDatabaseAdapter (or through GraphDatabaseStorage if metadata is required).  
+
+5. **External Interfaces**  
+   * No explicit external APIs (e.g., REST, gRPC) are described, but the presence of a well‑defined adapter suggests that future exposure (e.g., a service layer) could be built on top without touching the underlying storage engine.  
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via Dependency Injection** – When constructing `KnowledgeGraphManager` (or any other consumer), provide a pre‑configured `GraphDB` instance to `GraphDatabaseStorage`. This keeps connection handling centralized and makes testing easier.  
+* **Always go through GraphDatabaseStorage when dealing with typed entities.**  The component validates node and edge types, so bypassing it (by calling the adapter directly) risks corrupting the metadata catalog.  
 
-* **Prefer Domain Objects Over Raw Payloads** – Callers should convert their domain‑level representations of nodes and edges into the format expected by `storeGraph`. This prevents schema mismatches and ensures that validation logic (if any) remains within the storage layer.  
+* **Use PersistenceAgent for standard CRUD workflows.**  The agent encapsulates the correct sequence of validation → storage → post‑processing (e.g., indexing).  Direct calls to GraphDatabaseStorage should be reserved for internal utilities or bulk operations where the agent’s overhead is unnecessary.  
 
-* **Batch Operations When Possible** – Because `storeGraph` likely performs bulk writes, grouping multiple node/edge creations into a single call reduces round‑trips to the underlying database and improves throughput.  
+* **When extending the knowledge graph schema, update the metadata definitions inside GraphDatabaseStorage.**  Because the storage layer checks these definitions before delegating to the adapter, forgetting to register a new node type will result in runtime validation errors.  
 
-* **Handle Query Results Carefully** – `queryGraph` returns raw data from the graph engine. Consumers (e.g., `KnowledgeGraphManager`) should map these results back into typed domain models and guard against unexpected structures, especially when the query string is constructed dynamically.  
+* **Do not modify `storage/graph-database-adapter.ts` unless you need to change the underlying database technology.**  The adapter is the single point of truth for low‑level persistence; altering it without updating all consumers can break consistency guarantees.  
 
-* **Graceful Error Propagation** – Errors from `GraphDB` (connection failures, constraint violations) should be allowed to bubble up through `GraphDatabaseStorage` so that the higher‑level manager can decide on retries, fallback strategies, or user‑visible error messages.
+* **Leverage the shared adapter across sibling components for simple data retrieval.**  If a component only needs to read raw graph data without metadata enforcement (e.g., analytics), it may import the adapter directly for performance.  However, any write operation should still respect the metadata contract enforced by GraphDatabaseStorage.  
 
 ---
 
-### Architectural Patterns Identified  
+### 1. Architectural patterns identified  
 
-* **Facade / Wrapper** – `GraphDatabaseStorage` abstracts the `GraphDB` client behind a simple API (`storeGraph`, `queryGraph`).  
-* **Layered Architecture** – Distinct separation between data‑access (`GraphDatabaseStorage`) and domain‑logic (`KnowledgeGraphManager`).  
+* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the concrete graph database implementation.  
+* **Facade / Service Layer** – `GraphDatabaseStorage` provides a higher‑level façade that adds metadata handling on top of the adapter.  
+* **Agent/Coordinator (Command) Pattern** – `PersistenceAgent` orchestrates entity lifecycle commands, delegating persistence to GraphDatabaseStorage.  
 
-### Design Decisions and Trade‑offs  
+### 2. Design decisions and trade‑offs  
 
-* **Abstraction vs. Direct Access** – By wrapping `GraphDB`, the system gains flexibility (the underlying graph engine can be swapped with minimal impact) at the cost of an extra indirection layer, which may add a small performance overhead.  
-* **Minimal API Surface** – Limiting the public contract to two generic methods reduces maintenance burden but places more responsibility on callers to formulate correct queries and payloads.  
+* **Centralized metadata vs. flexibility** – By placing node/edge type validation in GraphDatabaseStorage, the system guarantees schema integrity but adds an extra layer for every write, which could affect write latency.  
+* **Shared adapter across many components** – Promotes consistency and reduces duplication, but couples all siblings to the same storage technology; swapping the underlying DB would require updating the adapter only, not each consumer.  
+* **Separate agent layer** – Improves separation of concerns (decision‑making vs. persistence) and makes it easier to inject cross‑cutting concerns (logging, retries), at the cost of an additional indirection.  
 
-### System Structure Insights  
+### 3. System structure insights  
 
-* `GraphDatabaseStorage` is a **leaf module** in the knowledge‑graph subsystem, directly responsible for persistence.  
-* It is **shared** by both `KnowledgeGraphManager` (the orchestrator) and the broader `KnowledgeManagement` package, reinforcing a single source of truth for graph data.  
+* The KnowledgeManagement hierarchy is built around a **core persistence stack**: `GraphDatabaseAdapter` → `GraphDatabaseStorage` → `PersistenceAgent`.  
+* Sibling components share the adapter, indicating a **horizontal reuse** strategy for storage capabilities.  
+* GraphDatabaseStorage is the **only place** that knows about graph‑metadata, making it the logical authority for schema evolution.  
 
-### Scalability Considerations  
+### 4. Scalability considerations  
 
-Scalability hinges on the capabilities of the underlying `GraphDB` implementation. Because `GraphDatabaseStorage` delegates all heavy lifting (batch inserts, query optimization) to `GraphDB`, the module itself does not impose bottlenecks. However, developers should be mindful of:
+* Because the adapter hides Graphology + LevelDB, scaling the underlying store (e.g., sharding LevelDB or swapping to a distributed graph DB) can be achieved by changing the adapter implementation without touching GraphDatabaseStorage or the agents.  
+* Metadata validation in GraphDatabaseStorage is in‑process and lightweight; however, bulk ingestion may benefit from bypassing the façade and using batch APIs on the adapter directly.  
+* The agent‑based workflow can be parallelized: multiple PersistenceAgent instances can operate concurrently as long as the underlying graph DB supports concurrent writes.  
 
-* **Connection Pooling** – Ensure the `GraphDB` client maintains an appropriate pool to handle concurrent `storeGraph`/`queryGraph` calls from multiple managers.  
-* **Query Complexity** – Complex traversals can strain the graph engine; callers should design queries that leverage indexes and avoid full‑graph scans.  
+### 5. Maintainability assessment  
 
-### Maintainability Assessment  
-
-The module’s **high cohesion** (single responsibility) and **low coupling** (only depends on `GraphDB`) make it straightforward to maintain. Adding new storage capabilities (e.g., bulk delete, transaction support) would involve extending the wrapper without touching the higher‑level managers. Unit testing is simplified because the `GraphDB` dependency can be mocked, allowing verification of method forwarding and error handling in isolation. Overall, the design promotes clean separation, easy replacement of the storage backend, and predictable evolution.
+* **High cohesion** – GraphDatabaseStorage’s sole responsibility is metadata‑aware persistence, making the codebase easy to reason about.  
+* **Loose coupling** – The adapter isolates storage technology, and the agent isolates business logic, which together yield a modular system that is straightforward to test and evolve.  
+* **Potential risk** – The reliance on a single metadata catalog means that any bug in GraphDatabaseStorage’s validation logic could affect all components. Comprehensive unit tests around schema registration are essential.  
+* **Documentation surface** – Since the observations list no concrete symbols, developers should maintain clear API docs for the adapter interface and the storage façade to prevent accidental misuse by sibling components.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseStorage module to handle storage and retrieval of knowledge graph data.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval in the Graphology + LevelDB knowledge graph. This adapter enables the component to handle data persistence, graph database storage, and query capabilities seamlessly. For instance, the PersistenceAgent (src/agents/persistence-agent.ts) leverages the GraphDatabaseAdapter to store and retrieve entities from the graph database, demonstrating a clear example of how the component's architecture supports data management. Furthermore, the CodeGraphAgent (src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter to construct the AST-based code knowledge graph, facilitating semantic code search capabilities.
+
+### Siblings
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve manually curated entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history and LSL sessions.
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities.
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct the AST-based code knowledge graph.
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

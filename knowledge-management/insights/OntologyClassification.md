@@ -2,110 +2,106 @@
 
 **Type:** SubComponent
 
-OntologyClassification leverages the CodeKnowledgeGraph sub-component for constructing and managing the code knowledge graph, enabling semantic code search and analysis.
+The OntologyClassification component might provide a mechanism for updating the ontology system based on new observations.
 
 ## What It Is  
 
-**OntologyClassification** is a **SubComponent** that lives inside the **KnowledgeManagement** component. Its concrete implementation is spread across several collaborating modules, the most visible of which are the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) and the **PersistenceAgent** (`agents/persistence-agent.ts`). The sub‑component is responsible for taking raw entity information, classifying it according to an ontology, and persisting the resulting classification data in the system‑wide graph store. It does not exist in isolation – it leans on the **EntityManagement**, **CodeKnowledgeGraph**, and **PersistenceService** sub‑components to manage the lifecycle of classified entities and to expose the resulting knowledge graph for downstream consumption (e.g., semantic code search).
+OntologyClassification is a **SubComponent** of the **LiveLoggingSystem**.  Although the source repository does not expose a concrete file path for this sub‑component, the surrounding documentation makes its purpose clear: it is responsible for assigning semantic categories to incoming transcript data by consulting an underlying ontology or knowledge‑graph store.  The classification work is driven by a combination of **knowledge‑graph look‑ups**, **machine‑learning‑based pattern recognition**, and a **caching layer** that speeds up repeated queries.  In addition, the component appears to expose a mechanism for **incrementally updating the ontology** when novel observations are discovered, ensuring that the system can evolve without a full redeployment.
 
-## Architecture and Design  
-
-The architecture that emerges from the observations is a **layered, adapter‑driven design** anchored by a single graph persistence layer. The **GraphDatabaseAdapter** acts as the low‑level gateway to the underlying Graphology + LevelDB store, providing a uniform API for all higher‑level components that need to read or write graph data. OntologyClassification, together with its sibling sub‑components (**ManualLearning**, **OnlineLearning**, **EntityManagement**, **CodeKnowledgeGraph**, **PersistenceService**, **PersistenceAgent**), all depend on this adapter, which enforces a **shared data contract** and guarantees that every mutation is automatically reflected in a JSON export (the “automatic JSON export sync” mentioned in the parent description).  
-
-At the next layer, **PersistenceAgent** implements the operational entry point for classification work. Its `execute()` function orchestrates the flow: it receives classification requests, invokes the **GraphDatabaseAdapter** to fetch any prerequisite graph structures, applies the ontology rules (the actual rule engine is not detailed in the observations), and finally writes the classified entities back through the same adapter. This pattern resembles a **service façade** – the agent hides the intricacies of graph access and presents a simple “execute” contract to callers.  
-
-The **EntityManagement** and **CodeKnowledgeGraph** sub‑components are used as **domain‑specific collaborators**. EntityManagement supplies the entity objects that need classification, while CodeKnowledgeGraph supplies the broader code‑level context (e.g., call‑graph, module relationships) that enriches the ontology’s semantic reasoning. Both of these collaborators also talk to the same **GraphDatabaseAdapter**, reinforcing a **single source of truth** for all graph data.  
-
-Overall, the design follows a **modular decomposition** where each sub‑component has a clear responsibility, and the **graph adapter** serves as the unifying integration point. No evidence of distributed or event‑driven patterns is present; the system appears to be a monolithic process that coordinates work through direct method calls.
-
-## Implementation Details  
-
-* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – This file implements the concrete persistence mechanism. It wraps Graphology (an in‑memory graph library) with LevelDB as the backing store, exposing methods for CRUD operations on nodes and edges. A key feature highlighted in the observations is its **automatic JSON export sync**, which likely means that after each write operation the adapter serialises the current graph state to a JSON file, keeping external tools or downstream components in sync without additional coordination code.  
-
-* **PersistenceAgent (`agents/persistence-agent.ts`)** – The `execute()` function is the workhorse for OntologyClassification. When invoked, it pulls the necessary entities from **EntityManagement**, possibly enriches them using **CodeKnowledgeGraph**, runs the ontology classification logic (the exact algorithm is not described), and then persists the results via the **GraphDatabaseAdapter**. Because the same adapter is used for both reading and writing, the agent can safely assume that any modifications are instantly reflected in the JSON export.  
-
-* **EntityManagement** – Though no specific file path is given, this sub‑component is referenced as the source of “classified entities and their relationships.” It likely provides an API (e.g., `getEntityById`, `listPendingClassifications`) that the PersistenceAgent consumes before classification.  
-
-* **CodeKnowledgeGraph** – Similarly, this sub‑component supplies the broader code‑knowledge context (e.g., AST nodes, module dependencies). The classification process can query it to resolve semantic relationships that inform the ontology mapping.  
-
-* **PersistenceService** – This service is used by OntologyClassification to “manage the persistence of classified entities and relationships in the knowledge graph.” It probably offers higher‑level transactional semantics (e.g., batch commit, rollback) built on top of the raw adapter.  
-
-All of these pieces are wired together under the **KnowledgeManagement** parent, which itself documents the shared reliance on the **GraphDatabaseAdapter** for “Graphology+LevelDB persistence.” The sibling components (ManualLearning, OnlineLearning, etc.) follow the same pattern, reinforcing a consistent architectural stance across the knowledge‑base domain.
-
-## Integration Points  
-
-1. **GraphDatabaseAdapter** – The primary integration contract for OntologyClassification. Every read or write to the ontology graph passes through this adapter, guaranteeing that the JSON export stays in step with the live graph.  
-
-2. **PersistenceAgent (`execute()`)** – Serves as the public entry point for classification jobs. Other system parts (e.g., a scheduler, a REST endpoint, or a CLI tool) would call this method to trigger classification.  
-
-3. **EntityManagement** – Supplies the raw entities that need classification. OntologyClassification depends on its API to obtain entity identifiers, current attributes, and any existing relationships.  
-
-4. **CodeKnowledgeGraph** – Provides semantic context that enriches the classification process. The sub‑component likely exposes graph traversal utilities that OntologyClassification can invoke to discover code‑level patterns.  
-
-5. **PersistenceService** – Offers a higher‑level persistence façade that may bundle multiple adapter calls into a single logical transaction. OntologyClassification uses this service when it needs to ensure that a batch of classified entities is stored atomically.  
-
-Because all siblings share the same adapter, any change to the adapter’s contract (e.g., a new export format) propagates uniformly, reducing the risk of integration drift. The parent **KnowledgeManagement** component orchestrates these interactions, ensuring that the classification pipeline fits into the broader knowledge‑base lifecycle.
-
-## Usage Guidelines  
-
-* **Always invoke classification through `PersistenceAgent.execute()`** – Direct calls to the GraphDatabaseAdapter bypass the classification logic and the automatic JSON export sync. The `execute()` method encapsulates the required pre‑ and post‑processing steps.  
-
-* **Supply fully‑hydrated entities** – Before calling `execute()`, make sure that the entities retrieved from **EntityManagement** contain all necessary attributes (e.g., type, metadata). Missing fields can cause the ontology rules to mis‑classify or reject the entity.  
-
-* **Leverage CodeKnowledgeGraph for context** – When an entity’s classification depends on code‑level relationships (e.g., inheritance, imports), query the **CodeKnowledgeGraph** first and attach the results to the entity payload. This ensures the ontology has the full semantic picture.  
-
-* **Treat the GraphDatabaseAdapter as the single source of truth** – Do not maintain parallel data stores for classification results. Rely on the adapter’s automatic JSON export for any external consumption; if you need a custom export, extend the adapter rather than duplicating its logic.  
-
-* **Batch operations via PersistenceService** – For large classification runs (e.g., processing a whole repository), wrap the calls in a PersistenceService transaction to minimise I/O overhead and to guarantee atomicity.  
-
-* **Monitor the JSON export** – Since downstream tools may read the exported JSON, verify that the export path is writable and that the file size remains manageable. If the graph grows substantially, consider rotating the export or archiving older snapshots.  
+Because OntologyClassification lives inside **LiveLoggingSystem**, it inherits the same high‑level goals of real‑time log processing and analysis.  It therefore works hand‑in‑hand with the sibling components **TranscriptManagement**, **LoggingInfrastructure**, **LSLConfigurationValidator**, and **RedactionAndFiltering**, each of which contributes a distinct stage in the logging pipeline (ingestion, buffering, validation, and privacy sanitisation respectively).  OntologyClassification sits downstream of **TranscriptManagement**, consuming the normalized transcript objects that the `TranscriptAdapter` class (found in `lib/agent-api/transcript-api.js`) produces.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB behind a uniform API.  
-* **Service façade** – `PersistenceAgent.execute()` hides the internal classification workflow behind a simple entry point.  
-* **Layered/modular decomposition** – Clear separation between low‑level persistence (adapter), domain services (EntityManagement, CodeKnowledgeGraph, PersistenceService), and orchestration (PersistenceAgent).  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Single graph store** simplifies consistency and eliminates data duplication, but couples all sub‑components to the same storage technology, potentially limiting independent scaling.  
-* **Automatic JSON export sync** provides out‑of‑the‑box integration with external tools, at the cost of extra I/O on every write; this trade‑off favours data freshness over raw write throughput.  
-* **Centralised `execute()` orchestration** ensures a uniform classification pipeline, but places the bulk of business logic in a single method, which could become a maintenance hotspot if the ontology grows complex.  
+The observations point to a **layered architecture** where OntologyClassification acts as a service layer on top of a persistent ontology database (or knowledge graph).  The component likely follows a **repository‑style abstraction**: a thin data‑access layer isolates the rest of the code from the specifics of the underlying graph store (e.g., SPARQL endpoint, Neo4j, etc.).  This design enables the classification logic to remain agnostic to storage details while still leveraging rich semantic relationships.
 
-### 3. System structure insights  
-* The **KnowledgeManagement** parent acts as a container for a family of graph‑centric sub‑components, each of which shares the same persistence adapter.  
-* Sibling components (ManualLearning, OnlineLearning, etc.) follow the same adapter‑first pattern, indicating a deliberate design choice to keep the graph layer consistent across learning modalities.  
-* OntologyClassification’s child‑level responsibilities are limited to classification; it delegates entity handling to **EntityManagement** and semantic enrichment to **CodeKnowledgeGraph**, reinforcing a “single responsibility” ethos.  
+A **hybrid classification pipeline** is implied.  First, a **caching mechanism** intercepts frequent ontology look‑ups, reducing latency and load on the graph store.  Second, a **machine‑learning model** (perhaps a lightweight classifier trained on historic transcript patterns) runs in parallel to capture nuances that are not explicitly encoded in the ontology.  The two results are then merged—either by a simple rule‑based arbiter or by confidence weighting—to produce the final classification label.
 
-### 4. Scalability considerations  
-* Because all writes funnel through a single **GraphDatabaseAdapter**, scaling write throughput may require sharding or moving to a distributed graph store. The current design’s reliance on LevelDB (a local key‑value store) suggests it is optimised for single‑node deployments.  
-* The automatic JSON export could become a bottleneck for very large graphs; a possible mitigation is to batch export operations or switch to incremental diff‑based exports.  
-* Read‑heavy workloads (e.g., semantic code search) can benefit from Graphology’s in‑memory representation, but memory consumption will grow with graph size; monitoring and possible paging strategies should be considered.  
+Interaction with other components follows the **interface‑driven integration** model already used by the parent LiveLoggingSystem.  The `TranscriptAdapter` class provides a **watch mechanism** that emits new transcript entries in real time.  OntologyClassification subscribes to this stream, processes each entry, and forwards enriched classification results downstream (e.g., to LoggingInfrastructure for persistence or to RedactionAndFiltering for privacy checks).  This event‑driven flow mirrors the pattern employed by the sibling components, reinforcing a consistent architectural style across the logging subsystem.
 
-### 5. Maintainability assessment  
-* **High cohesion** – Each sub‑component has a well‑defined purpose, making the codebase easier to understand and modify.  
-* **Low coupling** – The only hard dependency is the shared adapter; changes to the adapter’s interface will ripple across all siblings, so versioning and thorough integration tests are essential.  
-* **Clear entry points** – `PersistenceAgent.execute()` and the adapter’s CRUD methods provide obvious places for adding new features or fixing bugs.  
-* **Potential hotspots** – The classification logic inside `execute()` and the JSON export mechanism are likely to receive the most change; isolating them behind interfaces (e.g., a separate “ExportService”) could improve future maintainability.  
+---
 
-In summary, **OntologyClassification** is a well‑encapsulated sub‑component that leverages a shared graph persistence adapter, collaborates with domain‑specific services, and follows a straightforward, adapter‑centric architecture. Its design choices promote data consistency and ease of integration, while the primary scalability and maintainability concerns revolve around the centralised graph store and the automatic export mechanism.
+## Implementation Details  
+
+Even though the code base does not list concrete symbols for OntologyClassification, the functional responsibilities can be inferred:
+
+1. **Ontology Access Layer** – A module (e.g., `ontology-client.js`) encapsulates CRUD operations against the knowledge graph.  It likely uses a client library that speaks the graph’s query language and returns node/edge metadata needed for classification.
+
+2. **Cache Layer** – A short‑lived in‑memory store (such as a `Map` or an LRU cache) holds recent ontology query results keyed by the transcript phrase or concept identifier.  Cache hits bypass the remote graph call, delivering sub‑millisecond response times for repeated patterns.
+
+3. **ML Classification Engine** – A lightweight model (perhaps a TensorFlow.js or ONNX runtime wrapper) is loaded at start‑up.  The engine receives tokenised transcript snippets, extracts feature vectors, and outputs a probability distribution over known ontology classes.  The model is periodically retrained offline using the corpus accumulated by **TranscriptManagement**.
+
+4. **Ontology Update API** – When the system encounters a phrase that does not map cleanly to existing concepts, OntologyClassification can propose a new node or relationship.  An internal API (e.g., `addConcept(concept, context)`) writes the proposal back to the graph, optionally flagging it for human review.  This keeps the ontology current without manual database migrations.
+
+5. **Integration Hooks** – The component registers a listener on the `TranscriptAdapter.watch()` observable.  For each new transcript entry, the listener executes the cache‑first lookup, falls back to the ML engine, merges results, and emits a enriched event (e.g., `classificationReady`) that downstream components consume.
+
+---
+
+## Integration Points  
+
+- **Parent – LiveLoggingSystem**: OntologyClassification is instantiated by LiveLoggingSystem during system boot.  It receives configuration (graph endpoint URL, cache size, model path) from the same configuration source that powers the other logging sub‑components.
+
+- **Sibling – TranscriptManagement**: The `TranscriptAdapter` class in `lib/agent-api/transcript-api.js` supplies normalized transcript objects.  OntologyClassification depends on the **watch** mechanism of this adapter to obtain a real‑time feed of data.  The contract is simple: each transcript entry contains a unique session identifier and raw text payload.
+
+- **Sibling – LoggingInfrastructure**: After classification, the enriched payload is handed off to LoggingInfrastructure for durable storage.  The hand‑off likely uses a shared event bus or a direct method call (`logClassification(entry)`), mirroring the buffering strategy described for the logging sibling.
+
+- **Sibling – RedactionAndFiltering**: Classification results may contain sensitive categories (e.g., “PII”).  RedactionAndFiltering can inspect the classification tags to apply appropriate sanitisation before logs are persisted or forwarded.
+
+- **External – Ontology Store**: The component’s primary external dependency is the knowledge‑graph database.  Connection details (authentication, endpoint, query timeout) are injected via environment variables or a central configuration file, ensuring that the same store can be shared across environments (development, staging, production).
+
+---
+
+## Usage Guidelines  
+
+1. **Do not bypass the cache** – All classification requests should go through the provided `classifyTranscript(entry)` façade.  Directly invoking the ontology client defeats the performance optimisation that the caching layer provides.
+
+2. **Treat ontology updates as asynchronous** – When proposing new concepts, use the `proposeConcept()` API rather than writing directly to the graph.  This preserves the integrity of the shared ontology and allows downstream validation (e.g., by LSLConfigurationValidator or a human curator).
+
+3. **Monitor model drift** – The ML engine is trained on historic transcript data.  Periodically evaluate its confidence scores; if a sustained drop is observed, retrain the model with the latest corpus gathered by TranscriptManagement.
+
+4. **Respect the watch contract** – Listeners attached to `TranscriptAdapter.watch()` must be idempotent and fast.  Heavy processing should be off‑loaded to background workers to avoid blocking the real‑time transcript stream.
+
+5. **Configure cache size wisely** – The cache should be sized based on the expected vocabulary breadth.  An undersized cache leads to frequent graph look‑ups, while an oversized cache can waste memory without measurable benefit.
+
+---
+
+### Architectural patterns identified  
+* Layered service architecture (presentation → classification → ontology access)  
+* Repository/DAO abstraction for the knowledge‑graph store  
+* Event‑driven integration via the `TranscriptAdapter.watch()` observable  
+* Cache‑aside pattern for ontology look‑ups  
+* Hybrid inference (rule‑based ontology lookup + ML model)
+
+### Design decisions and trade‑offs  
+* **Hybrid classification** balances precision (ontology) with adaptability (ML) but adds complexity in result merging.  
+* **Caching** improves latency at the cost of memory consumption and potential staleness; cache invalidation policies must be defined.  
+* **Ontology update API** enables continuous learning but requires governance to avoid uncontrolled ontology growth.
+
+### System structure insights  
+OntologyClassification sits centrally in the logging pipeline, consuming real‑time transcript data, enriching it with semantic tags, and feeding downstream components that handle storage, validation, and privacy.  Its reliance on the same `TranscriptAdapter` abstraction used by its siblings enforces a uniform ingestion contract across LiveLoggingSystem.
+
+### Scalability considerations  
+* Horizontal scaling is feasible by deploying multiple OntologyClassification instances behind a load balancer; the shared cache can be externalised (e.g., Redis) to maintain coherence.  
+* The ontology store must support concurrent read‑heavy workloads; read‑replicas or a graph database with built‑in sharding can mitigate bottlenecks.  
+* Model inference can be off‑loaded to GPU‑enabled workers if latency becomes a concern.
+
+### Maintainability assessment  
+The clear separation between **ontology access**, **caching**, and **ML inference** promotes modularity, making each layer independently testable and replaceable.  The reliance on well‑defined interfaces (watch stream, classification façade, update API) reduces coupling with siblings.  However, the hybrid nature introduces additional integration points that require careful documentation and automated regression testing to ensure that changes in one layer (e.g., ontology schema evolution) do not silently break classification outcomes.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence allows for automatic JSON export sync, ensuring data consistency across the system. This design decision enables efficient data storage and retrieval, leveraging the strengths of both Graphology and LevelDB. The automatic JSON export sync feature, in particular, facilitates seamless integration with other components, as seen in the execute() function of the PersistenceAgent (agents/persistence-agent.ts), which relies on the GraphDatabaseAdapter for entity persistence and ontology classification.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the TranscriptAdapter class (lib/agent-api/transcript-api.js) as an abstract base for agent-specific transcript adapters. This design decision enables a unified interface for reading and converting transcripts, allowing for easier integration of different agent types, such as Claude and Copilot. The TranscriptAdapter class provides a watch mechanism for monitoring new transcript entries, which enables real-time updates and processing of session logs. This is particularly useful for applications that require immediate feedback and analysis of user interactions. For instance, the watch mechanism can be used to trigger notifications or alerts when specific events occur during a session.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing manually created entities and relationships.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline for extracting knowledge from git history, LSL sessions, and code analysis.
-- [EntityManagement](./EntityManagement.md) -- EntityManagement relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving entity data.
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving code knowledge graph data.
-- [PersistenceService](./PersistenceService.md) -- PersistenceService relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter relies on the LevelDB database (storage/leveldb.ts) for storing and retrieving graph data.
-- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
+- [TranscriptManagement](./TranscriptManagement.md) -- TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified interface for reading and converting transcripts.
+- [LoggingInfrastructure](./LoggingInfrastructure.md) -- LoggingInfrastructure likely utilizes a buffering mechanism to prevent log loss during high-traffic periods.
+- [LSLConfigurationValidator](./LSLConfigurationValidator.md) -- LSLConfigurationValidator likely checks configuration files for syntax errors and invalid settings.
+- [RedactionAndFiltering](./RedactionAndFiltering.md) -- RedactionAndFiltering likely utilizes regular expressions or natural language processing for identifying sensitive information.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*

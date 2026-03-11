@@ -2,105 +2,142 @@
 
 **Type:** SubComponent
 
-The ProjectMilestoneManager provides a milestone management API for other components to manage project milestones, promoting a standardized milestone management approach.
+ProjectMilestoneManager may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359) to handle potential connection failures.
 
 ## What It Is  
 
-**ProjectMilestoneManager** is a sub‑component that lives inside the **Trajectory** component. Its implementation is centred around the `SpecstoryAdapter` class found in `lib/integrations/specstory-adapter.js`. By leveraging this adapter, the manager talks to the Specstory extension and provides a full‑lifecycle API for creating, updating, and deleting project milestones. The component is deliberately “flexible” – it can accommodate different milestone formats and project‑specific requirements – and it exposes a standardized milestone‑management API that other parts of the system (e.g., GSDWorkflowManager, ConversationLogger) can call. In addition to the core tracking logic, ProjectMilestoneManager embeds error‑handling routines that keep the overall system stable when milestone operations fail.
+**ProjectMilestoneManager** is a *SubComponent* that lives inside the **Trajectory** component.  It is responsible for coordinating the planning and tracking of project milestones and does so by delegating integration work to an **IntegrationAdapter** child.  The integration work ultimately relies on the **SpecstoryAdapter** class found at  
 
-## Architecture and Design  
+```
+lib/integrations/specstory-adapter.js
+```  
 
-The architecture revolves around an **Adapter** pattern: `SpecstoryAdapter` abstracts the details of communicating with the Specstory extension (HTTP, IPC, file‑watch) and is reused by several sibling components—`SpecstoryConnector`, `ConversationLogger`, and `GSDWorkflowManager`. ProjectMilestoneManager composes this adapter through its child **SpecstoryIntegration**, which isolates the external‑service concerns from the internal milestone logic.  
-
-Internally, ProjectMilestoneManager is decomposed into three focused children:
-
-1. **MilestoneTracker** – consumes the `SpecstoryAdapter` to receive milestone‑related events from Specstory and translate them into internal state changes.  
-2. **MilestoneManager** – encapsulates the business rules for creating, updating, and deleting milestones; it likely interacts with a persistence layer (the observation hints at a “SharedMemoryStore‑like” approach).  
-3. **SpecstoryIntegration** – acts as the façade that the rest of the system uses to invoke Specstory‑related operations (e.g., logging a milestone change).
-
-The component follows a **modular composition** style: each child has a single responsibility, making the overall manager easier to test and evolve. Error handling is centralized through the **ErrorHandlingMechanism** sibling, which ProjectMilestoneManager invokes when milestone operations raise exceptions. This separation of concerns keeps the core milestone code clean while still providing robust resilience.
-
-## Implementation Details  
-
-* **SpecstoryAdapter (`lib/integrations/specstory-adapter.js`)** – Provides asynchronous methods for connecting to Specstory via multiple transports (HTTP, IPC, file watch). It also implements logging hooks used by both ProjectMilestoneManager and its siblings.  
-
-* **MilestoneTracker** – Listens to events emitted by the adapter (e.g., “milestoneCreated”, “milestoneUpdated”). It transforms the raw Specstory payload into domain objects that the MilestoneManager can consume.  
-
-* **MilestoneManager** – Exposes an internal API (`createMilestone`, `updateMilestone`, `deleteMilestone`) that enforces validation rules and persists milestone data. The observation mentions a possible “SharedMemoryStore”‑style persistence, suggesting an in‑memory cache that can be flushed to a durable store when needed.  
-
-* **SpecstoryIntegration** – Wraps the adapter calls that need to be performed from outside the manager (e.g., `pushMilestoneToSpecstory`). By keeping this logic in a dedicated child, the manager’s public API remains focused on business operations rather than transport details.  
-
-* **Error handling** – Whenever a milestone operation fails (network error, malformed payload, etc.), ProjectMilestoneManager delegates to the **ErrorHandlingMechanism** sibling. This mechanism logs the incident, attempts retries where appropriate, and surfaces a clean error object to callers, ensuring the system does not crash due to a single milestone fault.
-
-## Integration Points  
-
-ProjectMilestoneManager sits at the heart of the **Trajectory** hierarchy. Its primary external dependency is the `SpecstoryAdapter`, which it accesses through the **SpecstoryIntegration** child. The manager’s public API is consumed by sibling components that need milestone data:
-
-* **GSDWorkflowManager** – Queries the manager to decide which workflow phase to trigger based on milestone status.  
-* **ConversationLogger** – Calls the manager’s API to record milestone‑related conversation entries, which are then forwarded to Specstory via the shared adapter.  
-* **SpecstoryConnector** – May invoke the manager to synchronize milestone state when the Specstory extension reconnects after a disruption.  
-
-Internally, the manager’s children interact as follows: `MilestoneTracker` receives events from `SpecstoryIntegration`, passes them to `MilestoneManager`, which updates the persisted state and may emit further events for other components to consume. All error paths funnel through the **ErrorHandlingMechanism** sibling, ensuring a consistent handling strategy across the Trajectory subsystem.
-
-## Usage Guidelines  
-
-1. **Prefer the public API** – External code should interact with ProjectMilestoneManager only through its exposed methods (create, update, delete). Directly accessing child classes such as MilestoneManager or MilestoneTracker bypasses validation and error‑handling layers.  
-
-2. **Handle async errors** – Because the underlying `SpecstoryAdapter` works asynchronously, callers must await the manager’s promises and be prepared to catch `ErrorHandlingMechanism`‑generated errors.  
-
-3. **Respect the flexible format contract** – When creating or updating a milestone, supply data that conforms to the format expected by the manager’s validation logic. The flexible design allows extensions, but deviating from the documented schema can cause runtime rejections.  
-
-4. **Do not duplicate persistence** – Milestone data should be stored only via MilestoneManager. Adding a separate storage layer in a consuming component defeats the “standardized milestone management approach” and introduces consistency bugs.  
-
-5. **Leverage SpecstoryIntegration for external calls** – If a component needs to push milestone information back to Specstory (e.g., after a bulk import), it should use the SpecstoryIntegration façade rather than invoking the adapter directly. This keeps transport concerns encapsulated.
+which implements the `connectViaHTTP` method.  When ProjectMilestoneManager needs to talk to the Specstory extension, it invokes this method through its IntegrationAdapter, attempting to open an HTTP connection on three possible ports – **7357**, **7358**, and **7359**.  The multi‑port approach is explicitly mentioned as a way to survive connection failures and, implicitly, to spread traffic across ports.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Adapter pattern** – `SpecstoryAdapter` abstracts multiple connection mechanisms (HTTP, IPC, file watch).  
-* **Facade** – `SpecstoryIntegration` provides a simplified interface for external components to interact with Specstory.  
-* **Composition / Modular design** – ProjectMilestoneManager is built from three children, each with a single responsibility.  
-* **Error‑handling delegation** – Centralized via the `ErrorHandlingMechanism` sibling.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Flexibility vs. strict schema** – Allowing varied milestone formats makes the manager adaptable but requires robust validation logic, increasing implementation complexity.  
-* **Shared adapter reuse** – Reusing `SpecstoryAdapter` reduces duplication and ensures consistent transport handling, but couples all Milestone‑related components to the same external dependency, meaning a failure in the adapter can affect many siblings.  
-* **In‑memory persistence (SharedMemoryStore‑like)** – Provides fast access and simple testing, yet may need explicit flushing to durable storage for long‑term reliability.
+The observations reveal a **layered integration architecture**:  
 
-### 3. System structure insights  
-* The **Trajectory** component is the parent container, orchestrating several sub‑components that all rely on the same adapter.  
-* **ProjectMilestoneManager** acts as the domain hub for milestone lifecycle, while its siblings (SpecstoryConnector, ConversationLogger, GSDWorkflowManager) consume its API for complementary concerns (connection, logging, workflow).  
-* Child components (MilestoneTracker, MilestoneManager, SpecstoryIntegration) encapsulate event handling, business rules, and external communication respectively, forming a clear vertical slice of responsibility.
+1. **Trajectory (parent)** provides the overall planning and tracking context.  
+2. **ProjectMilestoneManager (sub‑component)** focuses on milestone‑specific logic.  
+3. **IntegrationAdapter (child)** abstracts the concrete way ProjectMilestoneManager talks to external services.  
+4. **SpecstoryAdapter (sibling component)** supplies the concrete implementation for connecting to the Specstory extension via HTTP, IPC, or file‑watch mechanisms.  
 
-### 4. Scalability considerations  
-* Because the adapter supports multiple transport methods, scaling to higher volumes of milestone events can be achieved by switching from file‑watch to HTTP or IPC without touching the manager logic.  
-* The modular child design allows horizontal scaling of the **MilestoneManager** persistence layer (e.g., moving from in‑memory to a distributed cache or database) without affecting tracking or integration code.  
-* Centralized error handling ensures that surge‑induced failures are caught and throttled, preserving system stability under load.
+The only concrete design pattern that can be justified from the evidence is a **Adapter pattern** – the IntegrationAdapter acts as a façade that shields ProjectMilestoneManager from the details of how the Specstory connection is established.  By delegating to SpecstoryAdapter, the sub‑component can remain agnostic to the transport (HTTP, IPC, file watch) and focus on milestone logic.
 
-### 5. Maintainability assessment  
-* **High cohesion, low coupling** – Each child handles a distinct concern, making unit testing straightforward and changes localized.  
-* **Single point of external dependency** – All Specstory interactions funnel through `SpecstoryAdapter`; updating the adapter (e.g., adding a new transport) propagates automatically to all consumers, simplifying maintenance.  
-* **Clear API surface** – The standardized milestone management API reduces the risk of ad‑hoc implementations across the codebase.  
-* Potential risk: heavy reliance on the shared adapter means that bugs or breaking changes in `lib/integrations/specstory-adapter.js` could ripple across many components; rigorous integration testing is essential.
+The `connectViaHTTP` method’s attempt to connect on three ports constitutes a **retry‑with‑fallback** strategy.  The observation that “multiple ports could suggest a load‑balancing strategy” indicates that the system is prepared either to retry on a different port when one fails or to distribute connections deliberately across ports, which is a lightweight form of load distribution without a dedicated load‑balancer component.
+
+Interaction flow (as inferred from the hierarchy):  
+
+- **PhasePlanner** and **TaskTracker** (sibling sub‑components) also call into **SpecstoryAdapter** for their own data, showing a shared integration surface.  
+- **ProjectMilestoneManager** calls its **IntegrationAdapter**, which forwards the request to **SpecstoryAdapter.connectViaHTTP**.  
+- **SpecstoryAdapter** iterates over the port list (7357 → 7358 → 7359) until a successful HTTP handshake is made, then returns the connection handle back up the chain.
+
+---
+
+## Implementation Details  
+
+Although no source symbols were directly listed, the observations give us enough to outline the mechanics:
+
+1. **SpecstoryAdapter (lib/integrations/specstory-adapter.js)**  
+   - Exposes a method `connectViaHTTP()`.  
+   - Internally loops through the hard‑coded port array `[7357, 7358, 7359]`.  
+   - For each port, it attempts an HTTP request (likely a health‑check or handshake) to the Specstory extension.  
+   - On success, it returns a connection object; on failure, it proceeds to the next port.  
+   - The method thus provides both **retry** (to survive transient failures) and a rudimentary **load‑balancing** capability (by spreading attempts across ports).
+
+2. **IntegrationAdapter (child of ProjectMilestoneManager)**  
+   - Serves as a thin wrapper around SpecstoryAdapter.  
+   - Exposes a higher‑level API that ProjectMilestoneManager uses (e.g., `openSpecstoryConnection()`), abstracting away the port‑list logic.  
+   - May also expose alternative connection methods (IPC, file watch) as hinted by the broader description of SpecstoryAdapter’s capabilities.
+
+3. **ProjectMilestoneManager**  
+   - Holds milestone data structures and business rules for planning, scheduling, and tracking.  
+   - When external milestone data or status updates are required, it calls its IntegrationAdapter, which in turn triggers `connectViaHTTP`.  
+   - The presence of a retry mechanism means that the manager can continue operating even if a particular port is temporarily unavailable, improving resilience.
+
+4. **Trajectory (parent)**  
+   - Provides the overarching context and may orchestrate multiple sub‑components (PhasePlanner, TaskTracker, ProjectMilestoneManager).  
+   - Its description emphasizes “flexible and scalable planning,” which aligns with the adaptable connection strategy employed by ProjectMilestoneManager.
+
+---
+
+## Integration Points  
+
+- **Specstory Extension** – The external service that stores or processes story‑level data.  ProjectMilestoneManager reaches it via **SpecstoryAdapter**, which can use HTTP, IPC, or file‑watch methods.  The HTTP path is the one explicitly described, using ports 7357‑7359.  
+
+- **IntegrationAdapter** – The immediate dependency of ProjectMilestoneManager.  It encapsulates the choice of transport and hides the retry‑logic from the manager.  
+
+- **Sibling Components (PhasePlanner, TaskTracker)** – These also depend on SpecstoryAdapter for their own data needs.  The shared adapter means that any change to the connection strategy (e.g., adding a new port) propagates uniformly across all three sub‑components.  
+
+- **Parent Component (Trajectory)** – Provides the higher‑level orchestration and may inject configuration (e.g., which ports to try) into ProjectMilestoneManager or its IntegrationAdapter.  Because Trajectory is described as “flexible and scalable,” it likely supplies environment‑specific settings that the IntegrationAdapter can consume.
+
+---
+
+## Usage Guidelines  
+
+1. **Never bypass the IntegrationAdapter** – All calls to the Specstory extension should go through the adapter to retain the retry and load‑balancing behavior.  Direct HTTP calls from ProjectMilestoneManager would duplicate logic and break resilience guarantees.  
+
+2. **Respect the port list order** – The current implementation attempts ports sequentially (7357 → 7358 → 7359).  If you need to prioritize a specific port, modify the array in `SpecstoryAdapter.connectViaHTTP` rather than re‑ordering calls elsewhere.  
+
+3. **Handle connection failures gracefully** – Even with retries, all three ports might be unreachable.  ProjectMilestoneManager should be prepared to receive a null/exception from the IntegrationAdapter and fallback to a safe state (e.g., queue milestone updates for later retry).  
+
+4. **Leverage alternative transports when appropriate** – The broader SpecstoryAdapter supports IPC and file‑watch methods.  If the deployment environment restricts HTTP (e.g., sandboxed containers), configure the IntegrationAdapter to use the alternative method rather than forcing HTTP.  
+
+5. **Keep the adapter thin** – Business logic (milestone calculations, deadline enforcement) must stay inside ProjectMilestoneManager.  Adding network concerns to the manager will increase coupling and reduce maintainability.
+
+---
+
+### Architectural Patterns Identified  
+
+1. **Adapter / Façade** – IntegrationAdapter abstracts the concrete SpecstoryAdapter implementation.  
+2. **Retry‑with‑Fallback** – `connectViaHTTP` cycles through multiple ports to survive failures.  
+3. **Implicit Load Distribution** – Using several ports can spread connection load without a dedicated load balancer.
+
+### Design Decisions and Trade‑offs  
+
+- **Decision:** Centralise external communication in SpecstoryAdapter.  
+  **Trade‑off:** All sub‑components share the same connection logic, simplifying maintenance but creating a single point of failure if the adapter is buggy.  
+
+- **Decision:** Use a fixed list of three ports for HTTP connections.  
+  **Trade‑off:** Provides deterministic retry behavior and modest load spreading; however, it limits flexibility unless the list is made configurable.  
+
+- **Decision:** Provide multiple transport options (HTTP, IPC, file watch).  
+  **Trade‑off:** Increases portability across environments but adds complexity to the adapter’s implementation and testing.
+
+### System Structure Insights  
+
+The hierarchy is cleanly nested: **Trajectory → ProjectMilestoneManager → IntegrationAdapter → SpecstoryAdapter**.  Sibling components (PhasePlanner, TaskTracker) sit at the same level as ProjectMilestoneManager and all depend on SpecstoryAdapter, indicating a **shared integration layer**.  This structure promotes reuse of connection logic while keeping domain‑specific code (milestones, phases, tasks) isolated.
+
+### Scalability Considerations  
+
+- **Connection Scalability:** By rotating across three ports, the system can handle a modest increase in concurrent connections without saturating a single port.  
+- **Component Scalability:** Because the integration logic is abstracted, additional sub‑components can be added (e.g., a new “RiskAnalyzer”) that also reuse SpecstoryAdapter without code duplication.  
+- **Future Growth:** If traffic grows beyond what three ports can comfortably support, the current pattern would need to evolve—either by expanding the port list, introducing a real load balancer, or moving to a more robust transport (e.g., gRPC).
+
+### Maintainability Assessment  
+
+The use of an **Adapter** layer isolates external‑service changes, making the system relatively easy to maintain.  The retry logic is simple and self‑contained within `connectViaHTTP`, reducing the surface area for bugs.  However, the hard‑coded port list is a maintainability hotspot; any environment‑specific change requires a code change unless a configuration mechanism is added.  Shared reliance on SpecstoryAdapter by multiple siblings means that a regression in the adapter can impact several parts of the system simultaneously, so thorough integration testing is essential.  
+
+Overall, the architecture balances **resilience** (through retries) and **reuse** (via a common adapter) while keeping the domain logic of ProjectMilestoneManager cleanly separated from transport concerns.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component is an AI trajectory and planning system that manages project milestones, GSD workflow, phase planning, and implementation task tracking. It utilizes a SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to connect to the Specstory extension via multiple methods, including HTTP, IPC, and file watch. The adapter enables logging of conversation entries and other data to Specstory. The component's architecture involves a flexible connection mechanism, allowing it to adapt to different environments and extension availability. Key patterns include the use of asynchronous connections, error handling, and logging mechanisms. The Trajectory component plays a crucial role in maintaining project milestones and workflow, ensuring that tasks are properly tracked and implemented. Its ability to connect to Specstory enables seamless logging and tracking of conversation entries, making it an essential tool for project management.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is designed to facilitate flexible and scalable planning and tracking of project milestones, with the SpecstoryAdapter class in lib/integrations/specstory-adapter.js playing a crucial role in connecting to the Specstory extension via HTTP, IPC, or file watch methods. This design decision allows for multiple integration points, enabling the component to adapt to different environments and use cases. The connectViaHTTP method in SpecstoryAdapter attempts to connect to the Specstory extension on multiple ports (7357, 7358, 7359) to establish a connection, demonstrating a retry mechanism to handle potential connection failures. The use of multiple ports also suggests a load-balancing strategy to distribute the connection load across different ports.
 
 ### Children
-- [MilestoneTracker](./MilestoneTracker.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to connect to the Specstory extension, enabling the MilestoneTracker to manage project milestones.
-- [MilestoneManager](./MilestoneManager.md) -- The MilestoneManager may utilize a data storage mechanism, such as a database or file system, to persist project milestone information, similar to the SharedMemoryStore pattern.
-- [SpecstoryIntegration](./SpecstoryIntegration.md) -- The SpecstoryIntegration uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension, allowing it to manage project milestones.
+- [IntegrationAdapter](./IntegrationAdapter.md) -- The ProjectMilestoneManager sub-component may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359).
 
 ### Siblings
-- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension via multiple methods, including HTTP, IPC, and file watch.
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversation entries to Specstory.
-- [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- ErrorHandlingMechanism implements error handling mechanisms to handle connection errors and exceptions, ensuring the system remains stable and functional.
-- [GSDWorkflowManager](./GSDWorkflowManager.md) -- GSDWorkflowManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage the GSD workflow.
+- [PhasePlanner](./PhasePlanner.md) -- PhasePlanner could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant phase planning data.
+- [TaskTracker](./TaskTracker.md) -- TaskTracker could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant task data.
+- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter implements the connectViaHTTP method to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359).
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*
