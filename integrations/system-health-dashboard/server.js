@@ -7,7 +7,7 @@
  */
 
 import express from 'express';
-import { createServer } from 'http';
+import { createServer, get as httpGet } from 'http';
 import { WebSocketServer } from 'ws';
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch } from 'fs';
 import { join, dirname } from 'path';
@@ -69,6 +69,8 @@ class SystemHealthAPIServer {
         this.wss = null; // WebSocket server instance
         this.wsClients = new Set(); // Connected WebSocket clients
         this.workflowEventBuffer = []; // Buffer for events before clients connect
+        this.lastKnownState = null; // Last WorkflowState from SSE stream (for new WS clients)
+        this.previousStatus = null; // Track previous status for legacy event mapping
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -2871,10 +2873,18 @@ class SystemHealthAPIServer {
 
         // Handle new WebSocket connections
         this.wss.on('connection', (ws, request) => {
-            console.log('[WebSocket] Client connected');
+            process.stderr.write('[WebSocket] Client connected\n');
             this.wsClients.add(ws);
 
-            // Send any buffered events to new client
+            // Send last known state snapshot to new client (SSE-03: reconnection support)
+            if (this.lastKnownState) {
+                this.sendToClient(ws, {
+                    type: 'STATE_SNAPSHOT',
+                    payload: { state: this.lastKnownState }
+                });
+            }
+
+            // Also send any buffered legacy events for backward compatibility
             for (const event of this.workflowEventBuffer) {
                 this.sendToClient(ws, event);
             }
@@ -2885,18 +2895,18 @@ class SystemHealthAPIServer {
                     const command = JSON.parse(data.toString());
                     this.handleWorkflowCommand(command);
                 } catch (error) {
-                    console.error('[WebSocket] Failed to parse command:', error);
+                    process.stderr.write(`[WebSocket] Failed to parse command: ${error.message}\n`);
                 }
             });
 
             // Handle client disconnect
             ws.on('close', () => {
-                console.log('[WebSocket] Client disconnected');
+                process.stderr.write('[WebSocket] Client disconnected\n');
                 this.wsClients.delete(ws);
             });
 
             ws.on('error', (error) => {
-                console.error('[WebSocket] Client error:', error);
+                process.stderr.write(`[WebSocket] Client error: ${error.message}\n`);
                 this.wsClients.delete(ws);
             });
 
@@ -2917,176 +2927,172 @@ class SystemHealthAPIServer {
             ws.on('close', () => clearInterval(heartbeatInterval));
         });
 
-        // Setup file watcher to forward coordinator progress updates as events
-        this.setupWorkflowProgressWatcher();
+        // Setup SSE client to forward typed state events from backend
+        this.setupWorkflowEventStream();
     }
 
     /**
-     * Watch workflow progress file and convert changes to WebSocket events
-     * This bridges the file-based coordinator with the event-driven dashboard
+     * Connect to backend /workflow-events SSE endpoint and forward typed state
+     * events to WebSocket clients. Replaces the old file-polling approach.
+     *
+     * On each SSE event:
+     *   1. Parse the typed WorkflowSSEEvent (state-change | initial-state)
+     *   2. Cache state in this.lastKnownState for new WS client connections
+     *   3. Broadcast STATE_SNAPSHOT to all WS clients
+     *   4. Emit legacy event types (WORKFLOW_STARTED etc.) for backward compat
      */
-    setupWorkflowProgressWatcher() {
-        const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
-        let lastContent = '';
-        let lastStepStatuses = {};
+    setupWorkflowEventStream() {
+        const sseUrl = 'http://localhost:3848/workflow-events';
+        let reconnectDelay = 1000;
+        const maxReconnectDelay = 30000;
 
-        // Poll progress file and emit events for changes
-        const pollInterval = setInterval(() => {
-            try {
-                if (!existsSync(progressPath)) {
-                    if (lastContent !== '') {
-                        // Workflow ended - emit completion or reset
-                        this.broadcastEvent({
-                            type: 'WORKFLOW_COMPLETED',
-                            payload: {
-                                workflowId: 'unknown',
-                                duration: 0,
-                                timestamp: new Date().toISOString()
-                            }
-                        });
-                        lastContent = '';
-                        lastStepStatuses = {};
-                    }
+        const connect = () => {
+            process.stderr.write(`[SSE] Connecting to ${sseUrl}\n`);
+
+            const req = httpGet(sseUrl, (res) => {
+                if (res.statusCode !== 200) {
+                    process.stderr.write(`[SSE] Unexpected status ${res.statusCode}, retrying in ${reconnectDelay}ms\n`);
+                    res.resume();
+                    setTimeout(connect, reconnectDelay);
+                    reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
                     return;
                 }
 
-                const content = readFileSync(progressPath, 'utf8');
-                if (content === lastContent) return;
+                // Connected successfully, reset reconnect delay
+                reconnectDelay = 1000;
+                process.stderr.write('[SSE] Connected to /workflow-events\n');
 
-                const progress = JSON.parse(content);
-                const newContent = content;
+                let buffer = '';
 
-                // Detect workflow start
-                if (lastContent === '' && progress.status === 'running') {
-                    this.broadcastEvent({
-                        type: 'WORKFLOW_STARTED',
-                        payload: {
-                            workflowId: progress.workflowId || 'unknown',
-                            workflowName: progress.workflowName || 'unknown',
-                            team: progress.team || 'coding',
-                            repositoryPath: progress.repositoryPath || '',
-                            startTime: progress.startTime || new Date().toISOString(),
-                            batchPhaseSteps: progress.batchPhaseSteps || [],
-                            preferences: {
-                                singleStepMode: progress.singleStepMode || false,
-                                stepIntoSubsteps: progress.stepIntoSubsteps || false,
-                                mockLLM: progress.mockLLM || false,
-                                mockLLMDelay: progress.mockLLMDelay || 500
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    buffer += chunk;
+
+                    // Process complete SSE messages (terminated by \n\n)
+                    let boundary;
+                    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+                        const message = buffer.slice(0, boundary);
+                        buffer = buffer.slice(boundary + 2);
+
+                        // Parse SSE fields
+                        let eventType = null;
+                        let eventData = null;
+
+                        for (const line of message.split('\n')) {
+                            if (line.startsWith('event: ')) {
+                                eventType = line.slice(7).trim();
+                            } else if (line.startsWith('data: ')) {
+                                eventData = line.slice(6);
+                            } else if (line.startsWith(': ')) {
+                                // Comment/heartbeat -- ignore
                             }
                         }
-                    });
-                }
 
-                // Detect step changes from stepsDetail
-                if (progress.stepsDetail) {
-                    for (const step of progress.stepsDetail) {
-                        const prevStatus = lastStepStatuses[step.name];
+                        if (!eventData || !eventType) continue;
 
-                        if (!prevStatus && step.status === 'running') {
-                            // Step started
-                            this.broadcastEvent({
-                                type: 'STEP_STARTED',
-                                payload: {
-                                    workflowId: progress.workflowId || 'unknown',
-                                    stepName: step.name,
-                                    agent: step.agent || step.name,
-                                    stepIndex: progress.stepsDetail.indexOf(step),
-                                    timestamp: new Date().toISOString()
-                                }
-                            });
-                        } else if (prevStatus === 'running' && step.status === 'completed') {
-                            // Step completed
-                            this.broadcastEvent({
-                                type: 'STEP_COMPLETED',
-                                payload: {
-                                    workflowId: progress.workflowId || 'unknown',
-                                    stepName: step.name,
-                                    agent: step.agent || step.name,
-                                    stepIndex: progress.stepsDetail.indexOf(step),
-                                    duration: step.duration || 0,
-                                    tokensUsed: step.tokensUsed,
-                                    llmProvider: step.llmProvider,
-                                    llmCalls: step.llmCalls,
-                                    outputs: step.outputs,
-                                    timestamp: new Date().toISOString()
-                                }
-                            });
-                        } else if (prevStatus === 'running' && step.status === 'failed') {
-                            // Step failed
-                            this.broadcastEvent({
-                                type: 'STEP_FAILED',
-                                payload: {
-                                    workflowId: progress.workflowId || 'unknown',
-                                    stepName: step.name,
-                                    agent: step.agent || step.name,
-                                    stepIndex: progress.stepsDetail.indexOf(step),
-                                    error: step.error || 'Unknown error',
-                                    duration: step.duration || 0,
-                                    timestamp: new Date().toISOString()
-                                }
-                            });
+                        try {
+                            const parsed = JSON.parse(eventData);
+                            this.handleSSEEvent(eventType, parsed);
+                        } catch (err) {
+                            process.stderr.write(`[SSE] Failed to parse event data: ${err.message}\n`);
                         }
-
-                        lastStepStatuses[step.name] = step.status;
                     }
+                });
+
+                res.on('end', () => {
+                    process.stderr.write(`[SSE] Connection closed, reconnecting in ${reconnectDelay}ms\n`);
+                    setTimeout(connect, reconnectDelay);
+                    reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+                });
+
+                res.on('error', (err) => {
+                    process.stderr.write(`[SSE] Stream error: ${err.message}\n`);
+                });
+            });
+
+            req.on('error', (err) => {
+                process.stderr.write(`[SSE] Connection error: ${err.message}, retrying in ${reconnectDelay}ms\n`);
+                setTimeout(connect, reconnectDelay);
+                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+            });
+        };
+
+        connect();
+    }
+
+    /**
+     * Handle a parsed SSE event from /workflow-events.
+     * Forwards typed state snapshot to WS clients and emits legacy events.
+     */
+    handleSSEEvent(eventType, parsed) {
+        const state = parsed.state;
+        if (!state) return;
+
+        // Cache for new WebSocket client connections
+        this.lastKnownState = state;
+
+        // Broadcast typed STATE_SNAPSHOT to all WS clients
+        const snapshot = { type: 'STATE_SNAPSHOT', payload: { state } };
+        if (eventType === 'state-change' && parsed.transition) {
+            snapshot.payload.transition = parsed.transition;
+        }
+        this.broadcastEvent(snapshot);
+
+        // Emit legacy event types for backward compatibility with existing React code
+        // These will be removed in Phase 18 when dashboard is rewritten
+        const currentStatus = state.status;
+        const prevStatus = this.previousStatus;
+
+        if (currentStatus === 'running' && prevStatus !== 'running') {
+            this.broadcastEvent({
+                type: 'WORKFLOW_STARTED',
+                payload: {
+                    workflowId: state.config?.workflowId || 'unknown',
+                    workflowName: state.config?.workflowName || 'unknown',
+                    team: state.config?.team || 'coding',
+                    startTime: state.startedAt || new Date().toISOString(),
+                    timestamp: new Date().toISOString()
                 }
+            });
+        }
 
-                // Detect pause state
-                if (progress.stepPaused && !JSON.parse(lastContent || '{}').stepPaused) {
-                    this.broadcastEvent({
-                        type: 'WORKFLOW_PAUSED',
-                        payload: {
-                            workflowId: progress.workflowId || 'unknown',
-                            pausedAtStep: progress.pausedAtStep || progress.currentStep || 'unknown',
-                            reason: 'single_step',
-                            timestamp: new Date().toISOString()
-                        }
-                    });
-                } else if (!progress.stepPaused && JSON.parse(lastContent || '{}').stepPaused) {
-                    this.broadcastEvent({
-                        type: 'WORKFLOW_RESUMED',
-                        payload: {
-                            workflowId: progress.workflowId || 'unknown',
-                            resumedAtStep: progress.currentStep || 'unknown',
-                            timestamp: new Date().toISOString()
-                        }
-                    });
+        if (currentStatus === 'paused' && prevStatus !== 'paused') {
+            this.broadcastEvent({
+                type: 'WORKFLOW_PAUSED',
+                payload: {
+                    workflowId: state.config?.workflowId || 'unknown',
+                    pausedAtStep: state.currentStepName || 'unknown',
+                    reason: state.pauseReason || 'single_step',
+                    timestamp: new Date().toISOString()
                 }
+            });
+        }
 
-                // Detect workflow completion
-                if (progress.status === 'completed' && JSON.parse(lastContent || '{}').status !== 'completed') {
-                    this.broadcastEvent({
-                        type: 'WORKFLOW_COMPLETED',
-                        payload: {
-                            workflowId: progress.workflowId || 'unknown',
-                            duration: progress.elapsedSeconds ? progress.elapsedSeconds * 1000 : 0,
-                            timestamp: new Date().toISOString()
-                        }
-                    });
+        if (currentStatus === 'completed' && prevStatus !== 'completed') {
+            this.broadcastEvent({
+                type: 'WORKFLOW_COMPLETED',
+                payload: {
+                    workflowId: state.config?.workflowId || 'unknown',
+                    duration: state.duration || 0,
+                    timestamp: new Date().toISOString()
                 }
+            });
+        }
 
-                // Detect workflow failure
-                if (progress.status === 'failed' && JSON.parse(lastContent || '{}').status !== 'failed') {
-                    this.broadcastEvent({
-                        type: 'WORKFLOW_FAILED',
-                        payload: {
-                            workflowId: progress.workflowId || 'unknown',
-                            error: progress.error || 'Unknown error',
-                            failedAtStep: progress.currentStep,
-                            duration: progress.elapsedSeconds ? progress.elapsedSeconds * 1000 : 0,
-                            timestamp: new Date().toISOString()
-                        }
-                    });
+        if (currentStatus === 'failed' && prevStatus !== 'failed') {
+            this.broadcastEvent({
+                type: 'WORKFLOW_FAILED',
+                payload: {
+                    workflowId: state.config?.workflowId || 'unknown',
+                    error: state.error || 'Unknown error',
+                    failedAtStep: state.currentStepName,
+                    duration: state.duration || 0,
+                    timestamp: new Date().toISOString()
                 }
+            });
+        }
 
-                lastContent = newContent;
-            } catch (error) {
-                // Ignore read errors during rapid updates
-            }
-        }, 100);
-
-        // Cleanup on server stop
-        this.server.on('close', () => clearInterval(pollInterval));
+        this.previousStatus = currentStatus;
     }
 
     /**
