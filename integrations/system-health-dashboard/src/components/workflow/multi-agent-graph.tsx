@@ -11,12 +11,15 @@ import {
   selectExecutionCurrentStep,
   selectExecutionCurrentSubstep,
   selectLLMState,
+  selectWorkflowState,
   type LLMMode,
 } from '@/store/slices/ukbSlice'
+import { deriveSubstepStatuses } from '@/shared/workflow-types/derived'
+import type { StepStatus } from '@/shared/workflow-types/schemas'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 // WebSocket hook disabled - no server-side implementation exists yet
 // import useWorkflowWebSocket from '@/hooks/useWorkflowWebSocket'
-import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES, SUBSTEP_COLORS, EDGE_TYPE_COLORS } from './constants'
+import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES, SUBSTEP_COLORS, NODE_STATUS_COLORS, EDGE_TYPE_COLORS } from './constants'
 import { Logger, LogCategories } from '@/utils/logging'
 
 interface MultiAgentGraphProps {
@@ -299,6 +302,9 @@ export function MultiAgentGraph({
   const executionSubstepStatuses = useSelector(selectExecutionSubstepStatuses)
   const executionCurrentStep = useSelector(selectExecutionCurrentStep)
   const executionCurrentSubstep = useSelector(selectExecutionCurrentSubstep)
+
+  // Phase 18: WorkflowState for substep status derivation
+  const workflowState = useSelector(selectWorkflowState)
 
   // LLM Mode state for per-agent badges
   const llmState = useSelector(selectLLMState)
@@ -1259,70 +1265,21 @@ export function MultiAgentGraph({
               const startAngle = -150
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
-              // Find ALL steps belonging to this agent and build per-substep status map
-              // Uses effectiveSteps (prefers event-driven state over polling-based)
-              const agentSteps = effectiveSteps.filter(s => {
-                const stepAgentId = stepToAgent[s.name] || s.name
-                return stepAgentId === expandedSubStepsAgent
-              })
-              const substepStatuses = new Map<string, string>()
-              for (const step of agentSteps) {
-                const substepId = effectiveStepToSubStep[step.name]
-                if (substepId) {
-                  substepStatuses.set(substepId, step.status)
-                }
-              }
+              // Phase 18: Derive substep statuses from WorkflowState (no inference/guessing)
+              // Find the backend step name for this agent to pass to deriveSubstepStatuses
+              const agentBackendStepName = Object.entries(stepToAgent).find(
+                ([_stepName, agentId]) => agentId === expandedSubStepsAgent
+              )?.[0] || expandedSubStepsAgent
 
-              // FALLBACK: Infer substep statuses from currentStep when polling data lacks substep detail
-              // This handles the case where effectiveSteps doesn't have individual substep statuses
-              const currentStepSubstepId = process.currentStep ? effectiveStepToSubStep[process.currentStep] : null
-              const currentStepAgentId = process.currentStep ? (stepToAgent[process.currentStep] || process.currentStep) : null
-              const substepOrder = substeps.map(s => s.id)  // e.g., ['conv', 'aggr', 'embed', 'dedup', 'pred', 'merge']
+              // Build substep definitions in the format deriveSubstepStatuses expects
+              const substepDefs = substeps.map(s => ({ id: s.id, label: s.name }))
 
-              // Check if this agent's parent step is already completed
-              // e.g., if 'generate_batch_observations' has status 'completed', all observation_generation substeps are done
-              const agentParentStepCompleted = effectiveSteps.some(step => {
-                const stepAgent = stepToAgent[step.name] || step.name
-                // Check if this is a parent step (not a substep) for this agent AND it's completed
-                const isParentStep = stepAgent === expandedSubStepsAgent && !effectiveStepToSubStep[step.name]
-                return isParentStep && step.status === 'completed'
-              })
+              // Derive substep statuses from state machine position
+              const substepStatuses: Map<string, StepStatus> = workflowState
+                ? deriveSubstepStatuses(workflowState, agentBackendStepName, substepDefs)
+                : new Map(substeps.map(s => [s.id, 'pending' as StepStatus]))
 
-              // Only trust parent-step-completed when we have NO granular substep data.
-              // In single-step mode, the parent step may report "completed" while substeps
-              // are still running — individual substep statuses should take priority.
-              const hasGranularSubstepData = substepStatuses.size > 0
-              if (agentParentStepCompleted && !hasGranularSubstepData) {
-                // No per-substep data available — trust the parent step status
-                substepOrder.forEach(substepId => {
-                  substepStatuses.set(substepId, 'completed')
-                })
-              } else if (currentStepAgentId === expandedSubStepsAgent && currentStepSubstepId) {
-                // We're currently running a substep of this agent — infer statuses
-                // for substeps that DON'T already have event-driven data
-                const currentIdx = substepOrder.indexOf(currentStepSubstepId)
-
-                if (currentIdx >= 0) {
-                  substepOrder.forEach((substepId, idx) => {
-                    // Don't overwrite SSE-sourced statuses
-                    if (substepStatuses.has(substepId)) return
-                    if (idx < currentIdx) {
-                      substepStatuses.set(substepId, 'completed')
-                    } else if (idx === currentIdx) {
-                      substepStatuses.set(substepId, 'running')
-                    } else {
-                      substepStatuses.set(substepId, 'pending')
-                    }
-                  })
-                }
-              }
-              // DEBUG: Log substep status computation
-              Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] agentSteps:', agentSteps.map(s => ({ name: s.name, status: s.status })))
-              Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] substepStatuses:', Object.fromEntries(substepStatuses))
-              const isAgentRunning = agentSteps.some(s => s.status === 'running')
-              // Agent is fully completed only if ALL its substeps are done (no running ones left)
-              const isAgentCompleted = !isAgentRunning && agentSteps.length > 0 &&
-                agentSteps.every(s => s.status === 'completed' || s.status === 'skipped')
+              Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] derived substepStatuses:', Object.fromEntries(substepStatuses))
 
               return substeps.map((substep, idx) => {
                 const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
@@ -1352,19 +1309,20 @@ export function MultiAgentGraph({
                 const substepStatus = substepStatuses.get(substep.id)
 
                 const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
+                const isSubstepFailed = substepStatus === 'failed'
                 const isActiveSubStep = substepStatus === 'running'
                 const isPending = !substepStatus || substepStatus === 'pending'
-                // Per-substep status takes priority over isAgentCompleted.
-                // isAgentCompleted only applies when no granular substep data exists.
-                const useAgentCompleted = isAgentCompleted && !substepStatuses.has(substep.id)
-                const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted || useAgentCompleted
+                const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted
 
-                // Colors based on per-substep state (centralized in SUBSTEP_COLORS)
+                // Colors based on derived substep status (centralized in SUBSTEP_COLORS)
                 let fillColor: string = SUBSTEP_COLORS.pending.fill
                 let strokeColor: string = SUBSTEP_COLORS.pending.stroke
-                if (isSubstepCompleted || useAgentCompleted) {
+                if (isSubstepCompleted) {
                   fillColor = SUBSTEP_COLORS.completed.fill
                   strokeColor = SUBSTEP_COLORS.completed.stroke
+                } else if (isSubstepFailed) {
+                  fillColor = NODE_STATUS_COLORS.failed.border
+                  strokeColor = NODE_STATUS_COLORS.failed.text
                 } else if (isActiveSubStep) {
                   fillColor = SUBSTEP_COLORS.running.fill
                   strokeColor = SUBSTEP_COLORS.running.stroke
@@ -1373,7 +1331,7 @@ export function MultiAgentGraph({
                   strokeColor = SUBSTEP_COLORS.selected.stroke
                 }
 
-                const statusText = isSubstepCompleted || useAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
+                const statusText = isSubstepCompleted ? ' (Completed)' : isSubstepFailed ? ' (Failed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
 
                 return (
                   <g
