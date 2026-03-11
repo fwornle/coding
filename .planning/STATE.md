@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: -- Workflow State Machine
 status: in-progress
-stopped_at: Completed 18-01 (dashboard Redux consumer pipeline)
-last_updated: "2026-03-11T11:15:07Z"
-last_activity: 2026-03-11 — Completed plan 18-01 (dashboard Redux consumer pipeline)
+stopped_at: Completed 18-02 (component migration - substep coloring, typed commands)
+last_updated: "2026-03-11T11:27:49Z"
+last_activity: 2026-03-11 — Completed plan 18-02 (component migration)
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
-  percent: 87
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Typed state machine for workflow orchestration -- single source of truth, typed transitions, dashboard as pure consumer
-**Current focus:** v3.0 Phase 18 — Dashboard Consumer
+**Current focus:** v3.0 Phase 18 complete — Dashboard Consumer
 
 ## Current Position
 
 Phase: 18 of 19 (Dashboard Consumer)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-03-11 — Completed plan 18-01 (dashboard Redux consumer pipeline)
+Plan: 2 of 2 complete
+Status: Phase Complete
+Last activity: 2026-03-11 — Completed plan 18-02 (component migration: substep coloring, typed commands, inference removal)
 
-Progress: [████████░░] 87% (7/8 plans complete)
+Progress: [██████████] 100% (8/8 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 7min
-- Total execution time: 48min
+- Total execution time: 58min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -48,6 +48,7 @@ Progress: [████████░░] 87% (7/8 plans complete)
 | 17    | 01   | 4min     | 2     | 7     |
 | 17    | 02   | 15min    | 2     | 10    |
 | 18    | 01   | 5min     | 2     | 2     |
+| 18    | 02   | 10min    | 2     | 4     |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Progress: [████████░░] 87% (7/8 plans complete)
 - [18-01]: Single setWorkflowState action replaces 12 granular event handlers -- no event-by-event reconstruction
 - [18-01]: Backward-compat sync in setWorkflowState writes to legacy execution fields for unmigrated components
 - [18-01]: deriveStepStatuses uses backend step names from stepMappings, reverse-mapped to agent IDs for UI
+- [18-02]: deriveSubstepStatuses called with backend step name from stepToAgent reverse lookup
+- [18-02]: Step/Into buttons use WebSocket sendCommand with isTransitionInFlight -- replaces REST fetch+poll
+- [18-02]: resolvedStatus in sidebar typed as DisplayStatus union using selectNodeStatus selector
 
 ### Critical Pitfalls
 
@@ -91,6 +95,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T11:10:21Z
-Stopped at: Completed 18-01 (dashboard Redux consumer pipeline)
-Resume with: Execute 18-02 (component migration to use WorkflowState selectors directly).
+Last session: 2026-03-11T11:27:49Z
+Stopped at: Completed 18-02 (component migration - substep coloring, typed commands, inference removal)
+Resume with: Phase 18 complete. Phase 19 (migration cleanup) is next if planned.
