@@ -703,6 +703,21 @@ const ukbSlice = createSlice({
       // Combine: new/merged processes + preserved running processes not in new data
       state.processes = [...mergedNewProcesses, ...existingRunningProcesses]
 
+      // Sync stepPaused from active process to top-level state (REST polling path)
+      const activeProcess = state.processes.find(
+        (p: UKBProcess) => p.status === 'running' || p.status === 'starting'
+      ) as any
+      if (activeProcess) {
+        if (activeProcess.stepPaused !== undefined) {
+          state.stepPaused = activeProcess.stepPaused === true
+          state.pausedAtStep = activeProcess.pausedAtStep || null
+        }
+      } else {
+        // No active process — clear pause state
+        state.stepPaused = false
+        state.pausedAtStep = null
+      }
+
       if (action.payload.config) {
         state.config = action.payload.config
       }
