@@ -757,11 +757,11 @@ class SystemHealthAPIServer {
                         // Single-step debugging mode state
                         // CRITICAL: Preserve actual values - don't default to false as this causes UI sync issues
                         // The UI will handle undefined values appropriately
-                        singleStepMode: workflowProgress.singleStepMode === true,  // Explicit boolean, false if undefined
-                        stepPaused: workflowProgress.stepPaused === true,          // Explicit boolean
+                        singleStepMode: workflowProgress.config?.singleStepMode === true || workflowProgress.singleStepMode === true,
+                        stepPaused: workflowProgress.stepPaused === true,
                         pausedAtStep: workflowProgress.pausedAtStep || null,
                         // LLM Mock mode for frontend testing
-                        mockLLM: workflowProgress.mockLLM === true,
+                        mockLLM: workflowProgress.config?.mockLLM === true || workflowProgress.mockLLM === true,
                         mockLLMDelay: workflowProgress.mockLLMDelay || 500,
                         // Batch phase step count (derived from workflow YAML)
                         batchPhaseStepCount: workflowProgress.batchPhaseStepCount || null,
@@ -804,13 +804,13 @@ class SystemHealthAPIServer {
                         proc.steps = this.buildStepInfo(workflowProgress);
 
                         // Single-step debugging mode state (must include for all processes, not just inline)
-                        proc.singleStepMode = workflowProgress.singleStepMode === true;
+                        proc.singleStepMode = workflowProgress.config?.singleStepMode === true || workflowProgress.singleStepMode === true;
                         proc.stepPaused = workflowProgress.stepPaused === true;
                         proc.pausedAtStep = workflowProgress.pausedAtStep || null;
                         proc.stepIntoSubsteps = workflowProgress.stepIntoSubsteps === true;
 
                         // LLM Mock mode
-                        proc.mockLLM = workflowProgress.mockLLM === true;
+                        proc.mockLLM = workflowProgress.config?.mockLLM === true || workflowProgress.mockLLM === true;
                         proc.mockLLMDelay = workflowProgress.mockLLMDelay || 500;
 
                         // Batch phase step count
@@ -1070,8 +1070,9 @@ class SystemHealthAPIServer {
             repositoryPath: null,
             // Single-step mode fields
             singleStepMode: config.singleStepMode === true,
-            stepPaused: state.status === 'paused',
-            pausedAtStep: state.status === 'paused' && state.pausedAt ? state.pausedAt.step : null,
+            // stepPaused is set by wave-controller directly on the progress file root, not via state machine
+            stepPaused: state.stepPaused === true || state.status === 'paused',
+            pausedAtStep: state.pausedAtStep || (state.status === 'paused' && state.pausedAt ? state.pausedAt.step : null),
             mockLLM: config.mockLLM === true,
             mockLLMDelay: config.mockLLMDelay || 500,
             // Wave-specific data for the trace modal
@@ -1431,7 +1432,7 @@ class SystemHealthAPIServer {
 
             const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
 
-            if (!progress.singleStepMode) {
+            if (!progress.singleStepMode && !progress.config?.singleStepMode) {
                 return res.json({
                     status: 'success',
                     message: 'Single-step mode not enabled, nothing to advance',
