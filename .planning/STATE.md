@@ -10,7 +10,7 @@ progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 92
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 19.1 (Dashboard State Machine Integration)
-Plan: 19.1-01 complete, 19.1-02 next
+Plan: 19.1-03 complete, 19.1-04 next
 Status: In Progress
-Last activity: 2026-03-11 — Completed plan 19.1-01 (step-complete dispatches + bridge layer)
+Last activity: 2026-03-12 — Completed plan 19.1-03 (enriched step-complete events with trace data)
 
-Progress: [█████████░] 92% (10/12 plans)
+Progress: [█████████░] 92% (11/12 plans)
 
 ### Phase 19 Blocker: State Machine Dashboard Integration Incomplete
 
@@ -62,6 +62,7 @@ Plan 19-01 (parallel validation) reached checkpoint but validation revealed the 
 | 18    | 01   | 5min     | 2     | 2     |
 | 18    | 02   | 10min    | 2     | 4     |
 | 19.1  | 01   | 3min     | 2     | 2     |
+| 19.1  | 03   | 7min     | 2     | 4     |
 
 ## Accumulated Context
 
@@ -98,6 +99,9 @@ Plan 19-01 (parallel validation) reached checkpoint but validation revealed the 
 - [19.1-01]: stepName/nextStep/duration fields per StepCompleteEventSchema (plan examples used wrong 'step' field)
 - [19.1-01]: bridgeStateMachineToLegacy returns null for non-state-machine format (passthrough for legacy data)
 - [19.1-01]: Terminal states detected via workflowId presence, not progress array
+- [19.1-03]: z.record(z.string(), z.unknown()) for trace schemas -- avoids coupling to TraceAgentInstance/TraceLLMCall interfaces
+- [19.1-03]: stepsDetail carried from RunningState through CompletedState for terminal state trace access
+- [19.1-03]: Terminal states included in API for 30 minutes via isRecentTerminal filter
 
 ### Critical Pitfalls
 
@@ -115,6 +119,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T17:16:40Z
-Stopped at: Completed 19.1-01-PLAN.md
-Resume with: Plan 19.1-02 next (trace modal and single-step control migration).
+Last session: 2026-03-12T00:10:00Z
+Stopped at: Completed 19.1-03-PLAN.md
+Resume with: Plan 19.1-04 next.
