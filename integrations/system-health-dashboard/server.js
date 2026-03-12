@@ -3357,12 +3357,19 @@ class SystemHealthAPIServer {
         try {
             switch (command.type) {
                 case 'STEP_ADVANCE':
-                    // Write resume signal to progress file (same as existing handleStepAdvance)
+                    // Write resume signal to progress file (must clear stepPaused like REST handler)
                     if (existsSync(progressPath)) {
                         const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        const previousStep = progress.pausedAtStep;
+                        progress.stepPaused = false;
                         progress.resumeRequestedAt = new Date().toISOString();
+                        if (command.payload?.stepInto === true) {
+                            progress.stepIntoSubsteps = true;
+                        } else if (command.payload?.stepInto === false) {
+                            progress.stepIntoSubsteps = false;
+                        }
                         writeFileSync(progressPath, JSON.stringify(progress, null, 2));
-                        console.log('[WebSocket] Step advance requested');
+                        process.stderr.write(`[WebSocket] Step advance: stepPaused=false (was at: ${previousStep})\n`);
                     }
                     break;
 
