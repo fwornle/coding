@@ -106,17 +106,36 @@ class HealthRefreshManager {
       const WAVE_STEPS = ['wave1', 'wave2', 'wave3', 'wave4']
       const completedSet = new Set(p.completedSteps || [])
 
+      // Build enriched stepsDetail: use state machine's stepsDetail if available,
+      // otherwise fall back to minimal wave step entries
+      const enrichedStepsMap = new Map<string, any>()
+      if (sm.stepsDetail && Array.isArray(sm.stepsDetail)) {
+        for (const step of sm.stepsDetail) {
+          enrichedStepsMap.set(step.name, step)
+        }
+      }
+
+      const stepsDetail = WAVE_STEPS.map((name: string, idx: number) => {
+        const enriched = enrichedStepsMap.get(name)
+        const status = completedSet.has(name) ? 'completed'
+          : p.currentWave === idx + 1 ? 'running' : 'pending'
+
+        if (enriched) {
+          return {
+            ...enriched,
+            status: enriched.status || status,
+          }
+        }
+        return { name, status }
+      })
+
       progress = {
         status: sm.status === 'paused' ? 'running' : sm.status,
         workflowName: sm.workflowName || 'wave-analysis',
         completedSteps: p.completedSteps.length,
         totalSteps: WAVE_STEPS.length,
         currentStep: p.currentSubstepId || p.currentStepName,
-        stepsDetail: WAVE_STEPS.map((name: string, idx: number) => ({
-          name,
-          status: completedSet.has(name) ? 'completed'
-            : p.currentWave === idx + 1 ? 'running' : 'pending',
-        })),
+        stepsDetail,
         startTime: p.startTime,
         lastUpdate: p.lastUpdate,
         elapsedSeconds: p.elapsedSeconds || 0,
