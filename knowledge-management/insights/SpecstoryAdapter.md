@@ -2,85 +2,88 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter class might be designed to adapt to different environments and use cases, given the flexible and scalable planning and tracking of project milestones.
+SpecstoryAdapter uses the httpRequest helper method to send HTTP requests to the Specstory extension in the connectViaHTTP method
 
 ## What It Is  
 
-The **SpecstoryAdapter** lives in the file `lib/integrations/specstory-adapter.js` and is a **SubComponent** of the **Trajectory** component. Its primary responsibility is to act as the bridge between the Trajectory system and the external **Specstory** extension. The adapter exposes a `connectViaHTTP` method that attempts to open an HTTP connection to the Specstory extension on three well‑known ports – **7357**, **7358**, and **7359**. By targeting several ports the adapter can recover from a single‑port failure and spread traffic when several instances of the extension are running side‑by‑side. The class is positioned alongside three sibling integration points – **ProjectMilestoneManager**, **PhasePlanner**, and **TaskTracker** – each of which may call into SpecstoryAdapter to retrieve milestone, planning, or task data respectively.
+**SpecstoryAdapter** is a concrete integration class located at `lib/integrations/specstory-adapter.js`. Its sole responsibility is to mediate communication between the **Trajectory** component and the external *Specstory* extension. By exposing three distinct connection entry points—`connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`—the adapter gives the parent **Trajectory** component a flexible way to log conversations and track project progress regardless of the environment in which the system is running (e.g., remote server, local process, or file‑system based signaling). The class does not contain business logic of its own; instead, it delegates the low‑level transport work to helper utilities such as the `httpRequest` function.
 
 ## Architecture and Design  
 
-The design of **SpecstoryAdapter** follows a classic **Adapter** pattern: it translates the internal calls made by Trajectory’s planning and tracking subsystems into the protocol required by the external Specstory service (HTTP, IPC, or file‑watch). The presence of a `connectViaHTTP` method that iterates over multiple ports reveals a **retry‑with‑fallback** strategy rather than a single‑point connection attempt. This strategy doubles as a rudimentary **load‑balancing** approach: by rotating through ports the adapter can distribute request load when the Specstory extension is deployed in a multi‑instance configuration.
+The design of **SpecstoryAdapter** follows a *transport‑agnostic* approach. Rather than hard‑coding a single communication channel, the adapter supplies a small, well‑defined API surface (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) that abstracts away the underlying mechanism. This results in a clear separation of concerns: **Trajectory** focuses on conversation logging and progress tracking, while **SpecstoryAdapter** concentrates on establishing and maintaining the link to the Specstory extension.
 
-Within the broader Trajectory architecture, the adapter is a leaf node that does not own other sub‑components, but it is a shared service for its siblings. **ProjectMilestoneManager**, **PhasePlanner**, and **TaskTracker** each depend on the adapter to obtain data from Specstory, which means the adapter serves as a **single source of truth** for external connectivity. The hierarchical context shows that Trajectory deliberately isolates external integration concerns inside the `lib/integrations/` folder, keeping the core planning logic clean and testable.
+From the observations, the adapter’s architecture can be seen as a *wrapper* around three different transport strategies. Each strategy is encapsulated in its own method, allowing the caller to select the most appropriate one at runtime. The `connectViaHTTP` method internally uses the `httpRequest` helper, which suggests that HTTP communication is performed through a reusable utility rather than bespoke request code. The IPC and file‑watch pathways are similarly isolated, implying that each transport channel can evolve independently without impacting the others.
+
+Interaction between components is straightforward. **Trajectory** imports the adapter from its defined path and invokes one of the connection methods based on configuration or environmental detection. Once a connection is established, **Trajectory** can forward logging data to the Specstory extension through the open channel. No other parts of the system are mentioned as directly depending on the adapter, which keeps the dependency graph shallow and easier to reason about.
 
 ## Implementation Details  
 
-The core of the implementation is the `connectViaHTTP` method. Although the source code is not displayed, the observations confirm that the method:
+The core of the implementation resides in `lib/integrations/specstory-adapter.js`. Although the source code is not provided, the observations outline the following key functions:
 
-1. **Iterates over the port list** `[7357, 7358, 7359]`.  
-2. **Attempts an HTTP request** (likely a health‑check or handshake) on each port in turn.  
-3. **Handles connection failures** by catching network errors and moving to the next port – this is the “retry mechanism” referenced in the observations.  
-4. **Selects a successful endpoint** and stores the connection handle for subsequent API calls.
+* **`connectViaHTTP`** – This method constructs an HTTP request targeting the Specstory extension. It delegates the actual network call to the `httpRequest` helper, which likely handles aspects such as URL composition, headers, payload serialization, and response handling. By using a helper, the adapter avoids duplicating request logic and can benefit from any shared error‑handling or retry mechanisms present in `httpRequest`.
 
-Because the adapter may also support **IPC** and **file‑watch** methods (as mentioned in the parent component description), the class likely contains a small **strategy selector** that chooses the appropriate transport based on runtime configuration or environment detection. This selector would instantiate the appropriate low‑level client (HTTP client, IPC socket, or file system watcher) and expose a uniform interface to the rest of the system.
+* **`connectViaIPC`** – This method establishes an inter‑process communication (IPC) channel. While the exact IPC mechanism (e.g., Unix domain sockets, named pipes, or Node.js `process.send`) is not specified, the presence of a dedicated method indicates that the adapter abstracts the low‑level IPC setup behind a clean interface.
 
-The adapter’s potential dependencies on **ProjectMilestoneManager**, **PhasePlanner**, and **TaskTracker** are not hard imports but rather *usage relationships*: those components call the adapter’s public methods (e.g., `fetchMilestones()`, `fetchPhasePlan()`, `fetchTasks()`) which internally rely on the established HTTP connection. The adapter therefore encapsulates all error handling, retry logic, and transport details, shielding its consumers from external variability.
+* **`connectViaFileWatch`** – This method leverages a file‑system watch pattern to detect changes or signals from the Specstory extension. It likely uses a file‑watching utility (such as `fs.watch` or a higher‑level library) to monitor a predefined file or directory for modifications that represent messages or status updates.
+
+Each connection method returns a handle or promise that **Trajectory** can use to transmit logging data. The adapter does not appear to embed any business logic; its responsibilities are limited to establishing the channel and possibly exposing a simple send/receive API.
 
 ## Integration Points  
 
-- **Parent – Trajectory**: Trajectory aggregates the SpecstoryAdapter alongside its other integration sub‑components. The adapter’s existence inside `lib/integrations/` signals that Trajectory expects all external connectors to follow a similar contract (e.g., expose a `connect…` method and a set of data‑fetching helpers).  
-- **Siblings – ProjectMilestoneManager, PhasePlanner, TaskTracker**: Each sibling can invoke the adapter to retrieve domain‑specific data. For example, `ProjectMilestoneManager` may call `SpecstoryAdapter.connectViaHTTP()` then `SpecstoryAdapter.getMilestones()`. The shared adapter reduces duplicated connection code across these siblings.  
-- **External – Specstory extension**: The adapter’s only external dependency is the Specstory service, reachable via HTTP on ports 7357‑7359, via IPC sockets, or via a file‑watch mechanism. The multi‑port approach gives the system flexibility to operate in environments where a single port may be blocked or already in use.  
-- **Configuration**: Although not explicitly described, the presence of multiple transport options suggests that the adapter reads configuration (perhaps from environment variables or a Trajectory settings object) to decide which transport to employ at startup.
+**SpecstoryAdapter** sits directly under the **Trajectory** component, which is its sole consumer according to the observations. The integration flow is as follows:
+
+1. **Trajectory** imports `SpecstoryAdapter` from `lib/integrations/specstory-adapter.js`.
+2. At initialization, **Trajectory** decides which transport to use (HTTP, IPC, or file watch) based on configuration, runtime environment, or user preference.
+3. **Trajectory** calls the appropriate `connectVia…` method, receiving back a connection object or promise.
+4. Logging data (conversation transcripts, progress metrics) is sent through this connection to the Specstory extension.
+5. The Specstory extension processes the data and may respond, with responses routed back through the same channel.
+
+No other sibling components are mentioned, so the adapter’s external interface is minimal: it only exposes the three connection methods. Internally, the adapter relies on the `httpRequest` helper for HTTP communication, implying a dependency on that utility module. The IPC and file‑watch pathways may depend on Node.js core modules (`net`, `fs`) or third‑party libraries, though those dependencies are not enumerated in the observations.
 
 ## Usage Guidelines  
 
-1. **Initialize Once** – Call `SpecstoryAdapter.connectViaHTTP()` during application start‑up (e.g., in Trajectory’s initialization routine). Because the method performs retries and selects a live port, invoking it repeatedly can cause unnecessary network chatter.  
-2. **Handle Asynchronous Errors** – The adapter’s connection attempts are asynchronous and may reject if all ports are unavailable. Consumers (ProjectMilestoneManager, PhasePlanner, TaskTracker) should propagate or log these errors rather than silently swallowing them.  
-3. **Prefer the Adapter Over Direct HTTP Calls** – All external data retrieval should go through the adapter’s high‑level methods. This ensures that any future changes to transport (e.g., moving from HTTP to IPC) remain transparent to the consumers.  
-4. **Do Not Hard‑Code Ports** – While the adapter currently targets 7357‑7359, future deployments may change these values. Rely on the adapter’s internal port list rather than embedding port numbers in sibling components.  
-5. **Monitor Connection Health** – If the system includes health‑checking infrastructure, expose the adapter’s selected port and connection status so operators can verify that the Specstory extension is reachable.
+When incorporating **SpecstoryAdapter** within **Trajectory** or any future component, developers should observe the following best practices:
+
+1. **Select the appropriate transport early** – Choose `connectViaHTTP` for environments where the Specstory extension is reachable over a network, `connectViaIPC` for same‑machine processes that can communicate via sockets or pipes, and `connectViaFileWatch` when a lightweight, file‑based signaling mechanism is preferred (e.g., in restricted sandboxed environments).
+
+2. **Handle connection lifecycles** – Each `connectVia…` method likely returns an asynchronous handle. Ensure that the handle is properly awaited, and that any cleanup (closing sockets, stopping file watchers) is performed when **Trajectory** shuts down or when the connection is no longer needed.
+
+3. **Leverage the `httpRequest` helper** – For HTTP connections, do not bypass the helper; it centralizes request configuration and error handling. Pass any custom headers or timeout values through the helper’s parameters if supported.
+
+4. **Maintain environment‑specific configuration** – Store the chosen transport method and any required endpoint details (URL, IPC socket path, watch file path) in a configuration object that **Trajectory** can read at startup. This keeps the adapter usage declarative and makes it easier to switch transports without code changes.
+
+5. **Monitor for errors** – Since the adapter abstracts away transport details, surface any connection errors back to **Trajectory** so that higher‑level retry or fallback logic can be applied. For example, if HTTP fails, **Trajectory** might automatically fall back to IPC if the environment permits.
 
 ---
 
-### 1. Architectural patterns identified  
-- **Adapter pattern** – translates internal calls to the external Specstory protocol.  
-- **Retry‑with‑fallback / simple load‑balancing** – attempts connections across multiple ports.  
-- **Strategy‑like transport selection** – supports HTTP, IPC, and file‑watch methods.
+### Architectural Patterns Identified
+* Transport‑agnostic wrapper (multiple connection strategies encapsulated in a single adapter)  
+* Separation of concerns between logging logic (**Trajectory**) and communication plumbing (**SpecstoryAdapter**)  
 
-### 2. Design decisions and trade‑offs  
-- **Multiple ports** improve resilience and enable basic load distribution but add complexity to connection logic and require careful error handling.  
-- **Centralized adapter** reduces duplicated code across siblings, at the cost of a single point of failure if the adapter itself is buggy.  
-- **Supporting several transport mechanisms** future‑proofs the integration but increases the code surface area that must be maintained and tested.
+### Design Decisions and Trade‑offs  
+* **Decision:** Provide three distinct connection methods rather than a single generic one.  
+  * *Trade‑off:* Increases flexibility and environment compatibility but adds a modest amount of code to maintain.  
+* **Decision:** Delegate HTTP work to a shared `httpRequest` helper.  
+  * *Trade‑off:* Promotes reuse and consistent error handling, but couples the adapter to the helper’s API contract.  
 
-### 3. System structure insights  
-- **Trajectory** is the parent orchestrator; it delegates external communication to integration sub‑components placed under `lib/integrations/`.  
-- **SpecstoryAdapter** sits alongside other domain‑specific adapters (ProjectMilestoneManager, PhasePlanner, TaskTracker), forming a cohesive integration layer.  
-- The adapter’s public API is the only contract exposed to its siblings, reinforcing a clean separation of concerns.
+### System Structure Insights  
+* The system follows a shallow dependency hierarchy: **Trajectory** → **SpecstoryAdapter** → (helpers such as `httpRequest`, Node core modules).  
+* No sibling components are shown to share the adapter, indicating a one‑to‑one relationship between **Trajectory** and **SpecstoryAdapter**.  
 
-### 4. Scalability considerations  
-- The port‑rotation approach scales horizontally: adding more Specstory instances simply means opening additional ports (or re‑using the existing range) and the adapter will automatically spread traffic.  
-- Because the adapter performs retries locally, the latency impact of a failed port is bounded to the retry timeout; however, large numbers of simultaneous retries could increase start‑up time under heavy load.  
-- Future scaling could be achieved by externalizing the port list to a configuration service, allowing dynamic expansion without code changes.
+### Scalability Considerations  
+* Adding new transport mechanisms (e.g., WebSocket, gRPC) can be done by introducing additional `connectVia…` methods without altering existing callers.  
+* The HTTP path can scale horizontally because it relies on standard stateless requests; IPC and file‑watch paths are inherently limited to a single host, so they should be used only where cross‑host scalability is not required.  
 
-### 5. Maintainability assessment  
-- **High maintainability**: the adapter encapsulates all external communication, so changes to Specstory’s API or transport details affect only this file (`lib/integrations/specstory-adapter.js`).  
-- **Potential risk**: the retry/load‑balancing logic is currently implicit; documenting the exact algorithm and exposing it via unit tests would guard against regression.  
-- **Clear boundaries** with sibling components mean that developers working on ProjectMilestoneManager, PhasePlanner, or TaskTracker can focus on domain logic without needing to understand the low‑level connection mechanics.  
-
-Overall, the **SpecstoryAdapter** provides a well‑defined, resilient integration point that aligns with Trajectory’s goal of flexible and scalable milestone planning while keeping external dependencies isolated and manageable.
+### Maintainability Assessment  
+* Centralizing all Specstory communication logic in `lib/integrations/specstory-adapter.js` simplifies maintenance; changes to transport handling are localized.  
+* The clear method boundaries (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) make the codebase easy to understand and test in isolation.  
+* Dependence on external helpers (e.g., `httpRequest`) means that updates to those utilities must be coordinated, but this also reduces duplication and encourages consistency across the codebase.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is designed to facilitate flexible and scalable planning and tracking of project milestones, with the SpecstoryAdapter class in lib/integrations/specstory-adapter.js playing a crucial role in connecting to the Specstory extension via HTTP, IPC, or file watch methods. This design decision allows for multiple integration points, enabling the component to adapt to different environments and use cases. The connectViaHTTP method in SpecstoryAdapter attempts to connect to the Specstory extension on multiple ports (7357, 7358, 7359) to establish a connection, demonstrating a retry mechanism to handle potential connection failures. The use of multiple ports also suggests a load-balancing strategy to distribute the connection load across different ports.
-
-### Siblings
-- [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359) to handle potential connection failures.
-- [PhasePlanner](./PhasePlanner.md) -- PhasePlanner could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant phase planning data.
-- [TaskTracker](./TaskTracker.md) -- TaskTracker could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant task data.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is designed to facilitate logging conversations and tracking project progress through its utilization of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides multiple connection methods, including connectViaHTTP, connectViaIPC, and connectViaFileWatch, which allows the component to establish a connection with the Specstory extension via different means. For instance, the connectViaHTTP method in the SpecstoryAdapter class uses the httpRequest helper method to send HTTP requests to the Specstory extension, enabling the component to log conversations and track project progress.
 
 
 ---

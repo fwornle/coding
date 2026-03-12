@@ -2,107 +2,95 @@
 
 **Type:** SubComponent
 
-The lack of specific implementation details for HookManager in the provided source files indicates that its implementation may be located in a separate module or file.
+The HookManager provides a flexible architecture for handling different types of hooks, including synchronous and asynchronous hooks
 
 ## What It Is  
 
-`HookManager` is the dedicated sub‑component inside the **ConstraintSystem** that is responsible for the complete life‑cycle of hooks – from registration through to execution and eventual cleanup.  Although the concrete source file is not listed among the observed symbols, the surrounding documentation makes it clear that `HookManager` lives **within the ConstraintSystem module** and is a first‑class citizen of that boundary.  Its purpose is to provide a **centralized registry** for hook callbacks so that other parts of the system (e.g., the `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` or the `GraphDatabaseAdapter` in `storage/graph-database-adapter.js`) can rely on a single, well‑defined entry point for hook‑related operations.
+The **HookManager** is a sub‑component that lives inside the **ConstraintSystem** package.  Although the exact file location is not listed in the supplied observations, every reference to the HookManager is made in the context of the ConstraintSystem’s internal plumbing (e.g., “ConstraintSystem contains HookManager”).  Its core responsibility is to act as a **registry‑based hub** for all hook definitions that the system may need to fire when certain constraints are evaluated.  By exposing a single registration point, the HookManager makes it possible for other parts of the platform—such as the **ContentValidator**, **ViolationCollector**, and the **GraphDatabaseAccessor**—to attach custom behaviour that runs synchronously or asynchronously in response to constraint‑related events.  
 
-The observations describe `HookManager` as the “engine” that enables hooks to be executed and managed, implying that any component that needs to trigger custom logic – such as validation steps, violation logging, or persistence hooks – will interact with it rather than implementing its own ad‑hoc callback handling.
+The component is deliberately flexible: it supports both **singleton** and **multi‑instance** registration modes, offers a **priority‑based dispatch** mechanism so that critical hooks run first, and incorporates an internal **caching layer** that reduces the number of registry look‑ups for frequently used hooks.  A built‑in **debug mode** gives developers visibility into hook registration and execution, which is especially useful when troubleshooting complex validation pipelines.  Finally, the HookManager is tightly coupled with the **GraphDatabaseAccessor** for persisting hook metadata and retrieving it on demand.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is **modular with a centralized hook registry**.  The ConstraintSystem is split into distinct modules (e.g., `ContentValidator`, `ViolationLogger`, `GraphDatabaseManager`), each encapsulating a specific concern.  `HookManager` sits at the core of this modular layout, providing a **single point of coordination** for all hook‑related activities.  
+The observations point to a **registry‑based architecture**.  The HookManager maintains a central map (the *registry*) where each hook is stored under a unique key.  This map is the single source of truth for hook discovery, registration, and removal.  Because the registry is consulted on every dispatch, the component also introduces a **caching mechanism** that stores recently resolved hook lists, thereby avoiding repeated full‑registry scans and improving dispatch latency.  
 
-The design pattern most directly supported by the observations is a **Registry (or Service Locator) pattern**: `HookManager` “may utilize a registry or similar mechanism to manage hook registrations and executions.”  This pattern gives every sibling component a uniform way to **register callbacks** and **trigger them** without needing to know the internal storage details.  The mention of “event listeners or callback functions” further suggests that the manager likely follows an **Observer‑style interaction**, where components publish hook events and `HookManager` notifies the registered listeners.
+The dispatch path follows a **priority‑based ordering**.  When an event is emitted, the HookManager queries the registry (or cache) for all hooks associated with that event, sorts them according to their declared priority, and then invokes them in that order.  This ensures that “critical events are handled promptly,” as noted in the observations.  The design explicitly distinguishes between **synchronous** and **asynchronous** hooks, allowing the manager to await async hooks where necessary while still supporting fire‑and‑forget semantics for lightweight callbacks.  
 
-Because the manager is isolated from the other modules, the system benefits from **low coupling** – changes to the hook registration logic do not ripple through `ContentValidationAgent` or `GraphDatabaseAdapter`.  The modular approach also supports **independent versioning and deployment** of the hook subsystem, a design decision that aligns with the broader modularity highlighted in the hierarchy context.
+Registration can occur in two distinct **modes**:  
+
+1. **Singleton registration** – a single instance of a hook is stored and reused for every dispatch of its event type.  
+2. **Multi‑instance registration** – multiple hook instances may be attached to the same event, each receiving its own execution context.  
+
+These modes give developers fine‑grained control over hook lifecycle and resource usage.  The presence of a **debug mode** suggests that the manager can emit detailed logs or diagnostics about registration state, priority resolution, and execution outcomes, which is valuable during development and testing.  
+
+From an integration standpoint, the HookManager **depends on the GraphDatabaseAccessor** to persist hook definitions (e.g., which hooks are enabled, their priority, and registration mode) and to retrieve them when the system boots or when a new constraint is introduced.  This relationship mirrors the sibling components—**ContentValidator**, **ViolationCollector**, and **GraphDatabaseAccessor**—which also rely on the same accessor for their own persistence needs, reinforcing a shared persistence strategy across the ConstraintSystem subtree.
 
 ---
 
 ## Implementation Details  
 
-The observations do not expose concrete class or function names, but they give a clear picture of the internal mechanics:
+*Registry & Caching* – Internally the HookManager likely holds a data structure such as `Map<string, HookEntry[]>` where each entry contains the hook callback, its priority, registration mode, and a flag indicating whether it is sync or async.  The caching layer probably mirrors this map but stores only the resolved, priority‑sorted arrays for a given event key, invalidating the cache whenever a new hook is registered or an existing one is removed.  
 
-1. **Registry Storage** – `HookManager` most likely maintains an in‑memory map (e.g., `Map<string, Hook[]>`) where the key is a hook identifier (such as `preValidate`, `postPersist`, etc.) and the value is an ordered list of callback functions.  This structure enables **fast registration** (`registerHook(id, fn)`) and **deterministic execution** (`executeHooks(id, payload)`).
+*Priority Dispatch* – When `dispatch(eventName, payload)` is called, the manager retrieves the cached hook list for `eventName`.  If the cache is missing, it pulls the raw list from the registry, sorts it by the numeric `priority` field (higher numbers first, or vice‑versa depending on convention), stores the sorted list back into the cache, and then iterates over the collection.  For each hook, the manager checks the `isAsync` flag: synchronous hooks are invoked directly, while asynchronous hooks are awaited (or queued) to preserve order when required.  
 
-2. **Registration API** – A public method (e.g., `addHook` or `register`) is expected to be called by sibling components.  The `ContentValidationAgent` may call this API during its initialization to plug custom validation steps, while the `ViolationLogger` could register post‑validation hooks for logging.
+*Registration Modes* – The API likely offers two methods, e.g., `registerSingleton(eventName, hook, options)` and `registerMulti(eventName, hook, options)`.  The `options` object would include `priority` and `async` flags.  In singleton mode the manager replaces any existing entry for that event with the new hook; in multi‑instance mode it pushes the new hook onto the array of hooks for that event.  
 
-3. **Execution Flow** – When a constraint‑related event occurs (e.g., a validation pass finishes), the owning component invokes `HookManager.execute(id, context)`.  The manager iterates over the stored callbacks, invoking each with the supplied context.  The observation that “event listeners or callback functions” may be used hints that the manager could support both **synchronous** and **asynchronous** hooks, returning a promise that resolves once all listeners have completed.
+*Debug Mode* – When enabled (perhaps via an environment variable or a configuration flag in the ConstraintSystem), the HookManager emits verbose logs: registration actions (`[HookManager][DEBUG] Registered singleton hook for "entityCreated" with priority 10`), cache hits/misses, and dispatch start/completion timestamps.  This aids developers in tracing hook execution paths, especially when multiple hooks compete for the same event.  
 
-4. **Lifecycle Management** – Although not explicitly described, a typical hook manager also provides **deregistration** (`removeHook`) and **clearing** (`reset`) capabilities, allowing the system to unload or replace hooks during runtime (useful for hot‑reloading in development or for test isolation).
-
-5. **Error Handling** – Because hooks are user‑supplied code, the manager likely wraps each callback in a try/catch block to prevent a single faulty hook from breaking the entire constraint workflow.  Errors would be propagated to the calling component (e.g., the `ContentValidationAgent`) for logging or remediation.
-
-All of these mechanisms are inferred from the statements that the manager “handles hook registration, execution, and management,” “may utilize a registry,” and “may involve event listeners or callback functions.”
+*Persistence Integration* – The manager calls into **GraphDatabaseAccessor** whenever a hook is added or removed.  The accessor writes a record to the underlying LevelDB‑backed graph store (as described for the sibling components).  On system start‑up, the HookManager reads all persisted hook records, reconstructs the registry, and primes the cache.  Because the accessor already handles JSON export sync for other components, the HookManager benefits from a consistent persistence contract without needing its own storage layer.
 
 ---
 
 ## Integration Points  
 
-`HookManager` is tightly integrated with the **ConstraintSystem** and its sibling modules:
+1. **ConstraintSystem (parent)** – The HookManager is instantiated and owned by the ConstraintSystem.  Whenever a constraint evaluation triggers an event (e.g., “constraintViolated”, “entityValidated”), the ConstraintSystem forwards the event to the HookManager for dispatch.  
 
-* **ContentValidator** – The `ContentValidationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) likely registers validation hooks that are executed before or after an entity’s content is processed.  The agent would call `HookManager.register('preValidate', fn)` during its startup routine.
+2. **GraphDatabaseAccessor (sibling)** – Acts as the persistence gateway for the HookManager.  All hook metadata (registration mode, priority, async flag) is stored as graph nodes/edges, enabling versioned retrieval and auditability.  The same accessor is used by **ContentValidator** and **ViolationCollector**, which means any changes to the accessor’s schema affect all three components uniformly.  
 
-* **ViolationLogger** – When a constraint violation is detected, the `ViolationLogger` can subscribe to a `postViolation` hook, allowing it to capture detailed diagnostic information without embedding logging logic directly inside the validation flow.
+3. **ContentValidator & ViolationCollector (siblings)** – Both may register hooks with the HookManager to augment validation or violation handling.  For example, ContentValidator could register an async hook that enriches validation results, while ViolationCollector could register a high‑priority singleton hook that logs violations to an external monitoring service.  
 
-* **GraphDatabaseManager** – The `GraphDatabaseAdapter` (`storage/graph-database-adapter.js`) may register persistence hooks (e.g., `prePersist`, `postPersist`) so that additional graph‑specific actions (such as indexing or relationship updates) are performed automatically when constraints trigger database writes.
+4. **External Modules** – Although not explicitly mentioned, any module that needs to react to constraint‑related events can import the HookManager from the ConstraintSystem and register its own hooks, leveraging the same registration API and benefiting from the shared caching and priority mechanisms.  
 
-* **External Extensions** – Because the manager is centralized, any future module that needs custom behavior can simply import the `HookManager` API and register its callbacks, ensuring **consistent interaction semantics** across the entire system.
-
-The only explicit dependency shown in the observations is the **parent‑child relationship**: `ConstraintSystem` contains `HookManager`.  No direct file paths for the manager itself are provided, but the modular architecture guarantees that the manager is reachable by all siblings through the ConstraintSystem’s public interface.
+The only explicit dependency is the **GraphDatabaseAccessor**; no other third‑party libraries are referenced in the observations, so the HookManager remains a relatively self‑contained piece within the ConstraintSystem’s ecosystem.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Register Early, Execute Late** – Modules should register their hooks during initialization (e.g., in a constructor or startup script) so that the manager’s registry is fully populated before any constraint events fire.  Delayed registration can lead to missed hook executions.
+1. **Choose the correct registration mode** – Use **singleton registration** when a hook should have a single, authoritative instance (e.g., a global audit logger).  Opt for **multi‑instance registration** when multiple independent consumers need to react to the same event (e.g., several analytics pipelines).  
 
-2. **Keep Hooks Small and Focused** – Since the manager may execute many hooks in a single event, each callback should perform a single, well‑defined task and return quickly.  Heavy‑weight processing should be off‑loaded to background workers to avoid blocking the constraint pipeline.
+2. **Assign meaningful priorities** – Since the HookManager dispatches hooks based on priority, assign higher priority values to hooks that must run before others (e.g., security checks) and lower values to non‑critical post‑processing hooks.  Remember that changing a priority will invalidate the cache for that event, causing a small recompute cost on the next dispatch.  
 
-3. **Handle Errors Gracefully** – Hook implementations must anticipate that the manager will swallow exceptions to protect the overall workflow.  Nevertheless, developers should log meaningful error messages inside their callbacks to aid debugging.
+3. **Respect sync vs async semantics** – If a hook performs I/O or long‑running work, mark it as asynchronous.  The manager will await it, preserving order but potentially increasing overall latency.  For lightweight work, keep the hook synchronous to avoid unnecessary promise overhead.  
 
-4. **Prefer Asynchronous Hooks When I/O Is Involved** – If a hook interacts with external resources (e.g., the `GraphDatabaseAdapter`), return a promise and let the manager await its completion.  This prevents race conditions and ensures that subsequent hooks see a consistent state.
+4. **Leverage debug mode during development** – Enable the HookManager’s debug mode when adding new hooks or troubleshooting unexpected execution order.  The verbose logs will show registration details, cache activity, and dispatch timing, making it easier to pinpoint misbehaving hooks.  
 
-5. **Deregister When No Longer Needed** – For components that are dynamically loaded or unloaded (such as test suites), call the deregistration API to avoid memory leaks or stale callbacks lingering in the registry.
+5. **Persist hook changes through GraphDatabaseAccessor** – When adding or removing hooks in production, ensure that the corresponding persistence calls succeed.  A failed write to the GraphDatabaseAccessor will leave the in‑memory registry out of sync with the stored state, leading to inconsistent behaviour after a restart.  
 
-6. **Document Hook Contracts** – Because the manager does not enforce a schema for the payload passed to hooks, each hook’s expected input and output should be documented alongside its registration call.  This practice reduces coupling errors between the manager and its consumers.
+6. **Avoid excessive registration churn** – Frequent registration and deregistration of hooks will cause repeated cache invalidations and database writes, which can degrade performance.  Prefer a stable set of hooks that are configured at application start‑up and only modify them when a major feature change is required.
 
 ---
 
-### Architectural Patterns Identified
-* **Registry / Service Locator** – Centralized storage of hook identifiers and callbacks.  
-* **Observer (Event‑Listener)** – Components publish events; `HookManager` notifies registered listeners.
+### Summary of Requested Items  
 
-### Design Decisions and Trade‑offs
-* **Centralization vs. Decentralization** – Centralizing hook handling simplifies coordination and debugging but introduces a single point of failure; the manager must be robust and well‑tested.  
-* **Synchronous vs. Asynchronous Execution** – Supporting both gives flexibility but requires careful error handling and ordering guarantees.
-
-### System Structure Insights
-* `HookManager` resides inside the **ConstraintSystem** and is a shared service for sibling modules (`ContentValidator`, `ViolationLogger`, `GraphDatabaseManager`).  
-* The modular layout isolates responsibilities, allowing each sibling to evolve independently while relying on a common hook infrastructure.
-
-### Scalability Considerations
-* Because the registry is in‑memory, the manager scales well for the typical number of hooks expected in a constraint engine.  If the system were to support thousands of dynamic hooks, a more sophisticated storage (e.g., a concurrent map or external cache) might be needed.  
-* Asynchronous hook support enables the system to handle I/O‑bound extensions without blocking the main validation pipeline, preserving throughput under load.
-
-### Maintainability Assessment
-* The **modular architecture** and **centralized hook registry** promote high maintainability: changes to hook handling are confined to a single component.  
-* Clear registration APIs and the ability to deregister hooks reduce technical debt and make unit testing straightforward.  
-* The lack of visible implementation details means that documentation and interface contracts become critical; developers must keep the hook contract specifications up‑to‑date to avoid integration bugs.
+1. **Architectural patterns identified** – Registry‑based hook storage, priority‑ordered dispatch, caching layer, singleton vs multi‑instance registration, debug instrumentation.  
+2. **Design decisions and trade‑offs** – Registry provides centralisation at the cost of a lookup step; caching mitigates lookup cost but adds invalidation complexity; priority ordering guarantees critical handling but requires careful priority assignment; sync vs async hooks give flexibility but affect latency; singleton vs multi‑instance gives lifecycle control but increases API surface.  
+3. **System structure insights** – HookManager is a sub‑component of ConstraintSystem, sharing the GraphDatabaseAccessor persistence layer with sibling components (ContentValidator, ViolationCollector).  Its registry sits at the heart of the event‑driven flow inside ConstraintSystem.  
+4. **Scalability considerations** – The registry can grow with the number of event types and hooks; caching ensures dispatch remains O(1) for cache hits.  Priority sorting is performed only on cache miss, keeping the hot path fast.  Async hooks allow the system to scale I/O‑bound work without blocking other hooks.  
+5. **Maintainability assessment** – Clear separation of concerns (registration, caching, dispatch) makes the HookManager easy to test and extend.  Debug mode and persistence through a shared accessor improve observability and consistency.  The main maintenance burden lies in managing priority values and ensuring cache invalidation stays correct when hooks are added or removed.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with separate modules for different functionalities such as content validation, hook management, and violation capture. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is responsible for entity content validation and refresh. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. The GraphDatabaseAdapter, found in storage/graph-database-adapter.js, is used for graph database interactions and persistence, demonstrating the system's ability to handle complex data relationships.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter provides a robust mechanism for storing and retrieving data in a graph database, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that data is consistently updated and available for further processing. For instance, the ContentValidationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on this adapter to store and retrieve validation results.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is responsible for entity content validation and refresh.
-- [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger's role in capturing and logging constraint violations suggests a focus on monitoring and reporting constraint-related issues.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseAdapter, found in storage/graph-database-adapter.js, is used for graph database interactions and persistence.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAccessor to retrieve entity data for validation, as seen in the storage/graph-database-adapter.ts file
+- [ViolationCollector](./ViolationCollector.md) -- ViolationCollector uses the GraphDatabaseAccessor to store and retrieve violation data
+- [GraphDatabaseAccessor](./GraphDatabaseAccessor.md) -- GraphDatabaseAccessor uses the LevelDB database to store and retrieve graph data
 
 
 ---
