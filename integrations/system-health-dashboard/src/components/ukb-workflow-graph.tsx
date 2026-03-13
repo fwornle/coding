@@ -331,6 +331,25 @@ const STEP_TO_AGENT: Record<string, string> = {
   'final_dedup': 'deduplication',
   'final_validation': 'content_validation',
 
+  // Wave-analysis sub-step mappings (waveN_substep → agent node)
+  'wave1_init': 'semantic_analysis',
+  'wave1_analyze': 'semantic_analysis',
+  'wave2_analyze': 'semantic_analysis',
+  'wave3_analyze': 'semantic_analysis',
+  'wave4_analyze': 'insight_generation',
+  'wave1_classify': 'ontology_classification',
+  'wave2_classify': 'ontology_classification',
+  'wave3_classify': 'ontology_classification',
+  'wave4_classify': 'ontology_classification',
+  'wave1_persist': 'persistence',
+  'wave2_persist': 'persistence',
+  'wave3_persist': 'persistence',
+  'wave4_persist': 'persistence',
+  'wave1_qa': 'quality_assurance',
+  'wave2_qa': 'quality_assurance',
+  'wave3_qa': 'quality_assurance',
+  'wave4_qa': 'quality_assurance',
+
   // Complete/Incremental workflow steps
   'analyze_git_history': 'git_history',
   'analyze_recent_changes': 'git_history',
@@ -1418,6 +1437,30 @@ export default function UKBWorkflowGraph({
     // For batch workflows: ensure kg_operators uses current batch status (same as other multi-step agents)
     if (isBatchWorkflow && currentBatchStepMap['kg_operators']) {
       map['kg_operators'] = currentBatchStepMap['kg_operators']
+    }
+
+    // Wave-analysis: expand wave-level completed steps to agent nodes
+    // Each wave runs: analyze → classify → qa → persist (+ kg_operators)
+    // When wave1/wave2/etc are "completed", mark participating agents green
+    const WAVE_AGENTS: Record<string, string[]> = {
+      wave1: ['semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave2: ['semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave3: ['semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave4: ['insight_generation', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+    }
+    if (process.steps) {
+      for (const step of process.steps) {
+        const agents = WAVE_AGENTS[step.name]
+        if (agents) {
+          for (const agentId of agents) {
+            // Propagate wave status to agent nodes; running beats completed beats pending
+            const existing = map[agentId]
+            if (!existing || (step.status === 'completed' && existing.status !== 'running') || step.status === 'running') {
+              map[agentId] = { ...step, name: agentId, status: step.status as any }
+            }
+          }
+        }
+      }
     }
 
     return map
