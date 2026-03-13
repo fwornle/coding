@@ -93,8 +93,8 @@ const WORKFLOW_AGENTS = [
   // --- Batch Processing Agents ---
   {
     id: 'batch_scheduler',
-    name: 'Batch Scheduler',
-    shortName: 'Batch',
+    name: 'Data Preparation',
+    shortName: 'Prep',
     icon: Calendar,
     description: 'Plans and tracks chronological batch windows. Divides git history into 50-commit batches for incremental processing with checkpoint-based resumption.',
     usesLLM: false,
@@ -332,7 +332,7 @@ const STEP_TO_AGENT: Record<string, string> = {
   'final_validation': 'content_validation',
 
   // Wave-analysis sub-step mappings (waveN_substep → agent node)
-  'wave1_init': 'semantic_analysis',
+  'wave1_init': 'batch_scheduler',
   'wave1_analyze': 'semantic_analysis',
   'wave2_analyze': 'semantic_analysis',
   'wave3_analyze': 'semantic_analysis',
@@ -1467,7 +1467,8 @@ export default function UKBWorkflowGraph({
     // Each wave runs: analyze → classify → persist (with sub-steps mapping to agents)
     // If currentStep is wave2_classify, then semantic_analysis is completed for this wave
     const WAVE_SUBSTEP_SEQUENCE = [
-      'semantic_analysis',   // waveN_init, waveN_analyze, sem_data_prep, sem_llm_analysis, sem_observation_gen, sem_entity_transform
+      'batch_scheduler',     // wave1_init (data preparation)
+      'semantic_analysis',   // waveN_analyze, sem_data_prep, sem_llm_analysis, sem_observation_gen, sem_entity_transform
       'quality_assurance',   // waveN_qa
       'ontology_classification', // waveN_classify
       'persistence',         // waveN_persist
@@ -2569,9 +2570,29 @@ export default function UKBWorkflowGraph({
                         const labelX = centerX + labelRadius * Math.cos(midAngle)
                         const labelY = centerY + labelRadius * Math.sin(midAngle)
 
-                        // Determine sub-step status from stepsDetail (process.steps)
+                        // Determine sub-step status from process.steps OR currentStep position
                         const stepInfo = process.steps?.find(s => s.name === substep.id)
-                        const substepStatus = stepInfo?.status || 'pending'
+                        let substepStatus = stepInfo?.status || 'pending'
+                        // For wave-analysis: derive from currentStep position within agent's sub-steps
+                        if (substepStatus === 'pending' && process.currentStep && AGENT_SUBSTEPS) {
+                          const agentSubs = AGENT_SUBSTEPS[agent.id]
+                          if (agentSubs) {
+                            const currentSubIdx = agentSubs.findIndex(s => s.id === process.currentStep)
+                            const thisSubIdx = agentSubs.findIndex(s => s.id === substep.id)
+                            if (currentSubIdx >= 0 && thisSubIdx >= 0) {
+                              if (thisSubIdx < currentSubIdx) substepStatus = 'completed'
+                              else if (thisSubIdx === currentSubIdx) substepStatus = 'running'
+                            } else if (currentSubIdx < 0 && thisSubIdx >= 0) {
+                              // currentStep maps to this agent but isn't a sub-step ID — check via STEP_TO_AGENT
+                              const currentAgent = STEP_TO_AGENT[process.currentStep] || process.currentStep
+                              if (currentAgent === agent.id) {
+                                // All sub-steps before current are completed
+                                const parentStatus = stepStatusMap[agent.id]?.status
+                                if (parentStatus === 'completed') substepStatus = 'completed'
+                              }
+                            }
+                          }
+                        }
                         const statusColors: Record<string, { fill: string; stroke: string; text: string }> = {
                           completed: { fill: '#22c55e', stroke: '#16a34a', text: '#fff' },
                           running: { fill: '#3b82f6', stroke: '#2563eb', text: '#fff' },
