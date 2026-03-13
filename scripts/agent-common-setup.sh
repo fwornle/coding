@@ -477,6 +477,24 @@ Use Skill tool with command: "documentation-style"
 }
 
 # ==============================================================================
+# AGENT INSTRUCTION GENERATION
+# ==============================================================================
+# Generate agent-specific instruction files at launch time
+# Copilot gets .github/copilot-instructions.md, OpenCode gets skill refs in CLAUDE.md
+ensure_agent_instructions() {
+  local target_project="$1"
+  local coding_repo="$2"
+  local generator="$coding_repo/scripts/generate-agent-instructions.sh"
+
+  if [[ ! -x "$generator" ]]; then
+    log "⚠️  generate-agent-instructions.sh not found, skipping"
+    return 0
+  fi
+
+  CODING_REPO="$coding_repo" "$generator" "$target_project" "$coding_repo"
+}
+
+# ==============================================================================
 # STATUSLINE CONFIG
 # ==============================================================================
 # Claude Code's native statusLine is owned by GSD (context window display).
@@ -572,6 +590,9 @@ agent_common_init() {
   # Ensure CLAUDE.md exists with mandatory skill instructions (especially for new projects)
   ensure_claude_md_with_skill_instruction "$target_project_dir" "$coding_repo"
 
+  # Generate agent-specific instruction files (Copilot, OpenCode)
+  ensure_agent_instructions "$target_project_dir" "$coding_repo"
+
   # Ensure statusLine config is present (Claude-specific but harmless for others)
   ensure_statusline_config "$target_project_dir" "$coding_repo"
 
@@ -591,6 +612,7 @@ export -f start_statusline_health_monitor
 export -f start_global_lsl_monitoring
 export -f start_browser_access_server
 export -f ensure_claude_md_with_skill_instruction
+export -f ensure_agent_instructions
 export -f ensure_statusline_config
 export -f initialize_unified_hooks
 export -f detect_corporate_network
