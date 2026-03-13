@@ -65,7 +65,7 @@ The transition system ensures safe mode switching with:
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
 | **OpenCode** | `coding --agent opencode` | Pipe-pane I/O capture |
 
-All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement.
+All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, constraint enforcement, and **shared skills** (see [Skills System](docs/skills-system.md)).
 
 ![GitHub Copilot CLI running in coding](docs/images/coding-copilot-cli.png)
 
@@ -216,6 +216,13 @@ Real-time code quality enforcement through PreToolUse hooks
 - **[VKB Visualizer](integrations/vkb-visualizer/)** - Knowledge graph visualization
 - **[Serena MCP](integrations/mcp-serena/)** - Structure-aware code search
 - **[All Integrations](integrations/)** - Complete integration list
+
+### Skills & Commands
+
+#### [Skills System](docs/skills-system.md)
+Reusable workflow instructions shared across all agents — drop a `.md` into `.claude/commands/` and it propagates to Claude, Copilot, and OpenCode automatically.
+
+![Skills System](docs/images/skills-system.png)
 
 ### Getting Started
 
@@ -435,6 +442,7 @@ Copyright © 2025 Frank Wornle
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
 - **LLM Providers & Local Models**: [docs/provider-configuration.md](docs/provider-configuration.md)
 - **Agent Abstraction API**: [docs/architecture/agent-abstraction-api.md](docs/architecture/agent-abstraction-api.md)
+- **Skills System**: [docs/skills-system.md](docs/skills-system.md)
 - **Adding Agents**: [docs/agent-integration-guide.md](docs/agent-integration-guide.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
 - **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)

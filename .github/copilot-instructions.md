@@ -94,6 +94,7 @@ cd $CODING_REPO/integrations/system-health-dashboard && npm run build
 
 `mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Requires Memgraph running.
 
+
 ## Available Skills
 
 The following skills are available. When a task matches a skill's description,

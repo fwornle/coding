@@ -104,6 +104,7 @@ nav:
     - Constraint Testing: guides/constraint-testing.md
     - VKB Visualization: guides/vkb-visualization.md
     - Knowledge Workflows: guides/knowledge-workflows.md
+    - Skills System: guides/skills-system.md
     - Docker Mode Setup: guides/docker-mode-setup.md
   - Reference:
     - Overview: reference/index.md
