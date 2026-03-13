@@ -1,0 +1,67 @@
+@startuml skills-system
+!include _standard-style.puml
+
+top to bottom direction
+
+title Skills System — Multi-Agent Propagation
+
+actor "Developer" as dev
+
+package "Skill Source" {
+  folder ".claude/commands/" as src <<core>> {
+    file "playwright-cli.md" as pw
+    file "documentation-style.md" as ds
+    file "sl.md" as sl
+    file "new-skill.md" as ns
+  }
+}
+
+package "generate-agent-instructions.sh" as gen <<infra>> {
+  component "install_claude_global()" as gc <<core>>
+  component "generate_copilot_instructions()" as gcp <<core>>
+  component "ensure_skill_references_in_claude_md()" as goc <<core>>
+  component "sanitize_paths()" as sp <<util>>
+}
+
+package "Claude Code" as claude_pkg <<agent>> {
+  folder "~/.claude/commands/" as claude_target {
+    file "*.md (slash commands)" as claude_skills
+  }
+}
+
+package "GitHub Copilot CLI" as copilot_pkg <<agent>> {
+  file ".github/copilot-instructions.md" as copilot_target
+  note right of copilot_target
+    CLAUDE.md rules +
+    skill catalog
+    (paths sanitized)
+  end note
+}
+
+package "OpenCode" as opencode_pkg <<agent>> {
+  file "CLAUDE.md" as opencode_target
+  note right of opencode_target
+    Auto-appended section:
+    "Available Skills
+    (Auto-Generated)"
+  end note
+}
+
+package "Trigger Points" as triggers <<infra>> {
+  component "install.sh\ninstall_skills()" as install <<cli>>
+  component "coding --<agent>\nagent-common-setup.sh" as launch <<cli>>
+}
+
+dev -[#43A047,thickness=2]-> src : 1. Drop .md file
+
+src -[#FF9800,thickness=2]-> gen : 2. Read skills
+
+gc -[#E53935,thickness=2]-> claude_target : Copy
+gcp -[#E53935,thickness=2]-> copilot_target : Generate
+goc -[#E53935,thickness=2]-> opencode_target : Append
+gcp --> sp : filter paths
+
+install -[#9C27B0,thickness=2,dashed]-> gen : At install
+launch -[#9C27B0,thickness=2,dashed]-> gen : At launch
+
+@enduml

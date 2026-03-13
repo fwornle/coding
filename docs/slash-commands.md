@@ -1,5 +1,7 @@
 # Custom Slash Commands
 
+> **Note**: Slash commands are now part of the unified **[Skills System](skills-system.md)** that propagates skills to all agents (Claude, Copilot, OpenCode). See that page for how to add new skills.
+
 This document describes the custom slash commands available in the coding system. These commands are installed globally in `~/.claude/commands/` and work across all projects.
 
 ---
