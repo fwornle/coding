@@ -1463,6 +1463,31 @@ export default function UKBWorkflowGraph({
       }
     }
 
+    // Wave-analysis: derive completed agents from currentStep position within the wave
+    // Each wave runs: analyze → classify → persist (with sub-steps mapping to agents)
+    // If currentStep is wave2_classify, then semantic_analysis is completed for this wave
+    const WAVE_SUBSTEP_SEQUENCE = [
+      'semantic_analysis',   // waveN_init, waveN_analyze, sem_data_prep, sem_llm_analysis, sem_observation_gen, sem_entity_transform
+      'quality_assurance',   // waveN_qa
+      'ontology_classification', // waveN_classify
+      'persistence',         // waveN_persist
+      'kg_operators',        // operator_conv, operator_aggr, etc.
+      'insight_generation',  // wave4_insights
+    ]
+    if (process.currentStep) {
+      const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
+      const currentIdx = WAVE_SUBSTEP_SEQUENCE.indexOf(currentAgentId)
+      if (currentIdx > 0) {
+        // All agents before current in the sequence are completed (within this wave)
+        for (let i = 0; i < currentIdx; i++) {
+          const priorAgent = WAVE_SUBSTEP_SEQUENCE[i]
+          if (!map[priorAgent] || map[priorAgent].status === 'pending') {
+            map[priorAgent] = { name: priorAgent, status: 'completed' } as any
+          }
+        }
+      }
+    }
+
     return map
     // Use stepsSignature instead of process.steps for reliable change detection
     // stepsSignature changes when any step's name or status changes
