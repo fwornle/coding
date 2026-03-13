@@ -2,127 +2,77 @@
 
 **Type:** SubComponent
 
-The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, classifies observations against the ontology system
+Handles The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.
 
 ## What It Is  
 
-The **OntologyClassificationAgent** is a concrete agent that lives inside the **SemanticAnalysis** sub‑component of the MCP server. Its source file is  
-
-```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
-```  
-
-Its sole responsibility is to take incoming observations, run them through the ontology classification system, and return a classification that conforms to the upper‑ and lower‑ontology definitions used by the platform. The agent inherits from **BaseAgent**, which supplies a generic `execute(input)` workflow that handles lazy initialization of the underlying LLM and provides a common entry point for all agents in the multi‑agent architecture.
-
-The classification result is subsequently validated against the ontology model to guarantee that the entity types produced are legal within the system’s hierarchical ontology (upper vs. lower layers). In short, the OntologyClassificationAgent is the “ontology‑aware” classifier that plugs into the broader semantic‑analysis pipeline.
-
----
+**Ontology** is a **sub‑component** of the **SemanticAnalysis** component in the Coding project.  It lives inside the same logical module that houses the other two sub‑components, **Pipeline** and **Insights**, and its sole responsibility is to manage the *ontology classification system*.  According to the observations, this system provides **upper‑ and lower‑ontology definitions**, performs **entity‑type resolution**, and carries out **validation** of the resulting knowledge structures.  The component also **contains a child component named OntologyCore**, which encapsulates the core logic required to realise those responsibilities.  No concrete file paths or source symbols were listed in the observations, so the exact location in the repository is not known, but the hierarchy makes it clear that Ontology is packaged alongside Pipeline and Insights under the `SemanticAnalysis` directory (or equivalent module).
 
 ## Architecture and Design  
 
-The surrounding **SemanticAnalysis** component follows a **multi‑agent architecture**. Each distinct processing step—ontology classification, semantic analysis, code‑graph construction—is encapsulated in its own agent class. The OntologyClassificationAgent is one such agent, and it **inherits** from `BaseAgent` (found at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`). This inheritance implements the **Template Method pattern**: `BaseAgent` defines the skeleton of an `execute(input)` method (including lazy LLM loading), while the subclass supplies the concrete classification logic.  
+The architecture of **Ontology** follows a **hierarchical composition** pattern: the parent component (**SemanticAnalysis**) aggregates three sibling sub‑components—**Pipeline**, **Ontology**, and **Insights**—each of which addresses a distinct concern of the overall semantic‑analysis pipeline.  This separation of concerns is evident from the observation that Ontology “handles the ontology classification system” while its siblings focus on data flow (Pipeline) and result synthesis (Insights).  Within Ontology itself, the presence of **OntologyCore** signals a *core‑wrapper* design: Ontology acts as a façade that exposes high‑level services (e.g., “resolve entity type”, “validate ontology”) while delegating the heavy lifting to OntologyCore.  
 
-Because the agent extends a shared base, it automatically gains:
-
-* **Lazy LLM initialization** – the LLM is instantiated only when the first `execute` call occurs, reducing start‑up overhead for the whole system.  
-* **Uniform execution contract** – every agent presents the same `execute(input)` signature, simplifying orchestration by higher‑level coordinators (e.g., the Pipeline coordinator agent, which also extends `BaseAgent`).  
-
-The classification workflow itself relies on an **ontology resolution layer** that distinguishes between *upper* and *lower* ontology definitions. This separation is a design decision that enables the system to first map an observation to a broad category (upper ontology) and then refine it to a more specific type (lower ontology). The subsequent **validation step** enforces that the chosen type exists in the ontology, preventing downstream components from receiving illegal or ambiguous classifications.
-
-No other design patterns (e.g., micro‑services, event‑driven) are mentioned in the observations, so the architecture is best described as a **single‑process, agent‑centric** design built around inheritance and a shared execution contract.
-
----
+No explicit design patterns such as micro‑services, event‑driven messaging, or dependency injection are mentioned, so we refrain from asserting their use.  The only pattern we can reliably infer is **composition** (parent‑child relationship) and **facade** (Ontology exposing a simplified API over OntologyCore).  Interaction between the components is likely synchronous: the **Pipeline** produces raw semantic artefacts, passes them to **Ontology** for classification and validation, and the resulting enriched entities are then consumed by **Insights** for higher‑level analysis.
 
 ## Implementation Details  
 
-1. **Class hierarchy** – `OntologyClassificationAgent` extends `BaseAgent`. The base class implements a generic `execute(input)` method that handles LLM bootstrapping, error handling, and possibly logging. The subclass overrides (or augments) this method to perform the actual ontology lookup and classification.  
+Because the observations report **“0 code symbols found”** and provide no concrete file paths, we cannot enumerate specific classes, methods, or modules.  What we can assert is that **Ontology** encapsulates three functional areas:
 
-2. **File location** – All code for this agent resides in  
-   `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  
+1. **Upper/Lower Ontology Definitions** – a taxonomy that distinguishes generic (upper) concepts from domain‑specific (lower) concepts.  This is probably represented as a set of definition files or in‑memory data structures that OntologyCore loads and queries.  
 
-3. **Classification logic** – Although the source code is not provided, the observations tell us that the agent:
-   * Receives an observation payload.
-   * Queries the **ontology classification system**, which contains both **upper** and **lower** ontology definitions.
-   * Determines the most appropriate entity type by traversing the ontology hierarchy.
-   * Passes the provisional result to a **validation process** that checks conformance with the ontology model.  
+2. **Entity‑Type Resolution** – a service that, given a raw entity extracted by the Pipeline, determines the most appropriate ontology class.  The resolution algorithm likely traverses the definition hierarchy, possibly employing rule‑based matching or simple lookup tables.  
 
-4. **Interaction with BaseAgent** – By leveraging the `execute(input)` pattern from `BaseAgent`, the OntologyClassificationAgent benefits from lazy LLM initialization. This means that the heavy LLM model is not loaded until the first classification request arrives, saving memory and CPU during cold starts.
+3. **Validation** – a consistency check that ensures an entity’s attributes and relationships conform to the constraints expressed in the ontology (e.g., mandatory properties, allowed parent‑child links).  Validation logic is expected to reside in OntologyCore, exposing a method such as `validate(entity)` that returns success/failure and diagnostic information.
 
-5. **Relation to sibling agents** – The **Pipeline** component’s coordinator agent also extends `BaseAgent`, indicating a shared execution framework across the whole SemanticAnalysis subsystem. The **Insights** sub‑component, while not directly observed, is hinted to use a `pattern_catalog.py` module, suggesting that insights generation may consume classification results produced by this agent.
-
----
+The **OntologyCore** component is the technical heart of this sub‑system.  It probably contains the data structures for the ontology graph, the lookup/resolution engine, and the validation routines.  Ontology itself would expose a thin wrapper API—perhaps a class named `OntologyService`—that forwards calls to OntologyCore, handling any required pre‑ or post‑processing (e.g., logging, error translation).
 
 ## Integration Points  
 
-* **Parent component – SemanticAnalysis** – The OntologyClassificationAgent is one of several agents orchestrated by SemanticAnalysis. Its output (validated ontology tags) is likely consumed by downstream agents such as the semantic‑analysis agent or the code‑graph construction agent.  
+**SemanticAnalysis** is the integration hub.  **Ontology** receives input from the **Pipeline** sub‑component, which processes Git history and LSL session data to produce raw knowledge entities.  The hand‑off is likely a method call such as `Ontology.resolveAndValidate(rawEntity)`.  Once Ontology has enriched and validated the entity, it returns the result to the **SemanticAnalysis** orchestrator, which then forwards it to **Insights** for aggregation, reporting, or downstream consumption.
 
-* **Sibling – Pipeline** – The Pipeline coordinator agent, also a subclass of `BaseAgent`, may schedule batch runs of the OntologyClassificationAgent, aggregating results before passing them to later stages. Because both agents share the same base, the Pipeline can treat them uniformly when building execution graphs.  
+External dependencies are not listed, but the nature of ontology work suggests possible reliance on:
 
-* **Sibling – Insights** – Although the exact wiring is unclear, the Insights sub‑component probably reads the classification results to populate pattern catalogs or generate higher‑level reports. The mention of `pattern_catalog.py` hints that Insights may import classification outputs as input data.  
+* **Data stores** (e.g., JSON/YAML files, a lightweight graph database) that hold the upper/lower definitions.  
+* **Utility libraries** for string matching or rule evaluation.  
 
-* **External dependencies** – The classification logic depends on the **ontology system** (upper/lower definitions) and a **validation subsystem** that checks conformance. Both are external to the agent but are essential for its correct operation. The lazy LLM provided by `BaseAgent` is another runtime dependency.  
-
-* **Interfaces** – The only explicit interface is the `execute(input)` method defined by `BaseAgent`. Input is an observation object; output is a validated ontology classification. Any consumer of the agent must adhere to this contract.
-
----
+All interactions appear to be **internal to the SemanticAnalysis module**, keeping the coupling tight but well‑defined through the parent‑child relationships.
 
 ## Usage Guidelines  
 
-1. **Invoke through `execute`** – Call the agent via its inherited `execute(input)` method. Do not attempt to bypass the base class, as this would skip lazy LLM initialization and any standard error handling baked into `BaseAgent`.  
+1. **Treat Ontology as a service, not a data store.**  Call the exposed façade methods (e.g., `resolveEntity`, `validateEntity`) rather than manipulating the underlying definition files directly.  This preserves the integrity of the upper/lower hierarchy managed by OntologyCore.  
 
-2. **Provide well‑formed observations** – The classification system expects observations that contain the fields required by the ontology resolver (e.g., textual description, metadata). Supplying malformed data will cause the validation step to fail.  
+2. **Feed only well‑formed entities** from the Pipeline.  Ontology assumes that incoming objects contain the minimal fields required for resolution; malformed inputs will cause validation failures and may propagate errors to Insights.  
 
-3. **Handle validation failures** – The validation process will reject classifications that do not map to a defined ontology entity. Callers should be prepared to catch validation exceptions or check a returned status flag to decide whether to retry, fallback, or surface an error.  
+3. **Handle validation results explicitly.**  The validation step can return detailed diagnostics; consuming code (e.g., the SemanticAnalysis orchestrator) should log or surface these messages to aid debugging.  
 
-4. **Batch processing via Pipeline** – For large volumes, prefer to let the **Pipeline** coordinator agent schedule batch runs. This ensures that the same LLM instance is reused across many `execute` calls, maximizing the benefit of lazy initialization.  
+4. **Do not bypass OntologyCore.**  Even though OntologyCore holds the core logic, direct access would break the façade contract and make future refactoring difficult.  
 
-5. **Do not modify the inheritance chain** – The design deliberately centralizes common behavior in `BaseAgent`. Adding additional base classes or mixing in unrelated functionality can break the uniform execution contract and introduce subtle bugs.  
+5. **Version your ontology definitions.**  Since upper and lower ontologies can evolve, maintain version metadata alongside the definition files so that downstream components can detect mismatches.
 
 ---
 
-### Architectural patterns identified  
+### Summary of Requested Items  
 
-* **Multi‑agent architecture** – distinct responsibilities are encapsulated in separate agent classes.  
-* **Template Method (via BaseAgent)** – common `execute` workflow is defined in a base class, with subclasses providing specific logic.  
-* **Inheritance‑based reuse** – OntologyClassificationAgent inherits shared initialization, logging, and error handling.  
-
-### Design decisions and trade‑offs  
-
-* **Decision to centralize LLM handling in BaseAgent** – simplifies agent code and reduces memory footprint, but creates tight coupling to the base class.  
-* **Separate upper/lower ontology layers** – improves classification granularity, yet adds complexity to the lookup algorithm and validation rules.  
-* **Agent‑centric granularity** – each processing step is isolated, aiding testability and modularity, but may introduce orchestration overhead when many agents are chained.  
-
-### System structure insights  
-
-* The **SemanticAnalysis** component is organized around a hierarchy of agents, all rooted in `BaseAgent`.  
-* **Pipeline** and **Insights** are sibling sub‑components that share the same execution contract, enabling a consistent orchestration model across the subsystem.  
-
-### Scalability considerations  
-
-* Because each agent follows the same lazy‑initialization pattern, multiple agents can share a single LLM instance when executed sequentially, reducing resource consumption.  
-* Classification work can be parallelized at the agent level—multiple instances of `OntologyClassificationAgent` can run concurrently on different observation batches, provided the underlying ontology store supports concurrent reads.  
-* The separation of upper and lower ontology layers may become a bottleneck if the ontology grows dramatically; indexing or caching strategies would be needed to keep lookup latency low.  
-
-### Maintainability assessment  
-
-* **High cohesion** – the OntologyClassificationAgent focuses exclusively on ontology classification, making its purpose clear.  
-* **Low coupling to other business logic** – reliance on the shared `BaseAgent` reduces duplicated boilerplate but introduces a single point of change; modifications to `BaseAgent` must be vetted across all agents.  
-* **Clear contract** – the `execute(input)` signature provides a stable API for both internal orchestrators (Pipeline) and external consumers (Insights).  
-* **Potential fragility** – validation logic is external; any change to the ontology definitions must be synchronized with the agent’s expectations to avoid runtime mismatches.  
-
-Overall, the OntologyClassificationAgent exemplifies a well‑structured, agent‑based piece of the SemanticAnalysis subsystem, leveraging inheritance for consistency while keeping the classification logic focused and testable.
+1. **Architectural patterns identified** – hierarchical composition, façade (Ontology over OntologyCore).  
+2. **Design decisions and trade‑offs** – clear separation of concerns among Pipeline, Ontology, and Insights; tight internal coupling for performance versus potential difficulty in independently scaling a single sub‑component.  
+3. **System structure insights** – Ontology sits centrally in the SemanticAnalysis pipeline, receiving raw entities, applying classification/validation, and passing enriched entities forward.  OntologyCore encapsulates the ontology graph and resolution algorithms.  
+4. **Scalability considerations** – because Ontology is a synchronous, in‑process component, scaling will rely on optimizing OntologyCore’s lookup structures (e.g., indexing the ontology graph) and possibly sharding definition files if the taxonomy grows very large.  Horizontal scaling would require refactoring toward a service boundary, which is not currently indicated.  
+5. **Maintainability assessment** – the façade‑core split aids maintainability: changes to ontology definitions or resolution rules can be confined to OntologyCore without affecting the public API.  However, the lack of explicit modular boundaries (e.g., separate packages or interfaces) and the absence of documented code symbols could make onboarding harder; adding clear interface contracts and unit‑test coverage would improve long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent architecture, with each agent responsible for a specific task, such as ontology classification, semantic analysis, and code graph construction. For example, the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, classifies observations against the ontology system. This agent extends the BaseAgent class, which provides a basic implementation of the execute(input) pattern, allowing for lazy LLM initialization and execution. The execute method in the OntologyClassificationAgent is responsible for executing the classification task, and it follows the pattern established by the BaseAgent class.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
+
+### Children
+- [OntologyCore](./OntologyCore.md) -- The parent context suggests that the OntologyCore is a crucial part of the SemanticAnalysis component, implying its significance in the overall project architecture.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline's batch processing is orchestrated by the coordinator agent, which extends the BaseAgent class in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts
-- [Insights](./Insights.md) -- The Insights sub-component likely utilizes the pattern_catalog.py module to extract and manage pattern catalogs, although its exact implementation remains unclear due to the absence of source files.
+- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
+- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 2 observations*
