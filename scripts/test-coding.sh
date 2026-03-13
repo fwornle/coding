@@ -1817,6 +1817,29 @@ else
 fi
 
 # =============================================================================
+print_test "Playwright CLI (E2E testing)"
+
+print_check "Playwright CLI skill"
+if file_exists "$CODING_ROOT/.claude/commands/playwright-cli.md"; then
+    print_pass "Playwright CLI skill installed"
+else
+    print_fail "Playwright CLI skill missing"
+fi
+
+print_check "Playwright browser"
+if npx playwright --version >/dev/null 2>&1; then
+    print_pass "Playwright CLI available ($(npx playwright --version 2>/dev/null))"
+else
+    print_warning "Playwright not installed — run: npx playwright install chromium"
+fi
+
+print_check "No Playwright MCP server in config"
+if grep -q "playwright" "$CODING_ROOT/claude-code-mcp-processed.json" 2>/dev/null; then
+    print_warning "Playwright MCP server still in config — should use CLI skill instead"
+else
+    print_pass "Playwright MCP server correctly removed (using CLI skill)"
+fi
+
 # PHASE 6: FALLBACK SERVICES FOR NON-CLAUDE AGENTS
 # =============================================================================
 
