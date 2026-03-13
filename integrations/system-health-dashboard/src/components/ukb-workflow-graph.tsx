@@ -69,16 +69,16 @@ const formatDurationMs = (ms?: number): string => {
   return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`
 }
 
-// Orchestrator node - represents the coordinator that manages all agents
+// Orchestrator node - represents the wave controller that manages all agents
 const ORCHESTRATOR_NODE = {
   id: 'orchestrator',
-  name: 'Orchestrator',
-  shortName: 'Coordinator',
+  name: 'Wave Controller',
+  shortName: 'Waves',
   icon: Play,
-  description: 'Multi-agent workflow coordinator. Manages parallel execution with max 3 concurrent steps, handles dependencies, retries failed steps, and aggregates results.',
+  description: 'Hierarchical wave orchestration engine. Executes 4 sequential waves (Project→Component→Detail→Insights), each with parallel agents bounded by concurrency limits.',
   usesLLM: false,
   llmModel: null,
-  techStack: 'Multi-Agent Orchestrator',
+  techStack: 'Wave Controller',
   row: -1,  // Above all other nodes
   col: 0.6,  // Centered (aligned with single-agent column)
 }
@@ -2785,7 +2785,7 @@ function OrchestratorDetailsSidebar({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5" />
-            <CardTitle className="text-lg">Workflow Coordinator</CardTitle>
+            <CardTitle className="text-lg">Wave Controller</CardTitle>
           </div>
           {getStatusBadge(process.status)}
         </div>

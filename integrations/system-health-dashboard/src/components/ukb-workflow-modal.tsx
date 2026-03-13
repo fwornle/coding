@@ -526,7 +526,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       : 'current'
 
     Logger.info(LogCategories.UKB, 'Step: advancing to next major step via WebSocket command')
-    sendCommand({ type: 'STEP_ADVANCE', payload: { workflowId } })
+    sendCommand({ type: 'STEP_ADVANCE', payload: { workflowId, stepInto: false } })
   }
 
   // Phase 18: Step into sub-steps via typed WebSocket command (no REST polling)
@@ -539,7 +539,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       : 'current'
 
     Logger.info(LogCategories.UKB, 'Step into: advancing into sub-steps via WebSocket command')
-    sendCommand({ type: 'STEP_INTO', payload: { workflowId } })
+    sendCommand({ type: 'STEP_ADVANCE', payload: { workflowId, stepInto: true } })
   }
 
   // Toggle LLM mock mode (MVI: dispatches Redux action)

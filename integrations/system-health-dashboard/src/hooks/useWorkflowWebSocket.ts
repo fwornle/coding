@@ -163,6 +163,11 @@ export function useWorkflowWebSocket(
         // Connection keepalive -- no Redux dispatch needed
         break
 
+      case 'STEP_ACK':
+        // Server acknowledged step advance — clear in-flight state
+        setIsTransitionInFlight(false)
+        break
+
       default:
         Logger.warn(LogCategories.UKB, 'Unknown WebSocket message type:', type)
     }
@@ -254,6 +259,8 @@ export function useWorkflowWebSocket(
       // Track in-flight state for step transitions (prevents double-click)
       if (command.type === 'STEP_ADVANCE' || command.type === 'STEP_INTO') {
         setIsTransitionInFlight(true)
+        // Safety timeout: clear in-flight after 3s even if no STATE_SNAPSHOT arrives
+        setTimeout(() => setIsTransitionInFlight(false), 3000)
       }
       return true
     } catch (sendError) {
