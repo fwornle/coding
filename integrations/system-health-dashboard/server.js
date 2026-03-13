@@ -3370,6 +3370,11 @@ class SystemHealthAPIServer {
                         }
                         writeFileSync(progressPath, JSON.stringify(progress, null, 2));
                         process.stderr.write(`[WebSocket] Step advance: stepPaused=false (was at: ${previousStep})\n`);
+                        // Acknowledge step advance so client clears isTransitionInFlight
+                        this.broadcastEvent({
+                            type: 'STEP_ACK',
+                            payload: { previousStep, stepInto: !!command.payload?.stepInto }
+                        });
                     }
                     break;
 
