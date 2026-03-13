@@ -1401,6 +1401,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   // Derive wave statuses from sub-steps (each wave's last sub-step determines completion)
                   const steps = activeCurrentProcess.steps || []
                   const waveStatuses = [1, 2, 3, 4].map(waveNum => {
+                    // Check top-level wave step (e.g. "wave1") first
+                    const topLevel = steps.find((s: { name: string }) => s.name === `wave${waveNum}`)
+                    if (topLevel) return (topLevel as { status: string }).status === 'completed' ? 'completed'
+                      : (topLevel as { status: string }).status === 'running' ? 'running' : 'pending'
+                    // Fallback: derive from sub-steps (e.g. "wave1_analyze", "wave1_classify")
                     const waveSteps = steps.filter((s: { name: string }) => s.name.startsWith(`wave${waveNum}_`))
                     if (waveSteps.some((s: { status: string }) => s.status === 'running')) return 'running'
                     if (waveSteps.length > 0 && waveSteps.every((s: { status: string }) => s.status === 'completed')) return 'completed'
