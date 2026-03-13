@@ -2204,6 +2204,8 @@ export default function UKBWorkflowGraph({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <g
+                      data-testid={`workflow-node-${agent.id}`}
+                      data-status={status}
                       className={`cursor-pointer ${wigglingNode === agent.id ? 'animate-wiggle' : ''}`}
                       onClick={() => onNodeClick?.(agent.id)}
                       onMouseEnter={() => handleNodeMouseEnter(agent.id)}
@@ -2212,6 +2214,7 @@ export default function UKBWorkflowGraph({
                       {/* Node background - using direct SVG colors for better control */}
                       {/* strokeWidth varies: 4px for running (bold), 2px for others */}
                       <rect
+                        data-testid={`node-rect-${agent.id}`}
                         x={pos.x}
                         y={pos.y}
                         width={nodeWidth}
@@ -2271,7 +2274,7 @@ export default function UKBWorkflowGraph({
                             <Icon className="h-4 w-4" />
                             {status === 'running' && <Loader2 className="h-3 w-3 animate-spin" />}
                           </div>
-                          <span className="text-xs font-medium text-center leading-tight">
+                          <span data-testid={`node-label-${agent.id}`} className="text-xs font-medium text-center leading-tight">
                             {agent.shortName}
                           </span>
                           {agent.usesLLM && (
@@ -2285,6 +2288,7 @@ export default function UKBWorkflowGraph({
 
                       {/* Status indicator - with smooth transition for visual feedback */}
                       <circle
+                        data-testid={`node-status-indicator-${agent.id}`}
                         cx={pos.x + nodeWidth - 8}
                         cy={pos.y + 8}
                         r={6}
@@ -2605,8 +2609,9 @@ export default function UKBWorkflowGraph({
                         return (
                           <Tooltip key={substep.id}>
                             <TooltipTrigger asChild>
-                              <g className="cursor-pointer">
+                              <g className="cursor-pointer" data-testid={`substep-${agent.id}-${substep.id}`} data-status={substepStatus}>
                                 <path
+                                  data-testid={`substep-path-${agent.id}-${substep.id}`}
                                   d={arcPath}
                                   fill={colors.fill}
                                   fillOpacity={0.85}

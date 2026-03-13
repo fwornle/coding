@@ -120,7 +120,9 @@ export function deriveStepStatuses(
 export function deriveSubstepStatuses(
   state: WorkflowState,
   stepName: string,
-  substeps: readonly { id: string; label: string }[]
+  substeps: readonly { id: string; label: string }[],
+  /** Optional mapping from backend substep IDs (e.g. 'sem_llm_analysis') to UI substep IDs (e.g. 'extract') */
+  backendToUiSubstepMap?: Record<string, string>
 ): Map<string, StepStatus> {
   const result = new Map<string, StepStatus>();
 
@@ -154,16 +156,28 @@ export function deriveSubstepStatuses(
   }
 
   // Step is current -- check for substep-level tracking
-  if (
-    state.status === 'running' &&
-    state.progress.currentSubstepIndex !== undefined &&
-    state.progress.currentSubstepIndex !== null
-  ) {
-    const currentIdx = state.progress.currentSubstepIndex;
+  // Resolve currentSubstepIndex: prefer explicit index, fall back to deriving from currentSubstepId
+  let resolvedIdx: number | undefined;
+  if (state.status === 'running' || state.status === 'paused') {
+    const progress = state.progress;
+    if (progress.currentSubstepIndex !== undefined && progress.currentSubstepIndex !== null) {
+      resolvedIdx = progress.currentSubstepIndex;
+    } else if (progress.currentSubstepId) {
+      // Map backend substep ID to UI substep ID, then find its index
+      const backendId = progress.currentSubstepId;
+      const uiSubstepId = backendToUiSubstepMap?.[backendId] ?? backendId;
+      const idx = substeps.findIndex(s => s.id === uiSubstepId);
+      if (idx >= 0) {
+        resolvedIdx = idx;
+      }
+    }
+  }
+
+  if (resolvedIdx !== undefined) {
     for (let i = 0; i < substeps.length; i++) {
-      if (i < currentIdx) {
+      if (i < resolvedIdx) {
         result.set(substeps[i].id, 'completed');
-      } else if (i === currentIdx) {
+      } else if (i === resolvedIdx) {
         result.set(substeps[i].id, 'running');
       } else {
         result.set(substeps[i].id, 'pending');
