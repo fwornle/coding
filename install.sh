@@ -2873,6 +2873,7 @@ main() {
     setup_vscode_extension
     install_enhanced_lsl
     install_slash_commands
+    generate_agent_instructions
     create_project_local_settings
     install_constraint_monitor_hooks
     verify_installation
@@ -3002,6 +3003,19 @@ install_slash_commands() {
         fi
     else
         info "No .claude/commands directory found (skipping slash commands)"
+    fi
+}
+
+# Generate instruction files for non-Claude agents (Copilot, OpenCode)
+generate_agent_instructions() {
+    echo -e "\n${CYAN}📝 Generating agent-specific instructions...${NC}"
+
+    if [[ -x "$CODING_REPO/scripts/generate-agent-instructions.sh" ]]; then
+        CODING_AGENT=all CODING_REPO="$CODING_REPO" \
+            "$CODING_REPO/scripts/generate-agent-instructions.sh" "$CODING_REPO" "$CODING_REPO"
+        success "Generated agent instructions (.github/copilot-instructions.md)"
+    else
+        warn "generate-agent-instructions.sh not found or not executable"
     fi
 }
 
