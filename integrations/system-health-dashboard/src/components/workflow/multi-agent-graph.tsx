@@ -639,6 +639,54 @@ export function MultiAgentGraph({
       }
     }
 
+    // Wave-analysis: expand wave-level completed steps to agent nodes.
+    // The bridge only reports wave1/wave2/wave3/wave4 as steps. When a wave
+    // completes, all participating agents should turn green.
+    const WAVE_AGENTS: Record<string, string[]> = {
+      wave1: ['batch_scheduler', 'semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave2: ['semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave3: ['semantic_analysis', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+      wave4: ['insight_generation', 'ontology_classification', 'quality_assurance', 'persistence', 'kg_operators'],
+    }
+    for (const step of effectiveSteps) {
+      const waveAgents = WAVE_AGENTS[step.name]
+      if (waveAgents) {
+        for (const waveAgentId of waveAgents) {
+          agentSet.add(waveAgentId)
+          // Propagate wave status: running > completed > pending
+          const existing = statusMap[waveAgentId]
+          if (!existing ||
+              step.status === 'running' ||
+              (step.status === 'completed' && existing.status !== 'running')) {
+            statusMap[waveAgentId] = { ...step, name: waveAgentId, status: step.status as StepInfo['status'] }
+          }
+        }
+      }
+    }
+
+    // Wave-analysis: derive completed agents from currentStep position.
+    // If currentStep is wave1_classify, then batch_scheduler and semantic_analysis
+    // are completed within this wave.
+    const WAVE_SUBSTEP_SEQUENCE = [
+      'batch_scheduler', 'semantic_analysis', 'quality_assurance',
+      'ontology_classification', 'persistence', 'kg_operators', 'insight_generation',
+    ]
+    if (currentStepAgentId) {
+      const currentIdx = WAVE_SUBSTEP_SEQUENCE.indexOf(currentStepAgentId)
+      if (currentIdx > 0) {
+        for (let i = 0; i < currentIdx; i++) {
+          const priorAgent = WAVE_SUBSTEP_SEQUENCE[i]
+          // Prior agents in the sequence must be completed — override pending or running
+          // (WAVE_AGENTS may have set them to 'running' from wave-level status)
+          const priorStatus = statusMap[priorAgent]?.status
+          if (!priorStatus || priorStatus === 'pending' || priorStatus === 'running') {
+            agentSet.add(priorAgent)
+            statusMap[priorAgent] = { name: priorAgent, status: 'completed' } as StepInfo
+          }
+        }
+      }
+    }
+
     return { stepStatusMap: statusMap, stepCountMap: countMap, agentsInWorkflow: agentSet }
   }, [effectiveSteps, process.currentStep, stepToAgent])
 
@@ -966,6 +1014,8 @@ export function MultiAgentGraph({
     return (
       <g
         key={agent.id}
+        data-testid={`workflow-node-${agent.id}`}
+        data-status={status}
         transform={`translate(${x - nodeWidth/2}, ${y - nodeHeight/2})`}
         onClick={() => handleNodeClickInternal(agent.id)}
         onMouseEnter={() => handleNodeMouseEnter(agent.id)}
@@ -1275,8 +1325,9 @@ export function MultiAgentGraph({
               const substepDefs = substeps.map(s => ({ id: s.id, label: s.name }))
 
               // Derive substep statuses from state machine position
+              // Pass the backend→UI substep mapping so currentSubstepId can be resolved
               const substepStatuses: Map<string, StepStatus> = workflowState
-                ? deriveSubstepStatuses(workflowState, agentBackendStepName, substepDefs)
+                ? deriveSubstepStatuses(workflowState, agentBackendStepName, substepDefs, effectiveStepToSubStep)
                 : new Map(substeps.map(s => [s.id, 'pending' as StepStatus]))
 
               Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] derived substepStatuses:', Object.fromEntries(substepStatuses))
