@@ -2872,8 +2872,7 @@ main() {
     setup_mcp_config
     setup_vscode_extension
     install_enhanced_lsl
-    install_slash_commands
-    generate_agent_instructions
+    install_skills
     create_project_local_settings
     install_constraint_monitor_hooks
     verify_installation
@@ -2974,48 +2973,16 @@ install_enhanced_lsl() {
     fi
 }
 
-# Install slash commands from .claude/commands to global Claude commands folder
-install_slash_commands() {
-    echo -e "\n${CYAN}📝 Installing Claude slash commands...${NC}"
-
-    local commands_source="$CODING_REPO/.claude/commands"
-    local commands_target="$HOME/.claude/commands"
-
-    # Create global commands directory if it doesn't exist
-    mkdir -p "$commands_target"
-
-    # Check if source directory exists and has commands
-    if [[ -d "$commands_source" ]]; then
-        local command_count=0
-        for cmd_file in "$commands_source"/*.md; do
-            if [[ -f "$cmd_file" ]]; then
-                local cmd_name=$(basename "$cmd_file")
-                cp "$cmd_file" "$commands_target/$cmd_name"
-                ((command_count++))
-                info "Installed slash command: /${cmd_name%.md}"
-            fi
-        done
-
-        if [[ $command_count -gt 0 ]]; then
-            success "Installed $command_count slash command(s) to $commands_target"
-        else
-            info "No slash commands found in $commands_source"
-        fi
-    else
-        info "No .claude/commands directory found (skipping slash commands)"
-    fi
-}
-
-# Generate instruction files for non-Claude agents (Copilot, OpenCode)
-generate_agent_instructions() {
-    echo -e "\n${CYAN}📝 Generating agent-specific instructions...${NC}"
+# Install skills to all supported agents (Claude global, Copilot, OpenCode)
+# Adding a skill: drop .md into .claude/commands/ → this function handles the rest.
+install_skills() {
+    echo -e "\n${CYAN}📝 Installing skills to all agents...${NC}"
 
     if [[ -x "$CODING_REPO/scripts/generate-agent-instructions.sh" ]]; then
-        CODING_AGENT=all CODING_REPO="$CODING_REPO" \
-            "$CODING_REPO/scripts/generate-agent-instructions.sh" "$CODING_REPO" "$CODING_REPO"
-        success "Generated agent instructions (.github/copilot-instructions.md)"
+        "$CODING_REPO/scripts/generate-agent-instructions.sh" "$CODING_REPO" "$CODING_REPO"
+        success "Skills synced to Claude (global), Copilot, and OpenCode"
     else
-        warn "generate-agent-instructions.sh not found or not executable"
+        warn "scripts/generate-agent-instructions.sh not found or not executable"
     fi
 }
 
