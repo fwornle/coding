@@ -2,104 +2,100 @@
 
 **Type:** Component
 
-[LLM] The SpecstoryAdapter class in lib/integrations/specstory-adapter.js plays a crucial role in the Trajectory component's architecture, as it provides the necessary functionality for connecting with the Specstory extension and logging conversations. The class's use of multiple connection methods and a fallback mechanism ensures that the component can adapt to different environments and scenarios, making it a robust and reliable solution for project progress tracking. Furthermore, the class's integration with the createLogger function in ../logging/Logger.js and the log method in the SpecstoryAdapter class enables the standardized formatting and sending of log entries to the Specstory extension.
+Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .
 
 ## What It Is  
 
-The **Trajectory** component lives under the `Trajectory/` subtree of the overall **Coding** knowledge‑base and its primary responsibility is to record conversational exchanges and project‑progress milestones in a way that can be consumed by the external **Specstory** extension.  All of the concrete logic that enables this behaviour is implemented in the `lib/integrations/specstory-adapter.js` file, where the `SpecstoryAdapter` class lives, and in the shared logger located at `../logging/Logger.js`.  When a Trajectory instance is created it generates a unique session identifier (`Date.now()`) that is attached to every log entry, allowing the Specstory extension to group and retrieve logs belonging to the same run.
+Trajectory is a **component** of the **Coding** project that provides an AI‑driven trajectory and planning system. Its purpose is to manage project milestones, the “Get‑Stuff‑Done” (GSD) workflow, phase planning, and implementation‑task tracking. The component lives in the repository alongside its siblings (LiveLoggingSystem, LLMAbstraction, DockerizedServices, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis) and is directly under the root **Coding** node – there are no sub‑components defined for Trajectory.  
 
-## Architecture and Design  
+All of the planning logic is funneled through a single integration file:  
 
-Trajectory follows a **pluggable integration** architecture.  The `SpecstoryAdapter` acts as an **Adapter** that translates internal logging calls into the protocol expected by the Specstory extension.  To remain functional across diverse runtime environments, the adapter implements three distinct connection strategies—`connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`—all defined in `lib/integrations/specstory-adapter.js`.  This multiplicity of connection methods is a classic **Strategy**‑like design: the component selects the most appropriate strategy at runtime and falls back to the next one when a prior attempt fails.  
+```
+lib/integrations/specstory-adapter.js
+```  
 
-The fallback mechanism is explicitly described in Observation 2: if HTTP or IPC cannot be established, `connectViaFileWatch` is used to keep logging alive, preventing data loss.  The use of a single `createLogger` factory from `../logging/Logger.js` provides a **Factory**‑style entry point for consistent log formatting and transmission, ensuring that every log entry—whether sent over HTTP, IPC, or file‑watch—shares the same structure.
-
-Because Trajectory is a child of the root **Coding** component, it inherits the project‑wide conventions for dependency injection and service registration that are evident in sibling components such as **DockerizedServices**.  However, Trajectory’s focus is on a narrow, well‑defined integration surface rather than a broad service mesh, keeping its footprint lightweight.
-
-## Implementation Details  
-
-1. **Session Identification** – Upon instantiation, Trajectory generates a session ID with `Date.now()`.  This value is stored internally and appended to every call to the adapter’s `log` method (Observation 3).  The session ID enables the Specstory extension to correlate logs belonging to a single execution run.
-
-2. **SpecstoryAdapter Class** – Located in `lib/integrations/specstory-adapter.js`, the class encapsulates all communication with the Specstory extension.  
-   * `connectViaHTTP` builds an HTTP request using the helper `httpRequest` (Observation 1) and sends the payload to the extension’s endpoint.  
-   * `connectViaIPC` opens an inter‑process communication channel (the exact IPC mechanism is not detailed in the observations but the method exists as an alternative).  
-   * `connectViaFileWatch` watches a designated file for changes; when the file is updated, the adapter reads the new content and forwards it as a log entry, acting as a safety net when the other two methods are unavailable (Observation 2).
-
-3. **Logging Pipeline** – The adapter imports `createLogger` from `../logging/Logger.js`.  This logger standardises the JSON shape of each log entry, injects the session ID, timestamps, and any additional metadata, then hands the formatted message to the active connection method.  The `log` method in `SpecstoryAdapter` is the single public entry point for all logging activities (Observations 1, 3, 5, 6).
-
-4. **Fallback Logic** – The connection routine attempts `connectViaHTTP` first, then `connectViaIPC`, and finally `connectViaFileWatch`.  Each attempt is wrapped in error handling; on failure the next strategy is tried, guaranteeing that logging continues even under constrained network or OS conditions (Observations 2, 4, 6).
-
-## Integration Points  
-
-* **Parent – Coding** – Trajectory is registered as a child component of the root **Coding** node.  This placement means it can be discovered by any higher‑level orchestration logic that walks the component tree, and it can share common utilities (e.g., the logger factory) that are defined at the project level.  
-
-* **Sibling Components** – While Trajectory’s primary concern is logging, it shares the same integration philosophy as siblings such as **LiveLoggingSystem** (which also deals with logging but focuses on ontology classification) and **DockerizedServices** (which uses dependency injection).  The common use of factories (`createLogger`) and fallback strategies indicates a project‑wide emphasis on resilience and configurability.  
-
-* **Child – SpecstoryAdapter** – The `SpecstoryAdapter` class is the concrete implementation that Trajectory delegates to.  All external communication passes through this class, making it the sole integration surface with the Specstory extension.  
-
-* **External Dependency – Specstory Extension** – The adapter’s three connection methods target the Specstory extension, which is expected to expose an HTTP endpoint, an IPC listener, or a file‑watchable log sink.  No other internal modules are referenced directly, keeping the coupling minimal.  
-
-* **Logging Utility – ../logging/Logger.js** – The logger created by `createLogger` is the only shared utility used across the component.  It provides a unified format for all log entries, ensuring downstream consumers (the Specstory extension) can parse logs reliably.
-
-## Usage Guidelines  
-
-1. **Instantiate Trajectory Early** – Create the Trajectory instance at application startup so that the session ID (`Date.now()`) is generated before any meaningful work begins.  This guarantees that every subsequent log entry is correctly scoped.  
-
-2. **Prefer HTTP When Available** – The adapter will automatically try `connectViaHTTP` first.  Ensure that the Specstory extension’s HTTP endpoint is reachable in production environments to benefit from the lowest‑latency path.  
-
-3. **Provide IPC or File‑Watch Fallbacks** – In environments where network traffic is restricted (e.g., CI pipelines, offline development), configure the Specstory extension to listen on an IPC socket or monitor a designated log file.  The fallback logic will seamlessly switch without code changes.  
-
-4. **Do Not Bypass the Adapter** – All logging should go through the `SpecstoryAdapter.log` method.  Directly writing to the logger or the file system circumvents the session‑ID injection and the fallback handling, leading to inconsistent logs.  
-
-5. **Handle Adapter Errors Gracefully** – Although the adapter includes its own error handling, callers should still be prepared for a failed `log` call (e.g., by catching exceptions or checking return values) to avoid silent data loss in extreme failure scenarios.  
-
-6. **Maintain Consistent Log Schema** – When extending the log payload, add fields only through the `createLogger` interface so that the JSON schema remains stable for the Specstory consumer.
+This file is the concrete bridge that connects the abstract notion of a “trajectory” to the concrete representation of project milestones and tasks. The component’s keyword set—*trajectory, milestone, planning, phase, GSD, roadmap, spec*—reinforces its focus on end‑to‑end schedule governance rather than low‑level code execution.
 
 ---
 
-### Architectural patterns identified  
-* **Adapter pattern** – `SpecstoryAdapter` translates internal log calls to the external Specstory protocol.  
-* **Strategy‑like pattern** – Multiple connection methods (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) selected at runtime.  
-* **Factory pattern** – `createLogger` supplies a standard logger instance.  
-* **Fallback/Resilience pattern** – Hierarchical attempt of connection strategies to avoid data loss.
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Multiple transport options** increase robustness but add complexity in testing each path.  
-* **Session ID generated via `Date.now()`** is simple and unique enough for most runs, but it does not guarantee global uniqueness across distributed nodes.  
-* **Centralised logging via a single adapter** reduces duplication but creates a single point of failure; the fallback mitigates this risk.  
+The observations reveal a **single‑adapter architectural style**. The presence of `specstory-adapter.js` indicates that Trajectory follows an **Adapter pattern**: it translates the internal planning model into the external “spec‑story” representation (presumably a format used elsewhere in the Coding project for specifications and road‑maps). By isolating this translation in a dedicated file, the component keeps its core planning responsibilities decoupled from the details of how specifications are persisted or consumed.
 
-### System structure insights  
-* Trajectory sits as a leaf component under the **Coding** root, with a single child (`SpecstoryAdapter`).  
-* It shares cross‑cutting concerns (logger factory, error handling) with siblings, suggesting a coherent architectural vision across the codebase.  
+Trajectory sits in a **modular component hierarchy** under the parent **Coding**. It shares the same flat sibling level with other infrastructure components, suggesting a **component‑based decomposition** where each major concern (logging, LLM abstraction, containerization, knowledge management, etc.) is isolated in its own module. No explicit inter‑component communication mechanisms (e.g., event buses or service calls) are mentioned, so the design appears to rely on **direct imports** or **shared adapters** for collaboration.
 
-### Scalability considerations  
-* Adding more connection strategies (e.g., WebSocket) would fit naturally into the existing strategy chain.  
-* The current file‑watch fallback may become a bottleneck under high‑throughput logging; scaling would require larger buffers or rotating log files.  
+Because there are **no sub‑components**, the design is intentionally lightweight: the entire planning capability is encapsulated within the Trajectory component and its single adapter file. This reduces coupling but also means that any future extension (e.g., adding a UI, alternative planning algorithms, or additional data sources) will need to be introduced either as new adapters or as sibling components.
 
-### Maintainability assessment  
-* The clear separation between `Trajectory`, `SpecstoryAdapter`, and the logger promotes easy updates—changing the transport logic does not affect the component’s public API.  
-* Because all connection logic lives in a single file (`specstory-adapter.js`), any bug fixes or enhancements are localized, aiding maintainability.  
-* However, the lack of explicit type definitions (observations show only JavaScript files) could hinder static analysis; adding TypeScript typings would improve long‑term maintainability.
+---
+
+## Implementation Details  
+
+The only concrete implementation artifact identified is:
+
+```
+lib/integrations/specstory-adapter.js
+```
+
+* **Role** – This module acts as the **integration point** between Trajectory’s internal milestone model and the external “spec‑story” format. It likely exports functions such as `createMilestone`, `updatePhase`, or `trackTask`, although the exact signatures are not listed in the observations.  
+
+* **Mechanics** – By virtue of being placed in `lib/integrations`, the adapter is positioned alongside other cross‑cutting integration utilities, implying a **library‑style** consumption pattern (i.e., other components import it as a regular Node.js module). The naming (`specstory-adapter`) suggests it implements a **translation layer**: converting internal objects (e.g., a `Milestone` class or plain JSON) into the spec‑story schema, and possibly persisting them to a datastore managed by another component (perhaps KnowledgeManagement, though that connection is not explicitly documented).  
+
+* **Data Flow** – When a new milestone is defined within Trajectory, the component likely invokes the adapter to serialize the milestone and store it. Conversely, when the system needs to render a roadmap, the adapter would deserialize stored spec‑story entries back into the planning model for display or further manipulation.
+
+Because **no code symbols** were discovered, we cannot enumerate class names or function signatures. The implementation therefore appears to be **thin** and **focused**, delegating most of the heavy lifting to the adapter.
+
+---
+
+## Integration Points  
+
+1. **Spec‑Story Integration** – The `specstory-adapter.js` file is the primary outward‑facing contract. Any system that consumes or produces spec‑story artifacts (e.g., a roadmap UI, reporting service, or external CI pipeline) will import this adapter.  
+
+2. **Parent Component (Coding)** – As a child of the root **Coding** component, Trajectory benefits from any shared configuration, logging, or error‑handling infrastructure provided at the parent level. The parent likely supplies environment variables, authentication tokens, or a common logger that the adapter can use.  
+
+3. **Sibling Components** – While no direct dependencies are listed, the **KnowledgeManagement** component maintains the project’s knowledge graph and could be a natural store for milestone data. Likewise, **ConstraintSystem** could enforce rules on milestone creation (e.g., date ranges, dependency cycles). The architecture’s flat sibling arrangement suggests that these interactions would be realized through **shared adapters** or **common libraries** rather than through a service‑oriented bus.  
+
+4. **External Tools** – The keywords “roadmap” and “spec” hint that Trajectory may be consumed by documentation generators or project‑tracking dashboards, though such tools are not explicitly enumerated in the observations.
+
+---
+
+## Usage Guidelines  
+
+* **Import the Adapter Directly** – When adding or updating milestones, developers should import functions from `lib/integrations/specstory-adapter.js` rather than manipulating spec‑story files manually. This guarantees that the internal planning model stays in sync with the persisted representation.  
+
+* **Respect the Keyword Vocabulary** – Use the defined terminology (milestone, phase, GSD, roadmap, spec) consistently in code comments, configuration files, and commit messages. This alignment aids downstream tools that may parse these terms.  
+
+* **Avoid Adding Sub‑Components Inside Trajectory** – The current design intentionally keeps Trajectory flat. If additional functionality is needed (e.g., a UI layer), create a new sibling component or a separate adapter rather than nesting it inside Trajectory.  
+
+* **Coordinate with KnowledgeManagement** – If milestone data needs to be queried across the system, store it through the adapter in a format that KnowledgeManagement can index. Verify that any schema changes are reflected in both the adapter and the knowledge graph definitions.  
+
+* **Validate Through ConstraintSystem** – Before persisting a new milestone, run any applicable constraints (e.g., no overlapping phases) through the ConstraintSystem to prevent invalid planning states.
+
+---
+
+### Consolidated Answers  
+
+1. **Architectural patterns identified** – Adapter pattern (via `specstory‑adapter.js`), component‑based modular decomposition, thin‑layer integration library.  
+2. **Design decisions and trade‑offs** – Centralizing all planning logic in a single adapter simplifies maintenance and reduces coupling, but limits extensibility (adding new spec formats requires new adapters). The flat component hierarchy keeps the system easy to navigate but may lead to tight coupling if many siblings start sharing data directly.  
+3. **System structure insights** – Trajectory is a leaf component under the root **Coding** node, with no internal sub‑components. It interacts primarily through the `lib/integrations` layer, positioning it as an integration‑focused module rather than a heavyweight service.  
+4. **Scalability considerations** – Because planning data flows through a single adapter file, concurrent updates could become a bottleneck if the adapter performs synchronous I/O. Scaling horizontally would require refactoring the adapter into a stateless service or adding caching layers.  
+5. **Maintainability assessment** – High maintainability for the current scope: a single source of truth (`specstory‑adapter.js`) is easy to locate and modify. However, as the planning domain expands (multiple roadmaps, richer phase semantics), the adapter may grow complex, necessitating clearer separation of concerns or additional adapters.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classifi; LLMAbstraction: [LLM] The LLMAbstraction component leverages the LLMService class (lib/llm/llm-service.ts) as the primary entry point for all LLM operations. This cla; DockerizedServices: [LLM] The DockerizedServices component utilizes dependency injection to manage its services and utilities, as seen in the LLMService class (lib/llm/ll; Trajectory: [LLM] The Trajectory component's architecture is designed to facilitate logging conversations and tracking project progress through its utilization of; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to cons; CodingPatterns: [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retri; ConstraintSystem: [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a multi-agent architecture, with each agent responsible for a specific task, such as ontology classifica.
-
-### Children
-- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the httpRequest helper method to send HTTP requests to the Specstory extension in the connectViaHTTP method
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This agent is responsible for mapping the observations to the relevant concepts in the ontology, which enables the system to provide accurate and meaningful classifications. The classification process involves a series of complex algorithms and logic, which are implemented in the classifyObservation function of the OntologyClassificationAgent class. The function takes an observation object as input, which contains the text to be classified, and returns a classification result object that includes the matched concepts and their corresponding scores.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component leverages the LLMService class (lib/llm/llm-service.ts) as the primary entry point for all LLM operations. This class handles mode routing, caching, circuit breaking, and provider fallback, thereby providing a unified interface for interacting with various LLM providers. For instance, the LLMService class utilizes the getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to determine the LLM mode for a specific agent, considering per-agent overrides, global mode, and default mode. This design decision enables the component to handle different LLM modes, including mock, local, and public, and to provide a flexible and scalable architecture.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes dependency injection to manage its services and utilities, as seen in the LLMService class (lib/llm/llm-service.ts) where it injects a mock service or a budget tracker. This design decision allows for loose coupling and testability of the services, enabling developers to easily swap out different implementations of the services. For instance, the LLMService class can be injected with a mock service for testing purposes, or with a budget tracker to monitor the service's resource usage. The use of dependency injection also facilitates the management of complex service dependencies, as services can be injected with other services or components, such as the ServiceStarter (lib/service-starter.js) injecting a service with a retry logic and timeout protection.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to construct a code knowledge graph based on Abstract Syntax Trees (ASTs). This allows for efficient semantic code search capabilities. The CodeGraphAgent is designed to work in conjunction with the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store and retrieve entities from the graph database. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) provides a type-safe interface for interacting with the graph database, ensuring seamless data persistence and retrieval. For instance, the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) takes an AST as input and returns a constructed code graph, which is then stored in the graph database via the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts).
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval. This is evident in how it utilizes the adapter to fetch and update data across various sub-components, ultimately contributing to the overall performance of the system. For instance, when constructing the code knowledge graph using the CodeGraphConstructor (code-graph-constructor.ts), it leverages the GraphDatabaseAdapter to store and retrieve relevant graph data. Furthermore, the GraphDatabaseInteractions class is used in conjunction with the GraphDatabaseAdapter to handle interactions with graph databases and knowledge graph construction, as seen in the way it employs the adapter to execute queries and retrieve results.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter provides a robust mechanism for storing and retrieving data in a graph database, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that data is consistently updated and available for further processing. For instance, the ContentValidationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on this adapter to store and retrieve validation results.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent architecture, with each agent responsible for a specific task, such as ontology classification, semantic analysis, and code graph construction. For example, the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, classifies observations against the ontology system. This agent extends the BaseAgent class, which provides a basic implementation of the execute(input) pattern, allowing for lazy LLM initialization and execution. The execute method in the OntologyClassificationAgent is responsible for executing the classification task, and it follows the pattern established by the BaseAgent class.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .
+- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .
+- [KnowledgeManagement](./KnowledgeManagement.md) -- KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
+- [CodingPatterns](./CodingPatterns.md) -- CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.. It contains 0 sub-components: .
+- [ConstraintSystem](./ConstraintSystem.md) -- ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 4 observations*

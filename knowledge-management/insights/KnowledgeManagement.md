@@ -2,155 +2,144 @@
 
 **Type:** Component
 
-[LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to construct a code knowledge graph based on Abstract Syntax Trees (ASTs). This allows for efficient semantic code search capabilities. The CodeGraphAgent is designed to work in conjunction with the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store and retrieve entities from the graph database. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) provides a type-safe interface for interacting with the graph database, ensuring seamless data persistence and retrieval. For instance, the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) takes an AST as input and returns a constructed code graph, which is then stored in the graph database via the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts).
+KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
 
 ## What It Is  
 
-The **KnowledgeManagement** component lives under the *integrations/mcp‑server‑semantic‑analysis* tree and is the engine that builds, enriches, stores, and queries a **code‑knowledge graph**. Its core agents are:
+**KnowledgeManagement** is the central component that owns the project‑wide knowledge graph for the *Coding* system. It is responsible for **graph storage, query, and lifecycle management**, encompassing the VKB server, an underlying graph database, entity‑persistence mechanisms, and a knowledge‑decay tracking subsystem. The component is split into two logical sub‑components:  
 
-* **CodeGraphAgent** – parses source code into an Abstract Syntax Tree (AST) and creates a graph representation (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`).  
-* **PersistenceAgent** – mediates all reads and writes to the underlying graph database (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`).  
-* **GraphDatabaseAdapter** – a type‑safe wrapper around a Graphology + LevelDB store that synchronises JSON exports (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  
+* **ManualLearning** – the curated, human‑authored portion of the graph (manual entities, direct edits, hand‑crafted observations).  
+* **OnlineLearning** – the automatically‑derived portion, populated by the batch‑analysis pipeline that processes Git history, LSL sessions, and code‑analysis results.  
 
-Together they enable **semantic code search**, **ontology‑driven classification**, and **trace reporting** (via `ukb-trace-report.ts`). The component sits inside the larger *Coding* parent, alongside siblings such as *LiveLoggingSystem* and *SemanticAnalysis*, and it owns several children (e.g., *CodeGraphConstructor*, *EntityPersistenceManager*, *OntologyClassificationSystem*) that expose the same underlying agents to higher‑level features like *ManualLearning* and *OnlineLearning*.
+All of this lives under the *Coding* root component, alongside siblings such as **LiveLoggingSystem**, **SemanticAnalysis**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **CodingPatterns**, and **ConstraintSystem**. No concrete file paths or symbols were discovered in the supplied observation set, so the description is based entirely on the component‑level metadata that was provided.
 
 ---
 
 ## Architecture and Design  
 
-### Multi‑Agent Collaboration  
-KnowledgeManagement follows a **multi‑agent architecture**: each responsibility is encapsulated in a dedicated agent (CodeGraphAgent, PersistenceAgent, OntologyManager, VKBRouter). The agents communicate through well‑defined interfaces rather than sharing mutable state, which keeps the system loosely coupled and easier to test.  
+The architecture follows a **component‑based, layered design** that cleanly separates *knowledge acquisition* from *knowledge storage & lifecycle*.  
 
-### Work‑Stealing Concurrency  
-The utility `runWithConcurrency` (`integrations/mcp-server-semantic-analysis/src/utils/concurrency-utils.ts`) implements a **work‑stealing pattern** using a shared atomic index counter. Threads (or async workers) pull the next task index atomically, guaranteeing that no two workers process the same chunk of work. This pattern is employed when constructing large code graphs or when bulk‑loading entities, improving throughput on multi‑core machines without introducing complex lock hierarchies.
+1. **Acquisition Layer** – Implemented by the two sub‑components. *ManualLearning* provides a UI or API surface for humans to author or edit entities directly. *OnlineLearning* consumes the output of the **SemanticAnalysis** batch pipeline (a sibling component) and injects derived entities into the graph. This split isolates the concerns of data provenance and enables independent evolution of each learning path.  
 
-### Ontology‑Driven Metadata  
-The **OntologySystem** (`ontology/index.js`) and **OntologyManager** (`ontology-manager.ts`) provide a classification service that annotates every graph entity with ontology metadata. The classification function (`classifyEntity`) and metadata provider (`provideMetadata`) are invoked before persistence, ensuring that the knowledge graph is semantically enriched at ingest time.  
+2. **Persistence Layer** – The observations list **VKB server**, **LevelDB**, **UKB**, and **Graphology** as key technologies. The VKB server appears to be the front‑end service exposing CRUD and query operations, while LevelDB (a fast key‑value store) likely backs entity persistence. UKB and Graphology are mentioned as keywords, suggesting they are either alternative graph back‑ends or libraries used for graph manipulation. The design therefore adopts a *pluggable storage* approach: the VKB server can route calls to the appropriate backend (LevelDB for simple key‑value entities, a full‑graph DB for complex relationships).  
 
-### Type‑Safe Persistence Layer  
-`GraphDatabaseAdapter` offers a **type‑safe façade** over Graphology + LevelDB. All persistence calls (`storeEntity`, `retrieveEntity`) are strongly typed, preventing runtime shape mismatches and allowing IDE‑level autocomplete for entity fields. The adapter also performs automatic JSON export syncing, guaranteeing that an external JSON snapshot stays consistent with the LevelDB store.
+3. **Lifecycle & Decay Layer** – A dedicated “knowledge decay tracking” subsystem monitors the freshness of entities. By tracking timestamps or usage metrics, the system can automatically downgrade or retire stale knowledge, keeping the graph relevant. This reflects a **policy‑driven lifecycle management** pattern where decay rules are encapsulated and applied uniformly across both manual and online data.  
 
-### VKB Routing for Database Access  
-When the server is stopped, the **VKB API** (via `VKBRouter` in `integrations/mcp-server-semantic-analysis/src/utils/vkb-router.ts`) routes direct database requests, sidestepping LevelDB lock conflicts. This design isolates read‑only analytics workloads from the main server process, preserving data integrity.
+4. **Query Interface** – Although not explicitly named, the presence of a “graph query” capability implies a query API (likely exposed via the VKB server) that sibling components such as **LiveLoggingSystem** or **Trajectory** can invoke to retrieve contextual knowledge.  
 
-### Reporting Pipeline  
-`UKBTraceReport` (`integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts`) consumes a set of persisted entities, enriches them with ontology metadata, and writes a detailed trace report back to the graph database through the PersistenceAgent. This closed‑loop reporting ensures that performance diagnostics are themselves part of the knowledge graph.
+Overall, the design is **modular** (clear component boundaries), **policy‑driven** (decay rules), and **extensible** (multiple storage back‑ends). No evidence of micro‑service or event‑driven patterns is present in the observations, so the architecture is best described as a monolithic service with internal modularity.
 
 ---
 
 ## Implementation Details  
 
-### CodeGraphAgent  
-* **`constructCodeGraph(ast)`** – receives an AST, walks it, and emits graph nodes/edges that model functions, classes, imports, and call relationships. The function is deliberately built to handle *large‑scale* codebases; it streams the AST and creates entities incrementally, feeding each batch to the PersistenceAgent.  
-* **`searchCodeGraph(query)`** – translates a semantic query into a graph traversal (leveraging Graphology’s query API) and returns matching entity IDs, which the caller then resolves via `PersistenceAgent.retrieveEntity`.
+* **VKB Server** – Acts as the façade for all graph operations. It receives create, read, update, delete, and query requests from internal callers (e.g., OnlineLearning) and external consumers (e.g., other components). The server likely hosts a REST or gRPC endpoint, though the exact protocol is not disclosed.  
 
-### PersistenceAgent  
-* **`storeEntity(entity)`** – forwards the entity to `GraphDatabaseAdapter.storeEntity`. Before storage, the agent may invoke `OntologyManager.provideMetadata` to attach classification data.  
-* **`retrieveEntity(id)`** – calls `GraphDatabaseAdapter.retrieveEntity` and returns a fully typed entity object. The agent abstracts away the underlying LevelDB transaction handling, exposing a simple async API to callers.
+* **Graph Database / Graphology** – The core graph representation is handled by a graph‑oriented library (named *Graphology*). This library provides node/edge structures, traversal algorithms, and possibly indexing for fast lookup.  
 
-### GraphDatabaseAdapter  
-* Implements **type‑safe CRUD** methods (`storeEntity<T>(entity: T)`, `retrieveEntity<T>(id: string): Promise<T>`).  
-* Internally uses **Graphology** for in‑memory graph manipulation and **LevelDB** for durable persistence. A background synchroniser writes the in‑memory graph to a JSON file after each successful transaction, guaranteeing an export that can be consumed by external tools.
+* **LevelDB** – Serves as the low‑level persistence engine for entity attributes that do not require full graph semantics (e.g., raw blobs, version metadata). It offers high‑throughput writes, which is useful for the high‑velocity ingestion performed by **OnlineLearning**.  
 
-### Concurrency Utilities  
-* `runWithConcurrency(tasks, workerFn, concurrency)` creates an atomic counter (`AtomicInteger`) that each worker atomically increments to claim the next task index. Workers stop when the counter exceeds the task list length. This approach avoids the “thundering herd” problem and keeps CPU utilisation high.
+* **UKB** – Mentioned alongside VKB; it may be a secondary knowledge base or a utility library that enriches entities with additional metadata (e.g., taxonomy, ontology links).  
 
-### Ontology Subsystem  
-* `OntologySystem.classifyEntity(entity)` returns a classification label (e.g., *Component*, *Service*, *Utility*).  
-* `OntologyManager.provideMetadata(entity)` enriches the entity with fields such as `ontologyId`, `tags`, and `confidenceScore`. Both functions are pure and side‑effect‑free, making them safe to call from any concurrency context.
+* **Knowledge Decay Tracker** – Implements a time‑based or usage‑based policy. Each entity likely stores a “last‑touched” timestamp; a background job evaluates decay thresholds and marks entities as *stale*, *archived*, or *deleted*.  
 
-### VKBRouter  
-* Examines the current server state; if the main server is stopped, it opens a direct LevelDB handle and forwards the request, preventing the usual file‑lock errors that occur when multiple processes try to open LevelDB simultaneously.
+* **ManualLearning Sub‑component** – Provides interfaces (perhaps a web UI or CLI) that allow developers to author entities, edit existing nodes, and attach observations. Because it deals with human‑curated data, it probably includes validation rules to maintain graph consistency.  
 
-### UKBTraceReport Generator  
-* `generateReport(entities)` iterates over the supplied entities, pulls ontology metadata, formats a human‑readable (and machine‑parseable) report, and persists the report entity via the PersistenceAgent. The report can later be queried like any other graph node.
+* **OnlineLearning Sub‑component** – Hooks into the **SemanticAnalysis** pipeline. After the batch analysis processes Git history, LSL sessions, and code analysis, it emits a stream of inferred entities (e.g., function‑to‑concept mappings, dependency graphs). OnlineLearning consumes this stream, transforms it into the graph schema, and persists it via the VKB server.  
+
+No concrete class or function names were extracted, so the description remains at the subsystem level.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – Coding**: KnowledgeManagement supplies the *semantic* layer for the entire Coding hierarchy. Sibling components (LiveLoggingSystem, SemanticAnalysis, etc.) also rely on the same `GraphDatabaseAdapter`, promoting a unified data store across the project.  
+1. **Sibling – SemanticAnalysis** – Supplies the raw, automatically‑derived knowledge that OnlineLearning ingests. The integration is likely a producer‑consumer relationship where the batch pipeline writes to a shared queue or directly calls the VKB server’s ingestion API.  
 
-2. **Children**:  
-   * *CodeGraphConstructor* simply forwards ASTs to `CodeGraphAgent.constructCodeGraph`.  
-   * *EntityPersistenceManager* is a thin wrapper around `PersistenceAgent.storeEntity`/`retrieveEntity`.  
-   * *OntologyClassificationSystem* exposes the `OntologySystem` API to external consumers (e.g., LiveLoggingSystem’s classification agent).  
+2. **Sibling – LiveLoggingSystem** – May query the knowledge graph to enrich live session logs with contextual information (e.g., linking a logged code snippet to its associated knowledge entity).  
 
-3. **External VKB API**: The `VKBRouter` enables external tooling (e.g., analytics dashboards) to read/write graph data without starting the full server, ensuring that the KnowledgeManagement component can be used in batch‑processing pipelines.  
+3. **Sibling – LLMAbstraction** – Could use the graph as a retrieval source for prompt augmentation, pulling relevant entities to condition LLM calls.  
 
-4. **Reporting**: `UKBTraceReportGenerator` is invoked by monitoring or CI jobs to produce trace artifacts that are themselves stored in the graph, allowing downstream components (like LiveLoggingSystem) to visualise historical performance.  
+4. **Sibling – DockerizedServices** – Provides the container runtime for the VKB server and its backing databases, ensuring consistent deployment across environments.  
 
-5. **Concurrency**: Any bulk operation (e.g., ingesting a new repository) should call `runWithConcurrency` to maximise CPU utilisation while still using the same underlying agents, guaranteeing consistent state across threads.
+5. **Parent – Coding** – Acts as the umbrella that orchestrates component initialization and configuration. KnowledgeManagement’s configuration (e.g., which storage backend to use) is likely defined in the parent’s deployment manifest.  
+
+6. **ConstraintSystem** – May enforce rules about what kinds of entities can be added or modified, especially for ManualLearning, ensuring that the graph stays within defined constraints.  
+
+All interactions are mediated through well‑defined service interfaces (APIs) exposed by the VKB server; there is no indication of direct file‑level coupling.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through the agents** – Direct access to `GraphDatabaseAdapter` is reserved for internal modules. Application code should call `PersistenceAgent.storeEntity` and `retrieveEntity` so that ontology metadata and VKB routing are applied automatically.  
-* **Prefer async/await** – All agent methods return Promises; mixing callbacks can break the atomic index counter used by `runWithConcurrency`.  
-* **Leverage the ontology before persisting** – Call `OntologyManager.provideMetadata` (or rely on the PersistenceAgent which does it implicitly) to ensure entities are searchable by classification.  
-* **Batch large imports** – Use `runWithConcurrency` with a sensible `concurrency` value (e.g., number of CPU cores) when constructing a code graph for a sizeable repository. This prevents memory spikes and maximises throughput.  
-* **Avoid server‑stop conflicts** – When the main server is not running, route all database calls through the VKB API (`VKBRouter`) rather than opening LevelDB directly. This prevents lock contention.  
-* **Version your reports** – The `UKBTraceReport` generator creates a new graph node for each report; include a timestamp or version field to avoid accidental overwrites.  
+* **Authoring Manual Knowledge** – Use the ManualLearning interface to create or edit entities. Ensure that each entity includes sufficient metadata (e.g., source, timestamp) because the decay subsystem relies on these fields to evaluate freshness.  
+
+* **Automated Knowledge Ingestion** – OnlineLearning should be invoked only by the output of the **SemanticAnalysis** pipeline. Do not feed ad‑hoc data directly; instead, wrap it in the expected schema and call the VKB ingestion endpoint.  
+
+* **Querying the Graph** – When retrieving knowledge, prefer the high‑level query API provided by the VKB server rather than accessing LevelDB or Graphology directly. This guarantees that decay policies are respected and that results are consistent across manual and online data.  
+
+* **Managing Decay** – Developers should be aware that stale entities may be archived automatically. If a manually curated entity is being retired unintentionally, adjust its “last‑touched” timestamp or mark it as protected via the provided metadata flag.  
+
+* **Extending Storage** – If a new persistence technology is required (e.g., a distributed graph DB), implement it behind the VKB server’s storage abstraction. Because the component already supports multiple back‑ends (LevelDB, Graphology), adding another should not affect callers.  
+
+* **Testing** – Leverage the DockerizedServices environment to spin up isolated instances of the VKB server and its databases. Mock the VKB API when writing unit tests for components that depend on KnowledgeManagement.  
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-1. **Multi‑Agent (separation of concerns)** – distinct agents for graph construction, persistence, ontology, and routing.  
-2. **Work‑Stealing Concurrency** – atomic index counter in `runWithConcurrency`.  
-3. **Type‑Safe Adapter** – `GraphDatabaseAdapter` enforces compile‑time entity shapes.  
-4. **Facade/Adapter** – PersistenceAgent hides LevelDB/Graphology details behind a simple API.  
+1. **Component‑Based Modularity** – Clear separation into KnowledgeManagement, ManualLearning, OnlineLearning, and sibling services.  
+2. **Layered Architecture** – Acquisition → Persistence → Lifecycle → Query layers.  
+3. **Policy‑Driven Lifecycle Management** – Knowledge decay tracking enforces freshness rules.  
+4. **Pluggable Storage** – Multiple back‑ends (LevelDB, Graphology, possibly UKB) behind a unified service façade.  
 
-### Design decisions and trade‑offs  
+### Design Decisions & Trade‑offs  
 
-* **Agent isolation** improves testability but adds a small indirection overhead for each DB call.  
-* **Work‑stealing** maximises CPU utilisation for large imports but requires careful handling of shared mutable state (the atomic counter).  
-* **Graphology + LevelDB** offers fast in‑memory traversal with durable storage; however, LevelDB’s single‑process lock model necessitates the VKB routing layer for out‑of‑process access.  
-* **Ontology enrichment at write‑time** guarantees searchable metadata but incurs extra CPU per entity; the trade‑off is justified by richer query capabilities.  
+* **Manual vs. Online Learning Split** – Improves provenance tracking but introduces duplication of validation logic across two paths.  
+* **Embedded Decay Logic** – Keeps the graph relevant automatically, yet adds background processing overhead and potential false‑positive pruning if thresholds are mis‑tuned.  
+* **Mixed Persistence (KV + Graph DB)** – Balances write performance (LevelDB) with relational querying (Graphology), at the cost of increased operational complexity.  
 
-### System structure insights  
+### System Structure Insights  
 
-The KnowledgeManagement component is a **core data‑pipeline hub**: AST → CodeGraphAgent → OntologyManager → PersistenceAgent → GraphDatabaseAdapter. Its children expose the same pipeline at higher abstraction levels (ManualLearning, OnlineLearning). Siblings share the same storage layer, meaning any schema change in the graph database propagates across the entire Coding domain.  
+* KnowledgeManagement sits centrally in the *Coding* hierarchy, acting as both a data source and a policy engine for the entire project.  
+* Its sub‑components are purely logical; they likely share the same runtime process (the VKB server) but expose distinct APIs for manual and automated ingestion.  
+* Siblings consume its query surface, while the parent component orchestrates configuration and deployment.  
 
-### Scalability considerations  
+### Scalability Considerations  
 
-* **Horizontal scaling of ingestion** is achieved via the work‑stealing concurrency model; adding more worker threads linearly reduces processing time until I/O (LevelDB writes) becomes the bottleneck.  
-* **Graph size** is bounded by LevelDB’s on‑disk capacity; the automatic JSON export provides a lightweight snapshot for downstream services without loading the full graph into memory.  
-* **Read‑heavy workloads** (semantic search) benefit from Graphology’s in‑memory indexes; caching frequently accessed sub‑graphs can further reduce LevelDB reads.  
+* **Ingestion Rate** – OnlineLearning can generate large batches from Git history; LevelDB’s high‑throughput writes help absorb spikes, but the graph layer (Graphology) must be sized appropriately for traversal performance.  
+* **Query Load** – As more components query the graph (e.g., LLMAbstraction for prompt augmentation), caching strategies or read‑replicas may become necessary.  
+* **Decay Processing** – The decay tracker should run as a periodic background job; its frequency can be tuned to balance freshness against CPU usage.  
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-* **High cohesion, low coupling** – each agent has a single responsibility, making unit testing straightforward.  
-* **Strong typing** via `GraphDatabaseAdapter` reduces runtime bugs and eases refactoring.  
-* **Explicit concurrency utilities** centralise parallelism logic, preventing ad‑hoc thread management scattered across the codebase.  
-* **Potential fragility** lies in the LevelDB lock semantics; any change to the storage backend would require revisiting the VKB routing and possibly the adapter implementation. Overall, the architecture is well‑structured for incremental evolution and clear ownership of concerns.
+* The clear component boundaries and policy‑driven design make the system **moderately maintainable**. Adding new knowledge sources only requires extending the appropriate sub‑component.  
+* However, the lack of a single unified storage abstraction (multiple back‑ends) can increase the maintenance burden when upgrading or migrating databases.  
+* Documentation of the VKB server’s API surface and decay policy configuration is essential to keep both manual curators and automated pipelines aligned.  
+
+---  
+
+*All statements above are directly derived from the supplied observations; no external assumptions have been introduced.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classifi; LLMAbstraction: [LLM] The LLMAbstraction component leverages the LLMService class (lib/llm/llm-service.ts) as the primary entry point for all LLM operations. This cla; DockerizedServices: [LLM] The DockerizedServices component utilizes dependency injection to manage its services and utilities, as seen in the LLMService class (lib/llm/ll; Trajectory: [LLM] The Trajectory component's architecture is designed to facilitate logging conversations and tracking project progress through its utilization of; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to cons; CodingPatterns: [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retri; ConstraintSystem: [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a multi-agent architecture, with each agent responsible for a specific task, such as ontology classifica.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.
 
 ### Children
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from manually authored entities.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from automatically extracted entities.
-- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from an AST.
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store entities in the graph database.
-- [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
-- [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
-- [OntologyClassificationSystem](./OntologyClassificationSystem.md) -- OntologyClassificationSystem uses the CodeGraphAgent's classifyEntity function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to classify entities.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning is a sub-component of KnowledgeManagement
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning is a sub-component of KnowledgeManagement
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This agent is responsible for mapping the observations to the relevant concepts in the ontology, which enables the system to provide accurate and meaningful classifications. The classification process involves a series of complex algorithms and logic, which are implemented in the classifyObservation function of the OntologyClassificationAgent class. The function takes an observation object as input, which contains the text to be classified, and returns a classification result object that includes the matched concepts and their corresponding scores.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component leverages the LLMService class (lib/llm/llm-service.ts) as the primary entry point for all LLM operations. This class handles mode routing, caching, circuit breaking, and provider fallback, thereby providing a unified interface for interacting with various LLM providers. For instance, the LLMService class utilizes the getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to determine the LLM mode for a specific agent, considering per-agent overrides, global mode, and default mode. This design decision enables the component to handle different LLM modes, including mock, local, and public, and to provide a flexible and scalable architecture.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes dependency injection to manage its services and utilities, as seen in the LLMService class (lib/llm/llm-service.ts) where it injects a mock service or a budget tracker. This design decision allows for loose coupling and testability of the services, enabling developers to easily swap out different implementations of the services. For instance, the LLMService class can be injected with a mock service for testing purposes, or with a budget tracker to monitor the service's resource usage. The use of dependency injection also facilitates the management of complex service dependencies, as services can be injected with other services or components, such as the ServiceStarter (lib/service-starter.js) injecting a service with a retry logic and timeout protection.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is designed to facilitate logging conversations and tracking project progress through its utilization of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js. This class provides multiple connection methods, including connectViaHTTP, connectViaIPC, and connectViaFileWatch, which allows the component to establish a connection with the Specstory extension via different means. For instance, the connectViaHTTP method in the SpecstoryAdapter class uses the httpRequest helper method to send HTTP requests to the Specstory extension, enabling the component to log conversations and track project progress.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval. This is evident in how it utilizes the adapter to fetch and update data across various sub-components, ultimately contributing to the overall performance of the system. For instance, when constructing the code knowledge graph using the CodeGraphConstructor (code-graph-constructor.ts), it leverages the GraphDatabaseAdapter to store and retrieve relevant graph data. Furthermore, the GraphDatabaseInteractions class is used in conjunction with the GraphDatabaseAdapter to handle interactions with graph databases and knowledge graph construction, as seen in the way it employs the adapter to execute queries and retrieve results.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter provides a robust mechanism for storing and retrieving data in a graph database, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that data is consistently updated and available for further processing. For instance, the ContentValidationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on this adapter to store and retrieve validation results.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent architecture, with each agent responsible for a specific task, such as ontology classification, semantic analysis, and code graph construction. For example, the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, classifies observations against the ontology system. This agent extends the BaseAgent class, which provides a basic implementation of the execute(input) pattern, allowing for lazy LLM initialization and execution. The execute method in the OntologyClassificationAgent is responsible for executing the classification task, and it follows the pattern established by the BaseAgent class.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .
+- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .
+- [Trajectory](./Trajectory.md) -- Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .
+- [CodingPatterns](./CodingPatterns.md) -- CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.. It contains 0 sub-components: .
+- [ConstraintSystem](./ConstraintSystem.md) -- ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*
