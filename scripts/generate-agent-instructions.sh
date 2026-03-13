@@ -1,15 +1,27 @@
 #!/bin/bash
 # generate-agent-instructions.sh
-# Generates instruction files for non-Claude agents (Copilot, OpenCode)
-# by combining CLAUDE.md rules with skill/command descriptions.
 #
-# All machine-specific paths (home dir, repo path, username) are replaced
-# with portable placeholders so generated files can be committed.
+# Single entry point for propagating skills to ALL supported coding agents.
+#
+# Adding a new skill:
+#   1. Drop a .md file into .claude/commands/
+#   2. Run: ./scripts/generate-agent-instructions.sh
+#   That's it — the skill becomes available in Claude, Copilot, and OpenCode.
+#
+# What it does per agent:
+#   Claude   → copies .claude/commands/*.md to ~/.claude/commands/ (global slash commands)
+#   Copilot  → generates .github/copilot-instructions.md (CLAUDE.md + skill catalog)
+#   OpenCode → appends "Available Skills" section to CLAUDE.md (idempotent)
+#
+# Machine-specific paths (home dir, repo path, username) are replaced with
+# portable placeholders in all generated output.
 #
 # Usage:
 #   ./scripts/generate-agent-instructions.sh [project_dir] [coding_repo]
 #
-# If no args given, uses current directory and auto-detects CODING_REPO.
+# Called by:
+#   - install.sh         (install time)
+#   - agent-common-setup (every launch via `coding --<agent>`)
 
 set -euo pipefail
 
@@ -26,7 +38,6 @@ CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
 log() { echo "[agent-instructions] $*" >&2; }
 
 # Replace machine-specific paths with portable placeholders
-# Handles: home dir, repo absolute path, username
 sanitize_paths() {
     local home_dir="$HOME"
     local username
@@ -63,11 +74,7 @@ extract_description() {
         fi
 
         if $in_desc; then
-            # If line starts with a YAML key, we're past the description
-            if [[ "$line" =~ ^[a-zA-Z_-]+: ]]; then
-                break
-            fi
-            # Continuation of multi-line description
+            if [[ "$line" =~ ^[a-zA-Z_-]+: ]]; then break; fi
             local trimmed="${line#"${line%%[![:space:]]*}"}"
             if [[ -n "$trimmed" ]]; then
                 desc="${desc:+$desc }$trimmed"
@@ -77,9 +84,12 @@ extract_description() {
     echo "$desc"
 }
 
-# Emit skill list from .claude/commands/*.md
+# Emit a markdown bullet list of all skills
+# Usage: emit_skill_list [prefix]
+#   prefix="/"  → "- **/playwright-cli** ..."
+#   prefix=""   → "- **playwright-cli** ..."
 emit_skill_list() {
-    local prefix="${1:-}"  # optional prefix for bullet lines (e.g. "/$name" vs "$name")
+    local prefix="${1:-}"
     for cmd_file in "$COMMANDS_DIR"/*.md; do
         [[ -f "$cmd_file" ]] || continue
         local name
@@ -87,7 +97,6 @@ emit_skill_list() {
         local desc
         desc=$(extract_description "$cmd_file")
         if [[ -z "$desc" ]]; then
-            # Fallback: use first non-empty, non-heading line
             desc=$(grep -v '^#\|^---\|^$' "$cmd_file" | head -1)
         fi
         echo "- **${prefix}${name}** (\`.claude/commands/$name.md\`): $desc"
@@ -95,7 +104,26 @@ emit_skill_list() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Generate .github/copilot-instructions.md
+# 1. Claude: install slash commands globally
+# ──────────────────────────────────────────────────────────────────────────────
+install_claude_global() {
+    local target="$HOME/.claude/commands"
+    mkdir -p "$target"
+
+    [[ -d "$COMMANDS_DIR" ]] || { log "No .claude/commands/ dir — skipping Claude global"; return 0; }
+
+    local count=0
+    for cmd_file in "$COMMANDS_DIR"/*.md; do
+        [[ -f "$cmd_file" ]] || continue
+        cp "$cmd_file" "$target/$(basename "$cmd_file")"
+        ((count++))
+    done
+
+    log "Claude: installed $count skill(s) → $target"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2. Copilot: generate .github/copilot-instructions.md
 # ──────────────────────────────────────────────────────────────────────────────
 generate_copilot_instructions() {
     local target_dir="$1"
@@ -117,16 +145,21 @@ Paths shown as `~` refer to the user's home directory.
 
 HEADER
 
-        # Include CLAUDE.md content (sanitize machine-specific paths)
         if [[ -f "$CLAUDE_MD" ]]; then
             echo "## Project Guidelines"
             echo ""
-            # Skip the first H1 line and sanitize paths
-            tail -n +2 "$CLAUDE_MD" | sanitize_paths
+            # Strip the auto-generated skills section (OpenCode marker) before including,
+            # since Copilot gets its own skills section below.
+            local marker="## Available Skills (Auto-Generated)"
+            awk -v marker="$marker" '
+                BEGIN { skip=0 }
+                $0 == marker { skip=1; next }
+                skip && /^## / { skip=0 }
+                !skip { print }
+            ' "$CLAUDE_MD" | tail -n +2 | sanitize_paths
             echo ""
         fi
 
-        # List available skills from .claude/commands/
         if [[ -d "$COMMANDS_DIR" ]]; then
             echo "## Available Skills"
             echo ""
@@ -139,12 +172,12 @@ HEADER
 
     } > "$output"
 
-    log "Generated $output"
+    log "Copilot: generated $output"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Augment CLAUDE.md with skill references for OpenCode
-# (OpenCode reads CLAUDE.md but doesn't have Claude's slash command system)
+# 3. OpenCode: append skill catalog to CLAUDE.md
+#    (OpenCode reads CLAUDE.md but has no slash command system)
 # ──────────────────────────────────────────────────────────────────────────────
 ensure_skill_references_in_claude_md() {
     local claude_md="$1"
@@ -154,9 +187,8 @@ ensure_skill_references_in_claude_md() {
 
     local marker="## Available Skills (Auto-Generated)"
 
-    # If marker already exists, replace the section; otherwise append
-    if grep -qF "$marker" "$claude_md" 2>/dev/null; then
-        # Remove old auto-generated section (from marker to next ## or EOF)
+    # Remove existing auto-generated section (idempotent)
+    if grep -qF -- "$marker" "$claude_md" 2>/dev/null; then
         local temp
         temp=$(mktemp)
         awk -v marker="$marker" '
@@ -168,7 +200,7 @@ ensure_skill_references_in_claude_md() {
         mv "$temp" "$claude_md"
     fi
 
-    # Append skill references
+    # Append fresh skill catalog
     {
         echo ""
         echo "$marker"
@@ -180,36 +212,21 @@ ensure_skill_references_in_claude_md() {
         echo ""
     } >> "$claude_md"
 
-    log "Updated skill references in $claude_md"
+    log "OpenCode: updated skill references in $claude_md"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 main() {
-    local agent="${CODING_AGENT:-all}"
+    log "Syncing skills to all agents (project=$PROJECT_DIR)"
 
-    log "Generating agent instructions (agent=$agent, project=$PROJECT_DIR)"
+    # Always do all three — one skill addition, all agents updated
+    install_claude_global
+    generate_copilot_instructions "$PROJECT_DIR"
+    ensure_skill_references_in_claude_md "$CLAUDE_MD"
 
-    case "$agent" in
-        copilot)
-            generate_copilot_instructions "$PROJECT_DIR"
-            ;;
-        opencode)
-            ensure_skill_references_in_claude_md "$CLAUDE_MD"
-            ;;
-        claude)
-            # Claude reads .claude/commands/ natively — nothing to generate
-            log "Claude agent: no additional instructions needed"
-            ;;
-        all)
-            generate_copilot_instructions "$PROJECT_DIR"
-            # Only augment CLAUDE.md for non-coding projects (coding repo CLAUDE.md is manually managed)
-            if [[ "$PROJECT_DIR" != "$CODING_REPO" ]]; then
-                ensure_skill_references_in_claude_md "$CLAUDE_MD"
-            fi
-            ;;
-    esac
+    log "Done — skills active in Claude, Copilot, and OpenCode"
 }
 
 main "$@"
