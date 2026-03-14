@@ -168,9 +168,6 @@ integrations/browser-access/logs/
 # PlantUML validation errors (transient, regenerated on diagram validation)
 knowledge-management/insights/plantuml_errors.json
 
-# Session and conversation logs (commented out to track sessions)
-# .specstory/history/
-
 # Package lock files (optional - some prefer to track these)
 package-lock.json
 **/package-lock.json
@@ -216,3 +213,6 @@ docker/config/
 
 # MkDocs build output
 site/
+
+# Coding infrastructure runtime files (auto-added by coding startup)
+.constraint-monitor.yaml

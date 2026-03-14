@@ -85,6 +85,7 @@ cd /Users/Q284340/Agentic/coding/integrations/system-health-dashboard && npm run
 `mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Requires Memgraph running.
 
 
+
 ## Available Skills (Auto-Generated)
 
 These skills are defined in `.claude/commands/` and provide reusable workflows.
