@@ -527,26 +527,23 @@ class HealthVerifier extends EventEmitter {
           continue;
         }
 
-        const stats = fsSync.statSync(healthFile);
-        const age = Date.now() - stats.mtime.getTime();
-
-        if (age > 60000) {
+        // Read health file first — need content to distinguish stopped vs stale
+        let healthData;
+        try {
+          healthData = JSON.parse(fsSync.readFileSync(healthFile, 'utf8'));
+        } catch (parseErr) {
           checks.push({
             ...check,
             status: 'error',
-            message: `Transcript monitor for ${projectName} health file is stale (${Math.round(age / 1000)}s old)`,
-            details: { projectPath, healthFile, age, reason: 'stale_health_file' }
+            message: `Transcript monitor for ${projectName} health file is unreadable`,
+            details: { projectPath, healthFile, reason: 'parse_error', error: parseErr.message }
           });
           continue;
         }
 
-        // Read health file and check PID
-        try {
-          const healthData = JSON.parse(fsSync.readFileSync(healthFile, 'utf8'));
-
-          // Check if monitor was gracefully stopped (no active Claude session)
-          // This is a valid state, not an error
-          if (healthData.status === 'stopped') {
+        // Check if monitor was gracefully stopped (no active Claude session)
+        // This is a valid state, not an error — skip staleness check
+        if (healthData.status === 'stopped') {
             checks.push({
               ...check,
               status: 'passed',
@@ -562,6 +559,20 @@ class HealthVerifier extends EventEmitter {
             });
             continue;
           }
+
+        // Staleness check — only for non-stopped monitors
+        const stats = fsSync.statSync(healthFile);
+        const age = Date.now() - stats.mtime.getTime();
+
+        if (age > 60000) {
+          checks.push({
+            ...check,
+            status: 'error',
+            message: `Transcript monitor for ${projectName} health file is stale (${Math.round(age / 1000)}s old)`,
+            details: { projectPath, healthFile, age, reason: 'stale_health_file' }
+          });
+          continue;
+        }
 
           const pid = healthData.metrics?.processId;
 
@@ -588,22 +599,14 @@ class HealthVerifier extends EventEmitter {
             continue;
           }
 
-          // Monitor is healthy - override severity to 'info' for passing checks
+          // Monitor is healthy
           checks.push({
             ...check,
-            status: 'passed',  // Use 'passed' (not 'pass') for consistency with report filter
-            severity: 'info',  // Pass = info, not error
+            status: 'passed',
+            severity: 'info',
             message: `Transcript monitor for ${projectName} is running (PID ${pid})`,
             details: { projectPath, pid, uptime: healthData.metrics?.uptimeSeconds }
           });
-        } catch (parseError) {
-          checks.push({
-            ...check,
-            status: 'error',
-            message: `Failed to parse health file for ${projectName}: ${parseError.message}`,
-            details: { projectPath, healthFile, reason: 'parse_error' }
-          });
-        }
       }
     } catch (error) {
       checks.push({
