@@ -251,6 +251,29 @@ class CombinedStatusLine {
   /**
    * Get trajectory state from live-state.json
    */
+  /**
+   * Check LSL transcript monitor health independently.
+   * Returns 'healthy', 'stale', or 'down'.
+   */
+  getLSLHealthStatus() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      const healthFile = join(codingPath, '.health', 'coding-transcript-monitor-health.json');
+
+      if (!existsSync(healthFile)) return 'down';
+
+      const health = JSON.parse(readFileSync(healthFile, 'utf8'));
+      if (health.status === 'stopped') return 'down';
+
+      const ageMs = Date.now() - (health.timestamp || 0);
+      if (ageMs > 120_000) return 'stale'; // 2 minutes
+
+      return 'healthy';
+    } catch {
+      return 'down';
+    }
+  }
+
   getTrajectoryState() {
     // Map states to icons (from config/live-logging-config.json) - SINGLE SOURCE OF TRUTH
     // NOTE: Leading space is intentional for proper spacing when appended
@@ -1738,6 +1761,17 @@ class CombinedStatusLine {
         else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
       }
     }
+
+    // LSL (Live Session Logging) Status - independent check for transcript monitor
+    const lslStatus = this.getLSLHealthStatus();
+    if (lslStatus === 'down') {
+      parts.push('[LSL🔴]');
+      overallColor = 'red';
+    } else if (lslStatus === 'stale') {
+      parts.push('[LSL⚠️]');
+      if (overallColor === 'green') overallColor = 'yellow';
+    }
+    // When healthy, don't show — keeps statusline compact
 
     // Constraint Monitor Status with TRJ label (trajectory)
     if (constraint.status === 'operational') {

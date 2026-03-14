@@ -159,11 +159,46 @@ function outputBlockedResponse(healthStatus) {
 }
 
 /**
+ * Independent LSL health check — runs regardless of health verifier status.
+ * Checks whether the transcript monitor is actively producing session logs.
+ * Returns a warning string if LSL is down, empty string if healthy.
+ */
+function checkLSLHealth() {
+    try {
+        const healthFile = join(codingRoot, '.health', 'coding-transcript-monitor-health.json');
+        if (!existsSync(healthFile)) {
+            return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded.\n';
+        }
+
+        const health = JSON.parse(readFileSync(healthFile, 'utf-8'));
+        const ageMs = Date.now() - (health.timestamp || 0);
+        const MAX_STALE_MS = 120_000; // 2 minutes
+
+        if (health.status === 'stopped') {
+            return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded. Run: node scripts/global-lsl-coordinator.js ensure /Users/Q284340/Agentic/coding\n';
+        }
+
+        if (ageMs > MAX_STALE_MS) {
+            const ageSec = Math.floor(ageMs / 1000);
+            return `🔴 LSL STALE: Transcript monitor health not updated for ${ageSec}s. LSL may have crashed. Run: node scripts/global-lsl-coordinator.js ensure /Users/Q284340/Agentic/coding\n`;
+        }
+
+        return ''; // Healthy
+    } catch {
+        // If we can't check, don't block — but warn
+        return '⚠️ LSL: Unable to verify transcript monitor status\n';
+    }
+}
+
+/**
  * Output health context for Claude (normal flow)
  * Simplified: no counts, just status. Details on dashboard.
  */
 function outputHealthContext(healthStatus) {
     let context = '';
+
+    // Always check LSL independently — this must never be suppressed
+    const lslWarning = checkLSLHealth();
 
     if (healthStatus.isStale) {
         context = `🔄 System Health: Verification triggered (data was stale)\n`;
@@ -172,10 +207,12 @@ function outputHealthContext(healthStatus) {
         const criticalCount = healthStatus.status.criticalCount || 0;
         const violations = healthStatus.status.violationCount || 0;
 
-        if (violations === 0) {
+        if (violations === 0 && !lslWarning) {
             context = `✅ System Health: All systems operational (verified ${ageSeconds}s ago)\n`;
         } else if (criticalCount > 0) {
             context = `❌ System Health: Critical issues detected - check dashboard\n`;
+        } else if (lslWarning) {
+            context = lslWarning;
         } else {
             context = `⚠️ System Health: Issues detected - auto-healing active\n`;
         }
