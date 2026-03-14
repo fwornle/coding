@@ -379,16 +379,28 @@ class GlobalLSLCoordinator {
     const projects = Object.keys(this.registry.projects);
     let healthyCount = 0;
     let recoveredCount = 0;
-    
+    let prunedCount = 0;
+
     for (const projectName of projects) {
       const projectInfo = this.registry.projects[projectName];
-      
+
+      // PRUNE: Remove projects with no active tmux session.
+      // Monitors should only run for projects with an open Claude/Copilot session.
+      const hasSession = await this.hasActiveTmuxSession(projectName);
+      if (!hasSession) {
+        this.log(`No active session for ${projectName} — pruning monitor`);
+        await this.cleanupStaleMonitor(projectInfo);
+        delete this.registry.projects[projectName];
+        prunedCount++;
+        continue;
+      }
+
       if (await this.isMonitorHealthy(projectInfo)) {
         healthyCount++;
         projectInfo.lastHealthCheck = Date.now();
       } else {
         this.log(`Recovering unhealthy monitor for ${projectName}`);
-        
+
         // Attempt recovery
         if (await this.ensure(projectInfo.projectPath)) {
           recoveredCount++;
@@ -400,7 +412,7 @@ class GlobalLSLCoordinator {
       }
     }
     
-    this.log(`Health check complete: ${healthyCount} healthy, ${recoveredCount} recovered`);
+    this.log(`Health check complete: ${healthyCount} healthy, ${recoveredCount} recovered, ${prunedCount} pruned`);
     this.saveRegistry();
   }
 
