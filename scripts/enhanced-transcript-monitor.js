@@ -119,6 +119,11 @@ class EnhancedTranscriptMonitor {
     this.exchangeCount = 0;
     this.lastFileSize = 0;
 
+    // Multi-transcript tracking: process ALL active transcripts simultaneously
+    // Each entry: { lastFileSize, lastProcessedUuid, agentType }
+    this.trackedTranscripts = new Map();
+    this._initMultiTranscriptTracking();
+
     // Idle timeout: auto-exit if no transcript activity for this duration
     // This prevents orphaned monitors when Claude sessions are force-quit
     this.idleTimeout = config.idleTimeout || 1800000; // 30 minutes default
@@ -241,6 +246,262 @@ class EnhancedTranscriptMonitor {
     const projectName = path.basename(this.config.projectPath);
     const stateFileName = `${projectName}-transcript-monitor-state.json`;
     return path.join(codingPath, '.health', stateFileName);
+  }
+
+  /**
+   * Initialize multi-transcript tracking by discovering all active transcripts
+   */
+  _initMultiTranscriptTracking() {
+    const allTranscripts = this.findAllActiveTranscripts();
+    const savedState = this._loadMultiTranscriptState();
+
+    for (const t of allTranscripts) {
+      const saved = savedState[t.path] || {};
+      this.trackedTranscripts.set(t.path, {
+        lastFileSize: 0,
+        lastProcessedUuid: saved.lastProcessedUuid || null,
+        agentType: t.source,
+        currentUserPromptSet: [],
+        lastTranche: null
+      });
+    }
+
+    // Ensure the primary transcript is in the tracked set
+    if (this.transcriptPath && !this.trackedTranscripts.has(this.transcriptPath)) {
+      this.trackedTranscripts.set(this.transcriptPath, {
+        lastFileSize: 0,
+        lastProcessedUuid: this.lastProcessedUuid,
+        agentType: this.agentType,
+        currentUserPromptSet: [],
+        lastTranche: null
+      });
+    }
+
+    if (this.trackedTranscripts.size > 1) {
+      process.stderr.write(`[EnhancedTranscriptMonitor] Multi-transcript: tracking ${this.trackedTranscripts.size} active transcripts\n`);
+    }
+  }
+
+  /**
+   * Find ALL active transcripts for this project (Claude JSONL + Copilot events.jsonl)
+   */
+  findAllActiveTranscripts() {
+    const transcripts = [];
+
+    // Claude JSONL files
+    const baseDir = path.join(os.homedir(), '.claude', 'projects');
+    const projectName = this.getProjectDirName();
+    const projectDir = path.join(baseDir, projectName);
+
+    if (fs.existsSync(projectDir)) {
+      try {
+        const files = fs.readdirSync(projectDir)
+          .filter(file => file.endsWith('.jsonl'))
+          .map(file => {
+            const filePath = path.join(projectDir, file);
+            const stats = fs.statSync(filePath);
+            return { path: filePath, mtime: stats.mtime, source: 'claude' };
+          })
+          .filter(f => (Date.now() - f.mtime.getTime()) < this.config.sessionDuration * 2);
+        transcripts.push(...files);
+      } catch (e) {
+        this.debug(`Error scanning Claude transcripts: ${e.message}`);
+      }
+    }
+
+    // Copilot events.jsonl
+    const copilotTranscript = this.findCopilotTranscript();
+    if (copilotTranscript) {
+      transcripts.push({ path: copilotTranscript, mtime: new Date(), source: 'copilot' });
+    }
+
+    return transcripts;
+  }
+
+  /**
+   * Load per-transcript state from state file
+   */
+  _loadMultiTranscriptState() {
+    try {
+      if (fs.existsSync(this.stateFile)) {
+        const state = JSON.parse(fs.readFileSync(this.stateFile, 'utf-8'));
+        return state.perTranscript || {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  }
+
+  /**
+   * Save per-transcript state to state file
+   */
+  _saveMultiTranscriptState() {
+    try {
+      const stateDir = path.dirname(this.stateFile);
+      if (!fs.existsSync(stateDir)) {
+        fs.mkdirSync(stateDir, { recursive: true });
+      }
+
+      // Merge with existing state to preserve primary lastProcessedUuid
+      let existing = {};
+      try {
+        if (fs.existsSync(this.stateFile)) {
+          existing = JSON.parse(fs.readFileSync(this.stateFile, 'utf-8'));
+        }
+      } catch { /* ignore */ }
+
+      const perTranscript = {};
+      for (const [tPath, tracker] of this.trackedTranscripts) {
+        if (tracker.lastProcessedUuid) {
+          perTranscript[tPath] = {
+            lastProcessedUuid: tracker.lastProcessedUuid,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      }
+
+      const state = {
+        ...existing,
+        lastProcessedUuid: this.lastProcessedUuid,
+        transcriptPath: this.transcriptPath,
+        perTranscript,
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+    } catch (error) {
+      this.debug(`Failed to save multi-transcript state: ${error.message}`);
+    }
+  }
+
+  /**
+   * Refresh the set of tracked transcripts (called periodically)
+   */
+  _refreshTrackedTranscripts() {
+    const allTranscripts = this.findAllActiveTranscripts();
+    let added = 0;
+    let removed = 0;
+
+    const activePaths = new Set(allTranscripts.map(t => t.path));
+
+    // Add new transcripts
+    for (const t of allTranscripts) {
+      if (!this.trackedTranscripts.has(t.path)) {
+        this.trackedTranscripts.set(t.path, {
+          lastFileSize: 0,
+          lastProcessedUuid: null,
+          agentType: t.source,
+          currentUserPromptSet: [],
+          lastTranche: null
+        });
+        added++;
+        process.stderr.write(`[EnhancedTranscriptMonitor] New transcript detected: ${path.basename(t.path)} (${t.source})\n`);
+      }
+    }
+
+    // Remove stale transcripts (no longer in active set)
+    for (const [tPath] of this.trackedTranscripts) {
+      if (!activePaths.has(tPath)) {
+        this.trackedTranscripts.delete(tPath);
+        removed++;
+      }
+    }
+
+    if (added > 0 || removed > 0) {
+      process.stderr.write(`[EnhancedTranscriptMonitor] Transcript refresh: ${added} added, ${removed} removed, ${this.trackedTranscripts.size} total\n`);
+    }
+  }
+
+  /**
+   * Process all tracked transcripts for new content (multi-transcript main loop)
+   */
+  async _processAllTrackedTranscripts() {
+    let anyNewContent = false;
+
+    for (const [tPath, tracker] of this.trackedTranscripts) {
+      try {
+        const stats = fs.statSync(tPath);
+        if (stats.size === tracker.lastFileSize) continue;
+
+        // New content detected in this transcript
+        anyNewContent = true;
+        tracker.lastFileSize = stats.size;
+
+        // Flush any pending prompt set from the previous transcript before switching.
+        // Without this, transcript A's leftover prompt set gets completed by transcript B's
+        // first exchange, causing cross-transcript contamination and wrong file targets.
+        if (this.currentUserPromptSet.length > 0) {
+          const flushTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+          const flushTarget = await this.determineTargetProject(this.currentUserPromptSet[0]);
+          if (flushTarget !== null) {
+            await this.processUserPromptSetCompletion(this.currentUserPromptSet, flushTarget, flushTranche);
+          }
+          this.currentUserPromptSet = [];
+        }
+
+        // Save and swap state to process this transcript
+        const savedPath = this.transcriptPath;
+        const savedSize = this.lastFileSize;
+        const savedUuid = this.lastProcessedUuid;
+        const savedAgent = this.agentType;
+        const savedPromptSet = this.currentUserPromptSet;
+        const savedLastTranche = this.lastTranche;
+
+        this.transcriptPath = tPath;
+        this.lastFileSize = tracker.lastFileSize;
+        this.lastProcessedUuid = tracker.lastProcessedUuid;
+        this.agentType = tracker.agentType;
+        this.currentUserPromptSet = tracker.currentUserPromptSet || [];
+        this.lastTranche = tracker.lastTranche || null;
+
+        try {
+          const exchanges = await this.getUnprocessedExchanges();
+          if (exchanges.length > 0) {
+            await this.processExchanges(exchanges);
+          }
+
+          // Flush stale prompt set for this transcript (held > 10s with no new exchanges)
+          if (this.currentUserPromptSet.length > 0) {
+            const lastTs = this.currentUserPromptSet[this.currentUserPromptSet.length - 1].timestamp;
+            const setAge = Date.now() - new Date(lastTs).getTime();
+            if (setAge > 10000) {
+              const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+              const target = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              if (target !== null) {
+                this.debug(`⏰ Flushing stale per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges (${Math.round(setAge/1000)}s old)`);
+                await this.processUserPromptSetCompletion(this.currentUserPromptSet, target, setTranche);
+              }
+              this.currentUserPromptSet = [];
+            }
+          }
+
+          // Save back updated state to tracker
+          tracker.lastProcessedUuid = this.lastProcessedUuid;
+          tracker.currentUserPromptSet = this.currentUserPromptSet;
+          tracker.lastTranche = this.lastTranche;
+        } catch (error) {
+          this.debug(`Error processing transcript ${path.basename(tPath)}: ${error.message}`);
+        }
+
+        // Restore primary state
+        this.transcriptPath = savedPath;
+        this.lastFileSize = savedSize;
+        this.lastProcessedUuid = savedUuid;
+        this.agentType = savedAgent;
+        this.currentUserPromptSet = savedPromptSet;
+        this.lastTranche = savedLastTranche;
+      } catch (e) {
+        // File may have been deleted
+        if (e.code === 'ENOENT') {
+          this.trackedTranscripts.delete(tPath);
+        }
+      }
+    }
+
+    if (anyNewContent) {
+      this.lastActivityTime = Date.now();
+      this._saveMultiTranscriptState();
+    }
+
+    return anyNewContent;
   }
 
   /**
@@ -1938,7 +2199,26 @@ class EnhancedTranscriptMonitor {
     // DISABLED: This was causing constant timestamp-only updates with minimal value
     // await this.updateComprehensiveTrajectory(targetProject);
 
-    console.log(`📋 Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${path.basename(sessionFile)}`);
+    process.stderr.write(`[LSL] Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${path.basename(sessionFile)}\n`);
+
+    // Git auto-track: stage LSL files in the project's own .specstory directory
+    // Fire-and-forget: don't block the monitor on git operations
+    if (sessionFile.includes('.specstory/history/') || sessionFile.includes('.specstory/logs/')) {
+      const resolvedTarget = path.resolve(targetProject);
+      const resolvedProject = path.resolve(this.config.projectPath);
+      // Only git-add for the monitor's own project, not cross-project files
+      if (resolvedTarget === resolvedProject) {
+        try {
+          const { exec } = await import('child_process');
+          exec(`git add "${sessionFile}"`, { cwd: this.config.projectPath, timeout: 5000 }, (err) => {
+            if (err) this.debug(`git add failed for ${path.basename(sessionFile)}: ${err.message}`);
+            else this.debug(`git add OK: ${path.basename(sessionFile)}`);
+          });
+        } catch (e) {
+          this.debug(`git auto-track error: ${e.message}`);
+        }
+      }
+    }
 
     // CRITICAL: Update lastProcessedUuid ONLY when prompt set is successfully written
     // This ensures incomplete exchanges are re-processed on subsequent cycles until
@@ -2264,7 +2544,7 @@ class EnhancedTranscriptMonitor {
     for (const exchange of exchanges) {
       // CRITICAL FIX: Use exchange timestamp for proper time tranche calculation
       const currentTranche = this.getCurrentTimetranche(exchange.timestamp); // Use exchange timestamp
-      console.log(`🐛 DEBUG TRANCHE: ${JSON.stringify(currentTranche)} for exchange at ${new Date(exchange.timestamp).toISOString()}`);
+      this.debug(`Tranche: ${currentTranche.timeString} for exchange at ${new Date(exchange.timestamp).toISOString()}`);
       
       // Real-time trajectory analysis for each exchange
       if (this.trajectoryAnalyzer) {
@@ -2485,10 +2765,16 @@ class EnhancedTranscriptMonitor {
       process.exit(1);
     }
 
-    console.log(`🚀 Starting enhanced transcript monitor`);
-    console.log(`📁 Project: ${this.config.projectPath}`);
-    console.log(`📊 Transcript: ${this.transcriptPath ? path.basename(this.transcriptPath) : 'waiting for session...'}`);
-    console.log(`🔍 Check interval: ${this.config.checkInterval}ms`);
+    process.stderr.write(`[EnhancedTranscriptMonitor] Starting enhanced transcript monitor\n`);
+    process.stderr.write(`[EnhancedTranscriptMonitor] Project: ${this.config.projectPath}\n`);
+    process.stderr.write(`[EnhancedTranscriptMonitor] Primary transcript: ${this.transcriptPath ? path.basename(this.transcriptPath) : 'waiting for session...'}\n`);
+    if (this.trackedTranscripts.size > 1) {
+      process.stderr.write(`[EnhancedTranscriptMonitor] Multi-transcript mode: tracking ${this.trackedTranscripts.size} active transcripts\n`);
+      for (const [tPath, tracker] of this.trackedTranscripts) {
+        process.stderr.write(`[EnhancedTranscriptMonitor]   - ${path.basename(tPath)} (${tracker.agentType})\n`);
+      }
+    }
+    process.stderr.write(`[EnhancedTranscriptMonitor] Check interval: ${this.config.checkInterval}ms\n`);
     const sessionDurationMins = Math.round(this.getSessionDurationMs() / 60000);
     console.log(`⏰ Session boundaries: Every ${sessionDurationMins} minutes`);
 
@@ -2521,30 +2807,17 @@ class EnhancedTranscriptMonitor {
         }
       }
 
-      // CRITICAL FIX: Periodically refresh transcript path to detect new Claude sessions
+      // Periodically refresh tracked transcripts to detect new/closed sessions
       transcriptRefreshCounter++;
       if (transcriptRefreshCounter >= TRANSCRIPT_REFRESH_INTERVAL) {
         transcriptRefreshCounter = 0;
-        const newTranscriptPath = this.findCurrentTranscript();
-        
-        if (newTranscriptPath && newTranscriptPath !== this.transcriptPath) {
-          console.log(`🔄 Transcript file changed: ${path.basename(newTranscriptPath)}`);
-          console.log(`   Previous: ${path.basename(this.transcriptPath)} (${this.lastFileSize} bytes)`);
+        this._refreshTrackedTranscripts();
 
-          // Reset file tracking for new transcript
+        // Also update primary transcript (for health file reporting)
+        const newTranscriptPath = this.findCurrentTranscript();
+        if (newTranscriptPath && newTranscriptPath !== this.transcriptPath) {
           this.transcriptPath = newTranscriptPath;
           this.lastFileSize = 0;
-          // BUG FIX: Don't reset lastProcessedUuid - it should persist across transcript files
-          // to prevent re-processing and duplicate writes to LSL files
-          // this.lastProcessedUuid = null; // REMOVED - was causing duplicate writes
-
-          // Log transcript switch to health file
-          this.logHealthError(`Transcript switched to: ${path.basename(newTranscriptPath)}`);
-
-          console.log(`   ✅ Now monitoring: ${path.basename(this.transcriptPath)}`);
-          console.log(`   📌 Continuing from last processed UUID to prevent duplicates`);
-
-          // Reset activity time on transcript switch (new session started)
           this.lastActivityTime = Date.now();
         }
       }
@@ -2565,25 +2838,28 @@ class EnhancedTranscriptMonitor {
         process.exit(0);
       }
 
-      // CRITICAL FIX: Check for hourly boundary crossing even without new content
-      // This ensures held prompt sets are written when the hour changes, not just
-      // when a new user prompt arrives. Without this, exchanges accumulate indefinitely
-      // when conversations span hour boundaries without new prompts.
+      // Flush held prompt sets when they're stale or cross hour boundaries.
+      // Without this, the last prompt set stays buffered indefinitely because
+      // processExchanges only completes a set when the NEXT user prompt arrives.
       if (this.currentUserPromptSet.length > 0) {
         const currentTranche = this.getCurrentTimetranche();
-        // FIX: Also handle case where lastTranche is null (startup or after reset)
-        // In that case, use the first exchange's timestamp to determine if we're in a different hour
         const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-        const shouldWrite = !this.lastTranche || this.isNewSessionBoundary(currentTranche, setTranche);
 
-        if (shouldWrite && (currentTranche.timeString !== setTranche.timeString || currentTranche.date !== setTranche.date)) {
-          console.log(`⏰ Hour boundary crossed while holding ${this.currentUserPromptSet.length} exchanges - completing to ${setTranche.timeString} window`);
+        // Flush if: hour boundary crossed OR set has been held too long (> 10s)
+        const hourCrossed = currentTranche.timeString !== setTranche.timeString || currentTranche.date !== setTranche.date;
+        const lastExchangeTs = this.currentUserPromptSet[this.currentUserPromptSet.length - 1].timestamp;
+        const setAge = Date.now() - new Date(lastExchangeTs).getTime();
+        const isStale = setAge > 10000; // 10 seconds without new exchanges in this set
+
+        if (hourCrossed || isStale) {
+          const reason = hourCrossed ? `hour boundary (${setTranche.timeString} → ${currentTranche.timeString})` : `stale (${Math.round(setAge/1000)}s)`;
+          this.debug(`⏰ Flushing held prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
           const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
           if (targetProject !== null) {
             const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
             if (wasWritten) {
               this.currentUserPromptSet = [];
-              this.lastTranche = currentTranche;  // Update to current hour
+              this.lastTranche = currentTranche;
             }
           } else {
             this.currentUserPromptSet = [];
@@ -2592,19 +2868,33 @@ class EnhancedTranscriptMonitor {
         }
       }
 
-      if (!this.hasNewContent()) return;
-
-      this.isProcessing = true;
-      try {
-        const exchanges = await this.getUnprocessedExchanges();
-        if (exchanges.length > 0) {
-          await this.processExchanges(exchanges);
+      // Multi-transcript processing: check ALL tracked transcripts for new content
+      if (this.trackedTranscripts.size > 1) {
+        this.isProcessing = true;
+        try {
+          await this._processAllTrackedTranscripts();
+        } catch (error) {
+          this.debug(`Error in multi-transcript loop: ${error.message}`);
+          this.logHealthError(`Multi-transcript loop error: ${error.message}`);
+        } finally {
+          this.isProcessing = false;
         }
-      } catch (error) {
-        this.debug(`Error in monitoring loop: ${error.message}`);
-        this.logHealthError(`Monitoring loop error: ${error.message}`);
-      } finally {
-        this.isProcessing = false;
+      } else {
+        // Single-transcript fallback (original behavior)
+        if (!this.hasNewContent()) return;
+
+        this.isProcessing = true;
+        try {
+          const exchanges = await this.getUnprocessedExchanges();
+          if (exchanges.length > 0) {
+            await this.processExchanges(exchanges);
+          }
+        } catch (error) {
+          this.debug(`Error in monitoring loop: ${error.message}`);
+          this.logHealthError(`Monitoring loop error: ${error.message}`);
+        } finally {
+          this.isProcessing = false;
+        }
       }
     }, this.config.checkInterval);
 
