@@ -302,14 +302,18 @@ class GlobalLSLCoordinator {
    */
   /**
    * Check if there's an active tmux session for a project.
-   * Active sessions indicate the user is working and needs LSL monitoring.
+   * Checks the actual working directory of each tmux pane, not session names,
+   * because sessions are named coding-{agent}-{pid} regardless of project.
    */
   async hasActiveTmuxSession(projectName) {
     try {
-      const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null');
-      const sessions = stdout.trim().split('\n').filter(Boolean);
-      // Match session names like "coding-claude-12345" or "coding-copilot-67890"
-      return sessions.some(s => s.startsWith(`${projectName}-`));
+      // Get pane working directories for all sessions
+      const { stdout } = await execAsync(
+        'tmux list-panes -a -F "#{pane_current_path}" 2>/dev/null'
+      );
+      const paths = stdout.trim().split('\n').filter(Boolean);
+      // Match if any pane is working in this project's directory
+      return paths.some(p => path.basename(p) === projectName || p.endsWith(`/${projectName}`));
     } catch {
       return false; // tmux not running or error — assume no session
     }
