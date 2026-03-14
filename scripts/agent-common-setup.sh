@@ -109,16 +109,22 @@ ensure_coding_runtime_ignored() {
     touch "$gitignore_file"
   fi
 
-  # Entries that coding services create in target projects
+  # Essential entries that coding services create in target projects.
+  # Each must be an exact line match (grep -xF) to avoid substring false positives.
   local entries=(
-    ".specstory/"
     ".constraint-monitor.yaml"
     ".claude/settings.local.json"
+    ".health/"
+    ".logs/"
+    ".specstory/trajectory/live-state.json"
+    ".specstory/validation-report.json"
+    ".specstory/change-log.json"
   )
 
   local added=false
   for entry in "${entries[@]}"; do
-    if ! grep -qF "$entry" "$gitignore_file" 2>/dev/null; then
+    # Use -xF for exact whole-line matching (prevents ".specstory/trajectory/..." matching ".specstory/")
+    if ! grep -qxF -- "$entry" "$gitignore_file" 2>/dev/null; then
       if [ "$added" = false ]; then
         echo "" >> "$gitignore_file"
         echo "# Coding infrastructure runtime files (auto-added by coding startup)" >> "$gitignore_file"
