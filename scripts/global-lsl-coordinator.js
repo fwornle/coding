@@ -90,13 +90,22 @@ class GlobalLSLCoordinator {
     this.log(`Ensuring LSL for project: ${projectName} (${absoluteProjectPath})`);
 
     // Check if project was intentionally stopped (prevents restart loops)
+    // BUT: override the stop marker if there's an active tmux session for this project,
+    // since that means the user is actively working and needs LSL.
     try {
       const ProcessStateManager = (await import('./process-state-manager.js')).default;
       const psm = new ProcessStateManager();
       await psm.initialize();
       if (await psm.isProjectStopped(absoluteProjectPath)) {
-        this.log(`Project ${projectName} is intentionally stopped, skipping`);
-        return false;
+        // Check for active tmux session before honoring stop marker
+        const hasActiveSession = await this.hasActiveTmuxSession(projectName);
+        if (hasActiveSession) {
+          this.log(`Project ${projectName} is stopped but has active tmux session — clearing stop marker and restarting`);
+          await psm.clearProjectStop(absoluteProjectPath);
+        } else {
+          this.log(`Project ${projectName} is intentionally stopped, skipping`);
+          return false;
+        }
       }
     } catch {
       // Fail-open: if check fails, continue with normal flow
@@ -291,6 +300,21 @@ class GlobalLSLCoordinator {
   /**
    * Clean up stale monitor process
    */
+  /**
+   * Check if there's an active tmux session for a project.
+   * Active sessions indicate the user is working and needs LSL monitoring.
+   */
+  async hasActiveTmuxSession(projectName) {
+    try {
+      const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null');
+      const sessions = stdout.trim().split('\n').filter(Boolean);
+      // Match session names like "coding-claude-12345" or "coding-copilot-67890"
+      return sessions.some(s => s.startsWith(`${projectName}-`));
+    } catch {
+      return false; // tmux not running or error — assume no session
+    }
+  }
+
   async cleanupStaleMonitor(projectInfo) {
     const { monitorPid, projectPath } = projectInfo;
 

@@ -2631,7 +2631,11 @@ class EnhancedTranscriptMonitor {
         this.classificationLogger.finalize();
       }
 
-      await this.stop();
+      // Don't set stop marker on signal-based shutdown (SIGINT/SIGTERM).
+      // These happen when tmux sessions are killed, machine sleeps, Docker restarts, etc.
+      // The coordinator should be free to restart the monitor for active sessions.
+      // Only explicit user-initiated stops (coding --stop) should set the marker.
+      await this.stop({ setStopMarker: false });
       process.exit(0);
     };
 

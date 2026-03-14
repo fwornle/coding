@@ -148,10 +148,11 @@ class HealthVerifier extends EventEmitter {
       databases.leveldb_lock_check.enabled = false;
     }
 
-    // Transcript monitor (LSL) doesn't run in Docker
-    if (services.enhanced_transcript_monitor) {
-      services.enhanced_transcript_monitor.enabled = false;
-    }
+    // NOTE: LSL transcript monitors run on the HOST, not inside Docker containers.
+    // They must remain enabled even in Docker mode — disabling them here was the root
+    // cause of LSL failures going undetected (the health system reported "all healthy"
+    // while no monitors were running). See: 2026-03-14 LSL silent failure analysis.
+    // if (services.enhanced_transcript_monitor) { ... } — intentionally NOT disabled
 
     // Qdrant is a separate container - adjust endpoint if env var set
     if (databases.qdrant_availability && process.env.QDRANT_URL) {
