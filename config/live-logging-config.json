@@ -254,27 +254,27 @@
     },
     "trajectory_states": {
       "exploring": {
-        "icon": "🔍EX",
+        "icon": "\ud83d\udd0dEX",
         "description": "Information gathering phase"
       },
       "on_track": {
-        "icon": "📈ON",
+        "icon": "\ud83d\udcc8ON",
         "description": "Productive trajectory progression"
       },
       "off_track": {
-        "icon": "📉OFF",
+        "icon": "\ud83d\udcc9OFF",
         "description": "Deviating from optimal path"
       },
       "implementing": {
-        "icon": "⚙️IMP",
+        "icon": "\u2699\ufe0fIMP",
         "description": "Active code modification"
       },
       "verifying": {
-        "icon": "✅VER",
+        "icon": "\u2705VER",
         "description": "Testing and validation phase"
       },
       "blocked": {
-        "icon": "🚫BLK",
+        "icon": "\ud83d\udeabBLK",
         "description": "Intervention preventing action"
       }
     }
@@ -325,12 +325,12 @@
     },
     "groq": {
       "billingType": "monthly",
-      "monthlySpend": 0,
+      "monthlySpend": 11.02,
       "billingMonth": "MAR",
       "spendLimit": null,
       "autoScrape": true,
       "scrapeIntervalMinutes": 15,
-      "lastScraped": null,
+      "lastScraped": "2026-03-14T15:30:00.000Z",
       "description": "Groq monthly billing. autoScrape uses Playwright to fetch spend from console.groq.com every scrapeIntervalMinutes during active sessions."
     },
     "google": {
