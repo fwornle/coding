@@ -44,7 +44,7 @@ import {
 } from 'lucide-react'
 import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, TIER_MODELS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
-import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
+import { UKBNodeDetailsSidebar } from './workflow'
 import type { RootState } from '@/store'
 import { Logger, LogCategories } from '@/utils/logging'
 import {

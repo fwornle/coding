@@ -6,5 +6,7 @@ export { MultiAgentGraph, WorkflowLegend } from './multi-agent-graph'
 // Note: SubStep and AGENT_SUBSTEPS are now in constants.ts and exported via export * from './constants'
 export { TraceModal } from './trace-modal'
 
+export { UKBNodeDetailsSidebar } from './node-details-sidebar'
+
 // Re-export for backward compatibility
 export { MultiAgentGraph as UKBWorkflowGraph } from './multi-agent-graph'
