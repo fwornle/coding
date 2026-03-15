@@ -539,12 +539,13 @@ export const MULTI_AGENT_EDGES: EdgeDefinition[] = [
   { from: 'content_validation', to: 'orchestrator', type: 'retry', label: 'feedback' },
 
   // === DATA FLOW EDGES (wave-analysis processing sequence) ===
-  // Wave-analysis flow: Init → Analyze → Classify → Persist (repeat per wave) → KG-Ops → Insights
+  // Wave-analysis flow: Init → Analyze → QA → Classify → Persist (repeat per wave) → KG-Ops → Insights
   { from: 'batch_scheduler', to: 'semantic_analysis', type: 'dataflow' },         // (1) init → analyze
-  { from: 'semantic_analysis', to: 'ontology_classification', type: 'dataflow' }, // (2) analyze → classify
-  { from: 'ontology_classification', to: 'persistence', type: 'dataflow' },       // (3) classify → persist
-  { from: 'persistence', to: 'kg_operators', type: 'dataflow' },                  // (4) persist → KG operators
-  { from: 'kg_operators', to: 'insight_generation', type: 'dataflow' },           // (5) operators → insights
+  { from: 'semantic_analysis', to: 'quality_assurance', type: 'dataflow' },       // (2) analyze → QA
+  { from: 'quality_assurance', to: 'ontology_classification', type: 'dataflow' }, // (3) QA → classify
+  { from: 'ontology_classification', to: 'persistence', type: 'dataflow' },       // (4) classify → persist
+  { from: 'persistence', to: 'kg_operators', type: 'dataflow' },                  // (5) persist → KG operators
+  { from: 'kg_operators', to: 'insight_generation', type: 'dataflow' },           // (6) operators → insights
 ]
 
 // Linear workflow edges (for when API provides DAG-style workflow)
@@ -916,6 +917,7 @@ export const SUBSTEP_COLORS = {
   pending:   { fill: '#93c5fd', stroke: '#60a5fa' },  // light blue (blue-300/400)
   running:   { fill: '#1d4ed8', stroke: '#ffffff' },   // dark blue (blue-700) + white glow
   completed: { fill: '#22c55e', stroke: '#16a34a' },   // green (green-500/600)
+  skipped:   { fill: '#d1d5db', stroke: '#9ca3af' },   // grey (gray-300/400) — won't run in this wave
   selected:  { fill: '#60a5fa', stroke: '#3b82f6' },   // medium blue (blue-400/500)
 } as const
 
