@@ -7,7 +7,11 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
-const cacheFile = path.join(codingRepo, '.logs', 'combined-status-line-cache.txt');
+// Per-project cache so each tmux session gets its own underline
+const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.env.TMUX_PANE_PATH || '';
+const projectName = projectPath ? path.basename(projectPath) : '';
+const cacheSuffix = projectName ? `-${projectName}` : '';
+const cacheFile = path.join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 const cslScript = path.join(__dirname, 'combined-status-line.js');
 
 // Load .env file so admin/management API keys are available
