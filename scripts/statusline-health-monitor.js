@@ -388,7 +388,11 @@ class StatusLineHealthMonitor {
             }
 
             // No monitor — check transcript for recent activity
-            const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `${claudeProjectPrefix}${projectName}`);
+            // Use projectPath from registry to build the correct Claude project dir
+            // (handles _work/ subdirs: e.g. /Agentic/_work/foo → -Users-...-Agentic--work-foo)
+            const registryProjectPath = projectInfo.projectPath || path.join(agenticDir, projectName);
+            const escapedProjectPath = registryProjectPath.replace(/\//g, '-').replace(/^-/, '');
+            const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `-${escapedProjectPath}`);
             if (fs.existsSync(claudeProjectDir)) {
               try {
                 const transcriptFiles = fs.readdirSync(claudeProjectDir)
@@ -634,13 +638,32 @@ class StatusLineHealthMonitor {
       // Skip if already found via other methods
       if (sessions[projectName]) continue;
 
-      // This session has Claude running but no monitor - show as dormant (💤)
-      // Not a warning (🟡) because having Claude open without a monitor is expected
-      // for idle sessions - the Global Process Supervisor will restart it if needed
+      // Agent is running — determine icon from transcript age if available
+      let iconData = { status: 'no-monitor', icon: '🟢', details: 'agent running' };
+      const claudeProjectsDir = path.join(process.env.HOME, '.claude', 'projects');
+      const registryData = fs.existsSync(this.registryPath)
+        ? JSON.parse(fs.readFileSync(this.registryPath, 'utf8'))
+        : {};
+      const projInfo = (registryData.projects || {})[projectName];
+      if (projInfo && projInfo.projectPath) {
+        const escapedPath = projInfo.projectPath.replace(/\//g, '-').replace(/^-/, '');
+        const projDir = path.join(claudeProjectsDir, `-${escapedPath}`);
+        if (fs.existsSync(projDir)) {
+          try {
+            const tFiles = fs.readdirSync(projDir)
+              .filter(f => f.endsWith('.jsonl'))
+              .map(f => ({ stats: fs.statSync(path.join(projDir, f)) }))
+              .sort((a, b) => b.stats.mtime - a.stats.mtime);
+            if (tFiles.length > 0) {
+              const age = Date.now() - tFiles[0].stats.mtime.getTime();
+              iconData = this.iconFromAge(age);
+            }
+          } catch { /* use default */ }
+        }
+      }
       sessions[projectName] = {
-        status: 'no-monitor',
-        icon: '💤',
-        details: 'idle'
+        ...iconData,
+        status: iconData.status || 'no-monitor'
       };
 
       this.log(`Detected Claude session without monitor: ${projectName}`, 'DEBUG');
