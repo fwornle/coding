@@ -1358,9 +1358,14 @@ export function MultiAgentGraph({
                 // Check if the parent agent is the one currently active
                 const activeAgent = activeSubstepBackendId ? (stepToAgent[activeSubstepBackendId] || activeSubstepBackendId) : null
                 const isThisAgentActive = activeAgent === expandedSubStepsAgent
+                // For wave-based persist sub-steps (w1/w2/w3), sub-steps beyond the
+                // current wave won't run in this wave — mark them 'skipped' (grey).
+                const isWaveBasedPersist = substeps.some(s => s.id === 'w1' || s.id === 'w2' || s.id === 'w3')
+
                 for (let i = 0; i < substeps.length; i++) {
                   if (isThisAgentActive && activeIdx >= 0) {
-                    substepStatuses.set(substeps[i].id, i < activeIdx ? 'completed' : i === activeIdx ? 'running' : 'pending')
+                    const futureStatus = isWaveBasedPersist ? 'skipped' : 'pending'
+                    substepStatuses.set(substeps[i].id, i < activeIdx ? 'completed' : i === activeIdx ? 'running' : futureStatus as StepStatus)
                   } else {
                     // Agent not active — check if it's already completed
                     const agentStatus = stepStatusMap[expandedSubStepsAgent]?.status

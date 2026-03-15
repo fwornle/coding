@@ -89,12 +89,13 @@
         "ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .",
         "ConstraintSystem handles constraint monitoring and enforcement system that validates code actions and file operations against configured rules during claude code sessions.",
         "Component uses keywords: constraint, rule, validation, enforcement, hook, violation",
-        "The ConstraintSystem component utilizes the ContentValidationAgent class in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to monitor and enforce constraints during code validation."
+        "The ConstraintSystem component utilizes the ContentValidationAgent class in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to monitor and enforce constraints during code validation.",
+        "The ConstraintSystem component utilizes the content-validation-agent.ts file in the integrations/mcp-server-semantic-analysis/src/agents directory to monitor and enforce constraints during code actions and file operations."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.285Z",
-        "last_updated": "2026-03-13T17:54:39.951Z"
+        "last_updated": "2026-03-15T10:31:38.376Z"
       },
       "id": "mc4flkg12nbo98"
     },
@@ -123,12 +124,13 @@
         "LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .",
         "LLMAbstraction handles abstraction layer over llm providers (anthropic, openai, groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.",
         "Component uses keywords: LLM, provider, anthropic, openai, groq, tier, model, dmr",
-        "The LLMAbstraction component utilizes the llm-service.ts file in the lib/llm directory to enable provider-agnostic model calls, which is further supported by specific provider implementations such as the anthropic-provider.ts and dmr-provider.ts files in the lib/llm/providers directory."
+        "The LLMAbstraction component utilizes the llm-service.ts file in the lib/llm directory to enable provider-agnostic model calls, which is further supported by specific provider implementations such as the anthropic-provider.ts and dmr-provider.ts files in the lib/llm/providers directory.",
+        "The LLMAbstraction component utilizes the llm-service.ts file in the lib/llm directory to enable provider-agnostic model calls, allowing for tier-based routing and integration with various providers such as Anthropic and OpenAI through classes like AnthropicProvider in lib/llm/providers/anthropic-provider.ts."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.293Z",
-        "last_updated": "2026-03-13T17:54:29.196Z"
+        "last_updated": "2026-03-15T10:31:38.318Z"
       },
       "id": "mc4flkgs99eop"
     },
@@ -139,12 +141,13 @@
         "DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .",
         "DockerizedServices handles docker containerization layer for all coding services including semantic analysis mcp, constraint monitor, code-graph-rag, and supporting databases.",
         "Component uses keywords: docker, container, compose, service, deployment, memgraph, redis",
-        "The DockerizedServices component utilizes the service-starter.js script to manage the lifecycle of its constituent services, including the semantic analysis MCP, which is mocked in llm-mock-service.ts for testing purposes."
+        "The DockerizedServices component utilizes the service-starter.js script to manage the lifecycle of its constituent services, including the semantic analysis MCP, which is mocked in llm-mock-service.ts for testing purposes.",
+        "The DockerizedServices component utilizes the llm-service.ts module, specifically the LLMService class, to provide semantic analysis functionality, as evidenced by its import and instantiation in the scripts/api-service.js file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.298Z",
-        "last_updated": "2026-03-13T17:54:29.363Z"
+        "last_updated": "2026-03-15T10:31:38.320Z"
       },
       "id": "mc4flkg22cvl1q"
     },
@@ -155,12 +158,13 @@
         "Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .",
         "Trajectory handles ai trajectory and planning system managing project milestones, gsd workflow, phase planning, and implementation task tracking.",
         "Component uses keywords: trajectory, milestone, planning, phase, GSD, roadmap, spec",
-        "The Trajectory component utilizes the specstory-adapter.js file in the lib/integrations directory to manage project milestones and implementation task tracking."
+        "The Trajectory component utilizes the specstory-adapter.js file in the lib/integrations directory to manage project milestones and implementation task tracking.",
+        "The Trajectory component utilizes the specstory-adapter.js file in the lib/integrations directory to manage project milestones and implementation task tracking, facilitating seamless integration with the GSD workflow and phase planning."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.302Z",
-        "last_updated": "2026-03-13T17:54:33.603Z"
+        "last_updated": "2026-03-15T10:31:38.321Z"
       },
       "id": "mc4flkga1xqjr"
     },
@@ -11006,7 +11010,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-13T17:54:58.797Z",
+    "exported_at": "2026-03-15T10:31:43.424Z",
     "total_entities": 420,
     "total_relations": 618,
     "description": "Coding project infrastructure and patterns"
