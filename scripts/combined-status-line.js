@@ -1737,14 +1737,11 @@ class CombinedStatusLine {
       const sessionEntries = Object.entries(globalHealth.sessions || {});
 
       if (sessionEntries.length > 0) {
-        // Get the active tmux pane's working directory so each pane
-        // underlines its own project, not the last-active one.
-        let currentProject;
-        try {
-          currentProject = execSync('tmux display-message -p "#{pane_current_path}"', { encoding: 'utf8', timeout: 2000 }).trim();
-        } catch {
-          currentProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
-        }
+        // TMUX_PANE_PATH is expanded per-window by tmux (#{pane_current_path})
+        // so each window's statusbar underlines its own project.
+        const currentProject = process.env.TMUX_PANE_PATH
+          || process.env.TRANSCRIPT_SOURCE_PROJECT
+          || process.cwd();
         const currentProjectName = currentProject.split('/').pop();
         const currentAbbrev = this.getProjectAbbreviation(currentProjectName);
 
@@ -2129,26 +2126,20 @@ async function main() {
     // API calls which can take >4s under load (especially with many Node processes).
     // The statusline-health-monitor daemon keeps the underlying data fresh every 15s,
     // so a 30s cache is safe. This ensures tmux always gets output within milliseconds.
-    const cacheFile = join(rootDir, '.logs', 'combined-status-line-cache.txt');
-    const cachePaneFile = join(rootDir, '.logs', 'combined-status-line-cache-pane.txt');
-    // Determine the active pane's project so cache is invalidated on pane switch
-    let currentPaneProject = '';
-    try {
-      currentPaneProject = execSync('tmux display-message -p "#{pane_current_path}"', { encoding: 'utf8', timeout: 2000 }).trim().split('/').pop();
-    } catch { /* not in tmux or failed */ }
+    // TMUX_PANE_PATH is set per-window by tmux; use it for per-project caching
+    const panePath = process.env.TMUX_PANE_PATH || '';
+    const paneProject = panePath ? basename(panePath) : '';
+    const cacheSuffix = paneProject ? `-${paneProject}` : '';
+    const cacheFile = join(rootDir, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
     try {
       if (existsSync(cacheFile)) {
         const stat = fs.statSync(cacheFile);
         const ageMs = Date.now() - stat.mtimeMs;
         if (ageMs < 30000) {
-          // Skip cache if the active pane's project changed
-          const cachedPane = existsSync(cachePaneFile) ? readFileSync(cachePaneFile, 'utf8').trim() : '';
-          if (!currentPaneProject || cachedPane === currentPaneProject) {
-            const cached = readFileSync(cacheFile, 'utf8').trim();
-            if (cached) {
-              process.stdout.write(cached + '\n', () => process.exit(0));
-              return;
-            }
+          const cached = readFileSync(cacheFile, 'utf8').trim();
+          if (cached) {
+            process.stdout.write(cached + '\n', () => process.exit(0));
+            return;
           }
         }
       }
@@ -2166,11 +2157,8 @@ async function main() {
 
     clearTimeout(timeout);
 
-    // Write cache for fast-path on subsequent invocations
-    try {
-      writeFileSync(cacheFile, status.text, 'utf8');
-      if (currentPaneProject) writeFileSync(cachePaneFile, currentPaneProject, 'utf8');
-    } catch { /* best effort */ }
+    // Write cache for fast-path on subsequent invocations (keyed per-project)
+    try { writeFileSync(cacheFile, status.text, 'utf8'); } catch { /* best effort */ }
 
     // Claude Code status line expects plain text output
     // Rich features like tooltips may need different configuration
