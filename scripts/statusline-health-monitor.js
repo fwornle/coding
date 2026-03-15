@@ -391,7 +391,7 @@ class StatusLineHealthMonitor {
             // Use projectPath from registry to build the correct Claude project dir
             // (handles _work/ subdirs: e.g. /Agentic/_work/foo → -Users-...-Agentic--work-foo)
             const registryProjectPath = projectInfo.projectPath || path.join(agenticDir, projectName);
-            const escapedProjectPath = registryProjectPath.replace(/\//g, '-').replace(/^-/, '');
+            const escapedProjectPath = registryProjectPath.replace(/[/_]/g, '-').replace(/^-/, '');
             const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `-${escapedProjectPath}`);
             if (fs.existsSync(claudeProjectDir)) {
               try {
@@ -646,7 +646,7 @@ class StatusLineHealthMonitor {
         : {};
       const projInfo = (registryData.projects || {})[projectName];
       if (projInfo && projInfo.projectPath) {
-        const escapedPath = projInfo.projectPath.replace(/\//g, '-').replace(/^-/, '');
+        const escapedPath = projInfo.projectPath.replace(/[/_]/g, '-').replace(/^-/, '');
         const projDir = path.join(claudeProjectsDir, `-${escapedPath}`);
         if (fs.existsSync(projDir)) {
           try {
