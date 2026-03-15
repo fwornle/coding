@@ -2126,8 +2126,9 @@ async function main() {
     // API calls which can take >4s under load (especially with many Node processes).
     // The statusline-health-monitor daemon keeps the underlying data fresh every 15s,
     // so a 30s cache is safe. This ensures tmux always gets output within milliseconds.
-    // TMUX_PANE_PATH is set per-window by tmux; use it for per-project caching
-    const panePath = process.env.TMUX_PANE_PATH || '';
+    // TMUX_PANE_PATH or TRANSCRIPT_SOURCE_PROJECT identifies which project
+    // this status render is for; cache is keyed per-project.
+    const panePath = process.env.TMUX_PANE_PATH || process.env.TRANSCRIPT_SOURCE_PROJECT || '';
     const paneProject = panePath ? basename(panePath) : '';
     const cacheSuffix = paneProject ? `-${paneProject}` : '';
     const cacheFile = join(rootDir, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
