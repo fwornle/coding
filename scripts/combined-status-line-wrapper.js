@@ -6,37 +6,35 @@
  * Reads cached rendered output first (<30s old). Only falls back to full
  * generation when cache is stale. This avoids the 18+s ES module resolution
  * penalty under system load that causes tmux status bar to blank.
+ *
+ * The cache is keyed per-project so each tmux window gets its own underline.
+ * TMUX_PANE_PATH is set by tmux via #{pane_current_path} expansion in .tmux.conf.
  */
 
 import { readFileSync, statSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname, join, basename } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRepo = process.env.CODING_REPO || join(__dirname, '..');
-const cacheFile = join(codingRepo, '.logs', 'combined-status-line-cache.txt');
-const cachePaneFile = join(codingRepo, '.logs', 'combined-status-line-cache-pane.txt');
 
-// Determine active pane's project to invalidate cache on pane switch
-let currentPaneProject = '';
-try {
-  currentPaneProject = execSync('tmux display-message -p "#{pane_current_path}"', { encoding: 'utf8', timeout: 2000 }).trim().split('/').pop();
-} catch { /* not in tmux or failed */ }
+// Determine which project this tmux window belongs to.
+// TMUX_PANE_PATH is expanded per-window by tmux before running this command.
+const panePath = process.env.TMUX_PANE_PATH || '';
+const paneProject = panePath ? basename(panePath) : '';
+const cacheSuffix = paneProject ? `-${paneProject}` : '';
+const cacheFile = join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
-// Fast path: serve from cache if fresh (<30s) AND same pane project
+// Fast path: serve from cache if fresh (<30s)
 try {
   if (existsSync(cacheFile)) {
     const stat = statSync(cacheFile);
     const ageMs = Date.now() - stat.mtimeMs;
     if (ageMs < 30000) {
-      const cachedPane = existsSync(cachePaneFile) ? readFileSync(cachePaneFile, 'utf8').trim() : '';
-      if (!currentPaneProject || cachedPane === currentPaneProject) {
-        const cached = readFileSync(cacheFile, 'utf8').trim();
-        if (cached) {
-          process.stdout.write(cached + '\n');
-          process.exit(0);
-        }
+      const cached = readFileSync(cacheFile, 'utf8').trim();
+      if (cached) {
+        process.stdout.write(cached + '\n');
+        process.exit(0);
       }
     }
   }
