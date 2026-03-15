@@ -678,20 +678,21 @@ export function MultiAgentGraph({
     if (currentStepAgentId) {
       const currentIdx = WAVE_SUBSTEP_SEQUENCE.indexOf(currentStepAgentId)
       if (currentIdx >= 0) {
-        // All agents before current are completed
+        // All agents before current are completed (in this wave)
         for (let i = 0; i < currentIdx; i++) {
           const priorAgent = WAVE_SUBSTEP_SEQUENCE[i]
-          const priorStatus = statusMap[priorAgent]?.status
-          if (!priorStatus || priorStatus === 'pending' || priorStatus === 'running') {
-            agentSet.add(priorAgent)
-            statusMap[priorAgent] = { name: priorAgent, status: 'completed' } as StepInfo
-          }
+          agentSet.add(priorAgent)
+          statusMap[priorAgent] = { name: priorAgent, status: 'completed' } as StepInfo
         }
-        // Current agent is running (unless already completed from a previous wave)
-        const currentStatus = statusMap[currentStepAgentId]?.status
-        if (!currentStatus || currentStatus === 'pending') {
-          agentSet.add(currentStepAgentId)
-          statusMap[currentStepAgentId] = { name: currentStepAgentId, status: 'running' } as StepInfo
+        // Current agent is running — override even if 'completed' from a prior wave
+        agentSet.add(currentStepAgentId)
+        statusMap[currentStepAgentId] = { name: currentStepAgentId, status: 'running' } as StepInfo
+        // Agents after current haven't run in this wave yet — reset to pending
+        // even if they were 'completed' from a prior wave
+        for (let i = currentIdx + 1; i < WAVE_SUBSTEP_SEQUENCE.length; i++) {
+          const futureAgent = WAVE_SUBSTEP_SEQUENCE[i]
+          agentSet.add(futureAgent)
+          statusMap[futureAgent] = { name: futureAgent, status: 'pending' } as StepInfo
         }
       }
     }
@@ -1366,6 +1367,20 @@ export function MultiAgentGraph({
                   if (isThisAgentActive && activeIdx >= 0) {
                     const futureStatus = isWaveBasedPersist ? 'skipped' : 'pending'
                     substepStatuses.set(substeps[i].id, i < activeIdx ? 'completed' : i === activeIdx ? 'running' : futureStatus as StepStatus)
+                  } else if (isThisAgentActive && activeIdx < 0) {
+                    // Agent is active but we're at a wave-level step (e.g. wave2_analyze)
+                    // with no sub-step mapping — show all sub-steps as pending (about to start)
+                    substepStatuses.set(substeps[i].id, 'pending')
+                  } else if (isWaveBasedPersist) {
+                    // Wave-based persist: only mark the waves that actually ran as completed.
+                    // Determine which waves completed from the last persist backend step.
+                    // e.g. if wave1_persist was the last, only w1 is completed; w2/w3 are skipped.
+                    const lastPersistStep = ['wave3_persist', 'wave2_persist', 'wave1_persist']
+                      .find(s => process.steps?.some(st => st.name === s && st.status === 'completed'))
+                    const lastPersistIdx = lastPersistStep
+                      ? substeps.findIndex(s => s.id === effectiveStepToSubStep[lastPersistStep])
+                      : -1
+                    substepStatuses.set(substeps[i].id, i <= lastPersistIdx ? 'completed' : 'skipped')
                   } else {
                     // Agent not active — check if it's already completed
                     const agentStatus = stepStatusMap[expandedSubStepsAgent]?.status
@@ -1403,7 +1418,8 @@ export function MultiAgentGraph({
                 // Per-substep status from runtime data
                 const substepStatus = substepStatuses.get(substep.id)
 
-                const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
+                const isSubstepCompleted = substepStatus === 'completed'
+                const isSubstepSkipped = substepStatus === 'skipped'
                 const isSubstepFailed = substepStatus === 'failed'
                 const isActiveSubStep = substepStatus === 'running'
                 const isPending = !substepStatus || substepStatus === 'pending'
@@ -1415,6 +1431,9 @@ export function MultiAgentGraph({
                 if (isSubstepCompleted) {
                   fillColor = SUBSTEP_COLORS.completed.fill
                   strokeColor = SUBSTEP_COLORS.completed.stroke
+                } else if (isSubstepSkipped) {
+                  fillColor = SUBSTEP_COLORS.skipped.fill
+                  strokeColor = SUBSTEP_COLORS.skipped.stroke
                 } else if (isSubstepFailed) {
                   fillColor = NODE_STATUS_COLORS.failed.border
                   strokeColor = NODE_STATUS_COLORS.failed.text
@@ -1426,7 +1445,7 @@ export function MultiAgentGraph({
                   strokeColor = SUBSTEP_COLORS.selected.stroke
                 }
 
-                const statusText = isSubstepCompleted ? ' (Completed)' : isSubstepFailed ? ' (Failed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
+                const statusText = isSubstepCompleted ? ' (Completed)' : isSubstepSkipped ? ' (Skipped)' : isSubstepFailed ? ' (Failed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
 
                 return (
                   <g
@@ -1443,7 +1462,7 @@ export function MultiAgentGraph({
                     <path
                       d={arcPath}
                       fill={fillColor}
-                      fillOpacity={isPending && !isSelected ? 0.7 : 1}
+                      fillOpacity={(isPending || isSubstepSkipped) && !isSelected ? 0.7 : 1}
                       stroke={strokeColor}
                       strokeWidth={isActiveSubStep ? 3 : isSubstepCompleted ? 2 : 1.5}
                       className={isActiveSubStep ? 'animate-pulse' : ''}

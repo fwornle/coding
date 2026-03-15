@@ -621,20 +621,36 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }).join('|')
   }, [processes])
 
+  // Track when workflows first enter terminal state so we can show them briefly before moving to History
+  const terminalTimestampsRef = useRef<Map<string, number>>(new Map())
+
   // Filter processes for the Active tab
   // ONLY show workflows that are actually running - cancelled/completed/failed go to History
-  // FIX: Previously included ALL isInlineMCP workflows regardless of status, causing "zombie" workflows
+  // Terminal workflows stay in Active for 10s so the trace doesn't go blank instantly
   const activeProcesses = useMemo(() => {
+    const now = Date.now()
     return processes.filter(p => {
       // Only consider truly active states
       const isActiveStatus = p.status === 'running' || p.status === 'starting' || p.status === 'cancelling'
       // For non-inline processes, also check isAlive flag
       const isAlive = p.isAlive && p.status !== 'completed' && p.status !== 'failed' && p.status !== 'cancelled'
-      // ALSO keep recently completed/failed processes so the trace doesn't go blank
-      // when a workflow finishes while the user is watching
-      const isTerminalWithSteps = (p.status === 'completed' || p.status === 'failed') &&
-        p.steps && p.steps.length > 0
-      return isActiveStatus || isAlive || isTerminalWithSteps
+      // Keep recently completed/failed workflows for 10s so the trace doesn't go blank
+      const isTerminal = (p.status === 'completed' || p.status === 'failed' || p.status === 'cancelled')
+      let isRecentlyTerminal = false
+      if (isTerminal && p.steps && p.steps.length > 0) {
+        const processKey = (p as any).workflowId || p.workflowName || 'default'
+        if (!terminalTimestampsRef.current.has(processKey)) {
+          terminalTimestampsRef.current.set(processKey, now)
+        }
+        const terminalSince = terminalTimestampsRef.current.get(processKey)!
+        isRecentlyTerminal = (now - terminalSince) < 10_000
+      }
+      if (!isTerminal) {
+        // Clean up timestamp if process is no longer terminal (restarted)
+        const processKey = (p as any).workflowId || p.workflowName || 'default'
+        terminalTimestampsRef.current.delete(processKey)
+      }
+      return isActiveStatus || isAlive || isRecentlyTerminal
     })
     // Include processesSignature to ensure recalculation when any process data changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -774,6 +790,17 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       dispatch(setSelectedNode('orchestrator'))
     }
   }, [open, activeTab, activeProcesses.length, selectedNode, dispatch])
+
+  // Auto-switch to History tab when Active tab becomes empty (workflow completed)
+  const prevActiveCountRef = useRef(activeProcesses.length)
+  useEffect(() => {
+    if (open && activeTab === 'active' && prevActiveCountRef.current > 0 && activeProcesses.length === 0) {
+      Logger.info(LogCategories.UI, 'Active tab empty after workflow completed, switching to History')
+      dispatch(setActiveTab('history'))
+      // History fetch will be triggered by the activeTab === 'history' effect above
+    }
+    prevActiveCountRef.current = activeProcesses.length
+  }, [open, activeTab, activeProcesses.length, dispatch])
 
   // Track previous step to detect step changes for auto-switching sidebar
   const previousStepRef = useRef<string | null>(null)
