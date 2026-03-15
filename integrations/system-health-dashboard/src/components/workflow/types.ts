@@ -51,6 +51,9 @@ export interface ProcessInfo {
   totalSteps: number
   batchPhaseStepCount?: number  // Derived from workflow YAML (replaces hardcoded BATCH_STEP_COUNT)
   currentStep?: string | null
+  pausedAtStep?: string | null
+  singleStepMode?: boolean
+  stepPaused?: boolean
   steps?: StepInfo[]
   // Multi-agent orchestration data - matches UKBProcess structure
   multiAgent?: {

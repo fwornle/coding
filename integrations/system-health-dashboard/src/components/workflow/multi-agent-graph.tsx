@@ -650,16 +650,20 @@ export function MultiAgentGraph({
     }
     for (const step of effectiveSteps) {
       const waveAgents = WAVE_AGENTS[step.name]
-      if (waveAgents) {
+      if (waveAgents && step.status === 'completed') {
+        // Only propagate completed status from waves to agent nodes.
+        // Running status is derived from currentStep position (below).
         for (const waveAgentId of waveAgents) {
           agentSet.add(waveAgentId)
-          // Propagate wave status: running > completed > pending
           const existing = statusMap[waveAgentId]
-          if (!existing ||
-              step.status === 'running' ||
-              (step.status === 'completed' && existing.status !== 'running')) {
-            statusMap[waveAgentId] = { ...step, name: waveAgentId, status: step.status as StepInfo['status'] }
+          if (!existing || existing.status === 'pending') {
+            statusMap[waveAgentId] = { ...step, name: waveAgentId, status: 'completed' as StepInfo['status'] }
           }
+        }
+      } else if (waveAgents) {
+        // Still add agents to the visible set even if wave is running
+        for (const waveAgentId of waveAgents) {
+          agentSet.add(waveAgentId)
         }
       }
     }
@@ -673,16 +677,21 @@ export function MultiAgentGraph({
     ]
     if (currentStepAgentId) {
       const currentIdx = WAVE_SUBSTEP_SEQUENCE.indexOf(currentStepAgentId)
-      if (currentIdx > 0) {
+      if (currentIdx >= 0) {
+        // All agents before current are completed
         for (let i = 0; i < currentIdx; i++) {
           const priorAgent = WAVE_SUBSTEP_SEQUENCE[i]
-          // Prior agents in the sequence must be completed — override pending or running
-          // (WAVE_AGENTS may have set them to 'running' from wave-level status)
           const priorStatus = statusMap[priorAgent]?.status
           if (!priorStatus || priorStatus === 'pending' || priorStatus === 'running') {
             agentSet.add(priorAgent)
             statusMap[priorAgent] = { name: priorAgent, status: 'completed' } as StepInfo
           }
+        }
+        // Current agent is running (unless already completed from a previous wave)
+        const currentStatus = statusMap[currentStepAgentId]?.status
+        if (!currentStatus || currentStatus === 'pending') {
+          agentSet.add(currentStepAgentId)
+          statusMap[currentStepAgentId] = { name: currentStepAgentId, status: 'running' } as StepInfo
         }
       }
     }
@@ -1324,11 +1333,41 @@ export function MultiAgentGraph({
               // Build substep definitions in the format deriveSubstepStatuses expects
               const substepDefs = substeps.map(s => ({ id: s.id, label: s.name }))
 
-              // Derive substep statuses from state machine position
+              // Derive substep statuses from state machine position OR legacy process data
               // Pass the backend→UI substep mapping so currentSubstepId can be resolved
-              const substepStatuses: Map<string, StepStatus> = workflowState
-                ? deriveSubstepStatuses(workflowState, agentBackendStepName, substepDefs, effectiveStepToSubStep)
-                : new Map(substeps.map(s => [s.id, 'pending' as StepStatus]))
+              let substepStatuses: Map<string, StepStatus>
+
+              // Check if workflowState is current (matches active workflow).
+              // Wave-analysis doesn't use the state machine, so workflowState may be
+              // null or stale. Always prefer legacy process data when available.
+              const wsIsCurrent = workflowState &&
+                workflowState.workflowId === process.workflowName &&
+                workflowState.status !== 'completed' &&
+                workflowState.status !== 'cancelled'
+              const hasLegacySubstep = !!(process.pausedAtStep || process.currentStep)
+
+              if (wsIsCurrent && !hasLegacySubstep) {
+                substepStatuses = deriveSubstepStatuses(workflowState, agentBackendStepName, substepDefs, effectiveStepToSubStep)
+              } else {
+                // Derive from legacy process.currentStep / pausedAtStep
+                substepStatuses = new Map<string, StepStatus>()
+                const activeSubstepBackendId = process.pausedAtStep || process.currentStep
+                // Map backend substep ID to UI substep ID
+                const activeUiId = activeSubstepBackendId ? (effectiveStepToSubStep[activeSubstepBackendId] ?? activeSubstepBackendId) : null
+                const activeIdx = activeUiId ? substeps.findIndex(s => s.id === activeUiId) : -1
+                // Check if the parent agent is the one currently active
+                const activeAgent = activeSubstepBackendId ? (stepToAgent[activeSubstepBackendId] || activeSubstepBackendId) : null
+                const isThisAgentActive = activeAgent === expandedSubStepsAgent
+                for (let i = 0; i < substeps.length; i++) {
+                  if (isThisAgentActive && activeIdx >= 0) {
+                    substepStatuses.set(substeps[i].id, i < activeIdx ? 'completed' : i === activeIdx ? 'running' : 'pending')
+                  } else {
+                    // Agent not active — check if it's already completed
+                    const agentStatus = stepStatusMap[expandedSubStepsAgent]?.status
+                    substepStatuses.set(substeps[i].id, agentStatus === 'completed' ? 'completed' : 'pending')
+                  }
+                }
+              }
 
               Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] derived substepStatuses:', Object.fromEntries(substepStatuses))
 

@@ -647,8 +647,8 @@ class SystemHealthAPIServer {
                     workflowProgress.status = 'cancelled';
                 }
 
-                const lastUpdate = new Date(workflowProgress.lastUpdate).getTime();
-                const age = Date.now() - lastUpdate;
+                const lastUpdate = new Date(workflowProgress.lastUpdate || workflowProgress.progress?.lastUpdate).getTime();
+                const age = isNaN(lastUpdate) ? 0 : Date.now() - lastUpdate;
                 const hasFailed = (workflowProgress.stepsFailed?.length || 0) > 0;
 
                 // Check if this workflow is already represented in registered processes
@@ -734,15 +734,15 @@ class SystemHealthAPIServer {
                         workflowName: workflowProgress.workflowName,
                         team: workflowProgress.team || 'unknown',
                         repositoryPath: workflowProgress.repositoryPath || codingRoot,
-                        startTime: workflowProgress.startTime,
-                        lastHeartbeat: workflowProgress.lastUpdate,
+                        startTime: workflowProgress.startTime || workflowProgress.progress?.startTime,
+                        lastHeartbeat: workflowProgress.lastUpdate || workflowProgress.progress?.lastUpdate,
                         status: inferredStatus,
                         completedSteps: completedSteps,
                         totalSteps: totalSteps,
-                        currentStep: workflowProgress.currentStep,
-                        stepsCompleted: workflowProgress.stepsCompleted || [],
+                        currentStep: workflowProgress.currentStep || workflowProgress.progress?.currentSubstepId || workflowProgress.progress?.currentStepName || null,
+                        stepsCompleted: workflowProgress.stepsCompleted || workflowProgress.progress?.completedSteps || [],
                         stepsFailed: workflowProgress.stepsFailed || [],
-                        elapsedSeconds: workflowProgress.elapsedSeconds || Math.round((Date.now() - new Date(workflowProgress.startTime).getTime()) / 1000),
+                        elapsedSeconds: workflowProgress.elapsedSeconds || workflowProgress.progress?.elapsedSeconds || Math.round((Date.now() - new Date(workflowProgress.startTime || workflowProgress.progress?.startTime).getTime()) / 1000),
                         logFile: null,
                         isAlive: inferredStatus === 'running',
                         health: health,
@@ -793,10 +793,10 @@ class SystemHealthAPIServer {
                     if (proc.status === 'running' && workflowProgress.workflowName === proc.workflowName) {
                         proc.completedSteps = workflowProgress.completedSteps || 0;
                         proc.totalSteps = workflowProgress.totalSteps || 0;
-                        proc.currentStep = workflowProgress.currentStep;
-                        proc.stepsCompleted = workflowProgress.stepsCompleted || [];
+                        proc.currentStep = workflowProgress.currentStep || workflowProgress.progress?.currentSubstepId || workflowProgress.progress?.currentStepName || null;
+                        proc.stepsCompleted = workflowProgress.stepsCompleted || workflowProgress.progress?.completedSteps || [];
                         proc.stepsFailed = workflowProgress.stepsFailed || [];
-                        proc.elapsedSeconds = workflowProgress.elapsedSeconds || 0;
+                        proc.elapsedSeconds = workflowProgress.elapsedSeconds || workflowProgress.progress?.elapsedSeconds || 0;
                         proc.batchProgress = workflowProgress.batchProgress || null;
                         proc.batchIterations = workflowProgress.batchIterations || null;
 
