@@ -719,11 +719,12 @@ export function MultiAgentGraph({
   }, [process.pausedAtStep, process.currentStep])
 
   const getNodeStatus = useCallback((agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'inactive' | 'retry' => {
-    // When workflow is completed, all participating agents are completed
-    const isWorkflowDone = process.completedSteps >= process.totalSteps && process.totalSteps > 0
-      && effectiveSteps.some(s => s.name === 'wave4' && s.status === 'completed')
+    // When workflow is completed, all participating agents are completed.
+    // Check: all waves done, OR process status is 'completed' (historical view)
+    const allWavesDone = effectiveSteps.some(s => s.name === 'wave4' && s.status === 'completed')
+    const processCompleted = (process as any).status === 'completed'
+    const isWorkflowDone = allWavesDone || processCompleted
     if (isWorkflowDone) {
-      // All wave-analysis agents should show green
       const waveAgents = ['batch_scheduler', 'semantic_analysis', 'quality_assurance',
         'ontology_classification', 'persistence', 'kg_operators', 'insight_generation']
       if (waveAgents.includes(agentId)) return 'completed'

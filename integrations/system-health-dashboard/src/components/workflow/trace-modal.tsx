@@ -409,7 +409,22 @@ export function TraceModal({
       if (!waveMap.has(waveNum)) {
         waveMap.set(waveNum, [])
       }
-      waveMap.get(waveNum)!.push(step)
+
+      // If the step has subSteps (pipeline stages like analyze, qa, classify, persist),
+      // expand them into separate entries for richer trace display.
+      const subSteps = (step as any).subSteps as Array<Record<string, unknown>> | undefined
+      if (subSteps && subSteps.length > 0) {
+        const waveSteps = waveMap.get(waveNum)!
+        for (const sub of subSteps) {
+          waveSteps.push({
+            ...sub,
+            wave: waveNum,
+            status: (sub.status as string) || 'completed',
+          } as any)
+        }
+      } else {
+        waveMap.get(waveNum)!.push(step)
+      }
     }
 
     const groups: WaveGroup[] = []

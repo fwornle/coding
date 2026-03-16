@@ -1505,7 +1505,7 @@ export function UKBNodeDetailsSidebar({
                 LLM Call Failed
               </h4>
               <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800 break-words">
-                <div>{stepInfo.outputs.llmError}</div>
+                <div>{String(stepInfo.outputs.llmError)}</div>
                 <div className="text-amber-500 text-[10px] mt-1 italic">Using rule-based fallback</div>
               </div>
             </div>
