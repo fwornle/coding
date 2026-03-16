@@ -128,8 +128,10 @@ integrations/mcp-server-browserbase/
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 
-# Workflow execution reports (generated on each UKB run, not needed in git)
+# Workflow execution reports and logs (generated on each UKB run, not needed in git)
 .data/workflow-reports/
+.data/trace-history/
+.data/workflow-logs/
 
 # 4-Layer Monitoring Architecture runtime files
 .global-service-registry.json
