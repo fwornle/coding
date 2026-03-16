@@ -22,3 +22,12 @@ agent_check_requirements() {
   fi
   _agent_log "✅ opencode CLI detected"
 }
+
+# Configure OpenCode to use corporate GitHub Copilot provider
+agent_pre_launch() {
+  # Set model via inline config (highest precedence after project config)
+  # This ensures opencode uses the corporate Copilot provider instead of
+  # defaulting to Anthropic direct API which requires personal credits.
+  export OPENCODE_CONFIG_CONTENT='{"model":"github-copilot-enterprise/claude-opus-4.6","disabled_providers":["anthropic"]}'
+  _agent_log "Configured model: github-copilot-enterprise/claude-opus-4.6"
+}
