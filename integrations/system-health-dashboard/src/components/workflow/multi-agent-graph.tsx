@@ -44,6 +44,8 @@ const STATUS_COLORS = {
   completed: { bg: 'fill-green-100', border: 'stroke-green-500', text: 'text-green-700' },
   failed: { bg: 'fill-red-100', border: 'stroke-red-500', text: 'text-red-700' },
   skipped: { bg: 'fill-gray-50', border: 'stroke-gray-200', text: 'text-gray-400' },
+  // Retry = QA retry in progress (orange border)
+  retry: { bg: 'fill-orange-100', border: 'stroke-orange-500', text: 'text-orange-700' },
   // Inactive = agent exists but has no steps in current workflow (distinct from skipped)
   inactive: { bg: 'fill-slate-50', border: 'stroke-slate-200', text: 'text-slate-300' },
 }
@@ -675,7 +677,12 @@ export function MultiAgentGraph({
       'batch_scheduler', 'semantic_analysis', 'quality_assurance',
       'ontology_classification', 'persistence', 'kg_operators', 'insight_generation',
     ]
-    if (currentStepAgentId) {
+    // Only apply per-wave position overrides if the workflow is still running.
+    // Once all waves are completed, all agents should stay green.
+    const allWavesComplete = ['wave1', 'wave2', 'wave3', 'wave4'].every(
+      w => effectiveSteps.some(s => s.name === w && s.status === 'completed')
+    )
+    if (currentStepAgentId && !allWavesComplete) {
       const currentIdx = WAVE_SUBSTEP_SEQUENCE.indexOf(currentStepAgentId)
       if (currentIdx >= 0) {
         // All agents before current are completed (in this wave)
@@ -705,18 +712,42 @@ export function MultiAgentGraph({
     return stepCountMap[agentId] || 0
   }, [stepCountMap])
 
-  const getNodeStatus = useCallback((agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'inactive' => {
+  // Detect if current step is a QA retry
+  const isRetryStep = useMemo(() => {
+    const current = process.pausedAtStep || process.currentStep
+    return current ? /_qa_retry$/.test(current) : false
+  }, [process.pausedAtStep, process.currentStep])
+
+  const getNodeStatus = useCallback((agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'inactive' | 'retry' => {
+    // When workflow is completed, all participating agents are completed
+    const isWorkflowDone = process.completedSteps >= process.totalSteps && process.totalSteps > 0
+      && effectiveSteps.some(s => s.name === 'wave4' && s.status === 'completed')
+    if (isWorkflowDone) {
+      // All wave-analysis agents should show green
+      const waveAgents = ['batch_scheduler', 'semantic_analysis', 'quality_assurance',
+        'ontology_classification', 'persistence', 'kg_operators', 'insight_generation']
+      if (waveAgents.includes(agentId)) return 'completed'
+    }
+
     // Check if agent has ANY steps in this workflow
     if (!agentsInWorkflow.has(agentId)) {
       return 'inactive' // Agent not used in this workflow
     }
 
     const stepInfo = stepStatusMap[agentId]
-    if (stepInfo) return stepInfo.status as any
+    if (stepInfo) {
+      // If the agent is running and the current step is a retry, show as retry
+      if (stepInfo.status === 'running' && isRetryStep) {
+        const currentStep = process.pausedAtStep || process.currentStep
+        const retryAgent = currentStep ? (stepToAgent[currentStep] || currentStep) : null
+        if (retryAgent === agentId) return 'retry'
+      }
+      return stepInfo.status as any
+    }
 
     const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
     return isWorkflowComplete ? 'skipped' : 'pending'
-  }, [stepStatusMap, agentsInWorkflow, process.completedSteps, process.totalSteps])
+  }, [stepStatusMap, agentsInWorkflow, process.completedSteps, process.totalSteps, isRetryStep, process.pausedAtStep, process.currentStep, stepToAgent])
 
   const handleNodeClickInternal = useCallback((agentId: string) => {
     // Close expanded substeps if clicking a different agent
@@ -759,7 +790,7 @@ export function MultiAgentGraph({
     return touched
   }, [stepStatusMap])
 
-  // Filter edges to only show progressive dataflow (completed/running agents)
+  // Filter edges to only show relevant connections
   const shouldShowEdge = useCallback((edge: EdgeDefinition): boolean => {
     // Control edges from orchestrator: only show to touched agents
     if (edge.type === 'control' && edge.from === 'orchestrator') {
@@ -770,9 +801,11 @@ export function MultiAgentGraph({
       const sourceStatus = stepStatusMap[edge.from]?.status
       return sourceStatus === 'completed' || sourceStatus === 'running'
     }
-    // Dataflow edges: show if FROM agent is completed/running
+    // Dataflow edges: always show once workflow is running.
+    // The numbered pipeline (1→2→3→...) is the canonical flow and should
+    // always be visible so users understand the workflow structure.
     if (edge.type === 'dataflow') {
-      return touchedAgents.has(edge.from) && touchedAgents.has(edge.to)
+      return true
     }
     return true // Other edge types always shown
   }, [touchedAgents, stepStatusMap])
@@ -1042,11 +1075,12 @@ export function MultiAgentGraph({
               width={nodeWidth}
               height={nodeHeight}
               rx={isOrchestrator ? nodeHeight/2 : 8}
-              className={`${colors.bg} ${colors.border} ${status === 'running' ? 'animate-pulse' : ''}`}
-              strokeWidth={isSelected ? 3 : status === 'running' ? 2.5 : isOrchestrator ? 2 : 1.5}
+              className={`${colors.bg} ${colors.border} ${status === 'running' || status === 'retry' ? 'animate-pulse' : ''}`}
+              strokeWidth={isSelected ? 3 : status === 'running' || status === 'retry' ? 2.5 : isOrchestrator ? 2 : 1.5}
               strokeDasharray={isInactive ? '4,2' : undefined}
               style={{
                 filter: isOrchestrator ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' :
+                        status === 'retry' ? 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.6))' :
                         status === 'running' ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.6))' : undefined,
               }}
             />

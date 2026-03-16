@@ -643,7 +643,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           terminalTimestampsRef.current.set(processKey, now)
         }
         const terminalSince = terminalTimestampsRef.current.get(processKey)!
-        isRecentlyTerminal = (now - terminalSince) < 10_000
+        isRecentlyTerminal = (now - terminalSince) < 3_000
       }
       if (!isTerminal) {
         // Clean up timestamp if process is no longer terminal (restarted)
@@ -688,6 +688,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           enabled: processMockLLM,
           delay: processMockLLMDelay ?? 500
         }))
+      }
+      // Sync global LLM mode from mockLLM flag — only when process is running
+      // (completed processes may not carry mockLLM, don't reset to public)
+      if (processMockLLM === true) {
+        dispatch(setGlobalLLMMode({ mode: 'mock' }))
+      } else if (processMockLLM === false && activeProcess.status === 'running') {
+        dispatch(setGlobalLLMMode({ mode: 'public' }))
       }
     }
   }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, mockLLMExplicit, dispatch])
@@ -1425,14 +1432,48 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 {/* Wave progress indicator for wave-analysis workflows */}
                 {activeCurrentProcess.workflowName === 'wave-analysis' && (() => {
                   const WAVE_LABELS: Record<number, string> = { 1: 'Project & Components', 2: 'SubComponents', 3: 'Details', 4: 'Insight Docs' }
-                  // Derive wave statuses from sub-steps (each wave's last sub-step determines completion)
+                  // Derive current wave from pausedAtStep (most up-to-date signal)
+                  const effectiveStep = pausedAtStep || activeCurrentProcess.currentStep || ''
+                  // Map step names to wave numbers (wave1_*, sem_* in W1 context, operator_* in W3, etc.)
+                  const STEP_TO_WAVE: Record<string, number> = {
+                    wave1_init: 1, wave1_analyze: 1, wave1_qa: 1, wave1_qa_retry: 1, wave1_classify: 1, wave1_persist: 1,
+                    wave2_analyze: 2, wave2_qa: 2, wave2_qa_retry: 2, wave2_classify: 2, wave2_persist: 2,
+                    wave3_analyze: 3, wave3_qa: 3, wave3_qa_retry: 3, wave3_classify: 3, wave3_persist: 3,
+                    wave4_insights: 4, wave4_kgops: 4, wave4_persist: 4, wave4_finalize: 4,
+                  }
+                  let currentWaveFromStep = STEP_TO_WAVE[effectiveStep] || 0
+                  // Sub-steps (sem_*, onto_*, operator_*) don't have wave prefix.
+                  // Derive wave from process.currentWave or from completed wave steps.
+                  if (currentWaveFromStep === 0) {
+                    const procWave = (activeCurrentProcess as any).currentWave
+                    if (procWave) {
+                      currentWaveFromStep = procWave
+                    } else {
+                      // Derive from completed wave steps: if wave1 completed, we're in W2+
+                      const steps_ = activeCurrentProcess.steps || []
+                      for (let w = 3; w >= 1; w--) {
+                        if (steps_.some((s: any) => s.name === `wave${w}` && s.status === 'completed')) {
+                          currentWaveFromStep = w + 1
+                          break
+                        }
+                      }
+                      // If no wave completed yet, we're in W1
+                      if (currentWaveFromStep === 0 && effectiveStep) currentWaveFromStep = 1
+                    }
+                  }
                   const steps = activeCurrentProcess.steps || []
                   const waveStatuses = [1, 2, 3, 4].map(waveNum => {
-                    // Check top-level wave step (e.g. "wave1") first
+                    // Use pausedAtStep-derived wave as the most reliable indicator
+                    if (currentWaveFromStep > 0) {
+                      if (waveNum < currentWaveFromStep) return 'completed'
+                      if (waveNum === currentWaveFromStep) return 'running'
+                      return 'pending'
+                    }
+                    // Fallback: check top-level wave step (e.g. "wave1") from API
                     const topLevel = steps.find((s: { name: string }) => s.name === `wave${waveNum}`)
                     if (topLevel) return (topLevel as { status: string }).status === 'completed' ? 'completed'
                       : (topLevel as { status: string }).status === 'running' ? 'running' : 'pending'
-                    // Fallback: derive from sub-steps (e.g. "wave1_analyze", "wave1_classify")
+                    // Fallback: derive from sub-steps
                     const waveSteps = steps.filter((s: { name: string }) => s.name.startsWith(`wave${waveNum}_`))
                     if (waveSteps.some((s: { status: string }) => s.status === 'running')) return 'running'
                     if (waveSteps.length > 0 && waveSteps.every((s: { status: string }) => s.status === 'completed')) return 'completed'

@@ -427,6 +427,7 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'wave3_persist': 'persistence',
   'wave4_insights': 'insight_generation',
   'wave4_insights_done': 'insight_generation',
+  'wave4_finalize': 'insight_generation',
   // Complete/incremental workflow steps
   'git_history': 'git_history',
   'vibe_history': 'vibe_history',
@@ -918,6 +919,7 @@ export const SUBSTEP_COLORS = {
   running:   { fill: '#1d4ed8', stroke: '#ffffff' },   // dark blue (blue-700) + white glow
   completed: { fill: '#22c55e', stroke: '#16a34a' },   // green (green-500/600)
   skipped:   { fill: '#d1d5db', stroke: '#9ca3af' },   // grey (gray-300/400) — won't run in this wave
+  retry:     { fill: '#f97316', stroke: '#ffffff' },   // orange (orange-500) + white glow — QA retry
   selected:  { fill: '#60a5fa', stroke: '#3b82f6' },   // medium blue (blue-400/500)
 } as const
 
@@ -928,6 +930,7 @@ export const NODE_STATUS_COLORS = {
   completed: { bg: '#dcfce7', border: '#22c55e', text: '#15803d' },  // green-100/500/700
   failed:    { bg: '#fee2e2', border: '#ef4444', text: '#b91c1c' },  // red-100/500/700
   skipped:   { bg: '#f9fafb', border: '#e5e7eb', text: '#9ca3af' },  // gray-50/200/400
+  retry:     { bg: '#fff7ed', border: '#f97316', text: '#c2410c' },  // orange-50/500/700
   inactive:  { bg: '#f8fafc', border: '#e2e8f0', text: '#cbd5e1' },  // slate-50/200/300
 } as const
 
