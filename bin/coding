@@ -41,6 +41,7 @@ OPTIONS:
   --agent AGENT      Force specific agent (any name with config/agents/<name>.sh)
   --claude           Force Claude Code (same as --agent claude)
   --copilot, --copi  Force CoPilot (same as --agent copilot)
+  --opencode         Force OpenCode (same as --agent opencode)
   --copilot-stop     Stop all CoPilot fallback services
   --config FILE      Use specific config file
   --project DIR      Set target project directory (default: current dir)
@@ -97,6 +98,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --claude)
       FORCE_AGENT="claude"
+      shift
+      ;;
+    --opencode)
+      FORCE_AGENT="opencode"
       shift
       ;;
     --config)
