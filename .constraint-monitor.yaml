@@ -36,7 +36,7 @@ constraints:
   message: Use Logger.log() instead of console.log for better log management
   severity: error
   enabled: true
-  file_pattern: '\.(js|ts|jsx|tsx|mjs|cjs)$'
+  file_pattern: \.(js|ts|jsx|tsx|mjs|cjs)$
   tool_filter:
   - Edit
   - Write
@@ -88,7 +88,8 @@ constraints:
   suggestion: Avoid eval() - use safer alternatives for dynamic code execution
 - id: no-parallel-files
   group: architecture
-  pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-]
+  pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[
+    ._-]
   message: 'CRITICAL: No parallel versions allowed - edit the original file directly'
   severity: critical
   enabled: true
@@ -106,9 +107,6 @@ constraints:
   semantic_validation: true
 - id: no-evolutionary-names
   group: architecture
-  # Pattern requires evolutionary word to NOT be preceded or followed by lowercase letters
-  # This prevents false positives like "isInFinalization", "entityLastUpdated", "processTestResults"
-  # The (?<![a-z]) ensures the word isn't embedded in camelCase (like lastUpdated)
   pattern: (?:class|function|const|let|var)\s+\w*(?<![a-z])(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)(?![a-z])
   message: Evolutionary naming detected - refactor original instead. (Whitelisted
     files are exempt from this rule)
@@ -144,7 +142,6 @@ constraints:
   enabled: true
   suggestion: Add '!include _standard-style.puml' after @startuml and before content
   whitelist:
-  # Fixed: Use **/ prefix for proper glob matching on full paths
   - '**/*.yaml'
   - '**/*.yml'
   - '**/.constraint-monitor.yaml'
@@ -184,20 +181,23 @@ constraints:
 - id: plantuml-no-incremental-filenames
   group: plantuml
   pattern: '[-_](?:2|3|v2|v3|new|updated|revised|final|copy)\.(puml|png)$'
-  message: 'CRITICAL: Incremental naming in diagrams is forbidden - modify the original file instead of creating versioned copies'
+  message: 'CRITICAL: Incremental naming in diagrams is forbidden - modify the original
+    file instead of creating versioned copies'
   severity: critical
   enabled: true
   applies_to: filename
   suggestion: Instead of creating diagram-name-2.puml, edit diagram-name.puml directly
 - id: plantuml-diagram-name-format
   group: plantuml
-  # Fixed: Changed \s to [ \t] to avoid matching newlines (which caused false positives on multi-line files)
-  pattern: '@startuml\s+(?:[A-Z]|[^\n]*[ \t][^\n]*|[^\n]*(?:v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-])'
-  message: 'CRITICAL: @startuml diagram name must be lowercase-hyphenated without spaces or version suffixes (determines output PNG filename)'
+  pattern: '@startuml\s+(?:[A-Z]|[^\n]*[ \t][^\n]*|[^\n]*(?:v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[
+    ._-])'
+  message: 'CRITICAL: @startuml diagram name must be lowercase-hyphenated without
+    spaces or version suffixes (determines output PNG filename)'
   severity: critical
   enabled: true
   applies_to: content
-  suggestion: 'Change @startuml My Diagram Name to @startuml my-diagram-name (must match filename without .puml extension)'
+  suggestion: Change @startuml My Diagram Name to @startuml my-diagram-name (must
+    match filename without .puml extension)
 - id: image-reference-pattern
   group: documentation
   pattern: '!\[.*\]\((?!docs/images/).*\.(png|jpg|jpeg|svg)\)'
@@ -208,26 +208,17 @@ constraints:
   suggestion: 'Move images to docs/images/ and update markdown references: ![Description](docs/images/filename.png)'
 - id: documentation-filename-format
   group: documentation
-  pattern: '(?:[A-Z][a-z]+[A-Z]|[A-Z]{2,}).*\.md$'
-  message: 'Documentation files should use kebab-case naming: feature-name.md (only README.md and CHANGELOG.md may use uppercase)'
+  pattern: (?:docs|mkdocs)/.*(?:[A-Z][a-z]+[A-Z]|[A-Z]{2,}(?!\.))[^/]*\.md$
+  message: 'Documentation files in docs/ and mkdocs/ should use kebab-case naming:
+    feature-name.md (only README.md and CHANGELOG.md may use uppercase)'
   severity: error
   enabled: true
   applies_to: file_path
   tool_filter:
   - Edit
   - Write
-  suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md or ALL-CAPS-FILE.md'
-  whitelist:
-  - '**/README.md'
-  - '**/CHANGELOG.md'
-  - '**/CLAUDE.md'
-  - '**/MEMORY.md'
-  - '**/INSTALL*.md'
-  - CLAUDE.md
-  # GSD planning files use uppercase by convention
-  # Need both patterns: *.md for direct files, **/*.md for subdirectories
-  - '**/.planning/*.md'
-  - '**/.planning/**/*.md'
+  suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md
+    or ALL-CAPS-FILE.md'
 - id: update-main-readme
   group: documentation
   pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
@@ -239,7 +230,8 @@ constraints:
 - id: no-incremental-documentation
   group: documentation
   pattern: (?i)\b(fixed|improved|added|updated|changed|modified|removed|deprecated|enhanced|new|now|recent|recently|previous|previously|old|older|formerly|originally|was|were|used
-    to be)\s+(in|on|for|during|as of)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\s*\d{4}\b|\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\s*\d{4}\b|(?:since|as of|in|from)\s+v\d+\.\d+|version\s+\d+\.\d+\s+(?:added|changed|fixed|updated)|\(fixed\)|\(added\)|\(improved\)|\(updated\)
+    to be)\s+(in|on|for|during|as of)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\s*\d{4}\b|\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\s*\d{4}\b|(?:since|as
+    of|in|from)\s+v\d+\.\d+|version\s+\d+\.\d+\s+(?:added|changed|fixed|updated)|\(fixed\)|\(added\)|\(improved\)|\(updated\)
   message: 'CRITICAL: Documentation describes CURRENT state only - no version history,
     fix dates, or incremental language. Use git for history.'
   severity: error
@@ -264,7 +256,7 @@ constraints:
     instead. You MUST invoke documentation-style skill FIRST'
   severity: error
   enabled: true
-  file_pattern: '\.md$'
+  file_pattern: \.md$
   suggestion: 1. Invoke Skill tool with skill='documentation-style' 2. Create .puml
     file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
   whitelist:
