@@ -1,8 +1,0 @@
-{
-  "workflowName": "wave-analysis",
-  "status": "completed",
-  "totalLLMCalls": 0,
-  "totalTokens": 0,
-  "entityCounts": {},
-  "stepsDetail": []
-}
