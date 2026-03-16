@@ -1180,12 +1180,13 @@ export const selectHistoricalProcessInfo = createSelector(
   (detail): UKBProcess | null => {
     if (!detail) return null
 
-    // Parse duration string (e.g., "2.20s") to milliseconds
-    const parseDuration = (durationStr: string): number => {
-      if (!durationStr) return 0
-      const match = durationStr.match(/([\d.]+)s/)
-      if (match) {
-        return Math.round(parseFloat(match[1]) * 1000)
+    // Parse duration to milliseconds — handles string ("2.20s") or number (ms)
+    const parseDuration = (duration: unknown): number => {
+      if (!duration) return 0
+      if (typeof duration === 'number') return Math.round(duration)
+      if (typeof duration === 'string') {
+        const match = duration.match(/([\d.]+)s/)
+        if (match) return Math.round(parseFloat(match[1]) * 1000)
       }
       return 0
     }
