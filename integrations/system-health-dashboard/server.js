@@ -3361,15 +3361,18 @@ class SystemHealthAPIServer {
                     if (existsSync(progressPath)) {
                         const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
                         const previousStep = progress.pausedAtStep;
+                        const wasStepInto = progress.stepIntoSubsteps;
                         progress.stepPaused = false;
                         progress.resumeRequestedAt = new Date().toISOString();
                         if (command.payload?.stepInto === true) {
                             progress.stepIntoSubsteps = true;
+                            if (progress.config) progress.config.stepIntoSubsteps = true;
                         } else if (command.payload?.stepInto === false) {
                             progress.stepIntoSubsteps = false;
+                            if (progress.config) progress.config.stepIntoSubsteps = false;
                         }
                         writeFileSync(progressPath, JSON.stringify(progress, null, 2));
-                        process.stderr.write(`[WebSocket] Step advance: stepPaused=false (was at: ${previousStep})\n`);
+                        process.stderr.write(`[WebSocket] Step advance: stepPaused=false, stepInto=${progress.stepIntoSubsteps} (was at: ${previousStep}, was stepInto: ${wasStepInto})\n`);
                         // Acknowledge step advance so client clears isTransitionInFlight
                         this.broadcastEvent({
                             type: 'STEP_ACK',
@@ -3383,8 +3386,18 @@ class SystemHealthAPIServer {
                         const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
                         progress.singleStepMode = command.payload.enabled;
                         progress.singleStepUpdatedAt = new Date().toISOString();
+                        // Also update config.singleStepMode if config exists
+                        if (progress.config) {
+                            progress.config.singleStepMode = command.payload.enabled;
+                        }
+                        // If disabling, clear pause state so workflow resumes immediately
+                        if (!command.payload.enabled) {
+                            progress.stepPaused = false;
+                            progress.pausedAtStep = null;
+                            process.stderr.write(`[WebSocket] Single-step DISABLED: cleared stepPaused, workflow will resume\n`);
+                        }
                         writeFileSync(progressPath, JSON.stringify(progress, null, 2));
-                        console.log(`[WebSocket] Single-step mode set to: ${command.payload.enabled}`);
+                        process.stderr.write(`[WebSocket] Single-step mode set to: ${command.payload.enabled}\n`);
                         // Confirm the change
                         this.broadcastEvent({
                             type: 'PREFERENCES_UPDATED',
