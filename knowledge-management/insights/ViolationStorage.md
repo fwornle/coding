@@ -2,103 +2,102 @@
 
 **Type:** Detail
 
-The captureViolation() function in violation-capture.js may interact with ViolationStorage through an API or interface, allowing for standardized storage and retrieval of violation data
+The interaction with the ContentValidationModule suggests that the ViolationStorage mechanism must adhere to specific data formats and validation rules as outlined in the project's documentation, such as the constraint configuration guide found in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-`ViolationStorage` is the persistent backing component used by the **ViolationCaptureService** to keep a record of every rule‑or policy breach that the system detects.  The only concrete file reference we have is the `violation‑capture.js` module, whose `captureViolation()` function is expected to call into **ViolationStorage** through a well‑defined API or interface.  The storage implementation itself is not hard‑coded; the observations indicate that it may be backed by a relational or NoSQL database **or** a file‑based store, depending on the deployment’s performance and durability requirements.  Because it lives inside the **ViolationCaptureService** hierarchy, `ViolationStorage` is the authoritative source of truth for later stages such as filtering (handled by the sibling **ViolationFilter**) and notification (handled by the sibling **ViolationNotification**).
+**ViolationStorage** is the concrete storage mechanism used by the **ViolationPersistenceService** to record constraint‑violation events that are discovered during content validation. The only concrete locations that mention this component are the high‑level design documents under the *integrations/mcp-constraint-monitor* folder, specifically  
 
-## Architecture and Design  
+* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – which defines the data format and configuration rules that any violation record must obey, and  
+* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – which describes the semantic‑constraint detection process whose output is persisted by ViolationStorage.  
 
-The design that emerges from the observations is a classic *separation‑of‑concerns* layout.  `captureViolation()` in `violation‑capture.js` does **not** embed persistence logic; instead it delegates to an abstraction exposed by **ViolationStorage**.  This abstraction behaves like a repository‑style interface: callers supply a violation object, and the storage layer handles serialization, indexing, and eventual retrieval.  The abstraction also encapsulates **data‑retention policies** –‑ rules that automatically expire or purge old records –‑ which keeps the lifecycle logic out of the capture path.
-
-Interaction between components follows a *pipeline* model:
-
-1. **ViolationCaptureService** receives raw violation data from tooling.  
-2. `captureViolation()` (in `violation‑capture.js`) forwards the data to **ViolationStorage** via its API.  
-3. The stored record is then available to **ViolationFilter**, which may use an in‑memory `Set`/`Map` to de‑duplicate before further processing.  
-4. When a new violation survives filtering, **ViolationNotification** picks it up, employing an *event‑driven* mechanism (webhooks, callbacks, or a message queue) to push the information to the dashboard.
-
-Thus, **ViolationStorage** sits at the heart of a linear flow, acting as the stable “source of truth” while remaining loosely coupled to both its parent (the capture service) and its siblings (filter and notification).
-
-## Implementation Details  
-
-Although no concrete symbols are listed, the observations give us enough to outline the internal mechanics:
-
-* **Persistence Backend** – The storage layer likely abstracts over either a database client (e.g., PostgreSQL, MongoDB) or a file system writer (JSON, CSV, or binary blobs).  The choice is driven by the need for *indexing* (to support fast queries on violation type, timestamp, or severity) and *serialization* (converting in‑memory violation objects to a storable format).  
-
-* **API / Interface** – `captureViolation()` calls a method such as `storeViolation(violation)` on **ViolationStorage**.  The method signature is probably generic enough to accept a plain JavaScript object describing the violation (e.g., `{ id, ruleId, assetId, timestamp, details }`).  By keeping the contract simple, the capture code remains agnostic to the underlying storage technology.
-
-* **Retention Management** – A configurable policy module lives inside **ViolationStorage**.  It may run a scheduled job (e.g., a `setInterval`‑based timer or a cron‑style task) that scans stored records and removes those older than a configured TTL or that exceed a quota.  This keeps the data store from growing without bound and satisfies regulatory constraints.
-
-* **Indexing Strategy** – To enable efficient look‑ups, the implementation likely creates indexes on fields that are frequently queried, such as `ruleId` or `timestamp`.  In a file‑based approach, this could be a secondary lookup structure (e.g., a Map of timestamps to file offsets) that is rebuilt on startup.
-
-* **Error Handling & Idempotency** – Because `captureViolation()` may be invoked repeatedly for the same event, **ViolationStorage** probably returns a status indicating whether the record was newly created or already existed.  This allows the sibling **ViolationFilter** to safely ignore duplicates.
-
-## Integration Points  
-
-* **Parent – ViolationCaptureService** – The service owns an instance of **ViolationStorage** and passes it to `captureViolation()` in `violation‑capture.js`.  The service is responsible for initializing the storage (e.g., opening DB connections or creating storage directories) and for shutting it down cleanly.
-
-* **Sibling – ViolationFilter** – After a violation is persisted, the filter reads from **ViolationStorage** (or receives a notification) to decide if the record is a duplicate.  The filter’s use of a `Set`/`Map` suggests that it may cache recently seen violation IDs, reducing the need for repeated DB look‑ups.
-
-* **Sibling – ViolationNotification** – This component subscribes to events emitted by **ViolationStorage** (or by the capture service after a successful store) and forwards them downstream via webhooks, callbacks, or a message queue.  The event‑driven nature of the notification path is explicitly called out in the observations.
-
-* **External Dependencies** – Depending on the chosen backend, **ViolationStorage** may depend on database drivers (`pg`, `mongoose`, etc.) or on file‑system utilities (`fs`, `path`).  It also likely relies on a serialization library (JSON.stringify, protobuf, etc.) and a scheduling library for retention jobs.
-
-## Usage Guidelines  
-
-1. **Treat `ViolationStorage` as a black‑box repository** – Call only the documented API (e.g., `storeViolation`, `queryViolations`, `purgeOld`).  Do not reach into the underlying DB or file system directly, as this would break the abstraction and make future backend swaps difficult.  
-
-2. **Respect the retention policy** – When writing custom violation types, ensure that any metadata required for automated purging (such as a `createdAt` timestamp) is present.  Missing fields may cause the retention job to skip those records, leading to uncontrolled growth.  
-
-3. **Leverage idempotent writes** – If the same violation may be reported multiple times, include a stable identifier (e.g., a hash of rule‑ID + asset‑ID + timestamp) so that **ViolationStorage** can detect duplicates.  This works hand‑in‑hand with **ViolationFilter**’s de‑duplication logic.  
-
-4. **Avoid heavyweight payloads** – Since the storage may be indexed for fast queries, keep the `details` field concise or store large blobs elsewhere and reference them by ID.  This improves query performance and reduces storage costs.  
-
-5. **Monitor retention jobs** – Configure alerts for the retention scheduler to surface failures (e.g., permission errors on file deletion or DB transaction failures).  A stalled retention process can quickly fill up storage and affect system stability.
+Although no source files are listed, the documentation makes it clear that **ViolationStorage** lives inside the *ConstraintSystem* boundary and is a child of **ViolationPersistenceService**. Its purpose is to provide a reliable, format‑compliant repository for violation payloads that the **ContentValidationModule** produces.
 
 ---
 
-### 1. Architectural patterns identified  
+## Architecture and Design  
 
-* **API/Interface abstraction** – `captureViolation()` interacts with **ViolationStorage** through a defined contract, decoupling capture logic from persistence.  
-* **Event‑driven notification** – The sibling **ViolationNotification** consumes storage‑related events (webhooks, callbacks, or message‑queue messages) to inform downstream dashboards.  
-* **Retention‑policy strategy** – A configurable policy that periodically expires or purges old records, akin to a strategy pattern for lifecycle management.  
+The observations point to a **layered architecture** in which the *ConstraintSystem* is split into distinct concerns:
 
-### 2. Design decisions and trade‑offs  
+1. **Validation Layer** – embodied by the **ContentValidationModule**, which applies rule sets to incoming content and emits violation objects.  
+2. **Persistence Layer** – represented by **ViolationPersistenceService** and its child **ViolationStorage**, which accept those objects and write them to the chosen backing store.  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Support both DB and file‑based backends | Flexibility for deployments with different durability/performance needs | Increases code complexity; must maintain two persistence paths and ensure feature parity (indexing, retention). |
-| Centralized retention job | Guarantees storage does not grow unchecked, satisfies compliance | Introduces a background process that must be monitored; may cause temporary performance spikes during bulk purges. |
-| Minimal API surface (store/query/purge) | Keeps capture code simple and encourages loose coupling | Limits advanced queries unless additional methods are added later, potentially requiring API expansion. |
+The design follows a **service‑repository style**: the *service* (`ViolationPersistenceService`) orchestrates the flow, while the *repository* (`ViolationStorage`) encapsulates all knowledge about how violations are serialized, validated against the constraint‑configuration schema, and ultimately persisted. The interaction is tight: the service “contains” the storage component, indicating composition rather than loose coupling, which is appropriate given the need for atomicity when recording a violation.
 
-### 3. System structure insights  
+Because the only concrete guidance comes from the two markdown documents, the system is deliberately **configuration‑driven**. The constraint‑configuration guide defines the exact JSON/YAML schema that a violation record must match, and the semantic‑constraint detection guide dictates the logical shape of the data (e.g., hierarchical rule identifiers, timestamps, affected content identifiers). This suggests that **ViolationStorage** likely validates incoming payloads against those schemas before committing them, enforcing data integrity at the persistence boundary.
 
-* **ViolationCaptureService** owns **ViolationStorage**, establishing a parent‑child relationship where the service orchestrates lifecycle (initialisation, shutdown).  
-* **ViolationFilter** and **ViolationNotification** are siblings that consume the same persisted data but apply orthogonal concerns (deduplication vs. outward communication).  
-* The overall system follows a *linear processing pipeline*: capture → store → filter → notify, with each stage isolated behind its own interface.
+No explicit patterns such as “event‑driven” or “micro‑services” are mentioned, so the architecture should be understood as a **monolithic module** within the larger MCP constraint‑monitor integration, with clear internal boundaries rather than distributed components.
 
-### 4. Scalability considerations  
+---
 
-* **Indexing** on frequently queried fields (rule ID, timestamp) enables the storage layer to handle growing volumes without degrading read performance.  
-* **Retention policies** cap the data set size, preventing unbounded growth and allowing the backend to scale horizontally (e.g., sharding a DB) if needed.  
-* If the file‑based backend is used, consider partitioning data by date directories to avoid single‑file bottlenecks.  
-* The event‑driven path used by **ViolationNotification** can be scaled out by adding more consumers to the message queue without touching **ViolationStorage**.
+## Implementation Details  
 
-### 5. Maintainability assessment  
+Even though the source code is absent, the documentation allows us to infer the key implementation responsibilities of **ViolationStorage**:
 
-The clear separation between capture, storage, filtering, and notification makes the codebase modular and easy to reason about.  Because **ViolationStorage** exposes a narrow, well‑defined API, changes to the underlying persistence technology (e.g., swapping PostgreSQL for DynamoDB) can be confined to the storage implementation without rippling through the capture or filter logic.  The only maintainability risk lies in supporting multiple backends simultaneously; rigorous automated tests for both paths are essential.  Overall, the design promotes high maintainability, provided that the retention scheduler and indexing logic are kept under version‑controlled configuration and are exercised in CI pipelines.
+* **Schema Validation** – Before any write, the storage component must parse the violation payload and validate it against the schema described in `constraint-configuration.md`. This likely involves a JSON‑schema validator or a custom deserializer that throws on mismatches.  
+* **Semantic Mapping** – The detection guide (`semantic-constraint-detection.md`) describes how raw detection results are transformed into a normalized violation object. **ViolationStorage** therefore contains logic that maps detection identifiers, severity levels, and context information into the storage model.  
+* **Persistence Mechanics** – While the exact backing store is not disclosed, the naming (“Storage”) and its placement under a *PersistenceService* imply a classic repository implementation: a class with `save`, `update`, and `query`‑style methods. The storage could be a relational database, a NoSQL document store, or a file‑based log, but the design abstracts that detail behind the service interface.  
+* **Transactional Guarantees** – Because violations are part of the system’s audit trail, the storage component is expected to provide at least *once* durability. The service‑storage composition suggests that the `ViolationPersistenceService` may open a transaction, delegate the write to **ViolationStorage**, and commit only on successful validation, ensuring consistency.  
+
+The hierarchy is simple: **ViolationPersistenceService** → **ViolationStorage**. No sibling components are mentioned, so the storage is the sole child responsible for persistence concerns.
+
+---
+
+## Integration Points  
+
+1. **ContentValidationModule** – The primary producer of violation data. The module hands over a violation payload to **ViolationPersistenceService**, which then forwards it to **ViolationStorage**. The contract between them is dictated by the data formats in `constraint-configuration.md`.  
+2. **Constraint Configuration** – The storage component reads the configuration files (or a compiled representation thereof) to know which fields are mandatory, the allowed value ranges, and any versioning rules. This coupling ensures that any change to the constraint schema automatically propagates to storage validation.  
+3. **Semantic Detection Logic** – The detection guide informs how raw detection results are interpreted. **ViolationStorage** must understand the semantic mapping to store the right identifiers and relationships, which means it likely imports utility classes or parsers defined elsewhere in the *semantic‑constraint‑detection* module.  
+4. **External Persistence Backend** – Though not named, the storage component will have a driver or client library for the underlying database or log system. That backend is an external dependency, but the design abstracts it behind the storage API, allowing the rest of the system to remain agnostic of the concrete store.
+
+---
+
+## Usage Guidelines  
+
+* **Always pass validated objects** – Developers should let the **ContentValidationModule** produce the violation payload and rely on its internal validation before invoking the `ViolationPersistenceService`. Direct calls to **ViolationStorage** should be avoided unless the caller can guarantee schema compliance.  
+* **Respect the constraint schema** – Any custom extensions to the violation record must first be reflected in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Failing to keep the documentation and the storage implementation in sync will cause runtime validation errors.  
+* **Handle persistence errors gracefully** – Because the storage component may reject malformed payloads or encounter backend failures, callers should catch the specific exceptions thrown by `ViolationPersistenceService.saveViolation` (or the equivalent method) and implement retry or fallback logic as appropriate.  
+* **Do not bypass the service layer** – The composition relationship (`ViolationPersistenceService` contains `ViolationStorage`) is intentional; it centralizes transaction handling and logging. Direct access to the storage backend circumvents these concerns and is discouraged.  
+
+---
+
+### Architectural patterns identified  
+
+* **Layered Architecture** – Validation → Service → Storage.  
+* **Service‑Repository (or Service‑Storage) Pattern** – `ViolationPersistenceService` orchestrates, `ViolationStorage` encapsulates persistence.  
+* **Configuration‑Driven Validation** – Schemas defined in external markdown files drive runtime validation.
+
+### Design decisions and trade‑offs  
+
+* **Tight coupling between service and storage** simplifies transaction management but reduces the ability to swap storage implementations without changing the service.  
+* **Schema validation at the storage boundary** guarantees data integrity but adds processing overhead on every write.  
+* **Configuration‑driven design** enables rapid rule changes without code modifications, at the cost of requiring disciplined documentation updates.
+
+### System structure insights  
+
+* **ViolationStorage** is a child component of **ViolationPersistenceService**, which itself sits within the *ConstraintSystem* core.  
+* The only sibling relationships are implicit; the storage component is the sole persistence artifact for violations.  
+* The component’s responsibilities are clearly bounded to format compliance and durable recording, leaving detection and business‑logic concerns to upstream modules.
+
+### Scalability considerations  
+
+* Because validation occurs on every write, scaling the storage layer will require efficient schema validators (e.g., compiled JSON‑schema).  
+* If the underlying store is a relational DB, horizontal scaling may involve sharding by tenant or time‑bucket.  
+* The service‑storage composition means that scaling the service (e.g., adding more instances) must be paired with a stateless storage client or connection pooling to avoid bottlenecks.
+
+### Maintainability assessment  
+
+* **High maintainability** – The clear separation of concerns and reliance on external, version‑controlled documentation make updates straightforward.  
+* **Potential risk** – The lack of explicit code symbols means that any change to the schema must be reflected both in docs and in the (unseen) validation logic; missing a sync could lead to runtime failures.  
+* **Extensibility** – Adding new violation fields only requires updates to the constraint‑configuration guide and, if needed, to the storage serializer, keeping the impact localized.  
+
+Overall, **ViolationStorage** embodies a disciplined, configuration‑driven persistence strategy that aligns tightly with the constraint‑monitoring domain while preserving a clean architectural boundary between validation, service orchestration, and data durability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ViolationCaptureService](./ViolationCaptureService.md) -- ViolationCaptureService uses the captureViolation() function in the violation-capture.js file to capture violations from tool interactions
-
-### Siblings
-- [ViolationFilter](./ViolationFilter.md) -- The captureViolation() function in violation-capture.js likely utilizes a filtering mechanism to exclude duplicate violations, potentially leveraging a data structure like a Set or Map to track unique violations
-- [ViolationNotification](./ViolationNotification.md) -- ViolationNotification would likely utilize a messaging or event-driven architecture to notify the dashboard of new violations, potentially leveraging webhooks, callbacks, or message queues
+- [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
 
 
 ---

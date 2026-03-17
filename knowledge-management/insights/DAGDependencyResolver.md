@@ -2,126 +2,91 @@
 
 **Type:** Detail
 
-The ConcurrentExecutor class uses the resolved dependencies to execute pipeline steps concurrently, ensuring that steps with unmet dependencies are not executed prematurely
+The use of a DAG-based execution model allows for flexible and dynamic pipeline configuration, with dependencies between tasks explicitly declared in the batch-analysis.yaml file.
 
 ## What It Is  
 
-`DAGDependencyResolver` lives inside the **Pipeline** component – the core orchestrator that drives a data‑processing workflow. The resolver is fed the declarative **pipeline‑configuration.json** file (typically found in the repository’s `config/` or project root) where each step lists a `depends_on` array that defines explicit DAG edges. The resolver’s sole responsibility is to turn those declarations into a concrete execution order that respects the directed‑acyclic‑graph (DAG) semantics. It does **not** read the JSON itself; that work belongs to its sibling, the **PipelineConfigurator**, which parses the file and builds the initial graph that the resolver then topologically sorts.
-
-The resolved ordering is subsequently handed to the **ConcurrentExecutor**, which schedules the ready‑to‑run steps on a thread‑pool. In this way, `DAGDependencyResolver` acts as the logical “brain” that guarantees no step is launched before all of its predecessor steps have completed, while still allowing maximum parallelism for independent branches of the pipeline.
+`DAGDependencyResolver` lives inside the **Pipeline** sub‑component of the batch‑processing system. Its concrete implementation is anchored to the configuration file **`batch-analysis.yaml`**, where every pipeline step declares explicit `depends_on` edges. In practice, `DAGDependencyResolver` reads the `depends_on` declarations from this YAML file, builds an in‑memory directed‑acyclic graph (DAG), and supplies the rest of the pipeline with a deterministic execution order that respects all declared dependencies. Because the resolver is a child of the **Pipeline** component, it is the authoritative source for dependency information that the broader pipeline execution engine consumes when scheduling tasks.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **pipeline‑centric, DAG‑driven orchestration model**. The high‑level flow is:
+The architecture revolves around a **DAG‑based execution model**. This model is the central design pattern identified in the observations: each pipeline step is a node, and the `depends_on` relationships defined in `batch-analysis.yaml` are the directed edges. `DAGDependencyResolver` embodies the *graph‑construction* and *topological‑sorting* responsibilities that enable the Pipeline to transform a declarative dependency description into an executable schedule.
 
-1. **PipelineConfigurator** reads `pipeline‑configuration.json` and creates an in‑memory representation of the steps and their `depends_on` relationships.  
-2. **DAGDependencyResolver** receives that representation and applies a **topological sort** to produce a linearised execution plan that respects the DAG constraints.  
-3. **ConcurrentExecutor** consumes the plan, uses a **thread‑pool** (a classic concurrency pattern) to run steps whose dependencies are already satisfied, and monitors completion to unlock downstream steps.
+Interaction flow:
 
-The design can be described as a **separation‑of‑concerns** pattern:
+1. **Configuration Ingestion** – The resolver parses `batch-analysis.yaml`, extracting step identifiers and their `depends_on` lists.  
+2. **Graph Construction** – Using the extracted data, it creates a directed graph data structure (typically an adjacency list or map).  
+3. **Validation** – The resolver checks the graph for cycles; any cycle detection triggers a configuration error because a true DAG must be acyclic.  
+4. **Ordering** – It performs a topological sort to produce a linear ordering (or a set of parallelizable layers) that the Pipeline’s scheduler can consume.
 
-- **Parsing & graph construction** – PipelineConfigurator  
-- **Dependency analysis & ordering** – DAGDependencyResolver  
-- **Parallel execution** – ConcurrentExecutor  
-
-Each component communicates through well‑defined data structures (the dependency graph and the ordered step list). The parent **PipelineCoordinator** orchestrates the sequence: it invokes the configurator, passes the graph to the resolver, and finally hands the resolved order to the executor. Because the resolver does not embed any execution logic, it can be swapped or extended without touching the executor or configurator, illustrating a **plug‑in style** modularity.
+Because the resolver is a child of **Pipeline**, the parent component delegates all dependency‑resolution concerns to it. Sibling components (if any) that need to understand task ordering simply query the resolver’s output rather than re‑implementing graph logic. This clear separation of concerns keeps the DAG handling logic encapsulated within `DAGDependencyResolver`.
 
 ---
 
 ## Implementation Details  
 
-### Graph Construction (PipelineConfigurator)  
-The configurator parses `pipeline‑configuration.json`, which contains entries such as:
+While the observations do not enumerate individual methods, the responsibilities of `DAGDependencyResolver` imply a small, focused API:
 
-```json
-{
-  "steps": [
-    { "name": "extract", "depends_on": [] },
-    { "name": "transform", "depends_on": ["extract"] },
-    { "name": "load", "depends_on": ["transform"] }
-  ]
-}
-```
+* **`load_configuration(path: str) -> None`** – Reads `batch-analysis.yaml` and populates an internal representation of steps and their raw `depends_on` lists.  
+* **`build_graph() -> None`** – Transforms the raw data into a directed graph object, typically using a dictionary where keys are step IDs and values are sets of dependent step IDs.  
+* **`detect_cycles() -> bool`** – Executes a depth‑first search (DFS) or Kahn’s algorithm to confirm the graph remains acyclic; returns `True` if a cycle is found, causing the resolver to raise a configuration exception.  
+* **`topological_sort() -> List[Set[str]]`** – Produces an ordered list of step groups; each set contains steps that can run concurrently because they share no mutual dependencies.  
+* **`get_execution_plan() -> List[Set[str]]`** – Public accessor used by the Pipeline to retrieve the final schedule.
 
-For each step it creates a node object (e.g., `PipelineStep`) and registers outgoing edges based on the `depends_on` array. The resulting structure is a classic adjacency‑list representation of a directed graph.
-
-### Dependency Resolution (DAGDependencyResolver)  
-`DAGDependencyResolver` receives the adjacency list and performs a **topological sort** (Kahn’s algorithm is a common choice). The algorithm works by:
-
-1. Identifying nodes with zero inbound edges (no unmet dependencies).  
-2. Emitting those nodes into the execution order list.  
-3. Removing emitted nodes and their outgoing edges, then repeating until the graph is empty.  
-
-If a cycle is detected (i.e., the graph cannot be emptied), the resolver raises an error, preventing the pipeline from entering an undefined state. The resolved order is typically a simple list of step identifiers that the executor can iterate over.
-
-### Concurrent Execution (ConcurrentExecutor)  
-The executor owns a **thread pool** (e.g., `java.util.concurrent.ExecutorService` or Python’s `concurrent.futures.ThreadPoolExecutor`). It tracks the dependency state of each step:
-
-- When a step’s dependencies are all marked *completed*, the executor submits the step’s runnable to the pool.  
-- Upon step completion, callbacks decrement dependency counters for downstream steps, potentially making them eligible for execution.  
-
-This approach guarantees that steps are never started prematurely while still exploiting parallelism for branches that have no mutual dependencies.
+The resolver’s internal state is tightly coupled to the **`batch-analysis.yaml`** file, making the file the single source of truth for dependency information. Because the resolver only deals with static configuration, it remains stateless between runs, which simplifies testing and enables deterministic builds.
 
 ---
 
 ## Integration Points  
 
-- **Parent** – `PipelineCoordinator` is the orchestrator that wires the three siblings together. It first calls `PipelineConfigurator.configurePipeline(pipeline-configuration.json)` to obtain the raw graph, then invokes `DAGDependencyResolver.resolve(graph)` to get the ordered list, and finally passes that list to `ConcurrentExecutor.execute(order)`.  
-- **Sibling – PipelineConfigurator** – Supplies the initial graph; any change in JSON schema directly impacts the configurator but not the resolver.  
-- **Sibling – ConcurrentExecutor** – Consumes the resolver’s output; the executor expects a deterministic ordering that respects dependencies, and it provides the runtime environment (thread pool, logging, error handling).  
-- **External Interfaces** – The resolver does not depend on I/O; it only requires an in‑memory graph object. This makes it easy to unit‑test by feeding synthetic graphs.  
-- **Data Flow** – `pipeline-configuration.json` → `PipelineConfigurator` → *graph* → `DAGDependencyResolver` → *ordered list* → `ConcurrentExecutor` → *runtime steps*.
+`DAGDependencyResolver` is invoked early in the Pipeline’s lifecycle. The parent **Pipeline** component calls the resolver during its initialization phase to obtain the execution plan. The resolver therefore depends on:
+
+* **YAML parsing library** – to read `batch-analysis.yaml`.  
+* **Graph utilities** – either a custom lightweight graph class or a standard library collection (e.g., `dict`/`set`) for adjacency representation.  
+
+The output of the resolver (the ordered list of step groups) is consumed by the Pipeline’s **scheduler** component, which translates each group into concrete task instances (e.g., Spark jobs, container executions). No other system parts directly read `batch-analysis.yaml`; they rely on the resolver to enforce consistency, which reduces duplicated parsing logic and centralizes error handling.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Keep the JSON declarative** – Only list direct dependencies in `depends_on`. Avoid implicit ordering; let the resolver compute the correct sequence.  
-2. **Validate the configuration early** – Run `PipelineConfigurator` in a validation mode (if available) to catch malformed JSON or missing step definitions before the resolver is invoked.  
-3. **Do not embed execution logic in the resolver** – All side‑effects (I/O, network calls, database writes) must live in the step implementations executed by `ConcurrentExecutor`. The resolver should remain pure‑function‑like for predictability and testability.  
-4. **Respect thread‑safety** – Steps executed concurrently must be thread‑safe. The executor assumes independent steps can run in parallel; shared mutable state must be protected or avoided.  
-5. **Handle cycles gracefully** – If a cycle is detected, the resolver will raise an exception. Catch this at the pipeline startup phase and surface a clear error message indicating the offending steps.  
-6. **Extensibility** – To add new step types, only modify `pipeline-configuration.json` and ensure the configurator can map the new type to a `PipelineStep` implementation. The resolver and executor require no changes.
+1. **Declare all dependencies explicitly** – Every step in `batch-analysis.yaml` must list its upstream steps in a `depends_on` array. Omitting a needed dependency can lead to race conditions, while adding unnecessary edges can reduce parallelism.  
+2. **Maintain a true DAG** – The resolver will reject configurations that introduce cycles. When adding new steps, verify that the new edges do not close a loop.  
+3. **Keep the YAML file minimal and declarative** – Since the resolver treats the file as the sole source of truth, avoid embedding procedural logic or runtime values inside `batch-analysis.yaml`.  
+4. **Leverage the parallel groups** – The topological sort returns sets of steps that can run concurrently. The Pipeline’s scheduler should respect these groups to maximize throughput.  
+5. **Version‑control the configuration** – Because the resolver’s behavior is entirely driven by `batch-analysis.yaml`, any change to the pipeline’s topology should be reviewed and tracked in source control.
 
 ---
 
-### 1. Architectural patterns identified  
-- **Separation‑of‑Concerns** (parsing, dependency analysis, execution)  
-- **Topological Sort** for DAG ordering (algorithmic pattern)  
-- **Thread‑Pool / Worker‑Pool** concurrency pattern  
+### Architectural Patterns Identified  
 
-### 2. Design decisions and trade‑offs  
-- **Pure resolver** vs. embedding execution logic – improves testability and modularity but requires a disciplined hand‑off to the executor.  
-- **Explicit `depends_on` edges** – makes the DAG visible and editable, at the cost of requiring authors to maintain correct dependency lists.  
-- **Concurrent execution** – gains performance on independent branches, but introduces the need for thread‑safe step implementations and careful error propagation.  
+* **DAG‑based Execution Model** – Nodes = pipeline steps; edges = `depends_on` relationships.  
+* **Separation of Concerns** – `DAGDependencyResolver` isolates graph construction and validation from scheduling logic.  
 
-### 3. System structure insights  
-The pipeline is a three‑layer stack under the **Pipeline** parent:  
-1. **Configuration layer** (`pipeline-configuration.json` + `PipelineConfigurator`)  
-2. **Resolution layer** (`DAGDependencyResolver`)  
-3. **Execution layer** (`ConcurrentExecutor`)  
+### Design Decisions and Trade‑offs  
 
-Each layer passes a well‑defined artifact to the next, enabling clear boundaries and easier unit testing.
+* **Declarative Dependency Definition** – By pushing all dependency information into `batch-analysis.yaml`, the system gains transparency and ease of modification, at the cost of requiring developers to maintain an accurate, up‑to‑date YAML file.  
+* **Static Resolution vs. Dynamic Scheduling** – Resolving the DAG once at pipeline start simplifies runtime scheduling but limits the ability to adapt dependencies on the fly. This trade‑off favors predictability and reproducibility.  
 
-### 4. Scalability considerations  
-- **Graph size** – Topological sort runs in O(V + E) time, so the resolver scales linearly with the number of steps and dependencies.  
-- **Parallelism** – The thread‑pool size can be tuned to the underlying hardware; independent sub‑graphs execute concurrently, allowing the pipeline to scale with CPU cores.  
-- **Memory footprint** – The in‑memory adjacency list grows with the number of steps; for extremely large pipelines, a streaming or lazy graph representation could be introduced without altering the resolver’s contract.  
+### System Structure Insights  
 
-### 5. Maintainability assessment  
-Because `DAGDependencyResolver` is isolated from I/O and execution concerns, it is highly maintainable: changes to the JSON schema only affect the configurator, and new concurrency strategies only impact the executor. The clear contract (input graph → ordered list) encourages comprehensive unit tests and makes the component resilient to future refactoring. The only maintenance burden is ensuring that step authors correctly declare dependencies, which can be mitigated with schema validation tools.
+The Pipeline hierarchy is: **Pipeline (parent) → DAGDependencyResolver (child)**. The resolver acts as the single entry point for dependency information, feeding a downstream scheduler that may have sibling components (e.g., resource allocators) but no other entity directly parses `batch-analysis.yaml`.  
+
+### Scalability Considerations  
+
+Because the resolver builds the full graph in memory and performs a single topological sort, its computational complexity is O(V + E) where V is the number of steps and E the number of dependency edges. This linear cost scales well for typical batch pipelines (hundreds to low‑thousands of steps). Parallel execution groups produced by the resolver enable the scheduler to exploit cluster resources efficiently, improving overall throughput.  
+
+### Maintainability Assessment  
+
+Encapsulating all DAG logic in `DAGDependencyResolver` yields high maintainability: changes to dependency handling are localized, and the YAML‑driven approach makes the pipeline’s structure self‑documenting. The lack of hidden runtime dependency manipulation reduces technical debt. However, maintainability hinges on disciplined updates to `batch-analysis.yaml`; stale or incorrect declarations directly break the execution plan, so robust validation (cycle detection) and thorough code reviews of the YAML file are essential.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
-
-### Siblings
-- [PipelineConfigurator](./PipelineConfigurator.md) -- The PipelineConfigurator class has a method called configurePipeline that takes the pipeline-configuration.json file as input and returns a configured pipeline graph
-- [ConcurrentExecutor](./ConcurrentExecutor.md) -- The ConcurrentExecutor class uses a thread pool to execute pipeline steps concurrently, with each thread executing a separate step
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline follows a DAG-based execution model, with each step declaring explicit depends_on edges in batch-analysis.yaml.
 
 
 ---

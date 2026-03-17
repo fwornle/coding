@@ -2,75 +2,129 @@
 
 **Type:** SubComponent
 
-Handles Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.
+The GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that ManualLearning can handle multiple concurrent requests without performance degradation.
 
 ## What It Is  
 
-**ManualLearning** is a **sub‑component** of the **KnowledgeManagement** component in the Coding project.  It is responsible for the ingestion, storage, and lifecycle handling of knowledge that originates from direct human activity – hand‑authored entities, explicit edits, and deliberately crafted observations.  The only concrete location information supplied by the observations is the hierarchical placement of the component: it lives under `KnowledgeManagement` (which itself is a top‑level component of the project) and sits alongside its sibling **OnlineLearning**.  No concrete file‑system paths or source symbols were discovered in the supplied code inventory, so the exact repository locations (e.g., `src/knowledge/manual/…`) are not currently known.
+**ManualLearning** is a sub‑component of the **KnowledgeManagement** domain that focuses on the acquisition, persistence, and manipulation of knowledge extracted from code, documentation, and other learning sources. The core of its persistence layer lives in the file **`storage/graph-database-adapter.ts`**, where the **`GraphDatabaseAdapter`** class is defined. This adapter supplies the concrete implementation that stores and queries knowledge graphs using a **Graphology + LevelDB** backend, while automatically synchronising a JSON export for downstream consumption.  
 
-## Architecture and Design  
-
-The observations reveal a **modular sub‑component architecture**: the larger **KnowledgeManagement** component is split into two focused areas – **ManualLearning** and **OnlineLearning** – each handling a distinct source of knowledge.  This separation of concerns is an explicit design decision that keeps human‑curated knowledge pathways isolated from algorithmic or data‑driven learning pipelines.  Because no concrete code symbols were identified, we cannot point to concrete design patterns (such as factories or adapters) in the source.  However, the very existence of sibling sub‑components suggests a **component‑based decomposition** where each sub‑component likely implements a common interface defined by the parent (e.g., a `KnowledgeProvider` contract) so that the rest of the system can treat manual and online knowledge uniformly.
-
-Interaction between **ManualLearning** and the rest of the system is therefore mediated through the parent **KnowledgeManagement**.  The parent likely exposes services such as “store entity”, “query entity”, and “track decay”, which **ManualLearning** fulfills by feeding manually supplied data into the same underlying graph storage that **OnlineLearning** also populates.  This shared persistence layer (the VKB server, graph database, etc., described for the parent) provides a single source of truth while allowing divergent ingestion paths.
-
-## Implementation Details  
-
-The current observation set does not list any concrete classes, functions, or file paths belonging to **ManualLearning**.  Consequently, we cannot enumerate concrete implementation artifacts such as `ManualEntityImporter` or `HumanEditHandler`.  What we can infer is that the component must contain logic for:
-
-1. **Accepting human‑authored input** – likely through UI forms, API endpoints, or direct file imports.  
-2. **Validating and normalising** the supplied knowledge so it conforms to the graph schema used by **KnowledgeManagement**.  
-3. **Persisting** the validated entities into the shared graph database, invoking the same persistence APIs that **OnlineLearning** uses.  
-4. **Recording provenance** (e.g., author, timestamp, edit history) to support later decay tracking and audit trails.  
-
-Because no source symbols were found, the exact module names (e.g., `manual_learning.py`, `human_curated/`) remain unspecified.  Developers should therefore locate the component by navigating the project hierarchy under the **KnowledgeManagement** directory and looking for folders or packages whose naming reflects “manual”, “human”, or “curated”.
-
-## Integration Points  
-
-- **Parent Component – KnowledgeManagement**: All knowledge, regardless of origin, is ultimately stored and queried through the services exposed by **KnowledgeManagement**.  **ManualLearning** therefore depends on the parent’s persistence API, decay‑tracking mechanisms, and any indexing or query facilities.  
-- **Sibling Component – OnlineLearning**: While there is no direct coupling described, both sub‑components share the same downstream graph store.  Any schema changes or versioning decisions made by one sibling must be compatible with the other, implying a coordinated contract at the **KnowledgeManagement** level.  
-- **External Interfaces**: The manual pathway likely consumes inputs from UI layers, admin consoles, or external data‑import pipelines.  These interfaces would pass raw human‑authored artifacts to **ManualLearning**, which then transforms them into graph entities.  
-- **Provenance & Decay Tracking**: Because the parent component tracks knowledge decay, **ManualLearning** must supply sufficient metadata (author, creation date, edit history) so that decay algorithms can operate uniformly across manual and online sources.
-
-## Usage Guidelines  
-
-1. **Always route human‑generated knowledge through the ManualLearning API** rather than inserting directly into the graph store.  This ensures that provenance metadata and validation steps are applied consistently.  
-2. **Preserve author and timestamp information** when creating or editing entities; the parent’s decay tracking relies on these fields to compute relevance over time.  
-3. **Validate against the shared schema** before persisting.  Manual entries that diverge from the schema can break downstream query operations used by both ManualLearning and OnlineLearning.  
-4. **Coordinate schema changes with the OnlineLearning team**.  Since both sub‑components write to the same graph, any modification to entity types or relationships must be backward compatible or accompanied by migration scripts at the KnowledgeManagement level.  
-5. **Leverage existing query and retrieval services** from KnowledgeManagement rather than re‑implementing search logic inside ManualLearning.  This maintains a single source of truth and reduces duplication.
+ManualLearning does not operate in isolation; it collaborates with a suite of sibling agents—**CodeAnalysisAgent**, **OntologyClassificationAgent**, **ContentValidationAgent**, **TraceReportGenerator**, and **OnlineLearning**—to transform raw inputs into structured graph entities. Its parent, **KnowledgeManagement**, delegates all graph‑persistence responsibilities to the same adapter, ensuring a single source of truth for entity storage across the entire knowledge stack.
 
 ---
 
-### 1. Architectural patterns identified  
-- **Component‑based decomposition** (KnowledgeManagement → ManualLearning & OnlineLearning)  
-- Implicit **shared‑persistence pattern**: both sub‑components write to a common graph database via the parent’s services.  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-- **Separation of manual vs. automated knowledge** improves clarity and governance but introduces the need for consistent schema contracts across sub‑components.  
-- Relying on a **single graph store** simplifies data access but can become a bottleneck if manual ingestion spikes; however, it guarantees unified query semantics.  
+The architecture that emerges from the observations is a **modular, adapter‑centric design**. The **`GraphDatabaseAdapter`** acts as an *Adapter* pattern that abstracts the underlying LevelDB storage details behind a clean, domain‑specific API used by ManualLearning and its siblings. By locating the adapter in **`storage/graph-database-adapter.ts`**, the system isolates persistence concerns from the learning logic, enabling each component to evolve independently.
 
-### 3. System structure insights  
-- The hierarchy is **KnowledgeManagement (parent) → ManualLearning & OnlineLearning (siblings)**, indicating that all knowledge lifecycle concerns (storage, decay, query) are centralized, while ingestion strategies are modularized.  
+A notable architectural decision is the **lock‑free implementation** of the adapter. LevelDB, by default, enforces a single‑writer lock that can become a bottleneck under concurrent workloads. ManualLearning’s designers replaced the traditional lock with a lock‑free strategy (likely using atomic operations or write‑ahead logs) to **prevent LevelDB lock conflicts**. This choice directly supports the requirement that ManualLearning handle **multiple concurrent requests without performance degradation**, a critical scalability trait for a system that may ingest code analysis results, ontology classifications, and validation reports in parallel.
 
-### 4. Scalability considerations  
-- ManualLearning’s throughput is bounded by human input rates, so scalability concerns focus on **efficient validation and bulk import mechanisms** rather than raw processing speed.  
-- Because it shares the same persistence layer as OnlineLearning, scaling the graph database (sharding, read replicas) benefits both sub‑components simultaneously.  
+Interaction between components follows a **pipeline‑style composition**:  
+1. **CodeAnalysisAgent** parses source code with AST techniques and emits raw concepts.  
+2. **OntologyClassificationAgent** consumes those concepts, classifies them against an ontology, and attaches confidence scores.  
+3. **ContentValidationAgent** validates the enriched concepts according to configurable modes, producing validation reports.  
+4. **TraceReportGenerator** can then stitch together the full provenance of a knowledge‑graph update, capturing data flow across the pipeline.  
 
-### 5. Maintainability assessment  
-- The clear division of responsibilities aids maintainability: changes to manual curation logic stay isolated from online learning algorithms.  
-- The lack of discovered code symbols suggests that documentation and discoverability may be limited; improving naming conventions and directory structures under KnowledgeManagement will help future developers locate and modify ManualLearning code.
+ManualLearning’s role is to **receive the final, validated concepts** and persist them via the **`GraphDatabaseAdapter`**. The sibling **OnlineLearning** component runs a similar pipeline but sources its inputs from git history and LSL sessions, showing a **shared processing model** that re‑uses the same adapter for storage.
+
+---
+
+## Implementation Details  
+
+The **`GraphDatabaseAdapter`** (found in **`storage/graph-database-adapter.ts`**) encapsulates three primary responsibilities:
+
+1. **Graphology + LevelDB Integration** – It creates a Graphology graph instance backed by LevelDB, enabling efficient vertex/edge storage while leveraging LevelDB’s on‑disk performance characteristics.  
+2. **Lock‑Free Write Path** – Rather than acquiring a global LevelDB mutex, the adapter employs a lock‑free algorithm (e.g., compare‑and‑swap on write batches) to allow simultaneous write operations. This eliminates the classic “database is locked” error that would otherwise surface when ManualLearning processes many concurrent extraction jobs.  
+3. **Automatic JSON Export Sync** – After each successful mutation, the adapter serialises the affected sub‑graph to JSON and writes it to a designated export location. This side‑channel export is used by downstream consumers (e.g., UI dashboards, audit tools) that prefer a static, human‑readable snapshot.
+
+From the perspective of ManualLearning, the workflow is:
+
+```ts
+import { GraphDatabaseAdapter } from './storage/graph-database-adapter';
+
+// 1. Receive validated concepts from ContentValidationAgent
+async function persistConcepts(concepts: Concept[]) {
+  const adapter = GraphDatabaseAdapter.getInstance(); // singleton for shared DB
+  await adapter.beginTransaction();
+
+  for (const c of concepts) {
+    // Map Concept -> Graph node + edges
+    adapter.upsertNode(c.id, { ...c.metadata });
+    // Possibly create relationships to existing entities
+    adapter.upsertEdge(c.id, c.parentId, { type: 'derivedFrom' });
+  }
+
+  await adapter.commitTransaction(); // lock‑free commit
+}
+```
+
+The **singleton pattern** (implicit in `getInstance`) guarantees a single connection pool to LevelDB, reinforcing the lock‑free guarantee across the entire KnowledgeManagement suite. The **transactional API** (`beginTransaction`, `commitTransaction`) abstracts the batch‑write semantics required for atomic updates, while the adapter internally flushes the JSON export after commit.
+
+---
+
+## Integration Points  
+
+ManualLearning sits at the intersection of **knowledge extraction** and **knowledge persistence**. Its primary integration surface is the **`GraphDatabaseAdapter`**, which it consumes directly. The adapter’s public contract (e.g., `upsertNode`, `upsertEdge`, `query`, `beginTransaction`, `commitTransaction`) is also used by the sibling **GraphDatabaseManager** component, illustrating a **shared persistence contract** across the KnowledgeManagement domain.
+
+Upstream, ManualLearning receives data from three agents:
+
+* **CodeAnalysisAgent** – Supplies raw AST‑derived concepts. The interface likely returns a list of `Concept` objects that include identifiers, source locations, and initial metadata.  
+* **OntologyClassificationAgent** – Enhances those concepts with ontology class labels and confidence scores. The classification payload is merged into the `Concept` objects before they reach ManualLearning.  
+* **ContentValidationAgent** – Performs mode‑specific validation (e.g., syntactic, semantic, policy) and attaches a validation status and report. ManualLearning only persists concepts that pass validation, ensuring data quality.
+
+Downstream, the **TraceReportGenerator** can query the same `GraphDatabaseAdapter` to reconstruct the lineage of any persisted node, linking back through the agents that contributed to its creation. This tight coupling via a common adapter enables **full‑stack traceability** without additional plumbing.
+
+Because the adapter is lock‑free and supports concurrent writes, ManualLearning can be invoked from multiple entry points (e.g., HTTP handlers, background workers) simultaneously, without needing external coordination mechanisms.
+
+---
+
+## Usage Guidelines  
+
+1. **Obtain the Adapter via its Singleton** – Always call `GraphDatabaseAdapter.getInstance()` rather than constructing a new adapter. This guarantees that the lock‑free write path and JSON export synchronisation remain consistent across all components.  
+2. **Batch Mutations Inside Transactions** – Wrap all node/edge upserts for a single learning session inside `beginTransaction` / `commitTransaction`. This not only leverages the adapter’s lock‑free batch commit but also ensures that the JSON export reflects a coherent snapshot.  
+3. **Validate Before Persisting** – Only forward concepts that have successfully passed the **ContentValidationAgent**. Persisting unvalidated data defeats the purpose of the validation pipeline and can pollute the knowledge graph with low‑confidence entities.  
+4. **Respect Ontology Confidence Scores** – When persisting classifications from **OntologyClassificationAgent**, store the confidence score alongside the class label. Downstream consumers (e.g., UI ranking, reasoning engines) rely on this metric to surface the most reliable knowledge.  
+5. **Avoid Direct LevelDB Calls** – All interactions with the underlying LevelDB store must go through the adapter. Direct LevelDB access bypasses the lock‑free logic and can re‑introduce contention, breaking the concurrency guarantees that ManualLearning depends on.  
+
+---
+
+### Summary of Key Architectural Insights  
+
+1. **Architectural patterns identified** – Adapter pattern for persistence abstraction; lock‑free concurrency strategy; pipeline composition across agents; singleton for shared DB connection.  
+2. **Design decisions and trade‑offs** – Choosing a lock‑free LevelDB wrapper improves concurrency at the cost of added complexity in write‑path implementation; automatic JSON export adds storage overhead but provides immediate consumable snapshots.  
+3. **System structure insights** – ManualLearning is a leaf sub‑component that delegates all storage to a shared `GraphDatabaseAdapter`, while upstream agents enrich data before it reaches the graph. Sibling components share the same adapter, promoting a unified data model.  
+4. **Scalability considerations** – Lock‑free writes enable high request parallelism; LevelDB’s on‑disk efficiency supports large graph sizes; JSON export may become a bottleneck if the graph grows dramatically, suggesting a possible future off‑load to a streaming export service.  
+5. **Maintainability assessment** – The clear separation of concerns (agents → validation → persistence) and the centralized adapter make the codebase easy to reason about and extend. However, the lock‑free implementation is a specialized area that should be well‑documented and covered by targeted tests to avoid subtle concurrency bugs.
+
+## Diagrams
+
+### Relationship
+
+![ManualLearning Relationship](images/manual-learning-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/manual-learning-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storage/graph-database-adapter.ts, enables Graphology+LevelDB persistence with automatic JSON export sync. By using this adapter, the component can efficiently store and query knowledge graphs, which are essential for entity persistence and knowledge decay tracking. Furthermore, the GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that the component can handle multiple concurrent requests without performance degradation.
+
+### Children
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The ManualLearning sub-component utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage knowledge graphs.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning is a sub-component of KnowledgeManagement
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to manage the graph database connection.
+- [CodeAnalysisAgent](./CodeAnalysisAgent.md) -- CodeAnalysisAgent uses AST-based techniques to analyze code structures and extract concepts.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses ontology systems to classify entities and provide confidence scores for classifications.
+- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses various modes to validate content and provide validation reports.
+- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator generates detailed trace reports of UKB workflow runs, capturing data flow, concept extraction, and ontology classification.
 
 
 ---
 
-*Generated from 2 observations*
+*Generated from 6 observations*

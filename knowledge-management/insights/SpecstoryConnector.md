@@ -2,77 +2,104 @@
 
 **Type:** SubComponent
 
-SpecstoryConnector utilizes the connectViaHTTP() function in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to send HTTP requests to the Specstory extension and handle responses.
+The connectViaHTTP function in lib/integrations/specstory-adapter.js uses asynchronous programming to improve performance and responsiveness.
 
 ## What It Is  
 
-The **SpecstoryConnector** is a sub‑component that lives inside the *Trajectory* hierarchy and is responsible for communicating with the external **Specstory** extension. Its implementation is spread across the integration layer found at `lib/integrations/specstory-adapter.js`. Within this file the `SpecstoryAdapter` class exposes three distinct asynchronous entry points – `connectViaHTTP()`, `connectViaIPC()` and `connectViaFileWatch()` – that the connector can invoke depending on the runtime environment. In the HTTP‑based path the connector calls the shared utility `httpRequest()` to issue the actual request and to process the response payload. The connector therefore acts as a thin façade that delegates the low‑level transport concerns to the adapter while exposing a stable API to its parent component **Trajectory** and to sibling components such as **ConversationLogger**.
+**SpecstoryConnector** is a sub‑component that lives inside the **Trajectory** component and is responsible for opening a communication channel to the external *Specstory* service.  The concrete implementation lives in the file `lib/integrations/specstory-adapter.js`.  Within that file the `SpecstoryAdapter` class implements the public `initialize` method, and the low‑level routine that actually creates the socket‑like link is the `connectViaHTTP` function.  The connector exposes a small configuration surface (URL, credentials, protocol choice) that callers—most notably the **ConnectionEstablisher** child component—use to drive the connection process.  Errors and fall‑backs are handled inside the adapter, allowing the rest of the system (e.g., the sibling **ConnectionManager**) to treat the connector as a reliable black box.
 
 ## Architecture and Design  
 
-The observed code demonstrates a **modular, separation‑of‑concerns** architecture. The `SpecstoryAdapter` class encapsulates all transport‑specific logic, while the `SpecstoryConnector` focuses on higher‑level orchestration. This division is evident in the way the connector simply invokes `connectViaHTTP()` (or the IPC / file‑watch alternatives) and lets the adapter handle the details of request construction, socket handling, or file‑system monitoring. The asynchronous nature of each connection method (all returning promises) reflects an **asynchronous I/O** design that allows the surrounding system – notably the parent *Trajectory* component – to remain responsive regardless of which transport is in use.
+The design that emerges from the observations is an **Adapter‑style** wrapper around the Specstory service.  The `SpecstoryAdapter` class adapts the external HTTP/HTTPS API to the internal expectations of the Trajectory ecosystem.  Inside the adapter the `initialize` method orchestrates a series of connection attempts, each using a different method (e.g., plain HTTP, HTTPS, possibly alternative transports).  This reflects a **Strategy**‑like approach: the adapter selects the appropriate connection strategy at runtime based on configuration and runtime feedback.
 
-The three connection functions (`connectViaHTTP()`, `connectViaIPC()`, `connectViaFileWatch()`) form a **strategy‑like** set of alternatives: the runtime can select the most appropriate strategy based on environment capabilities (e.g., a server with HTTP access, a desktop process that can use IPC, or a constrained environment that only permits file‑watch signaling). The connector does not embed any conditional logic for choosing the strategy; that responsibility is delegated upward to *Trajectory*, which, according to the hierarchy context, “handles multiple connection methods” and therefore can decide which adapter method to call.
+Communication between the sub‑components is deliberately **asynchronous**.  `connectViaHTTP` is built with callbacks and other asynchronous constructs, allowing the calling code to continue processing while the network handshake proceeds.  This async‑first stance is consistent with the broader Trajectory component, whose own documentation stresses “handling multiple tasks concurrently.”  The use of callbacks rather than promises or async/await suggests the codebase predates newer JavaScript idioms, but the intent—to keep the thread non‑blocking and improve responsiveness—is clear.
+
+Error handling is baked into the adapter.  The `initialize` method captures failures from `connectViaHTTP`, logs or propagates them, and then falls back to an alternative protocol if available.  This “try‑and‑fallback” flow reduces the chance of a hard failure propagating up to higher‑level components like **ConnectionManager** or **ConversationLogger**, which would otherwise need to duplicate the same resilience logic.
 
 ## Implementation Details  
 
-`lib/integrations/specstory-adapter.js` houses the `SpecstoryAdapter` class. Its public API consists of three async methods:
+At the heart of the connector is the `connectViaHTTP` function defined in `lib/integrations/specstory-adapter.js`.  The function:
 
-* **`connectViaHTTP()`** – builds an HTTP request using the shared `httpRequest()` helper, sends it to the Specstory extension’s HTTP endpoint, and returns the parsed response. The helper abstracts away low‑level node/http or fetch details, ensuring that the adapter remains focused on request semantics rather than transport plumbing.  
+1. **Accepts configuration** (URL, credentials, protocol flag).  
+2. **Creates an HTTP(S) request** object using the native Node.js `http` or `https` modules, depending on the protocol flag.  
+3. **Registers callbacks** for events such as `response`, `error`, and `timeout`.  These callbacks drive the connection‑establishment lifecycle: a successful `response` signals that the remote Specstory endpoint is reachable, while `error` triggers the fallback logic in `SpecstoryAdapter.initialize`.  
 
-* **`connectViaIPC()`** – opens an inter‑process channel (likely via Node’s `net` or `child_process` modules) to the Specstory extension, exchanges messages, and resolves with the extension’s reply. The method’s asynchronous signature lets callers await completion without blocking the event loop.  
+The `SpecstoryAdapter` class wraps this function.  Its `initialize` method reads the connector’s configuration, invokes `connectViaHTTP`, and, on failure, may retry with a different protocol or alternative connection method (the exact alternatives are not enumerated in the observations but the pattern is evident).  The class also exposes setters or a constructor‑based API to adjust the URL and credentials, giving the **ConnectionEstablisher** child component a clean interface for provisioning connections.
 
-* **`connectViaFileWatch()`** – watches a predefined file or directory for changes (using `fs.watch` or similar), writes a request payload to a trigger file, and reads the response once the extension writes back. This approach provides a fallback where network or IPC mechanisms are unavailable.
-
-The **SpecstoryConnector** itself does not expose its own transport code; instead, it invokes the appropriate `SpecstoryAdapter` method and forwards the result to its callers. The connector also re‑uses the `httpRequest()` function directly when the HTTP path is selected, reinforcing the adapter’s role as a thin wrapper rather than a duplicated implementation.
+Because the code relies on callbacks, the implementation must guard against “callback hell” and ensure that each asynchronous branch correctly releases resources (e.g., aborting the request on timeout).  The presence of multiple protocols (HTTP and HTTPS) is handled by a simple conditional that selects the appropriate module, keeping the code path short and maintainable.
 
 ## Integration Points  
 
-* **Parent – Trajectory**: The *Trajectory* component owns the SpecstoryConnector and orchestrates which connection method to employ. By abstracting the transport behind the adapter, *Trajectory* can switch between HTTP, IPC, or file‑watch without altering its own logic, satisfying the “multiple connection methods” requirement described in the hierarchy context.  
+* **Parent – Trajectory**: The Trajectory component treats SpecstoryConnector as a pluggable integration point.  Trajectory’s higher‑level orchestration (e.g., scheduling, state management) invokes `SpecstoryAdapter.initialize` during startup or when a reconnection is required.  The async nature of `connectViaHTTP` aligns with Trajectory’s overall concurrency model, allowing other subsystems (like the **ConversationLogger**) to continue logging while the network link is being negotiated.
 
-* **Sibling – ConversationLogger**: The **ConversationLogger** component “uses the connected API to log conversations with the Specstory extension.” It therefore depends on the same transport layer exposed by the connector. Because the connector’s API is transport‑agnostic, the logger can log regardless of whether the underlying channel is HTTP, IPC, or file‑watch, promoting reuse across siblings.  
+* **Sibling – ConnectionManager**: Although the exact implementation of ConnectionManager is not visible, the naming suggests it coordinates multiple connectors.  SpecstoryConnector likely registers itself with ConnectionManager, exposing a standard “connect / disconnect” interface that the manager can call uniformly across different external services.
 
-* **External – Specstory extension**: The ultimate consumer of the connector’s requests is the Specstory extension. The adapter’s three methods map directly to the extension’s supported communication mechanisms, ensuring a contract that the extension can honor.  
+* **Sibling – ConversationLogger**: This sibling is mentioned only in the manifest, but because it logs conversational data, it may rely on a stable connection provided by SpecstoryConnector to ship logs to the Specstory backend.  The connector’s error‑handling and fallback capabilities help guarantee that logging does not become a single point of failure.
 
-* **Utility – httpRequest()**: This function is a shared low‑level HTTP client used by both the adapter’s `connectViaHTTP()` and the connector itself. It represents the only explicit external dependency referenced in the observations.
+* **Child – ConnectionEstablisher**: The child component directly uses the `connectViaHTTP` function (or a thin wrapper around it) to perform the actual handshake.  By delegating the low‑level network work to ConnectionEstablisher, the adapter can focus on strategy selection and error handling, keeping responsibilities cleanly separated.
 
 ## Usage Guidelines  
 
-When integrating a new feature that needs to talk to the Specstory extension, developers should first ask *Trajectory* which transport is appropriate for the target environment. The recommended practice is to call the corresponding method on the **SpecstoryConnector** (e.g., `await connector.connectViaHTTP(payload)`) and handle the returned promise. Direct use of `httpRequest()` is reserved for cases where only the HTTP path is needed and the higher‑level adapter is intentionally bypassed—for example, in low‑level testing.  
+1. **Configure before initialize** – Set the target URL, credentials, and desired protocol (HTTP vs. HTTPS) on the `SpecstoryAdapter` instance before calling `initialize`.  Changing these values after a successful connection will not automatically renegotiate; a fresh `initialize` call is required.
 
-Because the connection methods are asynchronous, callers must use `await` or proper promise chaining to avoid unhandled rejections. Errors emitted by the adapter (network failures, IPC socket errors, file‑watch timeouts) should be caught at the *Trajectory* level where a fallback strategy can be selected (e.g., falling back from HTTP to file‑watch).  
+2. **Handle callbacks responsibly** – When integrating with `connectViaHTTP`, always provide error and timeout callbacks.  Failure to do so can leave the process hanging or cause unhandled exceptions that ripple up to Trajectory.
 
-Do not mix transport strategies within a single logical operation; pick one method per request to keep the interaction model simple and deterministic. When extending the connector, preserve the existing separation: add new transport strategies as additional methods on `SpecstoryAdapter` rather than modifying the connector’s core logic.
+3. **Prefer HTTPS when possible** – The adapter supports both HTTP and HTTPS; however, HTTPS offers transport‑level security.  The fallback to plain HTTP should only be used when the environment explicitly requires it (e.g., internal testing).
+
+4. **Leverage the fallback mechanism** – Do not attempt to implement your own retry logic around `initialize`.  The adapter already encapsulates a “try‑different‑method” strategy; duplicating it can lead to redundant network traffic and confusing error states.
+
+5. **Do not block the event loop** – Because `connectViaHTTP` is callback‑based, any synchronous work placed inside its callbacks will block other asynchronous operations.  Keep callback bodies short and off‑load heavy processing to worker threads or separate async functions.
 
 ---
 
 ### Architectural patterns identified  
-* **Separation of concerns / modularity** – transport logic lives in `SpecstoryAdapter`, orchestration lives in `SpecstoryConnector` and *Trajectory*.  
-* **Strategy‑like transport selection** – three interchangeable async methods (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`).  
-* **Asynchronous I/O** – all public methods return promises, enabling non‑blocking operation.
+
+* **Adapter pattern** – `SpecstoryAdapter` translates the external Specstory HTTP/HTTPS API into the internal connection contract.  
+* **Strategy‑like selection** – `initialize` chooses among multiple connection methods (HTTP, HTTPS, possibly others) based on configuration and runtime results.  
+* **Callback‑based asynchronous programming** – Network I/O is performed via callbacks, ensuring non‑blocking behavior.
 
 ### Design decisions and trade‑offs  
-* **Flexibility vs. complexity** – supporting three transports makes the system adaptable to varied environments but adds maintenance overhead for each transport implementation.  
-* **Thin façade** – the connector delegates to the adapter, reducing duplication but requiring clear contracts between them.  
-* **Reliance on shared `httpRequest`** – centralizes HTTP handling but creates a single point of failure if the helper changes.
+
+* **Callbacks vs. modern async/await** – Callbacks provide fine‑grained control and are compatible with older Node.js versions, but they increase the risk of nested logic and harder error propagation.  
+* **Protocol flexibility** – Supporting both HTTP and HTTPS adds configurability and resilience but also introduces duplicate code paths that must be kept in sync.  
+* **Built‑in fallback** – Centralizing retry/fallback logic in the adapter simplifies higher‑level components but makes the adapter more complex to test.
 
 ### System structure insights  
-The hierarchy forms a clear stack: *Trajectory* → **SpecstoryConnector** → **SpecstoryAdapter** → transport (HTTP/IPC/FileWatch) → **Specstory extension**. Sibling components like **ConversationLogger** consume the same connector API, reinforcing a shared communication layer.
+
+SpecstoryConnector sits as a leaf under **Trajectory**, exposing a clear “connection establishment” contract to its child **ConnectionEstablisher** while being orchestrated by sibling managers.  The separation of concerns (configuration, strategy selection, low‑level I/O) is evident in the class/function split (`SpecstoryAdapter` vs. `connectViaHTTP`).
 
 ### Scalability considerations  
-Because each connection method is async and non‑blocking, the system can handle many concurrent requests without saturating the event loop. Adding additional parallel transports (e.g., a pool of HTTP connections) would be straightforward within the existing adapter pattern. However, the file‑watch approach may become a bottleneck on high‑throughput workloads due to filesystem latency.
+
+Because each connection attempt is asynchronous and non‑blocking, the system can scale to many concurrent Specstory connections (e.g., per‑user sessions) without saturating the event loop.  However, the callback model may become a bottleneck if the number of simultaneous connections grows dramatically, as each callback adds overhead and potential memory pressure.  Switching to promise‑based or streaming APIs could improve scalability in the future.
 
 ### Maintainability assessment  
-The explicit modular boundary between connector and adapter promotes maintainability: transport changes are isolated to `SpecstoryAdapter`. The clear naming (`connectViaHTTP`, etc.) and reuse of `httpRequest()` aid readability. The main risk is keeping the three transport implementations in sync; any change to the Specstory extension’s protocol must be reflected across all three methods, which can be mitigated by extracting shared protocol logic into helper modules.
+
+The current design is **moderately maintainable**: the adapter isolates external service details, and the fallback logic is centralized.  The main maintenance risk stems from the callback‑heavy implementation, which can become difficult to reason about as new protocols or error‑handling paths are added.  Introducing thin wrapper utilities (e.g., a promise‑based helper) or refactoring to async/await would improve readability and testability without altering the external contract.  Documentation of the supported configuration keys (URL, credentials, protocol flag) is essential to prevent misuse by downstream components such as **ConnectionManager** or **ConversationLogger**.
+
+## Diagrams
+
+### Relationship
+
+![SpecstoryConnector Relationship](images/specstory-connector-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/specstory-connector-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is designed to handle multiple connection methods, including HTTP API, IPC, and file watch, to ensure reliable communication with the Specstory extension. This is evident in the connectViaHTTP(), connectViaIPC(), and connectViaFileWatch() functions in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js). The use of these asynchronous connection methods allows the component to adapt to different environments and connection scenarios, providing a robust and flexible communication mechanism. For instance, the connectViaHTTP() function utilizes the httpRequest() function to send HTTP requests to the Specstory extension and handle responses, demonstrating a clear separation of concerns and modularity in the code.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function in lib/integrations/specstory-adapter.js, which establishes a connection to the Specstory service via HTTP. This asynchronous approach allows the component to handle multiple tasks concurrently, improving overall performance and responsiveness. The connectViaHTTP function is a prime example of this, as it uses callbacks to handle the connection establishment process. Furthermore, the SpecstoryAdapter class's implementation of the initialize function, which attempts connections to the Specstory service using different methods, demonstrates the component's ability to adapt to various connection scenarios.
+
+### Children
+- [ConnectionEstablisher](./ConnectionEstablisher.md) -- The connectViaHTTP function in lib/integrations/specstory-adapter.js uses callbacks to handle the connection establishment process, indicating a need for a connection establishment mechanism.
 
 ### Siblings
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the connected API to log conversations with the Specstory extension.
+- [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
+- [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
 
 
 ---
