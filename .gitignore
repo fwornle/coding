@@ -218,3 +218,4 @@ site/
 
 # Coding infrastructure runtime files (auto-added by coding startup)
 .constraint-monitor.yaml
+.browser-profiles/

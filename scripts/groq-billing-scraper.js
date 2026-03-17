@@ -6,15 +6,16 @@
  * Uses Playwright to scrape current month's spend from console.groq.com/settings/billing/manage
  * Called by the health monitoring system during active coding sessions.
  *
- * Requirements:
- * - GROQ_API_KEY environment variable (used to verify we have Groq access)
- * - Playwright browser automation via MCP or direct
+ * Uses a persistent browser profile so you only need to log in once.
+ * On first run (or when session expires), launches headed for interactive login.
+ * Subsequent runs use headless mode with the stored session.
  *
  * Usage:
- *   node groq-billing-scraper.js [--force]
+ *   node groq-billing-scraper.js [--force] [--login]
  *
  * Options:
  *   --force  Skip interval check, scrape immediately
+ *   --login  Force headed mode for re-authentication
  */
 
 import fs from 'fs';
@@ -28,6 +29,7 @@ const CODING_REPO = process.env.CODING_REPO || path.resolve(__dirname, '..');
 
 const CONFIG_PATH = path.join(CODING_REPO, 'config', 'live-logging-config.json');
 const LOG_PATH = path.join(CODING_REPO, 'logs', 'billing-scraper.log');
+const STORAGE_STATE_PATH = path.join(CODING_REPO, '.browser-profiles', 'groq-state.json');
 
 /**
  * Output JSON result to stdout (for caller)
@@ -95,116 +97,211 @@ function shouldScrape(groqConfig, force = false) {
 }
 
 /**
+ * Check if the page is showing a login/auth screen
+ */
+function isLoginPage(page) {
+  const url = page.url();
+  return url.includes('login') || url.includes('auth') || url.includes('signin');
+}
+
+/**
+ * Extract spend amount from the billing page
+ * Returns spend text or null
+ */
+async function extractSpendFromPage(page) {
+  // Wait for page to be fully loaded and stable
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(3000);
+
+  let spendText = null;
+
+  // Try to find by looking for text near "Total Amount" in the Current Monthly Usage section
+  try {
+    const usageSection = await page.locator('text=Current Monthly Usage').locator('..').first();
+    if (usageSection) {
+      const amountElement = await usageSection.locator('text=/^\\$[0-9]+\\.?[0-9]*/').first();
+      if (amountElement) {
+        spendText = await amountElement.textContent();
+      }
+    }
+  } catch {
+    // Try alternative approach
+  }
+
+  // Fallback: look for Total Amount pattern
+  if (!spendText) {
+    try {
+      const totalAmountLabel = await page.locator('text=Total Amount').first();
+      if (totalAmountLabel) {
+        const container = await totalAmountLabel.locator('..').first();
+        const allText = await container.textContent();
+        const match = allText?.match(/\$([0-9]+\.?[0-9]*)/);
+        if (match) {
+          spendText = '$' + match[1];
+        }
+      }
+    } catch {
+      // Try next fallback
+    }
+  }
+
+  // Fallback: search full page content for spend pattern
+  if (!spendText) {
+    const content = await page.content();
+    const spendMatch = content.match(/Total\s*Amount[^$]*\$([0-9]+\.?[0-9]*)/i) ||
+                       content.match(/Current Monthly Usage[^$]*\$([0-9]+\.?[0-9]*)/i);
+    if (spendMatch) {
+      spendText = '$' + spendMatch[1];
+    }
+  }
+
+  return spendText;
+}
+
+/**
  * Scrape billing data from console.groq.com
+ * Uses storageState (JSON cookie file) to maintain login session.
+ * When auth is needed, launches in headed mode for interactive login via GitHub.
+ * (Google OAuth blocks automation browsers, so GitHub is used instead.)
+ *
  * Returns { spend: number, success: boolean, error?: string }
  */
-async function scrapeGroqBilling() {
+async function scrapeGroqBilling(forceLogin = false) {
   let browser = null;
 
   try {
     log('Starting Groq billing scrape...');
 
-    // Check for Groq API key (indicates we have Groq access)
-    if (!process.env.GROQ_API_KEY) {
-      return { success: false, error: 'GROQ_API_KEY not set' };
+    // Ensure profile directory exists
+    fs.mkdirSync(path.dirname(STORAGE_STATE_PATH), { recursive: true });
+
+    const hasStoredSession = fs.existsSync(STORAGE_STATE_PATH);
+
+    // First attempt: headless with stored cookies (unless --login forced)
+    if (!forceLogin && hasStoredSession) {
+      log('Trying headless scrape with stored session...');
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({
+        storageState: STORAGE_STATE_PATH
+      });
+
+      const page = await context.newPage();
+      await page.goto('https://console.groq.com/settings/billing/manage', {
+        waitUntil: 'networkidle',
+        timeout: 30000
+      });
+
+      if (!isLoginPage(page)) {
+        const spendText = await extractSpendFromPage(page);
+        if (spendText) {
+          const match = spendText.match(/\$([0-9]+\.?[0-9]*)/);
+          if (match) {
+            const spend = parseFloat(match[1]);
+            log(`Scraped Groq spend: $${spend}`);
+            // Refresh stored cookies
+            await context.storageState({ path: STORAGE_STATE_PATH });
+            return { success: true, spend };
+          }
+        }
+        const screenshotPath = path.join(CODING_REPO, 'logs', 'groq-billing-debug.png');
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        log('Authenticated but could not find spend amount on page', 'WARN');
+        return { success: false, error: 'Could not find spend amount on page' };
+      }
+
+      // Session expired — close and fall through to headed login
+      log('Session expired, switching to headed mode for login...');
+      await browser.close();
+      browser = null;
     }
 
-    // Launch browser in headless mode
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    // Headed mode: interactive login via GitHub
+    log('Launching headed browser for Groq login via GitHub...');
+    process.stderr.write('\n[Groq Billing] Opening browser — use "Continue with GitHub" to log in.\n');
+    process.stderr.write('[Groq Billing] (Google login is blocked in automation browsers.)\n');
 
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-    });
-
+    browser = await chromium.launch({ headless: false });
+    const context = await browser.newContext();
     const page = await context.newPage();
 
-    // Navigate to Groq billing manage page (where Current Monthly Usage is shown)
-    log('Navigating to console.groq.com/settings/billing/manage...');
+    await page.goto('https://console.groq.com/settings/billing/manage', {
+      waitUntil: 'networkidle',
+      timeout: 60000
+    });
+
+    // If on login page, try to click "Continue with GitHub" automatically
+    if (isLoginPage(page)) {
+      try {
+        // Dismiss cookie banner if present
+        const acceptBtn = page.locator('text=Accept All');
+        if (await acceptBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await acceptBtn.click();
+          await page.waitForTimeout(500);
+        }
+      } catch { /* no cookie banner */ }
+
+      try {
+        const githubBtn = page.locator('text=Continue with GitHub');
+        await githubBtn.waitFor({ timeout: 5000 });
+        await githubBtn.click();
+        log('Clicked "Continue with GitHub"');
+      } catch {
+        log('Could not find GitHub login button, waiting for manual login...', 'WARN');
+        process.stderr.write('[Groq Billing] Please click "Continue with GitHub" to log in.\n');
+      }
+    }
+
+    // Wait for the user to complete login (poll every 2s for up to 3 minutes)
+    let authenticated = false;
+    for (let i = 0; i < 90; i++) {
+      const url = page.url();
+      if (!isLoginPage(page) && !url.includes('github.com')) {
+        authenticated = true;
+        break;
+      }
+      await page.waitForTimeout(2000);
+    }
+
+    if (!authenticated) {
+      log('Login timed out after 3 minutes', 'WARN');
+      return { success: false, error: 'Login timed out. Run again with --login to retry.', needsAuth: true };
+    }
+
+    // Wait for page to fully settle after login redirect
+    log('Login detected, waiting for page to settle...');
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // Navigate to billing page (login may have redirected elsewhere)
     await page.goto('https://console.groq.com/settings/billing/manage', {
       waitUntil: 'networkidle',
       timeout: 30000
     });
-
-    // Check if we need to log in
-    const url = page.url();
-    if (url.includes('login') || url.includes('auth')) {
-      log('Login required - cannot scrape without authentication', 'WARN');
-      return {
-        success: false,
-        error: 'Login required. Please log in to console.groq.com in your browser first.',
-        needsAuth: true
-      };
-    }
-
-    // Wait for billing content to load
     await page.waitForTimeout(2000);
 
-    // Look for "Current Monthly Usage" section with "Total Amount" value
-    // Page structure: "Current Monthly Usage" header, then "Total Amount" label, then "$X.XX"
-    let spendText = null;
+    log('Login successful, extracting billing data...');
 
-    // Try to find by looking for text near "Total Amount" in the Current Monthly Usage section
-    try {
-      // Find the Current Monthly Usage section and get the dollar amount
-      const usageSection = await page.locator('text=Current Monthly Usage').locator('..').first();
-      if (usageSection) {
-        const amountElement = await usageSection.locator('text=/^\\$[0-9]+\\.?[0-9]*/').first();
-        if (amountElement) {
-          spendText = await amountElement.textContent();
-        }
-      }
-    } catch {
-      // Try alternative approach
-    }
+    // Save session cookies for future headless scrapes
+    await context.storageState({ path: STORAGE_STATE_PATH });
+    log(`Session saved to ${STORAGE_STATE_PATH}`);
 
-    // Fallback: look for Total Amount pattern
-    if (!spendText) {
-      try {
-        const totalAmountLabel = await page.locator('text=Total Amount').first();
-        if (totalAmountLabel) {
-          // Get the parent container and find the dollar amount nearby
-          const container = await totalAmountLabel.locator('..').first();
-          const allText = await container.textContent();
-          const match = allText?.match(/\$([0-9]+\.?[0-9]*)/);
-          if (match) {
-            spendText = '$' + match[1];
-          }
-        }
-      } catch {
-        // Try next fallback
-      }
-    }
-
-    // Fallback: search full page content for spend pattern
-    if (!spendText) {
-      const content = await page.content();
-      // Look for Total Amount followed by dollar value
-      const spendMatch = content.match(/Total\s*Amount[^$]*\$([0-9]+\.?[0-9]*)/i) ||
-                         content.match(/Current Monthly Usage[^$]*\$([0-9]+\.?[0-9]*)/i);
-      if (spendMatch) {
-        spendText = '$' + spendMatch[1];
-      }
-    }
+    const spendText = await extractSpendFromPage(page);
 
     if (!spendText) {
-      // Take a screenshot for debugging
       const screenshotPath = path.join(CODING_REPO, 'logs', 'groq-billing-debug.png');
       await page.screenshot({ path: screenshotPath, fullPage: true });
-      log(`Could not find spend on page. Screenshot saved to ${screenshotPath}`, 'WARN');
+      log('Could not find spend on page after login', 'WARN');
       return { success: false, error: 'Could not find spend amount on page' };
     }
 
-    // Parse the spend amount
-    const spendMatch = spendText.match(/\$([0-9]+\.?[0-9]*)/);
-    if (!spendMatch) {
+    const match = spendText.match(/\$([0-9]+\.?[0-9]*)/);
+    if (!match) {
       return { success: false, error: `Could not parse spend from: ${spendText}` };
     }
 
-    const spend = parseFloat(spendMatch[1]);
+    const spend = parseFloat(match[1]);
     log(`Scraped Groq spend: $${spend}`);
+    process.stderr.write(`[Groq Billing] Got spend: $${spend}. You can close the browser window.\n`);
 
     return { success: true, spend };
 
@@ -223,6 +320,7 @@ async function scrapeGroqBilling() {
  */
 async function main() {
   const force = process.argv.includes('--force');
+  const forceLogin = process.argv.includes('--login');
 
   // Load config
   const config = loadConfig();
@@ -242,8 +340,8 @@ async function main() {
     process.exit(0);
   }
 
-  // Check if we should scrape
-  if (!shouldScrape(groqConfig, force)) {
+  // Check if we should scrape (--login always scrapes)
+  if (!forceLogin && !shouldScrape(groqConfig, force)) {
     const lastScraped = groqConfig.lastScraped || 'never';
     const intervalMins = groqConfig.scrapeIntervalMinutes || 15;
     log(`Skipping scrape - last scraped: ${lastScraped}, interval: ${intervalMins}m`);
@@ -259,7 +357,7 @@ async function main() {
   }
 
   // Perform scrape
-  const result = await scrapeGroqBilling();
+  const result = await scrapeGroqBilling(forceLogin);
 
   if (result.success) {
     // Update config with new spend
