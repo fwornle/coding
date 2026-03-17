@@ -2388,92 +2388,11 @@ class StatusLineHealthMonitor {
    * Runs in background to avoid blocking health checks
    */
   async checkBillingScraper() {
-    // Don't run if already running
-    if (this.billingScraperRunning) return;
-
-    try {
-      // NOTE: BudgetTracker (.data/llm-usage-costs.json) only tracks local API calls.
-      // The Playwright scraper gets the ACTUAL Groq billing amount (which includes all
-      // API usage from any tool using the same key). Always allow the scraper to run.
-
-      // Load config to check if auto-scrape is enabled and get interval
-      const configPath = path.join(this.codingRepoPath, 'config', 'live-logging-config.json');
-      if (!fs.existsSync(configPath)) return;
-
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      const groqConfig = config?.provider_credits?.groq;
-
-      // Skip if not configured for auto-scrape
-      if (!groqConfig?.autoScrape || groqConfig?.billingType !== 'monthly') return;
-
-      // Check interval (default 15 minutes)
-      const intervalMs = (groqConfig.scrapeIntervalMinutes || 15) * 60 * 1000;
-      const now = Date.now();
-
-      if ((now - this.lastBillingCheck) < intervalMs) return;
-
-      // Check if there are active sessions (don't scrape if idle)
-      const activeSessions = await this.getRunningAgentSessions();
-      if (activeSessions.size === 0) {
-        this.log('Skipping billing scrape - no active sessions');
-        return;
-      }
-
-      // Run scraper in background
-      this.billingScraperRunning = true;
-      this.lastBillingCheck = now;
-
-      this.log('Starting Groq billing scraper...');
-
-      const scraperPath = path.join(this.codingRepoPath, 'scripts', 'groq-billing-scraper.js');
-      if (!fs.existsSync(scraperPath)) {
-        this.log('Billing scraper not found', 'WARN');
-        this.billingScraperRunning = false;
-        return;
-      }
-
-      // Run scraper as background process
-      const scraperProcess = spawn('node', [scraperPath], {
-        cwd: this.codingRepoPath,
-        env: { ...process.env, CODING_REPO: this.codingRepoPath },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      scraperProcess.stdout.on('data', (data) => { stdout += data.toString(); });
-      scraperProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-      scraperProcess.on('close', (code) => {
-        this.billingScraperRunning = false;
-
-        if (code === 0 && stdout) {
-          try {
-            const result = JSON.parse(stdout.trim());
-            if (result.scraped) {
-              this.log(`Groq billing updated: $${result.spend}`);
-            } else if (result.needsAuth) {
-              this.log('Groq billing scrape needs authentication', 'WARN');
-            }
-          } catch (parseError) {
-            this.log(`Billing scraper output parse error: ${parseError.message}`, 'WARN');
-          }
-        } else if (code !== 0) {
-          this.log(`Billing scraper failed (exit ${code}): ${stderr}`, 'WARN');
-        }
-      });
-
-      scraperProcess.on('error', (error) => {
-        this.billingScraperRunning = false;
-        this.log(`Billing scraper spawn error: ${error.message}`, 'ERROR');
-      });
-
-    } catch (error) {
-      this.billingScraperRunning = false;
-      this.log(`Billing check error: ${error.message}`, 'ERROR');
-    }
+    // No-op: Playwright scraper has been replaced by BudgetTracker + externalSpend.
+    // Groq spend is now calculated in api-quota-checker.js as:
+    //   localSpend (from .data/llm-usage-costs.json) + externalSpend (config offset)
+    // This updates in real-time as API calls are made — no browser scraping needed.
+    // To sync externalSpend, manually check console.groq.com and update config.
   }
 
   /**

@@ -325,13 +325,10 @@
     },
     "groq": {
       "billingType": "monthly",
-      "monthlySpend": 11.02,
       "billingMonth": "MAR",
       "spendLimit": null,
-      "autoScrape": true,
-      "scrapeIntervalMinutes": 15,
-      "lastScraped": "2026-03-14T15:30:00.000Z",
-      "description": "Groq monthly billing. autoScrape uses Playwright to fetch spend from console.groq.com every scrapeIntervalMinutes during active sessions."
+      "externalSpend": 10.81,
+      "description": "Groq monthly billing. Total = local BudgetTracker cost + externalSpend offset. Update externalSpend by checking console.groq.com and subtracting local cost. Resets to 0 on month rollover."
     },
     "google": {
       "prepaidCredits": null,
