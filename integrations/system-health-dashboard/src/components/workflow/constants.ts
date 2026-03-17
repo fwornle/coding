@@ -893,14 +893,17 @@ export const STEP_CATEGORIES: Record<string, 'analyze' | 'classify' | 'persist' 
  * Maps internal step names to descriptive labels.
  */
 export const STEP_DISPLAY_NAMES: Record<string, string> = {
-  'wave1_init': 'batch scheduler',
+  'wave1_init': 'init + CGR index',
   'wave1_analyze': 'semantic analysis',
+  'wave1_qa': 'quality assurance',
   'wave1_classify': 'ontology classification',
   'wave1_persist': 'persistence',
   'wave2_analyze': 'semantic analysis',
+  'wave2_qa': 'quality assurance',
   'wave2_classify': 'ontology classification',
   'wave2_persist': 'persistence',
   'wave3_analyze': 'semantic analysis',
+  'wave3_qa': 'quality assurance',
   'wave3_classify': 'ontology classification',
   'wave3_persist': 'persistence',
   'operator_conv': 'context convolution',
@@ -910,6 +913,12 @@ export const STEP_DISPLAY_NAMES: Record<string, string> = {
   'operator_pred': 'edge prediction',
   'operator_merge': 'structure fusion',
   'wave4_insights': 'insight generation',
+  'wave4_kgops': 'KG operators',
+  'wave4_persist': 'persistence',
+  'wave4_finalize': 'finalization',
+  // Batch-analysis steps (legacy)
+  'index_codebase': 'code graph (CGR)',
+  'link_documentation': 'docs linking',
 }
 
 // Substep arc colors for multi-agent-graph visualization

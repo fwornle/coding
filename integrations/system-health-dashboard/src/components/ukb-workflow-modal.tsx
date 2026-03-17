@@ -2479,6 +2479,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       wave: s.wave,
                       startTime: s.startTime,
                       endTime: s.endTime,
+                      subSteps: s.subSteps,
                       agentInstances: s.agentInstances,
                       entityFlow: s.entityFlow,
                       qaResult: s.qaResult,
