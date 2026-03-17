@@ -28,6 +28,7 @@ import {
   FileCode,
   Shield,
   Database,
+  FileText,
 } from 'lucide-react'
 import type {
   StepInfo,
@@ -869,31 +870,77 @@ export function TraceModal({
                                         )
                                       })
                                     )}
-                                    {/* Non-LLM step with no agents */}
+                                    {/* Summary for steps with counts but no detailed arrays */}
                                     {(!step.agentInstances || step.agentInstances.length === 0) &&
-                                      (!step.llmCallEvents || step.llmCallEvents.length === 0) &&
-                                      (!step.cgrQueryEvents || step.cgrQueryEvents.length === 0) && (
-                                      <div className="text-xs text-zinc-500 italic px-2 py-1">
-                                        No LLM calls, CGR queries, or agent instances
-                                      </div>
-                                    )}
+                                      (!step.llmCallEvents || step.llmCallEvents.length === 0) && (() => {
+                                      const llmCount = step.llmCalls ?? 0
+                                      const tokenCount = step.tokensUsed ?? 0
+                                      const cgrStats = (step as any).outputs?.cgrStats as { queriesMade?: number; cacheHits?: number; available?: boolean } | undefined
+                                      const outputs = (step as any).outputs as Record<string, unknown> | undefined
+                                      const hasAnySummary = llmCount > 0 || cgrStats || (outputs && Object.keys(outputs).length > 0)
+                                      if (!hasAnySummary) {
+                                        return (
+                                          <div className="text-xs text-zinc-500 italic px-2 py-1">
+                                            No LLM calls, CGR queries, or agent instances
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <div className="px-2 py-1.5 space-y-1 text-xs">
+                                          {llmCount > 0 && (
+                                            <div className="flex items-center gap-2 text-zinc-400">
+                                              <Cpu className="h-3 w-3 text-purple-400" />
+                                              <span>{llmCount} LLM calls</span>
+                                              {tokenCount > 0 && <span className="text-zinc-500">({tokenCount.toLocaleString()} tokens)</span>}
+                                              {step.llmProvider && <Badge variant="outline" className="text-[10px] h-4">{shortenModel(step.llmProvider)}</Badge>}
+                                            </div>
+                                          )}
+                                          {cgrStats && (
+                                            <div className="flex items-center gap-2 text-zinc-400">
+                                              <Database className="h-3 w-3 text-purple-400" />
+                                              <span>{cgrStats.queriesMade ?? 0} CGR queries</span>
+                                              {(cgrStats.cacheHits ?? 0) > 0 && <span className="text-zinc-500">({cgrStats.cacheHits} cached)</span>}
+                                            </div>
+                                          )}
+                                          {outputs?.generated != null && (
+                                            <div className="flex items-center gap-2 text-zinc-400">
+                                              <FileText className="h-3 w-3 text-blue-400" />
+                                              <span>{outputs.generated as number} insight docs generated</span>
+                                              {(outputs.failed as number) > 0 && <span className="text-red-400">({outputs.failed as number} failed)</span>}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })()}
                                     {/* Code Graph Queries (Phase 13) */}
+                                    {(() => {
+                                      const cgrStats = (step as any).outputs?.cgrStats as { queriesMade?: number; cacheHits?: number; available?: boolean } | undefined
+                                      const hasCgrEvents = step.cgrQueryEvents && step.cgrQueryEvents.length > 0
+                                      const hasCgrStats = cgrStats && (cgrStats.queriesMade ?? 0) > 0
+                                      // Only show CGR section if there are actual queries (events or stats)
+                                      if (!hasCgrEvents && !hasCgrStats) return null
+                                      return (
                                     <div className="mt-1">
                                       <div className="flex items-center gap-2 px-2 py-1 text-xs">
                                         <Database className="h-3 w-3 text-purple-400" />
                                         <span className="text-zinc-400 font-medium">Code Graph Queries</span>
-                                        {step.cgrQueryEvents && step.cgrQueryEvents.length > 0 && (
+                                        {hasCgrEvents && (
                                           <span className="text-zinc-500">
-                                            {step.cgrQueryEvents.length} queries
+                                            {step.cgrQueryEvents!.length} queries
                                             {' | '}
-                                            {step.cgrQueryEvents.filter(q => q.cacheHit).length} cached
+                                            {step.cgrQueryEvents!.filter(q => q.cacheHit).length} cached
                                             {' | '}
-                                            {step.cgrQueryEvents.reduce((sum, q) => sum + q.durationMs, 0)}ms total
+                                            {step.cgrQueryEvents!.reduce((sum, q) => sum + q.durationMs, 0)}ms total
+                                          </span>
+                                        )}
+                                        {!hasCgrEvents && hasCgrStats && (
+                                          <span className="text-zinc-500">
+                                            {cgrStats!.queriesMade} queries | {cgrStats!.cacheHits ?? 0} cached
                                           </span>
                                         )}
                                       </div>
-                                      {step.cgrQueryEvents && step.cgrQueryEvents.length > 0 ? (
-                                        step.cgrQueryEvents.map((query) => {
+                                      {hasCgrEvents ? (
+                                        step.cgrQueryEvents!.map((query) => {
                                           const queryNodeId = `${stepId}/cgr-${query.id}`
                                           return (
                                             <CGRQueryRow
@@ -906,10 +953,12 @@ export function TraceModal({
                                         })
                                       ) : (
                                         <div className="text-xs text-zinc-500 italic px-2 py-0.5">
-                                          No CGR queries in this step
+                                          Query details not available (stats only)
                                         </div>
                                       )}
                                     </div>
+                                      )
+                                    })()}
                                     {/* Entity flow detail for persist steps */}
                                     {category === 'persist' && step.entityFlow && (
                                       <div className="px-2 py-1.5 bg-zinc-800/30 rounded text-xs space-y-1">
@@ -987,6 +1036,45 @@ export function TraceModal({
                     <div>{selectedWave.steps.length}</div>
                   </div>
                   <Separator />
+                  {(() => {
+                    // Check if this wave has insight outputs instead of entity flow
+                    const insightStep = selectedWave.steps.find(s => s.name.includes('insight'))
+                    const insightOutputs = (insightStep as any)?.outputs as { generated?: number; failed?: number; skippedDiagrams?: number } | undefined
+                    const hasEntityFlow = selectedWave.entityFlow.produced > 0 || selectedWave.entityFlow.persisted > 0
+                    const hasInsights = insightOutputs?.generated != null && insightOutputs.generated > 0
+
+                    if (hasInsights && !hasEntityFlow) {
+                      return (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Insight Generation</h4>
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="flex flex-col items-center px-3 py-2 bg-blue-500/10 rounded">
+                              <span className="text-lg font-bold text-blue-400">{insightOutputs!.generated}</span>
+                              <span className="text-[10px] text-zinc-500">docs generated</span>
+                            </div>
+                            {(insightOutputs!.failed ?? 0) > 0 && (
+                              <>
+                                <ArrowRight className="h-4 w-4 text-zinc-600" />
+                                <div className="flex flex-col items-center px-3 py-2 bg-red-500/10 rounded">
+                                  <span className="text-lg font-bold text-red-400">{insightOutputs!.failed}</span>
+                                  <span className="text-[10px] text-zinc-500">failed</span>
+                                </div>
+                              </>
+                            )}
+                            {(insightOutputs!.skippedDiagrams ?? 0) > 0 && (
+                              <>
+                                <ArrowRight className="h-4 w-4 text-zinc-600" />
+                                <div className="flex flex-col items-center px-3 py-2 bg-amber-500/10 rounded">
+                                  <span className="text-lg font-bold text-amber-400">{insightOutputs!.skippedDiagrams}</span>
+                                  <span className="text-[10px] text-zinc-500">diagrams skipped</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
                   <div className="space-y-2">
                     <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Entity Flow</h4>
                     <div className="flex items-center gap-2 text-sm">
@@ -1006,6 +1094,8 @@ export function TraceModal({
                       </div>
                     </div>
                   </div>
+                    )
+                  })()}
                   <Separator />
                   <div className="space-y-1">
                     <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Steps</h4>
