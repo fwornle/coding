@@ -1390,6 +1390,7 @@ export function UKBNodeDetailsSidebar({
         )}
 
         {/* Step Execution Details - Always show with available data */}
+        {/* @ts-expect-error Separator component typing */}
         <Separator />
         <div className="space-y-3">
           <h4 className="font-medium text-sm">Execution Details</h4>
@@ -1431,16 +1432,18 @@ export function UKBNodeDetailsSidebar({
             )}
 
             {/* LLM Usage Details - show model by provider and token breakdown */}
-            {stepInfo?.outputs?.llmUsage && (
+            {stepInfo?.outputs?.llmUsage && (() => {
+              const llmUsage = stepInfo.outputs.llmUsage as Record<string, any>
+              return (
               <div className="space-y-1 pt-1 border-t border-dashed mt-1">
                 {/* Combined LLM display: model by provider */}
-                {(stepInfo.outputs.llmUsage.modelsUsed?.length > 0 || stepInfo.outputs.llmUsage.providersUsed?.length > 0) && (
+                {(llmUsage.modelsUsed?.length > 0 || llmUsage.providersUsed?.length > 0) && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">LLM</span>
                     <span className="font-mono text-[10px] text-right max-w-[180px]">
                       {(() => {
-                        const models = stepInfo.outputs.llmUsage.modelsUsed || []
-                        const providers = stepInfo.outputs.llmUsage.providersUsed || []
+                        const models = llmUsage.modelsUsed || []
+                        const providers = llmUsage.providersUsed || []
                         if (models.length > 0 && providers.length > 0) {
                           // Format: model by provider (e.g., "llama-3.3-70b by groq")
                           return models.map((m: string, i: number) =>
@@ -1456,19 +1459,20 @@ export function UKBNodeDetailsSidebar({
                     </span>
                   </div>
                 )}
-                {stepInfo.outputs.llmUsage.totalTokens > 0 && (
+                {llmUsage.totalTokens > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Tokens</span>
                     <span>
-                      <span className="text-green-600">{(stepInfo.outputs.llmUsage.totalPromptTokens || 0).toLocaleString()}</span>
+                      <span className="text-green-600">{(llmUsage.totalPromptTokens || 0).toLocaleString()}</span>
                       <span className="text-muted-foreground mx-0.5">{'->'}</span>
-                      <span className="text-blue-600">{(stepInfo.outputs.llmUsage.totalCompletionTokens || 0).toLocaleString()}</span>
-                      <span className="text-muted-foreground ml-1">({stepInfo.outputs.llmUsage.totalTokens.toLocaleString()} total)</span>
+                      <span className="text-blue-600">{(llmUsage.totalCompletionTokens || 0).toLocaleString()}</span>
+                      <span className="text-muted-foreground ml-1">({llmUsage.totalTokens.toLocaleString()} total)</span>
                     </span>
                   </div>
                 )}
               </div>
-            )}
+              )
+            })()}
 
             {/* Show message if no timing data yet */}
             {!stepInfo?.duration && resolvedStatus === 'completed' && (

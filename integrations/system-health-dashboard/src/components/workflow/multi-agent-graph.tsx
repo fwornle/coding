@@ -1377,6 +1377,7 @@ export function MultiAgentGraph({
               // Wave-analysis doesn't use the state machine, so workflowState may be
               // null or stale. Always prefer legacy process data when available.
               const wsIsCurrent = workflowState &&
+                'workflowId' in workflowState &&
                 workflowState.workflowId === process.workflowName &&
                 workflowState.status !== 'completed' &&
                 workflowState.status !== 'cancelled'

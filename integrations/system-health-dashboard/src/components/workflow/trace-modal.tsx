@@ -403,7 +403,10 @@ export function TraceModal({
   const waveGroups = useMemo((): WaveGroup[] => {
     if (!hasTraceData) return []
 
+    // Track parent step metrics per wave (for accurate totals when sub-steps lack duration)
+    const parentMetrics = new Map<number, { duration: number; llmCalls: number; tokens: number; entityFlow: TraceEntityFlow }>()
     const waveMap = new Map<number, StepInfo[]>()
+
     for (const step of steps) {
       const waveNum = step.wave ?? 0
       if (!waveMap.has(waveNum)) {
@@ -412,8 +415,16 @@ export function TraceModal({
 
       // If the step has subSteps (pipeline stages like analyze, qa, classify, persist),
       // expand them into separate entries for richer trace display.
+      // Keep parent metrics for wave-level totals since sub-steps may lack duration.
       const subSteps = (step as any).subSteps as Array<Record<string, unknown>> | undefined
       if (subSteps && subSteps.length > 0) {
+        // Store parent's aggregate metrics for wave totals
+        parentMetrics.set(waveNum, {
+          duration: step.duration ?? 0,
+          llmCalls: step.llmCalls ?? 0,
+          tokens: step.tokensUsed ?? 0,
+          entityFlow: step.entityFlow ? { ...step.entityFlow } : { produced: 0, passedQA: 0, persisted: 0 },
+        })
         const waveSteps = waveMap.get(waveNum)!
         for (const sub of subSteps) {
           waveSteps.push({
@@ -429,19 +440,31 @@ export function TraceModal({
 
     const groups: WaveGroup[] = []
     for (const [waveNumber, waveSteps] of waveMap) {
+      const parent = parentMetrics.get(waveNumber)
       let totalDuration = 0
       let totalLLMCalls = 0
       let totalTokens = 0
       const entityFlow: TraceEntityFlow = { produced: 0, passedQA: 0, persisted: 0 }
 
-      for (const step of waveSteps) {
-        totalDuration += step.duration ?? 0
-        totalLLMCalls += step.llmCalls ?? 0
-        totalTokens += step.tokensUsed ?? 0
-        if (step.entityFlow) {
-          entityFlow.produced += step.entityFlow.produced
-          entityFlow.passedQA += step.entityFlow.passedQA
-          entityFlow.persisted += step.entityFlow.persisted
+      if (parent) {
+        // Use parent step's aggregate metrics (more accurate when sub-steps lack duration)
+        totalDuration = parent.duration
+        totalLLMCalls = parent.llmCalls
+        totalTokens = parent.tokens
+        entityFlow.produced = parent.entityFlow.produced
+        entityFlow.passedQA = parent.entityFlow.passedQA
+        entityFlow.persisted = parent.entityFlow.persisted
+      } else {
+        // No parent — compute from individual steps
+        for (const step of waveSteps) {
+          totalDuration += step.duration ?? 0
+          totalLLMCalls += step.llmCalls ?? 0
+          totalTokens += step.tokensUsed ?? 0
+          if (step.entityFlow) {
+            entityFlow.produced += step.entityFlow.produced
+            entityFlow.passedQA += step.entityFlow.passedQA
+            entityFlow.persisted += step.entityFlow.persisted
+          }
         }
       }
 
