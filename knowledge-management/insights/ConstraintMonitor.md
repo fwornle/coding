@@ -2,130 +2,121 @@
 
 **Type:** SubComponent
 
-The ConstraintMonitor's enforcement mechanism is designed to be flexible and extensible, allowing for easy modification or replacement of constraint rules without affecting the rest of the system.
+The constraint monitoring system enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
 
 ## What It Is  
 
-`ConstraintMonitor` is the runtime engine that enforces the rule set defined for a **ConstraintSystem**.  It lives inside the `ConstraintSystem` component (the parent) and works hand‑in‑hand with its siblings – `GraphDatabaseAdapter`, `ContentValidator`, `ViolationLogger` and `HookManager` – to keep the model of constraints consistent and to react instantly when a rule is broken.  Although the exact source file is not listed in the observations, the component is clearly part of the same module tree as the `content‑validation‑agent.ts` file that implements the `ContentValidationAgent` used by the parent system.  
+**ConstraintMonitor** is a sub‑component that lives inside the **SemanticAnalysis** stack and is responsible for tracking, reporting, and managing constraint violations that arise during semantic processing. The core of the implementation lives under the `integrations/mcp-constraint-monitor/` directory. Its public documentation is spread across several markdown files:
 
-The monitor builds a **graph‑based representation** of constraints (nodes for individual rules, edges for dependencies) by delegating persistence and query operations to the `GraphDatabaseAdapter`.  It then continuously watches incoming data – supplied by the `ContentValidator` – and, whenever a change is detected, evaluates the graph in real time.  Any violation is handed off to the `ViolationLogger`, which records the event for later analysis or user feedback.  This design gives the system a clear separation between *model* (graph), *validation* (content checks), *enforcement* (monitoring loop) and *recording* (logging).  
+* **Dashboard** – `integrations/mcp-constraint-monitor/dashboard/README.md` describes a UI that visualises constraint violations in real time.  
+* **Claude Code Hook Data Format** – `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` defines the JSON payload structure used when agents emit constraint‑related events.  
+* **Constraint Configuration** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` explains how constraints are declared and loaded.  
+* **Semantic Constraint Detection** – `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` details the detection logic that runs inside the monitoring agents.  
 
-Because the enforcement logic is deliberately **flexible and extensible**, new constraint rules or alternative evaluation strategies can be introduced without touching the core monitor code.  The monitor therefore acts as a thin orchestration layer that coordinates the other sub‑components while remaining agnostic to the concrete rule implementations.
+Together these files describe a **modular, agent‑centric system** that can be extended without touching the core monitor. The component also contains a child entity, **ConstraintConfigurationLoader**, which is the concrete loader that parses the configuration described in the docs.
 
 ---
 
 ## Architecture and Design  
 
-The architecture around `ConstraintMonitor` follows a **modular, graph‑centric orchestration pattern**.  The primary design decisions evident from the observations are:
+The observations repeatedly point to a **modular architecture** built around **agents**. The high‑level README (`integrations/mcp-constraint-monitor/README.md`) states that the monitor “uses a modular architecture, with multiple agents responsible for specific tasks.” Each agent follows a **standardised structure** (the “BaseAgent pattern”) that is also used by sibling components such as the **SemanticAnalysisAgent** (`integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`). This pattern provides a common lifecycle (initialisation → execution → reporting) and a shared interface for emitting events in the Claude Code Hook format.
 
-1. **Graph‑based data model** – The monitor relies on a graph stored via `GraphDatabaseAdapter`.  This choice enables natural representation of constraint dependencies (e.g., “A requires B”) and efficient traversal when evaluating impact of a change.  
+The **ConstraintConfigurationLoader** child component is responsible for ingesting the declarative constraint definitions described in `docs/constraint-configuration.md`. By separating configuration loading from detection, the design isolates I/O concerns from the runtime agents, making it straightforward to swap out the source of constraints (e.g., JSON file, database, remote service) without altering detection logic.
 
-2. **Separation of concerns through sibling services** – `ContentValidator` supplies up‑to‑date entity content, `ViolationLogger` persists breach information, and `HookManager` (though not directly mentioned in the monitor’s description) offers a registration‑based event system that can be used by the monitor to subscribe to relevant lifecycle events (e.g., “entity‑updated”).  Each sibling encapsulates a single responsibility, keeping the monitor’s code focused on orchestration.  
+Interaction flow (derived from the docs):
 
-3. **Extensible enforcement pipeline** – The monitor’s enforcement mechanism is described as “flexible and extensible,” implying the use of strategy‑like abstractions (e.g., a `ConstraintRule` interface) that can be swapped or extended.  This design avoids hard‑coding rule evaluation and supports plug‑in style addition of new constraint types.  
+1. **Configuration Load** – At start‑up, the `ConstraintConfigurationLoader` reads the structured constraint definitions.  
+2. **Detection Agents** – The **Semantic Constraint Detection Agent** (`docs/semantic-constraint-detection.md`) consumes the loaded constraints and analyses incoming semantic payloads (produced by other agents in the SemanticAnalysis pipeline).  
+3. **Event Emission** – When a violation is found, the agent emits a payload that conforms to the **Claude Code Hook Data Format** (`docs/CLAUDE-CODE-HOOK-FORMAT.md`).  
+4. **Dashboard Consumption** – The dashboard component (`dashboard/README.md`) subscribes to those events and renders a live view of violations.
 
-4. **Real‑time monitoring loop** – The monitor is built for immediate detection of violations.  While the exact implementation is not listed, the observation of “real‑time” capability suggests an event‑driven loop, likely driven by `HookManager` notifications or by polling the graph for changes.  
-
-No higher‑level patterns such as microservices or message queues are mentioned, so the architecture remains a **single‑process, component‑based** system where the monitor is a sub‑component of the larger `ConstraintSystem`.
+Because the same BaseAgent pattern is used across the **OntologyClassificationAgent**, **InsightGenerationAgent**, and other sibling agents, the ConstraintMonitor shares a common development contract with its siblings, promoting reuse and reducing cognitive load for developers moving between Pipeline, Ontology, and Insights modules.
 
 ---
 
 ## Implementation Details  
 
-Even though the source symbols are not enumerated, the observations give enough concrete anchors to describe the implementation:
+* **Agent Standardisation** – All agents, including those in ConstraintMonitor, inherit from a base class defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. This base class supplies methods such as `initialize()`, `process(input)`, and `emit(event)`. The **SemanticAnalysisAgent** demonstrates the pattern in practice, and the same scaffold is applied to the constraint detection agent.
 
-* **Graph interaction** – `ConstraintMonitor` delegates all graph persistence and query work to the `GraphDatabaseAdapter`.  The adapter abstracts the underlying triplestore or graph database (e.g., Neo4j, RDF store) and exposes methods such as `addNode`, `addEdge`, and `findAffectedConstraints`.  The monitor builds the constraint graph at startup and updates it whenever the `ContentValidator` reports a change.  
+* **ConstraintConfigurationLoader** – Although the source code is not listed, the documentation (`docs/constraint-configuration.md`) indicates a loader that parses a well‑structured configuration file (likely JSON or YAML). The loader exposes an API like `loadConstraints(): ConstraintSet` that downstream agents query.
 
-* **Validation flow** – When the `ContentValidator` finishes its semantic analysis of an entity, it emits a validation result (likely via a callback or event).  `ConstraintMonitor` consumes this result, maps the affected entities onto graph nodes, and traverses outgoing edges to identify downstream constraints that may now be violated.  
+* **Claude Code Hook Format** – The monitor’s event contract is defined in `docs/CLAUDE-CODE-HOOK-FORMAT.md`. The format includes fields such as `constraintId`, `severity`, `location`, and a human‑readable `message`. Agents serialize violations into this shape before publishing, ensuring that downstream consumers (e.g., the dashboard) have a stable schema.
 
-* **Enforcement engine** – The flexible enforcement mechanism is realized through a set of rule objects (e.g., `BaseConstraintRule` subclasses).  Each rule implements a `evaluate(context)` method that receives the current graph snapshot and the validated content.  Because the monitor only orchestrates, adding a new rule class does not require changes to the monitor itself – it simply registers the new rule with the monitor’s rule registry.  
+* **Dashboard UI** – The dashboard README describes a web‑based view that pulls violation events from a message broker or API endpoint. It visualises each violation with its severity, source location, and a link back to the offending semantic element. The UI is decoupled from the detection logic; it merely consumes the standardized hook payload.
 
-* **Violation logging** – Upon detecting a breach, the monitor creates a `ViolationRecord` (or similar DTO) and passes it to the `ViolationLogger`.  The logger abstracts the persistence target, which could be a relational table, a NoSQL store, or a flat file, as indicated by the observation that it “uses a logging mechanism, such as a database or file‑based log.”  
-
-* **Real‑time detection** – The monitor likely runs inside an event loop that is triggered by the `HookManager`.  The HookManager’s registration‑based approach enables the monitor to subscribe to “entity‑updated” or “graph‑changed” hooks, ensuring that constraint checks happen as soon as new data arrives, satisfying the real‑time requirement.  
-
-Overall, the implementation stitches together a graph backend, a validation front‑end, and a logging back‑end, with the monitor acting as the glue that keeps them synchronized.
+* **Modularity & Extensibility** – Adding a new type of constraint simply requires extending the configuration schema and implementing a new detection routine inside the existing agent framework. No changes to the dashboard or the base agent are necessary, because they rely solely on the Claude Code Hook contract.
 
 ---
 
 ## Integration Points  
 
-`ConstraintMonitor` sits at the nexus of several key integrations:
+* **Parent – SemanticAnalysis** – ConstraintMonitor sits inside the **SemanticAnalysis** component, which orchestrates a suite of agents (OntologyClassificationAgent, SemanticAnalysisAgent, ContentValidationAgent). The monitor receives the same semantic payloads that these agents produce, allowing it to validate constraints against the enriched data.
 
-* **Parent – ConstraintSystem** – The monitor is a child of `ConstraintSystem`, which owns the overall lifecycle of constraints.  The parent provides configuration (e.g., which rule sets are active) and may invoke the monitor’s `start()` and `stop()` methods during system bootstrapping.  
+* **Sibling – Pipeline, Ontology, Insights** – Because all sibling components adopt the BaseAgent pattern, they can emit or consume events using the same Claude Code Hook format. For example, the **InsightGenerationAgent** can generate an insight when a particular constraint violation reaches a critical severity, leveraging the same event bus.
 
-* **Sibling – GraphDatabaseAdapter** – All graph‑related operations flow through this adapter.  The monitor calls methods like `queryConstraintsByEntity(entityId)` and `updateConstraintState(nodeId, state)`.  The adapter abstracts the underlying database, allowing the monitor to remain database‑agnostic.  
+* **Child – ConstraintConfigurationLoader** – The loader is the bridge between static configuration files and the runtime detection agents. It is invoked during system start‑up and may also be refreshed on‑demand (e.g., via a hot‑reload endpoint) to accommodate evolving business rules.
 
-* **Sibling – ContentValidator** – Validation results are the primary input to the monitor.  The validator performs semantic analysis (as described in the `content‑validation‑agent.ts` file) and returns a structured payload that the monitor consumes to locate affected constraints.  
+* **External Interfaces** – The dashboard consumes the violation stream, likely via a WebSocket or REST endpoint defined elsewhere in the system. The Claude Code Hook format serves as the contract for any external consumer that wishes to react to constraint events (e.g., alerting services, audit logs).
 
-* **Sibling – ViolationLogger** – After a rule evaluation fails, the monitor forwards a violation object to this logger.  The logger’s implementation decides whether to write to a file, a database, or an external monitoring service.  
-
-* **Sibling – HookManager** – Although not directly mentioned in the monitor’s description, the HookManager’s registration‑based model is the most plausible mechanism for delivering real‑time events to the monitor.  The monitor registers callbacks for relevant hooks (e.g., `onEntityValidated`, `onGraphMutation`).  
-
-These integration points are all defined through well‑named interfaces (e.g., `IGraphAdapter`, `IValidator`, `IViolationSink`), which keep the monitor loosely coupled and replaceable.
+* **Data Flow** – The overall flow can be visualised as: **SemanticAnalysis agents → ConstraintConfigurationLoader (static rules) → Semantic Constraint Detection Agent → Claude‑formatted event → Dashboard / downstream services**.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Register constraint rules early** – When initializing the `ConstraintSystem`, add all custom `ConstraintRule` implementations to the monitor’s registry before any validation runs.  This guarantees that the real‑time engine sees the full rule set from the first event.  
+1. **Follow the BaseAgent contract** – When creating a new constraint‑related agent, extend the `BaseAgent` class located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. Implement `initialize()`, `process(input)`, and use `emit(event)` to publish violations in the Claude Code Hook format.
 
-2. **Keep the graph in sync** – Any external code that modifies the constraint graph (e.g., administrative tools) must go through the `GraphDatabaseAdapter`.  Direct database writes bypass the monitor’s change detection and can lead to stale enforcement.  
+2. **Declare constraints using the documented schema** – All constraints must be defined according to the structure described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Keep the configuration file version‑controlled and validate it with the `ConstraintConfigurationLoader` before deployment.
 
-3. **Leverage the HookManager for extensions** – If a new component needs to react to constraint violations (e.g., a UI notification service), it should register with `HookManager` for the `violationDetected` hook rather than polling the logger.  This respects the monitor’s event‑driven design.  
+3. **Emit events that conform exactly to the Claude format** – The fields and data types specified in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` are the only ones the dashboard recognises. Missing or extra fields will cause the UI to ignore the event.
 
-4. **Avoid heavyweight validation inside the monitor** – The monitor’s responsibility is orchestration, not deep semantic analysis.  All content checks should be performed by `ContentValidator`; the monitor should only consume the results and trigger rule evaluation.  
+4. **Test detection logic in isolation** – Because the detection agent is decoupled from the dashboard, unit tests should focus on the agent’s `process` method and verify that the emitted payload matches the Claude schema. Integration tests can then verify that the dashboard correctly renders a sample payload.
 
-5. **Configure the ViolationLogger appropriately for the environment** – In development, a file‑based log may be sufficient, while production deployments should point the logger to a durable store (e.g., a relational table) to support audit trails and automated remediation workflows.  
+5. **Leverage existing configuration loading** – Do not re‑implement configuration parsing. Instead, call the public API of `ConstraintConfigurationLoader` to obtain the active constraint set. This ensures consistency across agents and reduces duplication.
 
-Following these conventions ensures that the monitor remains performant, reliable, and easy to extend.
+6. **Consider hot‑reload for rapid iteration** – If the system supports dynamic reloading of constraints, use the loader’s refresh capability rather than restarting the entire monitor. This keeps the dashboard view up‑to‑date with minimal disruption.
 
 ---
 
-### Summary of Requested Items  
+### Summary of Key Architectural Insights  
 
-**1. Architectural patterns identified**  
-* Graph‑based data model (graph persistence & traversal)  
-* Separation of concerns via sibling services (validation, logging, hook management)  
-* Strategy/plug‑in pattern for extensible constraint rules  
-* Event‑driven real‑time monitoring loop (via HookManager)  
+1. **Architectural patterns identified** – Modular agent‑based architecture, BaseAgent standardisation, configuration‑loader pattern, event‑driven communication via Claude Code Hook format.  
 
-**2. Design decisions and trade‑offs**  
-* **Graph vs. relational model** – Chosen for natural representation of constraint dependencies; trade‑off is the need for a graph database and associated query language.  
-* **Loose coupling through adapters** – `GraphDatabaseAdapter` and `ViolationLogger` abstract storage, improving replaceability at the cost of additional indirection layers.  
-* **Extensible rule engine** – Enables rapid addition of new constraints without monitor changes; however, it introduces runtime polymorphism overhead.  
-* **Real‑time event handling** – Provides immediate feedback but requires careful management of hook registration to avoid performance bottlenecks.  
+2. **Design decisions and trade‑offs** – Separation of configuration (loader) from detection improves extensibility but introduces an extra initialization step; using a single event schema simplifies downstream consumption at the cost of requiring strict adherence to the format.  
 
-**3. System structure insights**  
-* `ConstraintSystem` (parent) orchestrates the lifecycle; `ConstraintMonitor` is the enforcement sub‑component.  
-* Siblings each own a distinct cross‑cutting concern: graph persistence, content validation, logging, and hook registration.  
-* No child components are listed; the monitor itself is a leaf node in the component hierarchy.  
+3. **System structure insights** – ConstraintMonitor is a child of SemanticAnalysis, shares the BaseAgent contract with sibling components (Pipeline, Ontology, Insights), and owns a child loader component that bridges static rules to runtime agents.  
 
-**4. Scalability considerations**  
-* The graph database can scale horizontally (sharding, clustering) to handle large numbers of constraints and relationships.  
-* Real‑time monitoring scales with the volume of validation events; using asynchronous hook dispatch and batch evaluation can mitigate contention.  
-* Logging volume may become a bottleneck; configuring the `ViolationLogger` to use a high‑throughput store (e.g., append‑only log service) is advisable for production workloads.  
+4. **Scalability considerations** – Adding new constraint types or detection agents scales horizontally because each agent operates independently and publishes to a common event bus. The dashboard can handle increased event volume as long as the Claude payload remains lightweight.  
 
-**5. Maintainability assessment**  
-* High maintainability thanks to clear separation of responsibilities and well‑defined interfaces.  
-* Extensibility of the rule engine reduces the need for frequent changes to core monitor code.  
-* Dependency on a specific graph database technology introduces a potential maintenance overhead if the underlying store needs to be swapped, but the `GraphDatabaseAdapter` abstracts this risk.  
+5. **Maintainability assessment** – High maintainability due to the standardized BaseAgent pattern, clear documentation of configuration and event formats, and modular separation of concerns. The primary maintenance burden lies in keeping the Claude schema and configuration docs in sync with any schema evolution.
 
-These insights should give developers and architects a solid grounding for working with, extending, and operating the `ConstraintMonitor` within the broader `ConstraintSystem`.
+## Diagrams
+
+### Relationship
+
+![ConstraintMonitor Relationship](images/constraint-monitor-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/constraint-monitor-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's utilization of the ContentValidationAgent, as seen in the content-validation-agent.ts file, allows for the validation of entity content and the detection of stale observations and diagrams. This is a crucial aspect of maintaining the integrity of the codebase data. The ContentValidationAgent's implementation, which involves the use of semantic analysis, enables the ConstraintSystem to make informed decisions about the validity of the data. Furthermore, the integration of the ContentValidationAgent with the ConstraintSystem is an example of a design decision that prioritizes flexibility and maintainability, as it allows for the easy modification or replacement of the validation logic without affecting the rest of the system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is used for classifying observations against the ontology system. This agent follows the BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of this pattern enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
+
+### Children
+- [ConstraintConfigurationLoader](./ConstraintConfigurationLoader.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides guidance on configuring constraints, indicating a structured approach to constraint setup.
 
 ### Siblings
-- [HookManager](./HookManager.md) -- The HookManager uses a registration-based approach to manage hook events, allowing components to register for specific events and receive notifications when those events occur.
-- [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger uses a logging mechanism, such as a database or file-based log, to store constraint violations.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter uses a graph database, such as a triplestore or graph database management system, to store and query graph-based data structures.
-- [ContentValidator](./ContentValidator.md) -- The ContentValidator uses a validation mechanism, such as semantic analysis or data validation rules, to validate entity content.
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline follows a DAG-based execution model, with each step declaring explicit depends_on edges in batch-analysis.yaml.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses a BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts.
+- [Insights](./Insights.md) -- The insight generation system uses a pattern catalog to extract insights, as implemented in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

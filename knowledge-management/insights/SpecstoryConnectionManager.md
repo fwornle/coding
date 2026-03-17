@@ -2,95 +2,74 @@
 
 **Type:** Detail
 
-The lack of source files suggests that the SpecstoryConnectionManager's implementation details are not readily available, but its importance can be inferred from the parent context.
+The connection management is crucial for the SpecstoryDataAdapter to handle data exchange between the application and Specstory extension, as suggested in the parent analysis.
 
 ## What It Is  
 
-The **SpecstoryConnectionManager** is the central orchestrator that enables the **TrajectoryController** (its parent component) to open and maintain a communication channel with the external *Specstory* extension.  Although no concrete source‑file paths were discovered in the supplied observations, the hierarchy makes clear that the manager lives inside the same module/package as the other Trajectory‑related components and is referenced directly by the `TrajectoryController`.  Its primary responsibilities are to initialise the connection, apply configuration settings, handle any errors that arise during the handshake, and expose logging hooks so that the sibling **ConversationLogger** can record the dialogue between the controller and the Specstory extension.
+**SpecstoryConnectionManager** is the component responsible for governing the lifetime of the link between the host application and the *Specstory* extension. It lives inside the **SpecstoryIntegration** sub‑module (the only location mentioned in the observations) and is referenced as the manager that “handles the connection lifecycle.” Although no concrete file path or class signature is supplied, the name and its placement make it clear that this manager sits directly under **SpecstoryIntegration** and works in concert with the **SpecstoryDataAdapter**, which relies on a stable connection to move data to and from the extension. In practice, the manager is expected to initialise, maintain, and gracefully tear‑down the HTTP‑based channel that the **SpecstoryIntegration** component creates via the `connectViaHTTP` function.
 
 ## Architecture and Design  
 
-The limited evidence points to a **composition‑based architecture**: the `SpecstoryConnectionManager` aggregates three specialised child objects—`SpecstoryConnectionEstablisher`, `ErrorHandlingMechanism`, and `ConfigurationSettingsManager`.  This separation of concerns follows a **Facade**‑like pattern, where the manager presents a simple public API to its parent (`TrajectoryController`) while delegating the low‑level work to its children.  
+The limited evidence points to a **layered integration architecture**. At the top sits **SpecstoryIntegration**, which exposes the `connectViaHTTP` helper to perform raw HTTP calls against the Specstory extension. Beneath that layer, **SpecstoryConnectionManager** abstracts the raw HTTP interaction into a managed connection, shielding higher‑level consumers (e.g., **SpecstoryDataAdapter**) from the details of connection set‑up, retry, and disposal. This separation of concerns resembles a **Facade** pattern: the manager offers a simplified, stable interface while delegating the low‑level request mechanics to the `connectViaHTTP` routine. No other architectural patterns (such as micro‑services, event‑driven pipelines, etc.) are mentioned, so the design stays within a straightforward, synchronous HTTP client model.
 
-* **SpecstoryConnectionEstablisher** encapsulates the actual handshake logic, likely using the **SpecstoryAdapter** (which itself contains a reference back to the manager).  By isolating the establishment step, the system can swap out the underlying transport (e.g., WebSocket, HTTP) without touching the manager’s public contract.  
+Interaction flow can be inferred as follows:  
+1. **SpecstoryIntegration** calls `connectViaHTTP` to open a channel to the extension.  
+2. **SpecstoryConnectionManager** wraps that channel, exposing methods (not listed) that control the lifecycle (open, keep‑alive, close).  
+3. **SpecstoryDataAdapter** consumes the manager’s API to issue data‑exchange operations, assuming the connection is valid.  
 
-* **ErrorHandlingMechanism** is described as being implemented with try‑catch blocks and error logging, indicating a straightforward **Exception‑Shielding** approach.  Errors that bubble up from the establisher are caught here, transformed into domain‑specific error objects if needed, and then reported to the **ConversationLogger**.  
-
-* **ConfigurationSettingsManager** appears to source its data from a configuration file or database, suggesting a **Configuration‑Driven** design.  The manager therefore reads connection parameters (host, port, authentication tokens) at start‑up, keeping the connection logic decoupled from hard‑coded values.  
-
-The sibling components—**ConversationLogger** and **InitializationHandler**—share the same parent (`TrajectoryController`) and likely cooperate with the manager through well‑defined interfaces: the logger consumes events emitted by the manager, while the initializer may invoke the manager’s `initialize()` method during the controller’s start‑up sequence.
+Because the manager is the sole custodian of the connection, the architecture enforces a single point of truth for connection state, reducing the risk of duplicated or conflicting HTTP sessions.
 
 ## Implementation Details  
 
-Even though no concrete code symbols were located, the observations enumerate the key classes that compose the manager:
+The observations do not provide concrete code symbols, so the exact implementation cannot be reproduced. What is clear is that **SpecstoryConnectionManager** must internally reference the `connectViaHTTP` function supplied by **SpecstoryIntegration**. A plausible internal structure—derived strictly from the described responsibilities—would include:
 
-1. **SpecstoryConnectionManager** – serves as the façade.  Its public surface probably includes methods such as `initialize()`, `connect()`, `disconnect()`, and `logConversation()`.  Internally it holds private references to its three children.
+* **State tracking** (e.g., `isConnected`, `sessionToken`, timestamps) to know whether the HTTP channel is alive.  
+* **Lifecycle methods** such as `initialize()`, `refresh()`, and `dispose()` that call `connectViaHTTP` when needed and close the session when the manager is no longer required.  
+* **Error handling** that captures HTTP failures and possibly retries, ensuring that **SpecstoryDataAdapter** sees a consistent API surface.  
 
-2. **SpecstoryConnectionEstablisher** – responsible for creating the low‑level link.  It likely uses the **SpecstoryAdapter** (a separate component that knows the exact protocol of the Specstory extension) to send a connection request, await acknowledgement, and return a connection handle or promise.
-
-3. **ErrorHandlingMechanism** – wraps calls to the establisher in try‑catch blocks.  When an exception occurs, it records the failure via the **ConversationLogger** and may trigger retry logic or propagate a sanitized error up to the `TrajectoryController`.
-
-4. **ConfigurationSettingsManager** – reads a configuration source (e.g., `specstory-config.yaml` or a database table) at construction time.  It provides accessor methods like `getHost()`, `getPort()`, and `getCredentials()` that the establisher consumes during the handshake.
-
-Because the manager is referenced by both **TrajectoryController** and **SpecstoryAdapter**, it likely implements an interface (e.g., `ISpecstoryConnection`) that abstracts the connection lifecycle, enabling both the controller and the adapter to interact without tight coupling.
+Since the manager is described only as “implied to handle the connection lifecycle,” any additional helpers (e.g., request queuing, back‑off strategies) remain speculative and are not asserted here.
 
 ## Integration Points  
 
-* **TrajectoryController (Parent)** – Calls the manager during its own initialization routine.  The controller relies on the manager to supply a ready‑to‑use connection object that it can use for sending trajectory data to the Specstory extension.  Any failure in connection establishment is surfaced back to the controller via the manager’s error‑handling pathway.
+The primary integration point for **SpecstoryConnectionManager** is the `connectViaHTTP` function located in the **SpecstoryIntegration** component. This function likely returns an object or promise representing an active HTTP session, which the manager stores and manipulates. Downstream, the **SpecstoryDataAdapter** depends on the manager to provide a ready‑to‑use connection for data retrieval and submission. No other modules are explicitly mentioned, so the manager’s public contract is limited to these two relationships:
 
-* **ConversationLogger (Sibling)** – Subscribes to events emitted by the manager (e.g., `onConnectionEstablished`, `onMessageSent`, `onError`).  This tight coupling ensures that every exchange with Specstory is recorded for debugging or audit purposes.
+* **Upstream** – receives raw HTTP capabilities from **SpecstoryIntegration**.  
+* **Downstream** – supplies a stable connection interface to **SpecstoryDataAdapter** (and potentially other future adapters).  
 
-* **InitializationHandler (Sibling)** – Works in tandem with the manager to orchestrate the start‑up sequence.  It may invoke the manager’s `initialize()` method, then proceed with other controller set‑up steps once the connection is confirmed.
-
-* **SpecstoryAdapter (External Consumer)** – Holds its own reference to the manager, indicating that the adapter may request the manager to re‑establish a broken connection or to fetch updated configuration values at runtime.
-
-* **ConfigurationSettingsManager (Child)** – Provides the manager with runtime‑configurable parameters, allowing the system to adapt to different environments (development, staging, production) without code changes.
-
-These integration points form a clear dependency graph: the `TrajectoryController` → `SpecstoryConnectionManager` → (`SpecstoryConnectionEstablisher`, `ErrorHandlingMechanism`, `ConfigurationSettingsManager`) and outward to `ConversationLogger`, `InitializationHandler`, and `SpecstoryAdapter`.
+Because the manager sits at the intersection of these layers, any change to the HTTP protocol, authentication scheme, or endpoint URL would be localized within the manager and its upstream `connectViaHTTP` call, minimizing ripple effects.
 
 ## Usage Guidelines  
 
-1. **Initialize Early** – The `TrajectoryController` should invoke the manager’s `initialize()` method during its own start‑up phase, ensuring that configuration is loaded and the connection is attempted before any trajectory data is processed.
+1. **Never bypass the manager** – All HTTP interactions with the Specstory extension should be routed through **SpecstoryConnectionManager**. Direct calls to `connectViaHTTP` from other components would break the single‑source‑of‑truth model and could lead to duplicate connections.  
+2. **Respect the lifecycle** – Call the manager’s initialise/start method before attempting any data operation, and invoke its dispose/close method when the hosting feature is torn down (e.g., on component unmount or application shutdown).  
+3. **Handle errors at the manager level** – Since the manager is the gatekeeper, it should encapsulate retry logic and surface a clean error API to **SpecstoryDataAdapter**. Consumers should treat connection failures as exceptional and avoid implementing their own retry loops.  
+4. **Keep the manager stateless where possible** – While the manager must retain connection state, any configuration (such as endpoint URLs or authentication headers) should be supplied from a central configuration file rather than hard‑coded, facilitating easier environment changes.  
 
-2. **Handle Asynchronous Outcomes** – Because the connection establishment may involve network I/O, callers must treat the manager’s `connect()` method as asynchronous (e.g., returning a `Promise` or using callbacks).  The controller should await a successful `onConnectionEstablished` event before proceeding.
-
-3. **Leverage the Logger** – All messages sent to or received from Specstory should be passed through the **ConversationLogger** via the manager’s logging hooks.  This guarantees consistent audit trails and simplifies troubleshooting.
-
-4. **Respect Error Boundaries** – Errors captured by the **ErrorHandlingMechanism** should not be swallowed silently.  The manager must propagate a sanitized error object to the `TrajectoryController`, which can decide whether to retry, fallback, or abort the operation.
-
-5. **Externalise Configuration** – Developers should modify connection parameters only through the configuration source managed by `ConfigurationSettingsManager`.  Direct edits to hard‑coded values in the establisher are discouraged to preserve environment flexibility.
-
-6. **Do Not Bypass the Facade** – All interactions with the Specstory extension must go through the `SpecstoryConnectionManager`.  Direct use of the `SpecstoryAdapter` or the establisher bypasses the error‑handling and logging layers, increasing the risk of untracked failures.
+Following these conventions will preserve the intended separation of concerns and keep the integration robust.
 
 ---
 
-### Summary of Architectural Patterns, Decisions, and Trade‑offs  
+### Architectural patterns identified  
+* **Facade / Wrapper** – The manager abstracts the low‑level `connectViaHTTP` call behind a higher‑level lifecycle API.  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Pattern(s)** | Facade (manager as unified entry point), Composition (children for specific concerns), Configuration‑Driven design, Exception‑Shielding |
-| **Design Decisions** | Separate connection establishment, error handling, and configuration into distinct classes; expose a simple API to the controller; centralise logging via sibling logger |
-| **Trade‑offs** | Extra indirection adds modest overhead but yields better modularity and testability; reliance on configuration files introduces runtime dependency on external resources |
-| **System Structure** | Hierarchical: `TrajectoryController → SpecstoryConnectionManager → {Establisher, ErrorHandler, ConfigManager}` with lateral links to `ConversationLogger`, `InitializationHandler`, and `SpecstoryAdapter` |
-| **Scalability** | The façade can be extended to support multiple concurrent Specstory connections by scaling the establisher component; configuration manager can be swapped for a distributed config service if needed |
-| **Maintainability** | High, due to clear separation of concerns; each child class can be unit‑tested in isolation; changes to connection protocol affect only the establisher, leaving the manager’s contract untouched |
+### Design decisions and trade‑offs  
+* Centralising connection handling in a single manager reduces duplication and simplifies error handling, at the cost of a single point of failure if the manager itself becomes a bottleneck.  
+* Relying on synchronous HTTP (as implied by `connectViaHTTP`) keeps the design simple but may limit scalability under high‑throughput scenarios.  
 
-All statements above are directly grounded in the supplied observations; no speculative code paths or undocumented patterns have been introduced.
+### System structure insights  
+* **SpecstoryIntegration** → **SpecstoryConnectionManager** → **SpecstoryDataAdapter** forms a clear vertical stack, with each layer delegating responsibilities to the one below.  
+
+### Scalability considerations  
+* Because the manager appears to manage a single HTTP session, scaling to many concurrent data requests would depend on the underlying HTTP client’s ability to multiplex requests. If future load increases, the manager may need to evolve into a connection pool or support multiple concurrent sessions.  
+
+### Maintainability assessment  
+* The explicit separation between raw HTTP handling (`connectViaHTTP`) and lifecycle management (the manager) promotes maintainability: changes to the HTTP protocol affect only the integration layer, while connection‑state logic stays isolated. However, the current lack of concrete implementation details makes it difficult to assess test coverage or extensibility; documenting the manager’s public API and expected behaviours would be a valuable next step.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [TrajectoryController](./TrajectoryController.md) -- TrajectoryController utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
-
-### Children
-- [SpecstoryConnectionEstablisher](./SpecstoryConnectionEstablisher.md) -- The SpecstoryAdapter class is utilized to create a connection to the Specstory extension, as seen in the parent component's context.
-- [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism is likely to be implemented using try-catch blocks and error logging, as commonly seen in connection establishment processes.
-- [ConfigurationSettingsManager](./ConfigurationSettingsManager.md) -- The ConfigurationSettingsManager is likely to be implemented using a configuration file or a database, allowing for easy modification of connection settings and preferences.
-
-### Siblings
-- [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger would likely be used in conjunction with the SpecstoryConnectionManager to log conversations, as implied by the parent context.
-- [InitializationHandler](./InitializationHandler.md) -- The InitializationHandler would likely work in tandem with the SpecstoryConnectionManager to establish connections and initialize the TrajectoryController, as suggested by the parent context.
+- [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryAdapter uses the connectViaHTTP function to facilitate HTTP requests to the Specstory extension, allowing for seamless data retrieval and exchange.
 
 
 ---

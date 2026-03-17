@@ -2,101 +2,136 @@
 
 **Type:** SubComponent
 
-The DashboardService provides a standardized interface for dashboard operations, allowing for easier extension and management of dashboard-related functionality.
+The DashboardService provides a key component for the ServiceOrchestrator, enabling robust service management.
 
 ## What It Is  
 
-The **DashboardService** is a sub‑component that lives inside the `DockerizedServices` family of containers. Its concrete entry point is the script **`scripts/dashboard-service.js`**, which is invoked when the dashboard container starts. From this script the service boots its runtime, registers itself with the surrounding ecosystem, and exposes a standardized interface for all dashboard‑related operations (e.g., rendering widgets, serving static assets, handling UI‑API calls).  
-
-Internally the service leans on the **`lib/service-starter.js`** helper to guarantee a reliable launch sequence—this helper supplies retry logic, timeout handling, and health‑check verification. Where the dashboard needs language‑model capabilities it can call into the **`LLMServiceManager`**, which in turn may use the **`lib/llm/llm-service.ts`** implementation. For process‑level concerns (e.g., spawning child workers) the service can enlist the **`ProcessManagementService`**, which manages state through the **`ProcessStateManager`**.  
-
-Thus, DashboardService is a thin orchestration layer that ties together a start‑up harness, optional LLM functionality, and process management, all while being packaged as its own Docker container under the broader micro‑service‑oriented `DockerizedServices` component.
+**DashboardService** is the concrete implementation that “wraps and manages the dashboard” for the application. The primary entry point for this sub‑component lives in the file **`dashboard-service.js`**, which is located alongside its sibling service scripts (e.g., `api-service.js`) under the **DockerizedServices** container‑oriented codebase.  The service is a **SubComponent** of the larger **DockerizedServices** parent, and it is consumed directly by the **ServiceOrchestrator** to enable coordinated deployment and runtime management of the dashboard UI.  In practice, DashboardService acts as the façade through which the orchestrator, and ultimately the end‑user, interact with the visual monitoring layer of the system.
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture follows a **container‑per‑service** model, explicitly described in the parent `DockerizedServices` component. Each service—including DashboardService—has its own start‑up script (`scripts/dashboard-service.js`) and relies on a shared **ServiceStarter** utility (`lib/service-starter.js`). This utility embodies a **robust start‑up pattern**: it encapsulates retry loops, configurable timeouts, and health‑check callbacks, ensuring that a container only reports “ready” when the underlying process is truly operational.  
+The observations reveal a **modular, service‑oriented architecture** built around explicit separation of concerns. Each logical capability (API, dashboard, LLM operations) is packaged as an independent script that can be started, stopped, and monitored in isolation. The **DockerizedServices** parent component reinforces this modularity by containerising each sub‑component, allowing them to run as distinct Docker processes while sharing a common orchestration surface.
 
-DashboardService adopts a **facade pattern** for its public API. By exposing a “standardized interface for dashboard operations,” the component hides the underlying complexity (LLM calls, child‑process spawning) behind a clean contract that other parts of the system can consume without needing to know implementation specifics.  
+Two architectural patterns surface clearly:
 
-The optional coupling to **LLMServiceManager** demonstrates a **service‑to‑service dependency** rather than a direct library import. DashboardService does not embed LLM logic itself; instead it delegates to the manager, which in turn may instantiate the **`lib/llm/llm-service.ts`** class. This separation respects the **single‑responsibility principle**, allowing LLM concerns (mode routing, caching, circuit‑breaking) to evolve independently.  
+1. **Service Wrapper / Facade Pattern** – `dashboard-service.js` functions as a thin wrapper around the underlying dashboard implementation. It abstracts the startup, health‑checking, and shutdown mechanics, presenting a uniform interface to the orchestrator and other consumers.
 
-Interaction with **ProcessManagementService** follows a **coordinator pattern**: DashboardService registers its child processes with the ProcessStateManager, centralizing lifecycle tracking and enabling graceful shutdowns or restarts. The sibling components—`APIService`, `LLMServiceManager`, and `ProcessManagementService`—all share the same ServiceStarter and, where needed, the same LLM service implementation, reinforcing consistency across the Dockerized suite.
+2. **Orchestrator Pattern** – The **ServiceOrchestrator** sits above the individual services, invoking them, handling retries, and managing lifecycle events. DashboardService’s role as a “key component for the ServiceOrchestrator” shows that the orchestrator treats each wrapper script as a plug‑in that implements a common contract (e.g., start, stop, status).
+
+Communication between services is achieved through **well‑defined interfaces and sub‑components**. Although the concrete interface definitions are not listed, the wording “ensures efficient communication … using interfaces and sub‑components” indicates that each service publishes an API (likely HTTP or IPC) that the orchestrator or other services can call without needing to know internal details.  
+
+The **LLMService** class (`lib/llm/llm-service.ts`) is another shared sub‑component. DashboardService *utilizes* LLMService for “high‑level operations,” suggesting a dependency injection or service‑lookup mechanism where the dashboard can request LLM‑driven capabilities (e.g., natural‑language query handling, mode routing) without embedding LLM logic directly.
 
 ---
 
 ## Implementation Details  
 
-1. **Entry Point – `scripts/dashboard-service.js`**  
-   This script is the first piece of code executed inside the dashboard container. It typically imports the ServiceStarter, constructs a configuration object (port, env variables, health‑check URL), and invokes `ServiceStarter.start()` with a callback that boots the actual dashboard logic. Because the observation notes “providing a clear entry point for dashboard‑related functionality,” the script likely also wires up any required middleware (e.g., Express) and registers routes that constitute the public dashboard API.
+- **Entry Script – `dashboard-service.js`**  
+  This script is the only concrete artifact referenced for DashboardService. Its responsibilities include:  
+  * Launching the dashboard process (likely a Node/Express or static‑asset server).  
+  * Registering the service with the **ServiceOrchestrator** (e.g., exposing a health‑check endpoint or sending a “ready” signal).  
+  * Wiring up any required middleware that forwards requests to the **LLMService** for advanced handling.  
 
-2. **Robust Startup – `lib/service-starter.js`**  
-   The ServiceStarter module exports a `start` function that accepts three key parameters: a start‑up routine, a retry policy, and a health‑check function. Its implementation loops until either the start routine resolves successfully or the retry limit is hit, applying a timeout between attempts. After a successful launch it repeatedly polls the health‑check endpoint (often an HTTP `/health` route) until the service reports “healthy,” at which point it signals readiness to Docker (e.g., via `process.exit(0)` or a Docker health‑check file).
+- **Dependency on LLMService (`lib/llm/llm-service.ts`)**  
+  DashboardService calls into the `LLMService` class to perform “high‑level operations.” In the broader DockerizedServices context, LLMService provides mode routing, caching, and circuit‑breaking. DashboardService likely leverages these capabilities to:  
+  * Route user‑initiated queries to the appropriate LLM mode (e.g., chat vs. summarisation).  
+  * Cache expensive LLM responses that populate the dashboard, reducing latency.  
+  * Apply circuit‑breaking to keep the UI responsive if the LLM backend becomes unhealthy.  
 
-3. **LLM Integration – `lib/llm/llm-service.ts`** (via `LLMServiceManager`)  
-   When dashboard features need generative text or reasoning (e.g., auto‑generated reports), the service calls the `LLMServiceManager`. The manager abstracts the underlying `LLMService` class, which implements mode routing (choosing between chat, completion, embeddings), caching of recent requests, and circuit‑breaking to protect against downstream LLM outages. DashboardService does not instantiate `LLMService` directly; it sends a request object to the manager, which returns a promise resolved with the LLM response.
+- **Interaction with ServiceOrchestrator**  
+  The orchestrator treats DashboardService as a managed unit. Typical interactions include:  
+  * **Start** – The orchestrator invokes the script (possibly via `service-starter.js`, which handles retries and graceful degradation).  
+  * **Health Check** – Periodic pings to a status endpoint exposed by `dashboard-service.js`.  
+  * **Shutdown** – Coordinated termination to ensure the dashboard releases resources cleanly.  
 
-4. **Process Coordination – `ProcessManagementService` / `ProcessStateManager`**  
-   For workloads that require background workers (e.g., data aggregation, periodic refreshes), DashboardService registers each spawned child process with the ProcessStateManager. The manager maintains a map of process IDs to state (running, stopped, restarting) and exposes methods to query or terminate processes. This centralization enables the Docker container to cleanly shut down all children when a SIGTERM is received, preserving data integrity.
-
-5. **Standardized Interface**  
-   Although the concrete method signatures are not listed, the observation that DashboardService “provides a standardized interface for dashboard operations” suggests the existence of an exported object (or class) with methods such as `loadWidget(id)`, `refreshDashboard()`, and `exportReport(format)`. These methods internally coordinate the LLM calls and process management as needed, presenting a uniform API to callers (e.g., APIService or front‑end clients).
+Because no explicit functions or classes are listed inside `dashboard-service.js`, the implementation is likely lightweight, delegating most operational logic to shared utilities (e.g., the generic `service-starter.js` script) and to the LLMService library.
 
 ---
 
 ## Integration Points  
 
-- **Parent – DockerizedServices**: DashboardService is packaged as its own Docker container, inheriting the same container orchestration conventions (environment variables, health‑check semantics) as its siblings. The parent’s micro‑service stance means that scaling, networking, and logging are handled uniformly across all services.  
+1. **Parent – DockerizedServices**  
+   DashboardService lives inside the DockerizedServices container ecosystem. It benefits from the parent’s “modular design” and the generic startup script (`service-starter.js`) that provides retry, timeout, and graceful degradation mechanisms. This ensures the dashboard can be deployed, scaled, and isolated just like its siblings.
 
-- **Sibling – LLMServiceManager**: When dashboard features require language‑model assistance, DashboardService invokes the manager’s public methods. This dependency is loosely coupled; the dashboard only needs to know the manager’s contract, not the internal `LLMService` implementation.  
+2. **Sibling – APIService (`api-service.js`)**  
+   Both DashboardService and APIService are managed by the same orchestrator and share the same container‑level conventions. While APIService wraps the constraint‑monitoring API server, DashboardService wraps the UI. They likely communicate via HTTP calls: the dashboard may query the APIService for monitoring data, and both may rely on LLMService for enriched responses.
 
-- **Sibling – ProcessManagementService**: Child process lifecycle is delegated to this service. DashboardService calls into the manager to register new workers, query their status, or request graceful termination. The ProcessStateManager acts as the single source of truth for process health across the entire Dockerized suite.  
+3. **Sibling – LLMService (`lib/llm/llm-service.ts`)**  
+   DashboardService directly consumes LLMService for advanced operations. This creates a **dependency edge** where any change in LLMService’s contract (e.g., method signatures for mode routing) must be reflected in the dashboard wrapper.
 
-- **Sibling – APIService**: While APIService runs its own container (`scripts/api-service.js`), it may consume the dashboard’s standardized interface (e.g., to serve dashboard data through REST endpoints). Conversely, DashboardService might call APIService for authentication or shared configuration data, though such a call is not explicitly observed.  
+4. **Consumer – ServiceOrchestrator**  
+   The orchestrator is the primary integration point. It discovers DashboardService, triggers its lifecycle events, and monitors its health. The orchestrator also mediates any cross‑service communication, ensuring that the dashboard can safely call the APIService or LLMService without tight coupling.
 
-- **Shared Utilities – ServiceStarter**: All three services (Dashboard, API, potentially others) rely on the same start‑up harness, ensuring consistent behavior for retries, timeouts, and health verification.  
-
-These integration points form a tightly knit but modular ecosystem: each service owns its runtime, yet they collaborate through well‑defined managers and shared utilities.
+5. **Runtime – Docker / Container Layer**  
+   Because DockerizedServices encapsulates each sub‑component in its own container, DashboardService’s runtime environment includes the Docker runtime, network namespace, and any environment variables injected by the orchestrator (e.g., service URLs, credentials).
 
 ---
 
 ## Usage Guidelines  
 
-1. **Start the Service via Docker** – Deploy the dashboard container using the Docker compose or orchestration definition that references `scripts/dashboard-service.js`. Do not invoke the script manually outside the container unless you replicate the environment variables and health‑check expectations that ServiceStarter relies on.  
+- **Start via the Orchestrator** – Developers should never invoke `dashboard-service.js` directly in production. Instead, register the service with **ServiceOrchestrator** (or use the provided `service-starter.js` helper) so that retries, timeouts, and graceful shutdown are applied consistently across all services.
 
-2. **Leverage the Standard Interface** – Consume only the exported dashboard API (e.g., `loadWidget`, `refreshDashboard`). Avoid reaching into internal modules such as `lib/llm/llm-service.ts` directly; instead, request LLM work through `LLMServiceManager` to benefit from caching and circuit‑breaking.  
+- **Respect the Interface Contract** – When extending DashboardService, adhere to the same start/stop/health‑check signatures used by its siblings. This ensures the orchestrator can manage it without custom code.
 
-3. **Respect Retry and Health Policies** – When configuring custom health‑check endpoints, ensure they return a 200 status only after all internal subsystems (LLM client, child workers) are fully initialized. Modifying the retry count or timeout in `ServiceStarter` should be done with caution, as overly aggressive settings can mask genuine start‑up failures.  
+- **Leverage LLMService for Advanced Logic** – Any feature that requires natural‑language processing, caching, or circuit‑breaking should be delegated to `LLMService`. Directly embedding LLM calls inside the dashboard wrapper would break the separation of concerns and increase maintenance overhead.
 
-4. **Register Child Processes Properly** – Any background worker spawned by DashboardService must be registered with `ProcessManagementService` immediately after creation. This guarantees that shutdown signals propagate correctly and that the ProcessStateManager can report accurate status to monitoring tools.  
+- **Keep the Wrapper Thin** – The purpose of `dashboard-service.js` is orchestration, not business logic. Business rules, data transformations, or UI rendering should remain in the dashboard application itself or in dedicated libraries, not in the wrapper script.
 
-5. **Monitor Dependencies** – Because DashboardService may depend on LLMServiceManager and ProcessManagementService, health dashboards should aggregate the health of these downstream services. A degraded LLM endpoint should be reflected in the dashboard’s own health status, leveraging the circuit‑breaker logic in `LLMService`.  
+- **Monitor Health Endpoints** – Implement (or verify the existence of) a lightweight health‑check endpoint that returns a simple “OK” when the dashboard process is responsive. The orchestrator relies on this to decide whether to restart or scale the service.
 
-Following these conventions preserves the reliability guarantees baked into the ServiceStarter pattern and maintains the clean separation of concerns that the architecture enforces.
+- **Container Configuration** – When defining the Docker image for DashboardService, inherit the base image and environment conventions used by other services in DockerizedServices. This includes exposing the correct port, mounting any required static assets, and propagating configuration (e.g., LLMService endpoint URLs) via environment variables.
 
 ---
 
-### Summary of Key Architectural Insights  
+### Architectural Patterns Identified  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns** | Container‑per‑service, robust start‑up (ServiceStarter), facade for dashboard API, service‑to‑service delegation (LLMServiceManager), coordinator for child processes (ProcessManagementService). |
-| **Design decisions & trade‑offs** | Explicit entry script (`dashboard-service.js`) gives clear launch semantics; central ServiceStarter reduces duplicated start‑up code but introduces a shared failure mode if the helper misbehaves; delegating LLM work to a manager isolates heavy external calls but adds an extra network hop; process registration centralizes shutdown logic at the cost of tighter coupling to ProcessManagementService. |
-| **System structure** | DashboardService sits under `DockerizedServices`, alongside APIService and LLMServiceManager, all sharing `lib/service-starter.js`. Optional LLM functionality lives in `lib/llm/llm-service.ts`. Process coordination is handled by `ProcessStateManager`. |
-| **Scalability considerations** | Because each service runs in its own container, horizontal scaling is straightforward (run multiple dashboard containers behind a load balancer). The ServiceStarter’s health‑check ensures new instances only join the pool when fully ready. LLM calls are cached and circuit‑broken, mitigating downstream bottlenecks. ProcessManagementService must be aware of increased worker counts when scaling. |
-| **Maintainability assessment** | High maintainability: shared utilities (ServiceStarter, LLMService) reduce duplication; clear separation of concerns (dashboard façade, LLM manager, process manager) limits the impact of changes. The only risk is the tight coupling to the manager services; any API change in LLMServiceManager or ProcessManagementService will require coordinated updates in DashboardService. Overall, the design promotes easy onboarding of new developers and straightforward testing of each isolated piece. |
+| Pattern | Evidence |
+|---------|----------|
+| **Modular Service Wrapper** | `dashboard-service.js` “wraps and manages the dashboard.” |
+| **Orchestrator (Coordinator)** | ServiceOrchestrator “utilizes” DashboardService for deployment and management. |
+| **Facade / Interface Layer** | Communication “using interfaces and sub‑components.” |
+| **Dependency Injection / Shared Service** | DashboardService “utilizes the LLMService class for high‑level operations.” |
+| **Container‑Based Isolation** | DashboardService is a child of **DockerizedServices**, which “utilizes a modular design… enabling efficient and isolated service deployment.” |
+
+### Design Decisions & Trade‑offs  
+
+- **Isolation via Docker** – Guarantees that failures in the dashboard do not affect the API or LLM services, but adds container orchestration overhead and requires careful network configuration.  
+- **Thin Wrapper vs. Embedded Logic** – Keeps the wrapper simple and maintainable; however, any change to the underlying dashboard may require updates to the wrapper’s health‑check or startup logic.  
+- **Centralised LLMService** – Promotes reuse of caching, mode routing, and circuit‑breaking, but creates a single point of failure; the dashboard must handle LLMService unavailability gracefully.  
+- **Orchestrator‑Centric Lifecycle** – Uniform management across services improves operational consistency, yet developers must learn the orchestrator’s contract to add new services correctly.
+
+### System Structure Insights  
+
+- **Parent‑Child Hierarchy** – DockerizedServices (parent) → DashboardService (child). The parent supplies container‑level conventions; the child implements the dashboard façade.  
+- **Sibling Symmetry** – DashboardService, APIService, and LLMService share the same orchestration model, enabling interchangeable scaling and deployment strategies.  
+- **Service‑Oriented Communication** – All interactions happen through defined interfaces; no direct code coupling is observed between DashboardService and its siblings.
+
+### Scalability Considerations  
+
+- Because each service runs in its own Docker container, DashboardService can be **scaled horizontally** by launching additional instances behind a load balancer, with the ServiceOrchestrator handling registration and health monitoring.  
+- The reliance on **LLMService** for caching and circuit‑breaking helps mitigate load spikes on the LLM backend, preserving dashboard responsiveness under high query volume.  
+- Network latency between containers must be monitored; excessive cross‑service calls (e.g., dashboard → API → LLM) could become a bottleneck if not properly cached.
+
+### Maintainability Assessment  
+
+- **High** – The clear separation of concerns (wrapper vs. business logic) and the use of a shared orchestrator reduce the cognitive load when modifying any single service.  
+- **Consistent Conventions** – Using the same `service-starter.js` script across services ensures uniform error handling and startup semantics.  
+- **Potential Risk Areas** – Changes to the LLMService API or to the orchestrator’s contract ripple to DashboardService; careful versioning and integration testing are required.  
+
+Overall, DashboardService exemplifies a well‑structured, container‑native sub‑component that leverages a common orchestration layer and shared high‑level services to deliver a maintainable and scalable dashboard capability within the DockerizedServices ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component leverages a microservices architecture, where each service runs in its own container, providing flexibility, scalability, and ease of deployment. This is evident in the use of separate scripts for starting the API service (scripts/api-service.js) and the dashboard service (scripts/dashboard-service.js). The ServiceStarter script (lib/service-starter.js) is used for robust service startup with retry, timeout, and health verification, ensuring that services are properly initialized and registered. The LLMService class (lib/llm/llm-service.ts) handles high-level LLM operations, including mode routing, caching, and circuit breaking, which helps in managing the complexity of LLM-related tasks.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a modular design, incorporating multiple sub-components and interfaces to facilitate communication between different services. This is evident in the use of the LLMService class (lib/llm/llm-service.ts) for high-level LLM operations, including mode routing, caching, and circuit breaking. The service-starter.js script is also employed for robust service startup with retry, timeout, and graceful degradation mechanisms. This design decision enables efficient and isolated service deployment, while also allowing for easier maintenance and updates. For instance, the api-service.js and dashboard-service.js scripts wrap and manage the constraint monitoring API server and dashboard, respectively, demonstrating a clear separation of concerns.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager leverages the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking for LLM-related tasks.
-- [ProcessManagementService](./ProcessManagementService.md) -- ProcessManagementService utilizes the ProcessStateManager to manage child processes, providing a centralized point for process management.
-- [APIService](./APIService.md) -- APIService uses the scripts/api-service.js file to start the API service, providing a clear entry point for API-related functionality.
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator utilizes the LLMService class (lib/llm/llm-service.ts) for mode routing, caching, and circuit breaking.
+- [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) provides a modular design, incorporating multiple sub-components and interfaces.
+- [APIService](./APIService.md) -- The api-service.js script wraps and manages the constraint monitoring API server.
 
 
 ---

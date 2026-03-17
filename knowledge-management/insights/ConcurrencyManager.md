@@ -2,145 +2,132 @@
 
 **Type:** SubComponent
 
-ConcurrencyManager.useLockStriping() employs lock striping to reduce contention between threads
+The ConcurrencyManager may utilize environment variables, such as CODE_GRAPH_RAG_SSE_PORT, to establish connections with concurrent tasks.
 
 ## What It Is  
 
-**ConcurrencyManager** is a sub‑component of the **SemanticAnalysis** system that orchestrates how work is performed in parallel. All of its capabilities are exposed through a set of clearly‑named methods that describe the concrete technique being applied:
+The **ConcurrencyManager** is a sub‑component of the **Trajectory** component.  Although the source tree does not list a concrete file for the manager (the “Code Structure” section reports *0 code symbols found*), the surrounding documentation makes clear that its purpose is to **optimise task execution and ensure efficient, reliable processing of large numbers of concurrent operations**.  It is mentioned alongside environment variables such as `CODE_GRAPH_RAG_SSE_PORT`, the Graphology library, and a work‑stealing scheduling strategy, all of which point to a runtime that must juggle many independent tasks while keeping error handling and caching under control.  In the broader system, ConcurrencyManager works in concert with its parent **Trajectory**, and with sibling sub‑components such as **SpecstoryIntegration**, **GraphDatabaseManager**, **LLMService**, **LoggingMechanism**, and **BrowserAccessManager**.  
 
-* `ConcurrencyManager.useThreadPool()` – creates and controls a reusable pool of worker threads.  
-* `ConcurrencyManager.useLockStriping()` – applies lock striping to spread contention across many fine‑grained locks.  
-* `ConcurrencyManager.useWorkStealing()` – enables a work‑stealing scheduler so idle threads can “steal” tasks from busy peers.  
-* `ConcurrencyManager.useRealTimeScheduling()` – switches the scheduler into a real‑time mode where tasks receive deterministic latency guarantees.  
-* `ConcurrencyManager.useResourceMonitoring()` – attaches a monitoring hook that continuously reports CPU, memory and thread‑pool metrics.  
-* `ConcurrencyManager.useAdaptiveConcurrency()` – dynamically tunes the number of active workers based on the observed system load.  
-* `ConcurrencyManager.useTaskQueue()` – introduces a prioritized task queue that orders work before it reaches the thread pool.
-
-Although the source repository does not list concrete file paths for these methods, the observations make it explicit that **ConcurrencyManager** owns three child components—**ThreadPoolManager**, **TaskScheduler**, and **LockManager**—each of which implements a portion of the above functionality. The component lives inside the **SemanticAnalysis** hierarchy, alongside sibling modules such as **Pipeline**, **Ontology**, **Insights**, **DataStorage**, and **SecurityManager**.
-
----
+---  
 
 ## Architecture and Design  
 
-The design of **ConcurrencyManager** follows a **composition‑over‑inheritance** style. Rather than being a monolithic scheduler, it delegates distinct responsibilities to dedicated child objects:
+The observations suggest a **modular, library‑driven architecture**.  ConcurrencyManager relies on **Graphology** – a graph‑theory library – indicating that task relationships may be modelled as a directed graph, allowing the manager to reason about dependencies and parallelism.  The mention of *work‑stealing concurrency* signals the use of a **dynamic load‑balancing scheduler**: worker threads that “steal” work from each other when idle, which is a classic design for high‑throughput, low‑latency processing.  
 
-* **ThreadPoolManager** handles the lifecycle of the worker threads used by `useThreadPool()`.  
-* **TaskScheduler** maintains the internal **task queue** (`useTaskQueue()`) and implements the work‑stealing algorithm (`useWorkStealing()`) as well as the real‑time priority logic (`useRealTimeScheduling()`).  
-* **LockManager** provides the lock‑striping implementation (`useLockStriping()`) and any additional synchronization primitives required by concurrent tasks.
+Error handling is highlighted as a core responsibility, implying that the manager likely encapsulates task execution inside try/catch blocks or uses a promise‑based rejection pipeline to surface inconsistencies without crashing the whole system.  The presence of a **caching layer** (explicitly noted) points to a **cache‑aside pattern** where results of expensive sub‑tasks are stored and re‑used, reducing redundant work and improving throughput.  
 
-This separation mirrors a **Strategy pattern**: each `useXxx()` method selects a concrete strategy (e.g., thread‑pool vs. work‑stealing vs. adaptive concurrency) that the underlying manager objects execute. The component therefore presents a simple façade—`ConcurrencyManager`—while the heavy lifting is performed by its children.
+Interaction with external services is mediated through the **SpecstoryAdapter** (found at `lib/integrations/specstory-adapter.js`).  This adapter offers multiple connection methods (HTTP, IPC, file watching) and is already used by the parent **Trajectory** component.  By re‑using the same adapter, ConcurrencyManager can **share connection logic** with its siblings, reducing duplication and keeping the integration surface consistent.  
 
-Interaction with sibling components is implicit through shared system resources. For example, **Pipeline** agents that schedule DAG‑based jobs will likely call `ConcurrencyManager.useTaskQueue()` to enqueue steps, while **Insights** or **Ontology** may rely on `useAdaptiveConcurrency()` to keep their analysis pipelines responsive under varying load. The parent **SemanticAnalysis** component aggregates these agents, so the concurrency layer must be flexible enough to serve heterogeneous workloads.
-
-No evidence in the observations points to distributed or micro‑service architectures; the focus is strictly on intra‑process concurrency. Consequently, the design stays within the bounds of a single JVM (or equivalent runtime) and leverages classic multithreading constructs.
-
----
+---  
 
 ## Implementation Details  
 
-### Thread Pool  
-`ConcurrencyManager.useThreadPool()` signals the creation of a **ThreadPoolManager** instance. The manager is expected to:
+* **Graphology usage** – While no concrete class name is given, the observation that Graphology is used “suggests a well‑structured approach to concurrency management.”  In practice this usually means constructing a **task graph** where nodes represent units of work and edges encode dependencies.  The manager can then walk the graph, dispatching ready nodes to worker pools and updating the graph as tasks complete.  
 
-1. Allocate a configurable number of worker threads at start‑up.  
-2. Expose methods for graceful shutdown and dynamic resizing (required by `useAdaptiveConcurrency()`).  
-3. Keep a reference to the **TaskScheduler** so that queued work can be dispatched to idle threads.
+* **Work‑stealing scheduler** – The manager likely creates a pool of worker threads (or async workers) that each maintain a local deque of tasks.  When a worker’s deque empties, it attempts to steal tasks from the tail of another worker’s deque, balancing load without central coordination.  This design is optimal for irregular workloads where task execution times vary.  
 
-### Task Queue & Scheduler  
-`useTaskQueue()` introduces a priority‑aware queue that the **TaskScheduler** consumes. The scheduler:
+* **Environment variable `CODE_GRAPH_RAG_SSE_PORT`** – This variable is probably read at start‑up to configure a **Server‑Sent Events (SSE)** endpoint that streams task status or results to downstream consumers.  By externalising the port, the system can be deployed in varied environments (local dev, CI, production) without code changes.  
 
-* Pulls the highest‑priority task when a thread becomes idle.  
-* Implements **work‑stealing** (`useWorkStealing()`) by allowing each worker to inspect the queues of its peers and relocate tasks when its own queue is empty.  
-* Switches to a **real‑time scheduling** mode (`useRealTimeScheduling()`) where tasks are assigned fixed time slices or deadlines, ensuring predictable latency for time‑critical operations.
+* **Caching mechanisms** – The manager may maintain an in‑memory map (e.g., a `Map<string, Result>`) keyed by a deterministic task identifier.  Before scheduling a task, the manager checks the cache; a hit short‑circuits execution, while a miss triggers the normal work‑stealing path.  The cache could be invalidated based on TTL or explicit signals from the **GraphDatabaseManager** (which persists graph data via LevelDB).  
 
-### Lock Striping  
-`useLockStriping()` delegates to **LockManager**, which creates an array of lightweight mutexes (or semaphores). When a shared resource is accessed, the manager hashes the resource identifier to select one of the stripes, thereby reducing contention compared with a single global lock.
+* **Error handling** – Given the “potential for task inconsistencies or errors,” the manager probably wraps each task in a try/catch (or promise `.catch`) and records failures in a structured log that the **LoggingMechanism** sub‑component consumes.  Failed tasks may be retried, moved to a dead‑letter queue, or cause back‑pressure on the scheduler, depending on the severity.  
 
-### Adaptive Concurrency & Resource Monitoring  
-`useAdaptiveConcurrency()` continuously reads metrics supplied by `useResourceMonitoring()`. The **Resource Monitoring** hook—implemented inside **ConcurrencyManager** or possibly a dedicated monitor class—collects CPU utilisation, memory pressure, and thread‑pool queue depth. Based on configurable thresholds, the manager instructs **ThreadPoolManager** to increase or decrease the pool size, and may also adjust task‑queue priorities.
+* **SpecstoryAdapter integration** – The manager can invoke methods on the adapter (e.g., `connectViaHTTP`, `logConversation`) to fetch or push data required for a task.  Because the adapter already supports multiple transport mechanisms, ConcurrencyManager can operate transparently whether the underlying Specstory extension is reachable over HTTP, IPC, or file watching.  
 
-All of these mechanisms are exposed through the same façade, allowing callers to enable or disable them independently. The design assumes that each method can be called at runtime, enabling dynamic reconfiguration without restarting the parent **SemanticAnalysis** component.
-
----
+---  
 
 ## Integration Points  
 
-* **Parent – SemanticAnalysis**: The parent aggregates multiple agents (e.g., `SemanticAnalysisAgent`, `OntologyClassificationAgent`). Those agents submit work to **ConcurrencyManager** via `useTaskQueue()` and may request real‑time guarantees for critical analysis steps. The parent therefore depends on the concurrency façade to keep the overall pipeline responsive.
+1. **Parent – Trajectory**  
+   *Trajectory* creates and owns the ConcurrencyManager.  The parent likely configures the manager (e.g., passing the `CODE_GRAPH_RAG_SSE_PORT` value, providing the shared Graphology instance, and wiring the cache).  Trajectory also coordinates with **SpecstoryAdapter** to establish the initial connection to the Specstory extension, a connection that ConcurrencyManager later re‑uses for task‑level data exchange.  
 
-* **Sibling – Pipeline**: The **Pipeline** component’s DAG executor likely enqueues each DAG node as a task. By using the same task queue, the pipeline benefits from work‑stealing and adaptive scaling, ensuring that downstream agents (e.g., **Insights**) receive work promptly.
+2. **Sibling – SpecstoryIntegration**  
+   Both components rely on the same **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`).  This common dependency ensures that any change to connection handling (e.g., adding a new authentication header) propagates uniformly across the system.  
 
-* **Sibling – Ontology / Insights / DataStorage / SecurityManager**: These modules may call `useLockStriping()` when accessing shared caches or databases, thereby sharing the same **LockManager** instance and avoiding cross‑module lock contention.
+3. **Sibling – GraphDatabaseManager**  
+   The **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) supplies persistent storage for the task graph built with Graphology.  ConcurrencyManager may read the graph structure from LevelDB at start‑up and write back execution metadata (e.g., completion timestamps) as tasks finish.  
 
-* **Children – ThreadPoolManager / TaskScheduler / LockManager**: The three child components expose internal APIs (e.g., `ThreadPoolManager.setSize(int)`, `TaskScheduler.enqueue(Task)`, `LockManager.acquireLock(Object)`). **ConcurrencyManager** orchestrates calls among them based on the selected strategy.
+4. **Sibling – LLMService, LoggingMechanism, BrowserAccessManager**  
+   These components provide specialised services that ConcurrencyManager can schedule as tasks:  
+   * **LLMService** – launching or tearing down language‑model instances.  
+   * **LoggingMechanism** – persisting error reports or performance metrics generated by the manager.  
+   * **BrowserAccessManager** – performing headless‑browser operations that may be part of a larger workflow.  
 
-* **External – System Resources**: The resource‑monitoring hook taps into OS‑level metrics (CPU, memory) and possibly JVM‑level statistics (GC pause times). This data feeds the adaptive algorithm, making the concurrency layer aware of the broader execution environment.
+5. **External – Environment**  
+   The `CODE_GRAPH_RAG_SSE_PORT` environment variable configures the SSE endpoint that downstream consumers (e.g., UI dashboards) subscribe to for live task updates.  Changing this variable does not require code modifications, supporting flexible deployment pipelines.  
 
----
+---  
 
 ## Usage Guidelines  
 
-1. **Select the appropriate strategy early** – Call the `useXxx()` methods during component initialization rather than toggling them on‑the‑fly, unless the workload is known to fluctuate dramatically.  
-2. **Prefer `useTaskQueue()` for all work submissions** – Directly interacting with the thread pool bypasses the scheduler’s priority and work‑stealing logic, reducing predictability.  
-3. **Enable `useLockStriping()` when many threads contend on a shared map or cache** – It reduces the probability of a single lock becoming a bottleneck.  
-4. **Activate `useRealTimeScheduling()` only for latency‑critical paths** – Real‑time modes may sacrifice throughput; use them sparingly (e.g., for time‑bounded semantic analysis steps).  
-5. **Monitor resources continuously** – Keep `useResourceMonitoring()` active in production; the adaptive algorithm depends on accurate metrics to scale the pool safely.  
-6. **Do not mix conflicting strategies** – For instance, pairing a fixed‑size thread pool (`useThreadPool()`) with aggressive `useAdaptiveConcurrency()` can lead to contradictory resize commands. Choose either a static pool size or an adaptive policy.  
+* **Initialisation** – When constructing a Trajectory instance, always pass the required configuration object that includes the `CODE_GRAPH_RAG_SSE_PORT` value and a pre‑initialised Graphology instance.  Do not let ConcurrencyManager read environment variables directly; instead, centralise configuration in the parent to keep the component testable.  
 
----
+* **Task Definition** – Define each unit of work as a pure function that accepts a deterministic identifier.  Register the function with the manager **before** any workers start, so the task graph can be built correctly.  If a task produces a result that may be reused, explicitly return a cache‑able value and let the manager store it using its built‑in cache.  
 
-## Architectural Patterns Identified  
+* **Error Propagation** – Throw errors (or reject promises) from task functions; the manager will capture them, log through **LoggingMechanism**, and decide whether to retry based on a configurable policy.  Avoid swallowing errors inside tasks, as this defeats the manager’s global error handling.  
 
-* **Strategy / Policy pattern** – Different concurrency techniques (`ThreadPool`, `WorkStealing`, `AdaptiveConcurrency`, etc.) are selected at runtime via distinct façade methods.  
-* **Facade pattern** – `ConcurrencyManager` presents a simple API that hides the complexity of the underlying **ThreadPoolManager**, **TaskScheduler**, and **LockManager**.  
-* **Composition** – The sub‑component is built from three dedicated child managers rather than a deep inheritance hierarchy.  
+* **Specstory Interaction** – Use the methods exposed by **SpecstoryAdapter** (`connectViaHTTP`, `logConversation`, etc.) rather than implementing custom HTTP or IPC code.  This guarantees that any future changes to the Specstory extension’s protocol are automatically reflected in ConcurrencyManager’s behaviour.  
 
----
+* **Performance Tuning** –  
+  1. **Worker pool size** – Align the number of workers with the number of CPU cores for CPU‑bound tasks; for I/O‑bound workloads you may increase the pool size.  
+  2. **Cache TTL** – Adjust the cache expiration based on the volatility of the underlying data; a short TTL prevents stale results, while a long TTL maximises reuse.  
+  3. **SSE Port** – Ensure the port defined by `CODE_GRAPH_RAG_SSE_PORT` is open and not colliding with other services; otherwise live updates will be blocked.  
 
-## Design Decisions and Trade‑offs  
+* **Testing** – Mock the **SpecstoryAdapter** and **GraphDatabaseAdapter** when unit‑testing ConcurrencyManager.  Because the manager’s core logic (graph traversal, work‑stealing, caching) is pure, you can validate scheduling correctness without external side effects.  
 
-* **Fine‑grained lock striping vs. simplicity** – Lock striping improves scalability under high contention but introduces extra hashing logic and more lock objects to manage.  
-* **Work‑stealing vs. deterministic scheduling** – Work‑stealing maximises CPU utilisation for irregular workloads, whereas real‑time scheduling provides latency guarantees at the cost of possible under‑utilisation.  
-* **Adaptive concurrency vs. predictability** – Dynamically resizing the thread pool keeps the system responsive to load spikes, but frequent resizing can cause thread churn and unpredictable latency for short‑lived tasks.  
-* **Single‑process concurrency focus** – By staying intra‑process, the design avoids the overhead of distributed coordination but cannot scale beyond the resources of a single host.  
+---  
 
----
+### Architectural patterns identified  
 
-## System Structure Insights  
+* **Work‑stealing scheduler** – dynamic load balancing across worker threads.  
+* **Cache‑aside** – optional result caching to avoid duplicate work.  
+* **Adapter pattern** – `SpecstoryAdapter` abstracts HTTP, IPC, and file‑watching transports.  
+* **Graph‑based dependency management** – tasks represented as nodes in a Graphology graph.  
 
-* **Hierarchy** – `SemanticAnalysis` → `ConcurrencyManager` → (`ThreadPoolManager`, `TaskScheduler`, `LockManager`).  
-* **Sibling Interaction** – All sibling components rely on the same concurrency façade, promoting a unified threading model across the entire analysis pipeline.  
-* **Modular Extensibility** – Adding a new concurrency strategy (e.g., GPU off‑loading) would involve extending the façade with a new `useXxx()` method and a corresponding child manager, without disrupting existing agents.  
+### Design decisions and trade‑offs  
 
----
+* **Dynamic scheduling vs. static partitioning** – work‑stealing offers better utilisation under irregular workloads but adds complexity in synchronization.  
+* **In‑memory cache** – provides fast look‑ups but consumes RAM; the decision to keep it in‑process trades persistence for latency.  
+* **Environment‑driven SSE port** – eases deployment configuration but requires external orchestration to guarantee the port is available.  
 
-## Scalability Considerations  
+### System structure insights  
 
-* **Horizontal scaling is limited** – Because the design is confined to a single process, scaling out requires launching additional **SemanticAnalysis** instances, each with its own **ConcurrencyManager**.  
-* **Vertical scaling is well‑supported** – Work‑stealing, adaptive thread‑pool sizing, and lock striping all aim to make the most of additional CPU cores and memory on the host.  
-* **Resource‑monitoring feedback loop** – The real‑time metrics collected by `useResourceMonitoring()` enable the system to react to load spikes, preventing thread‑pool exhaustion and maintaining throughput.  
+The system is layered: **Trajectory** (orchestrator) → **ConcurrencyManager** (task engine) → **SpecstoryAdapter**, **GraphDatabaseAdapter**, and other service adapters.  Siblings share adapters, promoting reuse and a thin coupling between functional domains.  
 
----
+### Scalability considerations  
 
-## Maintainability Assessment  
+* The work‑stealing pool scales horizontally with CPU cores; adding more workers yields diminishing returns once contention on shared structures (e.g., the task graph) becomes a bottleneck.  
+* Caching mitigates repeated computation, but cache coherence across multiple node instances would require a distributed cache – not mentioned in the observations.  
+* SSE streaming can handle many subscribers, but the port must be provisioned with sufficient network bandwidth.  
 
-The clear separation of concerns (thread pool, scheduling, locking) makes the codebase approachable; each child manager can be unit‑tested in isolation. The façade’s method naming (`useThreadPool`, `useLockStriping`, etc.) is self‑documenting, reducing the learning curve for new developers. However, the flexibility of toggling many strategies at runtime can lead to configuration drift—teams must enforce conventions (as listed in the Usage Guidelines) to avoid contradictory settings. The absence of explicit file paths in the observations suggests that documentation or naming conventions in the repository should be reinforced to aid future navigation. Overall, the design balances extensibility with understandable modularity, supporting long‑term maintainability.
+### Maintainability assessment  
+
+Because the manager leans heavily on well‑known libraries (Graphology) and clear adapter boundaries (SpecstoryAdapter, GraphDatabaseAdapter), the codebase is **modular and testable**.  The lack of concrete source files in the current view suggests that the component may be defined in a small, focused module, which aids readability.  However, the reliance on environment variables and implicit caching policies could become sources of hidden bugs if not documented alongside the component.  Overall, the design promotes **separation of concerns**, making future extensions (e.g., adding a new transport to SpecstoryAdapter) straightforward.
+
+## Diagrams
+
+### Relationship
+
+![ConcurrencyManager Relationship](images/concurrency-manager-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/concurrency-manager-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various agents, including the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as ontology classification, semantic analysis, and code graph construction. The component's architecture is designed to facilitate the integration of multiple agents and enable the efficient processing of large amounts of data.
-
-### Children
-- [ThreadPoolManager](./ThreadPoolManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks, which implies the existence of a ThreadPoolManager to oversee thread creation and termination.
-- [TaskScheduler](./TaskScheduler.md) -- A TaskScheduler would be necessary to manage the queue of tasks to be executed by the thread pool, ensuring that high-priority tasks are executed promptly and that dependencies between tasks are respected.
-- [LockManager](./LockManager.md) -- The LockManager would need to implement locking mechanisms, such as mutexes or semaphores, to synchronize access to shared resources and prevent data corruption or inconsistency.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter (lib/integrations/specstory-adapter.js) to establish connections with the Specstory extension via multiple methods, including HTTP, IPC, and file watching. This modular approach enables flexibility in data exchange and retrieval. The connectViaHTTP function in SpecstoryAdapter, for instance, facilitates HTTP requests to the Specstory extension, allowing for seamless data retrieval and exchange. Furthermore, the logConversation function in SpecstoryAdapter implements asynchronous logging, enabling efficient data exchange with the Specstory extension. The use of specific libraries, such as Graphology and LevelDB, in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) enables effective management of graph data storage and retrieval.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier.useUpperOntology() utilizes a hierarchical ontology structure to classify entities
-- [Insights](./Insights.md) -- InsightGenerator.usePatternCatalog() leverages a pre-defined catalog of patterns to identify insights
-- [DataStorage](./DataStorage.md) -- DataStorage.useDatabase() utilizes a relational database to store processed data
-- [SecurityManager](./SecurityManager.md) -- SecurityManager.useAuthentication() utilizes authentication mechanisms to verify user identities
+- [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryAdapter uses the connectViaHTTP function to facilitate HTTP requests to the Specstory extension, allowing for seamless data retrieval and exchange.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseAdapter, located in storage/graph-database-adapter.ts, utilizes Graphology and LevelDB for effective management of graph data storage and retrieval.
+- [LLMService](./LLMService.md) -- The LLMService sub-component is likely responsible for managing the lifecycle of LLM services, including setup and teardown.
+- [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component is likely responsible for optimizing logging, ensuring efficient data exchange and retrieval.
+- [BrowserAccessManager](./BrowserAccessManager.md) -- The BrowserAccessManager sub-component is likely responsible for optimizing browser access, ensuring efficient data exchange and retrieval.
 
 
 ---

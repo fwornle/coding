@@ -2,99 +2,137 @@
 
 **Type:** SubComponent
 
-The ConstraintMonitoringService is designed to be highly available and fault-tolerant, using various mechanisms to ensure reliability.
-
-**ConstraintMonitoringService – Technical Insight Document**  
-
-*Component type: SubComponent*  
-*Parent component: DockerizedServices*  
-*Sibling components: SemanticAnalysisService, CodeGraphAnalysisService, LLMServiceManager, DockerOrchestrator*  
-
----
+The ConstraintMonitoringService provides a dashboard server, as defined in the integrations/mcp-constraint-monitor/dashboard/README.md file, to visualize the constraints and their dependencies.
 
 ## What It Is  
 
-The **ConstraintMonitoringService** lives inside the **DockerizedServices** container ecosystem. Although the exact source‑file locations are not listed in the observations, the service is clearly a dedicated sub‑component whose responsibility is to continuously watch the operational constraints of the broader system. Its primary duties, as described in the observations, include **health verification**, **circuit breaking**, **periodic timer‑driven checks**, **state‑machine‑based monitoring**, and **logging/alerting**. These capabilities together make the service the “watch‑dog” that guarantees the rest of the DockerizedServices‑based stack (including the **SemanticAnalysisService**, **CodeGraphAnalysisService**, **LLMServiceManager**, and **DockerOrchestrator**) remains functional, resilient, and observable.
+The **ConstraintMonitoringService** is a sub‑component that lives inside the *DockerizedServices* suite. Its primary artefacts are located under the `integrations/mcp-constraint-monitor/` directory. The service’s configuration is driven by the markdown file `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, which defines the set of constraints to be monitored and the relationships among them. In addition, the service ships a dedicated dashboard server whose instructions are documented in `integrations/mcp-constraint-monitor/dashboard/README.md`. The dashboard visualises the constraints and their dependencies for operators.  
 
-Because the service is part of a Docker‑orchestrated environment, it is expected to run as its own container or as a process within a shared container, leveraging the same deployment pipeline that the sibling services use. The observations emphasize that the service is **highly available** and **fault‑tolerant**, suggesting that it is deployed with redundancy (e.g., multiple replica containers) and that it participates in the same reliability infrastructure that the other DockerizedServices components rely upon.
+Operationally the service runs in its own Docker container (as defined in the shared `docker‑compose.yaml` of the parent *DockerizedServices* component). It consumes a number of environment variables—`CODE_GRAPH_RAG_SSE_PORT`, `CODE_GRAPH_RAG_PORT`, `MEMGRAPH_BATCH_SIZE`, `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `BROWSER_ACCESS_PORT`, and `BROWSER_ACCESS_SSE_URL`—to wire up external services such as the Code Graph RAG service, a Memgraph database, and a browser‑access layer. The service also leverages the semantic‑constraint‑detection logic described in `semantic-constraint-detection.md` to recognise higher‑level, semantic constraints in the code base.
 
 ---
 
 ## Architecture and Design  
 
-The design of **ConstraintMonitoringService** follows a **fault‑tolerance‑centric architecture**. The observations explicitly call out two classic reliability mechanisms:
+The observations point to a **container‑per‑service** architectural style orchestrated by Docker Compose. Within the *DockerizedServices* parent, each service—including the ConstraintMonitoringService’s API server and its dashboard server—has its own container, enabling isolated runtime environments and independent scaling. This mirrors the approach taken by sibling components such as **ServiceOrchestrator** and **CodeGraphRAGService**, which also declare their own containers and rely on environment variables for configuration.  
 
-1. **Health Verification** – a periodic self‑assessment that reports the service’s own status, likely exposing a health‑check endpoint that Docker‑Orchestrator can poll.  
-2. **Circuit Breaking** – a protective pattern that isolates failing downstream dependencies to prevent cascading failures across the DockerizedServices suite.
+The service’s design is **configuration‑driven**. The `constraint-configuration.md` file acts as the single source of truth for which constraints are active and how they depend on one another. By externalising this data, the service can be re‑configured without code changes, supporting rapid iteration on constraint policies.  
 
-These patterns are typical in resilient micro‑service ecosystems, but the document does not label the system as “micro‑service” or “event‑driven.” The service’s internal workflow appears to be driven by **timers** that trigger constraint checks on a fixed schedule. The mention of a **state machine** indicates that the monitoring process transitions through well‑defined states (e.g., *Idle → Checking → Alerting → Recovery*), providing deterministic behavior and simplifying reasoning about edge cases.
+Interaction with external systems follows a **port‑based integration** model. The environment variables `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` expose the ports on which the Code Graph RAG service listens, allowing the ConstraintMonitoringService to communicate over HTTP/HTTPS without hard‑coding network details. Similarly, `MEMGRAPH_BATCH_SIZE` tunes the batch size for writes to the Memgraph graph database, indicating a bulk‑loading optimisation pattern.  
 
-Interaction with sibling components is implicit: the **LLMServiceManager** also performs health verification, suggesting a shared convention for exposing health endpoints. Likewise, the **DockerOrchestrator** likely consumes the health and circuit‑breaker signals from ConstraintMonitoringService to make scaling or restart decisions. The service therefore fits into a **co‑ordination layer** that sits above the functional services (SemanticAnalysisService, CodeGraphAnalysisService) and below the orchestration layer.
+Security credentials (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`) are injected via environment variables, adhering to the **12‑factor app** practice of separating config from code. The presence of `BROWSER_ACCESS_PORT` and `BROWSER_ACCESS_SSE_URL` suggests a **server‑sent events (SSE)** channel used to push real‑time updates from a browser‑access service to the monitoring component.
 
 ---
 
 ## Implementation Details  
 
-Although no concrete code symbols are present, the observations allow us to infer the internal building blocks:
+Although no concrete code symbols were discovered, the file‑level artefacts reveal the key implementation pieces:
 
-* **Health Verification Module** – probably a lightweight HTTP server or gRPC endpoint that returns a status payload (e.g., `UP`, `DEGRADED`, `DOWN`). This module is invoked by DockerOrchestrator’s health‑check routine.
-* **Circuit Breaker Component** – likely implements the classic three‑state model (*Closed*, *Open*, *Half‑Open*) and tracks failure counts of downstream calls (e.g., database writes, external APIs). When thresholds are breached, the breaker trips to *Open* and short‑circuits further calls, protecting the rest of the system.
-* **Timer‑Based Scheduler** – a recurring timer (perhaps using `setInterval`, `java.util.Timer`, or a language‑specific scheduler) that fires constraint‑checking jobs at configurable intervals.
-* **Constraint Check Engine** – the core logic that evaluates system constraints (resource usage, latency bounds, SLA limits). The exact constraints are not enumerated, but the engine would read metrics from shared monitoring stores or in‑process counters.
-* **State Machine Engine** – orchestrates the lifecycle of a monitoring cycle. States could include *Initializing*, *CollectingMetrics*, *Evaluating*, *Alerting*, and *Recovering*. Transitions are triggered by timer events, health results, or circuit‑breaker status changes.
-* **Logging & Alerting Subsystem** – writes structured logs (likely JSON) to a centralized logging pipeline and pushes alerts (e.g., to Slack, PagerDuty, or a custom alert manager). This subsystem ensures operators are aware of any constraint violations or circuit‑breaker trips.
+1. **Constraint Configuration** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` provides a declarative schema (likely YAML or JSON embedded in markdown) that lists constraint identifiers, thresholds, and dependency graphs. The service parses this document at startup to build an in‑memory model of the monitoring landscape.
 
-Because the service is part of **DockerizedServices**, it likely inherits common configuration mechanisms (environment variables, Docker secrets) and may share logging libraries with its siblings. The presence of a state machine also hints at a deterministic testing approach, where each state transition can be unit‑tested in isolation.
+2. **Semantic Constraint Detection** – The `semantic-constraint-detection.md` document describes the algorithms or heuristics used to infer semantic constraints from source artefacts. The service probably loads this logic as a library or script that analyses code symbols, then maps the results onto the constraint model defined above.
+
+3. **Dashboard Server** – `integrations/mcp-constraint-monitor/dashboard/README.md` outlines how the dashboard is packaged (likely a Node.js or static‑site server) and how it consumes the service’s internal state via a REST or SSE endpoint. The dashboard visualises the constraint graph, highlighting violations and dependency chains.
+
+4. **Environment‑Driven Wiring** – The service reads the following variables at runtime:
+   - `CODE_GRAPH_RAG_SSE_PORT` / `CODE_GRAPH_RAG_PORT`: address the Code Graph RAG service for graph queries and streaming updates.
+   - `MEMGRAPH_BATCH_SIZE`: controls how many constraint events are bundled before persisting to Memgraph, balancing latency versus throughput.
+   - `ANTHROPIC_API_KEY` / `BROWSERBASE_API_KEY`: authenticate calls to external AI or browser‑automation services.
+   - `BROWSER_ACCESS_PORT` / `BROWSER_ACCESS_SSE_URL`: configure a browser‑access micro‑service that streams UI interactions back to the monitor.
+
+5. **Child Component – ConstraintConfigurator** – The ConstraintMonitoringService contains a **ConstraintConfigurator** sub‑component, whose responsibilities are to read the `constraint-configuration.md` file, validate its syntax, and expose an API (likely HTTP) for dynamic updates. This encapsulation isolates configuration concerns from the core monitoring loop.
 
 ---
 
 ## Integration Points  
 
-**ConstraintMonitoringService** interacts with the rest of the system through several well‑defined interfaces:
+The service sits at the intersection of several other DockerizedServices components:
 
-* **Health‑Check Endpoint** – consumed by **DockerOrchestrator** to decide container restarts or scaling actions. The same endpoint pattern is used by **LLMServiceManager**, indicating a shared health‑verification contract across DockerizedServices.
-* **Circuit‑Breaker Signals** – when the breaker opens, the service may emit events or status flags that other services (e.g., **SemanticAnalysisService**, **CodeGraphAnalysisService**) can subscribe to, allowing them to gracefully degrade or pause processing.
-* **Metrics & Monitoring Store** – while not explicitly named, the constraint checks must read runtime metrics. These could be sourced from a common metrics exporter (Prometheus, Graphite) that the sibling services also push to.
-* **Logging Infrastructure** – logs are funneled into a centralized system (perhaps the same pipeline used by the sibling services) enabling unified observability.
-* **Alerting Channels** – alerts are dispatched via shared notification channels, ensuring operators receive consistent messaging regardless of which sub‑component raised the issue.
+* **CodeGraphRAGService** – Provides the underlying code‑graph data that the monitor queries. Communication occurs over the ports exposed via `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT`. The monitor likely issues graph queries to retrieve dependency information needed for constraint evaluation.
 
-No child components are documented for ConstraintMonitoringService, so its integration surface is limited to the above external contracts and the internal coordination with its sibling services.
+* **Memgraph Database** – Acts as the persistent store for constraint events and graph snapshots. The batch size (`MEMGRAPH_BATCH_SIZE`) is tuned to optimise write performance, indicating a bulk‑insert pattern.
+
+* **Anthropic & BrowserBase APIs** – External AI or browser‑automation services are accessed using the injected API keys. These services may be used for advanced semantic analysis or for driving a headless browser that validates UI‑level constraints.
+
+* **Browser Access Service** – Configured via `BROWSER_ACCESS_PORT` and `BROWSER_ACCESS_SSE_URL`, this service streams real‑time browser interaction data back to the monitor, enabling live constraint checking against user actions.
+
+* **Dashboard UI** – The dashboard server reads the internal constraint state (potentially via a local HTTP endpoint) and renders it for operators. It consumes the same configuration and runtime data that the API server uses, ensuring a consistent view.
+
+All of these integrations are declaratively wired through environment variables, keeping the container images generic and reusable across environments (dev, test, prod).
 
 ---
 
 ## Usage Guidelines  
 
-1. **Configure Health Checks Consistently** – follow the same environment‑variable naming conventions used by **LLMServiceManager** (e.g., `HEALTH_ENDPOINT`, `HEALTH_INTERVAL_MS`). This ensures DockerOrchestrator can discover and poll the endpoint without custom scripts.  
-2. **Tune Circuit‑Breaker Thresholds Carefully** – set failure‑count windows and timeout periods based on the latency and error characteristics of downstream dependencies. Overly aggressive thresholds may cause unnecessary service degradation, while lax thresholds reduce protection.  
-3. **Align Timer Intervals with System Load** – the periodic constraint checks should be frequent enough to catch violations early but not so frequent that they add measurable overhead. Use the same scheduling library as the sibling services to maintain uniform behavior.  
-4. **Leverage Structured Logging** – emit logs in the same schema as the other DockerizedServices components so that log aggregation tools can correlate events across services. Include fields such as `service=ConstraintMonitoringService`, `state`, and `constraintId`.  
-5. **Monitor Alert Fatigue** – because the service can generate alerts for any constraint breach, implement alert‑grouping or severity levels to avoid overwhelming operators. Align alert routing with the channels already used by **SemanticAnalysisService** and **CodeGraphAnalysisService**.
+1. **Configuration First** – Before launching the service, edit `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to enumerate the constraints relevant to your code base. Validate the file using the ConstraintConfigurator’s validation endpoint (if exposed) to catch syntax errors early.
+
+2. **Environment Variable Management** – Store all required secrets (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`) in a secure secret manager and inject them at container start‑up. Avoid hard‑coding values in Dockerfiles or source code.
+
+3. **Port Alignment** – Ensure that the ports defined by `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` match the actual ports exposed by the **CodeGraphRAGService** container. Mismatched ports will cause runtime connection failures.
+
+4. **Batch Size Tuning** – Adjust `MEMGRAPH_BATCH_SIZE` based on the expected event rate. Larger batches improve throughput but increase latency for constraint violation detection. Start with the default and monitor Memgraph write latency.
+
+5. **Dashboard Access** – Run the dashboard server as defined in `integrations/mcp-constraint-monitor/dashboard/README.md`. Access it via the host‑mapped port to visualise constraint health. Use the dashboard for troubleshooting and for confirming that constraint dependencies are correctly represented.
+
+6. **Observability** – Leverage the SSE endpoints (`BROWSER_ACCESS_SSE_URL`) to stream live updates to monitoring tools or log aggregators. This provides immediate feedback when constraints are breached.
+
+7. **Version Compatibility** – Because the service shares the Docker Compose orchestration with siblings, keep all service images at compatible versions. Updating the **CodeGraphRAGService** may require a corresponding update to the port variables or API contract used by the monitor.
 
 ---
 
-### Summary of Architectural Findings  
+### Architectural Patterns Identified  
 
-| Aspect | Insight |
-|--------|---------|
-| **Architectural patterns identified** | Health‑verification endpoint, Circuit‑breaker, Timer‑driven scheduler, State‑machine workflow, Centralized logging & alerting |
-| **Design decisions & trade‑offs** | Prioritizing fault isolation (circuit breaker) vs. added latency; using a state machine for predictability vs. complexity of state management; timer‑based checks give deterministic cadence but may miss bursty violations |
-| **System structure insights** | Positioned as a reliability layer within **DockerizedServices**, sharing conventions with **LLMServiceManager** and feeding status to **DockerOrchestrator** |
-| **Scalability considerations** | Service can be replicated across containers; circuit breaker prevents overload; timer interval can be tuned per replica to spread load |
-| **Maintainability assessment** | Clear separation of concerns (health, circuit breaking, constraint evaluation) aids testability; reliance on shared logging and health‑check contracts reduces duplication; lack of concrete code symbols suggests documentation should be expanded to capture implementation details for future maintainers |
+1. **Container‑Per‑Service (Docker Compose) Architecture** – Isolation and independent lifecycle management.  
+2. **Configuration‑Driven Design** – Centralised markdown configuration for constraints.  
+3. **Port‑Based External Service Integration** – Environment‑variable driven network wiring.  
+4. **12‑Factor App Config Separation** – Secrets and runtime settings supplied via environment variables.  
+5. **Batch Processing for Graph Persistence** – Tunable batch size for Memgraph writes.  
 
-These observations collectively portray **ConstraintMonitoringService** as a deliberately engineered guardrail within the DockerizedServices suite, built to keep the broader system healthy, observable, and resilient without introducing unnecessary coupling.
+### Design Decisions and Trade‑offs  
+
+* **Isolation vs. Overhead** – Running the API server and dashboard in separate containers simplifies scaling but adds inter‑container networking overhead.  
+* **Markdown‑Based Config** – Human‑readable and easy to edit, but parsing markdown at runtime can be slower than a binary config format.  
+* **Environment Variable Wiring** – Provides flexibility across environments, yet requires careful secret management to avoid leakage.  
+* **Batch Size Tuning** – Improves write performance at the cost of detection latency; developers must balance based on workload characteristics.  
+
+### System Structure Insights  
+
+The ConstraintMonitoringService sits under the *DockerizedServices* parent, sharing the same compose‑file orchestration with **ServiceOrchestrator** and **CodeGraphRAGService**. Its child, **ConstraintConfigurator**, encapsulates all configuration parsing and validation logic, keeping the monitoring core focused on evaluation and reporting. The service’s external dependencies (CodeGraphRAG, Memgraph, AI APIs, browser access) are all decoupled via ports and keys, enabling substitution or version upgrades without code changes.
+
+### Scalability Considerations  
+
+* **Horizontal Scaling** – Because the API server is containerised, multiple instances can be launched behind a load balancer to handle higher request volumes. The dashboard is read‑only and can be scaled similarly.  
+* **Graph Store Throughput** – Scaling Memgraph horizontally may be required if constraint event rates exceed the capacity of a single instance; the `MEMGRAPH_BATCH_SIZE` can be increased to reduce write pressure.  
+* **Port Conflicts** – When scaling, each replica must be assigned unique host ports or use an internal network with service discovery to avoid collisions.  
+
+### Maintainability Assessment  
+
+The heavy reliance on declarative markdown files and environment variables makes the service **easy to maintain** for teams familiar with Docker Compose. The clear separation between configuration (ConstraintConfigurator) and runtime logic reduces the risk of accidental side effects when updating constraints. However, the lack of explicit code symbols in the current repository view suggests that the core implementation may be hidden behind scripts or compiled binaries, which could hinder direct code‑level debugging. Proper documentation of the markdown schema and the expected shape of external APIs (CodeGraphRAG, Memgraph) is essential to keep maintenance effort low.
+
+## Diagrams
+
+### Relationship
+
+![ConstraintMonitoringService Relationship](images/constraint-monitoring-service-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/constraint-monitoring-service-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) enables efficient data persistence and retrieval. This is evident in the way the adapter provides a standardized interface for interacting with the graph database, allowing for seamless integration with various services. For instance, the mcp-server-semantic-analysis service leverages this adapter to store and retrieve semantic analysis results, as seen in the lib/semantic-analysis/semantic-analysis-service.ts file. The adapter's implementation of the GraphDatabase interface (storage/graph-database-adapter.ts) ensures that all database interactions are properly abstracted, making it easier to switch to a different database if needed.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
+
+### Children
+- [ConstraintConfigurator](./ConstraintConfigurator.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a guide for configuring the constraints and their dependencies.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve semantic analysis results.
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code graph analysis results.
-- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager is responsible for managing LLM services, including lazy initialization and health verification.
-- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator is responsible for deploying and managing Docker containers for coding services.
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
+- [CodeGraphRAGService](./CodeGraphRAGService.md) -- The CodeGraphRAGService uses the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables to configure the ports for the Code Graph RAG service.
 
 
 ---

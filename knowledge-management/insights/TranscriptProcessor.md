@@ -2,115 +2,97 @@
 
 **Type:** SubComponent
 
-The use of separate modules for logging and transcript processing, as seen in the integrations/mcp-server-semantic-analysis/src/logging.ts and lib/agent-api/transcript-api.js files, indicates a clear separation of concerns.
+The TranscriptProcessor provides a standardized way of processing transcript data, ensuring consistency across the system.
 
 ## What It Is  
 
-**TranscriptProcessor** is the core sub‑component responsible for handling transcript data inside the **LiveLoggingSystem**.  Its implementation lives in the file  
-
-```
-lib/agent‑api/transcript‑api.js
-```  
-
-which sits under the `lib/agent‑api` directory – the logical place for API‑level utilities that mediate between the logging infrastructure and the various agent formats the system supports.  By being part of the *agent‑api* package, TranscriptProcessor is positioned as a gateway that receives raw transcript payloads from agents, normalises them, and emits a consistent representation for downstream consumers such as the logging pipeline (implemented in `integrations/mcp‑server‑semantic‑analysis/src/logging.ts`).  
-
-The component is declared a **SubComponent** of the parent **LiveLoggingSystem** and works alongside its sibling **LoggingModule**, which supplies the actual persistence and streaming of log events.  Together they form the two primary functional pillars of the LiveLoggingSystem: *data acquisition & normalisation* (TranscriptProcessor) and *data recording & analysis* (LoggingModule).
-
----
+The **TranscriptProcessor** is a sub‑component of the **LiveLoggingSystem**.  It lives inside the LiveLoggingSystem codebase (the exact source‑file locations are not disclosed in the observations, but it is clearly defined as a child of the LiveLoggingSystem component).  Its primary responsibility is to receive raw transcript data produced by a variety of agents, convert that data into a **unified transcript format**, and then run the data through a **processing pipeline** that prepares the transcript for downstream consumption.  The unified format is deliberately **configurable**, allowing the system to adapt the shape of the transcript to the needs of other components such as the **OntologyClassificationAgent**, **LoggingMechanism**, or any future analytics modules.  The component also encapsulates a **TranscriptUnifier** child, which houses the concrete logic that performs the conversion from source‑specific structures into the shared format.
 
 ## Architecture and Design  
 
-The observations point to a **modular architecture** built around clear separation of concerns.  TranscriptProcessor lives in its own module (`transcript‑api.js`) while logging concerns are isolated in a distinct TypeScript module (`logging.ts`).  This modularity is a deliberate design decision: each module owns a well‑defined responsibility and can evolve independently.
+The design of the TranscriptProcessor follows a **pipeline architecture**: raw input enters the component, is transformed, and then flows through a series of processing stages.  This pipeline is built around a **conversion mechanism** that maps heterogeneous transcript representations into a single, canonical model.  The existence of a configurable unified format indicates the use of a **configuration‑driven data model**; the processor can be tuned at runtime (or via configuration files) to emit fields, naming conventions, or metadata that match the expectations of downstream services.  
 
-* **Layered / API‑facade style** – By residing in `lib/agent‑api`, TranscriptProcessor acts as an API façade for the rest of the system.  It abstracts away the idiosyncrasies of different agent transcript formats, exposing a uniform interface that the logging layer (and any future consumers) can rely on.  The façade shields downstream code from format‑specific logic, which aligns with the “core component of the agent API” observation.
+The component is also an example of **composition**: the TranscriptProcessor **contains** a **TranscriptUnifier**, delegating the actual transformation work to this child.  By separating the unification logic from the surrounding pipeline orchestration, the design promotes single‑responsibility and makes the unifier reusable by other parts of the system if needed.  The parent‑child relationship with **LiveLoggingSystem** suggests that the processor is part of a larger logging workflow, sharing the same high‑throughput concerns as its sibling **LoggingMechanism**, which uses async buffering to cope with volume.  Consequently, the TranscriptProcessor inherits the same scalability mindset—its pipeline is explicitly described as “designed to handle high‑volume transcript data.”  
 
-* **Separation of Concerns** – The logging utilities (`integrations/mcp‑server‑semantic‑analysis/src/logging.ts`) are deliberately kept separate from transcript handling.  This prevents cross‑contamination of responsibilities: TranscriptProcessor focuses on conversion, validation, and formatting, while LoggingModule concentrates on transport, storage, and semantic analysis.
-
-* **Potential Adapter Pattern** – Although not explicitly named in the observations, the need to handle “various input formats” suggests that TranscriptProcessor likely implements adapters for each supported agent.  Each adapter would translate a proprietary transcript schema into the system’s canonical model, enabling the rest of the pipeline to treat all transcripts uniformly.
-
-The overall interaction can be visualised as:
-
-```
-[Agent] → TranscriptProcessor (lib/agent‑api/transcript‑api.js) → Normalised Transcript → LoggingModule (integrations/.../logging.ts) → LiveLoggingSystem
-```
-
----
+No explicit architectural styles such as micro‑services or event‑driven messaging are mentioned; the observations only point to a **modular, in‑process pipeline** that lives inside the LiveLoggingSystem monolith.
 
 ## Implementation Details  
 
-While the source code is not provided, the observations give enough clues to infer the internal structure:
+Even though the source does not expose concrete class or function names, the observations give a clear picture of the internal mechanics.  The **conversion mechanism** is the heart of the component: it inspects incoming transcript payloads, extracts relevant fields (speaker identifiers, timestamps, utterance text, confidence scores, etc.), and assembles them into the **unified format**.  Because the format is **configurable**, the conversion step likely consults a configuration object or schema that defines which source fields map to which unified fields, and possibly which optional enrichment steps to apply (e.g., language detection, sentiment tagging).  
 
-1. **Exported Functions / Classes** – `transcript‑api.js` most likely exports either a class (e.g., `TranscriptProcessor`) or a set of functions (`processTranscript`, `formatForLogging`).  These entry points encapsulate the core logic for **data conversion and formatting** (Observation 3).
+The **processing pipeline** then operates on the unified transcript.  Typical stages—though not enumerated in the observations—might include validation (ensuring required fields are present), enrichment (adding ontology tags via the **OntologyClassificationAgent**), and routing (forwarding the transcript to storage, real‑time dashboards, or downstream analytics).  The pipeline is built to be **high‑throughput**, implying that stages are lightweight, possibly asynchronous, and that data structures are reused to minimize allocation overhead.  
 
-2. **Format Normalisation** – The module must recognise multiple agent‑specific transcript schemas.  Internally it probably maintains a registry of format handlers (adapters) that each implement a common interface, such as `parse(rawPayload): NormalisedTranscript`.  This enables the processor to “handle various input formats” (Observation 6).
-
-3. **Dependency on Integration Utilities** – To communicate with other agents or external services, TranscriptProcessor may import helpers from the `integrations` directory (Observation 4).  For example, it could call a function in `integrations/mcp‑server‑semantic‑analysis/src/logging.ts` to emit diagnostic information during processing, or use shared configuration utilities.
-
-4. **Error Handling & Validation** – Given its role as a gateway, the processor likely validates incoming transcripts against a schema and throws or logs structured errors when malformed data is detected.  This defensive stance protects the downstream logging pipeline from corrupt inputs.
-
-5. **Exported API Surface** – Because it is part of the **agent‑api**, the public API is probably minimal: a single `process` method that accepts raw transcript data and returns a promise of a normalised object, ready for the LoggingModule.
-
----
+The **TranscriptUnifier** child component encapsulates the transformation logic.  By housing the conversion code in a dedicated sub‑module, the system can evolve the unification rules independently of the surrounding pipeline.  This also makes unit testing easier: the unifier can be exercised with a suite of source‑specific transcript fixtures to verify that the unified output conforms to the configured schema.
 
 ## Integration Points  
 
-TranscriptProcessor sits at the intersection of three major system zones:
+The TranscriptProcessor sits at the intersection of several system boundaries.  Its **parent**, **LiveLoggingSystem**, supplies raw transcript streams generated by various agents (e.g., the **OntologyClassificationAgent** that classifies observations).  The processor receives these streams, normalizes them, and then passes the unified transcripts back to the LiveLoggingSystem for further handling—most likely to the **LoggingMechanism**, which buffers and persists high‑volume logs.  Because the unified format is shared, other siblings such as **OntologyManager** and **LSLConfigManager** can safely read or augment the transcript without needing to understand each source’s native schema.  
 
-* **Agent Input Layer** – External agents push raw transcripts to the system, perhaps via HTTP, WebSocket, or a message queue.  The entry point for these payloads is routed to `lib/agent‑api/transcript‑api.js`, where the processor normalises them.
-
-* **Logging Subsystem** – After normalisation, the processor hands the data to the **LoggingModule** (`integrations/mcp‑server‑semantic‑analysis/src/logging.ts`).  This hand‑off is likely a function call such as `logging.emit(normalisedTranscript)`.  The logging module then performs persistence, streaming, and semantic analysis.
-
-* **Parent LiveLoggingSystem** – The parent component orchestrates the lifecycle of both TranscriptProcessor and LoggingModule.  It may expose higher‑level APIs (e.g., `LiveLoggingSystem.recordTranscript(agentId, payload)`) that internally delegate to the processor.  Because both sub‑components are siblings under the same parent, they share configuration (e.g., logging levels, environment flags) and can be coordinated through the LiveLoggingSystem’s initialization routine.
-
-No explicit third‑party libraries are mentioned, so all dependencies appear to be internal modules, reinforcing the self‑contained nature of the architecture.
-
----
+The **TranscriptUnifier** may expose a public API (e.g., `unify(rawTranscript): UnifiedTranscript`) that other components could call directly if they need to perform ad‑hoc conversion outside the normal pipeline.  Configuration for the unified format is probably sourced from the **LSLConfigManager**, ensuring that any changes to the schema are propagated consistently across the system.  The processor also relies on the **OntologyClassificationAgent** for semantic enrichment, indicating a downstream dependency where the unified transcript is fed into the classification agent to attach ontology tags before final logging.
 
 ## Usage Guidelines  
 
-1. **Pass Raw Agent Payloads Directly to the Processor** – Call the exported `process` (or similarly named) function from `lib/agent‑api/transcript‑api.js` with the exact payload received from an agent.  Do not pre‑transform the data; let the processor apply the canonical adapters.
+1. **Provide raw transcripts in the expected input shape** – the processor assumes that each incoming payload conforms to one of the known source formats.  Supplying malformed data will cause the conversion mechanism to fail validation, potentially halting the pipeline.  
 
-2. **Handle the Returned Normalised Object** – The processor returns a structured transcript object.  Forward this object unchanged to the LoggingModule’s API (`logging.emit` or equivalent).  Avoid mutating the object after receipt to preserve data integrity for downstream analysis.
+2. **Configure the unified format centrally** – use the configuration facilities supplied by **LSLConfigManager** to define the field mapping and any optional enrichments.  Changing the configuration does not require code changes; however, ensure that all downstream consumers (e.g., LoggingMechanism, OntologyClassificationAgent) are aware of the new schema.  
 
-3. **Respect Separation of Concerns** – Do not embed logging logic inside transcript handling code.  If diagnostic information is required, use the logging utilities (`integrations/mcp‑server‑semantic‑analysis/src/logging.ts`) explicitly rather than console statements.  This keeps the processor’s responsibilities focused on conversion.
+3. **Treat the processor as a high‑throughput, streaming component** – avoid inserting heavyweight, blocking operations inside custom pipeline stages.  If additional processing is required, implement it as a non‑blocking step or offload it to a background worker to preserve the pipeline’s throughput guarantees.  
 
-4. **Extend with New Agent Formats via Adapters** – When adding support for a new agent, create a new adapter module that implements the processor’s expected interface and register it inside `transcript‑api.js`.  Because the architecture is modular, this addition does not affect existing adapters or the logging pipeline.
+4. **Leverage the TranscriptUnifier for unit testing** – when adding new source agents or altering existing ones, write tests that feed representative raw transcripts into the unifier and assert that the output matches the configured unified schema.  This isolates conversion logic from the rest of the pipeline and helps maintain correctness as the system evolves.  
 
-5. **Error Propagation** – Capture any errors thrown by the processor and surface them through the LiveLoggingSystem’s error‑handling mechanisms.  Do not swallow exceptions; they provide valuable signals for debugging malformed transcripts.
+5. **Coordinate schema changes with sibling components** – because the unified format is shared across the LiveLoggingSystem ecosystem, any modification to the format should be communicated to the owners of **OntologyManager**, **LoggingMechanism**, and other consumers to avoid runtime mismatches.  
 
 ---
 
-### Architectural patterns identified
-* Modular architecture with clear separation of concerns  
-* Layered / API‑facade style (agent‑api layer)  
-* Implicit Adapter pattern for handling multiple agent transcript formats  
+### Architectural patterns identified  
+* Pipeline architecture for staged processing of transcript data.  
+* Configuration‑driven unified data model.  
+* Composition (TranscriptProcessor → TranscriptUnifier).  
 
-### Design decisions and trade‑offs
-* **Location in `lib/agent‑api`** – centralises transcript handling but couples it to the agent API layer.  
-* **Separate LoggingModule** – improves maintainability but introduces an extra hand‑off that must be kept in sync.  
-* **Modularity vs. Over‑head** – fine‑grained modules increase clarity but add import/initialisation overhead.
+### Design decisions and trade‑offs  
+* **Unified format** simplifies integration but introduces a configuration burden and a single point of schema truth.  
+* **High‑volume pipeline** favors lightweight, possibly asynchronous stages, at the cost of limiting complex, blocking logic within the pipeline.  
+* **Separation of unification logic** into a child component improves testability and modularity, though it adds an extra indirection layer.  
 
-### System structure insights
-* LiveLoggingSystem is the parent orchestrator, containing TranscriptProcessor and LoggingModule as sibling sub‑components.  
-* TranscriptProcessor acts as the gateway between external agents and the internal logging pipeline, normalising data for downstream consumption.
+### System structure insights  
+* TranscriptProcessor is a child of LiveLoggingSystem and a peer to OntologyManager, LoggingMechanism, LSLConfigManager, and OntologyClassificationAgent.  
+* It encapsulates a child component (TranscriptUnifier) that performs the core transformation.  
 
-### Scalability considerations
-* Adding new agent formats is straightforward: introduce a new adapter without touching existing code.  
-* Independent modules can be scaled horizontally (e.g., running multiple processor instances) because they expose pure functions/classes without hidden state.  
+### Scalability considerations  
+* The pipeline is explicitly described as capable of handling high‑volume data, implying design choices such as async buffering, minimal object allocation, and configurable parallelism.  
+* Configuration‑driven format allows the system to adapt the payload size (e.g., dropping optional fields) to meet performance targets.  
 
-### Maintainability assessment
-* Strong separation of concerns and modular file layout (e.g., `transcript‑api.js` vs. `logging.ts`) make the codebase easy to navigate and test.  
-* Centralising format conversion in one place reduces duplication and eases future updates.  
-* The reliance on internal modules rather than external dependencies limits version‑compatibility risks, further supporting long‑term maintainability.
+### Maintainability assessment  
+* Clear separation between conversion (TranscriptUnifier) and pipeline orchestration aids maintainability.  
+* Centralized configuration reduces code churn when schema changes are needed, but requires disciplined change management across all consumers.  
+* Lack of exposed code symbols suggests that documentation and tests around the unifier and pipeline stages are critical to preserve understandability as the component evolves.
+
+## Diagrams
+
+### Relationship
+
+![TranscriptProcessor Relationship](images/transcript-processor-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/transcript-processor-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's architecture is modular, with separate modules for logging, transcript processing, and ontology classification. This is evident in the way the code is organized, with different files and directories dedicated to each module. For example, the logging utilities are handled in the integrations/mcp-server-semantic-analysis/src/logging.ts file, while the transcript processing is handled in the lib/agent-api/transcript-api.js file. The use of a modular architecture allows for easier maintenance and scalability of the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, for classifying observations against the ontology system. This agent is crucial in providing a standardized way of categorizing and understanding the interactions within the Claude Code conversations. The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities. For instance, the agent initializes the ontology system by loading the necessary configuration files and setting up the classification models. This is evident in the code, where the constructor of the OntologyClassificationAgent class calls the initOntologySystem method, which in turn loads the configuration files and sets up the classification models.
+
+### Children
+- [TranscriptUnifier](./TranscriptUnifier.md) -- The parent analysis suggests the existence of a TranscriptUnifier component, which is a key aspect of the TranscriptProcessor sub-component.
 
 ### Siblings
-- [LoggingModule](./LoggingModule.md) -- The LoggingModule is implemented in the integrations/mcp-server-semantic-analysis/src/logging.ts file, which suggests a centralized approach to logging.
+- [OntologyManager](./OntologyManager.md) -- The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities.
+- [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism uses async buffering to handle high-volume logging scenarios.
+- [LSLConfigManager](./LSLConfigManager.md) -- The LSLConfigManager uses a validation mechanism to ensure configuration data is correct and consistent.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities.
 
 
 ---

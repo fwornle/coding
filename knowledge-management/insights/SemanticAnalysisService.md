@@ -2,130 +2,159 @@
 
 **Type:** SubComponent
 
-The implementation of the SemanticAnalysisService ensures that all database interactions are properly abstracted, making it easier to switch to a different database if needed.
+The SemanticAnalysisService sub-component uses the GraphDatabaseAdapter to store the analyzed data in the graph database.
 
-## What It Is  
+**SemanticAnalysisService – Technical Insight Document**  
 
-The **SemanticAnalysisService** lives in the source tree at `lib/semantic-analysis/semantic-analysis-service.ts`.  Its primary responsibility is to run the semantic‑analysis pipeline for incoming code artefacts and to persist the resulting analysis artefacts in the graph store.  All persistence operations are performed through the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`.  The service is packaged as a sub‑component of the broader **DockerizedServices** component and is consumed directly by the `mcp-server-semantic-analysis` service, which exposes the analysis capability to external callers.
-
-## Architecture and Design  
-
-The design of the SemanticAnalysisService is built around a few clear architectural choices that emerge directly from the observed code:
-
-1. **Adapter‑based Persistence Layer** – The service does not talk to the graph database directly.  Instead it relies on the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  This is a classic **Adapter pattern** that presents a *standardized interface* for all graph‑database interactions, allowing the service (and its siblings such as `CodeGraphAnalysisService`) to remain agnostic of the underlying storage implementation.  
-
-2. **Concurrency via Work‑Stealing** – Inside `semantic-analysis-service.ts` the analysis work is dispatched to a pool that employs **work‑stealing**.  This concurrency model enables threads that finish early to “steal” pending tasks from busier threads, balancing load automatically and improving throughput on multi‑core hosts.  
-
-3. **Lazy Initialization** – The service defers creation of heavyweight objects (e.g., the adapter instance and any internal caches) until they are first needed.  This **lazy‑initialization** strategy reduces start‑up latency for the Docker container that hosts the service, which is especially valuable when the service is part of the larger **DockerizedServices** suite that may be spun up on demand.  
-
-4. **Abstraction for Database Swappability** – By routing all DB calls through the adapter, the implementation guarantees that swapping the underlying graph store (e.g., moving from Neo4j to an in‑memory graph) requires only changes inside `storage/graph-database-adapter.ts`.  This aligns with the **Dependency Inversion Principle**, keeping high‑level analysis logic independent of low‑level storage details.  
-
-These patterns interlock: the service’s core logic stays pure and testable, the adapter shields it from storage concerns, and the concurrency + lazy‑init mechanisms ensure the component scales efficiently without unnecessary resource consumption.
-
-## Implementation Details  
-
-The heart of the component is the class (or exported function) defined in `lib/semantic-analysis/semantic-analysis-service.ts`.  While the exact symbol names are not listed, the observations highlight three functional aspects:
-
-* **Graph Interaction** – Calls such as `graphAdapter.saveAnalysisResult(id, payload)` and `graphAdapter.fetchResult(id)` are made throughout the service.  The adapter implements a **standardized interface** (e.g., `saveNode`, `query`, `delete`) that abstracts the Cypher or Gremlin queries required by the underlying graph engine.  
-
-* **Work‑Stealing Scheduler** – The service creates a worker pool (likely using Node.js worker threads or a library such as `poolifier`).  Tasks representing individual analysis jobs are placed onto a shared queue.  When a worker’s local queue empties, it probes other workers’ queues and “steals” work, as described in the observation about work‑stealing concurrency.  This approach maximizes CPU utilisation for CPU‑bound semantic analysis algorithms (e.g., AST traversal, symbol resolution).  
-
-* **Lazy Initialization** – The adapter instance and any heavy analysis artefacts (e.g., language models, rule sets) are wrapped in getter functions that instantiate the object on first access.  Pseudocode from the file shows patterns like:  
-
-  ```ts
-  let _graphAdapter: GraphDatabaseAdapter | null = null;
-  function getGraphAdapter(): GraphDatabaseAdapter {
-      if (!_graphAdapter) {
-          _graphAdapter = new GraphDatabaseAdapter(/* config */);
-      }
-      return _graphAdapter;
-  }
-  ```
-
-  This ensures that if the service is started but never receives an analysis request, the cost of connecting to the graph database is avoided.
-
-The service also exposes a **standardized public API** (likely a class method `analyze(source: string): Promise<AnalysisResult>` or a similar function) that the `mcp-server-semantic-analysis` service invokes.  The API returns a promise that resolves once the analysis is stored and the result identifier is available.
-
-## Integration Points  
-
-* **Parent – DockerizedServices** – As a child of **DockerizedServices**, the SemanticAnalysisService is containerised alongside its siblings (`ConstraintMonitoringService`, `CodeGraphAnalysisService`, etc.).  All of these services share the same `storage/graph-database-adapter.ts` implementation, which means they can operate against a common graph instance without duplicated connection logic.  
-
-* **Sibling Interaction** – The sibling `CodeGraphAnalysisService` also uses the GraphDatabaseAdapter, indicating a **shared persistence contract** across the Dockerized ecosystem.  This contract simplifies cross‑service queries; for example, a constraint‑monitoring rule could reference a semantic‑analysis node directly because both are stored using the same adapter schema.  
-
-* **Child – GraphDatabaseInteraction** – The child component **GraphDatabaseInteraction** is essentially the concrete implementation of the adapter.  Any changes to query optimisation, schema migrations, or connection pooling happen inside `storage/graph-database-adapter.ts` and are automatically reflected in the SemanticAnalysisService without code changes.  
-
-* **External Consumer – mcp-server-semantic-analysis** – The `mcp-server-semantic-analysis` service imports the public API from `semantic-analysis-service.ts`.  It forwards HTTP or RPC requests to the service, handling request validation, authentication, and response formatting.  Because the service’s interface is stable and abstracted, the server can evolve independently (e.g., adding new endpoints) without touching the analysis core.  
-
-* **Configuration & Environment** – The adapter likely reads connection parameters (host, credentials) from environment variables supplied to the Docker container.  This decouples deployment configuration from source code, adhering to the twelve‑factor app principle.
-
-## Usage Guidelines  
-
-1. **Invoke Through the Public API** – Call the exported analysis function (e.g., `analyze(sourceCode)`) rather than interacting with the adapter directly.  This guarantees that work‑stealing concurrency and lazy initialization are honoured.  
-
-2. **Do Not Manually Instantiate the Adapter** – The service expects to obtain the adapter via its internal lazy getter.  Creating a separate instance can break the singleton‑like behaviour and lead to duplicate connections.  
-
-3. **Respect Concurrency Limits** – The work‑stealing pool size is configured inside `semantic-analysis-service.ts`.  When embedding the service in custom scripts, avoid spawning additional worker threads that compete for the same CPU resources, as this can degrade the pool’s load‑balancing efficiency.  
-
-4. **Handle Promise Results Properly** – The analysis call returns a `Promise<AnalysisResult>`.  Ensure you `await` the promise or attach `.then/.catch` handlers to propagate errors (e.g., DB connectivity failures) back to the caller.  
-
-5. **Leverage the Standardized Interface for Future DB Swaps** – If a project decides to replace the underlying graph store, only `storage/graph-database-adapter.ts` needs to be updated.  No changes are required in the SemanticAnalysisService or its consumers, provided the adapter continues to honour the same method signatures.  
-
-6. **Testing** – Unit tests should mock the GraphDatabaseAdapter rather than the real database.  Because the adapter is the sole external dependency, a simple stub that implements the same interface is sufficient to verify analysis logic and concurrency behaviour.  
+*Sub‑component of **SemanticAnalysis** (implemented in the `integrations/mcp-server-semantic-analysis`* codebase).  
 
 ---
 
-### 1. Architectural patterns identified  
+## What It Is  
 
-* **Adapter pattern** – `GraphDatabaseAdapter` abstracts the graph database.  
-* **Work‑stealing concurrency** – dynamic load balancing across worker threads.  
-* **Lazy initialization** – deferred creation of heavy objects.  
-* **Dependency inversion** – high‑level analysis code depends on an abstract adapter, not a concrete DB client.  
+SemanticAnalysisService is the core execution engine that turns raw input data into semantically enriched knowledge. The service lives inside the **SemanticAnalysis** component and is wired through the `semantic-analysis-configuration.yaml` file. Its responsibilities are three‑fold:  
+
+1. **Invoke LLM services** – it forwards the incoming payload to the language‑model layer (the LLMIntegration sibling) to obtain natural‑language‑level interpretations.  
+2. **Enrich and persist the result** – the service hands the LLM output to the **OntologyClassificationAgent** and **CodeGraphAgent** (both built on top of `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) to map entities onto the system ontology and to construct a code‑structure graph. The enriched graph is then stored via the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  
+3. **Trigger downstream insight generation** – once the graph is persisted, the service calls the **Insights** sub‑component, which consumes the pipeline and ontology results to produce actionable insights.  
+
+All of these steps are orchestrated under the configuration defined in `semantic-analysis-configuration.yaml`, allowing operators to enable/disable agents, choose LLM providers, or point the service at different graph‑database instances.
+
+---
+
+## Architecture and Design  
+
+The architecture is **modular** and **agent‑centric**. A lightweight **BaseAgent** (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) provides common plumbing (logging, error handling, lifecycle hooks). Both the **OntologyClassificationAgent** (`.../ontology-classification-agent.ts`) and the **CodeGraphAgent** (`.../code-graph-agent.ts`) inherit from this base, exemplifying an **inheritance‑based reuse pattern** that keeps agent implementations focused on domain logic while sharing cross‑cutting concerns.
+
+Communication between the service and the graph store is mediated by the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). The adapter implements an **Observer pattern**: it publishes change events (e.g., “nodeCreated”, “relationshipAdded”) that other components—such as the **Insights** sub‑component—can subscribe to without tight coupling. This decoupling supports scalability and eases future extensions (e.g., adding a monitoring agent).
+
+Configuration is externalized in a YAML file (`semantic-analysis-configuration.yaml`). This **configuration‑as‑code** approach enables runtime re‑configuration without code changes, a design decision that trades a small amount of validation complexity for operational flexibility.
+
+Overall, the service sits at the intersection of several sibling modules:
+
+* **Pipeline** – shares the same BaseAgent foundation, reinforcing a consistent processing contract.  
+* **Ontology** – provides the classification logic that the service re‑uses via OntologyClassificationAgent.  
+* **OntologyManagement** – also consumes OntologyClassificationAgent, illustrating a **shared‑service** model.  
+* **LLMIntegration** – supplies the underlying language‑model calls that SemanticAnalysisService orchestrates.  
+
+The child component **SemanticConstraintDetection** (documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`) plugs into the service’s output graph to enforce domain‑specific constraints, reinforcing a **pipeline‑extension** design.
+
+---
+
+## Implementation Details  
+
+1. **Entry Point & Configuration** – When a request arrives, SemanticAnalysisService reads `semantic-analysis-configuration.yaml`. The file enumerates enabled agents, LLM endpoint URLs, and the target graph‑database connection string. The service constructs agent instances dynamically based on this map, ensuring that only the configured agents are instantiated.  
+
+2. **LLM Invocation** – The service calls a method in the **LLMIntegration** sibling (e.g., `LLMClient.analyze(input)`). The response is a structured JSON payload containing extracted entities, intents, and raw text summaries.  
+
+3. **Ontology Classification** – The payload is handed to `OntologyClassificationAgent` (`.../ontology-classification-agent.ts`). This agent extends `BaseAgent` and implements a `classify(entity)` routine that matches extracted entities against the ontology definitions managed by **OntologyManagement**. The result is a set of ontology node identifiers.  
+
+4. **Code Graph Construction** – Parallel to classification, `CodeGraphAgent` (`.../code-graph-agent.ts`) parses any code‑related snippets, builds an abstract syntax representation, and creates graph nodes/edges that model relationships such as “calls”, “inherits”, or “defines”.  
+
+5. **Persisting to Graph DB** – Both agents pass their node/edge collections to `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`). The adapter translates the in‑memory model into Cypher (or the native query language of the underlying graph store) and executes the transaction. As each mutation occurs, the adapter emits observer events (`onNodeCreated`, `onRelationshipAdded`).  
+
+6. **Insight Generation** – After a successful commit, the service triggers the **Insights** sub‑component. Insights consumes the observer events (or directly queries the graph) to synthesize higher‑level observations, such as “circular dependency detected” or “entity X appears in three unrelated domains”.  
+
+7. **Constraint Detection** – Finally, the **SemanticConstraintDetection** child component inspects the freshly persisted graph for violations (e.g., forbidden relationships defined in the constraint model) and reports them back to the caller or logs them for remediation.  
+
+No additional code symbols were listed in the observations, but the described flow follows the concrete file paths and class names that are present in the repository.
+
+---
+
+## Integration Points  
+
+| Integration | Path / Interface | Role |
+|-------------|------------------|------|
+| **LLMIntegration** | sibling module (e.g., `integrations/mcp-server-llm-integration`) | Provides `LLMClient.analyze` – the primary NLP service used by SemanticAnalysisService. |
+| **GraphDatabaseAdapter** | `storage/graph-database-adapter.ts` | Persists enriched graph data; implements Observer notifications consumed by Insights and other observers. |
+| **OntologyClassificationAgent** | `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` | Maps LLM‑extracted entities to ontology nodes; shares logic with OntologyManagement. |
+| **CodeGraphAgent** | `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` | Generates code‑structure graph elements from source snippets. |
+| **Insights** | sibling sub‑component (path not listed) | Subscribes to GraphDatabaseAdapter events to produce business‑level insights. |
+| **OntologyManagement** | sibling sub‑component (path not listed) | Supplies ontology definitions that ClassificationAgent relies on. |
+| **SemanticConstraintDetection** | documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` | Validates the persisted graph against domain constraints. |
+| **Configuration** | `semantic-analysis-configuration.yaml` | External YAML file that drives which agents are active and how external services are addressed. |
+
+All these integrations are **loose‑coupled** via interfaces (e.g., the adapter’s observer callbacks) and configuration‑driven wiring, which keeps the service replaceable and testable.
+
+---
+
+## Usage Guidelines  
+
+1. **Configuration First** – Always verify `semantic-analysis-configuration.yaml` before deploying or testing. Enable only the agents required for a given workload to reduce unnecessary LLM calls and graph writes.  
+
+2. **Agent Lifecycle** – Agents inherit from `BaseAgent`; they should be instantiated through the service’s factory method rather than directly, to ensure proper registration with the GraphDatabaseAdapter’s observer system.  
+
+3. **Idempotent Calls** – Because the service writes to a graph database, callers should design their upstream logic to avoid duplicate submissions for the same logical payload, or rely on the adapter’s internal upsert semantics (if configured).  
+
+4. **Error Propagation** – Errors from the LLM layer, ontology lookup, or graph transaction bubble up to the service’s top‑level handler. Implement retry logic at the caller level for transient LLM or database failures, but avoid retry loops that could cause duplicate graph entries.  
+
+5. **Monitoring & Observability** – Subscribe to the GraphDatabaseAdapter’s observer events (e.g., via a logging listener) to gain visibility into node/relationship creation rates. This is especially useful when scaling the service horizontally.  
+
+6. **Constraint Awareness** – When extending the system with new ontology concepts, update the **SemanticConstraintDetection** documentation (`semantic-constraint-detection.md`) accordingly, otherwise newly added nodes may bypass constraint checks.  
+
+---
+
+## Summary of Architectural Insights  
+
+### 1. Architectural patterns identified  
+* **Modular, agent‑centric architecture** – agents built on a shared `BaseAgent`.  
+* **Observer pattern** – implemented in `GraphDatabaseAdapter` for decoupled event propagation.  
+* **Configuration‑as‑code (YAML)** – externalizes service wiring and feature toggles.  
 
 ### 2. Design decisions and trade‑offs  
-
-| Decision | Benefit | Trade‑off |
-|----------|---------|-----------|
-| Use a dedicated GraphDatabaseAdapter | Decouples analysis logic from storage; easy DB replacement | Adds an extra indirection layer; requires maintenance of adapter code |
-| Work‑stealing thread pool | Maximizes CPU utilisation for CPU‑bound analysis | Increases implementation complexity; may introduce subtle race conditions if not carefully guarded |
-| Lazy initialization of adapter & caches | Faster container start‑up, lower memory footprint when idle | First request incurs initialization latency; must guard against concurrent first‑call races |
-| Expose a thin, promise‑based public API | Simple consumption by `mcp-server-semantic-analysis`; async‑friendly | Limited flexibility for advanced use‑cases (e.g., streaming large payloads) without extending the API |
+* **LLM‑driven analysis** gives rich semantic extraction but introduces external latency and cost; mitigated by optional agent toggling.  
+* **Graph database persistence** enables expressive relationship queries and insight generation, at the cost of requiring a dedicated graph store and handling eventual consistency.  
+* **Shared agents** (OntologyClassificationAgent used by both SemanticAnalysisService and OntologyManagement) reduce duplication but create a coupling point that must be version‑controlled carefully.  
 
 ### 3. System structure insights  
-
-* **DockerizedServices** acts as the hosting envelope, providing common runtime (Docker) and shared resources (graph DB).  
-* **SemanticAnalysisService** sits alongside other analysis‑oriented services, all of which consume the same **GraphDatabaseInteraction** child.  
-* The **parent‑child** relationship enforces a clear separation: the parent supplies container orchestration, the child supplies low‑level persistence, and the service itself focuses on domain logic.  
+* **Parent‑child hierarchy** – SemanticAnalysisService is a child of the **SemanticAnalysis** component and hosts the **SemanticConstraintDetection** child, forming a clear processing pipeline.  
+* **Sibling reuse** – the same BaseAgent and GraphDatabaseAdapter are leveraged by Pipeline, Ontology, and Insights, promoting a consistent contract across the ecosystem.  
 
 ### 4. Scalability considerations  
-
-* **Horizontal scaling** – Because persistence is abstracted, multiple container instances can point to a clustered graph database, allowing the analysis workload to be distributed across replicas.  
-* **CPU scaling** – Work‑stealing automatically spreads analysis tasks across available cores; adding more CPU resources in the Docker host linearly improves throughput up to the point of I/O saturation.  
-* **Cold‑start mitigation** – Lazy initialization reduces memory and connection overhead when scaling out many containers that may sit idle for periods.  
+* **Horizontal scaling of LLM calls** is straightforward because each request is stateless; a load balancer can distribute to multiple LLMIntegration instances.  
+* **Graph database writes** can become a bottleneck; employing batch inserts or asynchronous event handling (via the Observer pattern) can alleviate pressure.  
+* **Agent configurability** allows selective activation, enabling lightweight deployments for high‑throughput scenarios.  
 
 ### 5. Maintainability assessment  
+* **High maintainability** – the BaseAgent abstraction centralizes cross‑cutting concerns, making updates (e.g., logging format changes) propagate automatically.  
+* **Observer‑based decoupling** reduces ripple effects when adding new consumers of graph events.  
+* **YAML‑driven configuration** keeps feature toggles external to code, simplifying environment‑specific adjustments.  
+* **Potential risk** – reliance on external LLM services and a single graph store means that version mismatches or API changes must be tracked closely; comprehensive integration tests are essential.  
 
-The component is **highly maintainable** due to:
+---  
 
-* **Clear separation of concerns** – analysis, persistence, and concurrency are isolated in distinct modules/files.  
-* **Adapter abstraction** – database changes are localized to a single file (`storage/graph-database-adapter.ts`).  
-* **Standardised interface** – consumers (e.g., `mcp-server-semantic-analysis`) interact with a stable API, reducing ripple effects from internal refactors.  
+*This insight document is strictly derived from the provided observations and file paths, without extrapolating undocumented patterns.*
 
-Potential maintenance challenges include keeping the work‑stealing scheduler in sync with Node.js version updates and ensuring the lazy‑init logic remains race‑free as the codebase evolves. Regular unit tests that mock the adapter and stress‑test concurrency will help mitigate these risks.
+## Diagrams
+
+### Relationship
+
+![SemanticAnalysisService Relationship](images/semantic-analysis-service-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/semantic-analysis-service-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's utilization of the GraphDatabaseAdapter (storage/graph-database-adapter.ts) enables efficient data persistence and retrieval. This is evident in the way the adapter provides a standardized interface for interacting with the graph database, allowing for seamless integration with various services. For instance, the mcp-server-semantic-analysis service leverages this adapter to store and retrieve semantic analysis results, as seen in the lib/semantic-analysis/semantic-analysis-service.ts file. The adapter's implementation of the GraphDatabase interface (storage/graph-database-adapter.ts) ensures that all database interactions are properly abstracted, making it easier to switch to a different database if needed.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents. This design pattern promotes code reuse and maintainability, allowing developers to easily add or modify agents without affecting the overall system. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) are built on top of the BaseAgent, demonstrating the effectiveness of this modular approach. The use of design patterns such as the Observer pattern for handling notifications and updates, as observed in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), further enhances the system's maintainability and scalability.
 
 ### Children
-- [GraphDatabaseInteraction](./GraphDatabaseInteraction.md) -- The GraphDatabaseAdapter (storage/graph-database-adapter.ts) is utilized by the SemanticAnalysisService to interact with the graph database.
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md file provides documentation on semantic constraint detection, indicating its importance in the SemanticAnalysisService.
 
 ### Siblings
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService incorporates health verification mechanisms to ensure the service is functioning correctly.
-- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code graph analysis results.
-- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager is responsible for managing LLM services, including lazy initialization and health verification.
-- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator is responsible for deploying and managing Docker containers for coding services.
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying entities into the ontology.
+- [Insights](./Insights.md) -- The Insights sub-component uses the results of the Pipeline and Ontology sub-components to generate insights.
+- [OntologyManagement](./OntologyManagement.md) -- The OntologyManagement sub-component uses the OntologyClassificationAgent to classify entities into the ontology.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationModule sub-component uses the validation.ts module to validate the input data.
+- [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstruction sub-component uses the CodeGraphAgent to analyze the code structure.
+- [LLMIntegration](./LLMIntegration.md) -- The LLMIntegration sub-component uses the LLM services to analyze the input data.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses the graph-database-adapter.ts module to adapt the graph database.
 
 
 ---

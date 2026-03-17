@@ -2,124 +2,142 @@
 
 **Type:** SubComponent
 
-The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) dispatches hook events and registers handlers, allowing for decoupling of the hook configuration from the specific implementation details.
+The ViolationCaptureModule utilizes the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
 
-## What It Is  
-
-The **ViolationCaptureModule** lives inside the **ConstraintSystem** component and is the dedicated sub‑component that records, persists, and surfaces constraint‑violation events detected by the system.  Although the repository does not expose concrete source files for this module (the “Code Structure” entry shows *0 code symbols found*), the surrounding observations make clear where its responsibilities sit: it is the sink for violation data that originates from the hook infrastructure managed by `UnifiedHookManager` (`lib/agent-api/hooks/hook-manager.js`) and the configuration supplied by `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`).  
-
-In practice, the module is expected to accept violation payloads emitted by the hook system, store them (e.g., in a database or file store), log the occurrence, optionally filter or aggregate the data for analysis, and forward notifications (email, alerts, etc.) to downstream consumers such as the **WorkflowOrchestrator** sibling component.  Its primary purpose is therefore to provide a reliable, queryable record of constraint breaches that can be consumed by other parts of the platform for reporting, remediation, or automated workflow triggers.
+**ViolationCaptureModule – Technical Insight Document**  
 
 ---
 
-## Architecture and Design  
+### What It Is  
 
-The architectural posture of the **ViolationCaptureModule** is shaped by the patterns already evident in its parent, **ConstraintSystem**.  The parent leverages the **Observer pattern** (via `UnifiedHookManager`) to broadcast hook events and the **Factory pattern** (via `HookConfigLoader`) to assemble hook configurations.  The ViolationCaptureModule sits at the *observer* end of this pipeline: it registers as a handler for specific hook events (e.g., “constraint‑violation”) and therefore benefits from the loose coupling that the Observer pattern provides.  Because the hook manager does not need to know the concrete implementation of the handler, the ViolationCaptureModule can evolve independently—adding new persistence back‑ends, filtering rules, or notification channels without requiring changes to the hook infrastructure.
+The **ViolationCaptureModule** lives inside the *mcp‑constraint‑monitor* integration and is the component responsible for detecting, capturing, and persisting constraint‑violation events that arise during batch analysis.  Its primary artefacts are the documentation files  
 
-The module’s design also hints at a **pipeline** style processing chain:
+* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – the **ConstraintConfigurationGuide** that drives how constraints are expressed, and  
+* `integrations/mcp-constraint-monitor/README.md` – an overview that ties the module to the broader **ConstraintSystem**.  
 
-1. **Capture** – receives a violation object from the hook manager.  
-2. **Persist** – writes the object to a durable store (database or file system).  
-3. **Log** – emits a structured log entry through the system‑wide logging framework.  
-4. **Filter/Aggregate** – optional in‑memory or batch processing to reduce noise or compute statistics.  
-5. **Notify** – triggers external alerts (email, webhook, etc.) and forwards a reference to the **WorkflowOrchestrator**.
-
-While the observations do not name a specific “pipeline” class, the sequence is implied by the listed capabilities (storage, logging, filtering, notification).  This design keeps each concern isolated, supporting the **Single Responsibility Principle** and making the module amenable to unit testing and future extension.
+At runtime the module participates in a **DAG‑based execution model** defined in `batch-analysis.yaml`, where each step is topologically sorted to guarantee that violations are recorded only after the prerequisite analyses have completed.  The captured violations are stored in a form that can be efficiently queried, and a shared ontology metadata field is populated to avoid re‑classifying the same code fragment with an LLM later on.
 
 ---
 
-## Implementation Details  
+### Architecture and Design  
 
-Because concrete symbols are missing, the implementation can be inferred from the responsibilities described:
+The observations reveal a **modular architecture** that mirrors the overall design of its parent, **ConstraintSystem**.  The system is split into self‑contained sub‑components—ViolationCaptureModule, ContentValidationModule, HookManagementModule, GraphDatabaseAdapter, and SemanticAnalysisModule—each addressing a distinct concern of constraint monitoring.  This decomposition follows a *separation‑of‑concerns* pattern, allowing each module to be built, tested, and released independently (Observation 4).
 
-* **Handler Registration** – The module likely registers a callback with `UnifiedHookManager` (e.g., `hookManager.registerHandler('violation', handlerFn)`).  This registration occurs during the start‑up of the ConstraintSystem, ensuring that any hook that detects a rule breach will invoke the module’s entry point.
+Interaction between modules is orchestrated through a **directed‑acyclic‑graph (DAG) execution model**.  The `batch-analysis.yaml` file defines a series of analysis steps; a topological sort ensures that dependent steps (e.g., semantic analysis) run before violation capture, guaranteeing that the necessary context is available.  This workflow‑oriented pattern provides deterministic ordering without circular dependencies.
 
-* **Persistence Layer** – A storage abstraction (perhaps an interface named `ViolationStore`) would be injected into the module.  Implementations could target a relational DB, a NoSQL document store, or a flat file, matching the observation that “a data storage mechanism, such as a database or file system” is used.  The module would call a method like `store.save(violationRecord)`.
+A second design element is the **shared ontology metadata field** (Observation 5).  Both ViolationCaptureModule and GraphDatabaseAdapter write to this field, effectively acting as a cache that prevents redundant LLM re‑classification of the same code entity.  The pattern here is a lightweight *metadata‑driven cache* that reduces costly LLM invocations while keeping the ontology consistent across modules.
 
-* **Logging** – The module utilizes the system‑wide logging framework (e.g., `logger.info({event: 'violation', id: …})`).  By logging at a structured level, it enables downstream log aggregation tools to index and search for violation events.
-
-* **Filtering / Aggregation** – Prior to persistence or notification, the module may apply simple filters (e.g., severity thresholds) or batch aggregation (e.g., count violations per rule over a time window).  This could be implemented as a small utility class (`ViolationProcessor`) that receives raw events and returns a processed payload.
-
-* **Notification** – When a violation meets certain criteria, the module invokes a notifier component (`Notifier.sendEmail`, `Notifier.sendAlert`).  The observation that “a notification system, such as email or alerts” may be used suggests the presence of an abstraction that can be swapped (SMTP, Slack webhook, etc.).
-
-* **Integration with WorkflowOrchestrator** – After persisting and optionally notifying, the module likely emits a higher‑level event (e.g., `workflowOrchestrator.handleViolation(violationId)`) so that the orchestrator can incorporate the violation into its workflow definitions.  This mirrors the sibling relationship described in the hierarchy context.
-
-All of these pieces would be wired together in a composition root (perhaps `constraint-system/index.js`) where the factory (`HookConfigLoader`) creates the hook configuration, the hook manager registers the ViolationCaptureModule’s handler, and any required dependencies (store, logger, notifier) are instantiated.
+Documentation is treated as a first‑class integration artifact.  The module reads its configuration rules from `constraint-configuration.md`, and its public contract is described in the README.  This *documentation‑driven configuration* pattern keeps the runtime behaviour decoupled from hard‑coded values and makes the system adaptable to new constraints without code changes.
 
 ---
 
-## Integration Points  
+### Implementation Details  
 
-1. **UnifiedHookManager (`lib/agent-api/hooks/hook-manager.js`)** – The primary entry point for violation events.  The ViolationCaptureModule registers as a listener, receiving payloads that have already been normalized by the hook system.
+* **Configuration Guide** – The file `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is parsed by the ViolationCaptureModule at start‑up.  It defines the syntax and semantics of each constraint (e.g., naming conventions, dependency rules).  Because the guide is a child component of the module, any change to the markdown is immediately reflected in the next analysis run, eliminating the need for recompilation.
 
-2. **HookConfigLoader (`lib/agent-api/hooks/hook-config.js`)** – Supplies configuration that may dictate which hooks are active and what severity levels should trigger persistence or notification.  Because the loader follows the Factory pattern, new hook configurations can be added without touching the ViolationCaptureModule.
+* **DAG Execution** – The workflow is declared in `batch-analysis.yaml`.  Each node represents a processing stage (e.g., “SemanticConstraintDetection”, “CaptureViolations”).  The module registers its “CaptureViolations” node with a list of prerequisite nodes.  The orchestrator performs a **topological sort** to produce an execution order; nodes with no dependencies can be processed in parallel, while the ViolationCapture step is scheduled after all detection steps have finished.  This guarantees that the module receives a complete set of candidate violations.
 
-3. **WorkflowOrchestrator (sibling)** – Consumes references to persisted violations to drive workflow actions (e.g., opening a ticket, pausing a process).  The module likely calls a public method on the orchestrator or publishes an event on a shared event bus.
+* **Violation Capture & Storage** – When invoked, the module iterates over the list of detected constraint breaches, enriches each record with the shared ontology metadata (preventing duplicate LLM classification), and persists the result.  Although the concrete storage backend is not listed in the observations, the parent **ConstraintSystem** employs a **GraphDatabaseAdapter**, suggesting that violations are likely stored in a graph database to support complex relationship queries.
 
-4. **Logging Framework** – The module writes structured logs; the exact logger is not named but is assumed to be the same one used throughout the ConstraintSystem (e.g., `winston`, `pino`).
+* **Shared Ontology Metadata** – Both ViolationCaptureModule and GraphDatabaseAdapter write a canonical metadata field (e.g., `ontologyClassId`) into the persisted entity.  This field acts as a deterministic identifier for the LLM‑derived classification, allowing downstream components to skip re‑classification if the identifier is already present.  The design reduces LLM latency and cost while preserving semantic fidelity.
 
-5. **Notification Sub‑system** – External services (SMTP server, alerting platform) are invoked via a notifier abstraction.  The module does not embed protocol details, preserving decoupling.
-
-6. **Persistence Backend** – The module’s storage implementation may be swapped (DB vs. file system) without affecting its public contract, thanks to the abstract `ViolationStore` interface implied by the observations.
-
-These integration points illustrate a **layered** interaction model: the ViolationCaptureModule sits in the *service* layer, receiving events from the *infrastructure* layer (hooks) and feeding results to both *observability* (logging/notification) and *orchestration* (WorkflowOrchestrator) layers.
+* **Independence** – Because the module’s logic is encapsulated behind the DAG step and its configuration is externalised, developers can replace the underlying capture algorithm or swap the storage adapter without touching sibling modules.  The modular boundary is reinforced by the fact that the module does not import code from ContentValidationModule, HookManagementModule, or SemanticAnalysisModule; it only consumes their outputs via the DAG.
 
 ---
 
-## Usage Guidelines  
+### Integration Points  
 
-* **Register Early** – Ensure that the ViolationCaptureModule’s handler is registered with `UnifiedHookManager` during application start‑up before any hooks fire.  Delayed registration can cause missed violations.
+* **Parent – ConstraintSystem** – ViolationCaptureModule is a child of **ConstraintSystem**, which coordinates all monitoring sub‑components.  The parent provides the overall DAG definition (`batch-analysis.yaml`) and ensures that the module’s output (captured violations) is fed into higher‑level analytics or reporting pipelines.
 
-* **Configure Severity** – Use `HookConfigLoader` to define which violation severities should be persisted versus merely logged.  Align these settings with operational policies to avoid storage overload.
+* **Sibling – GraphDatabaseAdapter** – The adapter is responsible for persisting entities, including the ontology metadata that ViolationCaptureModule writes.  This tight coupling around the shared metadata field enables the “prevent redundant LLM re‑classification” optimisation (Observation 5).
 
-* **Choose an Appropriate Store** – For high‑throughput environments, prefer a database that supports bulk inserts and indexing on violation fields (e.g., rule ID, timestamp).  For low‑volume or prototype setups, a simple file‑based store may suffice.
+* **Sibling – SemanticAnalysisModule** – Generates the raw constraint‑violation candidates that ViolationCaptureModule later records.  The module consumes the semantic analysis results via the DAG’s data flow, but does not directly call any of its classes; the dependency is declarative in `batch-analysis.yaml`.
 
-* **Leverage Structured Logging** – Emit logs with a consistent schema (`event: 'violation', ruleId, severity, timestamp`).  This enables downstream log analysis tools to correlate violations with other system events.
+* **Sibling – HookManagementModule** – While not directly invoked, the hook system may be used to trigger custom actions after violations are stored (e.g., notifications).  The presence of a hook framework suggests that ViolationCaptureModule could expose hook points for extensions.
 
-* **Throttle Notifications** – Implement rate‑limiting in the notifier to prevent alert fatigue.  The module’s filtering step can be used to batch similar violations before sending a single consolidated alert.
-
-* **Coordinate with WorkflowOrchestrator** – When extending workflow definitions, reference the violation ID stored by the module.  Ensure that any workflow that reacts to a violation checks the persisted record for the latest state (e.g., resolved, ignored).
-
-* **Maintain Test Coverage** – Because the module interacts with multiple external systems (hook manager, storage, logger, notifier, orchestrator), mock each dependency in unit tests and verify that the processing pipeline behaves correctly under success and failure scenarios.
+* **Child – ConstraintConfigurationGuide** – The markdown guide (`constraint-configuration.md`) is read at runtime to configure which constraints are active and how they should be interpreted.  Any addition of new constraint types is performed by editing this guide, making the module highly extensible without code changes.
 
 ---
 
-### Summary of Requested Items  
+### Usage Guidelines  
 
-**1. Architectural patterns identified**  
-* Observer pattern – via `UnifiedHookManager` broadcasting hook events to the ViolationCaptureModule.  
-* Factory pattern – via `HookConfigLoader` creating hook configurations that drive which violations are captured.  
-* Pipeline / processing chain – implied sequence of capture → persist → log → filter/aggregate → notify.
+1. **Keep the configuration guide up‑to‑date** – When adding or deprecating constraints, edit `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  The module reads this file on each batch run, so no code changes are required.
 
-**2. Design decisions and trade‑offs**  
-* Decoupling the capture logic from storage and notification through abstractions improves extensibility but adds indirection.  
-* Using a generic persistence interface permits swapping back‑ends but requires careful schema versioning.  
-* Optional filtering/aggregation reduces noise and storage cost at the expense of additional processing latency.
+2. **Respect the DAG ordering** – Do not manually invoke the capture step outside of the `batch-analysis.yaml` workflow.  The topological sort guarantees that all prerequisite analyses have completed; bypassing it can lead to incomplete or inconsistent violation records.
 
-**3. System structure insights**  
-* ViolationCaptureModule is a leaf sub‑component of **ConstraintSystem**, consuming events from the hook subsystem and feeding results to the sibling **WorkflowOrchestrator**.  
-* It sits between the low‑level hook infrastructure and higher‑level workflow/orchestration logic, acting as the persistence and observability bridge.
+3. **Leverage the shared ontology metadata** – When extending the ontology (e.g., adding new classification types), ensure that the metadata field name remains unchanged.  This preserves the cache‑like behaviour that prevents redundant LLM calls across GraphDatabaseAdapter and ViolationCaptureModule.
 
-**4. Scalability considerations**  
-* Persistence choice is critical: a high‑volume system should use a database that supports horizontal scaling and efficient indexing on violation attributes.  
-* The Observer‑based event dispatch can handle many concurrent listeners; however, the module’s internal processing (filtering, aggregation) must be non‑blocking or off‑loaded to worker queues to avoid back‑pressure on the hook manager.  
-* Notification throttling and batch aggregation help keep external alert channels from being overwhelmed.
+4. **Prefer read‑only interactions** – Treat the module as a consumer of analysis results; it should not modify the outputs of sibling modules.  This maintains the clear separation of concerns that underpins the modular design.
 
-**5. Maintainability assessment**  
-* Strong separation of concerns (handler, store, logger, notifier) yields high maintainability; each piece can be updated or replaced independently.  
-* Reliance on established patterns (Observer, Factory) aligns the module with the rest of the ConstraintSystem, making onboarding easier for developers familiar with the parent component.  
-* The lack of concrete code symbols in the repository suggests that documentation and interface contracts are especially important to prevent drift as the module evolves.  
+5. **Monitor storage performance** – Since violations are stored for efficient querying, ensure that the underlying graph database (or whatever persistence layer is used) is sized appropriately for the expected volume of violations.  Periodic cleanup of stale violation records can keep query latency low.
 
-Overall, the **ViolationCaptureModule** embodies a well‑structured, extensible approach to recording constraint violations, leveraging the existing hook‑based architecture of the **ConstraintSystem** while providing clear integration pathways for persistence, observability, and workflow orchestration.
+---
+
+## Architectural Patterns Identified  
+
+1. **Modular / Component‑Based Architecture** – Independent sub‑components (ViolationCaptureModule, ContentValidationModule, etc.) that can be built and deployed separately.  
+2. **DAG‑Based Workflow Execution** – `batch-analysis.yaml` defines a directed acyclic graph of analysis steps with topological sorting.  
+3. **Documentation‑Driven Configuration** – Runtime behaviour is driven by external markdown files (`constraint-configuration.md`).  
+4. **Metadata‑Driven Caching** – Shared ontology metadata field used to avoid redundant LLM classification.
+
+## Design Decisions and Trade‑offs  
+
+| Decision | Rationale | Trade‑off |
+|----------|-----------|-----------|
+| Modular decomposition of monitoring concerns | Enables independent development, testing, and maintenance (Obs 4). | Introduces inter‑module coordination overhead (DAG orchestration). |
+| DAG execution with topological sort | Guarantees deterministic ordering and allows parallel execution of independent steps. | Requires careful definition of dependencies; adds complexity to pipeline configuration. |
+| External markdown guide for constraint configuration | Allows non‑developers to adjust constraints without code changes. | Validation of the guide must be robust; malformed markdown can cause runtime errors. |
+| Shared ontology metadata field as a cache | Reduces costly LLM re‑classification, improving performance (Obs 5). | Couples modules to a specific metadata schema; schema changes ripple across modules. |
+
+## System Structure Insights  
+
+* **Parent‑Child Relationship:** ViolationCaptureModule is a child of **ConstraintSystem** and owns the **ConstraintConfigurationGuide**.  
+* **Sibling Interaction:** It consumes outputs from **SemanticAnalysisModule** and writes metadata consumed by **GraphDatabaseAdapter**; all interactions are orchestrated by the parent’s DAG.  
+* **Isolation:** No direct code imports between siblings; communication is data‑flow driven via the DAG, reinforcing loose coupling.  
+
+## Scalability Considerations  
+
+* **Horizontal Scaling of DAG Nodes:** Independent DAG branches (e.g., semantic analysis) can be parallelised across workers, allowing the capture step to keep pace with larger codebases.  
+* **Storage Scalability:** Since violations are stored for efficient querying, the underlying persistence layer must support high‑write throughput and indexed retrieval—graph databases are a natural fit given the parent’s use of GraphDatabaseAdapter.  
+* **Metadata Cache Effectiveness:** The shared ontology field reduces LLM load, which is a major scalability bottleneck; as the number of code entities grows, the cache’s hit‑rate becomes increasingly important.  
+
+## Maintainability Assessment  
+
+The **modular design** and **documentation‑driven configuration** give the ViolationCaptureModule a high maintainability rating.  Developers can modify constraint rules by editing a markdown file, and the DAG ensures that new analysis steps can be added without touching the capture logic.  The only maintenance risk lies in the tight coupling to the ontology metadata schema; any change to that schema must be propagated to both ViolationCaptureModule and GraphDatabaseAdapter.  Overall, the clear separation of concerns, explicit execution ordering, and reliance on external documentation make the module straightforward to evolve and debug.
+
+## Diagrams
+
+### Relationship
+
+![ViolationCaptureModule Relationship](images/violation-capture-module-relationship.png)
+
+
+### Architecture
+
+![ViolationCaptureModule Architecture](images/violation-capture-module-architecture.png)
+
+
+
+## Architecture Diagrams
+
+![architecture](../../.data/knowledge-graph/insights/images/violation-capture-module-architecture.png)
+
+![relationship](../../.data/knowledge-graph/insights/images/violation-capture-module-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a combination of design patterns, including the Observer pattern and the Factory pattern, to achieve loose coupling and increased maintainability. For instance, the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) employs the Observer pattern to dispatch hook events and register handlers, allowing for a decoupling of the hook configuration from the specific implementation details. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) uses the Factory pattern to manage unified hook configurations, providing a flexible and extensible way to configure hooks. This design decision enables the system to easily add or remove hooks without affecting the overall architecture.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component employs a modular architecture, with separate modules for different aspects of constraint monitoring. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis. This design decision allows for efficient and reliable operation, as each module can be developed, tested, and maintained independently. The use of graph database persistence enables the system to efficiently store and query complex relationships between code entities, while semantic analysis enables the system to understand the meaning and context of code actions and file operations.
+
+### Children
+- [ConstraintConfigurationGuide](./ConstraintConfigurationGuide.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a comprehensive guide for constraint configuration, which is utilized by the ViolationCaptureModule.
 
 ### Siblings
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator may use a workflow definition language, such as XML or JSON, to define and configure workflows.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [HookManagementModule](./HookManagementModule.md) -- The HookManagementModule utilizes the integrations/copi/docs/hooks.md documentation to provide a reference for hook functions.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
+- [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
 
 
 ---

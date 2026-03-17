@@ -2,98 +2,130 @@
 
 **Type:** SubComponent
 
-The ServiceOrchestrator utilizes the directory structure, with separate directories for each service, to organize and manage the coding services.
+The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
 
 ## What It Is  
 
-**ServiceOrchestrator** lives at the root of the Docker‑based codebase and is principally defined in the **`docker‑compose.yml`** file.  This compose manifest enumerates each individual service (each of which occupies its own sub‑directory under the repository) and declares the relationships that the orchestrator must respect when bringing the system up or tearing it down.  In addition to the generic orchestration logic, ServiceOrchestrator relies on the **`lib/llm/llm‑service.ts`** source file to expose a high‑level façade for all Large Language Model (LLM) interactions.  Together, these artifacts give ServiceOrchestrator the role of a **central coordination component** inside the larger **DockerizedServices** parent, ensuring that all coding‑related services start in the correct order, run with the appropriate dependencies, and shut down cleanly.
+The **ServiceOrchestrator** is the coordinating sub‑component that brings together the individual Docker‑containerised services defined for the overall *DockerizedServices* suite. Its definition lives primarily in the **docker‑compose.yaml** file that sits at the root of the repository, where each service—such as the constraint‑monitoring API server (implemented in `scripts/api‑service.js`) and the dashboard server (documented in `integrations/mcp‑constraint‑monitor/dashboard/README.md`)—is declared as a separate container.  The orchestrator’s role is to spin up, configure, and manage the lifecycle of these containers, wiring them together through a shared set of environment variables (e.g., `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `MEMGRAPH_BATCH_SIZE`, `CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`).  
+
+Because ServiceOrchestrator sits under the parent **DockerizedServices** component, it inherits the same modular, container‑per‑service philosophy that the parent promotes.  Its sibling components—**ConstraintMonitoringService** and **CodeGraphRAGService**—are themselves concrete services that the orchestrator brings up, each of which relies on the same configuration mechanisms (environment variables, shared networks, volume mounts) defined in the compose file.
+
+---
 
 ## Architecture and Design  
 
-The design that emerges from the observations is a **modular, container‑oriented architecture** driven by a classic *orchestrator* pattern.  Each functional area (e.g., semantic analysis, constraint monitoring, code‑graph construction) lives in its own directory, which maps directly to a Docker service entry in **`docker‑compose.yml`**.  ServiceOrchestrator reads this manifest and enforces **dependency ordering** – a service that other components rely on is started first, and shutdown proceeds in the reverse order.  
+The observable architecture is a **modular, container‑based composition** driven by Docker Compose.  The compose file acts as the declarative “blueprint” for the system, listing each service with its image, build context, environment, ports, and dependencies.  This design yields a clear separation of concerns: every logical piece of functionality (constraint monitoring, code‑graph RAG, dashboard UI) lives in its own container image and can be started, stopped, or scaled independently.
 
-A second, explicit design pattern is the **Facade** pattern provided by **`lib/llm/llm‑service.ts`**.  The `LLMService` class hides the complexities of mode routing, caching, and circuit‑breaking behind a simple public API.  This façade is consumed not only by ServiceOrchestrator itself but also by its sibling **LLMServiceManager**, reinforcing a shared‑service approach within the DockerizedServices family.  
+Two concrete design patterns emerge from the observations:
 
-The overall interaction flow can be summarized as:
+1. **Configuration‑by‑Environment‑Variable** – All services read their runtime settings from variables such as `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `MEMGRAPH_BATCH_SIZE`, and the port variables for the Code Graph RAG service.  This pattern keeps code immutable across environments and allows the orchestrator (via the compose file) to inject the appropriate values for development, testing, or production.
 
-1. Docker Compose parses **`docker‑compose.yml`** and creates containers for each service directory.  
-2. ServiceOrchestrator initiates the startup sequence, consulting the declared dependencies to determine order.  
-3. As services launch, any component that needs LLM capabilities calls into `LLMService` (via the façade in **`lib/llm/llm‑service.ts`**).  
-4. On termination, ServiceOrchestrator reverses the startup order, ensuring graceful shutdown and resource cleanup.
+2. **Script‑Driven Service Bootstrap** – The `scripts/api‑service.js` file defines the entry point for the constraint‑monitoring API server.  The orchestrator references this script as the container’s command, meaning the orchestrator does not embed any custom startup logic itself; instead, it delegates startup to the service’s own bootstrap script.  The same approach is hinted at for the dashboard server through the README in `integrations/mcp‑constraint‑monitor/dashboard`.
 
-No other architectural styles (e.g., event‑driven messaging or service mesh) are mentioned, so the analysis stays strictly within the observed orchestrator‑centric, modular design.
+Interaction between components is primarily **network‑level**: containers share a Docker network (implicitly created by Docker Compose) and communicate over the ports exposed by each service (`CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`, etc.).  No higher‑level messaging or event bus is evident from the supplied observations, so inter‑service calls are likely simple HTTP or gRPC requests directly addressed to the appropriate host:port pair.
+
+---
 
 ## Implementation Details  
 
-The concrete implementation hinges on three artefacts:
+* **docker‑compose.yaml** – This is the central manifest.  Each service block lists:
+  * `image` or `build` directives pointing to Dockerfiles (not shown but implied).
+  * `environment` entries that pull in the keys listed above, ensuring secure credential propagation.
+  * `ports` mappings that expose internal service ports (e.g., `CODE_GRAPH_RAG_PORT`) to the host for external access or inter‑service communication.
+  * `depends_on` relationships that enforce start‑up ordering, guaranteeing that, for example, the constraint‑monitoring API is up before the dashboard attempts to query it.
 
-| Artefact | Role |
-|----------|------|
-| **`docker‑compose.yml`** | Declares each service container, its image/build context, environment, network links, and explicit `depends_on` clauses that encode the required start‑up order. |
-| **Directory structure** | Each service lives in its own folder (e.g., `semantic-analysis/`, `constraint-monitoring/`, `code-graph/`).  This physical separation mirrors the logical separation expressed in the compose file and makes the codebase easy to navigate. |
-| **`lib/llm/llm‑service.ts`** | Exposes the `LLMService` class, which implements a high‑level façade for LLM operations.  The class handles mode routing (selecting the appropriate LLM model), caching of recent calls, and circuit‑breaking to protect downstream services from overload.  ServiceOrchestrator imports this class to provide a unified LLM interface to any of its child services. |
+* **scripts/api‑service.js** – This Node‑style script implements the constraint‑monitoring API server.  The orchestrator launches this script inside its container, where it reads the same environment variables defined in the compose file.  The script likely sets up an HTTP server, registers routes for constraint queries, and connects to downstream resources such as Memgraph (using `MEMGRAPH_BATCH_SIZE` to tune batch operations).
 
-The orchestrator’s **startup/shutdown logic** is not spelled out in a dedicated source file in the observations, but its behavior is inferred from the compose file’s `depends_on` directives and the documented responsibility to “handle the startup and shutdown of the services, ensuring that the services are properly initialized and terminated.”  This suggests that ServiceOrchestrator either leverages Docker Compose’s native lifecycle hooks or wraps them in a thin script that invokes `docker-compose up`/`down` with the appropriate flags.
+* **integrations/mcp‑constraint‑monitor/dashboard/README.md** – While not code, the README provides the operational guidance for the dashboard service.  It describes required environment variables, static assets, and possibly the command to start the UI server.  The orchestrator references this documentation to ensure the dashboard container is started with the correct configuration.
 
-The **modular architecture** is reinforced by the fact that each service can be built, tested, and deployed independently, while still being part of the same orchestrated system.  The presence of the sibling **LLMServiceManager**—which also consumes `LLMService`—demonstrates that the façade is deliberately shared, avoiding duplicated LLM handling logic across services.
+* **Environment Variables** – The orchestrator does not hard‑code any secrets.  Instead, it expects the host environment (or a `.env` file) to supply values for:
+  * `ANTHROPIC_API_KEY` – likely used by services that call Anthropic’s LLM APIs.
+  * `BROWSERBASE_API_KEY` – used for browser automation services.
+  * `MEMGRAPH_BATCH_SIZE` – controls the size of write batches to the Memgraph graph database.
+  * `CODE_GRAPH_RAG_PORT` / `CODE_GRAPH_RAG_SSE_PORT` – expose the Code Graph Retrieval‑Augmented Generation service’s HTTP and Server‑Sent Events endpoints.
+
+Because the observations do not list any concrete class or function names beyond the script file, the implementation detail focus remains on how the orchestrator wires these artifacts together rather than on internal code logic.
+
+---
 
 ## Integration Points  
 
-ServiceOrchestrator sits at the nexus of three integration domains:
+ServiceOrchestrator integrates with the broader system through several explicit touch‑points:
 
-1. **Docker Compose Runtime** – All containers defined in **`docker‑compose.yml`** are launched, monitored, and terminated by the orchestrator.  The file’s `depends_on` entries constitute the explicit contract that ServiceOrchestrator enforces at runtime.  
+* **Parent – DockerizedServices** – The parent component defines the overall container ecosystem.  ServiceOrchestrator inherits the Docker network, volume mounts, and any global compose extensions defined at the parent level (e.g., common logging drivers or resource limits).
 
-2. **LLM Service Layer** – The `LLMService` class in **`lib/llm/llm‑service.ts`** is the only point of contact for any LLM‑related operation.  Both ServiceOrchestrator and its sibling **LLMServiceManager** import this class, making it the shared integration surface for language‑model capabilities.  
+* **Sibling – ConstraintMonitoringService** – This service is realized by the container that runs `scripts/api‑service.js`.  The orchestrator ensures that the required environment variables (including API keys) are present and that the service is reachable on its declared port.  The dashboard (another sibling) will call into this service for real‑time constraint data.
 
-3. **Parent Component – DockerizedServices** – DockerizedServices provides the overarching modular layout (separate directories per service) that ServiceOrchestrator leverages.  The parent’s design decisions (e.g., directory‑per‑service, use of Docker Compose) directly shape how ServiceOrchestrator discovers and orchestrates its children.  
+* **Sibling – CodeGraphRAGService** – The orchestrator configures this service using the `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` variables.  Any other component that needs code‑graph retrieval (e.g., a downstream LLM inference service) will address the service via these ports.
 
-No external APIs, message brokers, or databases are referenced in the observations, so the integration surface is limited to Docker’s container lifecycle and the internal LLM façade.
+* **External Secrets / Config Stores** – Although not directly visible, the reliance on environment variables for secrets implies an integration with a secret‑management solution (e.g., Docker secrets, `.env` files, or CI/CD injection).  The orchestrator’s compose file is the point where those secrets are injected into the container environment.
+
+* **Databases / State Stores** – The `MEMGRAPH_BATCH_SIZE` variable indicates a connection to a Memgraph graph database.  The orchestrator does not manage the database itself but passes the batch‑size configuration to whichever service (likely ConstraintMonitoringService) interacts with Memgraph.
+
+---
 
 ## Usage Guidelines  
 
-* **Define services in `docker‑compose.yml`** – Every new coding service must receive its own entry with a clear `depends_on` list that reflects real runtime dependencies.  This ensures ServiceOrchestrator can compute a correct start‑up order.  
+1. **Maintain a Single Source of Truth for Configuration** – All runtime settings should be defined as environment variables in a `.env` file or injected by the CI pipeline.  Do not edit the compose file to hard‑code secrets; instead, reference the variable names (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, etc.) as shown in the observations.
 
-* **Keep each service in its own directory** – The modular directory layout is not just a convenience; it is the physical manifestation of the orchestrator’s logical boundaries.  Adding a new feature should involve creating a new folder rather than mixing code with existing services.  
+2. **Leverage Docker Compose for Lifecycle Management** – Use `docker compose up -d` to start the full suite, and `docker compose down` to tear it down cleanly.  The `depends_on` clauses in `docker‑compose.yaml` guarantee proper ordering, so developers need not manually start services in a particular sequence.
 
-* **Consume LLM functionality through `LLMService` only** – Direct calls to any underlying LLM client should be avoided.  Instead, import the `LLMService` class from **`lib/llm/llm‑service.ts`** and use its public methods.  This guarantees that caching, circuit‑breaking, and mode routing remain consistent across the system.  
+3. **Respect Service Boundaries** – When adding new functionality, follow the existing pattern: create a dedicated container, expose only the ports needed, and configure it via environment variables.  Avoid coupling services by sharing filesystems; rely on network communication instead.
 
-* **Respect the startup/shutdown contract** – When developing a new service, implement graceful initialization (e.g., health‑check endpoints) and termination hooks so that ServiceOrchestrator can safely bring the container up or down without leaving dangling resources.  
+4. **Monitor Resource‑Related Variables** – Adjust `MEMGRAPH_BATCH_SIZE` only after profiling the graph workload, as larger batches can improve throughput but increase memory pressure.  Similarly, port variables (`CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`) should be kept unique across the compose file to prevent collisions.
 
-* **Leverage Docker Compose commands for local testing** – Use `docker-compose up --abort-on-container-exit` for integration tests to verify that the orchestrator respects dependency ordering, and `docker-compose down` to confirm clean shutdowns.
+5. **Document Changes in the Corresponding README** – If the dashboard’s startup command or required environment variables change, update `integrations/mcp‑constraint‑monitor/dashboard/README.md` so that the orchestrator’s documentation stays in sync.
 
-## Architectural Patterns Identified  
+---
 
-1. **Orchestrator Pattern** – ServiceOrchestrator centrally controls the lifecycle of multiple Docker services.  
-2. **Modular Architecture** – Each functional capability resides in its own directory and Docker service, enabling independent development and deployment.  
-3. **Facade Pattern** – `LLMService` provides a simplified, high‑level interface to complex LLM operations (mode routing, caching, circuit‑breaking).  
+### Architectural Patterns Identified  
 
-## Design Decisions and Trade‑offs  
+* **Modular Container‑Based Composition** – Each logical service lives in its own Docker container, defined in `docker‑compose.yaml`.  
+* **Configuration‑by‑Environment‑Variable** – Runtime behavior is driven by environment variables (e.g., API keys, batch sizes, ports).  
+* **Script‑Driven Service Bootstrap** – Service entry points are defined by scripts such as `scripts/api‑service.js`.  
 
-* **Explicit Dependency Declaration** – By encoding service order in `docker‑compose.yml`, the system guarantees correct startup sequencing, but it also couples the orchestration logic tightly to the compose file; any change in service relationships requires a compose‑file edit and a redeploy.  
-* **Container‑Level Modularity** – Isolating services in separate containers improves fault isolation and allows independent scaling, yet it introduces overhead (container runtime, networking) and increases the operational surface area that developers must understand.  
-* **Shared LLM Facade** – Centralizing LLM concerns in `LLMService` avoids duplicated logic and eases future changes (e.g., swapping models).  The trade‑off is a single point of failure; if the façade misbehaves, all dependent services are impacted.  
+### Design Decisions and Trade‑offs  
 
-## System Structure Insights  
+* **Decision:** Use Docker Compose as the orchestrator rather than a full‑scale orchestrator (Kubernetes).  
+  * *Trade‑off:* Simpler setup and faster iteration, but limited built‑in scaling and resilience features.  
+* **Decision:** Keep secrets out of the compose file, injecting them via environment variables.  
+  * *Trade‑off:* Improves security and portability, but requires careful handling of `.env` files or CI secret injection.  
+* **Decision:** Separate each service into its own container.  
+  * *Trade‑off:* Clear isolation and independent scaling, at the cost of increased container management overhead.  
 
-The hierarchy is clear: **DockerizedServices** (parent) establishes the modular layout; **ServiceOrchestrator** (sub‑component) consumes that layout via `docker‑compose.yml` and coordinates the services; **LLMServiceManager** (sibling) shares the `LLMService` façade.  This three‑tier relationship yields a clean separation of concerns: the parent defines *where* services live, the orchestrator defines *how* they run together, and the LLM manager defines *how* language‑model functionality is accessed.
+### System Structure Insights  
 
-## Scalability Considerations  
+The system is a **tree‑shaped composition**: the root `DockerizedServices` component defines the overall Docker network; under it, `ServiceOrchestrator` declares individual service containers; each container (e.g., ConstraintMonitoringService, CodeGraphRAGService) implements a specific domain capability.  The orchestrator’s compose file is the single point where inter‑service networking, environment propagation, and start‑up ordering are expressed.
 
-* **Horizontal Scaling via Docker Compose** – The compose file can be extended with `scale` directives to run multiple instances of a given service, leveraging the modular design.  However, Docker Compose is primarily intended for development and small‑scale deployments; larger production environments may need a more robust orchestrator (e.g., Kubernetes) to handle dynamic scaling, service discovery, and load balancing.  
-* **LLM Facade Caching** – By caching LLM responses inside `LLMService`, the system reduces redundant external calls, improving throughput as the number of services grows.  The circuit‑breaker further protects downstream LLM providers from overload, a key scalability safeguard.  
+### Scalability Considerations  
 
-## Maintainability Assessment  
+Because scaling is performed at the container level, adding more instances of a given service (e.g., multiple constraint‑monitoring API replicas) would require extending the `docker‑compose.yaml` with replica definitions or moving to a platform that supports service scaling (Docker Swarm or Kubernetes).  The current design’s reliance on static port mappings (`CODE_GRAPH_RAG_PORT`) could become a bottleneck if many instances are needed; dynamic port allocation or a load‑balancer would be required for true horizontal scaling.
 
-The **directory‑per‑service** convention and **single source of truth** (`docker‑compose.yml`) make the codebase highly navigable; new developers can locate a service’s code and its runtime definition quickly.  The shared `LLMService` façade reduces duplication and centralizes future LLM‑related changes.  On the downside, the reliance on manual `depends_on` entries can become error‑prone as the number of services expands; automated validation or a higher‑level dependency graph tool would mitigate this risk.  Overall, the design balances clarity and flexibility, providing a maintainable foundation while leaving room for future tooling enhancements.
+### Maintainability Assessment  
+
+The architecture is **highly maintainable** in the short term: each service is isolated, configuration is externalized, and documentation (e.g., the dashboard README) lives alongside the service definition.  However, as the number of services grows, the single `docker‑compose.yaml` may become unwieldy, and the manual management of environment variables could introduce errors.  Introducing a hierarchical compose structure (multiple compose files with overrides) or moving to a more robust orchestration platform would mitigate future maintenance overhead.
+
+## Diagrams
+
+### Relationship
+
+![ServiceOrchestrator Relationship](images/service-orchestrator-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/service-orchestrator-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a modular architecture, with separate directories for each service, allowing for flexible deployment and management. This is evident in the directory structure, where each service has its own subdirectory, such as semantic analysis, constraint monitoring, and code graph construction. The lib/llm/llm-service.ts file, which contains the LLMService class, provides a high-level facade for LLM operations, handling mode routing, caching, and circuit breaking. This design decision enables loose coupling between services and promotes scalability. Furthermore, the use of docker-compose for service orchestration, as seen in the docker-compose.yml file, provides a robust framework for integrating multiple services.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
+- [CodeGraphRAGService](./CodeGraphRAGService.md) -- The CodeGraphRAGService uses the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables to configure the ports for the Code Graph RAG service.
 
 
 ---

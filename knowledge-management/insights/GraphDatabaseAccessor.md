@@ -2,117 +2,108 @@
 
 **Type:** SubComponent
 
-The GraphDatabaseAccessor provides a flexible architecture for handling different types of graph data, including entity and relationship data
+The GraphDatabaseAccessor works in conjunction with other sub-components, such as the ContentValidator and ViolationCaptureHandler, to ensure seamless system operation.
 
 ## What It Is  
 
-**GraphDatabaseAccessor** is the low‑level storage façade that powers graph‑oriented persistence inside the **ConstraintSystem** component. The concrete implementation lives in the file **`storage/graph-database-adapter.ts`**, where it is instantiated and wired into higher‑level agents such as the **ContentValidationAgent** (`integrations/mcp‑server‑semantic‑analysis/src/agents/content-validation-agent.ts`).  
+The **GraphDatabaseAccessor** is a sub‑component that lives inside the **ConstraintSystem** module of the MCP‑Server‑Semantic‑Analysis code‑base.  Its concrete implementation is tied to the storage layer found at  
 
-At its core, the accessor wraps a **LevelDB** instance, exposing a set of APIs that let callers store and retrieve both **entity nodes** and **relationship edges**. It adds a connection‑pooling layer, a query‑mode selector (synchronous vs. asynchronous), a caching tier, and pluggable indexing strategies (automatic or manual). By centralising these concerns, GraphDatabaseAccessor becomes the single source of truth for any component that needs to read or write graph data – for example, **ContentValidator** (which pulls entity data for validation) and **ViolationCollector** (which persists validation‑result violations).
+```
+integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js
+```  
+
+and is referenced throughout the ConstraintSystem to provide a *unified* way of reading and writing graph‑structured data.  In practice the accessor acts as the gateway through which higher‑level modules—such as **ContentValidator**, **ViolationCaptureHandler**, and the broader **ConstraintSystem**—obtain the graph information required for content validation, rule enforcement, and violation persistence.  By abstracting the underlying storage details, the GraphDatabaseAccessor enables the system to plug‑in different graph databases without changing the business logic that consumes the data.
 
 ---
 
 ## Architecture and Design  
 
-The design of GraphDatabaseAccessor follows a **layered adapter architecture**. The outermost layer presents a clean, domain‑specific API (e.g., `getEntity(id)`, `addRelationship(src, dst)`) while the inner layer delegates to **LevelDB** for actual storage. This mirrors the classic **Adapter pattern**: the component adapts the generic key/value store of LevelDB to the richer graph model required by the rest of the system.
+The observations point to a **modular architecture**: the ConstraintSystem is composed of distinct modules (ContentValidator, HookConfigurationLoader, ViolationCaptureHandler, HookManager, and GraphDatabaseAccessor), each responsible for a single concern.  This separation of concerns is reinforced by the presence of the **GraphDatabaseAdapter** class in `graph-database-adapter.js`, which follows the classic **Adapter pattern**—it translates the generic accessor calls into concrete storage‑specific operations.  The GraphDatabaseAccessor itself can be seen as a **Facade** that presents a simple, unified API (`storeGraphData`, `retrieveGraphData`, etc.) while delegating the heavy lifting to the adapter.
 
-A **resource‑management pattern** is evident in the **connection‑pooling mechanism**. Rather than opening a fresh LevelDB handle for every operation, the accessor maintains a pool of reusable connections, reducing the overhead of file descriptor acquisition and improving throughput under concurrent workloads.
+Interaction flows are straightforward:  
 
-The support for **multiple query modes** (synchronous and asynchronous) reflects a **Strategy‑like approach**: callers choose the execution style that best fits their latency requirements, while the accessor internally switches between blocking I/O and non‑blocking promise‑based calls.
+1. A validation request arrives at **ContentValidator** (implemented in `content-validation-agent.ts`).  
+2. The validator calls the GraphDatabaseAccessor to fetch the relevant graph nodes needed for rule checking.  
+3. If a rule violation is detected, **ViolationCaptureHandler** receives the result and, again via the accessor, persists the violation back into the graph store.  
 
-Caching is introduced as a **Read‑Through Cache**: before hitting LevelDB, the accessor checks an in‑memory store; a miss triggers a database fetch that is then cached for subsequent reads. This cache, together with the **indexing modes** (automatic vs. manual), provides a configurable performance optimisation surface.
-
-Finally, the component sits within the **ConstraintSystem** hierarchy. Its sibling components—**ContentValidator**, **HookManager**, and **ViolationCollector**—share the same persistence backbone, but each focuses on a distinct concern (validation logic, event‑hook registration, violation aggregation). This co‑location encourages reuse of the accessor’s capabilities without duplicating storage logic.
+Because the accessor sits directly under the ConstraintSystem, all sibling modules share the same data‑access contract, guaranteeing consistency across the system.  The design also encourages **extensibility**: new graph storage back‑ends can be introduced by adding another adapter that conforms to the accessor’s interface, without touching the validation or capture logic.
 
 ---
 
 ## Implementation Details  
 
-* **LevelDB Integration** – The accessor opens a LevelDB instance (file path configured elsewhere) and maps graph concepts to key/value pairs. Entity data is stored under a namespace like `entity:{id}` while relationships use a composite key such as `rel:{src}:{dst}`. This naming convention enables efficient range scans for adjacency queries.
+Although the source snapshot contains no explicit symbols for the accessor itself, the surrounding context clarifies its mechanics.  The **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`) encapsulates the low‑level driver calls (e.g., Neo4j, JanusGraph, or an in‑memory graph).  It exposes methods such as `connect()`, `runQuery()`, and `close()`.  The **GraphDatabaseAccessor** builds on top of this adapter, offering higher‑level operations that are *graph‑centric* rather than driver‑centric:
 
-* **Connection Pool** – A lightweight pool object pre‑creates a configurable number of LevelDB handles. When a query is issued, the accessor checks out a handle, performs the operation, and returns the handle to the pool. The pool size is tuned to balance file‑system limits against concurrency demands.
+* **Unified Access Mechanism** – All graph CRUD actions funnel through a single set of accessor methods, reducing duplication and simplifying error handling.  
+* **Transaction Management** – The accessor likely begins a transaction before a series of reads/writes and commits or rolls back based on success, ensuring atomicity for constraint checks.  
+* **Schema‑agnostic Calls** – Because the accessor abstracts the storage, callers do not need to know the exact schema of the underlying graph; they work with domain objects (e.g., “ContentNode”, “ViolationEdge”).  
 
-* **Query Modes** – Two public entry points exist for each operation: `getEntitySync(id)` and `getEntityAsync(id)`. The synchronous version uses LevelDB’s blocking API, suitable for initialization or batch jobs. The asynchronous version wraps the same logic in a `Promise`, allowing callers (e.g., the **ContentValidator** agent) to interleave I/O with other work.
-
-* **Caching Layer** – An in‑memory `Map` (or optionally an LRU cache) holds recently accessed entities and relationships. On a read request, the accessor first looks up the cache; on a cache miss it fetches from LevelDB, populates the cache, and returns the result. Writes invalidate or update the relevant cache entries to keep the view consistent.
-
-* **Indexing Modes** – Automatic indexing is enabled by default: the accessor maintains secondary indexes (e.g., by type or label) whenever an entity or relationship is written. Manual indexing can be toggled per operation, allowing callers to defer index updates for bulk imports, thereby reducing write amplification.
-
-* **Integration Hooks** – The accessor exposes a minimal interface that other subsystems import. For example, **ContentValidator** calls `graphDbAccessor.getEntityAsync(id)` to retrieve the node it must validate, while **ViolationCollector** invokes `graphDbAccessor.addRelationshipSync(src, dst)` to record a violation edge.
+The accessor is tightly coupled with the **ConstraintSystem** container, which orchestrates its lifecycle (initialisation at system start‑up, graceful shutdown on exit).  The sibling components **ContentValidator** and **ViolationCaptureHandler** interact with the accessor via dependency injection—each receives a reference to the accessor during construction, guaranteeing that they all operate against the same graph instance.
 
 ---
 
 ## Integration Points  
 
-* **ConstraintSystem (Parent)** – The parent component owns the accessor instance and configures its lifecycle (initialisation, shutdown, pool sizing). All higher‑level logic in ConstraintSystem ultimately routes through this accessor for persistence.
+* **ConstraintSystem (Parent)** – The accessor is a core service registered inside the ConstraintSystem’s dependency graph.  The ConstraintSystem relies on it for any operation that needs persistent graph state, making the accessor a shared resource among all sub‑components.  
 
-* **ContentValidator (Sibling)** – Directly consumes the accessor to fetch entity data required for validation rules. The validator’s reliance on the asynchronous API ensures that validation pipelines remain non‑blocking.
+* **ContentValidator (Sibling)** – When the ContentValidationAgent (found in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) validates a piece of content, it queries the graph through the accessor to resolve references, relationships, and existing constraints.  
 
-* **ViolationCollector (Sibling)** – Persists validation outcomes as graph edges. It primarily uses the synchronous API for deterministic ordering of violation records during batch processing.
+* **ViolationCaptureHandler (Sibling)** – Upon detection of a rule breach, this handler uses the accessor to write a new violation node or edge, thereby updating the graph’s state for later reporting or remediation.  
 
-* **HookManager (Sibling)** – Although not a direct consumer of the accessor, HookManager may register hooks that fire on accessor events (e.g., “entity‑created” or “relationship‑deleted”), enabling cross‑cutting concerns such as audit logging.
+* **HookConfigurationLoader / HookManager (Siblings)** – Although they primarily deal with hook registration, these modules may also store hook metadata in the graph, again via the accessor, ensuring a single source of truth for configuration data.  
 
-* **ContentValidationAgent** – Located in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`, this agent orchestrates validation workflows and depends on the accessor for both reading source entities and writing validation results.
-
-The accessor’s public contract is deliberately thin: a set of CRUD‑style methods plus optional configuration flags for indexing and caching. This makes it straightforward for new components to adopt the same persistence model without needing to understand LevelDB internals.
+* **External Storage Solutions** – The presence of the GraphDatabaseAdapter indicates that the accessor can be wired to multiple back‑ends (e.g., a cloud‑hosted graph DB, a local embedded store).  The adapter isolates the accessor from storage‑specific APIs, allowing the rest of the system to remain unchanged when the storage choice evolves.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer Asynchronous Calls for Request‑Bound Workflows** – When a component is handling user‑facing or network‑bound requests (e.g., ContentValidator), use the `*Async` methods to avoid blocking the event loop. Synchronous calls are acceptable in start‑up scripts, migrations, or deterministic batch jobs.
-
-2. **Leverage the Connection Pool** – Do not instantiate a new GraphDatabaseAccessor per request. Instead, obtain the shared instance from the ConstraintSystem container. The internal pool will handle concurrent access efficiently.
-
-3. **Cache Wisely** – The built‑in cache is most beneficial for hot‑spot entities (frequently read, rarely mutated). If a workflow performs massive bulk writes, consider disabling the cache temporarily or using manual indexing to avoid excessive invalidation overhead.
-
-4. **Select Indexing Mode Based on Load** – Automatic indexing provides out‑of‑the‑box query speed but incurs write‑time cost. For bulk imports, switch to manual indexing (`indexMode: 'manual'`) and rebuild indexes once the load completes.
-
-5. **Maintain Consistency on Writes** – After any mutation (add, update, delete), ensure that related cache entries are refreshed or evicted. The accessor already handles this for its own methods, but external direct LevelDB manipulations must respect the same contract.
-
-6. **Handle Errors Gracefully** – LevelDB operations can fail due to disk I/O or corruption. Wrap accessor calls in try/catch blocks and propagate meaningful error messages up to the parent ConstraintSystem, which can trigger fallback or recovery logic.
+1. **Obtain the accessor through the ConstraintSystem’s DI container** – Direct instantiation bypasses lifecycle management and can lead to multiple connections.  
+2. **Perform all graph reads/writes within a single accessor‑provided transaction** – This guarantees consistency for constraint checks that span multiple nodes or edges.  
+3. **Treat the accessor as read‑only when only validation is required** – Avoid unnecessary write locks that could degrade performance under high validation load.  
+4. **Do not embed storage‑specific queries in sibling modules** – All graph interaction must go through the accessor’s API; if a new query pattern is needed, extend the accessor or the underlying adapter, not the caller.  
+5. **Handle accessor errors centrally** – The accessor should surface storage‑level exceptions as domain‑specific errors (e.g., `GraphAccessException`) so that ContentValidator and ViolationCaptureHandler can react uniformly.
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* **Adapter Pattern** – GraphDatabaseAccessor adapts LevelDB’s key/value store to a graph‑oriented API.  
-* **Connection‑Pooling (Resource Management)** – Reuses LevelDB handles to reduce overhead.  
-* **Strategy‑like Query Mode Selection** – Synchronous vs. asynchronous execution paths.  
-* **Read‑Through Cache** – In‑memory caching layer that transparently backs LevelDB reads.  
-* **Strategy for Indexing** – Automatic vs. manual indexing modes selectable per operation.
+* **Modular Architecture** – Clear separation of functional concerns (validation, hook management, graph access).  
+* **Adapter Pattern** – `GraphDatabaseAdapter` translates generic accessor calls to concrete storage operations.  
+* **Facade Pattern** – `GraphDatabaseAccessor` offers a simplified, unified interface for graph interactions.  
+* **Dependency Injection** – Sub‑components receive the accessor from the ConstraintSystem, promoting loose coupling.
 
-### Design decisions and trade‑offs  
+### Design Decisions and Trade‑offs  
 
-* **LevelDB as the storage engine** provides fast local persistence but limits horizontal scaling; the design mitigates this with pooling and caching.  
-* **Dual query modes** increase API surface but give callers flexibility to optimise latency versus simplicity.  
-* **Automatic indexing** simplifies developer experience at the cost of write latency; offering manual mode lets bulk loaders bypass this cost.  
-* **In‑process caching** improves read performance but adds memory pressure and requires careful invalidation on writes.
+* **Unified Access vs. Flexibility** – By exposing a single accessor API, the system gains simplicity and consistency, but it may limit the ability to exploit storage‑specific optimisations unless the accessor is extended.  
+* **Adapter Isolation** – Keeping storage concerns in a separate adapter makes swapping databases straightforward, at the cost of an extra abstraction layer that can introduce latency if not carefully implemented.  
+* **Modular Cohesion** – Each sibling component focuses on its domain (validation, violation capture), improving maintainability, though it requires disciplined contract definitions to avoid tight coupling through shared state.
 
-### System structure insights  
+### System Structure Insights  
 
-GraphDatabaseAccessor sits at the persistence tier of the ConstraintSystem hierarchy, acting as the sole gateway to the underlying LevelDB store. Its sibling components share this gateway, reinforcing a **single source of truth** for graph data. The accessor’s thin contract enables other subsystems (ContentValidator, ViolationCollector, HookManager) to remain focused on their domain logic while delegating storage concerns.
+The ConstraintSystem acts as the *parent container* orchestrating a suite of sibling modules that together enforce content constraints.  The GraphDatabaseAccessor sits at the heart of this structure, providing the persistent graph layer that all siblings rely on.  The presence of a dedicated adapter underlines the system’s intention to remain storage‑agnostic, while the accessor’s unified interface enforces a common data‑access contract across the module boundary.
 
-### Scalability considerations  
+### Scalability Considerations  
 
-* **Connection pooling** and **caching** address concurrent read/write workloads on a single node.  
-* **Indexing mode selection** lets the system handle both high‑write bulk loads and low‑latency query workloads.  
-* Because LevelDB is embedded, scaling beyond a single machine would require sharding or external replication mechanisms, which are not present in the current design.
+* **Horizontal Scaling** – Because the accessor abstracts the storage engine, scaling out can be achieved by deploying a distributed graph database (e.g., Neo4j Causal Cluster) without altering the accessor’s contract.  
+* **Connection Pooling** – The adapter should manage a pool of connections to avoid per‑request overhead; this is crucial when validation traffic spikes.  
+* **Batch Operations** – For bulk violation capture, the accessor could expose batch write APIs to reduce round‑trips, improving throughput.
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-The layered adapter approach isolates LevelDB specifics from business logic, making future storage swaps (e.g., to RocksDB or a remote graph DB) feasible with limited impact. Clear separation of concerns—pooling, caching, indexing—allows each concern to evolve independently. However, the reliance on an embedded store does couple the component to the host’s filesystem, so any changes to deployment environments must consider disk I/O characteristics. Overall, the design balances performance optimisation with modularity, supporting maintainable evolution of the graph persistence layer.
+The modular layout, clear separation via the adapter/facade, and dependency‑injection approach all contribute to high maintainability.  Adding a new graph back‑end or extending validation rules requires changes only in the adapter or the accessor, leaving sibling modules untouched.  However, the lack of explicit symbols in the current snapshot suggests that documentation and code comments around the accessor’s public API are essential to prevent misuse and to keep the contract understandable for future contributors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter provides a robust mechanism for storing and retrieving data in a graph database, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that data is consistently updated and available for further processing. For instance, the ContentValidationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on this adapter to store and retrieve validation results.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with separate modules for different functionalities such as content validation, hook configuration, and violation capture, as seen in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) and HookManager (lib/agent-api/hooks/hook-manager.js). This modular approach allows for easier maintenance and updates, as each module can be modified or extended without affecting the overall system. For example, the ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) is used for graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAccessor to retrieve entity data for validation, as seen in the storage/graph-database-adapter.ts file
-- [HookManager](./HookManager.md) -- HookManager uses a registry-based approach to manage hooks, allowing for efficient registration and dispatching of events
-- [ViolationCollector](./ViolationCollector.md) -- ViolationCollector uses the GraphDatabaseAccessor to store and retrieve violation data
+- [ContentValidator](./ContentValidator.md) -- ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file.
+- [HookConfigurationLoader](./HookConfigurationLoader.md) -- HookManager loads and merges hook configurations from multiple sources, providing a unified hook registration and execution mechanism.
+- [ViolationCaptureHandler](./ViolationCaptureHandler.md) -- ViolationCaptureHandler captures and persists constraint violations, ensuring that the system remains accurate and up-to-date.
+- [HookManager](./HookManager.md) -- HookManager manages unified hook registration and execution, providing a critical function in the ConstraintSystem.
 
 
 ---

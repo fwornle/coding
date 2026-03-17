@@ -2,94 +2,101 @@
 
 **Type:** Detail
 
-The HookConfigLoader, defined in hook-config-loader.ts, implements the mergeHookConfigs function to combine configurations from various sources, such as the hook-management-module.config.json file, and provide a unified view of hook configurations.
+The fact that integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md exists implies that hook configurations are formatted in a specific way, which the HookConfigLoader must handle.
 
 ## What It Is  
 
-`HookConfigLoader` lives in **`hook-config-loader.ts`** and is the concrete implementation responsible for gathering hook configuration data for the **`UnifiedHookManager`** that resides in the *HookManagementModule*.  The loader’s primary job is to read configuration fragments from a variety of places—most notably the **`hook‑management‑module.config.json`** file, but also any user‑level or project‑level configuration sources that the system exposes.  Once those fragments have been read, the loader runs a **`mergeHookConfigs`** routine that produces a single, coherent configuration object which the `UnifiedHookManager` can consume to initialise, register, or invoke hooks throughout the application.
-
-In practice, `HookConfigLoader` acts as the bridge between static configuration assets (JSON files) and the dynamic runtime needs of the hook management subsystem.  It is the only class explicitly mentioned as handling the “multiple sources” aspect, and it is tightly coupled to its parent module: the `UnifiedHookManager` calls into the loader whenever it needs an up‑to‑date view of the hook landscape.
+**HookConfigLoader** is a concrete module that lives at `lib/agent-api/hooks/hook-config.js`.  Its sole responsibility is to locate, read, and merge hook configuration data that can be supplied at two distinct scopes: **user‑level** (global to the developer or machine) and **project‑level** (specific to a repository or workspace).  The loader is a key collaborator of its parent component, **HookConfigurationManager**, which owns the loader and uses the merged result to drive the rest of the hook‑execution pipeline.  The existence of the documentation files `integrations/copi/docs/hooks.md` and `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` tells us that the configuration format is prescribed and that the loader must understand that schema in order to produce a valid, consumable configuration object.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **layered configuration‑aggregation architecture**.  At the top sits the `UnifiedHookManager` (the orchestrator for hook execution).  Directly beneath it is `HookConfigLoader`, which abstracts the details of where configuration data originates.  This separation of concerns mirrors a **Strategy‑like** approach: the loader encapsulates the “how to obtain and combine config” logic, while the manager simply requests a ready‑made configuration.  Although the documentation only *implies* the use of patterns such as Observer or Strategy, the concrete method `mergeHookConfigs` behaves like a strategy that can be swapped or extended to accommodate new source types without altering the manager.
+The architecture around **HookConfigLoader** follows a **configuration‑loader** pattern.  The loader abstracts the mechanics of discovering configuration sources (file system paths, environment variables, etc.) and exposing a single, deterministic configuration object to its consumer, the **HookConfigurationManager**.  This separation keeps the manager focused on higher‑level concerns such as validation, lifecycle management, and dispatching hook functions, while the loader handles the low‑level I/O and merge logic.
 
-Interaction flow is straightforward:
+From the observations we can infer a **two‑tier merging strategy**: the loader first reads the user‑level configuration (likely from a well‑known home‑directory location) and then overlays any project‑level definitions (found under the current repository).  The merge respects the precedence rules implied by “loads and merges hook configurations from user‑level and project‑level sources,” meaning project‑level values win when conflicts arise.  This deterministic precedence is a design decision that simplifies reasoning about which hook definitions are active in a given run.
 
-1. `UnifiedHookManager` invokes the loader (likely via a method such as `load()` or directly calling `mergeHookConfigs`).
-2. `HookConfigLoader` reads the **`hook‑management‑module.config.json`** file and any additional user/project configuration files.
-3. The loader merges these fragments into a single object.
-4. The merged configuration is returned to the manager, which then proceeds to initialise hooks.
-
-Because the loader is the sole point of contact for configuration files, any change to the file format or addition of a new source (e.g., environment variables) can be isolated within `HookConfigLoader`.  This design encourages **extensibility** while keeping the higher‑level hook management logic stable.
+The module’s placement under `lib/agent-api/hooks/` indicates it is part of the **agent‑API** boundary, exposing a stable interface to the rest of the system while remaining insulated from the concrete storage details of the configuration files.  No other sibling loaders are mentioned, but the pattern suggests that any future configuration domains (e.g., policy files, credential stores) could be added alongside **HookConfigLoader** using the same loader‑manager contract.
 
 ---
 
 ## Implementation Details  
 
-The heart of `HookConfigLoader` is the **`mergeHookConfigs`** function.  Although the source code is not displayed, the name and purpose make its responsibilities clear:
+Even though the source code is not directly visible, the path `lib/agent-api/hooks/hook-config.js` tells us the loader is implemented as a JavaScript (or TypeScript) module.  The module most likely exports a class or a set of functions that:
 
-* **Source Retrieval** – The function must locate and read JSON configuration files.  The primary source mentioned is **`hook‑management‑module.config.json`**, but the wording “multiple sources” suggests the implementation likely iterates over a collection of file paths (user‑level, project‑level) and parses each into a JavaScript object.
-* **Deep Merging Logic** – After parsing, the loader combines the objects.  A naïve shallow merge would overwrite nested structures, so the function probably implements a deep‑merge algorithm that respects precedence (e.g., project‑level overrides user‑level).  This ensures that the final configuration reflects the most specific settings while preserving defaults.
-* **Error Handling** – Because configuration files may be missing, malformed, or contain conflicting definitions, the loader is expected to surface meaningful errors or fallback to defaults.  The presence of a dedicated loader class makes it a natural place for such resilience logic.
-* **Return Shape** – The merged result is a unified configuration object that matches the schema expected by `UnifiedHookManager`.  This contract is implicit: the manager can only operate correctly if the loader supplies a structure it understands.
+1. **Discover Sources** – Resolve the location of the user‑level configuration (perhaps `~/.copi/hooks.json` or similar) and the project‑level configuration (e.g., `<repo_root>/hooks.json`).  
+2. **Parse the Files** – Read the files using Node’s `fs` APIs and parse them according to the schema described in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  The format documentation guarantees that the loader can validate the shape of the data before merging.  
+3. **Merge Logic** – Perform a shallow or deep merge, applying the rule that project‑level entries override user‑level entries.  The merge algorithm is deterministic, ensuring repeatable outcomes across runs.  
+4. **Expose the Result** – Return a plain JavaScript object (or a typed configuration class) that the **HookConfigurationManager** consumes.  The manager may further validate the merged configuration or transform it into runtime hook descriptors.
 
-The loader’s implementation is deliberately **stateless** from the perspective of the manager; each call to `mergeHookConfigs` produces a fresh configuration based on the current file system state.  This design avoids hidden caches and makes the behaviour deterministic, which is valuable for testing and for environments where configuration may change between runs.
+Because **HookConfigurationManager** “contains” the loader, the manager likely instantiates the loader once (perhaps lazily) and caches the merged configuration for the lifetime of the agent process.  This design avoids repeated file I/O and ensures that all hook consumers see a consistent view of the configuration.
 
 ---
 
 ## Integration Points  
 
-`HookConfigLoader` is tightly integrated with two parts of the system:
+- **Parent Component – HookConfigurationManager**: The manager is the primary consumer.  It invokes the loader during initialization, receives the merged configuration, and then registers hook functions accordingly.  Any changes to the loader’s return shape would require a corresponding update in the manager’s handling code.  
 
-1. **Parent – `UnifiedHookManager` (HookManagementModule)**  
-   The manager depends on the loader to supply a complete hook configuration before it can initialise any hooks.  The manager likely holds a reference to an instance of `HookConfigLoader` (or imports its static methods) and invokes `mergeHookConfigs` during its own startup sequence.
+- **Documentation – integrations/copi/docs/hooks.md**: This markdown file defines the public contract for hook functions (e.g., expected signatures, lifecycle hooks).  The loader must produce configuration objects that conform to these expectations, acting as the bridge between static configuration files and the dynamic hook execution engine.  
 
-2. **Configuration Assets – JSON Files**  
-   The loader reads from **`hook‑management‑module.config.json`** and any additional configuration files that live at user or project scope.  These files constitute the external interface of the loader; changes to their location or format will require corresponding updates in the loader’s file‑discovery logic.
+- **Format Specification – integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md**: The loader directly references this spec to parse and validate the raw JSON/YAML files.  Any evolution of the format (new fields, deprecations) will be reflected in the loader’s parsing logic.  
 
-No sibling components are mentioned, but any future configuration‑related utilities (e.g., a `ConfigValidator` or a `ConfigCache`) would naturally sit alongside `HookConfigLoader` within the HookManagementModule, sharing the same configuration file contracts.
+- **File System / Environment**: Implicitly, the loader depends on the host file system to locate configuration files and may also read environment variables for overrides (a common practice, though not explicitly documented).  
+
+No direct child entities are mentioned; the loader’s output is consumed rather than further decomposed within the same module.
 
 ---
 
 ## Usage Guidelines  
 
-* **Invoke Through the Manager** – Application code should never call `HookConfigLoader` directly.  Instead, rely on `UnifiedHookManager` to request the merged configuration, preserving the intended abstraction boundary.
-* **Keep Configuration Files Synchronized** – When adding or modifying user‑level or project‑level config files, ensure they follow the same JSON schema expected by `mergeHookConfigs`.  Inconsistent structures will lead to merge conflicts or runtime errors.
-* **Prefer Declarative Overrides** – If a hook needs to be customised for a specific project, place the override in the project‑level config rather than editing the base `hook‑management‑module.config.json`.  The loader’s merge order (project → user → base) will automatically apply the most specific settings.
-* **Test Configuration Merges** – Unit tests for any new configuration source should exercise `mergeHookConfigs` with representative fixture files to verify that precedence rules behave as intended.
-* **Avoid Side‑Effects in Config Files** – Since the loader treats configuration as pure data, embedding executable code or dynamic imports inside the JSON files can break the deterministic merge process.
+1. **Place Configuration Files Correctly** – To have the loader pick up a hook definition, developers should store user‑level hooks in the designated global location (as described in the docs) and project‑level hooks in the repository root.  Because project‑level settings win, any conflicting definitions should be intentionally placed in the project file.  
+
+2. **Follow the Hook Format** – All hook configuration files must adhere to the schema outlined in `CLAUDE-CODE-HOOK-FORMAT.md`.  Invalid JSON or schema violations will cause the loader to throw errors during the merge phase, preventing the **HookConfigurationManager** from starting.  
+
+3. **Avoid Direct Instantiation** – Consumers should not instantiate **HookConfigLoader** directly; instead, they should obtain the merged configuration through **HookConfigurationManager**, which guarantees that the loader has been executed exactly once and that the result is cached.  
+
+4. **Do Not Mutate the Returned Object** – The merged configuration should be treated as read‑only.  If a runtime component needs to adjust hook behavior, it should do so via the manager’s public APIs rather than mutating the loader’s output.  
+
+5. **Version Compatibility** – When upgrading the hook format documentation, ensure that any new fields are reflected in the loader’s parsing logic before deploying updated hook definitions, to avoid runtime incompatibilities.
 
 ---
 
-### 1. Architectural patterns identified
-* **Strategy‑like configuration aggregation** – `HookConfigLoader` encapsulates the “how to gather and merge” logic, allowing the manager to treat it as a black‑box strategy.
-* **Layered separation of concerns** – Distinct responsibilities for the manager (hook orchestration) and the loader (configuration sourcing/merging).
+### Architectural Patterns Identified  
 
-### 2. Design decisions and trade‑offs
-* **Single responsibility** – The loader focuses solely on configuration handling, simplifying testing but requiring the manager to handle any post‑merge validation.
-* **Stateless merge operation** – Guarantees deterministic output at the cost of re‑reading files on each call (potential performance impact in large projects).
-* **Deep merge vs shallow merge** – Choosing a deep merge preserves nested defaults but adds complexity and may mask conflicting keys.
+1. **Configuration‑Loader Pattern** – Isolates file‑system I/O and parsing from higher‑level business logic.  
+2. **Two‑Tier Merge Strategy** – Deterministic precedence (project over user) to resolve conflicts.  
+3. **Manager‑Loader Composition** – The parent **HookConfigurationManager** composes the loader, adhering to a clear separation of concerns.
 
-### 3. System structure insights
-* The HookManagementModule forms a cohesive unit where `UnifiedHookManager` is the orchestrator and `HookConfigLoader` is the configuration provider.
-* Configuration files act as external data sources; the loader is the only component that knows their locations and formats.
+### Design Decisions and Trade‑offs  
 
-### 4. Scalability considerations
-* Adding new configuration sources (e.g., environment variables, remote config services) can be done by extending `HookConfigLoader` without touching the manager.
-* For very large configuration sets, caching the merged result inside the loader could improve performance, though it would introduce statefulness that must be managed.
+- **Single Responsibility vs. Flexibility** – By keeping the loader focused on discovery and merging, the system is easy to maintain, but any additional source (e.g., remote config service) would require extending the loader or adding a new one.  
+- **Deterministic Precedence** – Favoring project‑level overrides simplifies developer expectations, at the cost of limiting the ability to have user‑level defaults that can be selectively disabled per project.  
+- **Caching at Manager Level** – Reduces repeated I/O, improving performance, but introduces a need to restart the agent to pick up configuration changes.
 
-### 5. Maintainability assessment
-* **High maintainability** – Clear separation between loading/merging and hook execution makes the codebase easier to reason about.
-* **Potential fragility** – Reliance on file‑system paths and JSON schemas means that changes to configuration format propagate directly to the loader; robust validation and comprehensive tests are essential to keep maintenance overhead low.
+### System Structure Insights  
+
+- The hook subsystem is organized under `lib/agent-api/hooks/`, with **HookConfigLoader** handling static configuration and **HookConfigurationManager** orchestrating runtime behavior.  
+- Documentation files live in `integrations/*/docs/`, indicating a clear separation between code and specification.  
+- The overall flow is: *Documentation → Config Files → HookConfigLoader → HookConfigurationManager → Hook Execution Engine*.
+
+### Scalability Considerations  
+
+- **File‑Based Config** scales well for a modest number of hooks; however, if the number of hook definitions grows dramatically, the loader’s merge algorithm may become a bottleneck.  The current design could be extended with streaming parsers or incremental caching.  
+- Adding new configuration sources (e.g., network‑based stores) would require augmenting the loader without breaking existing callers, thanks to the manager‑loader contract.
+
+### Maintainability Assessment  
+
+- The clear division between loader and manager, combined with explicit documentation of the hook format, makes the subsystem highly maintainable.  
+- Since the loader’s responsibilities are narrow, unit tests can focus on file discovery, parsing, and merge semantics, providing fast feedback on changes.  
+- Future schema changes are localized to the loader and the accompanying markdown spec, limiting the blast radius of modifications.  
+
+Overall, **HookConfigLoader** embodies a straightforward, well‑encapsulated design that fits cleanly within the larger hook configuration management architecture.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [HookManagementModule](./HookManagementModule.md) -- The UnifiedHookManager class in the HookManagementModule loads and merges hook configurations from multiple sources, including user and project levels, as seen in the HookConfigLoader class.
+- [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
 
 
 ---

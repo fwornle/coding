@@ -2,107 +2,159 @@
 
 **Type:** SubComponent
 
-OntologyManagement uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to manage the ontology and ensure data consistency and integrity
+The OntologyManagement sub-component uses the UpperOntologyDefinition and LowerOntologyDefinition modules to define the upper and lower ontologies.
 
 ## What It Is  
 
-**OntologyManagement** is the sub‑component responsible for the lifecycle of the system’s ontology – the formal representation of concepts, relationships, and constraints that underpin the KnowledgeManagement domain. The implementation lives inside the **KnowledgeManagement** component and relies heavily on the **PersistenceAgent** located at  
+The **OntologyManagement** sub‑component lives inside the *SemanticAnalysis* domain and is implemented through a collection of TypeScript modules and configuration files. Key artefacts that belong to this sub‑component include  
 
-```
-integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts
-```  
+* `ontology-management-configuration.yaml` – the external configuration that drives runtime behaviour.  
+* `entity-type-resolver.ts` – resolves the concrete type of an incoming entity before it is processed.  
+* `validation.ts` – validates raw input data against the expected schema.  
+* `UpperOntologyDefinition` and `LowerOntologyDefinition` – TypeScript modules that declare the upper‑level and lower‑level ontology vocabularies.  
+* `CodeGraphAgent` – analyses the structure of source code and produces a graph representation that feeds the ontology.  
+* `OntologyClassificationAgent` – consumes the resolved entity and the code‑graph output to classify the entity into the appropriate ontology node. The agent’s source lives at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  
+* `GraphDatabaseAdapter` – persists the updated ontology into the underlying graph database; its implementation can be found at `storage/graph-database-adapter.ts`.  
 
-The agent is invoked by OntologyManagement to store, retrieve, and synchronize ontology data while guaranteeing consistency and integrity. OntologyManagement also performs classification, validation, and reasoning steps on the ontology and employs an internal caching layer to accelerate repeated look‑ups and reduce pressure on the underlying storage.
+Together, these pieces enable the system to ingest raw entities, validate and resolve them, enrich them with code‑graph insights, classify them against a layered ontology, and finally store the results in a graph store. OntologyManagement is therefore the orchestrator that ties classification, code analysis, validation, and persistence into a coherent workflow.
 
 ---
 
 ## Architecture and Design  
 
-The overall architecture follows a **modular, agent‑centric design** that is explicitly described for the parent KnowledgeManagement component. Each concern (storage, analysis, persistence) is encapsulated in its own module, allowing independent evolution. Within this scheme OntologyManagement acts as a *consumer* of the **PersistenceAgent**, which itself abstracts the details of the underlying graph database (via the `GraphDatabaseAdapter` used elsewhere in the sibling components).  
+The observations reveal a **modular, agent‑based architecture**.  The parent component *SemanticAnalysis* provides a reusable `BaseAgent` (located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) that supplies common plumbing—logging, error handling, and lifecycle hooks—to concrete agents such as `OntologyClassificationAgent` and `CodeGraphAgent`.  This inheritance hierarchy encourages code reuse and isolates domain‑specific logic inside each agent, a classic **Template Method** style without being explicitly named.
 
-The interaction pattern can be described as **“agent‑mediated service”**: OntologyManagement calls high‑level methods on the PersistenceAgent (e.g., `saveOntology`, `loadOntology`, `applyChanges`). The agent, in turn, translates those calls into graph‑database operations, applying transactional safeguards to ensure data integrity. This separation mirrors the same agent‑based approach used by the **CodeGraphAgent** in the SemanticAnalysis and OnlineLearning siblings, reinforcing a consistent design language across the KnowledgeManagement family.
+Persistence is abstracted behind a **GraphDatabaseAdapter**, an implementation of the **Adapter pattern** that shields OntologyManagement from the specifics of the graph database (e.g., Neo4j, JanusGraph).  The adapter also participates in an **Observer pattern** for notifications and updates, as noted in the hierarchy context.  When the ontology is mutated, the adapter can broadcast change events to any interested subscriber, keeping the system loosely coupled.
 
-Caching is introduced directly inside OntologyManagement (observed in point 4) to improve performance. The cache sits in front of the PersistenceAgent, meaning that read‑heavy classification or reasoning queries can be satisfied locally, while write paths still funnel through the agent to keep the persistent store authoritative.
+Configuration is externalised in `ontology-management-configuration.yaml`.  By loading settings at startup, the component follows a **Configuration‑as‑Code** approach, allowing operators to tweak classification thresholds, database connection strings, or ontology versioning without recompiling.
+
+The **validation** and **entity‑type‑resolution** steps are performed by dedicated modules (`validation.ts` and `entity-type-resolver.ts`).  Their isolation reflects a **Separation‑of‑Concerns** design: validation ensures data integrity early, while the resolver translates generic payloads into concrete domain types that agents can consume.
+
+Overall, the architecture emphasizes **pluggability** (agents can be swapped or extended), **decoupling** (adapter hides storage details), and **configurability** (YAML file), all of which are directly observable from the file paths and module names provided.
 
 ---
 
 ## Implementation Details  
 
-* **PersistenceAgent (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`)** – The sole gateway through which OntologyManagement interacts with the ontology store. The agent offers a **flexible and scalable** API that abstracts persistence details. Although the source symbols are not listed, the repeated observations (“provides a flexible and scalable way”, “ensures data consistency”) imply that the agent implements transactional writes, conflict detection, and possibly versioning to keep the ontology coherent across concurrent operations.
+1. **Configuration (`ontology-management-configuration.yaml`)**  
+   The YAML file defines keys such as `graphDatabase.uri`, `classification.threshold`, and `ontology.version`.  At initialization, OntologyManagement reads this file (likely via a Node‑JS YAML parser) and injects the values into the respective services.  
 
-* **Classification, Validation, Reasoning** – OntologyManagement orchestrates these three logical phases. Classification assigns entities to appropriate taxonomy nodes, validation checks that constraints (e.g., cardinality, datatype restrictions) hold, and reasoning derives implicit relationships. The exact algorithms are not enumerated, but the presence of these steps signals that OntologyManagement contains a pipeline that invokes the PersistenceAgent at the start (load current ontology) and at the end (persist any inferred changes).
+2. **Entity Type Resolution (`entity-type-resolver.ts`)**  
+   This module exports a function (e.g., `resolveEntityType(payload): EntityType`) that inspects the incoming payload’s metadata and maps it to a concrete enum defined in the ontology definitions.  The resolver is called before any agent processing, ensuring that downstream agents receive a strongly‑typed entity object.  
 
-* **Caching Layer** – Implemented inside OntologyManagement to “improve performance and reduce the load on the ontology”. The cache likely stores recently accessed ontology fragments, classification results, or reasoning in‑memory structures. Cache invalidation is tied to write operations performed via the PersistenceAgent, ensuring that stale data does not propagate.
+3. **Validation (`validation.ts`)**  
+   The validation module provides a `validateInput(data): ValidationResult` API.  It checks required fields, type constraints, and possibly cross‑field rules.  Validation failures short‑circuit the pipeline, returning errors to the caller.  
 
-* **Relationship to KnowledgeManagement** – OntologyManagement is a child of the **KnowledgeManagement** component, which itself is built from distinct modules: storage (`GraphDatabaseAdapter`), agents (`CodeGraphAgent`, `PersistenceAgent`), and utilities. OntologyManagement inherits the same modular philosophy, reusing the PersistenceAgent just as **EntityPersistence** and **GraphDatabaseManagement** reuse the `GraphDatabaseAdapter`.
+4. **Ontology Definitions (`UpperOntologyDefinition` / `LowerOntologyDefinition`)**  
+   These modules expose hierarchical type trees.  `UpperOntologyDefinition` contains high‑level concepts (e.g., *SoftwareComponent*, *BusinessDomain*), while `LowerOntologyDefinition` refines them (e.g., *APIEndpoint*, *DatabaseTable*).  Agents reference these definitions to map resolved entities to the correct node.  
+
+5. **Code Graph Analysis (`CodeGraphAgent`)**  
+   Implemented as a subclass of `BaseAgent`, the CodeGraphAgent parses source code repositories, builds an abstract syntax graph, and emits a structured representation (likely a set of nodes and edges).  This graph is later used by the classification agent to enrich the entity’s context.  
+
+6. **Classification (`OntologyClassificationAgent`)**  
+   Also extending `BaseAgent`, this agent receives the resolved entity and the code‑graph payload.  Using rules derived from the ontology definitions, it decides which ontology node best fits the entity.  The decision logic may involve similarity scoring against the upper and lower ontology vocabularies.  
+
+7. **Persistence (`GraphDatabaseAdapter`)**  
+   The adapter translates the classified ontology node into a graph‑database mutation (e.g., a Cypher `MERGE` statement).  It also registers observers that listen for changes—other components can subscribe to receive updates when the ontology evolves.  
+
+Because the source tree reports **“0 code symbols found”**, the concrete function signatures are not listed, but the naming conventions and file locations give a clear picture of the implementation flow.
 
 ---
 
 ## Integration Points  
 
-1. **PersistenceAgent** – The primary integration point. OntologyManagement calls the agent’s public methods for all CRUD (Create, Read, Update, Delete) operations on ontology entities. Because the agent is also used by other siblings (e.g., EntityPersistence), any change to its contract impacts multiple components, reinforcing the need for a stable interface.
+OntologyManagement sits at the intersection of several sibling and parent components:
 
-2. **Caching Mechanism** – Internally coupled to the PersistenceAgent. When OntologyManagement writes through the agent, it must also purge or update the cache to keep the two in sync.
+* **Parent – SemanticAnalysis**: The parent provides the `BaseAgent` foundation and the overall orchestration framework. OntologyManagement inherits lifecycle hooks (e.g., `initialize()`, `shutdown()`) from this parent, ensuring consistent start‑up ordering with other sub‑components such as *Pipeline* or *SemanticAnalysisService*.  
 
-3. **KnowledgeManagement Parent** – OntologyManagement contributes the authoritative ontology to the broader KnowledgeManagement ecosystem. Other siblings such as **SemanticAnalysis** and **OnlineLearning** may query the ontology (via the PersistenceAgent) to enrich their own analysis pipelines.
+* **Sibling – Ontology**: The Ontology sibling hosts the same `OntologyClassificationAgent` source file, indicating shared classification logic. OntologyManagement therefore re‑uses the classification capabilities defined for the broader Ontology component, reinforcing the **DRY** principle.  
 
-4. **GraphDatabaseAdapter** – Although not called directly by OntologyManagement, the PersistenceAgent internally relies on the same graph‑database adapter that powers the sibling components. This shared storage layer guarantees that the ontology, entities, and knowledge graph reside in a unified persistence store.
+* **Sibling – Pipeline**: The Pipeline’s modular agent architecture mirrors OntologyManagement’s agent usage. Both rely on `BaseAgent`, suggesting they can be composed in a single processing chain if needed.  
+
+* **Sibling – ContentValidationModule**: This sibling also consumes `validation.ts`.  The shared validation module centralises data integrity checks, allowing both OntologyManagement and ContentValidationModule to enforce the same schema rules.  
+
+* **GraphDatabaseAdapter (Sibling/Shared Service)**: The adapter is a cross‑cutting concern used by multiple components (e.g., *Insights*, *CodeGraphConstruction*).  Its observer capability enables those components to react to ontology updates without tight coupling.  
+
+* **External – LLMIntegration**: While not directly referenced, the parent SemanticAnalysis uses LLM services.  It is plausible that OntologyManagement may receive enriched entity descriptions from LLM prompts, feeding them into the classification pipeline.  
+
+All dependencies are expressed through explicit module imports (e.g., `import { GraphDatabaseAdapter } from '../../storage/graph-database-adapter'`) and configuration injection, keeping the integration surface well‑defined.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always route ontology mutations through the PersistenceAgent.** Direct manipulation of the underlying graph database bypasses the consistency checks baked into the agent and can lead to divergence between cached and persisted states.  
+1. **Configure First** – Always start by editing `ontology-management-configuration.yaml`.  Adjust the `graphDatabase` connection parameters and classification thresholds before running the service; changes are picked up on the next start‑up without code changes.  
 
-* **Respect the cache lifecycle.** After any successful write via the PersistenceAgent, explicitly invalidate or refresh the relevant cache entries in OntologyManagement. Failure to do so may cause stale classification or reasoning results.  
+2. **Validate Early** – Feed raw payloads through `validation.ts` before invoking any agent.  A failed validation should be reported to the caller immediately to avoid unnecessary processing downstream.  
 
-* **Leverage the classification‑validation‑reasoning pipeline in order.** The pipeline assumes that the ontology is first classified, then validated, and finally reasoned upon. Skipping a step can produce inconsistent inference results.  
+3. **Resolve Types Before Classification** – Call `entity-type-resolver.ts` to obtain a concrete `EntityType`.  Passing an unresolved or generic object to `OntologyClassificationAgent` will result in a fallback classification or an error.  
 
-* **Consider scalability when loading large ontologies.** Because the PersistenceAgent is designed to be “flexible and scalable,” it likely supports streaming or batched reads. Use those patterns for bulk operations rather than loading the entire ontology into memory at once.  
+4. **Leverage the Adapter** – When persisting ontology updates, interact only with `GraphDatabaseAdapter`.  Do not embed database queries directly in agents; this preserves the Adapter pattern and enables future database swaps.  
 
-* **Treat OntologyManagement as a shared service.** Since siblings such as SemanticAnalysis depend on the same ontology, coordinate updates (e.g., via feature flags or versioned releases) to avoid breaking downstream consumers.
+5. **Observe Change Events** – If a component needs to react to ontology mutations (e.g., the *Insights* sub‑component), subscribe to the observer notifications exposed by `GraphDatabaseAdapter`.  This avoids polling and keeps the system reactive.  
+
+6. **Extend via Agents** – To add new classification logic or additional analysis steps, create a new subclass of `BaseAgent` and register it in the pipeline configuration.  Reuse the existing validation, resolver, and adapter modules to stay consistent with the established design.  
+
+7. **Testing** – Unit‑test each module in isolation: validation rules, resolver mappings, and agent decision logic.  Integration tests should spin up a lightweight in‑memory graph database (or a test container) and verify that the adapter correctly writes nodes and fires observers.  
 
 ---
 
-### Architectural patterns identified  
+### Summary of Requested Deliverables  
 
-1. **Modular architecture** – distinct storage, agent, and utility modules.  
-2. **Agent‑mediated service pattern** – OntologyManagement interacts with PersistenceAgent as a façade over the graph database.  
-3. **Cache‑aside pattern** – internal caching sits in front of the persistence layer to improve read performance.
+**1. Architectural patterns identified**  
+* Modular, agent‑based architecture built on a shared `BaseAgent`.  
+* Adapter pattern (`GraphDatabaseAdapter`) for persistence abstraction.  
+* Observer pattern for change notifications within the adapter.  
+* Configuration‑as‑Code via `ontology-management-configuration.yaml`.  
+* Separation‑of‑Concerns through distinct validation, resolution, and classification modules.  
 
-### Design decisions and trade‑offs  
+**2. Design decisions and trade‑offs**  
+* **Agents** provide extensibility but add an extra indirection layer.  
+* **Adapter** isolates storage details, enabling database swaps at the cost of a thin abstraction layer to maintain.  
+* **YAML configuration** grants flexibility but requires runtime parsing and validation of config files.  
+* **Shared validation/resolution modules** reduce duplication but create a tight coupling between siblings that must be coordinated when schemas evolve.  
 
-* **Centralising persistence in PersistenceAgent** simplifies consistency guarantees but creates a single point of failure; the agent must be robust and highly available.  
-* **Caching inside OntologyManagement** boosts read throughput but adds complexity around cache invalidation, especially under concurrent writes.  
-* **Reusing the same PersistenceAgent across multiple siblings** promotes code reuse and uniform data handling, yet any change to the agent’s API ripples through all dependent components, raising coordination overhead.
+**3. System structure insights**  
+OntologyManagement is a leaf sub‑component under *SemanticAnalysis* that orchestrates a pipeline of validation → type resolution → code‑graph analysis → classification → persistence.  Its child `OntologyClassificationAgent` re‑uses logic defined in the sibling *Ontology* component, while the `GraphDatabaseAdapter` serves as a common persistence gateway for multiple siblings.  
 
-### System structure insights  
+**4. Scalability considerations**  
+* Agent‑based processing can be parallelised across multiple threads or containers, allowing the classification pipeline to handle high‑throughput streams.  
+* The graph database backend, accessed through the adapter, can be scaled horizontally (sharding, clustering) depending on the underlying DB technology.  
+* Externalising thresholds and limits in YAML permits runtime tuning without redeployment, supporting dynamic scaling.  
 
-The KnowledgeManagement component is organized as a collection of interchangeable agents (PersistenceAgent, CodeGraphAgent) and adapters (GraphDatabaseAdapter). OntologyManagement sits as a consumer of the PersistenceAgent, while siblings either consume the same agent (EntityPersistence) or other agents (CodeGraphAgent). This layered structure encourages clear separation of concerns and facilitates independent evolution of storage vs. analysis logic.
+**5. Maintainability assessment**  
+The clear separation of responsibilities, reuse of `BaseAgent`, and centralised adapter make the codebase **highly maintainable**.  Adding new agents or swapping the graph store requires minimal changes.  However, the reliance on shared modules (validation, resolver) means that changes to those modules must be coordinated across all siblings, introducing a potential ripple effect.  Overall, the design promotes readability, testability, and future extension.
 
-### Scalability considerations  
+## Diagrams
 
-* The PersistenceAgent is described as “flexible and scalable,” suggesting it supports concurrent access, possibly sharding or batching.  
-* Caching reduces read load on the graph database, allowing the system to handle higher query rates without proportionally scaling storage.  
-* Because OntologyManagement relies on the same graph database as other components, overall system scalability hinges on the performance characteristics of the underlying `GraphDatabaseAdapter` (Graphology + LevelDB). Horizontal scaling would therefore involve scaling the LevelDB-backed graph store or introducing a distributed graph backend.
+### Relationship
 
-### Maintainability assessment  
+![OntologyManagement Relationship](images/ontology-management-relationship.png)
 
-The modular, agent‑centric design is highly maintainable: each module has a narrow responsibility, and changes are localized. The explicit use of shared agents (PersistenceAgent) reduces duplication but requires disciplined versioning and thorough integration testing. The presence of a caching layer adds a maintenance burden (cache coherence), but its benefits for performance justify the extra care. Overall, OntologyManagement’s architecture balances reusability and clarity, making future extensions—such as adding new reasoning rules or alternative persistence backends—relatively straightforward.
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/ontology-management-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a modular architecture, with separate modules for storage, agents, and utilities. This is evident in the way the component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence with automatic JSON export sync. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) and PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) are also separate modules that work together to manage the knowledge graph and perform various analysis tasks. This modular approach allows for flexibility and maintainability, as each module can be updated or replaced independently without affecting the rest of the component.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents. This design pattern promotes code reuse and maintainability, allowing developers to easily add or modify agents without affecting the overall system. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) are built on top of the BaseAgent, demonstrating the effectiveness of this modular approach. The use of design patterns such as the Observer pattern for handling notifications and updates, as observed in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), further enhances the system's maintainability and scalability.
+
+### Children
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyManagement sub-component uses the OntologyClassificationAgent to classify entities into the ontology, as mentioned in the Hierarchy Context.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence with automatic JSON export sync
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to perform semantic analysis on code and other data sources
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and manage entities in the graph database
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis uses the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to perform semantic analysis on code and other data sources
-- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and manage data in the graph database
-- [KnowledgeDecayTracking](./KnowledgeDecayTracking.md) -- KnowledgeDecayTracking uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to track the decay of knowledge and ensure data consistency and integrity
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying entities into the ontology.
+- [Insights](./Insights.md) -- The Insights sub-component uses the results of the Pipeline and Ontology sub-components to generate insights.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService sub-component uses the LLM services to analyze the input data.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationModule sub-component uses the validation.ts module to validate the input data.
+- [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstruction sub-component uses the CodeGraphAgent to analyze the code structure.
+- [LLMIntegration](./LLMIntegration.md) -- The LLMIntegration sub-component uses the LLM services to analyze the input data.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses the graph-database-adapter.ts module to adapt the graph database.
 
 
 ---
