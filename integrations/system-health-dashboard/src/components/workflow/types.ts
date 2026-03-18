@@ -34,6 +34,7 @@ export interface StepInfo {
   name: string
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
   startTime?: string
+  endTime?: string
   duration?: number
   outputs?: Record<string, unknown>
   // LLM metrics
@@ -41,6 +42,19 @@ export interface StepInfo {
   llmProvider?: string
   llmCalls?: number
   error?: string
+  // Trace extension fields for wave-analysis 3-level nested view
+  wave?: number
+  subSteps?: StepInfo[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  agentInstances?: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  entityFlow?: Record<string, any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  qaResult?: Record<string, any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  llmCallEvents?: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  cgrQueryEvents?: any[]
 }
 
 // Process info from Redux store - compatible with UKBProcess

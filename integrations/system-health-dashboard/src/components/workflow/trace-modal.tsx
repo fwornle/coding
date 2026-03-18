@@ -409,7 +409,11 @@ export function TraceModal({
     const waveMap = new Map<number, StepInfo[]>()
 
     for (const step of steps) {
-      const waveNum = step.wave ?? 0
+      // Determine wave number: use explicit wave property, or parse from step name (e.g. "wave4" → 4)
+      let waveNum = step.wave ?? 0
+      if (waveNum === 0 && step.name.match(/^wave(\d+)$/)) {
+        waveNum = parseInt(step.name.match(/^wave(\d+)$/)![1], 10)
+      }
       if (!waveMap.has(waveNum)) {
         waveMap.set(waveNum, [])
       }
@@ -537,7 +541,7 @@ export function TraceModal({
   if (!hasTraceData) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[90vw] w-[1200px] h-[80vh] grid grid-rows-[auto_1fr] gap-4 overflow-hidden">
+        <DialogContent className="max-w-[90vw] w-[1200px] max-h-[80vh] flex flex-col gap-4 overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5" />

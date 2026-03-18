@@ -1390,7 +1390,6 @@ export function UKBNodeDetailsSidebar({
         )}
 
         {/* Step Execution Details - Always show with available data */}
-        {/* @ts-expect-error Separator component typing */}
         <Separator />
         <div className="space-y-3">
           <h4 className="font-medium text-sm">Execution Details</h4>
