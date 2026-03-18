@@ -2,77 +2,83 @@
 
 **Type:** SubComponent
 
-The ProviderRegistry utilizes the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) to register providers.
+The ProviderRegistry uses the CircuitBreaker class to prevent cascading failures by detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)
 
 ## What It Is  
 
-`ProviderRegistry` lives in **`lib/llm/provider-registry.js`**.  It is a small but pivotal sub‑component of the larger **LLMAbstraction** component.  Its sole responsibility is to maintain a collection of LLM‑provider implementations and expose a simple lookup mechanism that other parts of the system – most notably **`LLMService`** (found in `lib/llm/llm-service.ts`) – can use to route a request to the correct provider.  The registry is populated with concrete provider classes such as **`AnthropicProvider`** (`lib/llm/providers/anthropic-provider.ts`) and **`DMRProvider`** (`lib/llm/providers/dmr-provider.ts`).  Because the registry lives in its own file and is referenced by both the parent **LLMAbstraction** component and sibling components like **BudgetTracker**, it acts as the single source of truth for “what providers are available” within the code base.
-
-## Architecture and Design  
-
-The design follows a **registry pattern**: a central map (or similar collection) holds provider identifiers together with instantiated provider objects.  This pattern enables **provider‑agnostic** routing – the rest of the system never needs to know which concrete class implements a given LLM; it simply asks the registry for the provider that matches a requested name or capability.  The registry is **decoupled** from the request‑handling logic; `LLMService` imports the registry and delegates the selection of a provider to it, preserving a clear separation of concerns.  
-
-The component hierarchy reinforces this separation.  `ProviderRegistry` is a child of **LLMAbstraction**, which defines the overall abstraction layer for language‑model interactions.  Its sibling **BudgetTracker** also consumes the registry, using it to attribute usage costs to the correct provider.  This shared dependency illustrates a **composition** relationship: multiple higher‑level services compose the same low‑level registry rather than each building its own provider list.
-
-Although the observations do not explicitly name a pattern beyond the registry, the way providers are registered (via direct imports of `AnthropicProvider` and `DMRProvider`) suggests a **plug‑in style** approach: adding a new provider only requires creating a class that conforms to the provider interface and inserting it into the registry file.  No other part of the system needs to be altered, which is a classic **open/closed** design principle.
-
-## Implementation Details  
-
-The core of the implementation resides in **`lib/llm/provider-registry.js`**.  While the exact code is not shown, the file’s purpose is clear from the observations: it imports concrete provider classes (`AnthropicProvider` from `lib/llm/providers/anthropic-provider.ts` and `DMRProvider` from `lib/llm/providers/dmr-provider.ts`) and registers them, likely in a JavaScript object or `Map` keyed by a provider identifier (e.g., `"anthropic"` or `"dmr"`).  The registry probably exposes at least two public functions:
-
-1. **`register(name, providerInstance)`** – used internally when the file is first evaluated to add the built‑in providers, and potentially available for runtime extension.
-2. **`getProvider(name)`** – queried by `LLMService` (in `lib/llm/llm-service.ts`) to retrieve the appropriate provider for a given request.
-
-`LLMService` acts as the façade for all LLM operations.  When a caller asks for a completion, chat, or other LLM service, `LLMService` consults the registry, obtains the matching provider, and forwards the request.  Because the registry is a singleton module (a common Node.js pattern), both `LLMService` and `BudgetTracker` see the same provider instances, ensuring consistent configuration and state.
-
-The observations also hint at **environment‑variable driven integration**: variables such as `CODE_GRAPH_RAG_SSE_PORT` and `BROWSER_ACCESS_SSE_URL` may be read by providers during registration to configure external services (e.g., a Code Graph Retrieval‑Augmented Generation pipeline or a browser‑access SSE endpoint).  While the registry itself probably does not parse these variables, the provider classes it instantiates likely do, meaning the registry indirectly participates in wiring together external systems.
-
-## Integration Points  
-
-`ProviderRegistry` sits at the intersection of several system boundaries:
-
-* **LLMAbstraction** – as a child component, the registry provides the concrete implementations that satisfy the abstract LLM interface defined by the parent.
-* **LLMService** (`lib/llm/llm-service.ts`) – the primary consumer; it queries the registry for a provider and then calls the provider’s methods (`generate`, `chat`, etc.).
-* **BudgetTracker** – a sibling that also imports the registry to map usage metrics (tokens, API calls) back to the specific provider, enabling cost accounting.
-* **External configuration files** – the registry’s provider list may be informed by documentation such as `integrations/copi/INSTALL.md` (for installation steps) and `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` (for semantic constraint handling).  These files are not code, but they likely describe required environment variables or runtime flags that providers read during construction.
-* **Environment variables** – `CODE_GRAPH_RAG_SSE_PORT` and `BROWSER_ACCESS_SSE_URL` are referenced as possible inputs that providers need.  The registry, by virtue of creating provider instances, ensures these values are passed where required.
-
-Because the registry is a plain JavaScript module, integration is straightforward: any module that needs provider information simply imports `lib/llm/provider-registry.js` and calls its public API.  No additional service discovery or dependency‑injection framework is required.
-
-## Usage Guidelines  
-
-1. **Add a New Provider** – Create a class that implements the same public interface as `AnthropicProvider` and `DMRProvider`.  Place the file under `lib/llm/providers/` and import it in `lib/llm/provider-registry.js`.  Register it by adding an entry to the internal map (e.g., `registry.register('myProvider', new MyProvider(config))`).  No changes to `LLMService` or other consumers are needed.  
-2. **Reference Providers Consistently** – When invoking LLM functionality through `LLMService`, always specify the provider name exactly as it appears in the registry.  This avoids mismatches and ensures the correct cost‑tracking path in `BudgetTracker`.  
-3. **Configure External Dependencies** – If a provider relies on external services (Code Graph RAG, browser SSE, etc.), ensure the corresponding environment variables (`CODE_GRAPH_RAG_SSE_PORT`, `BROWSER_ACCESS_SSE_URL`) are defined before the application starts.  The provider’s constructor will read them; the registry merely passes the instantiated object onward.  
-4. **Do Not Mutate the Registry at Runtime Unless Intended** – The registry is designed for static registration at module load time.  Dynamically adding or removing providers after startup can lead to inconsistent state between `LLMService` and `BudgetTracker`.  If runtime flexibility is required, expose a controlled `register` API and document its usage clearly.  
-5. **Keep Provider Implementations Side‑Effect Free** – Providers should encapsulate all external calls (API keys, network clients) within themselves.  This keeps the registry lightweight and prevents it from becoming a hidden source of side effects.
+**ProviderRegistry** is the concrete class that lives in `lib/llm/provider-registry.ts`.  Its sole responsibility is to act as the central catalogue for all Large‑Language‑Model (LLM) providers that the application can use.  The registry knows how to **register**, **un‑register**, and **enumerate** providers, and it exposes a simple API that other parts of the system (most notably `LLMService` in `lib/llm/llm-service.ts`) can call to obtain a ready‑to‑use provider instance.  Because the registry is a child of the broader **LLMAbstraction** component, it is the “source of truth” for provider availability throughout the LLM stack.
 
 ---
 
-### Architectural Patterns Identified
-* **Registry / Service Locator** – central map of provider identifiers to concrete instances.
-* **Plug‑in / Open‑Closed** – new providers can be added without modifying existing routing logic.
-* **Composition** – multiple higher‑level components (LLMService, BudgetTracker) compose the same registry.
+## Architecture and Design  
 
-### Design Decisions and Trade‑offs
-* **Simplicity vs. Flexibility** – Using a plain module‑level registry is easy to understand and has minimal runtime overhead, but it limits dynamic reconfiguration unless an explicit API is added.
-* **Single Source of Truth** – Centralizing provider information reduces duplication but creates a hard coupling; any change to provider registration propagates to all consumers.
-* **Environment‑Variable Configuration** – Delegating external configuration to providers keeps the registry thin, yet it requires developers to be aware of the required variables for each provider.
+The design of **ProviderRegistry** follows a **registry pattern** combined with **dependency‑injection (DI)**.  `LLMService` constructs the registry (or receives it via its constructor) and then injects concrete provider implementations into the registry.  This DI approach, highlighted in the observation that “the ProviderRegistry uses a dependency injection approach to allow for the addition of new providers” (see `lib/llm/llm-service.ts`), decouples the service logic from any specific provider class, making the system highly extensible and test‑friendly.
 
-### System Structure Insights
-* **Parent‑Child Relationship** – ProviderRegistry is a child of LLMAbstraction, providing concrete implementations for the abstract LLM contract.
-* **Sibling Interaction** – Both LLMService and BudgetTracker depend on the registry, illustrating a shared‑service model within the same abstraction layer.
-* **External Documentation Links** – Integration guides (`INSTALL.md`, `semantic-constraint-detection.md`) serve as operational references for providers, indicating that provider onboarding is documented outside the code but closely tied to the registry’s purpose.
+Resilience is built in through the **CircuitBreaker** collaboration.  The registry does not call providers directly; instead, when a provider is retrieved, the calling code (e.g., `LLMService`) wraps the request with the `CircuitBreaker` class (`lib/llm/circuit-breaker.ts`).  This protects the overall flow from cascading failures when a particular provider becomes unresponsive.  The registry also contributes to performance by **caching** provider metadata or client instances, as noted in the observation that “the ProviderRegistry uses a cache to improve performance and reduce the number of requests made to the providers” (again visible from `LLMService`).  Together, these choices form a **modular, resilient, and performant** subsystem within the LLM abstraction layer.
 
-### Scalability Considerations
-* Adding more providers scales linearly: each new provider adds one entry to the registry and a corresponding class file.  
-* Because provider lookup is a simple map access, request routing remains O(1) even with dozens of providers.  
-* If the number of providers grows dramatically, consider namespacing or grouping them to avoid identifier collisions, but the current design already supports that via unique keys.
+Interaction with sibling components is straightforward: `LLMController` (also an `EventEmitter` in `lib/llm/llm-service.ts`) receives high‑level commands, forwards them to `LLMService`, which in turn queries the `ProviderRegistry` for the appropriate provider.  The `BudgetTracker` sibling monitors cost but does not interfere with registration logic, keeping concerns cleanly separated.
 
-### Maintainability Assessment
-* **High maintainability** – The registry’s thin footprint and clear import‑register pattern make it easy for developers to audit which providers are available.  
-* **Low coupling** – Consumers interact only through the registry’s public API, so changes to provider internals rarely affect callers.  
-* **Potential risk** – Since the registry is a shared mutable module, inadvertent runtime mutations could cause hard‑to‑debug bugs; enforcing immutability or exposing a read‑only interface would further improve robustness.
+---
+
+## Implementation Details  
+
+1. **Core API (lib/llm/provider-registry.ts)**  
+   - **`register(providerId: string, providerFactory: () => Provider)`** – stores a factory function (or concrete instance) keyed by a unique identifier.  
+   - **`unregister(providerId: string)`** – removes the entry, allowing hot‑swap or de‑provisioning of providers.  
+   - **`getAvailableProviders(): string[]`** – returns the list of registered IDs, enabling UI or diagnostic components to enumerate options.  
+   - **`getProvider(providerId: string): Provider`** – fetches (and possibly caches) the concrete provider instance.  The cache is internal to the registry; subsequent calls for the same ID return the cached object unless it has been invalidated.
+
+2. **Dependency Injection (lib/llm/llm-service.ts)**  
+   `LLMService` receives an instance of `ProviderRegistry` in its constructor.  When the service starts, it calls `registry.register(...)` for each built‑in provider (e.g., OpenAI, Anthropic) and also exposes a public method for external modules to add custom providers.  Because the registry holds only factories, the actual provider objects are lazily instantiated, reducing startup overhead.
+
+3. **Caching Strategy**  
+   The cache lives inside the registry; it stores the instantiated provider after the first `getProvider` call.  This reduces the number of network‑handshakes or SDK initializations, which is especially valuable when providers require expensive authentication steps.  The cache is cleared when `unregister` is called, ensuring stale instances do not linger.
+
+4. **Error Handling**  
+   All registry operations are wrapped in try/catch blocks.  When a registration fails (e.g., the factory throws), `LLMService` captures the exception and surfaces a meaningful error to callers.  Retrieval errors are also caught; if a provider cannot be instantiated, the registry logs the failure and returns `null` (or throws a domain‑specific error), allowing the caller to fall back to another provider or abort gracefully.
+
+5. **CircuitBreaker Integration (lib/llm/circuit-breaker.ts)**  
+   While the registry itself does not contain circuit‑breaker logic, its public `getProvider` method is typically used inside a `CircuitBreaker.execute(() => provider.call(...))` pattern.  The breaker tracks failure counts per provider ID; once a threshold is breached, the breaker trips and `LLMService` stops routing requests to that provider until it recovers.
+
+---
+
+## Integration Points  
+
+- **Parent – LLMAbstraction**: The abstraction layer aggregates `ProviderRegistry`, `LLMService`, `LLMController`, `CircuitBreaker`, and `BudgetTracker`.  The registry is the authoritative source for which providers the abstraction can address.  Any new provider added to the system must be registered here before `LLMService` can use it.
+
+- **Sibling – LLMController**: `LLMController` listens for external events (e.g., API requests) and forwards them to `LLMService`.  When a request specifies a particular provider, the service queries the registry to resolve the concrete implementation.
+
+- **Sibling – CircuitBreaker**: The breaker consumes provider identifiers supplied by the registry to maintain per‑provider health state.  This tight coupling ensures that a failing provider is isolated without affecting the registry’s internal state.
+
+- **Sibling – BudgetTracker**: Although not directly coupled, `BudgetTracker` may query the registry to understand which providers are active, allowing it to attribute costs correctly.
+
+- **External Modules**: Third‑party code can extend the LLM stack by importing `ProviderRegistry` from `lib/llm/provider-registry.ts` and invoking `register` with a custom factory.  Because the registry follows DI, no changes to `LLMService` or other core classes are required.
+
+---
+
+## Usage Guidelines  
+
+1. **Register Early, Unregister Sparingly** – Register all built‑in providers during application bootstrap (typically in the `LLMService` constructor).  Unregister only when a provider is permanently deprecated or when you need to replace it with a newer version; doing so clears the internal cache and prevents stale connections.
+
+2. **Prefer Factories Over Direct Instances** – Pass a factory function to `register` rather than a pre‑instantiated provider.  This defers heavy initialization until the first request, keeping start‑up latency low and allowing the cache to manage lifecycle automatically.
+
+3. **Handle Retrieval Errors** – Always wrap `registry.getProvider(id)` calls in try/catch or use the `CircuitBreaker` helper.  Providers may fail to instantiate (missing credentials, network outage), and the registry will surface those errors.
+
+4. **Leverage the Cache** – Do not manually instantiate providers outside the registry; doing so bypasses the cache and defeats the performance optimization.  If you need a fresh instance (e.g., after credential rotation), first `unregister` the old ID and then `register` a new factory.
+
+5. **Observe CircuitBreaker State** – Before sending a request, query the breaker’s health for the target provider.  If the breaker is open, fallback to an alternative provider or return a graceful error to the caller.
+
+6. **Testing** – In unit tests, replace the real `ProviderRegistry` with a mock that registers stub factories.  Because the registry follows DI, the rest of the system (e.g., `LLMService`) can be exercised without contacting external LLM APIs.
+
+---
+
+### Summary of Key Insights  
+
+1. **Architectural patterns identified** – Registry pattern, Dependency Injection, Cache‑as‑a‑service, and resilience via CircuitBreaker.  
+2. **Design decisions and trade‑offs** – DI gives flexibility and testability at the cost of added indirection; caching improves latency but introduces cache‑invalidation considerations; circuit‑breaker adds robustness but requires tuning of thresholds.  
+3. **System structure insights** – `ProviderRegistry` sits under the `LLMAbstraction` parent, serving as the single source of truth for providers; it collaborates closely with `LLMService`, `LLMController`, `CircuitBreaker`, and `BudgetTracker`, each handling a distinct cross‑cutting concern (service orchestration, event handling, resiliency, and cost tracking).  
+4. **Scalability considerations** – Adding new providers is a matter of registering a factory; the cache scales linearly with the number of distinct providers, and the circuit‑breaker isolates failures, allowing the system to continue operating even when many providers are degraded.  
+5. **Maintainability assessment** – The clear separation of concerns (registration vs. usage vs. resilience) and the reliance on DI make the registry easy to extend and test.  The primary maintenance burden lies in keeping the cache coherent and ensuring circuit‑breaker thresholds remain appropriate as provider performance characteristics evolve.
 
 ## Diagrams
 
@@ -90,11 +96,12 @@ Because the registry is a plain JavaScript module, integration is straightforwar
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (LLM) providers. This is evident in the lib/llm/provider-registry.js file, where a registry of providers is maintained, enabling easy addition or removal of providers. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) are both registered in this registry, demonstrating the flexibility of the component's architecture. The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry. This design decision enables the component to adapt to changing requirements and new provider additions without significant modifications to the existing codebase.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.
 
 ### Siblings
-- [BudgetTracker](./BudgetTracker.md) -- The lib/llm/provider-registry.js file maintains a registry of providers, enabling easy addition or removal of providers, which is used by the BudgetTracker to track costs.
-- [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry.
+- [LLMController](./LLMController.md) -- The LLMController class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner, as seen in the LLMService class (lib/llm/llm-service.ts)
+- [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker class is responsible for detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)
+- [BudgetTracker](./BudgetTracker.md) -- The BudgetTracker class is responsible for managing the budget and tracking the costs associated with the LLM requests, as seen in the LLMService class (lib/llm/llm-service.ts)
 
 
 ---

@@ -2,122 +2,87 @@
 
 **Type:** SubComponent
 
-The project documentation highlights the CODE_GRAPH_RAG_PORT configuration, which is used by the CodeGraphRAG for accessing the graph database, facilitating code analysis.
+The CodeGraphRAG sub-component utilizes the graph_operations.py module to handle code graph and RAG operations, specifically through the CodeGraphBuilder class and its build_rag() function.
 
 ## What It Is  
 
-CodeGraphRAG is a **graph‑based Retrieval‑Augmented Generation (RAG) sub‑component** that lives under the `integrations/code-graph-rag` directory of the LiveLoggingSystem repository. Its primary source files are the `integrations/code-graph-rag/README.md` document, which outlines the purpose of the component, and the surrounding implementation files in the same directory (the exact source files are not listed in the observations but are implied to exist alongside the README).  
-
-The component is responsible for turning a codebase into a graph representation and then using that graph to answer queries or enrich generation tasks. It does so by connecting to a graph database (via a configurable port) and exposing a Server‑Sent Events (SSE) endpoint for streaming results. The configuration keys `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` are explicitly referenced in the documentation, indicating that the component’s runtime behavior is driven by these environment variables.  
-
-CodeGraphRAG is a child of the **LiveLoggingSystem** parent component and itself contains a child component called **GraphCodeRAG**, which is described in the same README as “Graph‑Based RAG System for Any Codebases.”  
-
----
+CodeGraphRAG is a **sub‑component** that lives inside the `DockerizedServices` assembly. Its primary source of documentation is the README located at **`integrations/code‑graph‑rag/README.md`**. The component is responsible for building a *graph‑based Retrieval‑Augmented Generation (RAG)* index over a codebase, enabling downstream services to query code‑level context efficiently. Configuration is driven by two environment variables – **`CODE_GRAPH_RAG_SSE_PORT`** (the port on which the Server‑Sent Events stream is exposed) and **`CODE_GRAPH_RAG_PORT`** (the main HTTP API port). The core operational logic resides in the **`graph_operations.py`** module, where the **`CodeGraphBuilder`** class implements the `build_rag()` function that constructs the graph and populates the RAG store.
 
 ## Architecture and Design  
 
-The observations reveal a **modular, configuration‑driven architecture**. CodeGraphRAG resides in its own integration folder (`integrations/code-graph-rag`) separate from other integrations such as `integrations/mcp-server-semantic-analysis` (which holds the OntologyClassificationAgent) and `integrations/browser-access`. This mirrors the broader modular design of LiveLoggingSystem, where each functional area lives in its own top‑level directory (e.g., `storage/graph-database-adapter.ts` for the GraphDatabaseAdapter).  
+The architecture follows a **modular, Docker‑centric** style typical of the `DockerizedServices` parent. Each sub‑component, including CodeGraphRAG, is packaged as an isolated container that reads its configuration from environment variables – a direct application of the *12‑factor app* principle for configuration.  
 
-Two concrete design choices stand out:
+Within CodeGraphRAG, the **Builder pattern** is evident through the `CodeGraphBuilder` class. By exposing a single `build_rag()` method, the class encapsulates the multi‑step process of parsing source files, constructing a dependency graph, and indexing the resulting nodes for retrieval. This isolates the complex graph construction logic from callers and makes the operation reusable.  
 
-1. **Port‑Based External Connectivity** – The presence of `CODE_GRAPH_RAG_PORT` (for the graph database) and `CODE_GRAPH_RAG_SSE_PORT` (for SSE streaming) indicates a *configuration‑as‑code* pattern. The component does not hard‑code connection details; instead, it reads them at start‑up, making the service portable across environments (development, staging, production).  
+The presence of a **handler** sub‑entity – `CodeGraphRAGHandler` – suggests a *Handler* or *Controller* pattern that mediates HTTP/SSE requests and forwards them to the builder or the underlying RAG store. While the exact implementation of the handler is not detailed in the observations, its naming and placement under CodeGraphRAG indicate it serves as the public entry point for the component’s API surface, analogous to how `LLMService` acts as the façade for LLM operations in the sibling `LLMService` component.  
 
-2. **Graph‑Centric Retrieval** – By “showcasing a graph‑based representation of code,” the component adopts a *graph‑oriented data model* for code artifacts. This is a purposeful architectural decision to leverage graph traversal capabilities for code‑level relationships (e.g., call graphs, inheritance hierarchies) that are difficult to express with flat text indexes.  
-
-Interaction with other parts of the system follows the same modular principle: CodeGraphRAG is referenced from the **LiveLoggingSystem** (the parent) and contains **GraphCodeRAG** (its child). The sibling components—GraphDatabaseAdapter, OntologyClassificationAgent, BrowserAccessMCP—share the same high‑level pattern of being self‑contained integrations that expose well‑defined interfaces (e.g., a database adapter, an agent, a UI front‑end).  
-
----
+Interaction with siblings is minimal but follows a common contract: both `CodeGraphRAG` and `LLMService` expose HTTP endpoints configured via environment variables and run inside the same Docker network managed by `DockerizedServices`. This shared deployment model enables them to be composed together—for example, an LLM request could trigger a code‑graph lookup via CodeGraphRAG.
 
 ## Implementation Details  
 
-While the observations do not enumerate concrete classes or functions, they give us enough anchors to describe the implementation scaffold:
+The heart of the implementation lives in **`integrations/code‑graph‑rag/graph_operations.py`**. The `CodeGraphBuilder` class is instantiated by the `CodeGraphRAGHandler` (the child component) when a request arrives at the RAG API. Its `build_rag()` function performs three logical phases:
 
-* **Configuration Access** – The README mentions `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT`. In practice, the component likely reads these values from environment variables or a configuration file at initialization, using a helper such as `process.env.CODE_GRAPH_RAG_PORT` (Node.js) or a similar runtime‑specific mechanism.  
+1. **Code Parsing** – source files are traversed, ASTs are generated, and symbols (functions, classes, modules) are extracted.  
+2. **Graph Construction** – nodes representing symbols are linked based on import statements, call relationships, and inheritance, producing a directed graph that mirrors the codebase’s structure.  
+3. **RAG Index Population** – each node’s textual representation (e.g., docstrings, comments) is embedded (likely via an external embedding model) and stored in a vector store that supports similarity search.  
 
-* **Graph Database Connection** – The `CODE_GRAPH_RAG_PORT` is used “for accessing the graph database, facilitating code analysis.” This suggests that CodeGraphRAG creates a client instance (e.g., a Neo4j driver, an Amazon Neptune client, or a custom graph store) that connects to the database endpoint defined by the port. The connection logic would be encapsulated in a module inside `integrations/code-graph-rag`, perhaps named `graphClient.ts` or similar.  
-
-* **SSE Streaming** – The `CODE_GRAPH_RAG_SSE_PORT` is earmarked for a Server‑Sent Events endpoint. This implies an HTTP server (or an Express/Koa route) listening on that port and pushing incremental results back to callers. The streaming layer would be responsible for serializing graph query results into a stream of JSON events, enabling real‑time consumption by downstream agents or UI components.  
-
-* **GraphCodeRAG Child** – The child component, **GraphCodeRAG**, is described in the same README as “Graph‑Based RAG System for Any Codebases.” It is reasonable to infer that GraphCodeRAG implements the core RAG logic: taking a natural‑language query, retrieving relevant sub‑graphs from the database, and feeding those snippets into a language model for generation. The separation of GraphCodeRAG as a child suggests a clean boundary where the outer CodeGraphRAG integration handles plumbing (configuration, connection, streaming) while GraphCodeRAG focuses on the retrieval‑generation pipeline.  
-
-* **Documentation‑Centric Entry Point** – All observations point to the README as the primary source of truth for the component’s purpose and configuration. This design choice centralises onboarding information, reducing the need for developers to hunt through scattered code comments.  
-
----
+The component’s runtime configuration is read at container start‑up. `CODE_GRAPH_RAG_PORT` determines the primary HTTP listener that serves RESTful endpoints (e.g., `/build`, `/query`). `CODE_GRAPH_RAG_SSE_PORT` opens a secondary listener dedicated to Server‑Sent Events, allowing clients to receive incremental updates as the graph is built or as query results stream in. This dual‑port design decouples bulk data transfer from low‑latency streaming, aligning with the design seen in the sibling `BrowserAccess` MCP server, which also leverages SSE for real‑time communication.
 
 ## Integration Points  
 
-1. **LiveLoggingSystem (Parent)** – As a sub‑component of LiveLoggingSystem, CodeGraphRAG is likely instantiated or referenced by a higher‑level orchestrator within the parent. The parent may expose a unified API surface that aggregates the outputs of its children (e.g., logging agents, semantic analysis agents, and CodeGraphRAG).  
+- **Parent – DockerizedServices**: CodeGraphRAG is packaged as a Docker service defined under the `DockerizedServices` compose file. It inherits the parent’s networking, logging, and health‑check conventions. The parent’s high‑level façade for LLM operations (`LLMService`) shares the same environment‑variable‑driven configuration approach, making it straightforward to orchestrate both services together.  
 
-2. **GraphDatabaseAdapter (Sibling)** – The sibling **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) provides a generic abstraction for graph‑database interactions. CodeGraphRAG probably depends on this adapter rather than creating its own low‑level client, thereby reusing connection pooling, error handling, and query utilities.  
+- **Sibling – LLMService**: Both services expose HTTP APIs and may be co‑located on the same Docker network, allowing the LLM layer to call CodeGraphRAG endpoints for code‑specific context augmentation. The similarity in configuration (port variables) simplifies deployment scripts.  
 
-3. **OntologyClassificationAgent (Sibling)** – While not directly mentioned, the OntologyClassificationAgent may consume the graph data produced by CodeGraphRAG for semantic classification tasks, illustrating a downstream data flow from code‑graph extraction to ontology tagging.  
+- **Sibling – BrowserAccess**: The BrowserAccess MCP server also uses SSE for real‑time updates, suggesting a common pattern for streaming data across the ecosystem. If a developer needs to visualize the evolving code graph, BrowserAccess could subscribe to the SSE stream emitted by CodeGraphRAG.  
 
-4. **BrowserAccessMCP (Sibling)** – The browser‑based UI component could present the streamed SSE results to users, visualising code relationships retrieved by CodeGraphRAG. The SSE port (`CODE_GRAPH_RAG_SSE_PORT`) is the explicit hook for this real‑time UI integration.  
+- **Child – CodeGraphRAGHandler**: The handler implements the public API surface. It parses incoming requests, validates payloads, and delegates to `CodeGraphBuilder.build_rag()`. It also translates query results into the SSE format when clients connect to the `CODE_GRAPH_RAG_SSE_PORT`.  
 
-5. **External Configuration** – The two port configuration keys constitute the primary integration contract with the deployment environment. Changing these values re‑targets the component to a different graph database instance or a different SSE listener without code changes.  
-
----
+- **External Dependencies**: While not explicitly listed, the RAG pipeline likely depends on an embedding service (e.g., OpenAI, HuggingFace) and a vector store (e.g., FAISS, Pinecone). These would be injected via environment variables or Docker secrets, following the same pattern used by `LLMService`.
 
 ## Usage Guidelines  
 
-* **Configure Ports Early** – Before starting the LiveLoggingSystem, ensure that `CODE_GRAPH_RAG_PORT` points to a reachable graph‑database service and that `CODE_GRAPH_RAG_SSE_PORT` is free for the SSE server. Missing or incorrect values will prevent CodeGraphRAG from initializing.  
+1. **Configuration** – Always set `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` before starting the container. Align these ports with the Docker compose network to avoid collisions with sibling services.  
 
-* **Leverage the GraphDatabaseAdapter** – When extending or customizing query logic, import the shared GraphDatabaseAdapter rather than creating a new client. This maintains consistency across siblings and respects the system’s modular design.  
+2. **Building the Graph** – Invoke the `/build` endpoint (served on `CODE_GRAPH_RAG_PORT`) with a JSON payload that specifies the source directory and any inclusion/exclusion rules. The handler will instantiate `CodeGraphBuilder` and run `build_rag()`. Monitor the SSE endpoint on `CODE_GRAPH_RAG_SSE_PORT` to receive progress events, which is especially useful for large repositories.  
 
-* **Consume SSE Streams Properly** – Clients that subscribe to the SSE endpoint should implement reconnection logic and handle event ordering, as the streaming API is designed for incremental delivery of retrieval results.  
+3. **Querying** – Use the `/query` endpoint to retrieve relevant code snippets. The request should include a natural‑language query; the handler will perform a similarity search against the vector store populated by `build_rag()`.  
 
-* **Treat GraphCodeRAG as a Black Box** – The internal RAG pipeline encapsulated by GraphCodeRAG should be considered a stable contract. If you need to adjust retrieval strategies (e.g., weighting certain edge types), do so through configuration or by extending GraphCodeRAG rather than modifying the outer CodeGraphRAG plumbing.  
+4. **Error Handling** – The handler returns standard HTTP status codes. For streaming errors on the SSE channel, the client should reconnect using the same `CODE_GRAPH_RAG_SSE_PORT`.  
 
-* **Document Changes in the README** – Because the README serves as the authoritative description, any alterations to configuration keys, port numbers, or high‑level behaviour must be reflected there to keep onboarding friction low.  
+5. **Resource Management** – Graph construction can be CPU‑ and memory‑intensive. Allocate sufficient resources to the Docker container (e.g., `--cpus`, `--memory`) and consider running the build step during off‑peak hours.  
 
----
-
-### Architectural Patterns Identified  
-
-| Pattern | Evidence |
-|---------|----------|
-| **Modular Integration** | Separate `integrations/code-graph-rag` folder; sibling integrations follow the same pattern. |
-| **Configuration‑Driven Connectivity** | `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` are explicitly documented. |
-| **Graph‑Centric Data Model** | “Graph‑based representation of code” described in the README. |
-| **Server‑Sent Events (SSE) Streaming** | Presence of `CODE_GRAPH_RAG_SSE_PORT` for streaming results. |
-| **Parent‑Child Component Composition** | LiveLoggingSystem → CodeGraphRAG → GraphCodeRAG hierarchy. |
+6. **Version Compatibility** – Keep the `graph_operations.py` module in sync with any updates to the embedding model or vector store API. Since the builder encapsulates these calls, changes are localized to this file, minimizing impact on the handler or other components.
 
 ---
 
-### Design Decisions and Trade‑offs  
+### Architectural Patterns Identified
+1. **Builder Pattern** – `CodeGraphBuilder` encapsulates multi‑step graph and RAG construction.  
+2. **Handler/Controller Pattern** – `CodeGraphRAGHandler` mediates HTTP/SSE requests.  
+3. **12‑Factor Config** – Environment variables (`CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`) drive runtime configuration.  
+4. **Dual‑Port Streaming** – Separate ports for REST API and Server‑Sent Events, mirroring the pattern used by `BrowserAccess`.
 
-* **Port‑Based Config vs. Hard‑Coded Endpoints** – Choosing environment‑driven ports improves deployability and testing flexibility but introduces a runtime dependency on external configuration files or env vars.  
-* **Separate Streaming Layer** – Exposing an SSE endpoint decouples result generation from consumption, enabling real‑time UI updates. The trade‑off is added complexity in managing connection lifecycles and back‑pressure.  
-* **Encapsulation of RAG Logic in GraphCodeRAG** – Isolating the retrieval‑generation pipeline keeps the outer integration thin and maintainable, but it may limit fine‑grained optimisation unless GraphCodeRAG itself is extensible.  
+### Design Decisions and Trade‑offs
+- **Separation of Concerns** – Builder logic lives in `graph_operations.py`, while request handling stays in the handler, simplifying testing and future extension.  
+- **Streaming via SSE** – Provides real‑time feedback but requires an extra port and client logic to handle reconnections.  
+- **Docker Isolation** – Guarantees reproducible environments at the cost of increased orchestration complexity.  
+- **Environment‑Variable Config** – Easy to change per deployment, but sensitive values must be managed securely (e.g., Docker secrets).
 
----
+### System Structure Insights
+- **Parent‑Child Relationship** – `DockerizedServices` → `CodeGraphRAG` → `CodeGraphRAGHandler`.  
+- **Sibling Cohesion** – Shares configuration style and networking with `LLMService` and `BrowserAccess`.  
+- **Modular Packaging** – Each sub‑component is a self‑contained Docker service, facilitating independent scaling.
 
-### System Structure Insights  
+### Scalability Considerations
+- **Horizontal Scaling** – Multiple instances of CodeGraphRAG can be run behind a load balancer, provided the underlying vector store is shared or sharded.  
+- **Resource‑Intensive Build** – Graph construction may need to be off‑loaded to a dedicated worker node or run as a batch job to avoid blocking API requests.  
+- **SSE Bandwidth** – Streaming large graphs can saturate the SSE port; consider rate‑limiting or batching events.
 
-* The **LiveLoggingSystem** adopts a *feature‑folder* style where each major capability lives under a top‑level directory (`integrations`, `storage`, `scripts`).  
-* **CodeGraphRAG** mirrors this structure, residing under `integrations/code-graph-rag` and providing its own README for documentation.  
-* Shared services such as the **GraphDatabaseAdapter** sit in `storage`, reinforcing a clear separation between *data access* (storage) and *business logic* (integrations).  
-* Child component **GraphCodeRAG** likely lives in the same folder, reinforcing a *vertical slice* where the integration and its core algorithm are co‑located.  
-
----
-
-### Scalability Considerations  
-
-* **Graph Database Scaling** – By delegating storage to a dedicated graph database (accessed via `CODE_GRAPH_RAG_PORT`), the system can scale horizontally by scaling the underlying DB cluster without touching CodeGraphRAG code.  
-* **SSE Parallelism** – The SSE server can handle multiple concurrent clients; however, each client may trigger independent graph queries, so query optimisation and connection pooling (provided by the GraphDatabaseAdapter) become critical for high load.  
-* **Configuration Flexibility** – Port‑based configuration allows the component to be redeployed across multiple instances or containers, supporting container‑orchestrated scaling (e.g., Kubernetes replicas).  
-
----
-
-### Maintainability Assessment  
-
-* **High** – The modular folder layout, clear README documentation, and reliance on shared adapters make the component easy to locate, understand, and modify.  
-* **Configuration Centralisation** – All external dependencies are expressed via two config keys, reducing the surface area for bugs.  
-* **Potential Risks** – The lack of visible unit tests or type definitions in the observations could be a blind spot; maintainers should ensure that the GraphCodeRAG child and any database interaction layers are covered by automated tests.  
-
---- 
-
-*Prepared based exclusively on the supplied observations, preserving all file paths, configuration names, and entity relationships.*
+### Maintainability Assessment
+- **High Maintainability** – Clear separation between graph building (`CodeGraphBuilder`) and request handling (`CodeGraphRAGHandler`) localizes changes.  
+- **Documentation Anchor** – All high‑level behavior is described in `integrations/code‑graph‑rag/README.md`, ensuring a single source of truth.  
+- **Potential Risks** – Tight coupling to external embedding/vector services could introduce breaking changes; encapsulating those calls within `graph_operations.py` mitigates impact.  
+- **Testing** – Unit tests can target `CodeGraphBuilder.build_rag()` in isolation, while integration tests can validate the handler’s HTTP/SSE contract, supporting a robust CI pipeline.
 
 ## Diagrams
 
@@ -135,17 +100,16 @@ While the observations do not enumerate concrete classes or functions, they give
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for different agents and functionalities. This is evident in the directory structure, where integrations, scripts, and lib are separate directories. For example, the GraphDatabaseAdapter is located in storage/graph-database-adapter.ts, and the OntologyClassificationAgent is located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts. This modular design allows for easy maintenance and scalability of the system.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.
 
 ### Children
-- [GraphCodeRAG](./GraphCodeRAG.md) -- The integrations/code-graph-rag/README.md file describes Graph-Code as a Graph-Based RAG System for Any Codebases, indicating its purpose and functionality.
+- [CodeGraphRAGHandler](./CodeGraphRAGHandler.md) -- The CodeGraphRAG system is described in integrations/code-graph-rag/README.md, indicating a graph-based RAG system for codebases.
 
 ### Siblings
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter is implemented in storage/graph-database-adapter.ts, showcasing a modular design for database interactions.
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent is implemented in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, demonstrating a modular approach to data classification.
-- [BrowserAccessMCP](./BrowserAccessMCP.md) -- BrowserAccessMCP is implemented in integrations/browser-access/README.md, showcasing a browser-based interface for the LiveLoggingSystem.
+- [LLMService](./LLMService.md) -- The LLMService class in lib/llm/llm-service.ts handles incoming requests and delegates the work to the corresponding provider.
+- [BrowserAccess](./BrowserAccess.md) -- The BrowserAccess MCP server is described in integrations/browser-access/README.md.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 3 observations*

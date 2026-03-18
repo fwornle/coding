@@ -2,108 +2,130 @@
 
 **Type:** Detail
 
-The StateManager would likely implement a finite state machine using an enumeration of states (e.g., Initialized, Running, Paused, Terminated) and define transitions between these states based on spec...
+The StateManager's behavior would be influenced by the ThresholdManager, as suggested by the parent analysis, to determine the threshold for opening or closing the circuit.
 
 ## What It Is  
 
-The **StateManager** is the core component that governs the lifecycle of a process within the system.  According to the observations, it is implemented as a **finite‑state‑machine (FSM)** that defines a closed set of states – for example `Initialized`, `Running`, `Paused`, and `Terminated` – and the permitted transitions between them.  The component lives under the **ProcessStateManager** hierarchy (i.e., *ProcessStateManager* *contains* a *StateManager*), so its source files are co‑located with the other process‑management modules, although the exact file paths were not disclosed in the supplied observations.  
+**StateManager** is the core component that drives the behaviour of the circuit‑breaker mechanism used by the LLM provider layer.  The implementation lives inside the **CircuitBreaker** class found at `lib/llm/circuit-breaker.ts`.  Within that file the StateManager is responsible for tracking the current circuit state (e.g., *closed*, *open*, *half‑open*) and for deciding when the circuit should transition based on runtime signals.  Its decision‑making is directly influenced by two collaborating collaborators – **ThresholdManager** (which supplies the numeric limits that trigger state changes) and **ResetManager** (which governs the timing and conditions for resetting a broken circuit).  
 
-State transitions are not performed in isolation; the StateManager exposes a **callback / event‑listener mechanism** that notifies interested parties whenever a state change occurs.  This design keeps the StateManager loosely coupled to the rest of the system while still allowing other modules—most notably **ResourceAllocator** and **ProcessRegistry**—to react to lifecycle events such as “process started” or “process terminated”.  In addition to pure state tracking, the StateManager also participates in **resource management**, coordinating with the sibling ResourceAllocator to allocate and free system resources in step with state changes.
+Because the observations explicitly state that “CircuitBreaker contains StateManager” and that the StateManager “would be influenced by the ThresholdManager” and “work closely with the ResetManager,” we can treat StateManager as the *state‑holding* and *state‑transition* engine embedded in the circuit‑breaker class.
 
 ---
 
 ## Architecture and Design  
 
-The observations point to three primary architectural concepts that shape the StateManager:  
+The architecture follows a **composition‑based separation of concerns**.  The high‑level `CircuitBreaker` class composes three distinct responsibilities:
 
-1. **Finite State Machine (FSM) pattern** – The enumeration of well‑defined states and explicit transition rules give the component a deterministic lifecycle model.  This makes reasoning about process behavior straightforward and enables compile‑time validation of illegal transitions.  
+1. **StateManager** – holds the current circuit state and encapsulates the transition logic.  
+2. **ThresholdManager** – provides the configurable thresholds (e.g., failure count, error‑rate) that the StateManager consults to decide when to open or close the circuit.  
+3. **ResetManager** – manages the reset schedule (e.g., timeout, back‑off) that tells the StateManager when a previously opened circuit may be probed again.
 
-2. **Observer / Callback pattern** – By publishing state‑change events, the StateManager allows other components (e.g., ResourceAllocator, ProcessRegistry) to subscribe without creating hard dependencies.  This event‑driven coupling is essential for a **loosely coupled architecture**, where each module can evolve independently as long as it respects the event contract.  
+This decomposition mirrors the classic **State pattern** (the circuit can be in one of several states and the behaviour changes accordingly) even though the pattern name is not explicitly mentioned in the source.  By extracting threshold evaluation and reset timing into their own managers, the design avoids a monolithic `CircuitBreaker` implementation and makes each concern independently testable.
 
-3. **Collaboration with sibling singletons** – The sibling **ProcessRegistry** is described as a singleton that offers a global registry of process instances.  The StateManager likely queries this registry to locate the process whose state it must manage, and it pushes state‑change notifications back to the registry so that the global view stays consistent.  The sibling **ResourceAllocator** must be kept in sync with the StateManager to ensure that resources are provisioned when a process enters `Running` and reclaimed when it reaches `Terminated`.  
+Interaction flow (as inferred from the observations):
 
-These patterns combine to create a **modular, responsibility‑segregated design**: ProcessStateManager owns the overall orchestration, StateManager owns the lifecycle, ProcessRegistry owns discovery, and ResourceAllocator owns resource bookkeeping.  The only explicit “design pattern” mentioned is the FSM; the callback mechanism is a classic observer approach, but we refrain from labeling it with a formal pattern name unless it appears in the source.
+* The `CircuitBreaker` receives a request to the LLM provider.  
+* The `StateManager` checks the current state. If the circuit is *open*, the request is rejected immediately.  
+* If the request proceeds, any response (success or failure) is reported back to the `StateManager`.  
+* The `StateManager` queries the **ThresholdManager** to see whether the failure metrics exceed the configured limits. If they do, the StateManager transitions the circuit to *open*.  
+* When the circuit is *open*, the **ResetManager** starts a timer or back‑off sequence. Upon expiry, it signals the StateManager that a *probe* may be attempted, potentially moving the circuit to a *half‑open* state.  
+
+The design therefore relies on **clear interfaces** between the three managers, allowing each to evolve (e.g., swapping a simple count‑based ThresholdManager for a more sophisticated statistical one) without impacting the others.
 
 ---
 
 ## Implementation Details  
 
-Even though no concrete symbols were extracted, the observations give enough semantic detail to outline the implementation shape:  
+* **Location** – All of the logic lives in `lib/llm/circuit-breaker.ts`.  The file defines the `CircuitBreaker` class, which internally instantiates a `StateManager`.  Although the exact class name for the manager is not listed, the observation that “CircuitBreaker contains StateManager” tells us the manager is a private or protected member of the `CircuitBreaker` implementation.  
 
-* **State Enumeration** – A language‑level `enum` (or equivalent) defines the canonical states (`Initialized`, `Running`, `Paused`, `Terminated`).  This enum is the single source of truth for the FSM and is likely declared in a file adjacent to the StateManager class.  
+* **State Representation** – The StateManager likely maintains an enum or string field representing the circuit’s current mode (`CLOSED`, `OPEN`, `HALF_OPEN`).  This field is the single source of truth for request gating.  
 
-* **Transition Table / Guard Logic** – The StateManager probably maintains an internal map that pairs a current state and an incoming event (e.g., `Start`, `Pause`, `Resume`, `Stop`) with the resulting next state.  Guard functions may verify pre‑conditions such as “resources are allocated” before allowing a transition to `Running`.  
+* **Threshold Interaction** – When a request fails, the StateManager forwards the failure count (or error‑rate) to the ThresholdManager.  The ThresholdManager returns a boolean (or a numeric comparison) indicating whether the failure metric has crossed the configured limit.  This decouples the threshold policy (fixed count, percentage, time‑window) from the state‑transition logic.  
 
-* **Callback / Event Listener Registry** – The component holds a collection of listener callbacks (function pointers, delegate objects, or observer interfaces).  When `setState(newState)` is invoked, the StateManager iterates over this collection and invokes each listener, passing the old and new state.  This mechanism is the conduit through which **ResourceAllocator** and **ProcessRegistry** receive updates.  
+* **Reset Coordination** – Upon entering the *open* state, the StateManager delegates timing responsibilities to the ResetManager.  The ResetManager could expose methods such as `scheduleReset()` or `isReadyToProbe()`.  When the reset condition is satisfied, the ResetManager notifies the StateManager, which then attempts a probe request and may transition to *half‑open* based on the outcome.  
 
-* **Resource Coordination** – In the transition to `Running`, the StateManager likely calls a method on **ResourceAllocator** (e.g., `allocateResources(processId)`).  Conversely, on transition to `Terminated`, it invokes `releaseResources(processId)`.  The ordering of these calls is critical: allocation must succeed before the state is officially set to `Running`, and deallocation should happen after the state changes to `Terminated` to avoid dangling resources.  
+* **State Transition Logic** – The StateManager contains the core transition rules:
+  * **Closed → Open** – triggered when `ThresholdManager` reports that the failure threshold is exceeded.  
+  * **Open → Half‑Open** – triggered by `ResetManager` after the reset interval expires.  
+  * **Half‑Open → Closed** – if the probe request succeeds; otherwise, the circuit reverts to *open*.  
 
-* **Integration with ProcessStateManager** – The parent component, **ProcessStateManager**, probably constructs the StateManager for each process instance, passing a reference to the process identifier and possibly a pointer to the global **ProcessRegistry**.  This enables the StateManager to look up process metadata and to report state changes back to the registry for system‑wide visibility.
+Because the observations do not list concrete method signatures, the description stays at the level of responsibilities and interactions rather than exact code.
 
 ---
 
 ## Integration Points  
 
-The StateManager sits at the intersection of three major subsystems:  
+* **Parent – CircuitBreaker** – The `CircuitBreaker` class is the public façade exposed to the rest of the LLM provider stack.  All external callers interact with `CircuitBreaker` (e.g., `execute(request)`).  Internally, `CircuitBreaker` forwards state‑related queries to its `StateManager`.  
 
-1. **ProcessStateManager (parent)** – Acts as the factory and owner of the StateManager.  It may expose high‑level APIs such as `startProcess(id)` or `pauseProcess(id)`, which delegate to the appropriate StateManager instance.  
+* **Sibling – ThresholdManager & ResetManager** – Both managers are peers to the StateManager within the same `CircuitBreaker` composition.  They are injected or instantiated alongside the StateManager, and each provides a well‑defined interface (`checkThreshold()`, `scheduleReset()`, etc.) that the StateManager consumes.  
 
-2. **ProcessRegistry (sibling)** – Provides a global lookup table for process objects.  The StateManager likely queries the registry to resolve a process identifier to its concrete instance and then updates the registry’s stored state after each transition.  Because ProcessRegistry is a singleton, the StateManager can safely hold a reference without worrying about lifecycle mismatches.  
+* **Downstream – LLM Provider** – When the StateManager reports a *closed* state, the request proceeds to the actual LLM provider.  Conversely, an *open* state short‑circuits the call, returning an error or fallback response.  
 
-3. **ResourceAllocator (sibling)** – Handles the low‑level provisioning of CPU, memory, I/O handles, etc.  The StateManager’s transition logic calls into ResourceAllocator at key points (entering `Running`, leaving `Running`).  This coupling is mediated through the callback/event system, so the StateManager does not need to know the internal allocation strategy—only that the allocator exposes `allocate` and `release` operations.  
+* **Upstream – Application Code** – Application components that rely on LLM calls import the `CircuitBreaker` from `lib/llm/circuit-breaker.ts`.  They do not need to be aware of the internal StateManager; they simply handle the success or circuit‑open error as part of normal error‑handling logic.  
 
-External consumers (e.g., monitoring dashboards, external orchestration tools) can also subscribe to the StateManager’s events to receive real‑time lifecycle information, enabling observability without breaking encapsulation.
+No additional external dependencies are mentioned in the observations, so the integration surface is limited to the three managers and the provider they protect.
 
 ---
 
 ## Usage Guidelines  
 
-* **Never mutate the state enum directly** – All state changes must go through the StateManager’s transition API so that guard checks and callbacks are reliably executed.  
+1. **Instantiate via CircuitBreaker** – Developers should never create a `StateManager` directly.  Use the exported `CircuitBreaker` class (`new CircuitBreaker(...)`) which will internally wire the StateManager, ThresholdManager, and ResetManager together.  
 
-* **Register listeners early** – Components that need to react to state changes (ResourceAllocator, logging services, etc.) should register their callbacks immediately after the StateManager is instantiated.  Late registration may miss critical transitions such as the initial `Initialized → Running` move.  
+2. **Configure Thresholds Early** – If the system allows passing a custom `ThresholdManager` (or configuration object) to the `CircuitBreaker` constructor, set realistic failure limits that match the provider’s SLA.  Overly aggressive thresholds will cause premature circuit opening, while lax thresholds may delay protection.  
 
-* **Handle allocation failures gracefully** – If the ResourceAllocator reports a failure during the transition to `Running`, the StateManager should abort the transition and remain in the current state, optionally emitting a `StateTransitionFailed` event for diagnostic purposes.  
+3. **Respect Reset Timing** – The `ResetManager` determines how long the circuit stays open.  Adjust its parameters (e.g., exponential back‑off) based on the expected recovery time of the provider.  Changing these values after the circuit is already open may lead to inconsistent behaviour.  
 
-* **Keep transition logic deterministic** – Avoid side‑effects inside guard functions; they should only inspect current conditions.  This preserves the predictability of the FSM and simplifies testing.  
+4. **Handle Circuit‑Open Errors** – When a request is rejected because the circuit is open, the calling code should treat it as a transient failure and optionally fallback to a cached response or a degraded mode.  Do not treat it as a permanent provider error.  
 
-* **Synchronize with ProcessRegistry** – After each successful transition, update the ProcessRegistry’s stored state atomically to keep the global view consistent.  If the registry update fails, consider rolling back the state change or entering a safe `Error` state.  
+5. **Monitor State Transitions** – For observability, log or emit metrics whenever the `StateManager` changes state.  This helps operators understand the health of the LLM provider and tune the ThresholdManager/ResetManager settings.  
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* Finite State Machine (FSM) for lifecycle control  
-* Observer / Callback (event‑listener) pattern for loose coupling  
+* **Composition over Inheritance** – `CircuitBreaker` composes `StateManager`, `ThresholdManager`, and `ResetManager`.  
+* **State Pattern (implicit)** – The circuit’s behaviour changes based on an internal state held by `StateManager`.  
+* **Separation of Concerns** – Threshold evaluation and reset timing are isolated into their own managers.
 
-### Design decisions and trade‑offs  
+### Design Decisions & Trade‑offs  
 
-* **Explicit state enumeration** provides clarity and compile‑time safety but adds rigidity; adding new states requires code changes in the enum and transition table.  
-* **Event‑driven notifications** decouple components, improving modularity and testability, at the cost of added runtime indirection and the need for careful listener management (e.g., avoiding memory leaks).  
-* **Collaboration with a singleton ProcessRegistry** simplifies global access but can become a bottleneck or a single point of failure in highly concurrent scenarios.  
+* **Modularity vs. Simplicity** – Splitting threshold logic and reset timing into separate managers adds modularity and testability but introduces extra indirection.  
+* **Flexibility of Thresholds** – By delegating to a `ThresholdManager`, the system can support simple count‑based thresholds or more sophisticated statistical models without altering the StateManager.  
+* **Reset Strategy Centralization** – Keeping reset logic in a dedicated `ResetManager` allows sophisticated back‑off policies but requires careful coordination to avoid race conditions when the circuit moves from *open* to *half‑open*.  
 
-### System structure insights  
+### System Structure Insights  
 
-The system is organized as a hierarchy: **ProcessStateManager** (orchestrator) → **StateManager** (lifecycle engine) with siblings **ProcessRegistry** (global discovery) and **ResourceAllocator** (resource bookkeeping).  Each module owns a distinct concern, and the StateManager acts as the glue that synchronizes state and resources.  
+The circuit‑breaker subsystem is a self‑contained unit under `lib/llm/`.  Its hierarchy is:
 
-### Scalability considerations  
+```
+CircuitBreaker (public façade)
+ ├─ StateManager (holds current state, decides transitions)
+ ├─ ThresholdManager (provides failure limits)
+ └─ ResetManager (handles timing for resets)
+```
 
-* The FSM itself scales linearly with the number of processes because each process owns its own StateManager instance.  
-* Event broadcasting must be efficient; using lightweight listener interfaces or a publish‑subscribe bus will help maintain performance as the number of subscribers grows.  
-* The singleton ProcessRegistry may need sharding or lock‑free data structures if the system must manage thousands of concurrent processes.  
+All three live in the same file, suggesting a tightly coupled but clearly partitioned implementation.
 
-### Maintainability assessment  
+### Scalability Considerations  
 
-The clear separation of concerns—state handling, resource allocation, and process registration—makes the codebase approachable.  The finite set of states and explicit transition table serve as self‑documenting logic, easing future extensions.  However, the reliance on callbacks demands disciplined listener lifecycle management; forgetting to deregister listeners could lead to memory leaks or stale notifications.  Overall, the design promotes maintainability provided that the event infrastructure and singleton registry are kept simple and well‑tested.
+* Because the state is held in memory within a single `CircuitBreaker` instance, scaling horizontally (multiple service instances) will result in **independent circuit states** per instance.  If a global view of provider health is required, an external shared store would be needed – a decision not reflected in the current design.  
+* The lightweight composition (no heavy external dependencies) means the circuit‑breaker adds minimal overhead per request, supporting high‑throughput scenarios.
+
+### Maintainability Assessment  
+
+The explicit separation into three managers makes the codebase **highly maintainable**:
+
+* **Unit testing** – Each manager can be tested in isolation (state transitions, threshold calculations, reset timing).  
+* **Future extensions** – New threshold strategies or reset policies can be introduced by implementing the same manager interfaces without touching the StateManager logic.  
+* **Readability** – Keeping the StateManager’s responsibilities focused on state tracking reduces cognitive load for developers reviewing the circuit‑breaker logic.  
+
+Overall, the design inferred from the observations demonstrates a clean, modular approach that balances flexibility with simplicity, while staying grounded in the concrete file `lib/llm/circuit-breaker.ts` and its constituent managers.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses a ProcessRegistry module to store and retrieve process instances, enabling dynamic process discovery and registration
-
-### Siblings
-- [ProcessRegistry](./ProcessRegistry.md) -- The ProcessRegistry module is likely to be implemented as a singleton, providing a global point of access for process instances, similar to the pattern used in the DockerizedServices component.
-- [ResourceAllocator](./ResourceAllocator.md) -- The ResourceAllocator would need to interact with the ProcessRegistry and StateManager to ensure that resource allocation and deallocation are properly synchronized with process instance creation and state transitions.
+- [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker class is responsible for detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)
 
 
 ---

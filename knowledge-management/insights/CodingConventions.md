@@ -2,90 +2,130 @@
 
 **Type:** SubComponent
 
-CodingConventions employs the GraphDatabaseInteractions class to handle interactions with graph databases and knowledge graph construction, as seen in the execution of queries and retrieval of results.
+The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md file provides a quick reference for status line integration, which is an example of a coding convention
 
 ## What It Is  
 
-**CodingConventions** is the sub‑component that enforces the organization’s coding standards – naming conventions, code formatting, readability and maintainability guidelines.  All of its persistent data (convention names, descriptions, and any rule metadata) lives in the graph store and is accessed through the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`.  When the system needs to materialise a knowledge graph that includes these conventions, the **CodeGraphConstructor** in `code-graph-constructor.ts` pulls the data via that adapter and injects it into the broader code‑knowledge graph.  In short, CodingConventions supplies the “what” (the conventions) and the “how” (the adapter‑driven persistence) for the rest of the platform to consume.
+**CodingConventions** is the documented set of coding standards, best‑practice recommendations, and usage patterns that govern the source‑level quality of the entire repository. The conventions are not implemented as executable code but are expressed in a collection of Markdown artefacts that live alongside the integrations that consume them. The primary locations where these conventions are defined are:
+
+* `integrations/copi/USAGE.md` – the canonical usage guide for the **Copi** integration, illustrating the conventions in practice.  
+* `integrations/code-graph-rag/CONTRIBUTING.md` – the contribution checklist that codifies the coding conventions that every new contribution must satisfy.  
+* `integrations/copi/README.md`, `integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md` – supplemental documentation that repeatedly references the same conventions (naming, file‑layout, status‑line handling, etc.).  
+* `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md` – a concrete example of a convention (the format of status‑line messages) that is expected to be followed by any code that emits UI feedback.  
+
+These files together constitute the **CodingConventions** sub‑component. They are organised under the broader **CodingPatterns** component, which groups together higher‑level patterns such as hook‑configuration loading and lazy LLM initialization. The **CopiUsageGuidelines** child component is a direct specialization of the conventions for the Copi integration, while sibling components like **DevelopmentPractices** and **DesignPatterns** share the same documentation‑driven approach.
 
 ---
 
 ## Architecture and Design  
 
-The architecture revolves around a **graph‑database‑centric data‑access layer** that is shared across the entire **CodingPatterns** parent component.  The `GraphDatabaseAdapter` implements an **Adapter pattern** – it hides the concrete graph‑DB client behind a uniform interface, allowing sub‑components such as CodingConventions, DesignPatterns, and BestPractices to interact with the same storage mechanism without coupling to a specific vendor or query language.  
+The architecture of **CodingConventions** is documentation‑centric. Rather than embedding rules in a static analysis tool or a language‑level framework, the project adopts a *documentation‑as‑code* pattern: every convention lives in a Markdown file that is version‑controlled alongside the source it governs. This pattern is evident from the repeated presence of the same conventions across multiple integration READMEs and the central `CONTRIBUTING.md` that aggregates them for all contributors.
 
-The **CodeGraphConstructor** acts as an orchestrator that builds the overall code‑knowledge graph.  It **leverages** the adapter to retrieve convention metadata and then integrates those nodes/edges into the graph.  The presence of a dedicated **GraphDatabaseInteractions** class (observed in the parent description) suggests a **Facade** that groups low‑level query execution, result handling, and transaction management into a single, reusable service.  This façade is used by the constructor and by the conventions sub‑component itself when it needs to execute ad‑hoc queries.  
+Interaction between components follows a **shared‑knowledge** model. The parent component **CodingPatterns** defines the overarching philosophy (modular hook loading, lazy LLM init) and the sub‑component **CodingConventions** refines that philosophy into concrete, actionable rules. Sibling components such as **DevelopmentPractices** reference the same conventions when describing hook functions (`integrations/copi/docs/hooks.md`), demonstrating a *horizontal reuse* of the same documentation artefacts.
 
-Because all sibling sub‑components (DesignPatterns, BestPractices, GraphDatabaseInteractions) also depend on the same adapter, the design promotes **horizontal reuse** and **consistent data‑access semantics** across the domain.  The parent component, **CodingPatterns**, therefore acts as a logical container that aggregates these vertically aligned responsibilities while delegating storage concerns to the shared adapter.
+The design emphasizes **low coupling** and **high cohesion**: the conventions are isolated from the implementation code (no code symbols were discovered), yet they are tightly coupled to the integration points that must obey them. This makes the conventions easy to evolve without recompiling any binaries, while still providing a single source of truth for all developers.
 
 ---
 
 ## Implementation Details  
 
-1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Provides CRUD‑style methods (e.g., `fetchConventionById`, `updateConvention`, `storeConventionMetadata`).  The adapter abstracts the underlying graph engine, exposing only the operations required by the conventions logic.  
+Although there are no executable symbols, the implementation of **CodingConventions** can be described in terms of its constituent documents:
 
-2. **CodeGraphConstructor (`code-graph-constructor.ts`)** – Instantiates the adapter, queries for convention nodes, and creates the appropriate graph structures (vertices for each convention, edges that may represent relationships such as “enforces” or “depends‑on”).  The constructor does not embed raw query strings; instead, it calls methods on the adapter or on the **GraphDatabaseInteractions** façade to keep the construction logic declarative.  
+| File | Role | Key Content |
+|------|------|--------------|
+| `integrations/copi/USAGE.md` | Primary usage guide | Step‑by‑step examples of how to apply naming, error‑handling, and status‑line conventions when using Copi. |
+| `integrations/code-graph-rag/CONTRIBUTING.md` | Contribution checklist | Explicit bullet list of required linting, test coverage, and documentation updates that reflect the coding conventions. |
+| `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md` | Convention example | Precise syntax for status‑line messages (prefixes, severity levels, JSON payload shape). |
+| `integrations/copi/INSTALL.md` & `MIGRATION.md` | Installation & migration | Guidelines that enforce version‑consistent naming, directory layout, and deprecation handling—each a concrete convention. |
+| `integrations/copi/README.md` | Overview | Summarises the conventions and points developers to the detailed guidelines. |
 
-3. **GraphDatabaseInteractions** – Although not listed with a concrete file path, this class is mentioned as handling “execution of queries and retrieval of results.”  It likely wraps the low‑level driver calls (e.g., transaction begin/commit, result pagination) and presents a higher‑level API that the constructor and CodingConventions use.  
-
-4. **CodingConventions Logic** – The sub‑component’s business rules (e.g., “all class names must be PascalCase”) are stored as metadata records in the graph.  When a developer or an automated linting tool queries the system, the conventions service retrieves the relevant nodes via the adapter, interprets the stored rules, and returns them to the caller.  Updates to conventions (adding a new rule or deprecating an old one) are performed through the same adapter, ensuring that the graph remains the single source of truth.
+The conventions are therefore *implemented* as reusable documentation fragments. They are referenced via relative links in the integration READMEs, ensuring that any change to a convention propagates automatically to all consuming integrations. The presence of a **CopiUsageGuidelines** child component shows that the parent **CodingConventions** can be specialized: the child simply re‑exports the same Markdown files under a narrower scope, adding Copi‑specific examples where needed.
 
 ---
 
 ## Integration Points  
 
-- **Parent Component – CodingPatterns**: CodingConventions lives under CodingPatterns, which coordinates the overall knowledge‑graph lifecycle.  The parent relies on the same `GraphDatabaseAdapter` to fetch and update data across its children, guaranteeing that any change to a convention is instantly visible to other sub‑components.  
+**CodingConventions** ties into the rest of the system through several documented integration points:
 
-- **Sibling Components – DesignPatterns, BestPractices, GraphDatabaseInteractions**: All siblings share the adapter, meaning they can interoperate without additional glue code.  For example, a design‑pattern rule could reference a coding‑convention node, and the traversal would be handled uniformly by the adapter and the interactions façade.  
+1. **Contributing workflow** – The `CONTRIBUTING.md` file is consulted by the repository’s CI pipeline (e.g., a pre‑commit hook or GitHub Action) to verify that new PRs respect the conventions. Though the observation set does not list the CI script, the presence of a contribution guide strongly implies this coupling.
 
-- **External Consumers**: Tools that enforce style (linters, CI pipelines) or UI components that display convention documentation call into the CodingConventions service.  Their only contract is the adapter‑based API (e.g., `getAllConventions()`, `applyConventionUpdates(payload)`).  
+2. **Copi integration** – All Copi‑related artefacts (`README.md`, `INSTALL.md`, `MIGRATION.md`, `USAGE.md`) embed references to the conventions, making the Copi codebase a consumer of the standards. The child component **CopiUsageGuidelines** formalises this relationship.
 
-- **GraphDatabaseInteractions**: Acts as the low‑level bridge to the graph database.  Any component that needs to run custom queries (e.g., analytics on convention adoption) goes through this façade, preserving consistency in error handling and transaction semantics.
+3. **MCP constraint monitor** – The `integrations/mcp-constraint-monitor/README.md` mentions that the monitor “utilizes coding conventions and best practices,” indicating that its internal logging, error handling, and configuration files follow the same conventions defined elsewhere.
+
+4. **Status‑line UI** – The quick‑reference document (`STATUS‑LINE‑QUICK‑REFERENCE.md`) is a shared contract used by any component that renders status information, such as the browser‑access MCP server (`integrations/browser-access/README.md`). This creates a cross‑integration contract enforced purely through documentation.
+
+These points illustrate a **documentation‑driven contract** model: each integration reads the conventions from the shared Markdown files and implements them locally, without a runtime interface.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always go through the GraphDatabaseAdapter** when reading or mutating convention data.  Direct driver calls bypass the abstraction and risk breaking the shared contract used by sibling components.  
+Developers working within the repository should treat the Markdown files as the authoritative source for any style‑related decision. The practical rules distilled from the observations are:
 
-2. **Prefer the CodeGraphConstructor** for any operation that needs to materialise or augment the knowledge graph.  It guarantees that conventions are wired into the graph using the same edge semantics as other sub‑components.  
+* **Follow the contribution checklist** in `integrations/code-graph-rag/CONTRIBUTING.md` before opening a PR. This includes running any linting scripts, ensuring test coverage, and updating documentation to reflect any new or changed conventions.  
+* **Adhere to the status‑line format** defined in `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md`. All UI feedback must include the required prefix, severity level, and optional JSON payload.  
+* **Consult `integrations/copi/USAGE.md`** for concrete examples of naming conventions, error‑handling patterns, and file‑structure expectations when adding or modifying Copi‑related code.  
+* **When migrating** an existing component, use the step‑by‑step migration guide in `integrations/copi/MIGRATION.md` to ensure that deprecated patterns are replaced with the current conventions.  
+* **For new integrations**, replicate the structure of the existing README/INSTALL/USAGE trio and embed links to the central conventions. This mirrors the pattern used across sibling components such as **DevelopmentPractices** and **DesignPatterns**.
 
-3. **Treat convention metadata as immutable once published**, unless a coordinated update is performed through the adapter’s update method.  This minimizes race conditions when multiple services (e.g., BestPractices or DesignPatterns) query the same nodes concurrently.  
-
-4. **Leverage GraphDatabaseInteractions** for complex queries that go beyond simple fetch/update, such as bulk analysis of rule violations.  This façade ensures that query execution, pagination, and error handling remain consistent across the system.  
-
-5. **Document any new convention** (name, description, enforcement level) in the same format used by existing records.  Consistency in the stored schema aids downstream components that rely on predictable property names.
+By consistently referencing these documents, developers guarantee that code across the repo remains uniform, readable, and maintainable.
 
 ---
 
-### Architectural patterns identified  
-* **Adapter pattern** – `GraphDatabaseAdapter` abstracts the concrete graph‑DB implementation.  
-* **Facade pattern** – `GraphDatabaseInteractions` groups low‑level query handling.  
-* **Shared‑service / horizontal reuse** – the same adapter is reused by sibling sub‑components.  
+### Architectural Patterns Identified
+1. **Documentation‑as‑Code** – conventions live in version‑controlled Markdown files.
+2. **Shared‑Knowledge Contract** – multiple integrations consume the same documentation artefacts, creating a de‑facto interface.
+3. **Horizontal Reuse** – sibling components (DesignPatterns, DevelopmentPractices) reference the same conventions, avoiding duplication.
 
-### Design decisions and trade‑offs  
-* **Centralised graph access** simplifies consistency but creates a single point of failure; the adapter must be robust and well‑tested.  
-* **Separate constructor** isolates graph‑building logic from business rules, improving separation of concerns at the cost of an extra indirection layer.  
+### Design Decisions and Trade‑offs
+* **Decision:** Encode standards in Markdown rather than a static‑analysis tool.  
+  *Trade‑off:* Low implementation overhead and easy updates, but relies on developer discipline and CI enforcement rather than compile‑time guarantees.
+* **Decision:** Keep conventions separate from executable code.  
+  *Trade‑off:* Improves readability and reduces coupling, yet makes automated validation more complex.
+* **Decision:** Provide a dedicated child component (**CopiUsageGuidelines**) to specialize the generic conventions.  
+  *Trade‑off:* Enables targeted examples without fragmenting the core set of rules, but adds a layer of indirection for newcomers.
 
-### System structure insights  
-* The system is organised as a **parent‑child hierarchy** (`CodingPatterns` → `CodingConventions`) with **sibling modules** that all depend on a common storage adapter, fostering a cohesive data model across patterns, best practices, and conventions.  
+### System Structure Insights
+* **CodingConventions** sits under the **CodingPatterns** parent, inheriting the broader philosophy of modular, reusable patterns.
+* It is a leaf node in the documentation hierarchy, with **CopiUsageGuidelines** as its only child, indicating a focused specialization.
+* Sibling components share the same documentation‑driven approach, suggesting a repository‑wide strategy for knowledge capture.
 
-### Scalability considerations  
-* Because all convention data lives in a graph store, scaling horizontally will rely on the underlying graph database’s sharding or clustering capabilities.  The adapter’s thin abstraction means it can be swapped for a more scalable backend without touching the higher‑level logic.  
+### Scalability Considerations
+* Because conventions are plain text, scaling to dozens of integrations simply requires adding new Markdown links; there is no performance penalty.
+* The model scales well for distributed teams: each developer can fetch the latest conventions via Git without additional tooling.
+* Potential bottleneck: as the number of conventions grows, maintaining consistency may require stricter CI checks or a linter that parses the Markdown.
 
-### Maintainability assessment  
-* High maintainability: the clear separation between **adapter**, **interactions façade**, and **construction logic** limits the impact of changes.  Adding new convention fields or rules requires only updates to the adapter’s schema handling and possibly the constructor, leaving sibling components untouched.  Consistent naming and shared usage patterns further reduce cognitive load for future developers.
+### Maintainability Assessment
+* **High maintainability** – changes to a convention propagate automatically to all consumers, and the single source of truth reduces duplication.
+* **Risk area** – reliance on human adherence; without automated enforcement, stale or divergent implementations can appear.
+* **Mitigation** – integrate CI jobs that parse the key Markdown files (e.g., status‑line schema) and fail builds if code deviates, thereby coupling the documentation‑centric design with automated quality gates.
+
+## Diagrams
+
+### Relationship
+
+![CodingConventions Relationship](images/coding-conventions-relationship.png)
+
+
+
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/coding-conventions-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval. This is evident in how it utilizes the adapter to fetch and update data across various sub-components, ultimately contributing to the overall performance of the system. For instance, when constructing the code knowledge graph using the CodeGraphConstructor (code-graph-constructor.ts), it leverages the GraphDatabaseAdapter to store and retrieve relevant graph data. Furthermore, the GraphDatabaseInteractions class is used in conjunction with the GraphDatabaseAdapter to handle interactions with graph databases and knowledge graph construction, as seen in the way it employs the adapter to execute queries and retrieve results.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
+
+### Children
+- [CopiUsageGuidelines](./CopiUsageGuidelines.md) -- The integrations/copi/USAGE.md file provides detailed usage guidelines for the Copi integration, including examples and migration instructions.
 
 ### Siblings
-- [DesignPatterns](./DesignPatterns.md) -- DesignPatterns utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve design pattern data.
-- [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve best practice data.
-- [GraphDatabaseInteractions](./GraphDatabaseInteractions.md) -- GraphDatabaseInteractions uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve graph data.
+- [DesignPatterns](./DesignPatterns.md) -- The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system
+- [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
+- [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
 
 
 ---

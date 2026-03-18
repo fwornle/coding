@@ -1,104 +1,95 @@
 # HookConfigLoader
 
-**Type:** Detail
+**Type:** SubComponent
 
-The fact that integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md exists implies that hook configurations are formatted in a specific way, which the HookConfigLoader must handle.
+The HookConfigLoader is implemented in the lib/agent-api/hooks/hook-config.js file, which suggests a modular design for loading and merging hook configurations.
 
 ## What It Is  
 
-**HookConfigLoader** is a concrete module that lives at `lib/agent-api/hooks/hook-config.js`.  Its sole responsibility is to locate, read, and merge hook configuration data that can be supplied at two distinct scopes: **user‑level** (global to the developer or machine) and **project‑level** (specific to a repository or workspace).  The loader is a key collaborator of its parent component, **HookConfigurationManager**, which owns the loader and uses the merged result to drive the rest of the hook‑execution pipeline.  The existence of the documentation files `integrations/copi/docs/hooks.md` and `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` tells us that the configuration format is prescribed and that the loader must understand that schema in order to produce a valid, consumable configuration object.
-
----
+`HookConfigLoader` is a **sub‑component** that lives in the file **`lib/agent-api/hooks/hook-config.js`**.  Its sole responsibility is to obtain hook configuration data from one or more sources, reconcile those fragments into a single, coherent configuration object, and make that object available to the surrounding **ConstraintSystem**.  The placement of the file under `lib/agent-api/hooks/` signals a deliberately modular design: the loader is isolated from the rest of the agent‑API implementation, which allows the rest of the system (for example, the sibling **ContentValidationAgent** and the **ConstraintConfiguration** documentation) to treat hook configuration as a black‑box service.  By being a child of **ConstraintSystem**, the loader supplies the configuration that the constraint engine later validates and enforces.
 
 ## Architecture and Design  
 
-The architecture around **HookConfigLoader** follows a **configuration‑loader** pattern.  The loader abstracts the mechanics of discovering configuration sources (file system paths, environment variables, etc.) and exposing a single, deterministic configuration object to its consumer, the **HookConfigurationManager**.  This separation keeps the manager focused on higher‑level concerns such as validation, lifecycle management, and dispatching hook functions, while the loader handles the low‑level I/O and merge logic.
+The observations point to a **modular loading‑and‑merging** architecture.  `HookConfigLoader` acts as an adaptor that abstracts the details of where hook definitions originate—whether they are required via CommonJS `require()`, imported with ES‑module `import()`, or fetched from other runtime locations.  This abstraction follows a **Facade**‑style pattern: callers (the ConstraintSystem) interact with a single, well‑defined API rather than dealing with the intricacies of file I/O, module resolution, or validation.  
 
-From the observations we can infer a **two‑tier merging strategy**: the loader first reads the user‑level configuration (likely from a well‑known home‑directory location) and then overlays any project‑level definitions (found under the current repository).  The merge respects the precedence rules implied by “loads and merges hook configurations from user‑level and project‑level sources,” meaning project‑level values win when conflicts arise.  This deterministic precedence is a design decision that simplifies reasoning about which hook definitions are active in a given run.
+A second design element is the **merging strategy**.  The loader combines multiple configuration fragments into one object, suggesting an internal **Strategy**‑like mechanism where the merge algorithm (e.g., shallow‑object spread, deep‑merge, or custom conflict resolution) can be swapped or tuned without affecting callers.  The presence of **caching** hints at a **Memoization** pattern: once a particular set of hook files has been loaded and merged, the result is stored so that subsequent requests can be served quickly, reducing I/O and computation overhead.  
 
-The module’s placement under `lib/agent-api/hooks/` indicates it is part of the **agent‑API** boundary, exposing a stable interface to the rest of the system while remaining insulated from the concrete storage details of the configuration files.  No other sibling loaders are mentioned, but the pattern suggests that any future configuration domains (e.g., policy files, credential stores) could be added alongside **HookConfigLoader** using the same loader‑manager contract.
-
----
+Error handling is explicitly mentioned, indicating that the component guards against malformed or missing configurations.  This defensive stance is typical of a **Robust Adapter** that validates inputs before they propagate downstream, thereby protecting the ConstraintSystem from cascading failures.
 
 ## Implementation Details  
 
-Even though the source code is not directly visible, the path `lib/agent-api/hooks/hook-config.js` tells us the loader is implemented as a JavaScript (or TypeScript) module.  The module most likely exports a class or a set of functions that:
+Although the source file contains no explicit symbols in the provided observations, the described responsibilities imply a small set of core functions inside **`lib/agent-api/hooks/hook-config.js`**:
 
-1. **Discover Sources** – Resolve the location of the user‑level configuration (perhaps `~/.copi/hooks.json` or similar) and the project‑level configuration (e.g., `<repo_root>/hooks.json`).  
-2. **Parse the Files** – Read the files using Node’s `fs` APIs and parse them according to the schema described in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  The format documentation guarantees that the loader can validate the shape of the data before merging.  
-3. **Merge Logic** – Perform a shallow or deep merge, applying the rule that project‑level entries override user‑level entries.  The merge algorithm is deterministic, ensuring repeatable outcomes across runs.  
-4. **Expose the Result** – Return a plain JavaScript object (or a typed configuration class) that the **HookConfigurationManager** consumes.  The manager may further validate the merged configuration or transform it into runtime hook descriptors.
+1. **Loading** – a routine that iterates over a list of configured hook sources, invoking `require()` or dynamic `import()` for each path.  The loader likely normalizes the result into a plain JavaScript object or array, the canonical internal representation for hook configurations.  
 
-Because **HookConfigurationManager** “contains” the loader, the manager likely instantiates the loader once (perhaps lazily) and caches the merged configuration for the lifetime of the agent process.  This design avoids repeated file I/O and ensures that all hook consumers see a consistent view of the configuration.
+2. **Merging** – a dedicated method that takes the array of raw configurations and combines them.  The merge may use native object spread (`{...a, ...b}`) for shallow merges or a recursive algorithm for nested structures.  The design choice here balances simplicity (shallow merge) against flexibility (deep merge) and dictates how conflicting hook definitions are resolved.  
 
----
+3. **Validation / Normalization** – before a merged configuration is handed to the ConstraintSystem, the loader probably runs a validation step that checks required fields, data types, and possibly schema compliance.  Normalization would convert legacy or shorthand forms into the canonical shape expected by downstream components.  
+
+4. **Caching** – the loader likely maintains an in‑memory cache (e.g., a module‑scoped map keyed by a hash of the source list) that stores the final merged configuration.  Subsequent calls check the cache first, returning the stored object unless a source file has changed (detected via timestamps or explicit invalidation).  
+
+5. **Error Propagation** – any failure during loading, merging, or validation is captured and re‑thrown as a domain‑specific error (e.g., `HookConfigError`).  This keeps the error surface consistent for the ConstraintSystem, which can decide whether to abort, fallback, or log the issue.
+
+The component’s internal state is therefore limited to the cache and possibly a list of source descriptors, keeping the implementation lightweight and focused.
 
 ## Integration Points  
 
-- **Parent Component – HookConfigurationManager**: The manager is the primary consumer.  It invokes the loader during initialization, receives the merged configuration, and then registers hook functions accordingly.  Any changes to the loader’s return shape would require a corresponding update in the manager’s handling code.  
+`HookConfigLoader` sits directly under **ConstraintSystem**, which consumes the final configuration to drive the constraint evaluation pipeline.  The loader does not appear to expose a public class hierarchy; instead, it likely exports a singleton instance or a set of functions that the ConstraintSystem imports.  Its dependencies are limited to Node’s module system (`require`/`import`) and any file‑system utilities needed to locate hook definition files.  Because the loader normalizes configurations into plain objects, it can be consumed by any other sub‑components that need hook metadata, though the current architecture only mentions the ConstraintSystem as the primary consumer.
 
-- **Documentation – integrations/copi/docs/hooks.md**: This markdown file defines the public contract for hook functions (e.g., expected signatures, lifecycle hooks).  The loader must produce configuration objects that conform to these expectations, acting as the bridge between static configuration files and the dynamic hook execution engine.  
-
-- **Format Specification – integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md**: The loader directly references this spec to parse and validate the raw JSON/YAML files.  Any evolution of the format (new fields, deprecations) will be reflected in the loader’s parsing logic.  
-
-- **File System / Environment**: Implicitly, the loader depends on the host file system to locate configuration files and may also read environment variables for overrides (a common practice, though not explicitly documented).  
-
-No direct child entities are mentioned; the loader’s output is consumed rather than further decomposed within the same module.
-
----
+Sibling components such as **ContentValidationAgent** (implemented in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) and **ConstraintConfiguration** (documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) operate alongside the loader but do not appear to depend on it directly.  This separation reinforces a clear boundary: the loader handles *configuration acquisition*, while the agents handle *runtime validation* and the documentation defines *configuration schema*.  Should a future feature require dynamic hook updates, the loader’s caching layer would be the natural integration point for a watcher or hot‑reload mechanism.
 
 ## Usage Guidelines  
 
-1. **Place Configuration Files Correctly** – To have the loader pick up a hook definition, developers should store user‑level hooks in the designated global location (as described in the docs) and project‑level hooks in the repository root.  Because project‑level settings win, any conflicting definitions should be intentionally placed in the project file.  
+Developers integrating with the ConstraintSystem should treat `HookConfigLoader` as a **read‑only service**.  The loader’s public API is expected to provide a method such as `getMergedConfig()` (or an equivalent) that returns the fully resolved hook configuration.  Calls should be made **after** any application‑level configuration (e.g., environment variables that point to custom hook directories) has been established, ensuring that the loader sees the correct source list.  
 
-2. **Follow the Hook Format** – All hook configuration files must adhere to the schema outlined in `CLAUDE-CODE-HOOK-FORMAT.md`.  Invalid JSON or schema violations will cause the loader to throw errors during the merge phase, preventing the **HookConfigurationManager** from starting.  
+When adding new hook definition files, place them in locations that the loader’s source list references; avoid mutating the files at runtime unless you also trigger a cache invalidation.  If a custom merge behavior is required, consider extending the loader’s merge function rather than rewriting it, preserving the existing error handling and validation pipeline.  
 
-3. **Avoid Direct Instantiation** – Consumers should not instantiate **HookConfigLoader** directly; instead, they should obtain the merged configuration through **HookConfigurationManager**, which guarantees that the loader has been executed exactly once and that the result is cached.  
-
-4. **Do Not Mutate the Returned Object** – The merged configuration should be treated as read‑only.  If a runtime component needs to adjust hook behavior, it should do so via the manager’s public APIs rather than mutating the loader’s output.  
-
-5. **Version Compatibility** – When upgrading the hook format documentation, ensure that any new fields are reflected in the loader’s parsing logic before deploying updated hook definitions, to avoid runtime incompatibilities.
+Because error handling is built into the loader, callers should be prepared to catch `HookConfigError` (or the generic error type the loader throws) and decide whether to abort the constraint checks or fall back to a safe default configuration.  Finally, keep hook configuration objects **pure data structures** (objects or arrays) without embedding executable code; this aligns with the loader’s validation expectations and maintains the separation of concerns between configuration and execution logic.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural Patterns Identified
+* **Facade / Adapter** – provides a single, stable API for loading, merging, and validating hook configs.  
+* **Strategy (Merge Algorithm)** – encapsulates the merge logic, allowing different conflict‑resolution policies.  
+* **Memoization / Caching** – stores the merged result to avoid repeated I/O and processing.  
 
-1. **Configuration‑Loader Pattern** – Isolates file‑system I/O and parsing from higher‑level business logic.  
-2. **Two‑Tier Merge Strategy** – Deterministic precedence (project over user) to resolve conflicts.  
-3. **Manager‑Loader Composition** – The parent **HookConfigurationManager** composes the loader, adhering to a clear separation of concerns.
+### Design Decisions and Trade‑offs
+* **Modular isolation** (loader in its own file) improves testability and limits coupling but adds an extra indirection for callers.  
+* **Caching** boosts performance at the cost of potential staleness; requires explicit invalidation logic.  
+* **Error‑centric design** protects the ConstraintSystem but may increase the surface area of error handling for developers.  
 
-### Design Decisions and Trade‑offs  
+### System Structure Insights
+`HookConfigLoader` is a leaf node under **ConstraintSystem**, with siblings that handle validation and documentation.  Its sole responsibility is configuration synthesis, reinforcing a clean separation of concerns across the constraint monitoring stack.  
 
-- **Single Responsibility vs. Flexibility** – By keeping the loader focused on discovery and merging, the system is easy to maintain, but any additional source (e.g., remote config service) would require extending the loader or adding a new one.  
-- **Deterministic Precedence** – Favoring project‑level overrides simplifies developer expectations, at the cost of limiting the ability to have user‑level defaults that can be selectively disabled per project.  
-- **Caching at Manager Level** – Reduces repeated I/O, improving performance, but introduces a need to restart the agent to pick up configuration changes.
+### Scalability Considerations
+The loader’s caching mechanism and lightweight merge algorithm enable it to handle an increasing number of hook sources with minimal latency.  Should the number of sources grow dramatically, the merge strategy may need to shift from a shallow to a more efficient deep‑merge implementation, and cache invalidation mechanisms may require more sophisticated change detection (e.g., file watchers).  
 
-### System Structure Insights  
+### Maintainability Assessment
+The component’s narrow focus, clear file location, and reliance on standard Node module loading make it **highly maintainable**.  Adding new hook sources or tweaking merge rules involves localized changes within `lib/agent-api/hooks/hook-config.js` without rippling effects on the rest of the system.  The explicit error handling and validation steps further reduce the risk of silent failures, supporting long‑term reliability.
 
-- The hook subsystem is organized under `lib/agent-api/hooks/`, with **HookConfigLoader** handling static configuration and **HookConfigurationManager** orchestrating runtime behavior.  
-- Documentation files live in `integrations/*/docs/`, indicating a clear separation between code and specification.  
-- The overall flow is: *Documentation → Config Files → HookConfigLoader → HookConfigurationManager → Hook Execution Engine*.
+## Diagrams
 
-### Scalability Considerations  
+### Relationship
 
-- **File‑Based Config** scales well for a modest number of hooks; however, if the number of hook definitions grows dramatically, the loader’s merge algorithm may become a bottleneck.  The current design could be extended with streaming parsers or incremental caching.  
-- Adding new configuration sources (e.g., network‑based stores) would require augmenting the loader without breaking existing callers, thanks to the manager‑loader contract.
+![HookConfigLoader Relationship](images/hook-config-loader-relationship.png)
 
-### Maintainability Assessment  
 
-- The clear division between loader and manager, combined with explicit documentation of the hook format, makes the subsystem highly maintainable.  
-- Since the loader’s responsibilities are narrow, unit tests can focus on file discovery, parsing, and merge semantics, providing fast feedback on changes.  
-- Future schema changes are localized to the loader and the accompanying markdown spec, limiting the blast radius of modifications.  
 
-Overall, **HookConfigLoader** embodies a straightforward, well‑encapsulated design that fits cleanly within the larger hook configuration management architecture.
+## Architecture Diagrams
+
+![relationship](../../.data/knowledge-graph/insights/images/hook-config-loader-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.
+
+### Siblings
+- [ContentValidationAgent](./ContentValidationAgent.md) -- The ContentValidationAgent utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file to perform validation tasks.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
