@@ -2,106 +2,75 @@
 
 **Type:** Detail
 
-The integrations/copi/EXAMPLES.md file contains examples of hook functions, which can be used in conjunction with the HookFunctionsReference to implement custom hook functions.
+The integrations/copi/README.md file mentions the Copi project, which includes hook functions as part of its functionality, indicating their significance in the DevelopmentPractices context.
 
 ## What It Is  
 
-**HookFunctionsReference** is the canonical, markdown‑based reference that describes every hook function available to the **HookManagementModule**. The reference lives in the repository at  
-
-```
-integrations/copi/docs/hooks.md
-```  
-
-and is deliberately placed alongside the example catalogue in  
-
-```
-integrations/copi/EXAMPLES.md
-```  
-
-The reference is not code; it is a structured document that enumerates hook signatures, expected inputs/outputs, lifecycle moments (e.g., *pre‑constraint‑check*, *post‑constraint‑apply*), and any required registration steps. The **HookManagementModule**—itself a sub‑component of the larger **ConstraintSystem** component—relies on this markdown file to validate, expose, and orchestrate hook functions that custom‑logic can tap into during constraint‑related processing. In short, **HookFunctionsReference** is the single source of truth for developers who need to understand, extend, or debug the hook ecosystem that powers constraint handling in COPI.
-
----
+**HookFunctionsReference** is the canonical reference for the hook‑function API that lives inside the **Copi** integration. The reference is authored in the file **`integrations/copi/docs/hooks.md`**, which contains a detailed description of each hook, usage patterns, and code snippets that illustrate how developers can implement and invoke them. Complementary, **`integrations/copi/EXAMPLES.md`** supplies concrete, runnable examples that show the hooks in action within the **DevelopmentPractices** sub‑component. The overarching **`integrations/copi/README.md`** mentions that hook functions are a core part of Copi’s functionality, underscoring their importance for anyone working with the **DevelopmentPractices** component. In short, HookFunctionsReference is the single source of truth for what hooks exist, how they behave, and how they should be integrated into a Copi‑based workflow.
 
 ## Architecture and Design  
 
-The architecture surrounding **HookFunctionsReference** follows a *documentation‑driven modular* approach. The **ConstraintSystem** component delegates all hook‑related responsibilities to its child, **HookManagementModule**, which in turn treats the markdown reference as an *interface contract* rather than a hard‑coded API. This design creates a clear separation between *definition* (the markdown reference) and *execution* (the runtime hook manager).  
+The architecture surrounding HookFunctionsReference follows a **documentation‑driven design**. Rather than scattering hook definitions across disparate source files, the project centralises the contract in **`integrations/copi/docs/hooks.md`**. This approach makes the hook API discoverable and version‑controlled alongside the rest of the Copi integration. The design also embraces an **example‑centric pattern**: the **`integrations/copi/EXAMPLES.md`** file lives side‑by‑side with the reference, providing concrete implementations that developers can copy, modify, or run directly. This twin‑file strategy—reference plus examples—creates a tight feedback loop between specification and practice, ensuring that the documented behaviour matches real‑world usage within the **DevelopmentPractices** sub‑component.
 
-The only explicit design pattern observable from the provided material is **Reference‑Based Configuration**: the hook manager reads the `hooks.md` file at start‑up (or on demand) to build an internal catalogue of permissible hooks. Because the reference is human‑readable, it doubles as documentation for developers and as a machine‑parsable schema for validation logic. The presence of `EXAMPLES.md` reinforces a **Example‑Centric Learning** pattern—developers can copy a sample implementation, adjust it to their domain, and then register it against the catalogue defined in `hooks.md`.  
-
-Interaction flow is straightforward:  
-
-1. **HookManagementModule** loads `integrations/copi/docs/hooks.md`.  
-2. It parses the defined hook signatures and registers them in an internal registry.  
-3. When the **ConstraintSystem** triggers a constraint‑related event, the manager looks up the appropriate hook(s) in this registry and invokes any user‑supplied implementations that match the signature.  
-
-No other components are mentioned, so the design remains tightly scoped to the hook subsystem, avoiding unnecessary coupling.
-
----
+Interaction between components is implicit rather than coded in the observations. Hooks are described as being **utilised by DevelopmentPractices**, meaning that any code inside the DevelopmentPractices layer will call into the hook functions defined by Copi. The documentation therefore serves as the contract that both the hook provider (Copi) and the consumer (DevelopmentPractices) agree upon. Because the reference is stored under the **integrations/copi** hierarchy, it is clear that hooks are scoped to the Copi integration and are not a generic system‑wide facility.
 
 ## Implementation Details  
 
-Although no concrete code symbols are listed, the observations let us infer the key implementation artefacts:
+The observations do not expose concrete class or function names, but they do reveal the concrete artefacts that embody the implementation guidance:
 
-* **HookFunctionsReference (integrations/copi/docs/hooks.md)** – a markdown file that likely follows a consistent heading and table format (e.g., `## Hook Name`, `### Signature`, `### Description`). This structure enables deterministic parsing by the hook manager.  
+* **`integrations/copi/docs/hooks.md`** – This markdown file enumerates each hook, its purpose, expected input parameters, return values, and any side‑effects. The examples within the file demonstrate typical signatures (e.g., `function onEvent(context) { … }`) and illustrate how the hook is registered with Copi’s runtime (often via a configuration object or registration API).  
+* **`integrations/copi/EXAMPLES.md`** – Here the same hooks are exercised in realistic scenarios. The examples show the full lifecycle: registration, invocation, and handling of results. They also expose common patterns such as error handling inside a hook and the use of asynchronous constructs (e.g., promises or async/await) when the hook performs I/O.  
+* **`integrations/copi/README.md`** – The README frames hooks as a “significant” part of Copi, indicating that the hook mechanism is a deliberate extension point rather than an after‑thought. It likely points developers to the reference and examples for onboarding.
 
-* **HookManagementModule** – the runtime engine that *consumes* `hooks.md`. It probably contains a parser (e.g., a lightweight markdown or YAML front‑matter parser) that extracts hook metadata into a data structure such as a dictionary keyed by hook name. The module then exposes registration APIs (`registerHook(name, fn)`) and dispatch mechanisms (`invokeHook(name, context)`).  
-
-* **EXAMPLES.md** – a companion markdown file that provides concrete JavaScript/TypeScript (or the language used in the repo) snippets showing how to implement a hook that conforms to a signature described in `hooks.md`. Developers copy these snippets, adjust business logic, and register the function with the manager.  
-
-Because the reference is external to the codebase, the implementation can evolve the hook catalogue without recompiling the core module—only the markdown needs updating. This also means that any validation logic (e.g., checking that a supplied function matches the declared arity) must be performed at runtime based on the parsed reference.
-
----
+Because the source observations contain **zero code symbols**, the implementation details are expressed entirely through documentation and illustrative snippets. The design therefore relies on developers reading the markdown, copying the sample code, and embedding it into their own modules within DevelopmentPractices.
 
 ## Integration Points  
 
-The primary integration surface for **HookFunctionsReference** is the **HookManagementModule**. The module reads the markdown file directly from the path `integrations/copi/docs/hooks.md`, making the file a *configuration dependency* of the hook subsystem. Consequently, any build or deployment pipeline must ensure that this file is present and up‑to‑date in the runtime environment.  
+HookFunctionsReference integrates with the broader system through two primary pathways:
 
-Downstream, the **ConstraintSystem** component invokes the hook manager whenever a constraint lifecycle event occurs. From the perspective of the broader application, developers interact with the hook system via the public registration API exposed by **HookManagementModule**. The examples in `integrations/copi/EXAMPLES.md` serve as a *developer‑facing integration guide*, showing exactly how to bind custom logic to the hooks described in the reference. No other modules are explicitly mentioned, so the hook subsystem remains a self‑contained integration point within the constraint domain.
+1. **Consumer Integration – DevelopmentPractices** – The **DevelopmentPractices** sub‑component imports or registers the hooks described in **`hooks.md`**. The documentation clarifies the expected contract, allowing DevelopmentPractices to invoke hooks at well‑defined extension points (e.g., before a build, after a test run). Because the reference lives under the Copi integration, any change to the hook contract must be coordinated with DevelopmentPractices to avoid breaking consumers.
 
----
+2. **Provider Integration – Copi Runtime** – Although not shown in code, the README’s mention of hooks as “part of its functionality” implies that Copi ships a runtime that discovers, registers, and dispatches hook callbacks. The reference file therefore acts as the interface specification for that runtime. The **EXAMPLES.md** file demonstrates how a developer can plug a custom implementation into the Copi runtime, confirming the integration surface.
+
+No external libraries or third‑party services are mentioned, so the only dependencies are internal: the hook reference, the Copi runtime, and the DevelopmentPractices code that consumes the hooks.
 
 ## Usage Guidelines  
 
-1. **Consult the Reference First** – Always start with `integrations/copi/docs/hooks.md` to understand the exact hook name, expected signature, and when it is fired. The reference is the authoritative contract; deviating from it will cause registration failures or runtime errors.  
+Developers working within the **DevelopmentPractices** component should treat **`integrations/copi/docs/hooks.md`** as the authoritative source for any hook they intend to implement or call. The following conventions emerge from the observations:
 
-2. **Leverage the Example Library** – Use the snippets in `integrations/copi/EXAMPLES.md` as the baseline for any custom hook implementation. Copy the example, adapt the business logic, and ensure the function signature matches the definition in `hooks.md`.  
-
-3. **Register Through the HookManagementModule API** – After implementing a hook, call the registration method provided by **HookManagementModule** (e.g., `registerHook('preConstraintCheck', myHook)`). The manager will validate the function against the parsed reference before accepting it.  
-
-4. **Keep the Reference Synchronized** – When adding new hooks or modifying existing ones, update `hooks.md` first, then adjust any related examples. Because the manager parses the file at start‑up, stale documentation will lead to mismatches that are hard to debug.  
-
-5. **Avoid Direct Code Coupling** – Do not hard‑code hook names or signatures in business logic; always retrieve them from the manager’s registry. This practice preserves the decoupling that the documentation‑driven design provides and eases future extensions.
+* **Read the reference before coding** – The markdown outlines required signatures, expected data shapes, and error‑handling expectations. Skipping this step can lead to mismatched contracts.  
+* **Leverage the examples** – The **`integrations/copi/EXAMPLES.md`** file provides ready‑made snippets that can be copied verbatim or adapted. Using these examples reduces the risk of deviating from the intended hook behaviour.  
+* **Keep documentation in sync** – Since the hook contract is documented rather than inferred from code, any change to a hook’s signature must be reflected immediately in **`hooks.md`** and, if applicable, in **`EXAMPLES.md`**. This ensures that all consumers (including future developers) see an up‑to‑date contract.  
+* **Scope hooks to Copi** – Hooks are defined within the Copi integration; avoid re‑using them in unrelated components unless the contract explicitly permits it. This maintains clear boundaries and prevents accidental coupling.  
+* **Test hook implementations** – The examples illustrate typical test harnesses (e.g., invoking a hook with mock context). Replicating this pattern in unit tests helps guarantee that custom hook logic conforms to the documented expectations.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
+* Documentation‑driven design (centralised markdown reference)  
+* Example‑centric pattern (paired reference and runnable examples)
 
-1. **Reference‑Based Configuration** – Using a markdown file (`hooks.md`) as the definitive contract for runtime behavior.  
-2. **Example‑Centric Learning** – Providing `EXAMPLES.md` to illustrate correct implementations.  
+### Design decisions and trade‑offs  
+* **Centralised reference** simplifies discovery and versioning but places the burden of keeping docs in sync with code.  
+* **Separate examples file** encourages learning by doing, yet duplicates some information that must be maintained in two places.
 
-### Design Decisions and Trade‑offs  
+### System structure insights  
+* Hook functions are scoped to the **Copi** integration (`integrations/copi/...`).  
+* They serve as extension points for the **DevelopmentPractices** sub‑component, establishing a clear provider‑consumer relationship.
 
-* **Human‑Readable Contract** – Choosing markdown makes the contract easy for developers to read and edit, but it requires a reliable parser and introduces a runtime dependency on file I/O.  
-* **Separation of Concern** – Placing hook definitions outside the codebase isolates the hook catalogue from business logic, improving modularity at the cost of an extra validation step during registration.  
+### Scalability considerations  
+* Adding new hooks merely requires extending the markdown and examples, which scales well for a growing API surface.  
+* However, as the number of hooks grows, the single markdown file may become unwieldy; future refactoring could split hooks into thematic sections or separate files.
 
-### System Structure Insights  
-
-* **ConstraintSystem → HookManagementModule → HookFunctionsReference** forms a clear vertical hierarchy.  
-* The hook subsystem is self‑contained; its only external assets are the two markdown files.  
-
-### Scalability Considerations  
-
-Because the reference is parsed at start‑up, the size of `hooks.md` directly impacts initialization time. For a large number of hooks, consider caching the parsed representation or moving to a more efficient format (e.g., JSON) while preserving the markdown for documentation. The runtime registration and invocation model scales linearly with the number of active hooks, which is acceptable given the typical modest hook count in constraint processing.  
-
-### Maintainability Assessment  
-
-The documentation‑driven approach yields high maintainability: updates to hook contracts are made in a single place (`hooks.md`), and developers have ready‑made examples (`EXAMPLES.md`). The main maintenance risk lies in keeping the reference and examples synchronized; automated linting or CI checks that validate that every hook listed in `hooks.md` has a corresponding example could mitigate this. Overall, the design promotes clear ownership, easy onboarding, and straightforward evolution of the hook ecosystem.
+### Maintainability assessment  
+* High maintainability when documentation is kept current; low risk of hidden implementation drift because the contract lives in source‑controlled markdown.  
+* The lack of autogenerated API stubs means manual synchronization is required, which introduces a potential source of error if developers forget to update the docs after code changes.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [HookManagementModule](./HookManagementModule.md) -- The HookManagementModule utilizes the integrations/copi/docs/hooks.md documentation to provide a reference for hook functions.
+- [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
 
 
 ---

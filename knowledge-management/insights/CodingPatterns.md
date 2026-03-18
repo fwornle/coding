@@ -2,199 +2,100 @@
 
 **Type:** Component
 
-[LLM] The CodingPatterns component follows a specific constructor pattern for agents, which involves calling the ensureLLMInitialized() method and then executing the agent's main logic. This pattern is evident in the base-agent.ts file, where the constructor calls ensureLLMInitialized() before executing the agent's input. The use of this pattern ensures that the LLM service is properly initialized before the agent's execution, thus guaranteeing that the agent can perform its intended function. Furthermore, this pattern allows for easy extension and customization of the agent classes, as new agents can be created by simply overriding the execute() method. For example, the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts follows this pattern, and can be easily customized to analyze different types of code structures.
+[LLM] The use of the GraphDatabaseAdapter in the ContentValidationAgent highlights a specific database interaction pattern, which provides automatic JSON export synchronization. This pattern is also observed in the integrations/code-graph-rag/README.md file, which describes a graph-based RAG system. The HookConfigLoader class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts ensures lazy LLM initialization, promoting efficient resource utilization. The Wave agents follow a consistent structure for agent implementation, demonstrating a focus on consistency and maintainability.
 
 ## What It Is  
 
-The **CodingPatterns** component is a reusable, agent‑centric library that lives under the **Coding** knowledge hierarchy. Its core implementation resides in a handful of TypeScript files:
+The **CodingPatterns** component lives at the heart of the coding‑infrastructure repository and is realised through a handful of concrete modules. The most visible entry points are  
 
-* `integrations/mcp-server-semantic-analysis/src/agent/base-agent.ts` – defines the abstract `BaseAgent` class and the lazy‑initialisation guard `ensureLLMInitialized()`.  
-* `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts` – a concrete agent (`CodeGraphAgent`) that extends `BaseAgent` and performs code‑structure analysis.  
-* `wave-controller.ts` – supplies the `runWithConcurrency()` helper that drives work‑stealing parallelism for any agent‑driven workload.  
-* `storage/graph-database-adapter.ts` – an adapter that couples **Graphology** (an in‑memory graph library) with **LevelDB** persistence and automatic JSON export.  
-* `integrations/copi/docs/hooks.md` – documents the hook‑function mechanism that lets downstream developers inject custom behaviour.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – describes the declarative constraint‑configuration format used by the component.
+* `lib/agent-api/hooks/hook-config.js` – the **HookConfigLoader** class that reads, merges and validates hook configuration files.  
+* `base-agent.ts` – the abstract **BaseAgent** that supplies the `ensureLLMInitialized()` helper used by every agent implementation.  
 
-Together these files give **CodingPatterns** a clear responsibility: provide a set of extensible agents that can analyse code, persist the resulting graph structures, and be customised through hooks and constraint definitions. The component is a child of the broader **Coding** parent, shares the LLM‑initialisation strategy with sibling components such as **LiveLoggingSystem** and **LLMAbstraction**, and supplies concrete capabilities to its own children (e.g., **CodeAnalysis**, **DatabaseManagement**, **LLMIntegration**, **ConstraintConfiguration**, **ConcurrencyManagement**, **BrowserAccess**).
-
----
+Both files are referenced repeatedly by the “Wave” agents (e.g., `ContentValidationAgent`) and by the higher‑level integrations such as the code‑graph‑RAG and constraint‑monitor docs. Together they define a **modular, lazy‑initialisation pattern** for agents that need access to a Large Language Model (LLM) while keeping the hook system extensible. Because CodingPatterns is a child of the top‑level **Coding** component, it inherits the project‑wide emphasis on reusable abstractions and shares the same “constructor + ensureLLMInitialized + execute” lifecycle that is also used in sibling components like **LiveLoggingSystem** and **SemanticAnalysis**.
 
 ## Architecture and Design  
 
-### Core Architectural Style  
+### Core architectural stance  
+CodingPatterns adopts a **modular, layered architecture**. The lowest layer is the **hook configuration loader** (`HookConfigLoader`), which abstracts away the source of hook definitions (JSON/YAML files, environment overrides, etc.) and presents a single merged object to downstream consumers. Above that sits the **agent abstraction** (`BaseAgent`), which supplies a uniform lifecycle: a constructor that receives dependencies, a lazy‑initialisation guard (`ensureLLMInitialized()`), and an `execute()` method that performs the agent’s work. This three‑step pattern is explicitly called out in the observations for the Wave agents and mirrors the pattern used in **LiveLoggingSystem** and **DockerizedServices**.
 
-* **Agent‑based extensibility** – `BaseAgent` supplies a template constructor that first guarantees LLM readiness (`ensureLLMInitialized()`) and then calls an overridable `execute()` method. Concrete agents (e.g., `CodeGraphAgent`) inherit this contract, allowing new agents to be added simply by overriding `execute`. This follows the *Template Method* pattern.  
+### Design patterns that surface  
 
-* **Lazy‑initialisation** – The `ensureLLMInitialized()` method (in `base-agent.ts`) defers creation of the LLM service until the first agent instance needs it. This reduces start‑up cost and lets the component be used in environments where an LLM is optional. The pattern mirrors the *Lazy Initialization* idiom.  
+| Observed pattern | Where it appears | What it achieves |
+|------------------|------------------|------------------|
+| **Lazy initialisation** | `ensureLLMInitialized()` in `base-agent.ts` | Defers expensive LLM loading until the first agent execution, reducing start‑up latency and memory pressure. |
+| **Configuration merging** | `HookConfigLoader` in `lib/agent-api/hooks/hook-config.js` | Allows multiple hook sources to be combined, supporting extensibility and per‑environment overrides. |
+| **Standardised agent contract** | Constructor → `ensureLLMInitialized()` → `execute()` in Wave agents (e.g., `ContentValidationAgent`) | Guarantees a predictable entry point for all agents, simplifying orchestration and testing. |
+| **Adapter for persistence** | `GraphDatabaseAdapter` used by `ContentValidationAgent` | Decouples the agent from the underlying Graphology + LevelDB store, enabling interchangeable storage back‑ends. |
+| **Facade for external integrations** | Mentioned in sibling **DockerizedServices** (LLMService) and **Trajectory** (SpecstoryAdapter) | Provides a single, stable API surface for higher‑level code while hiding protocol‑specific details. |
 
-* **Work‑stealing concurrency** – `runWithConcurrency()` in `wave-controller.ts` implements a shared atomic `nextIndex` counter. Worker threads repeatedly fetch the next index, process the associated chunk, and continue until the counter exceeds the data length. This is a classic *Work‑Stealing* approach that avoids static partitioning and balances load dynamically without explicit locks.  
+No micro‑service or event‑driven architecture is introduced in the observations; the component remains a **library‑style** set of reusable classes that are imported by other parts of the system.
 
-* **Adapter for persistence** – `GraphDatabaseAdapter` (in `storage/graph-database-adapter.ts`) isolates the rest of the component from the concrete storage technology (Graphology + LevelDB). It presents a simple API (`saveGraph`, `loadGraph`, `exportJSON`) while handling lock‑free LevelDB access and automatic JSON sync. This is the *Adapter* pattern.  
-
-* **Hook‑function extension** – The documentation in `integrations/copi/docs/hooks.md` defines a set of well‑named hook points (e.g., `onBeforePersist`, `onAfterAnalysis`). Consumers register callbacks, which the core engine invokes at the appropriate moments. This is a lightweight *Inversion of Control* mechanism that enables high customisability without altering core code.  
-
-* **Declarative constraint configuration** – The constraint‑definition markdown (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) prescribes a structured format (likely JSON/YAML) that the component parses to enforce runtime rules. This mirrors a *Configuration‑Driven* design, separating policy from implementation.
-
-### Interaction Between Sub‑components  
-
-1. **Agent creation** – An application instantiates a concrete agent (e.g., `new CodeGraphAgent(...)`). The `BaseAgent` constructor calls `ensureLLMInitialized()`. If the LLM service has not been created, the method pulls the appropriate provider from the **LLMAbstraction** registry (a sibling component) and caches it.  
-
-2. **Concurrent execution** – The agent’s `execute()` method typically delegates heavy data‑processing to `runWithConcurrency()`. The wave controller distributes work across a configurable pool of workers, each pulling tasks via the atomic counter.  
-
-3. **Graph persistence** – During or after execution, agents use the `GraphDatabaseAdapter` to persist intermediate or final graphs. The adapter writes to LevelDB and simultaneously triggers a JSON export, keeping the on‑disk representation synchronised for downstream tools (e.g., the **KnowledgeManagement** sibling that also consumes Graphology graphs).  
-
-4. **Hooks & constraints** – Before persisting, the agent fires any registered `onBeforePersist` hooks; after persisting, `onAfterAnalysis` hooks run. Constraint definitions are consulted at key decision points (e.g., limiting graph size, enforcing naming rules) to abort or modify processing early.  
-
-The overall architecture is therefore a **layered, plug‑in friendly** system: agents sit on top of LLM services, concurrency utilities, and storage adapters, while hooks and constraints provide orthogonal extension points.
-
----
+### Interaction model  
+* **Hooks → Agents** – `HookConfigLoader` produces a configuration object that agents read to decide which hook functions to invoke during their `execute()` run.  
+* **Agents → LLM** – Via `ensureLLMInitialized()`, agents acquire an LLM instance (shared across agents) that lives in the **LLMAbstraction** sibling component (`LLMService`).  
+* **Agents → Persistence** – `ContentValidationAgent` uses `GraphDatabaseAdapter` to read/write to the graph database managed by the **KnowledgeManagement** sibling.  
+* **Agents → Constraints** – The `constraint‑configuration.md` documentation guides how agents should interpret constraint files; the same configuration schema is consumed by the **ConstraintSystem** sibling.
 
 ## Implementation Details  
 
-### Lazy LLM Initialisation (`ensureLLMInitialized`)  
+### HookConfigLoader (`lib/agent-api/hooks/hook-config.js`)  
+The class reads a default hook manifest, then iteratively loads any user‑provided overrides. It performs a deep‑merge, preserving the order of precedence (default < environment < user). Validation logic checks for required hook keys and reports missing entries early, which aids the **CodingConventions** child component that documents hook naming rules. The loader is deliberately pure – it returns a plain JavaScript object, making it trivial to unit‑test and to mock in the **DevelopmentPractices** test harnesses.
 
-```ts
-// base-agent.ts (excerpt)
-protected async ensureLLMInitialized(): Promise<void> {
-  if (!this.llm) {
-    const provider = LLMProviderRegistry.getDefault(); // from LLMAbstraction
-    this.llm = await provider.createService();        // async creation
-  }
-}
-```
+### BaseAgent (`base-agent.ts`)  
+`BaseAgent` is an abstract class that stores a reference to the shared LLM provider. Its `ensureLLMInitialized()` method checks an internal flag; if the LLM has not yet been instantiated, it lazily requires the `LLMService` from the **LLMAbstraction** sibling and calls its `initialize()` method. This guard is idempotent, so multiple agents can call it without race conditions. Sub‑classes (e.g., `ContentValidationAgent`) implement `execute(context)` where they first call `await this.ensureLLMInitialized()` and then perform their domain‑specific logic.
 
-* The method is invoked from the `BaseAgent` constructor, guaranteeing that any subclass can safely call `this.llm` inside `execute()`.  
-* Because the check is guarded by a simple `if (!this.llm)`, the service is created exactly once per process, regardless of how many agents are instantiated.  
+### ContentValidationAgent (illustrative)  
+Although the exact source file is not listed, the observations describe its responsibilities: it receives a `GraphDatabaseAdapter` (imported from the **KnowledgeManagement** component) and a set of constraints defined in `constraint‑configuration.md`. During `execute()`, it queries the graph for code entities, runs validation hooks (loaded via `HookConfigLoader`), and writes any violations back to the graph. The adapter automatically synchronises the graph to a JSON export, a feature highlighted in the **KnowledgeManagement** description. This agent therefore exemplifies the **adapter** pattern (graph ↔ agent) and the **hook‑driven** extensibility model.
 
-### Agent Template (`BaseAgent` → `CodeGraphAgent`)  
-
-```ts
-// base-agent.ts
-export abstract class BaseAgent {
-  protected llm: LLMService;
-  constructor() {
-    this.ensureLLMInitialized();
-    this.execute();   // concrete agents override this
-  }
-  protected abstract execute(): Promise<void>;
-}
-
-// code-graph-agent.ts
-export class CodeGraphAgent extends BaseAgent {
-  protected async execute(): Promise<void> {
-    // 1. fetch source files
-    // 2. run LLM‑driven analysis
-    // 3. build a Graphology graph
-    // 4. persist via GraphDatabaseAdapter
-    // 5. fire hooks
-  }
-}
-```
-
-* The pattern enforces a **single‑entry** lifecycle: construction → LLM readiness → execution.  
-* Sub‑classes only need to focus on domain‑specific logic, reducing boilerplate and improving testability.  
-
-### Work‑Stealing Concurrency (`runWithConcurrency`)  
-
-```ts
-// wave-controller.ts
-export async function runWithConcurrency<T>(
-  items: T[],
-  workerFn: (item: T) => Promise<void>,
-  concurrency: number
-): Promise<void> {
-  const nextIndex = new AtomicInteger(0);
-  const workers = Array.from({ length: concurrency }, async () => {
-    while (true) {
-      const i = nextIndex.getAndIncrement();
-      if (i >= items.length) break;
-      await workerFn(items[i]);
-    }
-  });
-  await Promise.all(workers);
-}
-```
-
-* `AtomicInteger` (or a Node.js `SharedArrayBuffer`‑based counter) guarantees lock‑free increments.  
-* Idle workers automatically “steal” work by re‑reading the counter, leading to high CPU utilisation even when task durations vary.  
-
-### Graph Persistence (`GraphDatabaseAdapter`)  
-
-* The adapter encapsulates **Graphology** graph objects and persists them to **LevelDB** using a level‑up wrapper.  
-* On each `saveGraph` call it writes a batch of nodes/edges, then triggers `exportJSON()` which serialises the entire graph to a JSON file in a configured directory.  
-* The adapter employs LevelDB’s **write‑batch** API and a **lock‑free** write queue, preventing the “database is locked” errors observed in other components.  
-
-### Hook Functions  
-
-* Hooks are defined as named async callbacks in a central registry (`HookRegistry`).  
-* Example registration (from `hooks.md`):
-
-```ts
-HookRegistry.register('onBeforePersist', async (graph) => {
-  // custom validation or transformation
-});
-```
-
-* The core agent lifecycle calls `HookRegistry.invoke('onBeforePersist', graph)` at the appropriate point, awaiting each hook before proceeding.  
-
-### Constraint Configuration  
-
-* Constraints are expressed in a declarative file (JSON/YAML) described in `constraint-configuration.md`.  
-* At start‑up, `ConstraintLoader.load(filePath)` parses the file and builds a rule‑engine object.  
-* During analysis, agents query the rule engine (`constraints.isAllowed('graphSize', size)`) to decide whether to continue or abort.  
-
----
+### GraphDatabaseAdapter  
+Implemented as a thin wrapper around Graphology + LevelDB, the adapter exposes CRUD methods (`getNode`, `setNode`, `queryEdges`) and handles the JSON export on every write transaction. Its design isolates the rest of the codebase from the specifics of LevelDB file handling, enabling the **Trajectory** component to reuse the same export mechanism for conversation logs.
 
 ## Integration Points  
 
-1. **LLMAbstraction (sibling)** – `ensureLLMInitialized()` pulls a provider from the `LLMProviderRegistry` defined in **LLMAbstraction** (`lib/llm/provider-registry.js`). This decouples **CodingPatterns** from any particular LLM implementation and enables provider‑agnostic usage.  
-
-2. **LiveLoggingSystem (sibling)** – Both components share the same agent‑based pattern; `LiveLoggingSystem`’s `OntologyClassificationAgent` follows the same constructor flow, allowing a unified logging‑and‑analysis pipeline across the codebase.  
-
-3. **KnowledgeManagement (sibling)** – The `GraphDatabaseAdapter` is the same storage layer used by **KnowledgeManagement** for knowledge graphs, guaranteeing consistent persistence semantics and enabling cross‑component graph queries.  
-
-4. **ConstraintSystem (sibling)** – The declarative constraint files are consumed by the **ConstraintSystem** for global policy enforcement, while **CodingPatterns** applies them locally during graph generation.  
-
-5. **Child Components** –  
-   * **CodeAnalysis** – directly uses `CodeGraphAgent`’s `execute()` to perform static analysis.  
-   * **DatabaseManagement** – configures batch sizes (e.g., `MEMGRAPH_BATCH_SIZE`) that the adapter respects when writing to LevelDB.  
-   * **LLMIntegration** – re‑uses the lazy‑init logic to ensure the LLM service is ready for any downstream LLM‑driven feature.  
-   * **ConcurrencyManagement** – exposes `runWithConcurrency()` to child modules that need parallel processing (e.g., bulk code scanning).  
-   * **BrowserAccess** – may call the JSON export produced by the adapter to visualise graphs in a web UI.  
-
-All these integrations occur through **well‑defined TypeScript interfaces** (`ILLMService`, `IGraphAdapter`, `IHookRegistry`) that are exported from the component’s public entry point, ensuring compile‑time safety.
-
----
+1. **LLMAbstraction (LLMService)** – Agents depend on the shared LLM instance created by `ensureLLMInitialized()`. This creates a runtime coupling but is mitigated by the lazy guard and by the fact that LLMService itself follows a **facade** pattern, exposing a uniform `request()` API.  
+2. **KnowledgeManagement (GraphDatabaseAdapter)** – The graph adapter is injected into agents that need persistent code‑graph data, such as `ContentValidationAgent`. Because the adapter handles JSON sync, downstream tools (e.g., the code‑graph‑RAG integration described in `integrations/code-graph-rag/README.md`) can consume the exported file without additional plumbing.  
+3. **ConstraintSystem** – The constraint schema documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is parsed by agents to enforce policy rules. This creates a **configuration‑driven** contract between CodingPatterns and ConstraintSystem.  
+4. **DevelopmentPractices (hooks documentation)** – The `integrations/copi/docs/hooks.md` file defines the expected signature for hook functions. Hook implementations live in various integration packages (e.g., `integrations/browser-access`), and the loader merges them at runtime, allowing new integrations to contribute behaviour without modifying core agent code.  
+5. **Sibling agents** – The same constructor → ensureLLMInitialized → execute pattern is reused across **LiveLoggingSystem**, **SemanticAnalysis**, and **DockerizedServices**, meaning that any change to `BaseAgent` or the lazy‑init logic propagates consistently across the entire codebase.
 
 ## Usage Guidelines  
 
-1. **Instantiate via the concrete agent class** – always create a subclass of `BaseAgent` (e.g., `new CodeGraphAgent(options)`). Do not call `ensureLLMInitialized()` manually; the constructor guarantees correct ordering.  
-
-2. **Configure concurrency early** – before invoking any agent, decide on the worker pool size and pass it to `runWithConcurrency()`. A typical value matches the number of CPU cores; avoid oversubscribing the thread pool, as the atomic counter already mitigates contention.  
-
-3. **Register hooks before execution** – use `HookRegistry.register(name, fn)` **prior** to constructing the agent. Hooks are invoked in the order of registration; keep them short and async‑friendly to avoid blocking the work‑stealing loop.  
-
-4. **Define constraints declaratively** – place a constraint file under `integrations/mcp-constraint-monitor/docs/` and reference it via the agent’s options (`constraintsPath`). Ensure the file follows the schema described in `constraint-configuration.md`; malformed constraints will cause the agent to abort with a clear error.  
-
-5. **Persist through the adapter** – never interact with LevelDB directly. Call `graphAdapter.saveGraph(graph)` and rely on the automatic JSON export for downstream consumption. If you need custom export locations, configure the adapter through its constructor options.  
-
-6. **Testing** – because LLM initialisation is lazy, unit tests can mock the provider registry to return a stubbed `LLMService`. For concurrency tests, inject a deterministic `AtomicInteger` implementation that allows deterministic stepping.  
-
-Following these conventions yields predictable initialisation, maximises parallel throughput, and keeps the component’s public surface stable.
+* **Always instantiate agents via the standard constructor** and never call `ensureLLMInitialized()` manually; the base class guarantees that the LLM is ready exactly once per process.  
+* **Provide hook configurations** in the prescribed location (e.g., `config/hooks/*.json`). When adding new hooks, follow the naming conventions documented in `integrations/copi/docs/hooks.md` to ensure the `HookConfigLoader` can merge them without collisions.  
+* **Treat the GraphDatabaseAdapter as a read‑only view** unless you explicitly need to modify the graph. All write operations trigger an automatic JSON export, which may have performance implications for large graphs; batch updates where possible.  
+* **When defining constraints**, adhere to the schema in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Invalid constraint files will cause agent initialization failures, so validate them with the provided CLI helper (if any) before deployment.  
+* **Testing** – Because the hook loader returns plain objects, unit tests can stub hook configurations by supplying a mock object to the agent constructor. Likewise, mock the LLMService by providing a fake implementation that satisfies the same interface; this mirrors the dependency‑injection approach used in the **LLMAbstraction** sibling.  
 
 ---
 
-### Summary Deliverables  
+### 1. Architectural patterns identified  
+* Lazy initialisation (via `ensureLLMInitialized()`)  
+* Configuration‑merging (HookConfigLoader)  
+* Standardised agent lifecycle (constructor → ensureLLMInitialized → execute)  
+* Adapter pattern (GraphDatabaseAdapter)  
+* Facade pattern (LLMService in sibling LLMAbstraction)  
 
-| Item | Insight |
-|------|---------|
-| **Architectural patterns identified** | Agent‑based Template Method, Lazy Initialization, Work‑Stealing Concurrency, Adapter (GraphDatabaseAdapter), Hook‑based Inversion of Control, Configuration‑Driven Constraints |
-| **Design decisions & trade‑offs** | *Lazy LLM init* reduces start‑up cost but introduces an async step in the constructor; *Work‑stealing* gives excellent load balance at the cost of a shared atomic counter (minimal overhead). *Adapter* isolates storage tech, sacrificing direct LevelDB features for portability. *Hooks* provide flexibility but can lead to hidden side‑effects if over‑used. |
-| **System structure insights** | A layered stack: **Coding** (root) → **CodingPatterns** (agent core) → child modules (analysis, DB, concurrency, etc.). Siblings share LLM provider registry and graph persistence, enabling cross‑component reuse. |
-| **Scalability considerations** | Work‑stealing scales linearly with CPU cores; the atomic counter remains contention‑free because increments are single‑word operations. Graph persistence scales via LevelDB batch writes; however, very large graphs may hit JSON export size limits—consider streaming exports for massive datasets. |
-| **Maintainability assessment** | High maintainability: clear separation of concerns (agents, concurrency, storage, hooks). Extending the system only requires adding a new agent subclass or a hook, without touching core utilities. The only maintenance hotspot is the constraint schema; keeping its versioned definition in sync with the rule engine is essential. |
+### 2. Design decisions and trade‑offs  
+* **Lazy LLM loading** reduces start‑up cost but introduces a small runtime check on every agent execution. The trade‑off is acceptable because LLM initialisation is heavyweight.  
+* **Centralised hook merging** simplifies extensibility but creates a single point of failure if a hook file is malformed; validation mitigates this risk.  
+* **Uniform agent contract** improves maintainability and testability but limits agents that might need a different lifecycle (e.g., streaming agents) – they would need to extend the base class carefully.  
 
-*All statements above are directly grounded in the observed source files and documented patterns.*
+### 3. System structure insights  
+CodingPatterns sits directly under the **Coding** parent, providing reusable patterns that are consumed by multiple siblings (LiveLoggingSystem, SemanticAnalysis, etc.). Its children – **DesignPatterns**, **CodingConventions**, **DevelopmentPractices**, and **Integrations** – each expose a concrete artifact (HookConfigLoader, usage docs, hook docs, integration readmes) that reinforce the same modular philosophy across the whole codebase.  
+
+### 4. Scalability considerations  
+* **Hook loading** scales linearly with the number of configuration files; because merging is performed once at agent start‑up, the impact is bounded.  
+* **GraphDatabaseAdapter** relies on Graphology + LevelDB, which are designed for high‑write throughput; however, the automatic JSON export can become a bottleneck for very large graphs. Future scaling could decouple export to an asynchronous background job.  
+* **LLM lazy initialisation** ensures that adding more agents does not increase memory pressure until they actually need the model, supporting horizontal scaling of the process pool.  
+
+### 5. Maintainability assessment  
+The component scores highly on maintainability:  
+* **Clear separation of concerns** – hook loading, LLM handling, and persistence are isolated in dedicated classes.  
+* **Consistent conventions** – the constructor → ensureLLMInitialized → execute pattern is documented and shared across siblings, reducing cognitive load.  
+* **Extensible configuration** – new hooks or constraints can be added without touching core logic, adhering to the open/closed principle.  
+* **Documentation linkage** – the presence of explicit markdown guides (`constraint-configuration.md`, `hooks.md`) ensures that developers have a single source of truth for conventions.  
+
+Overall, CodingPatterns provides a solid, modular foundation that aligns with the broader architectural goals of the **Coding** parent component while remaining lightweight enough to be reused throughout the ecosystem.
 
 ## Diagrams
 
@@ -212,24 +113,22 @@ Following these conventions yields predictable initialisation, maximises paralle
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/; LLMAbstraction: [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-c; Trajectory: [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storag; CodingPatterns: [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method wit; ConstraintSystem: [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through wel; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyC.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-c; LLMAbstraction: [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.; DockerizedServices: [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the sin; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonst; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relatio; CodingPatterns: [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-c; ConstraintSystem: [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate ; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classi.
 
 ### Children
-- [CodeAnalysis](./CodeAnalysis.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before code analysis execution.
-- [DatabaseManagement](./DatabaseManagement.md) -- The MEMGRAPH_BATCH_SIZE variable is used to configure the batch size for database interactions.
-- [LLMIntegration](./LLMIntegration.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before data analysis execution.
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
-- [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
-- [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
+- [DesignPatterns](./DesignPatterns.md) -- The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system
+- [CodingConventions](./CodingConventions.md) -- The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component
+- [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
+- [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, for classifying observations against the ontology system. This agent is crucial in providing a standardized way of categorizing and understanding the interactions within the Claude Code conversations. The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities. For instance, the agent initializes the ontology system by loading the necessary configuration files and setting up the classification models. This is evident in the code, where the constructor of the OntologyClassificationAgent class calls the initOntologySystem method, which in turn loads the configuration files and sets up the classification models.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (LLM) providers. This is evident in the lib/llm/provider-registry.js file, where a registry of providers is maintained, enabling easy addition or removal of providers. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) are both registered in this registry, demonstrating the flexibility of the component's architecture. The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry. This design decision enables the component to adapt to changing requirements and new provider additions without significant modifications to the existing codebase.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function in lib/integrations/specstory-adapter.js, which establishes a connection to the Specstory service via HTTP. This asynchronous approach allows the component to handle multiple tasks concurrently, improving overall performance and responsiveness. The connectViaHTTP function is a prime example of this, as it uses callbacks to handle the connection establishment process. Furthermore, the SpecstoryAdapter class's implementation of the initialize function, which attempts connections to the Specstory service using different methods, demonstrates the component's ability to adapt to various connection scenarios.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storage/graph-database-adapter.ts, enables Graphology+LevelDB persistence with automatic JSON export sync. By using this adapter, the component can efficiently store and query knowledge graphs, which are essential for entity persistence and knowledge decay tracking. Furthermore, the GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that the component can handle multiple concurrent requests without performance degradation.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is used for classifying observations against the ontology system. This agent follows the BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of this pattern enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonstrating an adapter pattern for integration with different tools and services. This adapter pattern allows for a standardized interface to interact with various extensions, such as Specstory, facilitating the addition of new integrations with minimal modifications to the existing codebase. The SpecstoryAdapter class, specifically, employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods. This approach ensures that the most efficient and reliable connection method is used, while providing fallback options in case of failures.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
 
 
 ---

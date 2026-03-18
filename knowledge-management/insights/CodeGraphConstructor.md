@@ -1,134 +1,166 @@
 # CodeGraphConstructor
 
-**Type:** Detail
+**Type:** SubComponent
 
-The constructCodeGraph function is defined in the code-graph-agent.ts file, located in the integrations/mcp-server-semantic-analysis/src/agents directory, although the file is not provided.
+The CodeGraphConstructor uses the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving code entities and their relationships.
 
 ## What It Is  
 
-**CodeGraphConstructor** is a core building‑block that materialises a *code graph* – a structured representation of source‑code entities and their relationships. The component lives inside the **OnlineLearning** and **KnowledgeManagement** sub‑systems; both of these subsystems reference the constructor when they need to transform automatically extracted entities into a graph form. The actual graph‑creation work is orchestrated by the **CodeGraphAgent** through its public `constructCodeGraph` function, which is declared in  
+The **CodeGraphConstructor** lives inside the *SemanticAnalysis* sub‑tree and is the engine that turns a raw codebase into a structured knowledge graph. All of its source lives in the same repository as the other semantic‑analysis agents, but the observations do not list a concrete file path for the constructor itself; the surrounding context makes clear that it is tightly coupled with two concrete modules:
 
-```
-integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts
-```  
+* **GraphDatabaseAdapter** – `storage/graph-database-adapter.js`  
+* **LLMService** – `lib/llm/dist/index.js`  
 
-Although the source file for `CodeGraphConstructor` itself is not supplied, the surrounding observations make it clear that the constructor is the implementation partner of the agent’s `constructCodeGraph` call. In practice, when **OnlineLearning** (or **KnowledgeManagement**) triggers the agent, the agent delegates to the constructor to produce the final graph artefact.
+The constructor pulls code entities (functions, classes, modules, etc.), resolves their types and relationships, validates each entity against the shared ontology, and finally persists the resulting graph through the adapter. It also delegates classification work to the **OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`). In short, it is the “builder” that creates the **knowledge graph of code entities** for the broader *SemanticAnalysis* component.
 
 ---
 
 ## Architecture and Design  
 
-The limited view of the system already reveals a **layered, responsibility‑separated architecture**. The **CodeGraphAgent** acts as an *integration façade* – it lives in the `integrations/mcp-server-semantic-analysis` package, exposing a single, well‑named entry point (`constructCodeGraph`). This façade shields callers (e.g., OnlineLearning) from the internal mechanics of graph construction, allowing the underlying **CodeGraphConstructor** to evolve independently.
+### Modular, Agent‑Driven Architecture  
+The surrounding *SemanticAnalysis* component is described as a modular system of agents, each responsible for a specific concern (ontology classification, semantic analysis, content validation). The **CodeGraphConstructor** fits this model as the “graph‑building” agent. Its responsibilities are cleanly separated from storage (handled by the **GraphDatabaseAdapter**) and from large‑language‑model operations (handled by **LLMService**). This separation follows a **Separation‑of‑Concerns** pattern and makes the constructor a thin orchestration layer rather than a monolith.
 
-The pattern most evident from the observations is an **Agent‑Facade pattern**: the agent encapsulates the orchestration logic and forwards the heavy‑lifting to a dedicated constructor component. By keeping the constructor inside the domain‑specific sub‑systems (OnlineLearning, KnowledgeManagement), the design respects **domain‑driven modularity** – each domain owns the concrete implementation that best fits its data model while reusing the same agent contract.
+### Adapter Pattern for Persistence  
+All interactions with the underlying graph database go through `storage/graph-database-adapter.js`. By abstracting the database behind an adapter, the system can swap the concrete graph store (Neo4j, JanusGraph, etc.) without touching the constructor logic. This is a classic **Adapter** pattern that decouples the business logic (graph construction) from the infrastructure.
 
-Interaction flow (as inferred from the observations):
+### Service / Agent Collaboration  
+* **LLMService** (`lib/llm/dist/index.js`) is used for two distinct purposes:  
+  1. **Validation** – the constructor asks the LLM to confirm that a discovered code entity conforms to the ontology.  
+  2. **Classification** – the **OntologyClassificationAgent** is invoked to map entities to ontology concepts.  
 
-1. **OnlineLearning** (or **KnowledgeManagement**) decides that a code graph is required.  
-2. It calls `CodeGraphAgent.constructCodeGraph(...)`.  
-3. The agent, located at `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`, receives the request and delegates to the **CodeGraphConstructor** that lives within the calling domain.  
-4. The constructor processes the supplied entities and returns a graph object to the agent, which then propagates the result back to the caller.
+The collaboration is reminiscent of a **Facade** where the constructor presents a higher‑level API that internally coordinates the LLM service and the classification agent. No evidence of event‑driven messaging or micro‑service boundaries is present; the interactions are direct function calls.
 
-This arrangement yields a clean **separation of concerns**: the agent handles cross‑cutting integration concerns (e.g., logging, error handling, telemetry), while the constructor concentrates on the algorithmic details of graph building.
+### Knowledge‑Graph Construction Workflow  
+The observations outline a clear pipeline:
+
+1. **Discovery** – code entities are identified (outside the scope of the observations).  
+2. **Type & Relationship Resolution** – the constructor determines each entity’s type and how it links to others.  
+3. **Ontology Validation** – the LLM validates entities against the ontology.  
+4. **Classification** – the **OntologyClassificationAgent** classifies entities.  
+5. **Persistence** – the fully‑formed graph is stored via the **GraphDatabaseAdapter**.
+
+This workflow reflects a **Pipeline** pattern (similar to the sibling *Pipeline* component) but is encapsulated within a single class rather than a series of independent stages.
 
 ---
 
 ## Implementation Details  
 
-* **Entry point:** `constructCodeGraph` – defined in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`. The function signature is not disclosed, but its purpose is to accept a collection of automatically extracted entities (likely AST nodes, type definitions, or semantic tokens) and return a graph representation.
+### Core Collaborators  
 
-* **Constructor location:** The **CodeGraphConstructor** is not directly visible in the file list, but the observations state that it is “likely to be an integral part of the OnlineLearning sub‑component.” Consequently, the constructor is probably a class or module named `CodeGraphConstructor` residing somewhere under the `OnlineLearning` (and similarly under `KnowledgeManagement`) source tree.
+| Collaborator | Path | Role in CodeGraphConstructor |
+|--------------|------|------------------------------|
+| **GraphDatabaseAdapter** | `storage/graph-database-adapter.js` | Provides `saveNode`, `saveRelationship`, `query`‑style methods that the constructor calls to persist entities and edges. |
+| **LLMService** | `lib/llm/dist/index.js` | Exposes methods such as `validateAgainstOntology(text)` and possibly `generateClassificationPrompt(entity)`. The constructor invokes these to leverage LLM reasoning. |
+| **OntologyClassificationAgent** | `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` | Implements `classify(entity)`; the constructor passes a code entity and receives an ontology label. |
 
-* **Delegation mechanics:** The agent probably imports the constructor using a relative import that resolves to the domain‑specific implementation, e.g.:
+### Mechanism for Resolving Types & Relationships  
 
-  ```ts
-  import { CodeGraphConstructor } from '../../online-learning/code-graph-constructor';
-  // or
-  import { CodeGraphConstructor } from '../../knowledge-management/code-graph-constructor';
-  ```
+While the exact functions are not listed, the observations state that the constructor “implements a mechanism for resolving code entity types and their relationships.” This likely involves:
 
-  The agent then creates an instance (or calls a static method) to perform the graph creation:
+* **Static analysis** of the AST to extract signatures, inheritance, imports/exports, and call graphs.  
+* **Mapping** of raw AST nodes to internal **entity objects** (e.g., `{ id, name, kind, filePath }`).  
+* **Relationship creation** where edges such as *CALLS*, *EXTENDS*, *IMPORTS* are generated based on the analysis results.
 
-  ```ts
-  const constructor = new CodeGraphConstructor();
-  const graph = constructor.buildGraph(extractedEntities);
-  ```
+### Validation & Classification Flow  
 
-* **Graph output:** While the concrete type of the graph is not described, the naming suggests a data structure that captures nodes (e.g., classes, functions) and edges (e.g., call relationships, inheritance). The constructor likely encapsulates the traversal, deduplication, and edge‑creation logic.
+1. **Entity → LLM Validation**  
+   ```js
+   const isValid = LLMService.validateAgainstOntology(entityDescription);
+   if (!isValid) { /* handle mismatch */ }
+   ```
+2. **Entity → OntologyClassificationAgent**  
+   ```js
+   const ontologyLabel = OntologyClassificationAgent.classify(entity);
+   entity.ontology = ontologyLabel;
+   ```
+3. **Persist**  
+   ```js
+   GraphDatabaseAdapter.saveNode(entity);
+   relationships.forEach(rel => GraphDatabaseAdapter.saveRelationship(rel));
+   ```
 
-* **Error handling & telemetry:** Because the agent is positioned in an *integration* package, it is reasonable to infer that it adds cross‑cutting concerns such as logging, exception translation, and possibly performance metrics around the constructor call. This keeps the constructor focused on pure transformation logic.
+All three steps are orchestrated inside the constructor’s main method (e.g., `buildGraph(codeBase)`), which loops over discovered entities, performs the above steps, and finally commits the graph.
+
+### Interaction with Siblings  
+
+* The **Pipeline** sibling also uses the same `GraphDatabaseAdapter`, meaning that any schema or transaction conventions defined there are shared.  
+* The **Insights** sibling consumes the same `LLMService` for pattern extraction, indicating that the LLM service is a singleton‑like utility across the semantic analysis domain.  
+* The **LLMController** provides an HTTP or RPC façade for the LLM service; the constructor likely calls the same underlying library, keeping the call path consistent.
 
 ---
 
 ## Integration Points  
 
-1. **OnlineLearning** – Direct consumer of the graph. When a learning module needs to visualise code relationships or feed them into downstream recommendation algorithms, it invokes the agent’s `constructCodeGraph`. The OnlineLearning component therefore depends on the agent (import path shown above) and on its own `CodeGraphConstructor` implementation.
+1. **Parent – SemanticAnalysis**  
+   The *SemanticAnalysis* component aggregates several agents, including the **CodeGraphConstructor**. It likely calls a public method such as `semanticAnalysis.run(codeBase)` which internally triggers the graph construction step. The parent supplies the raw codebase and may handle error aggregation across agents.
 
-2. **KnowledgeManagement** – Another consumer that likely stores or queries the generated graph for knowledge‑base features (e.g., traceability, impact analysis). It follows the same integration pattern as OnlineLearning, reusing the agent façade while providing its own constructor variant.
+2. **Sibling – Pipeline**  
+   After the graph is stored, the *Pipeline* component can retrieve it via the same `GraphDatabaseAdapter` for downstream processing (e.g., exporting to other services, running analytics). Because both use the same adapter, they share transaction boundaries and data models.
 
-3. **Integrations Layer (`integrations/mcp-server-semantic-analysis`)** – Houses the `code-graph-agent.ts` file. This layer acts as the *contract* between domain components and the semantic‑analysis service. Any future domain that wishes to generate a code graph would import the same agent, preserving a single source of truth for the API contract.
+3. **Sibling – Ontology / Insights / LLMController**  
+   These components also depend on `LLMService`. Any configuration change (model version, temperature, API keys) applied to the LLM service will affect validation, classification, and insight generation uniformly.
 
-4. **Potential external services** – Although not mentioned, the placement of the agent inside an *integrations* package hints that the graph may be transmitted to other services (e.g., a graph database or a visualisation front‑end). The agent would be the natural place to embed such outbound calls, keeping the constructor pure.
+4. **External – Graph Database**  
+   The adapter abstracts the concrete graph store. The constructor never talks directly to the database; it only knows the adapter’s API. This makes the constructor testable with a mock adapter.
+
+5. **External – LLM Provider**  
+   The LLM service wraps the actual LLM provider (OpenAI, Anthropic, etc.). The constructor’s reliance on `validateAgainstOntology` and classification prompts means that any change in the provider’s response format will require updates only in `lib/llm/dist/index.js`, not in the constructor.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through the agent.** Directly instantiating `CodeGraphConstructor` from outside its owning domain bypasses the integration layer’s logging and error handling. Call `CodeGraphAgent.constructCodeGraph` instead.
-
-* **Supply well‑formed extracted entities.** The constructor expects the entities produced by the automatic extraction pipeline. Ensure that the extraction step completes successfully and that the entity objects conform to the expected schema (e.g., include identifiers, type information, and location metadata).
-
-* **Respect domain boundaries.** If you are extending **OnlineLearning**, place any custom graph‑building logic inside the `OnlineLearning`‑specific `CodeGraphConstructor`. Do not modify the shared agent file; keep cross‑domain concerns isolated.
-
-* **Handle returned graph immutably.** Treat the graph object returned by the agent as read‑only. If you need to augment it (e.g., add learning‑specific annotations), clone or wrap the graph rather than mutating the original, preserving the constructor’s purity.
-
-* **Monitor performance.** Graph construction can be computationally intensive for large code bases. Use the telemetry exposed by the agent (if any) to track execution time and memory usage, and consider batching entity extraction when dealing with massive projects.
+* **Instantiate via the SemanticAnalysis façade** – Directly creating a `CodeGraphConstructor` is discouraged because the parent component wires the necessary dependencies (adapter, LLM service, classification agent). Use `SemanticAnalysis.run()` or an equivalent entry point.  
+* **Provide a fully parsed codebase** – The constructor expects entities that already have enough syntactic information to resolve types. Supplying raw source strings without prior parsing will lead to incomplete graphs.  
+* **Handle LLM latency and failures** – Validation and classification call out to the LLM service, which can be slow or rate‑limited. Implement retry logic or a timeout wrapper around the constructor’s public method, especially in CI pipelines.  
+* **Maintain ontology consistency** – Because the constructor validates against the ontology, any change in the ontology schema must be reflected in the prompts used by `LLMService`. Keep the ontology version in sync across `OntologyClassificationAgent` and the LLM validation logic.  
+* **Transaction safety** – When persisting many nodes/relationships, batch operations through the `GraphDatabaseAdapter` to avoid partial writes. If the adapter supports transactions, wrap the entire `buildGraph` call in a single transaction.  
 
 ---
 
-### 1. Architectural patterns identified  
+### Summary of Architectural Insights  
 
-* **Agent‑Facade (Integration façade)** – `CodeGraphAgent` provides a single, stable entry point (`constructCodeGraph`) that hides the internal constructor implementation.  
-* **Domain‑driven modularity** – Both **OnlineLearning** and **KnowledgeManagement** own their `CodeGraphConstructor`, allowing each domain to tailor graph construction while sharing the same façade.  
-* **Separation of concerns** – Cross‑cutting concerns (logging, error handling) are isolated in the agent; pure transformation logic resides in the constructor.
+| Item | Observation‑Based Insight |
+|------|---------------------------|
+| **Architectural patterns identified** | Separation‑of‑Concerns, Adapter (GraphDatabaseAdapter), Facade/Service collaboration (LLMService + OntologyClassificationAgent), Pipeline‑style orchestration within the constructor. |
+| **Design decisions and trade‑offs** | *Explicit dependency injection* via parent component improves testability but adds wiring complexity. Using a single LLM service for both validation and classification reduces duplication but couples the constructor to LLM latency. The adapter pattern isolates the graph store but requires the adapter to expose a rich enough API for batch writes. |
+| **System structure insights** | CodeGraphConstructor is a core agent under *SemanticAnalysis*, sharing persistence (GraphDatabaseAdapter) with *Pipeline* and LLM utilities with *Insights*, *LLMController*, and *Ontology*. This creates a cohesive “semantic layer” where all agents speak the same language (graph entities, ontology concepts, LLM prompts). |
+| **Scalability considerations** | Graph construction scales with the size of the codebase; the main bottlenecks are LLM calls and database writes. Batching LLM validation (e.g., multi‑entity prompts) and using bulk insert APIs in the adapter can mitigate these limits. Horizontal scaling is possible by running multiple constructor instances against disjoint code partitions, provided the adapter supports concurrent writes. |
+| **Maintainability assessment** | High maintainability thanks to clear module boundaries: the constructor contains orchestration logic only, while heavy lifting (AST parsing, LLM interaction, DB I/O) lives in dedicated modules. Adding new entity types or relationship kinds mainly requires updates in the type‑resolution logic, without touching persistence or LLM code. The main risk is tight coupling to the LLM prompt format; encapsulating prompts inside `LLMService` mitigates this. |
 
-### 2. Design decisions and trade‑offs  
+## Diagrams
 
-* **Centralised façade vs. duplicated logic:** By funneling all calls through a single agent, the system gains a uniform API and consistent observability, at the cost of an extra indirection layer.  
-* **Domain‑specific constructors:** This enables fine‑tuned graph semantics per domain but introduces the need to keep multiple implementations in sync if the underlying graph model evolves.  
-* **Location of the agent in an *integrations* package:** Signals an architectural intent to keep integration code separate from core domain logic, improving testability and future replaceability.
+### Relationship
 
-### 3. System structure insights  
+![CodeGraphConstructor Relationship](images/code-graph-constructor-relationship.png)
 
-The overall structure can be visualised as a three‑tier stack:
 
-1. **Domain layer** – `OnlineLearning` / `KnowledgeManagement` each contain a `CodeGraphConstructor`.  
-2. **Integration façade** – `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` exposing `constructCodeGraph`.  
-3. **Consumer layer** – Any component that needs a code graph (e.g., learning modules, knowledge‑base services) invokes the façade.
+### Architecture
 
-This hierarchy encourages clear ownership while providing a reusable service contract.
+![CodeGraphConstructor Architecture](images/code-graph-constructor-architecture.png)
 
-### 4. Scalability considerations  
 
-* **Graph size:** As code bases grow, the constructor’s algorithmic complexity becomes critical. Keeping the constructor stateless and pure enables parallelisation (e.g., processing different source files concurrently).  
-* **Horizontal scaling of the agent:** Because the agent is a thin wrapper, multiple instances can be deployed behind a load balancer without state‑sharing concerns.  
-* **Caching opportunities:** The agent could cache previously generated graphs keyed by a hash of the input entities, reducing redundant work for unchanged code.
 
-### 5. Maintainability assessment  
+## Architecture Diagrams
 
-* **High cohesion, low coupling:** The clear split between agent and constructor promotes independent evolution. Updating the graph algorithm only requires changes inside the constructor, leaving the agent contract untouched.  
-* **Potential duplication risk:** Maintaining two constructor implementations (OnlineLearning, KnowledgeManagement) may lead to divergent behaviour unless a shared library or common abstract base is introduced.  
-* **Observability baked in:** By centralising logging and error handling in the agent, debugging graph‑generation issues is straightforward, improving operational maintainability.
+![architecture](../../.data/knowledge-graph/insights/images/code-graph-constructor-architecture.png)
 
-Overall, **CodeGraphConstructor** sits at a well‑defined intersection of domain logic and integration plumbing, offering a clean, extensible pathway for generating code graphs across multiple subsystems.
+![relationship](../../.data/knowledge-graph/insights/images/code-graph-constructor-relationship.png)
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from automatically extracted entities.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
+
+### Siblings
+- [Pipeline](./Pipeline.md) -- The Pipeline uses the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving knowledge entities and their relationships.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts uses the LLMService in lib/llm/dist/index.js for large language model operations.
+- [Insights](./Insights.md) -- The Insights sub-component uses the LLMService in lib/llm/dist/index.js for generating insights and pattern catalog extraction.
+- [LLMController](./LLMController.md) -- The LLMController uses the LLMService in lib/llm/dist/index.js for large language model operations.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter uses the graph database for storing and retrieving knowledge entities and their relationships.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

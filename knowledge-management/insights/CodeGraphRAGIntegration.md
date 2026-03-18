@@ -1,121 +1,97 @@
-# CodeGraphRAGIntegration
+# CodeGraphRagIntegration
 
 **Type:** Detail
 
-The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the project documentation implies a configured integration with Code Graph RAG, facilitating real-time code analysis and monitoring.
+The Claude Code Setup for Graph-Code MCP Server documentation in integrations/code-graph-rag/docs/claude-code-setup.md implies that the CodeGraphRagIntegration detail node involves configuring the code-graph-rag system for use with the Claude Code MCP Server.
 
 ## What It Is  
 
-**CodeGraphRAGIntegration** is the concrete implementation that ties the **CodeAnalysisAgent** to a graph‑based Retrieval‑Augmented Generation (RAG) service dedicated to codebases. The integration lives under the `integrations/code-graph-rag/` folder of the repository. Its purpose is to expose the internal AST‑driven analysis performed by **CodeAnalysisAgent** to the external “Code Graph RAG” service so that downstream agents (for example the Claude‑based code assistant) can query a live, graph‑structured representation of a code repository. The primary documentation for the integration is the **README** at  
+**CodeGraphRagIntegration** is the detail‑node that bridges the larger **CodeGraphConstruction** workflow with the external *graph‑code* Retrieval‑Augmented Generation (RAG) service. The integration lives under the repository path `integrations/code-graph-rag/`, with its high‑level description in `integrations/code-graph-rag/README.md`. The README makes clear that the *graph‑code* system is a graph‑based RAG engine capable of ingesting any codebase and exposing query capabilities.  
 
-```
-integrations/code-graph-rag/README.md
-```  
+The integration’s primary responsibility is to configure, launch, and communicate with that external service. Two environment variables—`CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT`—are documented as the network endpoints used by the integration. The presence of a dedicated setup guide (`integrations/code-graph-rag/docs/claude-code-setup.md`) shows that the node also prepares the RAG service for use with the **Claude Code MCP Server**, a downstream component that consumes the graph‑based knowledge.  
 
-and the Claude‑specific setup instructions are recorded in  
-
-```
-integrations/code-graph-rag/docs/claude-code-setup.md
-```  
-
-Both files describe the integration as a “graph‑based RAG system for any codebases”, confirming that the component is deliberately generic and not tied to a single language or project. Two environment variables – `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` – are defined in the project documentation, indicating that the integration runs a service (or a set of services) that listen on dedicated ports for HTTP and Server‑Sent Events (SSE) traffic respectively.  
-
-In the overall hierarchy, **CodeGraphRAGIntegration** is a child of **CodeAnalysisAgent** (the parent component that performs AST‑based extraction). The relationship is explicit: *CodeAnalysisAgent contains CodeGraphRAGIntegration*. No sibling components are listed in the observations, but any other integration under `integrations/` would be a logical sibling.
+Because **CodeGraphRagIntegration** is a child of **CodeGraphConstruction**, it is invoked whenever the construction pipeline needs to create or query the code knowledge graph. It is also listed under the broader **OnlineLearning** component, indicating that the graph‑RAG service may be leveraged for continuous learning or feedback loops in the system.
 
 ---
 
 ## Architecture and Design  
 
-The architecture revealed by the observations is a **service‑oriented integration** that bridges a local code‑analysis pipeline with an external graph‑RAG engine. The design relies on **configuration‑driven networking**: the integration reads `CODE_GRAPH_RAG_PORT` (the main HTTP endpoint) and `CODE_GRAPH_RAG_SSE_PORT` (the streaming endpoint) to establish bi‑directional communication with the RAG service. This pattern resembles a **thin‑client façade**, where the heavy lifting (graph construction, vector storage, retrieval) resides in the external RAG system, while the local component focuses on feeding it fresh analysis data and consuming its responses.
+The observable architecture follows a **port‑driven integration pattern**. The integration does not embed the graph‑code engine; instead it treats the engine as a separate process reachable via TCP ports (`CODE_GRAPH_RAG_PORT` for standard HTTP/REST calls and `CODE_GRAPH_RAG_SSE_PORT` for Server‑Sent Events streams). This decoupling enables the RAG service to be scaled, upgraded, or swapped without touching the core construction code.  
 
-The presence of an SSE port suggests an **event‑driven streaming model** for real‑time updates. As **CodeAnalysisAgent** discovers new AST nodes or concept extracts, it can push incremental changes to the graph service over the SSE channel, allowing downstream LLM‑based agents (e.g., Claude) to receive up‑to‑date context without polling. This design choice reduces latency and bandwidth compared to a pure request‑response approach.
+Configuration is **declarative**: the README and the Claude‑specific markdown file serve as the source of truth for required environment variables, startup flags, and authentication steps. By centralising these details in documentation rather than hard‑coding them, the design encourages reproducible deployments across environments (local, CI, production).  
 
-The documentation in `claude-code-setup.md` explicitly mentions a “Claude Code Setup for Graph‑Code MCP Server”, indicating that the integration is intended to be used together with a Claude‑powered code assistant. The pattern here is a **client‑server contract** where the client (the agent) formats its payloads according to the expectations of the Graph‑Code MCP (Multi‑Component Platform) server, which then returns graph‑augmented results. No explicit micro‑service or event‑bus frameworks are referenced; the integration appears to rely on standard HTTP/SSE primitives.
+The integration also adopts a **client‑server communication model** with a streaming capability (SSE). The streaming endpoint is likely used for incremental retrieval of large code graphs or for real‑time updates during a query, which aligns with the RAG paradigm where a language model may request chunks of context as it generates output.  
+
+From a hierarchical standpoint, **CodeGraphRagIntegration** is a *detail* node inside **CodeGraphConstruction**. This suggests a **layered composition**: the parent orchestrates high‑level graph construction, while the child handles the concrete transport and protocol specifics required to talk to the external RAG system. No sibling components are mentioned, but any sibling would share the same parent orchestration responsibilities and would similarly be isolated by their own integration detail nodes.
 
 ---
 
 ## Implementation Details  
 
-Because the observations do not list concrete classes or functions, the implementation can be inferred from the file hierarchy and the environment variables:
+The only concrete artefacts we can reference are the documentation files:
 
-1. **Configuration Layer** – The integration reads `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` at startup, most likely via a small helper module that parses `process.env` (or the equivalent in the host language). This module is probably located near the top of the `integrations/code-graph-rag/` directory, though the exact file name is not disclosed.
+| Path | Role |
+|------|------|
+| `integrations/code-graph-rag/README.md` | Provides the overall purpose of the graph‑code RAG system and explains that it is leveraged by **CodeGraphConstruction**. |
+| `integrations/code-graph-rag/docs/claude-code-setup.md` | Describes the steps needed to configure the RAG service for the **Claude Code MCP Server**. This includes setting the two port variables, likely provisioning authentication tokens, and possibly launching the service in a Docker container or as a background process. |
 
-2. **Transport Layer** – Two transport clients are expected:
-   * An **HTTP client** that posts analysis artefacts (e.g., AST nodes, extracted concepts) to the RAG service at `http://localhost:{CODE_GRAPH_RAG_PORT}`. The client may expose methods like `pushGraphUpdate(payload)` or `queryGraph(query)`.
-   * An **SSE client** that opens a persistent connection to `http://localhost:{CODE_GRAPH_RAG_SSE_PORT}/events` (or a similar endpoint). This client listens for events such as “graph‑updated”, “index‑ready”, or “error”, enabling the local agent to react promptly.
+From these files we can infer the following implementation mechanics:
 
-3. **Adapter Logic** – Inside **CodeAnalysisAgent**, after each AST traversal or concept extraction, the agent invokes the integration’s adapter functions. These functions translate internal data structures (e.g., `CodeNode`, `Concept`) into the JSON schema expected by the graph‑RAG service. The adapter is the glue that keeps the two systems loosely coupled.
+1. **Environment‑Variable‑Driven Startup** – The integration expects `CODE_GRAPH_RAG_PORT` (the main HTTP endpoint) and `CODE_GRAPH_RAG_SSE_PORT` (the SSE streaming endpoint) to be defined before any interaction. The README likely outlines default values and how to override them.
 
-4. **Claude‑Specific Hook** – The `claude-code-setup.md` file likely documents additional steps required to register the integration with Claude’s code‑assistant runtime. This could involve providing an API key, setting up a “MCP server” endpoint, or configuring Claude to listen on the SSE stream for real‑time context.
+2. **Configuration for Claude Code MCP** – The Claude‑specific guide probably details how to point the MCP server at the RAG service, perhaps by setting a `CLAUDE_CODE_RAG_URL` or similar variable that combines the host and `CODE_GRAPH_RAG_PORT`. It may also cover TLS/SSL considerations, given the security posture of a code‑knowledge service.
 
-Because no source symbols were discovered, the integration probably consists of a small set of utility modules rather than a large class hierarchy. The design emphasizes **separation of concerns**: analysis stays within **CodeAnalysisAgent**, while graph‑RAG responsibilities (storage, retrieval, vectorisation) are delegated to the external service.
+3. **Transport Layer** – While no source code is present, the presence of an SSE port strongly suggests that the integration uses an HTTP client capable of handling Server‑Sent Events. The client would open a persistent GET request to the SSE endpoint, receive incremental JSON payloads (e.g., graph nodes, code snippets), and feed them into the construction pipeline.
+
+4. **Error Handling & Retry** – Standard practice for port‑based services includes health‑check endpoints and retry logic. Though not explicitly documented, the existence of two separate ports hints that the integration can fall back to the non‑streaming HTTP API if SSE connectivity fails.
+
+Because there are **zero code symbols** discovered, the actual classes or functions that perform the HTTP calls are not observable. The integration therefore appears to be **configuration‑first** with the operational logic residing in external libraries or scripts referenced in the markdown guides.
 
 ---
 
 ## Integration Points  
 
-The primary integration surface is the **environment‑variable‑driven network interface**. By exposing `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT`, the system allows developers to run the graph‑RAG service locally, in a container, or as a remote endpoint without code changes. The integration points can be enumerated as follows:
+1. **Parent – CodeGraphConstruction** – The parent component consumes the graph‑code RAG service to *construct* and *query* the knowledge graph. It likely calls into the integration’s HTTP API to ingest code artifacts (e.g., ASTs, dependency graphs) and later to retrieve relevant context during a RAG query. The README explicitly states that **CodeGraphConstruction** “uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph,” confirming this tight coupling.
 
-| Integration | Direction | Protocol | Key Artifact |
-|-------------|-----------|----------|--------------|
-| **CodeAnalysisAgent → Graph‑RAG** | Push | HTTP POST | Serialized AST / concept payloads |
-| **Graph‑RAG → CodeAnalysisAgent** | Stream | Server‑Sent Events | Real‑time update notifications |
-| **Claude Code Assistant → Graph‑RAG** | Query | HTTP (via Claude SDK) | Natural‑language code queries |
-| **Graph‑RAG → Claude** | Response | HTTP JSON | Retrieved graph fragments, citations |
+2. **Sibling – OnlineLearning** – While no sibling detail nodes are listed, the fact that **OnlineLearning** contains **CodeGraphRagIntegration** implies that the RAG service may also be used for continual model updates or feedback loops. In such a scenario, the integration would expose additional endpoints (perhaps for model fine‑tuning) that the online learning subsystem could invoke.
 
-The **Claude‑specific documentation** suggests that the integration also registers a “MCP Server” endpoint with Claude, enabling Claude to issue graph queries directly. This creates a **tri‑angular coupling**: `CodeAnalysisAgent` feeds the graph, Claude consumes it, and the graph service mediates both sides.
+3. **External Consumer – Claude Code MCP Server** – The Claude‑specific setup document indicates a direct integration path from the RAG service to the **Claude Code MCP Server**. This server likely acts as a language‑model front‑end that queries the graph‑code RAG backend for code context, then incorporates that context into Claude’s generation pipeline.
 
-No other code‑level dependencies are mentioned, but given the naming conventions, the integration likely depends on standard HTTP libraries (e.g., `requests`, `axios`) and an SSE client library. The absence of explicit sibling components in the observations means that any other integration (e.g., a “SemanticSearchIntegration”) would follow a similar pattern, sharing the same environment‑variable approach.
+4. **Infrastructure – Port Exposure** – The two environment variables serve as the contract between the integration and any runtime environment (Docker, Kubernetes, bare‑metal). Any deployment script must ensure those ports are open, correctly mapped, and that the RAG service is reachable at the advertised host (often `localhost` in local development or a service name in a cluster).
 
 ---
 
 ## Usage Guidelines  
 
-1. **Port Configuration** – Ensure that both `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` are set before launching **CodeAnalysisAgent**. The ports must match the configuration of the external graph‑RAG service; mismatched ports will cause connection failures and loss of real‑time updates.
+* **Define Ports Early** – Before starting any component that depends on **CodeGraphRagIntegration**, set `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT`. Use the values recommended in `integrations/code-graph-rag/README.md` unless you have a specific networking requirement.  
 
-2. **Service Availability** – Start the Graph‑RAG server *before* the agent begins analysis. The SSE endpoint must be reachable; otherwise, the agent will fall back to a fire‑and‑forget HTTP push, losing incremental updates.
+* **Follow the Claude Setup** – When integrating with the Claude Code MCP Server, follow the step‑by‑step instructions in `integrations/code-graph-rag/docs/claude-code-setup.md`. This ensures that authentication, endpoint URLs, and any required model‑specific flags are correctly applied.  
 
-3. **Payload Consistency** – When extending **CodeAnalysisAgent** with new AST node types or concept extractors, update the adapter logic in **CodeGraphRAGIntegration** to serialize these new structures according to the graph‑RAG schema. Failure to do so will result in rejected payloads.
+* **Prefer SSE for Large Queries** – For queries that may return large or streaming results (e.g., traversing a deep dependency graph), use the SSE endpoint (`CODE_GRAPH_RAG_SSE_PORT`). This reduces latency and memory pressure on the client side because results arrive incrementally.  
 
-4. **Claude Integration** – Follow the step‑by‑step instructions in `integrations/code-graph-rag/docs/claude-code-setup.md`. Typical steps include providing an API token for Claude, registering the MCP server URL, and optionally configuring Claude’s request timeout to align with the SSE stream latency.
+* **Graceful Degradation** – If SSE connectivity cannot be established (network firewalls, proxy restrictions), fall back to the standard HTTP API on `CODE_GRAPH_RAG_PORT`. Implement retry logic with exponential back‑off to handle transient failures.  
 
-5. **Monitoring & Debugging** – Use the SSE stream to monitor health signals such as “graph‑updated” or “error”. Logging these events helps diagnose synchronization issues between the local analysis and the remote graph. If the SSE channel disconnects, restart the agent to re‑establish the connection.
+* **Version Compatibility** – Because the integration is a thin wrapper around an external service, keep the version of the graph‑code RAG engine in sync with the expectations documented in the README. Updating the engine without reviewing the README may introduce breaking changes to request/response formats.  
 
-6. **Scalability** – For large codebases, consider increasing the resources (CPU, memory) of the Graph‑RAG service rather than the agent, because the heavy graph construction and vector indexing happen remotely. The agent remains lightweight, acting primarily as a data feeder.
+* **Monitoring & Health Checks** – Expose a simple health‑check endpoint (often `/health` on the main port) and monitor both ports. Alert on connection failures to either port, as they indicate a broken integration path that will affect both **CodeGraphConstruction** and **OnlineLearning** pipelines.  
+
+* **Isolation in CI** – In continuous‑integration pipelines, spin up the RAG service in an isolated container, inject the required environment variables, and run a minimal smoke test that exercises both the HTTP and SSE endpoints. This validates that the integration configuration remains functional as the codebase evolves.  
 
 ---
 
 ### Summary of Architectural Insights  
 
-1. **Identified Architectural Patterns**  
-   * Configuration‑driven client‑server integration (environment variables for ports).  
-   * Event‑driven streaming via Server‑Sent Events for real‑time graph updates.  
-   * Thin‑client façade that delegates storage and retrieval to an external graph‑RAG service.  
-
-2. **Design Decisions & Trade‑offs**  
-   * **Decoupling**: By keeping the graph logic external, the system stays language‑agnostic and easier to evolve, at the cost of a network dependency.  
-   * **Real‑time Feedback**: SSE provides low‑latency updates but requires a stable connection; fallback to pure HTTP is possible but loses immediacy.  
-   * **Port‑Based Configuration**: Simple to change in CI/CD pipelines, but hard‑coded port numbers may clash in shared environments unless carefully managed.  
-
-3. **System Structure Insights**  
-   * **CodeAnalysisAgent** → **CodeGraphRAGIntegration** (adapter) → **Graph‑RAG Service** (HTTP + SSE).  
-   * Claude’s code assistant sits on the opposite side of the graph service, issuing queries that are satisfied by the same graph built from the agent’s analysis.  
-
-4. **Scalability Considerations**  
-   * Horizontal scaling of the Graph‑RAG service (multiple instances behind a load balancer) can handle larger codebases without changing the agent.  
-   * SSE connections scale linearly with the number of agents; monitoring connection limits on the RAG server is advisable.  
-
-5. **Maintainability Assessment**  
-   * High maintainability due to clear separation: updates to analysis logic stay within **CodeAnalysisAgent**, while changes to graph storage stay inside the external service.  
-   * The integration’s small footprint (environment variables, HTTP/SSE clients) means low code churn, but documentation (README, Claude setup) must stay in sync with any protocol changes.  
-
-These insights should guide developers and architects when extending, deploying, or troubleshooting the **CodeGraphRAGIntegration** component within the broader code‑analysis ecosystem.
+1. **Architectural patterns identified** – Port‑driven integration, client‑server with SSE streaming, configuration‑first (environment‑variable driven) design.  
+2. **Design decisions & trade‑offs** – Decoupling the RAG engine via ports gives deployment flexibility but adds operational overhead (port management, health‑checking). SSE provides low‑latency streaming at the cost of requiring persistent connections.  
+3. **System structure insights** – **CodeGraphRagIntegration** sits as a leaf detail node under **CodeGraphConstruction**, and is also referenced by **OnlineLearning**, indicating reuse across construction and learning workflows.  
+4. **Scalability considerations** – Independent ports enable horizontal scaling of the RAG service (multiple instances behind a load balancer). SSE scales well for many concurrent consumers provided the backend can sustain open connections.  
+5. **Maintainability assessment** – With logic externalised to documentation and environment variables, the integration is easy to update (change ports, URLs) without code changes. However, the lack of visible code symbols means that any bug fixes or feature extensions must be coordinated with the external RAG service’s codebase, placing a maintenance burden on the team responsible for that service.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodeAnalysisAgent](./CodeAnalysisAgent.md) -- CodeAnalysisAgent uses AST-based techniques to analyze code structures and extract concepts.
+- [CodeGraphConstruction](./CodeGraphConstruction.md) -- CodeGraphConstruction uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph
 
 
 ---

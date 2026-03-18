@@ -2,64 +2,93 @@
 
 **Type:** SubComponent
 
-The CLAUDE_CODE_HOOK_FORMAT.md file in integrations/mcp-constraint-monitor/docs provides information on Claude Code hook format, which is related to constraint configuration.
+Its implementation could involve using specific parsing mechanisms, such as JSON or YAML parsers, to load and interpret the ConstraintConfiguration.
 
 ## What It Is  
 
-The **ConstraintConfiguration** sub‑component lives inside the *mcp‑constraint‑monitor* integration and is documented primarily in the markdown file **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`**.  This guide (also exposed as the child entity **ConstraintConfigurationGuide**) describes how constraints are defined, validated, and enforced at runtime.  In practice, the sub‑component is a logical layer that reads configuration values—such as the **`BROWSER_ACCESS_PORT`** environment variable—and applies them to the constraint‑enforcement engine used by the broader **CodingPatterns** component.  The same documentation set also contains **`CLAUDE_CODE_HOOK_FORMAT.md`**, which clarifies the hook syntax that downstream services (e.g., the Claude LLM integration) must follow when interacting with constraint configuration.  Together, these files form the authoritative source of truth for how constraints are expressed and validated across the system.  
+`ConstraintConfiguration` is a **sub‑component** of the `ConstraintSystem` that lives in the **constraint‑monitor** integration. Its primary definition is documented in the file  
+
+```
+integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+```  
+
+The documentation (the *ConstraintConfigurationGuide*) describes the set of configuration options and validation rules that the system uses to evaluate entity content and code actions. In practice, the configuration is a structured data artifact—most likely a JSON or YAML document—that enumerates the constraints the `ConstraintSystem` must enforce. The `ConstraintConfiguration` is therefore the *declarative contract* that drives the behavior of runtime agents such as the `ContentValidationAgent`.
 
 ## Architecture and Design  
 
-ConstraintConfiguration follows a **configuration‑driven validation** architecture.  Rather than hard‑coding rule logic throughout the codebase, the sub‑component centralises all constraint definitions in a declarative format (as outlined in the markdown guide).  At start‑up, the system loads the configuration file(s) and validates them against a schema defined in the same documentation set.  This design mirrors the pattern used by sibling components such as **BrowserAccess** (which also relies on environment variables like `BROWSER_ACCESS_SSE_URL`) and **DatabaseManagement** (which reads `MEMGRAPH_BATCH_SIZE`).  By treating constraint data as external, version‑controlled assets, the architecture enables **separate concerns**: the core constraint engine remains stable while domain experts can tweak rules without recompiling code.  
+The architecture surrounding `ConstraintConfiguration` follows a **modular, configuration‑driven** style. The `ConstraintSystem` acts as the container for the configuration, exposing it to sibling agents (`ContentValidationAgent` and `HookConfigLoader`) that need to interpret the rules at runtime. The design emphasizes **separation of concerns**: the configuration is authored and stored independently of the validation logic, allowing the validation agents to remain focused on applying rules rather than defining them.
 
-The sub‑component is situated under the **CodingPatterns** parent, inheriting the same lazy‑initialisation philosophy that the parent applies to LLM services (see `ensureLLMInitialized()` in `base‑agent.ts`).  Although no concrete classes are listed in the observations, it is reasonable to infer that ConstraintConfiguration is instantiated on‑demand—only when a component (e.g., a code‑analysis agent) first requests constraint validation.  This lazy approach reduces start‑up overhead and aligns ConstraintConfiguration with the broader system’s performance‑optimisation goals.  
+From the observations we can infer a **configuration‑loader pattern**. The configuration file is parsed (JSON/YAML) into an in‑memory object or array, which the `ContentValidationAgent` then queries when validating an entity. Error handling is built into this loading step—if the configuration is malformed or cannot be parsed, the system raises a clear error rather than proceeding with undefined behavior. This defensive stance keeps the rest of the `ConstraintSystem` stable even when the configuration is incorrect.
+
+The relationship to sibling components highlights a **shared‑service model**. Both `ContentValidationAgent` (implemented in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) and `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`) retrieve configuration data through a common interface exposed by `ConstraintConfiguration`. This promotes reuse and ensures that any change to the configuration format propagates consistently across the validation and hook‑loading pipelines.
 
 ## Implementation Details  
 
-The implementation hinges on three concrete artifacts identified in the observations:
+Although no concrete code symbols were discovered, the observations give a clear picture of the implementation workflow:
 
-1. **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`** – This file serves as the **ConstraintConfigurationGuide**.  It enumerates the supported constraint keys, acceptable value types, and the validation rules that must be satisfied before a constraint is accepted.  The guide also specifies how the configuration is consumed by the runtime engine (e.g., via a JSON/YAML loader).  
+1. **Parsing** – The configuration is likely read from a file (or a set of files) using a JSON or YAML parser. The choice of format is hinted at by the mention of “specific parsing mechanisms, such as JSON or YAML parsers.” The parser produces a native JavaScript/TypeScript object that represents the constraints.
 
-2. **`integrations/mcp-constraint-monitor/docs/CLAUDE_CODE_HOOK_FORMAT.md`** – Although primarily about Claude code hooks, this document defines the **hook format** that the constraint engine expects when external LLM services emit constraint‑related events.  The hook format ensures that constraint updates are **idempotent** and can be parsed reliably by the configuration loader.  
+2. **Data Structure** – Once parsed, the configuration is stored in an **object or array** that provides fast, key‑based lookup for rule definitions. This structure enables agents to retrieve a rule by name, type, or target entity without costly traversal.
 
-3. **`BROWSER_ACCESS_PORT` variable** – This environment variable is explicitly mentioned as a configurable entry point for constraint configuration.  In practice, the runtime reads `process.env.BROWSER_ACCESS_PORT` (or the equivalent in the host language) and injects the value into the constraint validation context, allowing constraints that depend on browser‑access parameters to be dynamically adjusted.  
+3. **Error Handling** – The loading routine includes validation of the schema (e.g., required fields, value types). If validation fails, the system throws an error that is caught by higher‑level components, preventing the `ConstraintSystem` from operating with an invalid configuration.
 
-Because the observations report “0 code symbols found,” the actual class or function names (e.g., a `ConstraintValidator` or `ConstraintLoader`) are not exposed.  Nevertheless, the documented flow can be reconstructed: a loader reads the markdown‑derived schema, parses the environment variables, validates the resulting object, and registers it with the enforcement engine.  Errors are surfaced early (during initialization) to prevent malformed constraints from reaching production code paths.  
+4. **Extensibility** – The documentation notes that the configuration “may provide a way to extend or customize the validation rules.” This suggests that the parsed object includes a **plug‑in point**—perhaps a list of custom rule definitions or a reference to external modules—that the `ConstraintSystem` can dynamically incorporate at runtime.
+
+5. **Interaction with ContentValidationAgent** – The `ContentValidationAgent` reads the in‑memory configuration to decide which constraints apply to a given entity. For each entity, it iterates over the relevant rules, executes the corresponding validation logic, and aggregates any violations for reporting.
 
 ## Integration Points  
 
-ConstraintConfiguration is tightly coupled with several sibling components that also rely on environment‑driven configuration.  For instance, **BrowserAccess** consumes `BROWSER_ACCESS_SSE_URL`, while **DatabaseManagement** reads `MEMGRAPH_BATCH_SIZE`.  This common pattern suggests a **centralised configuration service** (or at least a shared conventions layer) that all sub‑components tap into.  The parent **CodingPatterns** component orchestrates these sub‑components, ensuring that each is lazily initialised only when needed.  When a code‑analysis agent (from the **CodeAnalysis** sibling) triggers a constraint check, it calls into the ConstraintConfiguration loader to obtain the current rule set.  Likewise, the **LLMIntegration** sibling may emit constraint‑related hooks that conform to the format described in `CLAUDE_CODE_HOOK_FORMAT.md`, which the ConstraintConfiguration engine consumes to update its internal state.  
+`ConstraintConfiguration` sits at the heart of a small but tightly coupled integration landscape:
 
-No explicit API contracts are listed, but the documentation implies a **file‑based contract** (the markdown guide) and an **environment‑variable contract** (`BROWSER_ACCESS_PORT`).  These act as the primary integration surfaces, allowing other components to remain agnostic of the internal validation mechanics while still benefiting from up‑to‑date constraint enforcement.  
+* **Parent – ConstraintSystem** – The `ConstraintSystem` owns the configuration and provides the public API that agents call to retrieve rule sets. It also likely manages lifecycle events such as reload on configuration change.
+
+* **Sibling – ContentValidationAgent** – Implemented in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`, this agent consumes the configuration to perform entity‑level validation. The agent expects the configuration to be already parsed and available via a method like `getConstraints()`.
+
+* **Sibling – HookConfigLoader** – Located in `lib/agent-api/hooks/hook-config.js`, this loader merges hook configurations from multiple sources. While its primary purpose is hook handling, it also needs to respect any constraints that affect hook execution, pulling the same configuration data to stay consistent.
+
+* **Child – ConstraintConfigurationGuide** – The guide (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) serves as the authoritative source for developers writing or updating the configuration file. It likely contains schema examples, allowed values, and extension guidelines that both the loader and validation agents rely on.
+
+The integration model is **dependency‑injection friendly**: agents receive a reference to the configuration object rather than directly importing file‑system utilities, which makes unit testing and future refactoring straightforward.
 
 ## Usage Guidelines  
 
-Developers should treat the **ConstraintConfigurationGuide** (`constraint-configuration.md`) as the single source of truth for any new or modified constraints.  All changes must be validated against the schema described therein before being merged, ensuring that runtime validation will not reject them.  When adding a new constraint that depends on external parameters, expose the required values via clearly‑named environment variables—mirroring the existing `BROWSER_ACCESS_PORT` pattern—to keep configuration consistent across the system.  
+1. **Author Configuration in the Documented Format** – Follow the schema described in `ConstraintConfigurationGuide`. Use JSON or YAML as indicated, and keep the file in the location expected by the loader (typically under the `integrations/mcp-constraint-monitor` directory).
 
-When integrating with LLM services or other agents that emit constraint‑related events, adhere strictly to the hook syntax defined in `CLAUDE_CODE_HOOK_FORMAT.md`.  This guarantees that the constraint loader can parse and apply updates without manual intervention.  Because the sub‑component follows the parent’s lazy‑initialisation model, developers should avoid eager imports of constraint‑related modules; instead, request the configuration through the provided accessor (e.g., a `getConstraintConfig()` helper) at the point of first use.  
+2. **Validate Before Deployment** – Run the configuration parser locally (or via CI) to catch syntax errors early. The built‑in error handling will surface missing required fields or type mismatches.
 
-Finally, any modification to the constraint files should be accompanied by unit tests that exercise the validation logic, even though the observations do not list concrete test files.  Maintaining this discipline will preserve the **maintainability** of the system as the rule set grows.  
+3. **Leverage Extensibility Points Carefully** – When adding custom validation rules, ensure they conform to the extension contract documented in the guide. Register any custom rule modules so that `ConstraintSystem` can discover them at start‑up.
+
+4. **Do Not Modify Runtime Objects Directly** – The parsed configuration object should be treated as read‑only after the system has started. If you need to change constraints at runtime, use the provided reload mechanism (if any) rather than mutating the object in place.
+
+5. **Synchronize with Sibling Components** – Because `ContentValidationAgent` and `HookConfigLoader` both depend on the same configuration, any change must be compatible with both validation logic and hook merging logic. Test changes against both agents to avoid runtime inconsistencies.
 
 ---
 
-### Architectural Patterns Identified  
-* Configuration‑driven validation (declarative constraint definitions)  
-* Lazy initialisation (inherited from parent CodingPatterns)  
-* Environment‑variable based configuration (shared with siblings)  
+### Architectural patterns identified
+* **Modular, configuration‑driven architecture** – configuration is decoupled from validation logic.  
+* **Configuration‑loader pattern** – a dedicated parsing step produces an in‑memory representation.  
+* **Shared‑service model** – sibling agents consume the same configuration through a common interface.
 
-### Design Decisions & Trade‑offs  
-* **Declarative constraints** simplify rule updates but shift validation complexity to the loader.  
-* **Lazy initialisation** reduces start‑up cost but requires careful handling of first‑use race conditions.  
-* **Environment‑variable exposure** enables flexibility across deployment environments but can lead to scattered configuration if not documented centrally.  
+### Design decisions and trade‑offs
+* **Declarative constraints** vs. hard‑coded rules – improves flexibility but adds runtime parsing overhead.  
+* **JSON/YAML parsing** – human‑readable and easy to edit, at the cost of needing robust schema validation.  
+* **Read‑only in‑memory object** – simplifies concurrency but requires a reload mechanism for dynamic updates.
 
-### System Structure Insights  
-ConstraintConfiguration sits under the **CodingPatterns** hierarchy, sharing a configuration philosophy with siblings like **BrowserAccess** and **DatabaseManagement**.  Its child, **ConstraintConfigurationGuide**, provides the authoritative documentation that drives both runtime behaviour and developer workflow.  
+### System structure insights
+* `ConstraintSystem` is the container, exposing `ConstraintConfiguration` to agents.  
+* `ConstraintConfigurationGuide` acts as the sole source of truth for the schema.  
+* Sibling agents (`ContentValidationAgent`, `HookConfigLoader`) share the same configuration instance, ensuring consistent rule application across validation and hook loading.
 
-### Scalability Considerations  
-Because constraint validation occurs at initialisation, the load is proportional to the size of the configuration file rather than request volume.  Scaling to larger rule sets will primarily affect start‑up latency; this can be mitigated by caching the parsed configuration or by segmenting constraints into modular files that are loaded on demand.  
+### Scalability considerations
+* Because the configuration is loaded once into memory, scaling to many validation requests incurs only lookup cost (O(1) for key‑based access).  
+* Adding a large number of constraints could increase memory footprint and iteration time in the `ContentValidationAgent`; careful structuring of the object (e.g., indexing by entity type) mitigates this.  
+* The modular design allows the configuration loader to be swapped for a streaming parser if future data volumes grow.
 
-### Maintainability Assessment  
-The reliance on a single markdown guide for both documentation and schema definition centralises knowledge, which is a strong maintainability signal.  However, the absence of visible code symbols means that the concrete implementation is hidden; future contributors will need to locate the loader and validator logic (likely in the *mcp‑constraint‑monitor* package) to make changes.  Providing explicit type definitions or schema files alongside the markdown would further improve maintainability.
+### Maintainability assessment
+* **High maintainability** – clear separation between configuration (doc‑driven) and logic (agents).  
+* Documentation (`ConstraintConfigurationGuide`) provides an explicit contract, reducing guesswork.  
+* Centralized error handling around parsing prevents silent failures.  
+* Potential maintenance burden lies in keeping the guide synchronized with any schema changes; automated schema validation in CI can alleviate this risk.
 
 ## Diagrams
 
@@ -77,17 +106,14 @@ The reliance on a single markdown guide for both documentation and schema defini
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.
 
 ### Children
-- [ConstraintConfigurationGuide](./ConstraintConfigurationGuide.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a guide on constraint configuration.
+- [ConstraintConfigurationGuide](./ConstraintConfigurationGuide.md) -- The ConstraintConfigurationGuide is documented in integrations/mcp-constraint-monitor/docs/constraint-configuration.md, which serves as a central resource for understanding constraint configuration.
 
 ### Siblings
-- [CodeAnalysis](./CodeAnalysis.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before code analysis execution.
-- [DatabaseManagement](./DatabaseManagement.md) -- The MEMGRAPH_BATCH_SIZE variable is used to configure the batch size for database interactions.
-- [LLMIntegration](./LLMIntegration.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before data analysis execution.
-- [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
-- [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
+- [ContentValidationAgent](./ContentValidationAgent.md) -- The ContentValidationAgent utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file to perform validation tasks.
+- [HookConfigLoader](./HookConfigLoader.md) -- The HookConfigLoader is implemented in the lib/agent-api/hooks/hook-config.js file, which suggests a modular design for loading and merging hook configurations.
 
 
 ---

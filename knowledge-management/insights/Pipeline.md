@@ -2,132 +2,110 @@
 
 **Type:** SubComponent
 
-The KG operators in the pipeline perform knowledge graph operations, such as entity resolution and link prediction, as defined in integrations/mcp-server-semantic-analysis/src/agents/kg-operators-agent.ts.
+The observation generation agent in the Pipeline employs the OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts for classifying observations against the ontology system.
 
 ## What It Is  
 
-The **Pipeline** sub‑component lives inside the *SemanticAnalysis* service and is realised by a collection of specialised agents under the `integrations/mcp-server-semantic-analysis/src/agents/` directory.  The core agents are:
+The **Pipeline** sub‑component lives inside the *SemanticAnalysis* domain and is realized by a collection of cooperating agents that move knowledge entities through a series of processing stages. The core files that give the Pipeline its behaviour are spread across the code‑base: it draws on `storage/graph-database-adapter.js` for all persistence operations, relies on `lib/llm/dist/index.js` (the **LLMService**) for any large‑language‑model work, and invokes the `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` (the **OntologyClassificationAgent**) when observations must be matched against the ontology. In addition, the **CodeGraphConstructor** (a sibling component) supplies the graph‑construction logic that the Pipeline’s KG operators use. The Pipeline’s runtime is orchestrated by a coordinator agent that steers work distribution among a pool of workers, each of which can pull work from a shared `nextIndex` counter – a classic work‑stealing scheme that keeps the workers busy and minimizes idle time.  
 
-* `coordinator-agent.ts` – orchestrates task execution.  
-* `observation-generation-agent.ts` – creates raw observations from the incoming data set.  
-* `kg-operators-agent.ts` – runs Knowledge‑Graph (KG) operations such as entity resolution and link prediction.  
-* `deduplication-agent.ts` – removes duplicate observations before they are persisted.  
-* `persistence-agent.ts` – writes the final, cleaned results to the backing store.  
-
-All of these agents are driven by a **DAG‑based execution model** whose topology is declared in `batch-analysis.yaml`.  Each step in the DAG lists a `depends_on` array, allowing the pipeline runtime to resolve ordering constraints automatically.  The DAG is resolved by the child component **DAGDependencyResolver**, which lives inside the Pipeline package.
-
-The runtime employs a **work‑stealing scheduler** implemented inside the `PipelineAgent` (not directly listed but referenced by the observation “utilizes a work‑stealing approach via a shared `nextIndex` counter”).  Idle worker threads pull the next available task index from this shared counter, guaranteeing high utilisation without a central queue bottleneck.
-
-Together, these pieces form a modular, agent‑centric batch processing pipeline that can be extended by adding new agents that follow the same BaseAgent contract used throughout the broader *SemanticAnalysis* component.
+Together, these pieces form a modular, agent‑driven pipeline that ingests raw observations, enriches them with semantic classifications, builds a code‑centric knowledge graph, removes duplicates, and finally persists the resulting entities in the graph database.
 
 ---
 
 ## Architecture and Design  
 
-### Agent‑Centric Modularity  
-The pipeline follows the **agent pattern** that is also used by its siblings—*OntologyClassificationAgent*, *InsightGenerationAgent*, etc.—and by the parent *SemanticAnalysis* component.  Each functional piece (observation generation, KG operations, deduplication, persistence) is encapsulated in its own agent class (e.g., `observation-generation-agent.ts`).  All agents inherit from the common `BaseAgent` defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`, giving them a uniform lifecycle (`init`, `run`, `shutdown`) and a shared configuration surface.  This design promotes reuse and makes the addition of new processing stages straightforward.
+The Pipeline follows a **modular agent‑centric architecture**. Each functional responsibility is encapsulated in a dedicated agent: a coordinator, an observation‑generation agent, KG operators, a deduplication agent, and a persistence agent. This separation of concerns mirrors the description of the parent *SemanticAnalysis* component, which “employs a modular architecture with various agents, each responsible for a specific task”. The agents communicate implicitly through shared data structures (the knowledge‑entity collections) and explicitly through the services they depend on.
 
-### DAG‑Based Dependency Resolution  
-The **DAGDependencyResolver** interprets the `depends_on` edges defined in `batch-analysis.yaml`.  By constructing a directed acyclic graph of pipeline steps, the resolver can compute a topological order and expose ready‑to‑run nodes to the scheduler.  Because dependencies are explicit, the system can parallelise any steps that have no mutual constraints, while still honouring required sequencing (e.g., deduplication must run after observation generation).
+Two concrete design patterns surface in the observations:
 
-### Work‑Stealing Scheduler (PipelineAgent)  
-Execution is driven by a **coordinator‑worker model**.  The `coordinator-agent.ts` owns the global DAG state and publishes ready task indices.  Workers (the internal threads of `PipelineAgent`) share a monotonic `nextIndex` counter; when a worker finishes its current job it atomically increments the counter and immediately claims the next pending task.  This **work‑stealing** approach eliminates the need for a central work queue, reduces contention, and scales well with the number of CPU cores.
+1. **Work‑Stealing Scheduler** – Workers share a monotonic `nextIndex` counter. When a worker finishes its current chunk, it atomically increments the counter to claim the next batch of tasks. This pattern reduces coordination overhead and improves throughput on heterogeneous workloads.  
 
-### Separation of Concerns  
-Each agent focuses on a single responsibility:
+2. **Adapter Pattern** – The `GraphDatabaseAdapter` abstracts the underlying graph‑database implementation. All persistence and retrieval calls from the Pipeline (both the KG operators and the final persistence agent) go through this adapter, allowing the rest of the pipeline to remain agnostic of the specific database technology.
 
-* **ObservationGenerationAgent** – transforms raw input into domain‑specific observations.  
-* **KgOperatorsAgent** – performs graph‑centric analytics (entity resolution, link prediction).  
-* **DeduplicationAgent** – filters out duplicate observations, ensuring idempotent downstream processing.  
-* **PersistenceAgent** – abstracts the storage backend (database, file store, etc.) and writes the final payload.
+The Pipeline also exhibits **Dependency Injection** at the module level: the coordinator injects the `LLMService` into the observation‑generation agent, while the OntologyClassificationAgent receives the same service for classification work. This keeps the agents loosely coupled and makes it straightforward to swap out the LLM implementation if needed.
 
-The clear boundary between agents mirrors the **single‑responsibility principle**, making the pipeline easier to test and evolve.
+Interaction flow is linear but parallelizable: the coordinator spawns workers, each worker runs the observation‑generation step (using the OntologyClassificationAgent), passes results to the KG operators (which use the CodeGraphConstructor), then to the deduplication agent, and finally to the persistence agent (via GraphDatabaseAdapter). The sibling components—**Ontology**, **Insights**, **CodeGraphConstructor**, **LLMController**, and **GraphDatabaseAdapter**—share the same underlying services (LLMService and GraphDatabaseAdapter), reinforcing a cohesive ecosystem where each sibling contributes a distinct capability while reusing common infrastructure.
 
 ---
 
 ## Implementation Details  
 
-### Coordinator Agent (`coordinator-agent.ts`)  
-The coordinator reads `batch-analysis.yaml`, builds the DAG via `DAGDependencyResolver`, and tracks node states (pending, running, completed).  It exposes an API (`getReadyTasks()`) that returns the indices of nodes whose dependencies have all completed.  The coordinator also reacts to task completion events emitted by workers, updating the DAG state and unlocking downstream nodes.
+*Coordinator Agent* – Located conceptually within the Pipeline’s runtime, this agent imports `lib/llm/dist/index.js` to create an instance of **LLMService**. It initializes a shared integer `nextIndex` (likely stored in a thread‑safe or atomic wrapper) and launches a pool of worker threads or async tasks. The work‑stealing loop repeatedly reads `nextIndex`, increments it, and assigns the resulting slice of observations to the worker.
 
-### Observation Generation Agent (`observation-generation-agent.ts`)  
-This agent implements a `run()` method that iterates over the input data slice assigned by the scheduler.  For each record it creates an `Observation` object, populating fields required by downstream KG operators.  The implementation follows the BaseAgent contract, handling errors locally and reporting status back to the coordinator via a shared `TaskResult` channel.
+*Observation‑Generation Agent* – Implements the logic that turns raw inputs into structured observations. It calls the **OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) to classify each observation against the ontology. The OntologyClassificationAgent itself delegates the heavy‑weight text processing to **LLMService**, which may perform classification prompts or embeddings.
 
-### KG Operators Agent (`kg-operators-agent.ts`)  
-The KG operator encapsulates two primary functions: **entity resolution** (matching observations to existing KG nodes) and **link prediction** (inferring new relationships).  Internally it calls out to the Knowledge‑Graph service layer, passing batches of observations.  Because KG operations can be computationally heavy, the agent processes its assigned slice in configurable batch sizes, allowing the work‑stealing scheduler to keep CPUs busy.
+*KG Operators* – These agents invoke the **CodeGraphConstructor** (a sibling component) to translate classified observations into nodes and edges of a code‑centric knowledge graph. The constructor interacts with `storage/graph-database-adapter.js` to persist intermediate graph fragments, ensuring that relationships among code entities are captured accurately.
 
-### Deduplication Agent (`deduplication-agent.ts`)  
-Deduplication is performed using an in‑memory hash set keyed by a deterministic observation fingerprint.  The agent scans the incoming observation list, discarding any entry whose fingerprint already exists.  The design assumes that the volume of observations per task fits comfortably in memory; for larger workloads the agent could be swapped for a streaming deduplication strategy.
+*Deduplication Agent* – Scans the set of newly created graph entities for duplicates. The exact algorithm is not spelled out, but its purpose is to “remove duplicate entities to prevent redundant processing”, which suggests a hash‑based or identifier‑based check before further steps.
 
-### Persistence Agent (`persistence-agent.ts`)  
-The persistence agent receives a clean list of observations and writes them to the configured datastore.  The datastore abstraction is hidden behind an interface (`IDataStore`) that the agent injects at construction time, enabling the same agent to target a relational database, a NoSQL store, or a flat file without code changes.
+*Persistence Agent* – The final stage calls `GraphDatabaseAdapter` again, this time to write the fully‑deduplicated knowledge graph into the persistent graph store. Because both the KG operators and the persistence agent use the same adapter, any transactional semantics (e.g., batch writes) are centralized in `storage/graph-database-adapter.js`.
 
-### Work‑Stealing Mechanics  
-All worker threads share a `nextIndex` atomic integer.  The typical loop inside `PipelineAgent` looks like:
-
-```ts
-while (true) {
-  const idx = Atomics.add(nextIndex, 0, 1);
-  const task = coordinator.getTaskByIndex(idx);
-  if (!task) break; // no more work
-  const agent = agentFactory.create(task.type);
-  agent.run(task.payload);
-  coordinator.reportCompletion(idx);
-}
-```
-
-Because `nextIndex` is atomically incremented, any idle worker can instantly claim the next pending task, achieving near‑optimal CPU utilisation.
+The shared `nextIndex` counter and the agent pipeline together enable high concurrency while preserving deterministic ordering of work chunks. The code paths that bind the components are explicit: every agent that needs to store or retrieve graph data imports `storage/graph-database-adapter.js`; any agent that requires LLM capabilities imports `lib/llm/dist/index.js`.
 
 ---
 
 ## Integration Points  
 
-* **SemanticAnalysis (Parent)** – The Pipeline is a child of the `SemanticAnalysis` component, which supplies the overall orchestration framework and the `BaseAgent` definition.  The parent also provides configuration (e.g., batch sizes, KG service endpoints) that the pipeline agents consume.  
-* **Ontology & Insights (Siblings)** – While the Pipeline focuses on raw observation processing, the *OntologyClassificationAgent* (sibling) later consumes the persisted observations to align them with the ontology.  The *InsightGenerationAgent* reads the same persisted data to extract higher‑level insights.  This creates a natural data‑flow pipeline: **Pipeline → Ontology → Insights**.  
-* **ConstraintMonitor (Sibling)** – The ConstraintMonitor dashboard can query the persisted observations to surface any violations detected during pipeline execution, offering a runtime validation loop.  
-* **DAGDependencyResolver (Child)** – The resolver is invoked by the coordinator to compute execution order; any change to `batch-analysis.yaml` instantly propagates to the scheduler without code modification.  
-* **External KG Service** – The KG operators agent calls out to an external knowledge‑graph service via a client library, meaning the pipeline’s correctness depends on the service’s contract and latency characteristics.  
-* **Data Store** – The persistence agent’s `IDataStore` implementation is injected by the SemanticAnalysis bootstrapping code, allowing the pipeline to be reused across environments (dev, test, prod) with different storage back‑ends.
+The Pipeline is tightly integrated with several sibling modules:
+
+* **LLMService** (`lib/llm/dist/index.js`) – Provides the language‑model capabilities needed by both the observation‑generation agent (via OntologyClassificationAgent) and the broader *Insights* sub‑component. Any change to the LLM API surface would ripple through these agents.
+
+* **OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) – Acts as the bridge between raw observations and the ontology system. It is a shared dependency of the Pipeline and the *Ontology* sibling, ensuring consistent classification logic across the system.
+
+* **CodeGraphConstructor** – Supplies the graph‑building logic used by the KG operators. Because the *CodeGraphConstructor* also depends on `GraphDatabaseAdapter`, the Pipeline and the *CodeGraphConstructor* share the same persistence layer.
+
+* **GraphDatabaseAdapter** (`storage/graph-database-adapter.js`) – The single point of contact for all graph‑database interactions. Both the KG operators and the persistence agent rely on this adapter, making it a critical integration hotspot.
+
+* **Parent Component – SemanticAnalysis** – The Pipeline is a child of *SemanticAnalysis*, which orchestrates the overall semantic workflow. The parent component’s description emphasizes modular agents, a pattern that the Pipeline inherits and extends with its own work‑stealing scheduler.
+
+These integration points are all explicit in the observed file paths, allowing developers to trace the flow of data and responsibilities across the system without guessing at hidden contracts.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Define DAG Steps Explicitly** – Add or modify pipeline stages only by editing `batch-analysis.yaml`.  Each step must list its `depends_on` identifiers; missing dependencies will cause the DAG resolver to reject the configuration.  
-2. **Respect the BaseAgent Contract** – New agents should extend `BaseAgent` and implement the required lifecycle methods.  This ensures the coordinator can instantiate and manage them uniformly.  
-3. **Tune Batch Sizes for KG Operations** – Because KG operators are the most CPU‑intensive stage, adjust the `kgBatchSize` configuration (exposed via the parent component) to balance memory usage against throughput.  
-4. **Monitor Work‑Stealing Health** – If workers appear idle for extended periods, verify that the `nextIndex` counter is being incremented correctly and that no task is stuck in a “running” state without reporting completion.  
-5. **Stateless Agents Preferred** – Agents should avoid retaining mutable state between runs; any required context must be passed through the task payload.  This maximises the effectiveness of the work‑stealing scheduler and simplifies testing.  
-6. **Testing Strategy** – Unit‑test each agent in isolation using mock implementations of the KG client and the datastore.  End‑to‑end tests should construct a minimal `batch-analysis.yaml` DAG and assert that the final persisted observations match expectations.  
+When extending or maintaining the Pipeline, adhere to the following conventions that emerge from the observed design:
+
+1. **Leverage the Adapter** – All interactions with the graph database must go through `storage/graph-database-adapter.js`. Direct database calls bypass the adapter’s abstraction and risk breaking the consistency guarantees that both the KG operators and the persistence agent rely on.
+
+2. **Respect the Work‑Stealing Contract** – The shared `nextIndex` counter is the sole coordination primitive for task distribution. New workers should increment this counter atomically and process the returned index range; inserting custom synchronization mechanisms can introduce contention and defeat the purpose of the work‑stealing design.
+
+3. **Inject LLMService via Agents** – Any new agent that requires language‑model capabilities should receive an instance of `LLMService` from the coordinator or a higher‑level factory, mirroring how the observation‑generation agent and the OntologyClassificationAgent obtain it. This keeps the LLM dependency explicit and testable.
+
+4. **Classify Through OntologyClassificationAgent** – When adding new observation types, route them through the existing OntologyClassificationAgent rather than implementing ad‑hoc classification logic. This preserves a single source of truth for ontology alignment and ensures that future ontology updates are automatically applied.
+
+5. **Deduplication First, Persistence Last** – Follow the established processing order: generate observations → classify → construct graph → deduplicate → persist. Skipping the deduplication step can lead to redundant nodes and increased storage costs, while persisting before deduplication may create orphaned duplicates.
+
+By following these guidelines, developers can maintain the Pipeline’s performance characteristics and keep its modular structure intact.
 
 ---
 
 ### Architectural Patterns Identified  
 
-* **Agent Pattern** – Modular agents each encapsulating a distinct processing step.  
-* **BaseAgent Template** – A shared abstract class providing a uniform lifecycle.  
-* **DAG‑Based Dependency Resolution** – Explicit `depends_on` edges in `batch-analysis.yaml` interpreted by `DAGDependencyResolver`.  
-* **Coordinator‑Worker (Work‑Stealing) Scheduler** – Central coordinator with distributed workers pulling tasks via a shared atomic counter.  
+1. **Work‑Stealing Scheduler** – shared `nextIndex` counter for dynamic load balancing.  
+2. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the graph‑database implementation.  
+3. **Modular Agent Architecture** – each functional step is encapsulated in its own agent.  
+4. **Dependency Injection** – services (LLMService, GraphDatabaseAdapter) are passed into agents rather than being hard‑coded.
 
 ### Design Decisions and Trade‑offs  
 
-* **Explicit DAG vs. Implicit Scheduling** – Choosing a declarative DAG gives developers fine‑grained control over ordering but requires careful maintenance of the YAML file.  
-* **Work‑Stealing Scheduler** – Provides high CPU utilisation without a central queue, at the cost of a slightly more complex concurrency model (need for atomic counters and careful task completion signalling).  
-* **Agent Granularity** – Fine‑grained agents improve testability and replaceability but introduce more inter‑agent communication overhead.  
+*Choosing work‑stealing* trades a small amount of synchronization overhead for significantly higher CPU utilization, especially when task durations are unpredictable.  
+*Using a single GraphDatabaseAdapter* centralizes persistence logic, simplifying maintenance but creating a potential bottleneck if the adapter does not support high‑throughput batch operations.  
+*Encapsulating functionality in agents* improves testability and separation of concerns, at the cost of increased indirection when tracing execution flow.  
 
 ### System Structure Insights  
 
-The Pipeline sits as a child of *SemanticAnalysis*, reusing the BaseAgent infrastructure shared with its siblings.  Its child component, **DAGDependencyResolver**, isolates the graph‑processing logic, allowing the coordinator to focus on orchestration.  The sibling agents (Ontology, Insights) consume the Pipeline’s persisted output, forming a downstream processing chain.
+The Pipeline sits as a child of **SemanticAnalysis**, reusing sibling services (Ontology, Insights, CodeGraphConstructor, LLMController, GraphDatabaseAdapter). All agents communicate through shared services rather than direct file or network calls, forming a tightly‑coupled but well‑abstracted internal ecosystem. The linear processing chain is parallelized by the work‑stealing pool, giving the system both clarity of flow and scalability.
 
 ### Scalability Considerations  
 
-* **Horizontal Scaling** – Because workers are lightweight threads sharing only the `nextIndex` counter, the pipeline can scale to the number of logical cores on a machine.  Scaling beyond a single host would require a distributed coordination layer, which is not present in the current design.  
-* **KG Operator Load** – KG operations dominate runtime; scaling out the KG service or batching more aggressively can improve throughput.  
-* **Memory Footprint** – Deduplication currently holds a hash set for each task in memory; very large observation sets may need a spill‑to‑disk or external deduplication service.  
+- **Horizontal scaling** is enabled by adding more workers to the pool; the work‑stealing counter automatically distributes work without a central dispatcher.  
+- **LLMService latency** can become a scaling choke point; caching classification results or batching LLM calls could mitigate this.  
+- **GraphDatabaseAdapter throughput** must be verified under load; if the underlying database supports bulk writes, the adapter should expose batch APIs to keep up with high‑volume pipelines.
 
 ### Maintainability Assessment  
 
-The use of a common `BaseAgent` and the clear separation of responsibilities make the codebase approachable for new developers.  The declarative DAG keeps execution logic out of code, reducing the risk of regression when adding new steps.  However, the reliance on a shared atomic counter for work‑stealing introduces subtle concurrency bugs if not carefully guarded, and the in‑memory deduplication may require future refactoring for massive data volumes.  Overall, the architecture balances extensibility with performance, and the explicit file‑based DAG provides a single source of truth for execution ordering.
+The agent‑based decomposition and clear adapter boundaries make the Pipeline highly maintainable. Adding new processing steps involves creating a new agent and wiring it into the existing work‑stealing loop. However, the reliance on a single shared counter means that any bugs in its atomic handling could affect the entire pipeline, so thorough unit and integration testing of the coordination logic is essential. The reuse of LLMService and GraphDatabaseAdapter across multiple siblings also means that changes to these shared services must be coordinated carefully to avoid regressions in unrelated components.
 
 ## Diagrams
 
@@ -145,15 +123,14 @@ The use of a common `BaseAgent` and the clear separation of responsibilities mak
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is used for classifying observations against the ontology system. This agent follows the BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of this pattern enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
-
-### Children
-- [DAGDependencyResolver](./DAGDependencyResolver.md) -- The Pipeline sub-component follows a DAG-based execution model, with each step declaring explicit depends_on edges in batch-analysis.yaml, as described in the parent context.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses a BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts.
-- [Insights](./Insights.md) -- The insight generation system uses a pattern catalog to extract insights, as implemented in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts.
-- [ConstraintMonitor](./ConstraintMonitor.md) -- The constraint monitoring system uses a dashboard to display constraint violations, as seen in integrations/mcp-constraint-monitor/dashboard/README.md.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts uses the LLMService in lib/llm/dist/index.js for large language model operations.
+- [Insights](./Insights.md) -- The Insights sub-component uses the LLMService in lib/llm/dist/index.js for generating insights and pattern catalog extraction.
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor uses the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving code entities and their relationships.
+- [LLMController](./LLMController.md) -- The LLMController uses the LLMService in lib/llm/dist/index.js for large language model operations.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter uses the graph database for storing and retrieving knowledge entities and their relationships.
 
 
 ---

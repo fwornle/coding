@@ -1,162 +1,111 @@
 # ConnectionManager
 
-**Type:** SubComponent
+**Type:** Detail
 
-The ConnectionManager sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
+ConnectionManager (connection-manager.ts:10) prioritizes connection methods in the order of HTTP, IPC, and file watch, as specified in the ConnectionPriorityEnum defined in the adapter-pattern.ts file.
 
 ## What It Is  
 
-The **ConnectionManager** is a sub‑component that appears in the project manifest as part of the **Trajectory** component.  No source files containing a concrete implementation were located in the repository – the “Code Structure” section reports *0 code symbols found* and no key files are listed.  Consequently, the exact file path (e.g., `lib/connection-manager.js` or similar) is unknown, and the implementation may reside in a module that is not currently checked‑in or is generated at build time.  
-
-From the observations, the ConnectionManager is envisioned as the logical piece that orchestrates **multiple connections to the Specstory service**.  It is expected to provide facilities such as connection pooling, error handling with fall‑backs, metrics collection, and possibly load‑balancing or fail‑over capabilities.  Its role is therefore to abstract the low‑level connection details away from higher‑level consumers (e.g., the **Trajectory** component) and present a stable, reusable interface for establishing and maintaining those connections.
+**ConnectionManager** is the orchestration component that decides how the application reaches the Specstory service. The concrete implementation lives in `connection-manager.ts` (line 10) and is part of the **AdapterPattern** package. It does not contain the low‑level transport code itself; instead it delegates to the **SpecstoryAdapter** located in `lib/integrations/specstory-adapter.js`. The adapter exposes three private‑ish helper methods—`connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`—each implementing a distinct transport mechanism. The overall behaviour is a prioritized, fallback‑driven connection strategy: HTTP is tried first, then IPC, and finally file‑watch, as dictated by the `ConnectionPriorityEnum` defined in `adapter-pattern.ts`.
 
 ---
 
 ## Architecture and Design  
 
-Because the source is absent, the architectural picture must be inferred from the surrounding context and the explicit observations.  
+The observed code follows a classic **adapter** arrangement. The parent component, **AdapterPattern**, aggregates the `ConnectionManager` and the `SpecstoryAdapter`, positioning the manager as the façade that external callers use while the adapter encapsulates the concrete transport details.  
 
-1. **Separation of Concerns** – The manifest places ConnectionManager under **Trajectory**, indicating a clear boundary: Trajectory coordinates overall workflow while delegating the responsibility of managing Specstory connections to ConnectionManager.  This mirrors a classic *Facade* style where a higher‑level component (Trajectory) hides the complexity of connection handling behind a dedicated manager.  
+The connection selection logic is expressed as a **priority‑ordered fallback**. `ConnectionManager` reads the ordering from `ConnectionPriorityEnum` (HTTP → IPC → FileWatch) and attempts each method in turn. This mirrors a *chain‑of‑responsibility* style flow: each attempt is made, and on failure the next link in the chain is invoked. The fallback is explicitly implemented inside `SpecstoryAdapter`—the three `connectVia*` methods are called sequentially, and the adapter proceeds to the next method only when the previous one signals failure.  
 
-2. **Potential Connection‑Pooling Pattern** – Observation 4 mentions “a connection pooling mechanism to improve performance.”  If implemented, this would follow the well‑known *Object Pool* pattern: a pool of pre‑created, reusable connection objects is maintained, and callers borrow/release them rather than creating a new socket or HTTP client for each request.  
-
-3. **Error‑Handling / Fallback Strategy** – Observation 5 suggests the manager “could be configured to handle errors and fallbacks during connection establishment.”  This aligns with a *Retry* or *Circuit‑Breaker* style approach, where the manager tracks failure rates and either retries with back‑off or switches to an alternate endpoint.  
-
-4. **Metrics & Monitoring** – Observation 6 points to “monitor and analyze connection metrics.”  This implies an internal telemetry subsystem (counters, latency histograms, success/failure rates) that may be exposed via an internal API or exported to external monitoring tools.  
-
-5. **Load‑Balancing / Failover** – Observation 7 raises the possibility of load‑balancing or failover logic.  If present, the manager would likely maintain a list of Specstory endpoints and select one per request based on health checks or round‑robin distribution, which is a classic *Strategy* pattern for endpoint selection.  
-
-The only concrete code reference in the surrounding hierarchy is the **SpecstoryAdapter** class in `lib/integrations/specstory-adapter.js`.  That file demonstrates asynchronous connection establishment via a `connectViaHTTP` function that uses callbacks.  While ConnectionManager does not appear directly in that file, the existence of an asynchronous adapter suggests that ConnectionManager would need to be compatible with the same async style (e.g., returning promises or accepting callbacks) so that Trajectory can compose its workflow without blocking.
+Because the priority list is defined in a shared enum (`adapter-pattern.ts`), the ordering can be altered centrally without touching the manager or the adapter, illustrating a **configuration‑driven design**. The manager therefore remains thin: it merely reads the enum, initiates the first connection attempt, and relies on the adapter’s internal fallback to handle the rest.
 
 ---
 
 ## Implementation Details  
 
-Given the lack of concrete symbols, the implementation can only be described in terms of *expected* building blocks derived from the observations:
+1. **ConnectionPriorityEnum (adapter-pattern.ts)** – Enumerates the supported transports in the exact order the system prefers them: `HTTP`, `IPC`, `FILE_WATCH`. This enum is the single source of truth for priority, ensuring consistency between `ConnectionManager` and `SpecstoryAdapter`.  
 
-| Expected Piece | Likely Responsibility | Possible Location (inferred) |
-|----------------|-----------------------|------------------------------|
-| **ConnectionPool** | Holds a configurable number of live HTTP/WS connections to Specstory; provides `acquire()` / `release()` methods. | Could be defined in a module such as `lib/connection-manager/pool.js`. |
-| **ConnectionFactory** | Knows how to create a fresh Specstory connection (e.g., invoking `SpecstoryAdapter.connectViaHTTP`). | May be co‑located with the pool or in `lib/integrations/specstory-adapter.js`. |
-| **ErrorHandler / RetryPolicy** | Wraps connection attempts, applies exponential back‑off, and optionally switches to a secondary endpoint. | Could be a helper in `lib/connection-manager/retry.js`. |
-| **MetricsCollector** | Instruments each connection lifecycle event (open, close, error, latency) and aggregates counters. | Might export to a monitoring library (e.g., Prometheus) via `lib/connection-manager/metrics.js`. |
-| **EndpointSelector** | Implements load‑balancing or failover logic (round‑robin, health‑check based). | Could be a strategy object in `lib/connection-manager/selector.js`. |
-| **Public API** | Exposes methods such as `getConnection()`, `releaseConnection(conn)`, `shutdown()`, and possibly `getMetrics()`. | Likely the default export of `lib/connection-manager/index.js`. |
+2. **ConnectionManager (connection-manager.ts)** – At line 10 the manager imports the enum and, when a connection request arrives, invokes the adapter’s entry point (likely a public `connect()` method). It passes the prioritized list so the adapter knows which transports to try first. The manager does not contain any network‑oriented code; its responsibility is limited to coordination and error propagation.  
 
-The **SpecstoryAdapter**’s `connectViaHTTP` function is a concrete example of the low‑level connection primitive that ConnectionManager would wrap.  The adapter uses callbacks, so ConnectionManager would either adapt those callbacks into a promise‑based pool API (common in modern Node.js code) or continue the callback style for consistency.  The asynchronous nature of the adapter aligns with the need for ConnectionManager to be non‑blocking, allowing Trajectory to issue multiple concurrent connection requests.
+3. **SpecstoryAdapter (lib/integrations/specstory-adapter.js)** – Implements three concrete connection routines:
+   * `connectViaHTTP` – Opens an HTTP client to the Specstory endpoint.
+   * `connectViaIPC` – Falls back to an inter‑process communication channel when HTTP is unavailable.
+   * `connectViaFileWatch` – As a last resort, watches a file system location for messages.
+   
+   The adapter’s internal flow checks the result of each method; on failure it automatically calls the next one, respecting the order defined in the enum. The fallback mechanism is deterministic and linear, guaranteeing that only one transport is active at any moment.
+
+4. **Error handling** – Although not explicitly described, the fallback pattern implies that each `connectVia*` method returns a success flag or throws an exception that the adapter catches to decide whether to continue down the chain.
 
 ---
 
 ## Integration Points  
 
-1. **Trajectory (Parent)** – Trajectory references ConnectionManager in the manifest and is expected to call its public API when it needs to interact with Specstory.  The manager therefore acts as a service provider for Trajectory, encapsulating all connection‑related concerns.  
+* **Parent – AdapterPattern**: `ConnectionManager` is a child of the `AdapterPattern` module, meaning any consumer of the adapter pattern will obtain a connection through this manager. The parent likely provides shared utilities (logging, configuration loading) that both the manager and the adapter reuse.  
 
-2. **SpecstoryConnector (Sibling)** – This sibling also deals with Specstory, but its description focuses on a single `connectViaHTTP` call.  It is plausible that SpecstoryConnector is a thin wrapper around the low‑level adapter, while ConnectionManager provides the higher‑level pooling and resilience features that SpecstoryConnector alone does not.  In practice, SpecstoryConnector might delegate to ConnectionManager for any repeated or high‑throughput use cases.  
+* **Sibling – Other adapters**: While not listed, the architecture suggests that additional adapters could exist alongside `SpecstoryAdapter`, each exposing a similar set of `connectVia*` methods. They would all be orchestrated by their own `ConnectionManager` instances, sharing the same priority enum.  
 
-3. **ConversationLogger (Sibling)** – Although unrelated to connections, ConversationLogger appears in the same manifest level.  Both siblings likely share the same lifecycle management (initialization, shutdown) orchestrated by Trajectory, meaning that any start‑up sequence that brings up ConnectionManager should be coordinated with the logger to ensure logs capture connection events.  
+* **External services** – The three transports connect to the same logical service (Specstory) but via different protocols. HTTP may target a remote REST endpoint, IPC may communicate with a locally spawned process, and file watch may interact with a shared directory used by another component.  
 
-4. **SpecstoryAdapter (External Integration)** – The adapter lives in `lib/integrations/specstory-adapter.js`.  ConnectionManager would import this module to create raw connections, then apply pooling, retry, and metrics around it.  The adapter’s callback‑based API is a concrete integration point that the manager must handle.  
+* **Configuration** – The enum in `adapter-pattern.ts` is the integration contract. Changing the order or adding new transports requires only modifications to this file, after which `ConnectionManager` and `SpecstoryAdapter` automatically respect the new policy.  
 
-5. **Configuration / Environment** – The observations hint at configurability (e.g., pool size, retry limits, endpoint list).  Those settings would likely be supplied via a JSON/YAML config file referenced by Trajectory or via environment variables, and read by ConnectionManager at initialization.
+* **Testing hooks** – Because the fallback logic is encapsulated inside the adapter, unit tests can mock each `connectVia*` method to verify that the manager correctly proceeds to the next method on failure.
 
 ---
 
 ## Usage Guidelines  
 
-*Initialize Early*: Trajectory should instantiate ConnectionManager during its own start‑up phase so that the connection pool is ready before any Specstory calls are made.  
+1. **Prefer the manager API** – Callers should request a connection through `ConnectionManager` rather than invoking the adapter’s private methods directly. This guarantees that the defined priority and fallback logic are applied consistently.  
 
-*Prefer the Manager Over Direct Adapter Calls*: When a component needs a Specstory connection, it should request one from ConnectionManager (`await cm.getConnection()` or via callback) rather than invoking `SpecstoryAdapter.connectViaHTTP` directly.  This ensures pooling, retry, and metrics are applied consistently.  
+2. **Do not reorder transports in code** – The ordering lives in `ConnectionPriorityEnum`. If a different preference is required (e.g., IPC before HTTP), modify the enum in `adapter-pattern.ts` only; avoid hard‑coding a different sequence in consumer code.  
 
-*Release Connections Promptly*: After a request completes, the caller must release the connection back to the pool (`cm.releaseConnection(conn)`).  Failing to do so can exhaust the pool and degrade performance.  
+3. **Handle connection failures centrally** – Since the adapter will try all three methods before giving up, the manager should be prepared to receive a final failure response and surface a single, aggregated error to the caller.  
 
-*Observe Metrics*: Developers should monitor the metrics exposed by ConnectionManager (e.g., connection latency, error rates).  High error counts may indicate the need to adjust retry policies or add additional Specstory endpoints.  
+4. **Extend with caution** – Adding a new transport (e.g., WebSocket) requires:
+   * Adding a new entry to `ConnectionPriorityEnum`.
+   * Implementing a `connectViaWebSocket` method in `SpecstoryAdapter`.
+   * Updating the fallback sequence inside the adapter to include the new method.
+   Directly modifying the manager is unnecessary if the enum is respected.  
 
-*Handle Errors at the Call Site*: While ConnectionManager can encapsulate retries, callers should still be prepared for a final failure (e.g., a thrown exception or an error callback) and implement appropriate fallback logic (perhaps switching to an offline mode).  
-
-*Configuration Consistency*: All pool‑related settings (max size, idle timeout) should be kept in a single configuration object that Trajectory passes to ConnectionManager.  Changing these values at runtime without a restart may lead to undefined behavior unless the manager explicitly supports hot‑reloading.  
-
----
-
-## Architectural Patterns Identified  
-
-| Pattern | Evidence from Observations |
-|---------|----------------------------|
-| **Facade / Service Layer** | ConnectionManager sits under Trajectory and abstracts Specstory connection details. |
-| **Object Pool (Connection Pooling)** | Observation 4 explicitly mentions a pooling mechanism. |
-| **Retry / Circuit‑Breaker (Error‑Handling)** | Observation 5 discusses handling errors and fallbacks. |
-| **Strategy (Endpoint Selection / Load Balancing)** | Observation 7 suggests load‑balancing or failover logic. |
-| **Telemetry / Monitoring** | Observation 6 points to metrics collection. |
+5. **Logging and observability** – Because the fallback chain can obscure which transport succeeded, it is advisable to log the outcome of each `connectVia*` attempt inside the adapter. This aids debugging when the preferred transport repeatedly fails.
 
 ---
 
-## Design Decisions and Trade‑offs  
+### Architectural patterns identified  
 
-*Pooling vs. On‑Demand Connections*: Pooling reduces connection‑setup latency but consumes resources even when idle.  The design must balance pool size against memory/CPU constraints, especially in environments with limited resources.  
+* **Adapter pattern** – `SpecstoryAdapter` translates the generic connection request into concrete transport calls.  
+* **Chain‑of‑Responsibility (fallback)** – The sequential try‑fallback approach across HTTP → IPC → FileWatch.  
+* **Configuration‑driven priority** – Use of `ConnectionPriorityEnum` to dictate behavior without code changes.
 
-*Callback vs. Promise API*: The existing `SpecstoryAdapter.connectViaHTTP` uses callbacks.  Wrapping this in promises simplifies modern async/await usage but adds an extra abstraction layer.  Choosing one style influences the ergonomics for Trajectory and any other consumers.  
+### Design decisions and trade‑offs  
 
-*Centralized vs. Distributed Error Handling*: Embedding retry logic inside ConnectionManager centralizes resilience, but it also hides failure details from callers that might need more granular context.  The trade‑off is between simplicity for most callers and flexibility for advanced use cases.  
+* **Explicit priority vs. dynamic selection** – By fixing the order in an enum, the system gains predictability and simplicity, at the cost of flexibility for runtime‑based selection.  
+* **Single point of fallback logic** – Centralising the fallback in the adapter reduces duplication but makes the adapter responsible for both transport implementation and orchestration, which could increase its size.  
+* **Transport independence** – Each `connectVia*` method can be developed and tested in isolation, supporting modularity.
 
-*Metrics Overhead*: Collecting detailed per‑connection metrics provides valuable insight but can introduce CPU and I/O overhead.  The design should allow metrics collection to be toggled or sampled.  
+### System structure insights  
 
-*Load‑Balancing Complexity*: Implementing sophisticated load‑balancing (e.g., health‑check driven) improves availability but adds state management and health‑probe traffic.  A simpler round‑robin selector may be sufficient for many deployments.
+The hierarchy is clear: `AdapterPattern` → `ConnectionManager` → `SpecstoryAdapter` → transport methods. The manager acts as a façade, while the adapter holds the concrete implementation and fallback chain. The enum provides a shared contract across the hierarchy.
 
----
+### Scalability considerations  
 
-## System Structure Insights  
+* **Adding new transports** scales linearly: a new enum entry and a corresponding method suffice.  
+* **Concurrent connections** – The current design appears sequential; if high‑throughput scenarios require parallel attempts, the fallback mechanism would need redesign.  
+* **Performance** – The fallback adds latency only when earlier transports fail; in the common case (HTTP works) the overhead is minimal.
 
-- **Trajectory** acts as the orchestrator, delegating connection concerns to ConnectionManager.  
-- **ConnectionManager** is the dedicated service layer for Specstory connectivity, likely composed of several internal modules (pool, factory, retry, metrics, selector).  
-- **SpecstoryConnector** may be a thin wrapper that directly uses the low‑level adapter for one‑off connections, while ConnectionManager handles high‑throughput scenarios.  
-- **ConversationLogger** operates independently but shares the same lifecycle management, meaning its initialization order may need to be coordinated with ConnectionManager to capture connection‑related logs.  
+### Maintainability assessment  
 
-Overall, the system follows a modular decomposition where each concern (connection handling, logging, adapter specifics) lives in its own sub‑component, promoting separation of responsibilities.
+* **High maintainability** – The separation of concerns (manager vs. adapter) and the single source of truth for priority simplify updates.  
+* **Potential risk** – The adapter’s fallback chain is a single function; as more transports are added, the method could become cumbersome. Refactoring into a loop over an ordered list of strategy objects would preserve readability.  
+* **Testability** – Clear boundaries allow unit tests to mock each transport, ensuring the fallback behaves as expected.  
 
----
-
-## Scalability Considerations  
-
-- **Horizontal Scaling**: Because ConnectionManager maintains an in‑process pool, scaling the service horizontally (multiple Node.js instances) will automatically multiply the total number of concurrent Specstory connections, which can improve throughput but must be bounded by the Specstory service’s capacity.  
-- **Pool Size Tuning**: Adjusting the pool’s max size allows the system to handle more simultaneous requests without overwhelming the remote service.  Autoscaling policies could adjust this value based on observed load metrics.  
-- **Failover & Load‑Balancing**: If multiple Specstory endpoints are configured, ConnectionManager can distribute traffic, reducing hot‑spots and providing resilience against a single endpoint failure.  
-- **Metrics‑Driven Scaling**: The metrics collector (Observation 6) can feed alerts that trigger scaling actions when latency or error rates cross thresholds.
-
----
-
-## Maintainability Assessment  
-
-The absence of concrete source files makes a direct maintainability audit impossible, but the inferred design promotes good maintainability:
-
-- **Clear Separation**: By isolating connection logic in a dedicated manager, changes to pooling, retry policies, or metrics can be made without touching Trajectory or other consumers.  
-- **Configuration‑Driven Behavior**: If pool size, retry limits, and endpoint lists are externalized, operational tweaks require no code changes.  
-- **Modular Internal Structure**: Splitting responsibilities into distinct internal modules (pool, selector, metrics) keeps each file focused, easing testing and future refactoring.  
-- **Potential Technical Debt**: The lack of visible implementation suggests the component may be a placeholder or generated at build time.  If that is the case, developers must ensure the generation process is well‑documented; otherwise, future contributors may struggle to locate or modify the code.  
-
-Overall, assuming the inferred patterns are realized, ConnectionManager would be a maintainable, extensible piece of the system, provided that its implementation follows the modular outline suggested by the observations.
-
-## Diagrams
-
-### Relationship
-
-![ConnectionManager Relationship](images/connection-manager-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/connection-manager-relationship.png)
+Overall, the current architecture delivers a straightforward, deterministic connection strategy while keeping the codebase organized around well‑defined responsibilities.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function in lib/integrations/specstory-adapter.js, which establishes a connection to the Specstory service via HTTP. This asynchronous approach allows the component to handle multiple tasks concurrently, improving overall performance and responsiveness. The connectViaHTTP function is a prime example of this, as it uses callbacks to handle the connection establishment process. Furthermore, the SpecstoryAdapter class's implementation of the initialize function, which attempts connections to the Specstory service using different methods, demonstrates the component's ability to adapt to various connection scenarios.
-
-### Siblings
-- [SpecstoryConnector](./SpecstoryConnector.md) -- The connectViaHTTP function in lib/integrations/specstory-adapter.js uses callbacks to handle the connection establishment process.
-- [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
+- [AdapterPattern](./AdapterPattern.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

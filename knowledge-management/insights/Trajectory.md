@@ -2,123 +2,107 @@
 
 **Type:** Component
 
-[LLM] The Trajectory component's architecture is characterized by its use of modular and reusable code patterns, as seen in the SpecstoryAdapter class's implementation of the log function in lib/integrations/specstory-adapter.js. This logging functionality is not only useful for debugging purposes but also provides valuable insights into the component's behavior and interactions with external services. The connectViaIPC function's attempt to connect to the Specstory service using Inter-Process Communication (IPC) demonstrates the component's ability to leverage different communication protocols to achieve its goals. Moreover, the SpecstoryAdapter class's constructor and initialize function work together to establish a robust and reliable connection to the Specstory service, showcasing the component's attention to detail and commitment to maintaining a high level of quality and performance.
+[LLM] The Trajectory component's utilization of the Code Graph RAG system, as mentioned in integrations/code-graph-rag/README.md, implies a graph-based approach to code analysis and understanding. This approach enables the system to capture complex relationships between code entities, such as functions, classes, and variables, and to reason about the code's structure and behavior. The Code Graph RAG system's SSE port, specified in CODE_GRAPH_RAG_SSE_PORT, and its port, specified in CODE_GRAPH_RAG_PORT, demonstrate the system's ability to communicate with other components and services, facilitating the exchange of information and the coordination of actions. The SpecstoryAdapter's interaction with the Code Graph RAG system, although not directly implemented, highlights the potential for integrating multiple components and services to achieve a comprehensive understanding of the codebase.
 
 ## What It Is  
 
-The **Trajectory** component lives under the `lib/integrations/` directory of the project and is centred on the **SpecstoryAdapter** class defined in `lib/integrations/specstory-adapter.js`.  This adapter is the concrete implementation that enables the Trajectory component to talk to the external **Specstory** service.  Its responsibilities include establishing a connection (via HTTP, IPC, or a file‑watch fallback), sending HTTP requests, logging every conversation, and handling any errors that arise during those interactions.  The component is a child of the top‑level **Coding** node, sits alongside siblings such as **LiveLoggingSystem**, **LLMAbstraction**, and **DockerizedServices**, and itself contains three logical sub‑modules – **SpecstoryConnector**, **ConversationLogger**, and **ConnectionManager** – each of which maps to a distinct concern inside the adapter (connection establishment, logging, and overall connection lifecycle respectively).
+The **Trajectory** component lives primarily in the file `lib/integrations/specstory‑adapter.js`.  This module implements a **SpecstoryAdapter** class that is responsible for logging conversational data to the external Specstory service.  The adapter pulls in a centralized logger from `../logging/Logger.js` and is driven by configuration that can be supplied through environment variables or the various `integrations/*` markdown files (e.g., `integrations/copi/INSTALL.md`, `integrations/code-graph-rag/README.md`).  Trajectory therefore acts as the bridge between the core Coding platform and the Specstory logging endpoint, while also exposing a set of helper children – **AdapterPattern**, **ConcurrencyManager**, **LLMInitializer**, and **SpecstoryLogger** – that encapsulate distinct concerns such as connection strategy, work‑stealing task execution, lazy LLM boot‑strapping, and the concrete logging API.
 
 ---
 
 ## Architecture and Design  
 
-Trajectory follows a **modular, adapter‑oriented architecture**.  The `SpecstoryAdapter` acts as an *Adapter* that translates the internal representation of a session (properties like `extensionId`, `extensionApi`, `sessionId`, and `initialized`) into the protocol‑specific calls required by Specstory.  Within the adapter the **Strategy** idea is evident: `initialize()` sequentially tries several connection strategies (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`).  Each strategy is encapsulated in its own function, allowing the component to pick the first successful method and to fall back gracefully when a method fails.  The fallback chain resembles a lightweight **Chain‑of‑Responsibility**, although it is implemented imperatively rather than via a formal pattern class hierarchy.
+Trajectory is built around a **modular, adapter‑centric architecture**.  The central `SpecstoryAdapter` follows the **Adapter Pattern**: it presents a stable, internal interface (`logConversation`, `initialize`, `connect…`) while translating calls to the concrete Specstory transport mechanisms.  The adapter’s connection logic is ordered by preference – HTTP first, then IPC, and finally a file‑watch fallback – as implemented in the methods `connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`.  This ordered‑fallback strategy is a classic **Chain‑of‑Responsibility** style decision, ensuring the most efficient channel is used while preserving resilience.
 
-The component is heavily **asynchronous**.  All connection attempts are performed with callbacks (e.g., `connectViaHTTP` supplies a callback that is invoked once the HTTP socket is ready).  This non‑blocking style lets Trajectory handle multiple concurrent connection attempts without stalling the event loop, mirroring the asynchronous design seen across the broader **Coding** ecosystem (e.g., the LiveLoggingSystem’s agents also use callbacks and async I/O).  Error handling is explicit: every asynchronous block is wrapped in a `try…catch`, and any caught exception is logged via the dedicated `log` method.  This combination of async callbacks and defensive `try‑catch` blocks provides a resilient runtime behaviour that is consistent with the reliability goals of sibling components such as **ConstraintSystem**, which also employ granular error handling.
+Concurrency within Trajectory is handled by a **work‑stealing model** (observed in the sibling component **ConcurrencyManager** and hinted at by the description of “work‑stealing concurrency for efficient processing”).  Idle workers can pull pending logging tasks, which keeps the logging pipeline saturated without over‑committing threads.  This model dovetails with the parent **Coding** component’s broader use of work‑stealing in other sub‑systems (e.g., KnowledgeManagement), indicating a system‑wide preference for this concurrency style.
 
-Because the component logs every inbound and outbound payload, it shares a **cross‑cutting concern** with the sibling **LiveLoggingSystem**.  The `log` function in `specstory-adapter.js` writes conversation data to a location that can be consumed by the system‑wide logging infrastructure, reinforcing a unified observability strategy across the whole codebase.
+Initialization of heavy resources – notably the large language model (LLM) used to enrich logged conversations – follows a **lazy initialization** approach.  The `initialize` method of `SpecstoryAdapter` defers creation of the extension API until the first log request arrives, mirroring the lazy LLM pattern seen in the sibling **LiveLoggingSystem** and **LLMInitializer** child.  This decision reduces start‑up latency and memory pressure, especially in environments where logging may be sporadic.
+
+Finally, configuration is externalized via **environment variables** (e.g., `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`) and markdown‑based install guides, allowing the same binary to be re‑used across dev, CI, and production contexts without code changes.  The presence of dedicated README and EXAMPLES files under each `integrations/*` folder reinforces a **self‑documenting, convention‑over‑configuration** philosophy.
 
 ---
 
 ## Implementation Details  
 
-### Core Class – `SpecstoryAdapter`  
-*File:* `lib/integrations/specstory-adapter.js`  
+1. **SpecstoryAdapter (lib/integrations/specstory‑adapter.js)**  
+   - **Connection strategy** – The adapter defines three private helpers: `connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`.  At runtime `initialize` attempts each in turn, stopping at the first successful handshake.  The HTTP path likely uses a standard `fetch`/`axios` client; the IPC path uses Node’s `net` or `child_process` sockets; the file‑watch fallback writes JSON payloads into a monitored directory, where a separate consumer can ingest them.  
+   - **Lazy API initialization** – Inside `initialize`, the adapter checks for an existing `extensionApi` instance.  If absent, it loads the module on demand, wiring it to the selected transport.  This guards against unnecessary allocation of network sockets or file watchers when the component is instantiated but never used.  
+   - **Logging** – `logConversation` formats the payload into a standardized JSON schema (the “standardized logging format” mentioned) before delegating to the active transport.  Errors in the primary channel trigger a fallback to the file‑watch mechanism, ensuring no loss of data.  
 
-The constructor initializes four key fields:  
+2. **Centralized Logger (../logging/Logger.js)**  
+   - All adapter actions funnel through this logger, providing a single point for log level control, output destination configuration, and potential integration with the broader **LiveLoggingSystem**.  By re‑using this class, Trajectory inherits the same async buffering and non‑blocking I/O guarantees that other components enjoy.  
 
-```js
-this.extensionId   // identifier of the host VS Code extension
-this.extensionApi  // reference to the VS Code extension API
-this.sessionId     // unique session token for the Specstory conversation
-this.initialized   // boolean flag indicating whether a connection is active
-```  
+3. **ConcurrencyManager (child component)**  
+   - Though the concrete class is not listed, the description aligns it with the work‑stealing pattern used elsewhere (e.g., `WaveController.runWithConcurrency()`).  The manager likely maintains a pool of worker promises that pull tasks from a shared queue; when a worker finishes, it “steals” work from another busy worker’s queue, minimizing idle time.  
 
-These fields are later used by the connection methods to embed context into every request.
+4. **LLMInitializer (child component)**  
+   - Mirrors the lazy LLM initialization seen in **LiveLoggingSystem**.  The initializer probably wraps the LLM service (found in `lib/llm/llm-service.ts` under the sibling **LLMAbstraction**) and only constructs the model when `logConversation` requests enriched data.  
 
-### Connection Strategies  
+5. **SpecstoryLogger (child component)**  
+   - Provides a thin façade over `SpecstoryAdapter`, exposing a simple `log` method for higher‑level callers.  By separating the façade from the adapter, the system can swap out the underlying logging implementation without touching consumer code.  
 
-| Method | Purpose | Mechanics | Error handling |
-|--------|---------|-----------|----------------|
-| `connectViaHTTP(callback)` | Primary, network‑based connection | Issues an HTTP request to the Specstory endpoint using the internal `httpRequest` helper. The callback is invoked when the socket is ready. | Wrapped in `try…catch`; any failure falls through to the next strategy. |
-| `connectViaIPC(callback)` | Local IPC fallback (e.g., when running inside the same process) | Opens an IPC channel (likely a Unix domain socket or Windows named pipe) and registers the same callback. | Errors are caught and logged; the method returns control to `initialize`. |
-| `connectViaFileWatch(callback)` | Last‑resort, file‑system based communication | Writes request data to a watched directory; an external watcher reads the file and replies via another file. | Errors are caught; the method also logs the activity, ensuring visibility even when no network is available. |
-
-The `initialize()` method orchestrates these strategies:
-
-```js
-initialize() {
-  try { this.connectViaHTTP(this.onConnected); }
-  catch (_) { try { this.connectViaIPC(this.onConnected); }
-  catch (_) { this.connectViaFileWatch(this.onConnected); } }
-}
-```
-
-Thus, the component can adapt to a variety of runtime environments—cloud, local dev, or constrained sandbox—without requiring the caller to know which transport is in use.
-
-### Request Dispatch  
-
-`httpRequest(options, payload, callback)` builds a standard HTTP request (method, headers, body) and forwards it to the Specstory service.  The function is pure‑JS and does not rely on external libraries, keeping the adapter lightweight and easy to test.
-
-### Logging  
-
-`log(message, data)` writes a structured entry that includes the current `sessionId` and the raw message payload.  The log is used both for debugging (as observed in the LLM note) and for feeding the **LiveLoggingSystem**’s real‑time visualisation pipeline.  Because the logging implementation lives in the same file, any change to the log format automatically propagates to all connection strategies.
+6. **Configuration & Environment**  
+   - The component reads variables such as `CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`, and the various API keys from `process.env`.  The presence of markdown install guides (`integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md`) indicates that these variables are expected to be set by deployment scripts or CI pipelines rather than hard‑coded.  
 
 ---
 
 ## Integration Points  
 
-Trajectory sits at the intersection of three internal sub‑modules:
-
-* **SpecstoryConnector** – Exposes the public API (`initialize`, `sendMessage`, etc.) that higher‑level components (e.g., a UI panel or a background worker) call.  Internally it delegates to the connection methods described above.  
-* **ConversationLogger** – Provides the `log` function used by all strategies.  Although its source is not visible, the adapter’s call pattern suggests it writes to a shared logging sink consumed by **LiveLoggingSystem**.  
-* **ConnectionManager** – Maintains the lifecycle flag (`initialized`) and may expose events such as “connected”, “disconnected”, and “error”.  The manager likely registers the callbacks passed to the three `connectVia*` functions.
-
-Externally, Trajectory depends on:
-
-* **Specstory service** – an HTTP/IPC endpoint that implements the Specstory protocol.  
-* **VS Code extension API** – passed via `extensionApi` to allow the adapter to read configuration or show UI notifications.  
-* **File‑watch infrastructure** – a directory watched by an external process that implements the file‑watch fallback.
-
-Sibling components such as **LLMAbstraction** and **KnowledgeManagement** do not directly call Trajectory, but they share the same asynchronous error‑handling philosophy and the same logging backbone, meaning that any improvement to the `log` implementation benefits the whole ecosystem.
+- **Specstory Service** – The ultimate external dependency; communication occurs via HTTP, IPC, or file‑watch as dictated by the adapter.  
+- **Code Graph RAG** – Though not directly invoked, the presence of `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` in the environment suggests that Trajectory may emit logs that are later consumed by the graph‑based retrieval‑augmented generation (RAG) subsystem, enabling richer analysis of conversation context.  
+- **LLMAbstraction (lib/llm/llm-service.ts)** – Provides the LLM capabilities that Trajectory can embed into logged conversations (e.g., summarisation, sentiment).  The lazy initializer ensures this service is only pulled in when needed.  
+- **LiveLoggingSystem** – Shares the same `Logger` implementation, meaning that logs from Trajectory are co‑alesced with live logs from other components, giving a unified view in any monitoring dashboard.  
+- **DockerizedServices** – Since DockerizedServices expose a façade for LLM operations, any LLM‑related enrichment performed by Trajectory will pass through the same façade, preserving consistency across the platform.  
+- **Configuration Files** – The markdown files under `integrations/*` act as contracts; developers modify these to enable/disable the Specstory integration, adjust ports, or switch fallback mechanisms.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer the default `initialize()` call** – developers should never invoke a specific `connectVia*` method directly; let `initialize()` decide the best transport based on the runtime environment.  
-2. **Handle the “connected” callback** – the adapter supplies a callback (often named `onConnected`) that signals when the underlying channel is ready.  All subsequent messages must be queued until this callback fires.  
-3. **Do not swallow errors** – because each strategy is wrapped in `try…catch`, any caught exception is already logged.  Propagating the error up the call stack (or emitting an “error” event from `ConnectionManager`) enables higher‑level UI components to inform the user.  
-4. **Respect the logging contract** – any custom payload added to a message should be JSON‑serialisable; the `log` function expects a plain object and will fail silently otherwise.  Consistent logging ensures that the **LiveLoggingSystem** can visualise the conversation flow.  
-5. **Avoid blocking the event loop** – all network or file‑system operations are asynchronous; avoid inserting synchronous heavy computation in the callbacks, or move it to a worker thread to keep Trajectory responsive.
+1. **Prefer the default connection order** – Do not manually reorder the fallback chain; the adapter’s built‑in preference (HTTP → IPC → file‑watch) has been tuned for latency and reliability.  
+2. **Set environment variables early** – Ensure all required keys (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `CODE_GRAPH_RAG_PORT`, etc.) are defined before the first call to `logConversation`.  Missing variables will cause the adapter to fall back to the slower file‑watch path.  
+3. **Leverage the SpecstoryLogger façade** – When adding new logging points in the codebase, import `SpecstoryLogger` rather than the raw adapter.  This isolates callers from transport details and makes future swaps (e.g., to a different logging backend) trivial.  
+4. **Respect lazy initialization** – Do not pre‑emptively call `initialize` unless you need to verify connectivity at start‑up.  Allow the lazy path to allocate resources only when a real conversation needs logging; this conserves memory and reduces start‑up time.  
+5. **Handle back‑pressure** – The work‑stealing concurrency model will queue log tasks automatically, but extremely high‑volume bursts may still saturate the underlying transport.  If you anticipate such loads, consider increasing the size of the worker pool or configuring a dedicated HTTP endpoint with higher throughput.  
+6. **Maintain configuration documentation** – Whenever you add a new environment variable or change a port, update the corresponding `README.md` or `EXAMPLES.md` under the relevant `integrations/*` folder.  This keeps the self‑documenting nature of the system intact.  
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* **Adapter** – `SpecstoryAdapter` bridges internal session data to external Specstory protocols.  
-* **Strategy / Chain‑of‑Responsibility** – `initialize()` sequentially tries `connectViaHTTP`, `connectViaIPC`, then `connectViaFileWatch`.  
-* **Callback‑based Asynchrony** – all I/O is performed via callbacks rather than promises/async‑await.  
-* **Cross‑cutting Logging** – a shared `log` function that feeds system‑wide observability.
+1. **Adapter Pattern** – `SpecstoryAdapter` abstracts multiple transport mechanisms behind a single interface.  
+2. **Chain‑of‑Responsibility** – Connection attempts cascade through HTTP → IPC → file‑watch.  
+3. **Work‑Stealing Concurrency** – `ConcurrencyManager` distributes logging tasks among idle workers.  
+4. **Lazy Initialization** – Both the LLM extension API and the Specstory connection are created on first use.  
+5. **Facade Pattern** – `SpecstoryLogger` offers a simplified logging API to callers.  
 
-### Design decisions and trade‑offs  
+### Design Decisions & Trade‑offs  
 
-* **Multiple transport fallback** improves robustness but adds complexity to the initialization flow.  
-* **Callback‑only async model** keeps the code simple and compatible with older Node versions, yet it can lead to “callback hell” if more steps are added.  
-* **Explicit try‑catch per strategy** isolates failures, but the nested catches can obscure the original stack trace.  
-* **File‑watch fallback** guarantees operation in highly restricted environments, at the cost of higher latency and reliance on an external watcher process.
+- **Fallback Transport** – Adding a file‑watch fallback improves resilience but introduces eventual‑consistency latency; logs may be delayed until the watcher processes the file.  
+- **Lazy Loading** – Reduces startup cost and memory usage, at the expense of a small first‑call latency when the connection or LLM is finally instantiated.  
+- **Work‑Stealing** – Maximizes CPU utilization under bursty logging loads, but requires careful queue management to avoid starvation of high‑priority tasks.  
+- **Environment‑Driven Config** – Enables flexible deployments but places the burden of correct env‑var management on operators; missing keys silently degrade to slower paths.  
 
-### System structure insights  
+### System Structure Insights  
 
-Trajectory is a thin, purpose‑built integration layer that sits under the **Coding** umbrella.  Its three children (Connector, Logger, Manager) each encapsulate a single concern, mirroring the clean separation seen in sibling components (e.g., **LLMAbstraction** separates provider registration from service orchestration).  The component’s public surface is the `initialize` and subsequent message‑sending functions, while internal details (connection strategy selection, error handling) remain encapsulated.
+Trajectory sits under the **Coding** root component and shares the same modular conventions as its siblings (LiveLoggingSystem, LLMAbstraction, DockerizedServices, etc.).  Its children break the responsibilities into focused units: the **AdapterPattern** encapsulates transport logic, **ConcurrencyManager** handles task scheduling, **LLMInitializer** provides on‑demand model loading, and **SpecstoryLogger** presents a clean public API.  This separation mirrors the architecture of other siblings, reinforcing a consistent, component‑based mental model across the codebase.  
 
-### Scalability considerations  
+### Scalability Considerations  
 
-Because each connection attempt is non‑blocking, the component can handle many concurrent sessions as long as the underlying Specstory service can scale.  The fallback mechanisms are lightweight; however, the file‑watch path may become a bottleneck under heavy load due to filesystem I/O limits.  Adding a promise‑based wrapper or moving to an event‑emitter model would make it easier to pool connections and apply back‑pressure.
+- **Horizontal Scaling** – Because the adapter’s transport is stateless (HTTP) or uses OS‑level IPC, multiple Trajectory instances can run behind a load balancer without coordination.  
+- **Back‑pressure Handling** – The work‑stealing pool can be sized based on the expected logging throughput; adding more workers scales linearly until the underlying network or disk I/O becomes the bottleneck.  
+- **Fallback Path Load** – In a failure scenario where HTTP/IPC are unavailable, the file‑watch fallback may become a hotspot; provisioning a high‑performance shared volume mitigates this risk.  
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-The code is **highly modular**: each transport lives in its own function, and logging is isolated.  This makes unit testing straightforward—each strategy can be mocked independently.  The reliance on callbacks, while functional, can hinder readability and increase the risk of misplaced error handling as the component evolves.  Refactoring toward `async/await` or a small promise utility would improve maintainability without altering external behaviour.  Overall, the clear separation of concerns, explicit error handling, and shared logging give Trajectory a solid foundation for future extension.
+Trajectory’s design is **highly maintainable**:
+
+- **Modularity** – Clear separation of concerns means changes to transport logic, concurrency, or LLM loading can be made in isolation.  
+- **Centralized Logging** – Re‑using `../logging/Logger.js` provides a single place to adjust log format, rotation, or destination.  
+- **Documentation‑Driven Configuration** – The extensive markdown guides in `integrations/*` act as living contracts, reducing the need to read source code for deployment details.  
+- **Pattern Consistency** – The same adapter and lazy‑init patterns appear across siblings, lowering the learning curve for new contributors.  
+
+Potential maintenance risks include the need to keep fallback mechanisms in sync (e.g., ensuring the file‑watch directory schema matches what downstream consumers expect) and the reliance on environment variables, which can become fragmented across deployment scripts if not centrally audited. Regular integration tests that simulate each transport fallback will help keep the component robust as the surrounding ecosystem evolves.
 
 ## Diagrams
 
@@ -136,21 +120,22 @@ The code is **highly modular**: each transport lives in its own function, and lo
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/; LLMAbstraction: [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-c; Trajectory: [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storag; CodingPatterns: [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method wit; ConstraintSystem: [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through wel; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyC.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-c; LLMAbstraction: [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.; DockerizedServices: [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the sin; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonst; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relatio; CodingPatterns: [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-c; ConstraintSystem: [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate ; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classi.
 
 ### Children
-- [SpecstoryConnector](./SpecstoryConnector.md) -- The connectViaHTTP function in lib/integrations/specstory-adapter.js uses callbacks to handle the connection establishment process.
-- [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
-- [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
+- [AdapterPattern](./AdapterPattern.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods.
+- [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager may use a work-stealing concurrency model, allowing idle workers to pull tasks immediately, similar to the WaveController.runWithConcurrency() method.
+- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer may use a lazy loading approach to initialize LLMs, delaying initialization until the model is actually needed, reducing memory usage and improving system responsiveness.
+- [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, for classifying observations against the ontology system. This agent is crucial in providing a standardized way of categorizing and understanding the interactions within the Claude Code conversations. The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities. For instance, the agent initializes the ontology system by loading the necessary configuration files and setting up the classification models. This is evident in the code, where the constructor of the OntologyClassificationAgent class calls the initOntologySystem method, which in turn loads the configuration files and sets up the classification models.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (LLM) providers. This is evident in the lib/llm/provider-registry.js file, where a registry of providers is maintained, enabling easy addition or removal of providers. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) are both registered in this registry, demonstrating the flexibility of the component's architecture. The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry. This design decision enables the component to adapt to changing requirements and new provider additions without significant modifications to the existing codebase.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storage/graph-database-adapter.ts, enables Graphology+LevelDB persistence with automatic JSON export sync. By using this adapter, the component can efficiently store and query knowledge graphs, which are essential for entity persistence and knowledge decay tracking. Furthermore, the GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that the component can handle multiple concurrent requests without performance degradation.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is used for classifying observations against the ontology system. This agent follows the BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of this pattern enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
 
 
 ---

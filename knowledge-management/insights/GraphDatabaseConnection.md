@@ -2,81 +2,85 @@
 
 **Type:** Detail
 
-The GraphDatabaseConnector class in the EntityPersistence sub-component likely contains the GraphDatabaseConnection logic, as it is responsible for interacting with the graph database.
+The presence of a CODE_GRAPH_RAG_PORT in the project documentation suggests that the GraphDatabaseConnection would be responsible for establishing a connection to the graph database through this port.
 
 ## What It Is  
 
-The **GraphDatabaseConnection** detail node lives inside the **EntityPersistence** component.  The observations point to the **`GraphDatabaseConnector`** class – located in the *EntityPersistence* sub‑module – as the concrete place where the connection logic is implemented.  This class is responsible for establishing, configuring, and possibly pooling connections to the underlying graph database that is accessed through the **Graphology** library.  Configuration for the connection (such as host, port, authentication, and pool size) is expected to be supplied by a dedicated configuration module or settings class, although the exact file path for that module is not listed in the observations.  
-
-In practice, **GraphDatabaseConnection** is the abstraction that the rest of the system (for example, the **EntityStorage** sibling and any higher‑level services) uses to read and write graph‑structured data without dealing directly with low‑level driver calls.  By encapsulating the connection details, the component isolates the rest of the codebase from changes in the database driver or connection strategy.
-
----
+`GraphDatabaseConnection` is the low‑level component that establishes and maintains the link between the **GraphDatabaseAdapter** and the external graph store used by the Code‑Graph‑RAG service. The only concrete location that mentions this entity is the **`integrations/code-graph-rag/README.md`** file, which explicitly calls out a *graph database* as a core dependency of the adapter. The surrounding documentation also references two configuration keys – **`MEMGRAPH_BATCH_SIZE`** and **`CODE_GRAPH_RAG_PORT`** – that together imply the connection must be configurable at runtime (batch size for bulk operations and a network port for the graph service). In the hierarchy, `GraphDatabaseConnection` lives directly under its parent, **`GraphDatabaseAdapter`**, which is described as the façade responsible for persisting and retrieving “knowledge entities and their relationships.” No concrete class definitions or source files for the connection itself appear in the current code‑base snapshot, but the surrounding artifacts make its purpose unmistakable: it is the concrete conduit through which the adapter talks to the graph database.
 
 ## Architecture and Design  
 
-The architecture follows a **layered separation of concerns**.  At the top level, the **EntityPersistence** component owns the responsibility for persisting domain entities.  Within that component, the **`GraphDatabaseConnector`** class acts as the data‑access layer, delegating graph‑specific operations to the **Graphology** library.  This arrangement mirrors a classic **Repository**‑style pattern: the connector provides a stable API for storing and retrieving entities while hiding the underlying graph database implementation.
+The documentation points to an **Adapter pattern**: `GraphDatabaseAdapter` acts as a higher‑level abstraction that shields the rest of the system from the specifics of the graph store, while `GraphDatabaseConnection` is the concrete implementation that knows how to speak the graph database protocol. The presence of configuration keys (`MEMGRAPH_BATCH_SIZE`, `CODE_GRAPH_RAG_PORT`) suggests a **configuration‑driven design** where the connection details are externalised rather than hard‑coded, enabling the same code to run against different deployments (e.g., development vs. production).  
 
-A second design element hinted at by the observations is **connection pooling**.  The mention that the **GraphDatabaseConnection** “may implement connection pooling or other optimization techniques” suggests an **optimisation layer** built into the connector to reuse open sessions, reduce latency, and limit the overhead of repeatedly opening new connections.  This is a common performance‑oriented pattern in data‑access components.
-
-The component also respects **configuration‑driven design**.  By pulling connection parameters from a dedicated configuration file or settings class, the connector remains environment‑agnostic, supporting different deployment scenarios (development, testing, production) without code changes.  This aligns with the **External Configuration** principle often seen in well‑structured systems.
-
----
+Because the only observed interaction is that the adapter “uses the graph database for storing and retrieving knowledge entities,” we can infer a **separation of concerns**: the adapter orchestrates business‑level operations (e.g., “store entity X”) while delegating the actual I/O to `GraphDatabaseConnection`. This division encourages testability – the adapter can be unit‑tested with a mock connection – and keeps the networking logic isolated. No evidence of a connection‑pooling library or asynchronous I/O is present, so the design appears to be a straightforward, synchronous client wrapper at this stage.
 
 ## Implementation Details  
 
-The core implementation resides in the **`GraphDatabaseConnector`** class inside the *EntityPersistence* sub‑component.  Although the exact source file is not listed, the class likely exposes methods such as `connect()`, `disconnect()`, and perhaps higher‑level CRUD helpers (e.g., `saveEntity()`, `findEntityById()`).  Internally, these methods would instantiate a **Graphology** client object, passing in the configuration values read from the dedicated settings module.
+Although no source symbols were discovered, the surrounding documentation gives us a clear picture of the expected implementation contract. `GraphDatabaseConnection` is expected to:
 
-If connection pooling is present, the connector probably maintains an internal pool object (e.g., a list or a third‑party pool library) that tracks active sessions.  When a request for a connection arrives, the connector either returns an idle session from the pool or creates a new one if the pool has capacity.  After the operation completes, the session is returned to the pool rather than being closed outright.  This mechanism reduces the cost of TCP handshakes and authentication for each operation.
+1. **Read configuration** – It must consume `CODE_GRAPH_RAG_PORT` to know which host/port to target, and `MEMGRAPH_BATCH_SIZE` to determine how many records to send in a single bulk request. These values are likely injected via an environment‑variable loader or a central settings module that the connection reads at startup.  
 
-Configuration handling is another key piece.  A separate **database configuration** module (perhaps named `graphDbConfig.js` or similar) would expose properties such as `host`, `port`, `username`, `password`, and `maxPoolSize`.  The `GraphDatabaseConnector` reads these values at construction time, ensuring that the connection behaviour can be altered without recompiling the connector.
+2. **Establish a network session** – Using the supplied port, the connection would open a TCP or HTTP/WebSocket session to the Memgraph (or another graph DB) endpoint. The fact that a *port* is highlighted (rather than a full URI) hints that the service may be running locally in a containerised environment, where only the port needs to be exposed.  
 
-Because the **GraphologyAdapter** sibling may provide custom graph algorithms or data structures, the connector likely collaborates with it by passing raw graph objects retrieved from the database to the adapter for further processing before they are returned to the caller.  This keeps the connector focused on transport concerns while delegating algorithmic work to the adapter.
+3. **Expose CRUD‑style methods** – While not explicitly listed, the adapter’s need to “store and retrieve knowledge entities” implies that the connection provides methods such as `execute_query(query: str) -> Result` or higher‑level helpers like `bulk_insert(nodes: List[Node])`. The `MEMGRAPH_BATCH_SIZE` key indicates that bulk insertion is a primary use‑case, so the connection likely buffers incoming entities and flushes them when the batch size is reached.  
 
----
+4. **Handle errors and reconnection** – A robust connection wrapper would translate low‑level transport errors into domain‑specific exceptions that the adapter can catch and react to (e.g., retry, fallback). While this is not documented, it follows naturally from the adapter‑connection contract.
+
+Because no concrete class or function names appear, the above points are derived directly from the configuration keys and the parent‑child relationship described in the observations.
 
 ## Integration Points  
 
-**EntityPersistence** is the parent component, and it uses **GraphDatabaseConnection** as its gateway to the graph store.  The **EntityStorage** sibling also relies on the same **`GraphDatabaseConnector`**, indicating that both storage‑focused and higher‑level persistence logic share a common connection backbone.  This shared usage reduces duplication and ensures consistent connection handling across the persistence layer.
+`GraphDatabaseConnection` sits at the intersection of three major system zones:
 
-The **GraphologyAdapter** sibling is another integration point.  While the adapter implements domain‑specific graph operations, it depends on the connector to supply a live graph instance or a transaction context.  Consequently, the adapter’s public API likely accepts a connection or session object supplied by **GraphDatabaseConnection**.
+* **Configuration Layer** – It reads `MEMGRAPH_BATCH_SIZE` and `CODE_GRAPH_RAG_PORT` from the project’s configuration files or environment. Any change to these keys will affect connection behaviour, so the configuration subsystem is a direct dependency.  
 
-External dependencies include the **Graphology** library itself, which provides the low‑level driver and query capabilities.  The connector abstracts this library, meaning that any future switch to a different graph engine would only require changes inside **GraphDatabaseConnector** and its configuration, leaving the rest of the system untouched.
+* **GraphDatabaseAdapter** – This is the only documented consumer. The adapter calls into the connection to perform graph‑specific operations (e.g., inserting nodes, traversing relationships). The adapter likely passes domain objects (knowledge entities) to the connection, which then translates them into graph queries.  
 
-Finally, any configuration module that supplies connection settings is a critical integration point.  Changes to environment variables or configuration files will flow directly into the connector at startup, influencing pool size, timeout values, and authentication details.
+* **External Graph Service** – The actual graph database (Memgraph or a compatible engine) runs on the port indicated by `CODE_GRAPH_RAG_PORT`. The connection must adhere to the protocol expected by that service (Cypher over HTTP, gRPC, etc.). No other internal components are mentioned as direct peers, so the connection does not appear to be shared with unrelated modules.
 
----
+Because no sibling components are listed, we can only note that any future sibling (e.g., a `RelationalDatabaseConnection`) would follow a similar pattern, allowing the higher‑level adapters to swap storage back‑ends with minimal friction.
 
 ## Usage Guidelines  
 
-1. **Obtain a Connection via the Connector** – All graph operations should start by calling the appropriate method on the **`GraphDatabaseConnector`** (e.g., `connector.getSession()` or `connector.executeQuery()`).  Direct use of the Graphology client is discouraged to preserve the pooling and configuration logic.
+1. **Configure before use** – Ensure that `CODE_GRAPH_RAG_PORT` and `MEMGRAPH_BATCH_SIZE` are defined in the environment or the central settings file *prior* to instantiating `GraphDatabaseAdapter`. Missing or malformed values will prevent the connection from establishing a session.  
 
-2. **Respect the Pool Lifecycle** – When a session is retrieved from the connector, ensure it is returned to the pool (or closed) after use.  Follow the pattern `const session = connector.acquire(); …; connector.release(session);` if the API exposes such methods.  This prevents pool exhaustion and maintains optimal performance.
+2. **Batch responsibly** – The `MEMGRAPH_BATCH_SIZE` determines the granularity of bulk writes. Setting this value too low may increase network overhead; setting it too high could cause memory pressure or exceed the graph server’s request limits. Tune it based on the expected throughput and the capacity of the underlying graph engine.  
 
-3. **Configure via the Central Settings Module** – Do not hard‑code connection strings or credentials.  Update the dedicated configuration file or class (the one referenced by the connector) to change host, port, or pool size.  This keeps deployments reproducible across environments.
+3. **Prefer the adapter for business logic** – Directly invoking `GraphDatabaseConnection` from application code bypasses the abstraction that the adapter provides. All domain‑level interactions (storing knowledge entities, querying relationships) should go through `GraphDatabaseAdapter` to keep the system decoupled and testable.  
 
-4. **Leverage the GraphologyAdapter for Complex Queries** – For advanced graph traversals or algorithmic needs, pass the session or graph object to the **GraphologyAdapter** rather than embedding algorithmic code inside the connector.  This maintains the single‑responsibility principle.
+4. **Handle connection failures gracefully** – Although not explicitly documented, the connection wrapper should raise well‑defined exceptions. Callers (the adapter) should catch these and implement retry or fallback strategies, especially in a distributed deployment where network partitions are possible.  
 
-5. **Handle Errors at the Connector Level** – The connector should surface connection‑related exceptions (e.g., timeouts, authentication failures).  Callers should catch these exceptions and implement retry or fallback logic, but should not attempt to re‑establish connections manually; let the connector manage that.
+5. **Avoid hard‑coding ports** – Do not embed the port number in source code; always rely on the `CODE_GRAPH_RAG_PORT` key. This keeps the service portable across environments (local development, CI pipelines, production clusters).
 
 ---
 
-### Summary of Key Insights  
+### 1. Architectural patterns identified  
+* **Adapter pattern** – `GraphDatabaseAdapter` abstracts the graph store, delegating I/O to `GraphDatabaseConnection`.  
+* **Configuration‑driven design** – Connection parameters are externalised via `MEMGRAPH_BATCH_SIZE` and `CODE_GRAPH_RAG_PORT`.  
 
-1. **Architectural patterns identified** – Layered separation of concerns, Repository‑style data‑access, Connection‑pooling optimisation, External configuration.  
-2. **Design decisions and trade‑offs** – Centralising connection logic in `GraphDatabaseConnector` improves maintainability and performance but adds a single point of failure; pooling reduces latency at the cost of added complexity in session management.  
-3. **System structure insights** – `GraphDatabaseConnection` sits in *EntityPersistence*, shared by sibling components *EntityStorage* and *GraphologyAdapter*, providing a unified gateway to the Graphology‑driven graph store.  
-4. **Scalability considerations** – Connection pooling enables the system to handle higher request concurrency without overwhelming the database; configurable pool size allows tuning for different load profiles.  
-5. **Maintainability assessment** – By isolating configuration, connection handling, and algorithmic processing into distinct classes/modules, the design promotes easy updates (e.g., swapping the graph engine) and clear ownership, which supports long‑term maintainability.
+### 2. Design decisions and trade‑offs  
+* **Synchronous vs. asynchronous** – The current documentation does not mention async handling, suggesting a simpler synchronous client that is easier to reason about but may limit throughput under high load.  
+* **Batching** – Introducing `MEMGRAPH_BATCH_SIZE` improves write efficiency at the cost of added complexity (buffer management, potential data loss on failure).  
+
+### 3. System structure insights  
+* `GraphDatabaseConnection` is a leaf node in the component hierarchy, directly owned by `GraphDatabaseAdapter`.  
+* It acts as the sole bridge to the external graph service, making it a critical integration point.  
+
+### 4. Scalability considerations  
+* **Batch size tuning** – Larger batches can increase throughput but require more memory and may hit server limits.  
+* **Port configurability** – Allows horizontal scaling by running multiple graph instances behind different ports or load balancers.  
+* Absence of a connection pool suggests that scaling will rely on multiple adapter instances rather than multiplexed connections.  
+
+### 5. Maintainability assessment  
+* The clear separation between adapter (business logic) and connection (transport logic) promotes maintainability; changes to the graph protocol affect only `GraphDatabaseConnection`.  
+* Reliance on external configuration keys keeps environment‑specific details out of code, simplifying deployments.  
+* However, the lack of visible source symbols means the current code‑base provides little insight into error handling or resource cleanup, which could become maintenance hotspots as the system grows.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the Graphology library to interact with the graph database in the GraphDatabaseConnector class
-
-### Siblings
-- [EntityStorage](./EntityStorage.md) -- GraphDatabaseConnector class in the EntityPersistence sub-component uses the Graphology library to interact with the graph database, indicating a clear separation of concerns for entity storage.
-- [GraphologyAdapter](./GraphologyAdapter.md) -- The GraphologyAdapter detail node may contain custom implementations of graph algorithms or data structures to support the entity storage and retrieval needs of the EntityPersistence sub-component.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter uses the graph database for storing and retrieving knowledge entities and their relationships.
 
 
 ---

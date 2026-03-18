@@ -2,124 +2,161 @@
 
 **Type:** Component
 
-[LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
+[LLM] The ProcessStateManager (scripts/process-state-manager.js) is used to manage and register child processes with the Global Service Coordinator. The ProcessStateManager class is responsible for managing the lifecycle of child processes, including starting and stopping them, and registering them with the Global Service Coordinator. The ProcessStateManager is used by the ServiceStarter class to start and stop services, and it provides a way to manage the lifecycle of child processes in a centralized way. For example, the startProcess function in scripts/process-state-manager.js is used to start a child process, and the stopProcess function is used to stop a child process. The ProcessStateManager also provides a way to register child processes with the Global Service Coordinator, which allows the component to keep track of all running child processes.
 
 ## What It Is  
 
-The **DockerizedServices** component lives inside the *DockerizedServices* directory of the overall **Coding** code‑base.  Its concrete implementation is expressed through a collection of source files that define the individual services and the runtime glue that starts them.  The primary orchestration definition is the `docker‑compose.yaml` file, which declares separate containers for the *constraint‑monitoring API server* (implemented in `scripts/api‑service.js`) and the *dashboard server*, among others.  Each service reads its configuration from environment variables or dedicated configuration files – for example, `CODING_REPO` and `CONSTRAINT_API_PORT` are injected at container start‑up.  Supporting libraries such as `lib/llm/llm-service.ts`, `storage/graph-database-adapter.ts`, and `lib/service-starter.js` provide reusable building blocks that the individual services consume.
+The **DockerizedServices** component lives under the top‑level source tree of the *Coding* project and is the container for three concrete sub‑components: **LLMService** (`lib/llm/llm-service.ts`), **BrowserAccess** (described in `integrations/browser-access/README.md`) and **CodeGraphRAG** (described in `integrations/code-graph-rag/README.md`).  
+Its primary responsibility is to expose a **high‑level façade** for all Large‑Language‑Model (LLM) interactions while also orchestrating the lifecycle of the auxiliary services that run inside the Docker environment. The façade is embodied by the `LLMService` class, which receives every external request, decides which provider should handle it, and delegates the work downstream. Supporting this façade are a set of infrastructure helpers – a `ProviderRegistry`, a `CircuitBreaker`, a `ServiceStarter` that implements retry‑with‑back‑off, and a `ProcessStateManager` that registers child processes with the Global Service Coordinator. Persistence of the knowledge graph that backs the LLM calls is abstracted through a **GraphDatabaseAdapter** (inferred to exist at `lib/db/graph-database-adapter.js`).  
+
+Together these pieces give DockerizedServices a clear separation between request routing, provider selection, fault tolerance, and process orchestration, making it the “engine room” for any LLM‑driven workflow that runs inside the Dockerized environment.
 
 ---
 
 ## Architecture and Design  
 
-DockerizedServices follows a **modular, container‑per‑service** architecture.  By describing each micro‑unit in `docker‑compose.yaml`, the component leverages Docker Compose as a lightweight orchestrator that isolates runtime concerns (networking, ports, volume mounts) while keeping the overall system simple to spin up for development or testing.  This modularity mirrors the broader **Coding** hierarchy, where sibling components such as **LiveLoggingSystem** and **LLMAbstraction** also expose self‑contained services that are wired together through environment‑driven configuration.
+### Facade & Registry  
+`LLMService` acts as a **Facade** (see `lib/llm/llm-service.ts`) that hides the complexity of mode resolution, provider fallback and health‑checking from callers. Internally it consults the **ProviderRegistry** (`lib/llm/provider-registry.js`), a classic **Registry pattern**, to look up the concrete provider implementation (mock, local, public) that matches the requested mode. The registry also encodes provider priority, ensuring that higher‑priority providers are tried first and that a fallback chain is automatically honoured.
 
-Several classic design patterns are evident in the code base:  
+### Adapter & Persistence  
+Although the `GraphDatabaseAdapter` source file is not listed, the observation explicitly calls it out as the abstraction over a **Graphology + LevelDB** store. This is an **Adapter pattern** that isolates the rest of the component from the particulars of the underlying graph database and supplies the automatic JSON export‑sync feature that is critical for backup and recovery of sensitive LLM‑generated data.
 
-* **Singleton** – `lib/llm/llm-service.ts` implements the LLMService as a singleton, guaranteeing a single, thread‑safe instance that holds model caches, routing tables, and circuit‑breaker state.  This avoids redundant model loading across the many containers that may need LLM capabilities (e.g., the semantic‑analysis API server).  
+### Resilience Patterns  
+Two well‑known resilience mechanisms are baked into the design:
 
-* **Factory** – `lib/service-starter.js` acts as a factory for service instances.  It encapsulates the creation logic, applying retry policies, timeout guards, and health‑check hooks before exposing a ready‑to‑run service object.  
+* **Circuit Breaker** – implemented in `lib/llm/circuit-breaker.js`. The `isCircuitOpen` method guards outbound calls to a provider, while `resetTimeout` handles the transition back to a closed state after a cooldown period. This prevents a single failing provider from cascading failures throughout DockerizedServices.  
+* **Retry‑with‑Back‑off** – realized in `lib/service-starter.js`. The `startService` function retries a failed service start with exponentially increasing delays, protecting the system from endless loops and allowing graceful degradation when optional services cannot be launched.
 
-* **Mock** – The testing‑only `integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts` follows the Mock pattern, providing a stand‑in LLM implementation that returns deterministic responses.  This enables the rest of DockerizedServices to be exercised without external model dependencies.  
+### Process Coordination  
+`ProcessStateManager` (`scripts/process-state-manager.js`) centralises child‑process lifecycle management. Its `startProcess` / `stopProcess` APIs register each spawned process with the **Global Service Coordinator**, giving the rest of the system a single source of truth for “what is running”. This mirrors the **Supervisor** role often found in container orchestration layers.
 
-* **Adapter** – `storage/graph-database-adapter.ts` implements an adapter that translates the component’s domain objects into the persistence format required by the underlying graph database (LevelDB/Graphology).  The adapter also synchronises JSON exports, decoupling storage concerns from business logic.  
-
-Interaction between services is primarily **message‑oriented over HTTP** (ports exposed by Docker Compose) and **shared configuration via environment variables**.  For example, the *ConstraintMonitoringService* (a child of DockerizedServices) reads its constraint definitions from `integrations/mcp‑constraint‑monitor/docs/constraint‑configuration.md` and exposes an API that the dashboard consumes.  The *CodeGraphRAGService* (another child) uses `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` environment variables to publish retrieval‑augmented generation streams that downstream agents in **SemanticAnalysis** can subscribe to.
+### Relationship to the Rest of the System  
+DockerizedServices sits under the **Coding** root component and shares architectural DNA with its siblings. For example, the **LLMAbstraction** sibling also uses dependency injection in its own `LLMService` implementation, reinforcing the idea that providers can be swapped or mocked. The **KnowledgeManagement** sibling supplies the same Graphology+LevelDB stack that the inferred `GraphDatabaseAdapter` wraps, while **Trajectory** demonstrates an adapter‑based integration (SpecstoryAdapter) that is conceptually similar to how DockerizedServices isolates its database behind an adapter. This commonality makes cross‑component collaboration straightforward.
 
 ---
 
 ## Implementation Details  
 
-### Service Startup – `lib/service-starter.js`  
-The ServiceStarter class encapsulates three responsibilities:  
-1. **Retry Logic** – On launch it attempts to start the target service binary (e.g., `node scripts/api-service.js`) up to a configurable number of times, backing off exponentially.  
-2. **Timeout Protection** – If the service does not emit a “ready” health‑check signal within the `STARTUP_TIMEOUT_MS` window, the starter aborts and propagates an error.  
-3. **Health Verification** – After a successful start, the starter polls the service’s health endpoint (`/healthz`) until a 200 response is received, confirming the container is ready to accept traffic.  
+### `LLMService` (`lib/llm/llm-service.ts`)  
+* **Entry Point** – The public method `handleRequest(request)` receives a normalized request object.  
+* **Mode Routing** – It extracts the requested mode (e.g., *chat*, *completion*, *embedding*) and asks the `ProviderRegistry` for the best‑matched provider.  
+* **Provider Delegation** – Once a provider instance is obtained, `LLMService` forwards the request, wrapping the call in a `CircuitBreaker` check. If the circuit is open, the request is short‑circuited to the next provider in the priority list.  
+* **Event Emission** – The class extends `EventEmitter` (as noted in the LLMAbstraction sibling), emitting lifecycle events such as `initialized`, `request-start`, and `request-complete`, which other components can listen to for logging or metrics.
 
-The factory pattern is evident because the starter returns a concrete service object that implements a common `start()` / `stop()` interface, allowing the orchestrator to treat all services uniformly.
+### `ProviderRegistry` (`lib/llm/provider-registry.js`)  
+* **Registration** – `registerProvider(name, providerInstance, priority)` stores providers in an internal map keyed by name and ordered by priority.  
+* **Lookup** – `getProvider(name)` returns the highest‑priority provider that matches the requested name or mode. The registry also exposes `listProviders()` for introspection, useful for debugging or health dashboards.  
 
-### LLM Service – `lib/llm/llm-service.ts`  
-Implemented as a TypeScript singleton, LLMService holds:  
-* **Mode Routing** – a map from request type (e.g., “semantic‑analysis”, “code‑graph‑RAG”) to a concrete provider (Anthropic, DMR, etc.).  
-* **Caching Layer** – an in‑memory LRU cache keyed by prompt hash, reducing duplicate calls to expensive LLM endpoints.  
-* **Circuit Breaker** – per‑provider state that trips after a configurable error threshold, temporarily routing requests to fallback providers or the mock service.  
+### `CircuitBreaker` (`lib/llm/circuit-breaker.js`)  
+* **State Machine** – Tracks three states: *closed*, *open*, and *half‑open*.  
+* **Health Monitoring** – Counts consecutive failures; once a threshold is reached, `isCircuitOpen` flips the state to *open* and starts a timeout.  
+* **Recovery** – `resetTimeout` schedules a transition to *half‑open* after the cooldown, allowing a probe request to test the provider’s health before fully closing the circuit again.
 
-All consumers (e.g., the semantic‑analysis API server) import the singleton via `import LLMService from '../../lib/llm/llm-service'`, ensuring a single point of control for model interactions across containers.
+### `ServiceStarter` (`lib/service-starter.js`)  
+* **Retry Logic** – `startService(service, options)` attempts to start the supplied service. On failure it waits `baseDelay * 2^attempt` milliseconds (capped by a max delay) before retrying, up to a configurable maxAttempts.  
+* **Graceful Degradation** – If the service is optional and maxAttempts are exhausted, the function returns a sentinel value rather than throwing, letting the rest of DockerizedServices continue operating.
 
-### Graph Persistence – `storage/graph-database-adapter.ts`  
-The adapter reads connection details (`GRAPH_DB_CONN_STRING`) from the environment and opens a LevelDB instance wrapped by Graphology.  It exposes CRUD methods (`addNode`, `addEdge`, `querySubgraph`) that return plain JavaScript objects.  A background worker watches for changes and writes a JSON snapshot to the directory defined by `JSON_EXPORT_DIR`.  This design decouples the rest of DockerizedServices from the specifics of LevelDB locking, as noted in the sibling **KnowledgeManagement** component’s description of a “lock‑free architecture”.
+### `ProcessStateManager` (`scripts/process-state-manager.js`)  
+* **Process Lifecycle** – `startProcess(command, args, options)` spawns a child process, records its PID, and registers it with the Global Service Coordinator via an IPC channel.  
+* **Shutdown Coordination** – `stopProcess(pid)` sends a termination signal, removes the registration, and ensures any dependent services are notified.  
+* **State Persistence** – The manager keeps an in‑memory map of active processes that can be dumped to a JSON file for post‑mortem analysis, aligning with the automatic JSON export sync described for the GraphDatabaseAdapter.
 
-### Constraint Monitoring API – `scripts/api-service.js`  
-This Node.js entry point reads configuration (`CONSTRAINT_API_PORT`, `CODING_REPO`) from `process.env`, instantiates the ServiceStarter, and registers HTTP routes that expose constraint status, health checks, and metrics.  The service is launched as a Docker container defined in `docker‑compose.yaml` under the name `constraint-monitor`.
-
-### Mock LLM – `integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`  
-The mock implements the same interface as the real LLMService but returns canned JSON payloads.  Test suites import this module directly, allowing CI pipelines to run deterministic integration tests without network calls to external LLM providers.
+### `GraphDatabaseAdapter` (inferred, `lib/db/graph-database-adapter.js`)  
+* **Adapter Interface** – Exposes `saveNode(node)`, `getNode(id)`, `query(criteria)` and `exportToJson(filePath)`.  
+* **Underlying Store** – Internally uses Graphology for in‑memory graph operations and LevelDB for durable storage. The export‑sync feature periodically writes the whole graph to a JSON snapshot, providing a quick recovery path if the LevelDB files become corrupted.
 
 ---
 
 ## Integration Points  
 
-DockerizedServices sits at the intersection of several other **Coding** components:  
+1. **Provider Ecosystem** – The `ProviderRegistry` is populated by the **LLMAbstraction** sibling (which provides mock, local, and public provider implementations). DockerizedServices can therefore reuse the same provider binaries without duplication.  
 
-* **LiveLoggingSystem** – consumes logs emitted by DockerizedServices containers via a shared logging driver; the logs are later processed by the LiveLoggingSystem’s OntologyClassificationAgent.  
-* **LLMAbstraction** – supplies the provider registry (`lib/llm/provider-registry.js`) that LLMService consults for routing; any new provider added to LLMAbstraction automatically becomes available to DockerizedServices without code changes.  
-* **KnowledgeManagement** – re‑uses the same `storage/graph-database-adapter.ts` to persist graph data generated by the *CodeGraphRAGService*; both components therefore share the JSON export directory, enabling downstream analytics.  
-* **SemanticAnalysis** – calls the semantic‑analysis API server (hosted in DockerizedServices) to obtain enriched code‑level semantics, which are then fed into agents such as `CodeGraphAgent`.  
+2. **Knowledge Graph** – The `GraphDatabaseAdapter` directly consumes the Graphology+LevelDB stack that the **KnowledgeManagement** sibling maintains. Any updates performed by `LLMService` (e.g., storing embeddings or conversation metadata) are instantly visible to KnowledgeManagement’s query layer.  
 
-Child components expose their own ports and configuration keys:  
+3. **Process Supervision** – `ProcessStateManager` registers child processes with the **Global Service Coordinator**, a cross‑component orchestrator that also tracks services started by **LiveLoggingSystem** and **Trajectory**. This shared coordinator enables system‑wide health dashboards and coordinated shutdowns.  
 
-* **ServiceOrchestrator** – orchestrates the lifecycle of all DockerizedServices containers, reading the `docker‑compose.yaml` and applying the ServiceStarter logic to each defined service.  
-* **ConstraintMonitoringService** – reads its rule set from `integrations/mcp‑constraint‑monitor/docs/constraint‑configuration.md` and publishes constraint violations over HTTP.  
-* **CodeGraphRAGService** – uses `CODE_GRAPH_RAG_SSE_PORT` for Server‑Sent Events streams, allowing real‑time retrieval‑augmented generation results to be consumed by agents in **SemanticAnalysis**.  
+4. **BrowserAccess & CodeGraphRAG** – Both child integrations are launched as separate processes via `ServiceStarter` and tracked by `ProcessStateManager`. They expose HTTP or IPC endpoints that `LLMService` may call (e.g., to fetch code snippets for retrieval‑augmented generation).  
 
-All services rely on a common pattern of **environment‑driven configuration**, making the component portable across local development, staging, and production clusters.
+5. **Circuit Breaker & Retry** – The resilience layer is used not only for LLM providers but also for external services such as BrowserAccess. If a browser‑automation container becomes unresponsive, the circuit breaker will short‑circuit further calls while `ServiceStarter` attempts to restart it with exponential back‑off.  
+
+6. **Event Bus** – Because `LLMService` inherits from `EventEmitter`, sibling components (e.g., **LiveLoggingSystem**) can subscribe to request‑level events for logging, metrics collection, or dynamic throttling.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Container Management** – Always start DockerizedServices via `docker‑compose up -d` from the repository root.  This ensures that ServiceOrchestrator, ServiceStarter, and health‑check hooks are applied uniformly.  For single‑service debugging, you may run the individual entry point (e.g., `node scripts/api-service.js`) after setting the required environment variables (`CONSTRAINT_API_PORT`, `CODING_REPO`, etc.).  
+* **Always go through `LLMService`** – Treat `LLMService.handleRequest` as the sole public API for any LLM‑related operation. Directly invoking providers or the database bypasses the circuit‑breaker and retry logic and is discouraged.  
 
-2. **Configuration Discipline** – Keep all mutable settings in `.env` files or CI secret stores.  Do not hard‑code ports or connection strings inside source files; the observations stress that both `CODING_REPO` and `CONSTRAINT_API_PORT` are intended to be overridden at runtime.  
+* **Register providers early** – During application bootstrap, call `ProviderRegistry.registerProvider` for each implementation you intend to use. Assign sensible priority values; a typical ordering is *public* > *local* > *mock*.  
 
-3. **LLM Provider Updates** – When adding a new LLM provider, register it in `lib/llm/provider-registry.js`.  Because LLMService is a singleton, the new provider becomes instantly visible to all services without redeploying the entire stack.  
+* **Respect the circuit‑breaker contract** – Do not manually reset the circuit state; let `CircuitBreaker` manage it. If you need to override thresholds for testing, expose them via a configuration object passed to `LLMService` at construction time.  
 
-4. **Testing with Mocks** – Use the `llm‑mock‑service.ts` implementation in integration tests.  Replace the real LLMService import with the mock via dependency injection or module aliasing; this avoids external API calls and guarantees repeatable test outcomes.  
+* **Start optional services with `ServiceStarter`** – When adding a new child process (e.g., a custom RAG service), wrap its launch in `ServiceStarter.startService`. Configure `maxAttempts` and `baseDelay` according to the service’s expected startup time to avoid unnecessary back‑off delays.  
 
-5. **Graph Persistence** – Do not modify the LevelDB files directly.  All interactions should go through `GraphDatabaseAdapter` to ensure the automatic JSON export remains in sync.  If you need to change the export directory, adjust the `JSON_EXPORT_DIR` environment variable and restart the affected services.  
+* **Persist graph changes via the adapter** – All mutations to the knowledge graph should be performed through the `GraphDatabaseAdapter`. This guarantees that the automatic JSON export sync runs, preserving data integrity across container restarts.  
 
-6. **Health Monitoring** – Rely on the `/healthz` endpoint exposed by each service for liveness probes in orchestration platforms (Kubernetes, Docker Swarm).  The ServiceStarter already validates this endpoint during startup; external monitors should follow the same contract.
+* **Monitor events** – Subscribe to `LLMService` events (`request-start`, `request-failure`, `circuit-open`) for observability. The same events are emitted by sibling components, enabling a unified logging pipeline (as used by LiveLoggingSystem).  
+
+* **Graceful shutdown** – On container termination, invoke `ProcessStateManager.stopAll()` (or iterate over registered PIDs) before exiting. This ensures the Global Service Coordinator receives the final state and can clean up any lingering resources.
 
 ---
 
-### Architectural patterns identified  
+### 1. Architectural patterns identified  
 
-* Modular container‑per‑service architecture (Docker Compose)  
-* Singleton (LLMService)  
-* Factory (ServiceStarter)  
-* Mock (LLM Mock Service)  
-* Adapter (GraphDatabaseAdapter)  
+| Pattern | Where it appears | Purpose |
+|---------|------------------|---------|
+| **Facade** | `LLMService` (`lib/llm/llm-service.ts`) | Provides a single, high‑level entry point for all LLM operations. |
+| **Registry** | `ProviderRegistry` (`lib/llm/provider-registry.js`) | Centralises provider instances and priority rules. |
+| **Adapter** | `GraphDatabaseAdapter` (inferred `lib/db/graph-database-adapter.js`) | Decouples the component from the concrete Graphology + LevelDB store and adds JSON export sync. |
+| **Circuit Breaker** | `CircuitBreaker` (`lib/llm/circuit-breaker.js`) | Prevents cascading failures when a provider becomes unresponsive. |
+| **Retry‑with‑Back‑off** | `ServiceStarter` (`lib/service-starter.js`) | Handles transient startup failures for optional services. |
+| **Supervisor / Process Registry** | `ProcessStateManager` (`scripts/process-state-manager.js`) | Tracks child processes and registers them with the Global Service Coordinator. |
+| **Event‑Driven** | `LLMService` extends `EventEmitter` (inherited from sibling LLMAbstraction) | Enables loose coupling for logging, metrics, and external reaction to lifecycle events. |
 
-### Design decisions and trade‑offs  
+---
 
-* **Singleton LLMService** – centralises model state and caching, reducing memory footprint, but introduces a single point of contention if many requests arrive concurrently; mitigated by internal thread‑safety.  
-* **Docker Compose orchestration** – simple to use and great for local development, yet may not scale to large production clusters where a full orchestrator (K8s) would be required.  
-* **Environment‑driven configuration** – maximises portability, but requires disciplined secret management to avoid leaking credentials.  
-* **Retry/Timeout logic in ServiceStarter** – improves resilience during container start‑up, at the cost of longer start‑up times when services are genuinely failing.  
+### 2. Design decisions and trade‑offs  
 
-### System structure insights  
+* **Single façade vs. direct provider calls** – Centralising all LLM traffic through `LLMService` simplifies routing and fault‑tolerance but adds a small indirection overhead. The trade‑off is worthwhile for the consistency and testability it yields.  
+* **Provider priority list** – By encoding priority in the registry, the system can automatically fall back to cheaper or more reliable providers. However, mis‑configured priorities could lead to sub‑optimal cost usage or unexpected latency.  
+* **Circuit breaker granularity** – The breaker is applied per‑provider rather than per‑request type, which reduces complexity but may mask failures that only affect a subset of operations (e.g., embeddings vs. completions).  
+* **Retry‑with‑Back‑off on service start** – This protects the container from hanging on a mis‑behaving optional service, but if the back‑off parameters are too aggressive the system may give up on a service that would have recovered quickly. Configurability is therefore essential.  
+* **Process registration with a global coordinator** – Gives a holistic view of the system state, but introduces a single point of coordination; the coordinator must be highly available and performant.  
 
-DockerizedServices is a leaf node under the **Coding** root, sharing common libraries (LLMAbstraction, KnowledgeManagement) with its siblings.  Its children—**ServiceOrchestrator**, **ConstraintMonitoringService**, and **CodeGraphRAGService**—are each defined as separate containers in `docker‑compose.yaml`, each exposing a focused API surface.  The component’s internal libraries (`lib/`, `storage/`) are reused by sibling components, reinforcing a cohesive ecosystem.
+---
 
-### Scalability considerations  
+### 3. System structure insights  
 
-* Adding more services is straightforward: define a new entry in `docker‑compose.yaml` and implement a starter script that uses ServiceStarter.  
-* Horizontal scaling of a service (e.g., running multiple instances of the semantic‑analysis API) would require an external load balancer; the current Docker Compose setup does not provide built‑in service discovery beyond Docker’s internal DNS.  
-* The singleton LLMService could become a bottleneck under heavy load; scaling out would involve extracting the LLMService into its own microservice with a stateless API, allowing multiple instances behind a router.  
+DockerizedServices is a **layered orchestration hub**:  
 
-### Maintainability assessment  
+1. **Presentation layer** – `LLMService.handleRequest` (facade).  
+2. **Routing layer** – `ProviderRegistry` decides which concrete implementation to invoke.  
+3. **Resilience layer** – `CircuitBreaker` and `ServiceStarter` protect against provider and service failures.  
+4. **Persistence layer** – `GraphDatabaseAdapter` abstracts the graph store, providing automatic JSON sync.  
+5. **Process‑management layer** – `ProcessStateManager` registers all child processes with the Global Service Coordinator, enabling cross‑component visibility.  
 
-The component’s reliance on well‑known patterns (Singleton, Factory, Adapter) and clear separation of concerns (each service in its own container) makes the codebase approachable for new contributors.  Configuration is externalised, reducing the need for code changes across environments.  However, the tight coupling of many services to the same singleton LLMService and shared GraphDatabaseAdapter may require careful coordination when updating those core libraries.  The presence of a dedicated mock implementation and health‑check contracts aids automated testing and continuous integration, further supporting long‑term maintainability.
+Each layer communicates through well‑defined interfaces (e.g., `getProvider`, `saveNode`, `startProcess`), keeping the overall system loosely coupled and allowing individual layers to evolve independently.
+
+---
+
+### 4. Scalability considerations  
+
+* **Horizontal scaling of providers** – Because providers are selected at runtime via the registry, multiple instances of a “public” provider can be added behind a load balancer without changing DockerizedServices code. The registry can be extended to return a round‑robin list of healthy instances.  
+* **Circuit breaker per provider** – Allows the system to continue serving requests using healthy providers while isolating the failing ones, supporting graceful degradation under load spikes.  
+* **Back‑off parameters** – Exponential back‑off prevents thundering‑herd problems when many containers attempt to restart a failing optional service simultaneously.  
+* **Graph database sharding** – The `GraphDatabaseAdapter` abstracts the underlying store, making it feasible to replace the single LevelDB instance with a sharded or replicated Graphology backend if the knowledge graph grows beyond a single node’s capacity.  
+* **Process supervision** – `ProcessStateManager` can be extended to spawn multiple instances of BrowserAccess or CodeGraphRAG, each registered separately, enabling parallel processing of RAG queries.  
+
+---
+
+### 5. Maintainability assessment  
+
+* **Clear separation of concerns** – Each responsibility (routing, provider management, resilience, persistence, process supervision) lives in its own module, which simplifies unit testing and future refactoring.  
+* **Explicit registration APIs** – `ProviderRegistry.registerProvider` and `ProcessStateManager.startProcess` make the system’s extensibility surface obvious; new providers or child services can be added with minimal code churn.  
+* **Event‑driven hooks** – By emitting lifecycle events, `LLMService` allows logging, metrics, and other cross‑cutting concerns to be implemented in separate listeners, reducing code duplication.  
+* **Consistent naming and file placement** – All LLM‑related helpers reside under `lib/llm/`, while process‑management lives under `scripts/`, making navigation intuitive for developers familiar with sibling components.  
+* **Potential hidden coupling** – The inferred `GraphDatabaseAdapter` is not present in the observed file list, so developers must ensure its contract stays stable; otherwise, changes to the underlying Graphology+LevelDB implementation could ripple into LLMService logic.  
+* **Documentation dependencies** – Several key pieces (e.g., the exact shape of the provider interface, the JSON export sync schedule) are described only
 
 ## Diagrams
 
@@ -137,21 +174,21 @@ The component’s reliance on well‑known patterns (Singleton, Factory, Adapter
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/; LLMAbstraction: [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (; DockerizedServices: [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-c; Trajectory: [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storag; CodingPatterns: [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method wit; ConstraintSystem: [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through wel; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyC.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-c; LLMAbstraction: [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.; DockerizedServices: [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the sin; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonst; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relatio; CodingPatterns: [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-c; ConstraintSystem: [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate ; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classi.
 
 ### Children
-- [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
-- [CodeGraphRAGService](./CodeGraphRAGService.md) -- The CodeGraphRAGService uses the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables to configure the ports for the Code Graph RAG service.
+- [LLMService](./LLMService.md) -- The LLMService class in lib/llm/llm-service.ts handles incoming requests and delegates the work to the corresponding provider.
+- [BrowserAccess](./BrowserAccess.md) -- The BrowserAccess MCP server is described in integrations/browser-access/README.md.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG system is described in integrations/code-graph-rag/README.md.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes the OntologyClassificationAgent, which is defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, for classifying observations against the ontology system. This agent is crucial in providing a standardized way of categorizing and understanding the interactions within the Claude Code conversations. The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities. For instance, the agent initializes the ontology system by loading the necessary configuration files and setting up the classification models. This is evident in the code, where the constructor of the OntologyClassificationAgent class calls the initOntologySystem method, which in turn loads the configuration files and sets up the classification models.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (LLM) providers. This is evident in the lib/llm/provider-registry.js file, where a registry of providers is maintained, enabling easy addition or removal of providers. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) are both registered in this registry, demonstrating the flexibility of the component's architecture. The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry. This design decision enables the component to adapt to changing requirements and new provider additions without significant modifications to the existing codebase.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of asynchronous programming is evident in the SpecstoryAdapter class, specifically in the connectViaHTTP function in lib/integrations/specstory-adapter.js, which establishes a connection to the Specstory service via HTTP. This asynchronous approach allows the component to handle multiple tasks concurrently, improving overall performance and responsiveness. The connectViaHTTP function is a prime example of this, as it uses callbacks to handle the connection establishment process. Furthermore, the SpecstoryAdapter class's implementation of the initialize function, which attempts connections to the Specstory service using different methods, demonstrates the component's ability to adapt to various connection scenarios.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storage/graph-database-adapter.ts, enables Graphology+LevelDB persistence with automatic JSON export sync. By using this adapter, the component can efficiently store and query knowledge graphs, which are essential for entity persistence and knowledge decay tracking. Furthermore, the GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that the component can handle multiple concurrent requests without performance degradation.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture with multiple agents, each responsible for a specific task, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is used for classifying observations against the ontology system. This agent follows the BaseAgent pattern, providing a standardized structure for agent development, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts. The use of this pattern enables easier modification and extension of the agent's functionality, as demonstrated in the implementation of the SemanticAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonstrating an adapter pattern for integration with different tools and services. This adapter pattern allows for a standardized interface to interact with various extensions, such as Specstory, facilitating the addition of new integrations with minimal modifications to the existing codebase. The SpecstoryAdapter class, specifically, employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods. This approach ensures that the most efficient and reliable connection method is used, while providing fallback options in case of failures.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
 
 
 ---

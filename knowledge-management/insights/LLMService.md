@@ -2,101 +2,109 @@
 
 **Type:** SubComponent
 
-The LLMService might use the integrations/code-graph-rag/README.md file as a reference for understanding how to integrate with the Code Graph RAG system for LLM operations.
+The LLMService sub-component, implemented in the LLMService.py file within the Coding/DockerizedServices/LLMService directory, utilizes the mode_routing.py module to handle incoming requests and route them to the appropriate provider based on the specified mode in the config.json file.
 
 ## What It Is  
 
-`LLMService` is the concrete entry‑point for every Large Language Model (LLM) operation in the codebase.  Its implementation lives in **`lib/llm/llm-service.ts`** and it is a child of the broader **LLMAbstraction** component.  The service’s sole responsibility is to accept high‑level LLM requests (completion, chat, embedding, etc.) and forward them to the correct provider implementation.  The provider is selected by consulting the **`ProviderRegistry`** (defined in **`lib/llm/provider-registry.js`**), which holds a map of registered provider classes such as **`AnthropicProvider`** (`lib/llm/providers/anthropic-provider.ts`) and **`DMRProvider`** (`lib/llm/providers/dmr-provider.ts`).  Internally, `LLMService` delegates the actual routing logic to a `RequestRouter` component, reinforcing a clean separation between request handling and provider selection.
+The **LLMService** sub‑component is the concrete implementation that exposes the public API for all large‑language‑model (LLM) operations inside the **DockerizedServices** container. Its code lives in two places that reflect the dual‑language stack of the project:  
 
-Because `LLMService` sits inside the **LLMAbstraction** hierarchy, it inherits the component’s provider‑agnostic philosophy.  It also shares the same registry used by sibling components like **BudgetTracker**, which leverages the registry to attribute cost metrics to each provider.  The service is therefore not an isolated module; it is tightly coupled to the registry and to any integration documentation that guides how external systems (e.g., Code Graph RAG, MCP Constraint Monitor, BrowserBase) are wired into LLM workflows.
+* The TypeScript façade is defined in `lib/llm/llm-service.ts`. The `LLMService` class in this file receives every incoming request, decides which *mode* and which *provider* should handle the request, and then forwards the work to that provider.  
+* A Python counterpart exists at `Coding/DockerizedServices/LLMService/LLMService.py`. This version imports the `mode_routing.py` module and uses the routing logic there to dispatch calls based on the `mode` field that is read from the component’s `config.json`.  
+
+Both implementations serve the same logical purpose: they are the **single public entry point** for LLM‑related functionality, shielding callers from the details of individual providers (e.g., OpenAI, Anthropic) and from the internal decision‑making about which operational *mode* (e.g., chat, completion, embeddings) should be used.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **registry‑based routing** approach.  `ProviderRegistry` acts as a centralized catalogue of all available LLM providers.  `LLMService` queries this registry at runtime to resolve the appropriate provider for a given request, embodying a **Strategy‑like** selection mechanism without hard‑coding any provider logic.  This design enables the system to remain **provider‑agnostic**—new providers can be added simply by registering them in `provider-registry.js`, and `LLMService` will automatically be able to route to them.
+The observable design revolves around a **facade‑router** architecture. The `LLMService` class acts as a *facade*: it presents a clean, unified surface (`handleRequest`) while encapsulating the complexity of mode selection and provider fallback. Behind the façade, the **ModeRouter** (implemented in `mode_routing.py` and referenced by the Python side) functions as a *router* that maps a request’s `mode`—as declared in `config.json`—to a concrete provider implementation.
 
-`LLMService` delegates the low‑level dispatching to its child component **`RequestRouter`**.  Although the source of `RequestRouter` is not listed, the observation that “LLMService contains RequestRouter” indicates a clear separation of concerns: `LLMService` validates and normalizes incoming requests, while `RequestRouter` performs the concrete mapping to a provider instance and invokes the provider‑specific API.  This separation mirrors the **Facade** pattern (exposing a simple façade to callers) combined with a **Router** pattern (directing traffic based on runtime data).
+The routing decision is performed in the `handleRequest` function (TS) and its Python analogue, which first reads the configuration, determines the appropriate *mode* (e.g., “chat”, “completion”), then selects a provider that supports that mode. If the primary provider is unavailable, a fallback provider is chosen, a pattern that resembles a **fallback strategy** but is not named as such in the source. The separation of concerns is explicit: the façade knows *when* to route, while the router knows *how* to map modes to providers.
 
-Sibling component **BudgetTracker** also consumes `ProviderRegistry`, illustrating a **shared‑service** model where multiple subsystems depend on the same source of truth for provider metadata.  The parent **LLMAbstraction** encapsulates this ecosystem, presenting a unified abstraction layer that shields downstream code from provider‑specific details.
+Because the component lives inside the broader **DockerizedServices** parent, it benefits from the container’s lifecycle management and shared infrastructure (networking, logging, etc.). Its siblings—**BrowserAccess** and **CodeGraphRAG**—also expose their own façades under the same parent, suggesting a consistent architectural style across the DockerizedServices suite.
 
 ---
 
 ## Implementation Details  
 
-* **Entry Point (`lib/llm/llm-service.ts`)** – The class defines public methods such as `generateCompletion`, `runChat`, and `fetchEmbedding` (names inferred from typical LLM operations).  Each method first extracts contextual information (e.g., model name, request type) and then calls the registry to obtain the matching provider class.  The service likely constructs a lightweight request object that `RequestRouter` consumes.
+* **`lib/llm/llm-service.ts`** – The TypeScript file declares the `LLMService` class. Its core method, `handleRequest(request)`, performs three steps:  
+  1. **Mode determination** – inspects the incoming request (or defaults) to decide which operational mode applies.  
+  2. **Provider resolution** – consults an internal registry of providers, checking which ones support the chosen mode.  
+  3. **Delegation** – forwards the request to the selected provider’s method (e.g., `provider.generateChat`).  
 
-* **Provider Registry (`lib/llm/provider-registry.js`)** – This module exports a singleton or static registry object that maps provider identifiers (e.g., `"anthropic"`, `"dmr"`) to concrete provider classes.  Registration occurs at module load time, as seen with the explicit imports of `AnthropicProvider` and `DMRProvider`.  The registry also exposes helper methods such as `getProvider(id)` and `listProviders()`, which `LLMService` and **BudgetTracker** rely upon.
+  The class also encapsulates any fallback logic: if the primary provider throws an error or reports unavailability, the next compatible provider is tried automatically.
 
-* **RequestRouter (child of LLMService)** – While the source file is not listed, the relationship “LLMService contains RequestRouter” implies that `LLMService` holds an instance (or static reference) to a router object.  The router receives the normalized request, looks up the provider via the registry, and forwards the call to the provider’s implementation.  This indirection allows `LLMService` to stay thin and testable.
+* **`Coding/DockerizedServices/LLMService/LLMService.py`** – The Python implementation mirrors the TS façade but relies on the `mode_routing.py` helper. Upon import, it reads `config.json` (located alongside the source) to obtain a mapping of modes to provider identifiers. When `handle_request(request)` is called, it invokes `ModeRouter.route(request.mode)` which returns a provider instance ready to process the request.
 
-* **Integration Hooks** – Observations reference several integration documents and environment variables:
-  * `integrations/code-graph-rag/README.md` – likely provides guidance on enriching LLM prompts with code‑graph context.
-  * `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – supplies constraint definitions that `LLMService` may apply before routing.
-  * `LOCAL_CDP_URL`, `BROWSERBASE_API_KEY`, `MEMGRAPH_BATCH_SIZE` – runtime configuration values that providers or the router can consume for external API calls, authentication, or batch processing.  `LLMService` probably reads these variables from a central configuration module and passes them downstream.
+* **`mode_routing.py`** – Although its internals are not listed, the module is referenced as the *ModeRouter* child of LLMService. Its responsibility is to maintain the mode‑to‑provider map, possibly exposing functions like `get_provider_for_mode(mode)` and handling fallback selection.
 
-* **Error Handling & Fallbacks** – Although not explicitly documented, the routing model suggests that if a provider cannot be resolved (e.g., missing registration or mis‑configured environment), `LLMService` would raise a domain‑specific exception, allowing callers to handle missing‑provider scenarios gracefully.
+* **`config.json`** – This configuration file drives the routing decisions. It likely contains entries such as `{ "mode": "chat", "provider": "openai" }` and may also list secondary providers for fallback scenarios.
+
+The combination of these files yields a clear flow: **request → LLMService façade → ModeRouter → concrete provider**. The design isolates configuration (JSON), routing logic (ModeRouter), and provider implementations, making each part independently testable.
 
 ---
 
 ## Integration Points  
 
-`LLMService` is a nexus for several external and internal integrations:
+LLMService interacts with several surrounding pieces:
 
-1. **Provider Registry** – The primary dependency; without it, `LLMService` cannot resolve providers.  Both **BudgetTracker** and any future cost‑monitoring modules share this dependency, ensuring a single source of truth for provider metadata.
+* **DockerizedServices (parent)** – Provides the container environment, shared logging, and possibly a common service registry that LLMService uses to discover provider clients. The parent’s description emphasizes that LLMService is the “single public entry point” for LLM work, indicating that external callers (other services, API gateways) should target this façade exclusively.
 
-2. **Code Graph RAG Integration** – The README in `integrations/code-graph-rag/` likely describes how to augment LLM prompts with graph‑based retrieval results.  `LLMService` may invoke a helper from this integration before routing, injecting retrieved snippets into the request payload.
+* **ModeRouter (child)** – Directly invoked by both the TypeScript and Python façades to resolve the appropriate provider. Any change in routing rules (e.g., adding a new mode) must be reflected in `mode_routing.py` and the accompanying `config.json`.
 
-3. **MCP Constraint Monitor** – The constraint configuration file provides rules (e.g., token limits, content safety policies) that `LLMService` can enforce.  These constraints are applied at the service layer, guaranteeing that all downstream providers respect the same policy set.
+* **Provider modules** – Though not listed, the providers are external libraries or internal wrappers (e.g., `OpenAIProvider`, `AnthropicProvider`). LLMService depends on their public interfaces for generating responses, embeddings, etc. The fallback mechanism ties these providers together.
 
-4. **BrowserBase API** – Authentication via `BROWSERBASE_API_KEY` suggests that some providers (or a wrapper layer) perform browser‑based interactions (e.g., headless browsing for web‑augmented LLM calls).  `LLMService` passes the API key to the relevant provider or to a shared HTTP client.
+* **Sibling components** – **BrowserAccess** and **CodeGraphRAG** live alongside LLMService under DockerizedServices. While they do not directly call LLMService, they share the same container and may rely on similar façade‑router patterns, suggesting a uniform integration contract across the suite.
 
-5. **Local CDP & Memgraph Batching** – `LOCAL_CDP_URL` and `MEMGRAPH_BATCH_SIZE` hint at batch processing pipelines where multiple LLM requests are aggregated before being sent to a local Content Delivery Platform (CDP) or a graph database.  The router or individual providers likely respect these settings to optimise throughput.
+* **Configuration (`config.json`)** – Acts as the contract between LLMService and the environment. Changing the mode‑provider mapping here immediately influences routing without code changes.
 
-All these integration points are referenced indirectly through configuration files and environment variables, meaning `LLMService` remains loosely coupled: it does not embed provider‑specific logic but merely forwards configuration to the appropriate downstream component.
+Overall, LLMService presents a clean API surface while delegating to well‑defined internal modules, making it straightforward to replace or extend any part of the chain.
 
 ---
 
 ## Usage Guidelines  
 
-* **Prefer Registry‑Based Provider Selection** – When invoking `LLMService`, specify the target provider using the identifier registered in `ProviderRegistry` (e.g., `"anthropic"` or `"dmr"`).  Direct instantiation of provider classes bypasses the routing layer and defeats the abstraction.
+1. **Always invoke the façade** – Callers should interact with `LLMService.handleRequest` (TS) or `LLMService.handle_request` (Python) rather than contacting providers directly. This guarantees that mode routing and fallback logic are applied consistently.
 
-* **Configure Environment Variables Early** – Ensure that `LOCAL_CDP_URL`, `BROWSERBASE_API_KEY`, and `MEMGRAPH_BATCH_SIZE` are defined in the runtime environment before the service is initialized.  Missing variables can cause provider initialization failures or degraded performance.
+2. **Respect the mode contract** – The request payload must include a `mode` field that matches one of the keys defined in `config.json`. Supplying an unknown mode will cause the router to raise an error; therefore, validate mode values early in the caller.
 
-* **Leverage Integration Docs** – If your use‑case requires code‑graph augmentation or constraint enforcement, follow the step‑by‑step guidance in `integrations/code-graph-rag/README.md` and `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  These docs describe required payload shapes and any pre‑processing that should occur before calling `LLMService`.
+3. **Configure providers centrally** – Updates to provider credentials, endpoints, or new providers must be made in the provider registry and reflected in `config.json`. Avoid hard‑coding provider identifiers in calling code.
 
-* **Monitor Costs via BudgetTracker** – Since `BudgetTracker` reads the same `ProviderRegistry`, any request sent through `LLMService` will automatically be accounted for.  Align your cost‑monitoring alerts with the provider identifiers you use.
+4. **Handle provider errors gracefully** – Although LLMService includes fallback handling, callers should still be prepared for exceptions (e.g., rate limits) and implement retry or user‑friendly error messaging.
 
-* **Testing Strategy** – Mock `ProviderRegistry` and `RequestRouter` in unit tests to isolate `LLMService` logic.  Because routing is delegated, you can verify that the service correctly resolves providers without invoking real external APIs.
-
-* **Error Propagation** – Catch exceptions thrown by `LLMService` at the application boundary and translate them into user‑friendly messages.  The service will surface provider‑resolution errors, authentication failures (e.g., missing `BROWSERBASE_API_KEY`), or constraint violations.
+5. **Keep `config.json` in sync with `mode_routing.py`** – When adding a new mode, ensure both the JSON mapping and the router’s internal map are updated. Automated tests that verify the router returns a provider for each configured mode help maintain this consistency.
 
 ---
 
-### Architectural patterns identified  
-* **Registry‑Based Provider Selection** – Centralized `ProviderRegistry` used for dynamic lookup.  
-* **Facade** – `LLMService` offers a simplified public API over diverse provider implementations.  
-* **Router** – `RequestRouter` encapsulates the dispatch logic from service to provider.  
+### Architectural Patterns Identified  
 
-### Design decisions and trade‑offs  
-* **Provider‑agnostic design** enables easy addition/removal of LLM providers but introduces an indirection layer that can add slight latency.  
-* **Shared registry** promotes consistency across components (e.g., BudgetTracker) at the cost of a single point of failure if the registry is mis‑configured.  
-* **Environment‑driven configuration** keeps secrets out of code but requires disciplined deployment practices to guarantee variables are present.  
+1. **Facade Pattern** – `LLMService` provides a single, simplified entry point (`handleRequest`).  
+2. **Router / Dispatcher** – `ModeRouter` (via `mode_routing.py`) directs requests to the appropriate provider based on mode.  
+3. **Fallback/Strategy** – Provider fallback logic selects an alternative when the primary provider fails.  
 
-### System structure insights  
-* `LLMAbstraction` → `LLMService` → `RequestRouter` → concrete provider classes.  
-* Sibling components (e.g., **BudgetTracker**) also depend on `ProviderRegistry`, illustrating a **shared‑service** topology.  
-* Integration documentation files act as external adapters, not compiled code, but they influence runtime behaviour via configuration.  
+### Design Decisions and Trade‑offs  
 
-### Scalability considerations  
-* The routing model scales horizontally: multiple instances of `LLMService` can share the same registry without contention.  
-* `MEMGRAPH_BATCH_SIZE` indicates built‑in support for batch processing, allowing the system to amortize network overhead across many LLM calls.  
-* Adding new providers does not require changes to `LLMService`, supporting growth in provider ecosystem without service redeployment.  
+* **Single entry point** simplifies external usage and centralizes routing, but it concentrates responsibility, making the façade a potential performance bottleneck if not scaled.  
+* **Configuration‑driven routing** offers flexibility to add or change providers without code changes, at the cost of runtime validation complexity and the need to keep config and router in sync.  
+* **Provider fallback** improves resilience, yet introduces nondeterministic behavior when multiple providers are viable, which may affect reproducibility of results.  
 
-### Maintainability assessment  
-* High maintainability thanks to clear separation of concerns: `LLMService` (facade), `RequestRouter` (dispatch), `ProviderRegistry` (catalogue).  
-* Centralized registration reduces duplication and eases onboarding of new providers.  
-* Reliance on external markdown docs for integration logic introduces a documentation‑code drift risk; keeping those docs in sync with code changes is essential for long‑term health.
+### System Structure Insights  
+
+* Hierarchical layout: **DockerizedServices** → **LLMService** → **ModeRouter**.  
+* Parallel language implementations (TS and Python) suggest the service can be consumed from both Node.js and Python ecosystems.  
+* Sibling components share the same parent, indicating a modular design where each sub‑component follows a similar façade‑router pattern.  
+
+### Scalability Considerations  
+
+* Adding new providers or modes is a matter of extending `config.json` and updating `mode_routing.py`, supporting horizontal scaling of capabilities.  
+* The façade could be horizontally scaled by deploying multiple container instances behind a load balancer; because routing decisions are stateless and configuration‑driven, there is minimal shared state.  
+* Provider fallback may increase latency under failure conditions; monitoring and circuit‑breaker patterns could be introduced later to mitigate this.  
+
+### Maintainability Assessment  
+
+* **High maintainability**: clear separation of concerns (facade vs. router vs. provider), configuration‑driven behavior, and explicit file locations make the codebase easy to navigate.  
+* **Potential risks**: duplication between the TypeScript and Python implementations could lead to divergence; a shared interface definition or code‑generation step would reduce this risk.  
+* **Testing surface**: unit tests can target `handleRequest` and the router independently, while integration tests validate end‑to‑end provider interactions, supporting continuous maintenance.
 
 ## Diagrams
 
@@ -114,16 +122,16 @@ All these integration points are referenced indirectly through configuration fil
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component is designed with a provider-agnostic approach, allowing for seamless integration of multiple Large Language Model (LLM) providers. This is evident in the lib/llm/provider-registry.js file, where a registry of providers is maintained, enabling easy addition or removal of providers. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) and the DMRProvider class (lib/llm/providers/dmr-provider.ts) are both registered in this registry, demonstrating the flexibility of the component's architecture. The LLMService class (lib/llm/llm-service.ts) serves as the main entry point for all LLM operations, routing requests to the appropriate provider based on the registry. This design decision enables the component to adapt to changing requirements and new provider additions without significant modifications to the existing codebase.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.
 
 ### Children
-- [RequestRouter](./RequestRouter.md) -- The LLMService class serves as the main entry point for all LLM operations, implying a routing mechanism is necessary.
+- [ModeRouter](./ModeRouter.md) -- The ModeRouter is mentioned in the parent context as a suggested L3 node, implying its importance in the LLMService sub-component.
 
 ### Siblings
-- [BudgetTracker](./BudgetTracker.md) -- The lib/llm/provider-registry.js file maintains a registry of providers, enabling easy addition or removal of providers, which is used by the BudgetTracker to track costs.
-- [ProviderRegistry](./ProviderRegistry.md) -- The lib/llm/provider-registry.js file maintains a registry of providers, enabling easy addition or removal of providers.
+- [BrowserAccess](./BrowserAccess.md) -- The BrowserAccess MCP server is described in integrations/browser-access/README.md.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG system is described in integrations/code-graph-rag/README.md.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*
