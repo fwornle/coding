@@ -188,6 +188,7 @@ export interface StepInfo {
   qaResult?: TraceQAResult
   llmCallEvents?: TraceLLMCall[]
   cgrQueryEvents?: TraceCGRQuery[]  // Phase 13: Code Graph RAG query events
+  subSteps?: StepInfo[]            // Nested sub-steps for wave detail view
 }
 
 // Active workflow process

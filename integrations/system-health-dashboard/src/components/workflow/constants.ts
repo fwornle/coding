@@ -870,7 +870,7 @@ export const WAVE_DISPLAY_NAMES: Record<number, string> = {
 // Step type categorization for step-level nesting within waves (Phase 12)
 export const STEP_CATEGORIES: Record<string, 'analyze' | 'classify' | 'persist' | 'qa' | 'init' | 'insights' | 'kgops'> = {
   wave1_init: 'init',
-  wave_docs: 'init',
+  wave1_docs: 'init',
   wave1_analyze: 'analyze',
   wave1_classify: 'classify',
   wave1_persist: 'persist',
@@ -895,7 +895,7 @@ export const STEP_CATEGORIES: Record<string, 'analyze' | 'classify' | 'persist' 
  */
 export const STEP_DISPLAY_NAMES: Record<string, string> = {
   'wave1_init': 'init + CGR index',
-  'wave_docs': 'documentation scan',
+  'wave1_docs': 'documentation scan',
   'wave1_analyze': 'semantic analysis',
   'wave1_qa': 'quality assurance',
   'wave1_classify': 'ontology classification',
