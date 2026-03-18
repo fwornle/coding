@@ -2,169 +2,154 @@
 
 **Type:** Component
 
-[LLM] The ConstraintSystem's constructor and execution pattern, as defined in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts), provide a clear and consistent way to initialize and execute the system. The constructor initializes the agent's dependencies and sets up the necessary configuration, while the execution pattern defines the sequence of events that occur during the validation process. This design decision ensures that the system is easy to understand and maintain, and that the validation process is predictable and reliable.
+[LLM] The ConstraintSystem component follows a modular design, with separate modules for content validation, hook management, and violation capture. This design decision facilitates flexibility and maintainability, as individual modules can be updated or replaced without affecting the overall system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is an example of this modularity, as it provides a mechanism for loading and merging user and project-level hook configurations. The HookConfigLoader class includes methods for loading configuration files, merging configurations, and providing the resulting configuration to the UnifiedHookManager.
 
 ## What It Is  
 
-The **ConstraintSystem** is the core component that enforces code‑base rules, validates actions, and records constraint violations. Its implementation lives in several concrete files:
+The **ConstraintSystem** component lives in the *semantic‑analysis* portion of the code base and is realised across several concrete files:
 
-* **ContentValidationAgent** – `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`  
-* **HookConfigLoader** – `lib/agent-api/hooks/hook-config.js` (including the `mergeConfigs` helper)  
-* **Hook manager** – `lib/agent-api/hooks/hook-manager.js`  
-* **Graph persistence** – `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`  
-* **Violation capture** – `scripts/violation-capture-service.js`
+* `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js` – the low‑level **GraphDatabaseAdapter** that persists knowledge, constraints and violation data in a graph database.  
+* `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` – the **ContentValidationAgent** that validates entity content against a set of configurable rules.  
+* `integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.js` – the **SemanticAnalyzer** that parses raw entity text, applies NLP/ML techniques and surfaces potential semantic violations.  
+* `lib/agent-api/hooks/hook-manager.js` – the **UnifiedHookManager** that centralises hook registration, deregistration and dispatch for the whole ConstraintSystem.  
+* `lib/agent-api/hooks/hook-config.js` – the **HookConfigLoader** that merges user‑level and project‑level hook configurations before they are handed to the manager.  
+* `scripts/violation-capture-service.js` – the **ViolationCaptureService** that records constraint violations detected at runtime and stores them via the GraphDatabaseAdapter.
 
-Together these files form a modular, scalable subsystem that validates entity content, loads and merges hook configurations, captures live‑session violations, and persists the resulting data in a Graphology + LevelDB store. The component sits under the top‑level **Coding** parent and works alongside sibling components such as **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, and **SemanticAnalysis**. Its three direct children—**ContentValidationAgent**, **HookConfigLoader**, and **ConstraintConfiguration**—realize the concrete validation workflow.
+Together these files implement a **ConstraintSystem** that enforces data‑consistency rules, captures any breaches, and makes the resulting knowledge queryable through a graph store. The component sits under the top‑level **Coding** parent, alongside siblings such as **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, and **SemanticAnalysis**. Its own children – **ContentValidator**, **ViolationCapture**, **SemanticAnalyzer**, and **GraphDatabaseAdapter** – each focus on a distinct responsibility while remaining tightly coupled through well‑defined interfaces.
 
 ---
 
 ## Architecture and Design  
 
-### Modular, layered architecture  
+The observations reveal a **modular, component‑oriented architecture**. Each functional concern (validation, analysis, hook handling, persistence) lives in its own module, enabling independent evolution. The design leans on three concrete patterns that are explicitly present in the source:
 
-The observations repeatedly stress a **modular** design: each responsibility is encapsulated in its own sub‑module. The **ContentValidationAgent** focuses solely on the validation logic, while **HookConfigLoader** deals with configuration aggregation, and the **GraphDatabaseAdapter** abstracts persistence. This separation of concerns makes the system easy to extend—new validation agents or hook types can be added without touching existing code.
+1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the underlying graph database (likely Neo4j or a similar store) behind methods such as `addNode`, `removeEdge`, `updateNode`. This shields higher‑level agents from storage‑specific APIs and makes swapping the persistence layer feasible without touching validation or analysis logic.  
 
-### Adapter pattern for persistence  
+2. **Manager / Registry Pattern** – `UnifiedHookManager` acts as a central registry for hook callbacks. By exposing `registerHook`, `unregisterHook`, and `invokeHook` methods, it decouples producers of events (e.g., the validation agent) from consumers (custom user hooks). The complementary `HookConfigLoader` merges configuration files, reinforcing the manager’s role as the single source of truth for hook wiring.  
 
-`graph-database-adapter.js` implements an **adapter** that hides the details of the underlying Graphology + LevelDB database. The adapter presents a simple API to the rest of the ConstraintSystem (e.g., `saveViolation`, `loadGraph`) while handling JSON export synchronization internally. This isolates the rest of the code from storage‑specific quirks and permits swapping the storage engine in the future with minimal impact.
+3. **Agent / Service Pattern** – Both `ContentValidationAgent` and `SemanticAnalyzer` are implemented as autonomous agents that encapsulate a specific piece of business logic (validation vs. semantic parsing). They expose clear public methods (`loadRules`, `validateEntity`, `parseContent`, `detectViolations`) and rely on the adapter and manager to perform I/O and event propagation. The `ViolationCaptureService` is a lightweight service that persists any violations reported by the agents.
 
-### Centralized hook management  
+Interaction flow (derived from the file locations and method responsibilities) follows a **pipeline**:
 
-The **unified hook management system** (`hook-manager.js`) acts as a single entry point for all hook events (pre‑commit, file‑write, etc.). By funneling every hook through this manager, the ConstraintSystem guarantees that violations are captured consistently. The manager also interacts with the **ViolationCaptureService** to forward events to the dashboard persistence layer.
+* An entity’s raw content is handed to `SemanticAnalyzer` → semantic patterns are identified.  
+* The resulting analysis is fed into `ContentValidationAgent`, which loads rule sets and checks the content for rule breaches.  
+* When a breach is found, the agent triggers a hook via `UnifiedHookManager` (allowing external code to react) and also calls `ViolationCaptureService`.  
+* `ViolationCaptureService` writes the violation to the graph store through `GraphDatabaseAdapter`.  
 
-### Configuration merging  
-
-The `mergeConfigs` function inside `hook-config.js` combines user‑level and project‑level hook definitions into a single, coherent configuration. This approach provides flexibility: teams can supply custom rules without breaking the base configuration, and the merged result is consumed by the Hook manager and the ContentValidationAgent.
-
-### Execution pattern (constructor + run)  
-
-The **ContentValidationAgent** follows a clear **constructor‑then‑execute** pattern. Its constructor wires dependencies (graph adapter, hook manager, configuration) and prepares internal state. The `execute` method then orchestrates the validation flow: loading the merged configuration, registering hooks, and invoking validation on incoming code actions. This predictable lifecycle aids readability and testing.
+Because the component lives under the same parent as **LiveLoggingSystem** and **SemanticAnalysis**, it shares the broader strategy of using a graph database for knowledge representation, but it diverges by focusing on *constraint enforcement* rather than *logging* or *ontology classification*.
 
 ---
 
 ## Implementation Details  
 
-### ContentValidationAgent (`content-validation-agent.ts`)  
+### GraphDatabaseAdapter (`graph-database-adapter.js`)  
+The adapter implements CRUD operations on graph entities. Its API includes methods for **adding**, **removing**, and **updating** both nodes and edges, which the rest of the ConstraintSystem calls to persist validation results, semantic relationships, and violation records. By centralising graph interaction, the adapter also provides a single place to handle connection pooling, transaction management, and error handling.
 
-* **Constructor** – receives a `GraphDatabaseAdapter` instance, a reference to the `HookManager`, and the merged hook configuration. It stores these in private fields.  
-* **execute()** – registers the agent’s validation callbacks with the Hook manager, then iterates over pending actions (e.g., file saves, AST changes). For each action it checks the relevant constraints defined in the merged config and, on failure, emits a violation event.
+### UnifiedHookManager (`hook-manager.js`)  
+The manager maintains an internal map of hook identifiers to callback functions. Registration (`registerHook`) adds a callback to this map, while deregistration (`unregisterHook`) removes it. When a hook event occurs—such as a validation failure—the manager’s `invokeHook` method iterates over the relevant callbacks, passing a structured payload (e.g., entity ID, rule violated, severity). This design enables **loose coupling**: new hooks can be introduced without altering validation or capture code.
 
 ### HookConfigLoader (`hook-config.js`)  
+Configuration files exist at both *user* and *project* scopes. The loader reads each JSON/YAML file, merges them (project config overrides user defaults), and supplies the merged result to `UnifiedHookManager`. This ensures that hook behaviour can be customised per project while preserving a sensible global baseline.
 
-* **loadConfig()** – reads configuration files from predefined locations (user home, project `.hooks` directory).  
-* **mergeConfigs(userConfig, projectConfig)** – deep‑merges the two objects, giving precedence to project‑level rules while preserving user extensions. The merged object is cached for the lifetime of the process and supplied to the Hook manager.
+### ContentValidationAgent (`content-validation-agent.ts`)  
+The agent’s lifecycle consists of three phases:
 
-### Hook Manager (`hook-manager.js`)  
+1. **Rule Loading** – `loadValidationRules` reads rule definitions (likely from a DSL or JSON schema) and stores them internally.  
+2. **Validation** – `validateEntityContent` receives an entity’s content, forwards it to `SemanticAnalyzer` for parsing, then iterates over the loaded rules, applying each to the parsed representation.  
+3. **Reporting** – Upon detecting a breach, the agent calls `UnifiedHookManager.invokeHook` (so external observers can react) and forwards a violation object to `ViolationCaptureService`.
 
-* Maintains a registry of hook types (`preValidate`, `postValidate`, etc.).  
-* Provides `registerHook(type, callback)` and `emitHook(type, payload)` methods.  
-* Listens for violation events from the ContentValidationAgent and forwards them to the **ViolationCaptureService**.
+### SemanticAnalyzer (`semantic-analyzer.js`)  
+Implemented as a pure‑function‑oriented agent, it offers `parseEntityContent` (tokenisation, syntactic parsing), `detectViolations` (pattern matching using NLP/ML models), and `reportAnalysisResults`. The analyzer is reusable: both the `ContentValidationAgent` and any future agents can call it to obtain a semantic model of an entity.
 
 ### ViolationCaptureService (`violation-capture-service.js`)  
+The service receives violation objects, enriches them with timestamps and context, and persists them via `GraphDatabaseAdapter`. It also exposes retrieval methods (`getViolationReports`) that enable downstream analytics (e.g., trend detection across live sessions).
 
-* Subscribes to the Hook manager’s violation channel.  
-* Persists each violation via the GraphDatabaseAdapter, ensuring the constraint monitor dashboard can query the latest state.  
-* Performs lightweight aggregation (e.g., counts per rule) before writing, reducing write amplification on LevelDB.
-
-### GraphDatabaseAdapter (`graph-database-adapter.js`)  
-
-* Wraps Graphology’s in‑memory graph with LevelDB persistence.  
-* Exposes `saveNode`, `saveEdge`, `exportJSON`, and `syncExport` methods.  
-* Implements an automatic JSON export sync that runs after each write, guaranteeing that external tools (the dashboard) see a consistent snapshot.
-
-### Interaction flow  
-
-1. **Startup** – `HookConfigLoader` loads and merges configs.  
-2. **Agent init** – `ContentValidationAgent` is instantiated with the merged config, the graph adapter, and the hook manager.  
-3. **Hook registration** – The agent registers its validation callbacks with the Hook manager.  
-4. **Runtime** – When a code action occurs, the Hook manager fires the appropriate hook; the agent validates the action, and on failure emits a violation.  
-5. **Capture** – `ViolationCaptureService` receives the violation, persists it via the GraphDatabaseAdapter, and triggers a JSON export for the dashboard.
+Collectively, these classes embody a **clear separation of concerns**: storage, event management, rule processing, and semantic parsing each live in their own module, reducing cross‑cutting dependencies.
 
 ---
 
 ## Integration Points  
 
-* **LiveLoggingSystem** – The ViolationCaptureService consumes live‑session logs produced by the LiveLoggingSystem, turning raw log entries into structured constraint violations.  
-* **LLMAbstraction** – Although not directly referenced, the ContentValidationAgent may rely on LLM‑driven classification (as seen in sibling components) for semantic rule evaluation, meaning the agent can accept LLM‑provided insights via dependency injection.  
-* **DockerizedServices** – The graph persistence layer runs inside Docker containers managed by DockerizedServices; the adapter abstracts container boundaries, allowing the ConstraintSystem to remain agnostic of deployment details.  
-* **Trajectory** – Hook events that involve user interaction (e.g., speculative edits) are logged by the Trajectory component; the Hook manager can forward these events for later replay or audit.  
-* **KnowledgeManagement** – The GraphDatabaseAdapter stores constraint data in the same Graphology + LevelDB store used by KnowledgeManagement, enabling cross‑component queries (e.g., “which entities violate rule X?”).  
-* **CodingPatterns** – The modular hook loading mechanism mirrors the pattern used in CodingPatterns, reinforcing a consistent configuration strategy across the codebase.
+1. **Graph Database** – The sole persistence dependency is the graph database accessed through `GraphDatabaseAdapter`. Any component that needs to query constraints, entities, or violations must go through this adapter, ensuring a consistent data model across the system.  
 
-External interfaces are primarily the **Hook manager API** (`registerHook`, `emitHook`) and the **GraphDatabaseAdapter API** (`saveNode`, `exportJSON`). Both are deliberately thin to keep coupling low.
+2. **Hook Infrastructure** – `UnifiedHookManager` is the gateway for external extensions. Plugins, UI dashboards, or automated remediation scripts register callbacks via the manager, receiving detailed violation payloads. The `HookConfigLoader` supplies the configuration that determines which hooks are active for a given project.  
+
+3. **SemanticAnalysis Sibling** – The sibling component **SemanticAnalysis** also uses agents and the graph store, suggesting a shared convention for agent‑based processing and graph‑backed knowledge. This commonality simplifies cross‑component data exchange (e.g., an ontology classification result from **LiveLoggingSystem** could be consumed by `SemanticAnalyzer`).  
+
+4. **LiveLoggingSystem** – While not directly called, the logging system’s graph‑based storage mirrors the persistence strategy of ConstraintSystem, meaning that logs and constraint violations can be queried together for richer debugging or audit trails.  
+
+5. **Parent Component – Coding** – At the top level, **Coding** orchestrates component initialization. It likely creates a single instance of `GraphDatabaseAdapter` that is injected into the child modules (ContentValidator, ViolationCapture, etc.), ensuring a unified connection pool and consistent transaction boundaries.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Never modify the merged configuration directly** – always add or override rules through either the user‑level or project‑level config files. Let `mergeConfigs` produce the final object.  
-2. **Register custom hooks via the Hook manager** – use `hookManager.registerHook(type, fn)` early in the application bootstrap to ensure your hook participates in the validation lifecycle.  
-3. **Persist only through the GraphDatabaseAdapter** – direct LevelDB access circumvents the automatic JSON sync and can lead to stale dashboard data.  
-4. **Handle violations asynchronously** – the ViolationCaptureService writes to LevelDB in a non‑blocking fashion; callers should not await the write unless they need immediate confirmation.  
-5. **Test agents in isolation** – because the ContentValidationAgent’s constructor receives its dependencies, unit tests can supply mock adapters and hook managers without pulling in the full system.  
+* **Initialize the Adapter First** – Before any validation or analysis runs, instantiate `GraphDatabaseAdapter` and ensure the connection is healthy. Pass the instance to agents and services rather than letting each module create its own connection.  
 
-Following these conventions preserves the modularity and scalability that the ConstraintSystem’s design intentionally provides.
+* **Load Hook Config Early** – Invoke `HookConfigLoader.loadConfiguration()` during application bootstrap, then feed the merged config into `UnifiedHookManager.registerHook`. This guarantees that all subsequent validation events are observable.  
+
+* **Define Validation Rules Declaratively** – Store rule definitions in a version‑controlled JSON/YAML file and load them with `ContentValidationAgent.loadValidationRules`. Keeping rules external to code makes them easier to audit and evolve without recompiling.  
+
+* **Treat Violation Capture as Side‑Effect‑Free** – `ViolationCaptureService` should be called *after* hooks have been invoked, so that external observers can react before the violation is persisted. This ordering preserves the ability to abort or modify a violation record if needed.  
+
+* **Prefer Agent‑Based Extension** – If new analysis capabilities are required (e.g., a “TemporalConstraintAgent”), follow the existing agent pattern: expose a clear public API, depend on `GraphDatabaseAdapter` for persistence, and use `UnifiedHookManager` for event propagation. This keeps the system extensible without breaking existing contracts.  
+
+* **Monitor Graph Performance** – Because all constraint data lives in a graph, ensure appropriate indexes (e.g., on entity IDs, constraint types) are created in the underlying database. This is especially important as the number of entities grows.  
+
+* **Testing** – Mock `GraphDatabaseAdapter` and `UnifiedHookManager` in unit tests to isolate the logic of `ContentValidationAgent` and `SemanticAnalyzer`. The modular design makes such isolation straightforward.
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* **Modular decomposition** – distinct agents, loaders, and adapters.  
-* **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
-* **Centralized event hub** – the unified hook manager acts as a publish/subscribe bus.  
-* **Configuration merging** – `mergeConfigs` implements a deterministic composition strategy.
+1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the graph store.  
+2. **Manager / Registry Pattern** – `UnifiedHookManager` centralises hook lifecycle.  
+3. **Agent / Service Pattern** – `ContentValidationAgent`, `SemanticAnalyzer`, and `ViolationCaptureService` act as autonomous processing units.  
+4. **Modular Design** – Separate directories and files for validation, hooks, persistence, and capture.  
 
-### Design decisions and trade‑offs  
+### Design Decisions and Trade‑offs  
 
-* **Modularity vs. runtime overhead** – separating concerns improves maintainability but adds a small indirection cost (hook registration, adapter calls).  
-* **Graphology + LevelDB persistence** – provides rich graph queries and durable storage, at the expense of increased memory usage during graph construction.  
-* **Automatic JSON export** – guarantees dashboard consistency but introduces synchronous I/O after each write; the system mitigates this with LevelDB’s fast write path.  
+* **Graph‑Based Persistence** – Chosen for flexible relationship queries; trade‑off is added complexity in schema design and the need for graph‑specific indexing.  
+* **Central Hook Manager** – Enables loose coupling and easy extensibility; however, it introduces a single point of failure if the manager crashes or becomes a bottleneck.  
+* **Agent Separation** – Improves testability and future extensibility; may increase latency due to inter‑agent communication if not optimised.  
+* **Configuration Merging** – Allows per‑project customisation while preserving defaults; the merge logic must handle conflicts deterministically.  
 
-### System structure insights  
+### System Structure Insights  
 
-The ConstraintSystem sits as a child of the **Coding** root, sharing the same configuration philosophy as **CodingPatterns** and reusing the same storage layer as **KnowledgeManagement**. Its three children (ContentValidationAgent, HookConfigLoader, ConstraintConfiguration) each encapsulate a clear responsibility, enabling independent evolution.
+* **Parent‑Child Relationship** – ConstraintSystem is a child of the **Coding** component, inheriting the project‑wide graph‑database strategy.  
+* **Sibling Synergy** – Shares storage conventions with **LiveLoggingSystem** and **SemanticAnalysis**, enabling cross‑component queries (e.g., linking a violation to a logged event).  
+* **Child Modules** – `ContentValidator`, `ViolationCapture`, `SemanticAnalyzer`, and `GraphDatabaseAdapter` each expose a narrow API, reinforcing the *single responsibility* principle.  
 
-### Scalability considerations  
+### Scalability Considerations  
 
-* The graph adapter’s LevelDB backend scales horizontally for large numbers of nodes/edges, while the automatic JSON export can be throttled if the violation rate spikes.  
-* Hook registration is lightweight, allowing thousands of concurrent hooks without a noticeable performance penalty.  
-* Because validation runs synchronously per action, the system can be horizontally scaled by sharding validation responsibilities across multiple agent instances (each with its own adapter instance).
+* **Horizontal Scaling of Agents** – Because agents are stateless aside from the shared adapter, multiple instances can run in parallel to handle high‑throughput validation workloads.  
+* **Graph Database Sharding** – As the volume of entities and violations grows, the underlying graph store must support sharding or clustering to maintain query performance.  
+* **Hook Execution Overhead** – Hook callbacks should be lightweight or executed asynchronously to avoid slowing the validation pipeline.  
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-The clear constructor‑execute pattern, thin public APIs, and isolated adapters make the codebase highly maintainable. Adding new constraint rules only requires updating configuration files or extending the ContentValidationAgent’s rule set. The unified hook manager centralizes event handling, reducing duplicated listener logic. Overall, the design choices favor readability, testability, and future extension while keeping runtime complexity manageable.
-
-## Diagrams
-
-### Relationship
-
-![ConstraintSystem Relationship](images/constraint-system-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/constraint-system-relationship.png)
+The modular layout, explicit adapters, and clear manager interfaces make the ConstraintSystem highly maintainable. Adding new validation rules, hooks, or analysis agents requires only localized changes. The primary maintenance burden lies in the graph schema—any evolution of entity or constraint models must be reflected in the adapter and possibly in index definitions. Overall, the component’s separation of concerns, reliance on well‑known patterns, and consistent configuration handling support long‑term evolution with minimal risk of regression.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-c; LLMAbstraction: [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.; DockerizedServices: [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the sin; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonst; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relatio; CodingPatterns: [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-c; ConstraintSystem: [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate ; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classi.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integ; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with differ; DockerizedServices: [LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/l; Trajectory: [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible con; KnowledgeManagement: [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agen; CodingPatterns: [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js); SemanticAnalysis: [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance.
 
 ### Children
-- [ContentValidationAgent](./ContentValidationAgent.md) -- The ContentValidationAgent utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file to perform validation tasks.
-- [HookConfigLoader](./HookConfigLoader.md) -- The HookConfigLoader is implemented in the lib/agent-api/hooks/hook-config.js file, which suggests a modular design for loading and merging hook configurations.
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
+- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture works closely with the ContentValidator sub-component to capture validation failures and persist them for further analysis.
+- [SemanticAnalyzer](./SemanticAnalyzer.md) -- SemanticAnalyzer leverages natural language processing (NLP) techniques to parse and understand entity content.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter implements a standardized data model for representing entities, relationships, and constraints in the graph database.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonstrating an adapter pattern for integration with different tools and services. This adapter pattern allows for a standardized interface to interact with various extensions, such as Specstory, facilitating the addition of new integrations with minimal modifications to the existing codebase. The SpecstoryAdapter class, specifically, employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods. This approach ensures that the most efficient and reliable connection method is used, while providing fallback options in case of failures.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integrations/code-graph-rag/README.md). This allows for efficient querying and retrieval of entities, which is crucial for the system's classification layers. The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) plays a key role in this process, as it classifies observations against the ontology system. The agent's constructor and the ensureLLMInitialized method demonstrate a lazy initialization approach for LLM services, which helps prevent unnecessary computations and improves overall system performance.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with different LLM providers. This class employs dependency injection, allowing for flexible configuration of the component, including the injection of mock services and budget trackers. The LLMService class also defines a set of interfaces (lib/llm/types.js) for LLM providers, requests, and responses, ensuring a standardized interaction with different providers. For example, the LLMService class uses the provider registry (lib/llm/provider-registry.js) to manage the registration and retrieval of various LLM providers, such as the AnthropicProvider (lib/llm/providers/anthropic-provider.ts) and DMRProvider (lib/llm/providers/dmr-provider.ts).
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/llm-service.ts) for managing large language model operations. This modularity allows for easier maintenance and updates, as well as scalability. For instance, the LLMService class utilizes dependency injection through the setModeResolver, setMockService, and setBudgetTracker methods, making it easier to test and extend the service. Additionally, the use of configuration files, such as YAML files, to manage settings and priorities for different providers and services, enables flexible configuration and customization.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible connections to external services. This adapter attempts to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a persistent connection approach. For instance, the connectViaHTTP method tries multiple ports to establish a connection, showcasing the adapter's ability to handle varying connection scenarios. This flexibility is crucial for maintaining a scalable and maintainable system, enabling easier integration of new services or features as needed.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
 
 
 ---

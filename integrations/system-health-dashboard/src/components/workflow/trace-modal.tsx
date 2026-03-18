@@ -742,11 +742,10 @@ export function TraceModal({
         </div>
 
         {/* Main Content: Tree + Detail Panel */}
-        <div className="flex-1 min-h-0 flex gap-4">
+        <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
           {/* Left: 3-level tree */}
-          <div className="flex-1 min-w-0">
-            <ScrollArea className="h-full">
-              <div className="space-y-1 pr-4">
+          <div className="flex-1 min-w-0 overflow-auto">
+            <div className="space-y-1 pr-4">
                 {waveGroups.map((wg) => {
                   const waveId = `wave-${wg.waveNumber}`
                   const isWaveExpanded = expandedIds.has(waveId)
@@ -824,6 +823,10 @@ export function TraceModal({
                                   {step.llmCalls != null && step.llmCalls > 0 && (
                                     <span className="text-[10px] text-zinc-500">{step.llmCalls} LLM</span>
                                   )}
+                                  {(() => {
+                                    const cgrQ = (step as any).outputs?.cgrStats?.queriesMade
+                                    return cgrQ > 0 ? <span className="text-[10px] text-emerald-500">{cgrQ} CGR</span> : null
+                                  })()}
                                   <span className="text-xs text-zinc-500 tabular-nums w-16 text-right">
                                     {formatDuration(step.duration)}
                                   </span>
@@ -1011,7 +1014,6 @@ export function TraceModal({
                   )
                 })}
               </div>
-            </ScrollArea>
           </div>
 
           {/* Right: Context-aware detail panel */}

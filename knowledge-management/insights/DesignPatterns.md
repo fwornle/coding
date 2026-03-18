@@ -2,147 +2,100 @@
 
 **Type:** SubComponent
 
-The integrations/code-graph-rag/README.md file describes a graph-based RAG system, which is an example of a design pattern utilized in the CodingPatterns component
+The integrations/code-graph-rag/docs/claude-code-setup.md file provides setup instructions for the Graph-Code MCP Server, potentially using design patterns like the builder pattern for configuration.
 
 ## What It Is  
 
-The **DesignPatterns** sub‑component lives inside the **CodingPatterns** parent and is centred on a reusable, hook‑driven agent architecture. The core of this system is the **`HookConfigLoader`** class found in `lib/agent-api/hooks/hook-config.js`. This loader reads hook configuration files, merges them, and exposes a unified hook registry that the rest of the platform can query. Agent implementations – exemplified by the “Wave” agents – inherit from a base class defined in `base-agent.ts`. The base class supplies a three‑step lifecycle: a constructor, the `ensureLLMInitialized()` method (which lazily creates the large‑language‑model (LLM) instance), and an `execute()` method that runs the agent’s main logic. Documentation that describes the shape of hook payloads (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and concrete usage examples (`integrations/copi/EXAMPLES.md`) further tie the sub‑component together. Together, these pieces provide a **flexible, scalable hook system** that can be extended by other components such as **CodingPatterns**, **DevelopmentPractices**, and **Integrations**.
-
----
+The **DesignPatterns** sub‑component lives at the intersection of several concrete modules inside the broader **CodingPatterns** component.  Its most visible artefacts are the `GraphDatabaseAdapter` class in `storage/graph-database-adapter.ts`, the CodeGraph RAG documentation in `integrations/code-graph-rag/README.md`, and a handful of usage and configuration guides (e.g., `copi/USAGE.md`, `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md`).  Together these files describe how the system organises its core logic around reusable architectural idioms –‑ singleton for the graph store, graph‑oriented data structures for code‑base navigation, and a collection of higher‑level patterns (factory, observer, builder, decorator, strategy) that shape how developers extend or configure the platform.  In short, **DesignPatterns** is the documented catalogue of the recurring structural and behavioural solutions that the rest of the **CodingPatterns** ecosystem relies on.
 
 ## Architecture and Design  
 
-The architecture follows a **modular plug‑in (Hook) pattern**. `HookConfigLoader` acts as the **hook registry** – it discovers hook definitions from multiple configuration sources, merges them, and makes them available to agents at runtime. This design decouples hook providers from hook consumers: a new hook can be added simply by placing a correctly‑shaped configuration file in the expected location, without touching existing agent code.
+The architecture is deliberately centred on a **graph‑centric** data model.  The `GraphDatabaseAdapter` ( `storage/graph-database-adapter.ts` ) is instantiated as a **singleton**, guaranteeing a single, globally‑available graph database backed by Graphology + LevelDB.  This ensures that every component—whether the CodeGraph RAG engine, the constraint monitor, or the Copi CLI—operates against the same consistent graph instance, eliminating duplication and synchronisation hazards.  
 
-Agent classes adopt a **lazy‑initialization pattern** for heavyweight resources. The `ensureLLMInitialized()` method, defined in `base-agent.ts`, checks whether the LLM instance already exists; if not, it constructs it on demand. This reduces start‑up latency and memory pressure, especially when many agents are instantiated but only a subset actually need the LLM.
+On top of this shared graph layer, the **CodeGraph RAG** system (documented in `integrations/code‑graph‑rag/README.md`) follows a **graph pattern**: code entities become vertices, relationships become edges, and retrieval is performed via graph traversals.  The README emphasises handling “large codebases” and “efficient query performance”, indicating that the architecture expects the graph to act as the primary index for code‑level reasoning.  
 
-The **Wave agents** illustrate a **template‑method style** lifecycle. All agents share the same skeleton – constructor → `ensureLLMInitialized()` → `execute()` – while each concrete agent supplies its own `execute` implementation. This uniform structure simplifies orchestration, testing, and onboarding of new agents.
+The surrounding tooling hints at several auxiliary patterns:  
 
-Interaction flow:  
-1. **Configuration Load** – At application start, `HookConfigLoader` reads hook config files (e.g., those referenced in `integrations/copi/docs/hooks.md`).  
-2. **Agent Creation** – A Wave agent is instantiated; its constructor registers the agent’s interest in specific hooks.  
-3. **Lazy Resource Allocation** – When the agent first needs the LLM, it calls `ensureLLMInitialized()`.  
-4. **Execution** – The agent’s `execute()` method runs, pulling hook callbacks from the registry and invoking them as defined in the hook format (`CLAUDE-CODE-HOOK-FORMAT.md`).  
+* **Factory** – the Copi CLI wrapper (`copi/USAGE.md`) appears to select concrete command classes based on user input, a classic factory‑style decoupling of object creation from the calling code.  
+* **Observer** – the hook format described in `mcp‑constraint‑monitor/docs/CLAUDE‑CODE‑HOOK‑FORMAT.md` is poised to broadcast state changes to interested listeners, matching the observer pattern’s publish/subscribe contract.  
+* **Builder** – the setup guide for the Graph‑Code MCP Server (`integrations/code‑graph‑rag/docs/claude‑code‑setup.md`) walks the user through step‑by‑step configuration, a narrative that maps naturally to a builder that assembles a complex configuration object.  
+* **Decorator** – the status‑line integration (`copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md`) extends an existing UI element without altering its core, a textbook use of the decorator pattern.  
+* **Strategy** – the constraint‑configuration guide (`mcp‑constraint‑monitor/docs/constraint‑configuration.md`) outlines interchangeable constraint policies, suggesting a strategy‑based plug‑in point for different validation behaviours.  
 
-Because the hook system is defined in **DesignPatterns**, sibling components such as **DevelopmentPractices** (which also reference `integrations/copi/docs/hooks.md`) can reuse the same registry, reinforcing a consistent cross‑component contract.
-
----
+These patterns are not isolated; they interlock through the shared graph instance and common configuration interfaces, forming a cohesive, pattern‑rich architecture.
 
 ## Implementation Details  
 
-* **`lib/agent-api/hooks/hook-config.js` – `HookConfigLoader`**  
-  * Reads JSON/YAML hook definition files from a configurable directory.  
-  * Merges overlapping definitions, preserving order of precedence (later files overwrite earlier ones).  
-  * Exposes `getHook(name)` and `listHooks()` APIs used by agents to discover callbacks.  
+At the heart of the implementation is the **`GraphDatabaseAdapter`** class.  It exports a function—often named `getGraphInstance()`—that lazily creates (or returns the already‑created) Graphology graph backed by LevelDB storage.  By exposing only this accessor, the module enforces the singleton contract: any import of the adapter receives the same graph reference, guaranteeing data consistency across the codebase.  The adapter also wires an automatic JSON export sync, which periodically serialises the in‑memory graph to a JSON file, enabling external tools (e.g., the RAG engine) to consume a snapshot without needing direct DB access.  
 
-* **`base-agent.ts` – Base Agent Class**  
-  * Holds a protected property `llm?: LLM`.  
-  * Implements `ensureLLMInitialized(): Promise<void>` which:  
-    1. Checks `this.llm`.  
-    2. If undefined, constructs the LLM using a factory (the exact factory is not detailed in the observations but is encapsulated).  
-    3. Caches the instance for subsequent calls.  
-  * Declares an abstract `execute(context: any): Promise<any>` that concrete agents must override.  
+The **CodeGraph RAG** documentation does not contain executable code, but it describes a workflow where source files are parsed into AST nodes, each node becomes a vertex, and import/export relationships become edges.  Queries such as “find all functions that call X” are resolved by graph traversals, leveraging Graphology’s traversal APIs.  Because the graph is a singleton, the RAG module can safely perform read‑only traversals while other subsystems (e.g., the constraint monitor) may be mutating the graph in response to hook events.  
 
-* **Wave Agent Example (implied by observation 3)**  
-  * **Constructor** – registers required hooks via `HookConfigLoader`.  
-  * **`ensureLLMInitialized()`** – inherited from the base class, guaranteeing that the LLM is only spun up when needed.  
-  * **`execute()`** – pulls data from the hook payload (format described in `CLAUDE-CODE-HOOK-FORMAT.md`) and performs the agent‑specific task.  
+The **Copi CLI** wrapper, as outlined in `copi/USAGE.md`, likely implements a **factory** that maps command‑line flags to concrete handler classes (e.g., `StatusLineRenderer`, `GraphExporter`).  When a user invokes `copi status`, the factory instantiates the appropriate renderer, which may then be **decorated** by the status‑line extension described in `STATUS‑LINE‑QUICK‑REFERENCE.md`.  This layered construction keeps the core CLI thin while allowing optional features to be mixed in.  
 
-* **Documentation Assets**  
-  * `integrations/copi/docs/hooks.md` – enumerates the hook function signatures, serving as the contract that both hook providers and consumers follow.  
-  * `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines the JSON schema for hook data, ensuring that agents can safely deserialize payloads.  
-  * `integrations/copi/EXAMPLES.md` – offers concrete code snippets that demonstrate how to register a hook and invoke it from an agent, reinforcing the pattern for developers.  
+The **constraint monitor** consumes hook payloads defined in `CLAUDE‑CODE‑HOOK‑FORMAT.md`.  A central dispatcher registers observers for hook types (e.g., `fileChanged`, `dependencyAdded`).  Each observer implements a specific **strategy** for validation (e.g., `NamingConventionStrategy`, `CircularDependencyStrategy`).  When a hook arrives, the dispatcher notifies all relevant observers, which then apply their strategy to the graph and emit diagnostics.  
 
-* **Cross‑Component Reference** – The **CodingPatterns** parent component mentions the same `HookConfigLoader` class, indicating that the hook infrastructure is shared across multiple sub‑components, promoting reuse.
-
----
+Finally, the **builder‑style** configuration process in `claude‑code‑setup.md` likely constructs a `McpServerConfig` object by chaining setter methods (e.g., `.withPort(8080).withGraphPath("./graph.db")`).  This approach isolates complex configuration logic from the runtime code and makes the setup reproducible.
 
 ## Integration Points  
 
-* **Hook Registry ↔ Agent Layer** – Agents obtain hook callbacks through the public API of `HookConfigLoader`. The registry is the sole entry point for hook discovery, keeping agents agnostic of where the hooks originated.  
+The singleton graph instance is the primary integration seam.  Every component that needs to read or write code‑level metadata imports `storage/graph-database-adapter.ts`.  Consequently, the **CodeGraph RAG** engine, the **Copi** status line, and the **ConstraintMonitor** all share a common data surface, enabling cross‑cutting concerns such as real‑time constraint validation during a RAG query.  
 
-* **LLM Factory ↔ Base Agent** – `ensureLLMInitialized()` abstracts the LLM creation behind a factory or provider that lives outside the agent code. This decouples the agent from specific LLM implementations (e.g., Claude, GPT).  
+The **Copi CLI** interacts with the graph indirectly via its factory‑produced command objects.  For example, a `copi export` command may invoke a service that traverses the graph and writes a JSON dump, while a `copi status` command decorates the terminal status line with live graph metrics (node count, edge density).  This loose coupling is reinforced by the CLI’s reliance on interfaces defined in the `copi` package rather than concrete graph classes.  
 
-* **Documentation ↔ Development** – The markdown files in `integrations/copi/docs/` and `integrations/mcp-constraint-monitor/docs/` act as **design contracts**. Tools that generate TypeScript types from these schemas can be used to enforce compile‑time safety.  
+The **ConstraintMonitor** registers observers that listen to hook events emitted by external tools (e.g., Claude code generation).  Those hooks are defined in `mcp‑constraint‑monitor/docs/CLAUDE‑CODE‑HOOK‑FORMAT.md` and are consumed by a dispatcher that updates the graph and runs strategy‑based checks.  This creates a feedback loop: a code change triggers a hook, the monitor validates constraints against the graph, and the result can be surfaced through the Copi status line or logged for the developer.  
 
-* **Sibling Components** – Both **DevelopmentPractices** and **CodingConventions** reference the same hook documentation, meaning that any change to the hook format must be coordinated across these siblings to avoid breaking contracts.  
-
-* **Parent Component – CodingPatterns** – Since **DesignPatterns** is a child of **CodingPatterns**, any higher‑level orchestration (e.g., a workflow engine) can load the hook configuration once at the CodingPatterns level and pass the same `HookConfigLoader` instance down to DesignPatterns, ensuring a single source of truth.
-
----
+Configuration flows from the **builder** described in `claude‑code‑setup.md` into the runtime.  The built `McpServerConfig` object is passed to the Graph‑Code MCP Server, which then initialises the `GraphDatabaseAdapter` with the appropriate persistence path and export settings.  This ensures that the singleton graph is bootstrapped consistently across environments (development, CI, production).
 
 ## Usage Guidelines  
 
-1. **Declare Hooks Early** – Place hook configuration files in the directory watched by `HookConfigLoader` before the application starts. Follow the schema defined in `CLAUDE-CODE-HOOK-FORMAT.md` to avoid runtime validation errors.  
+1. **Always obtain the graph through the adapter’s accessor** (`getGraphInstance()`).  Direct instantiation of Graphology objects bypasses the singleton guarantee and can lead to divergent state.  
+2. **Prefer the factory‑provided CLI commands** when interacting with the system from the terminal.  Adding a new command should be done by extending the factory map rather than editing the core CLI parser, preserving the open/closed principle.  
+3. **When defining new hook types**, follow the JSON schema in `CLAUDE‑CODE‑HOOK‑FORMAT.md` and register a corresponding observer.  This keeps the observer chain coherent and avoids missed notifications.  
+4. **Use the builder API** from `claude‑code‑setup.md` for any custom server configuration.  Supplying a partial configuration object can lead to undefined defaults; the builder ensures all required fields are populated before the server starts.  
+5. **If extending the status line**, implement a decorator that wraps the base renderer.  This pattern allows multiple independent extensions (e.g., graph health, constraint violations) to coexist without modifying the original renderer.  
 
-2. **Leverage Lazy LLM Initialization** – Do not manually instantiate the LLM inside an agent’s constructor. Always call `await this.ensureLLMInitialized()` at the point where the LLM is first required. This preserves the intended resource‑efficiency guarantees.  
-
-3. **Respect the Agent Skeleton** – When creating a new agent, extend the base class from `base-agent.ts` and implement only the `execute` method. Keep the constructor lightweight (e.g., only register needed hooks).  
-
-4. **Validate Hook Payloads** – Use the examples in `integrations/copi/EXAMPLES.md` as a reference for parsing hook data. Prefer runtime validation against the JSON schema from `CLAUDE-CODE-HOOK-FORMAT.md` to catch mismatches early.  
-
-5. **Coordinate Changes Across Siblings** – Because **DevelopmentPractices** and **CodingConventions** also consume the same hook definitions, any modification to hook signatures or formats must be communicated through the shared documentation files to maintain consistency.  
-
-6. **Testing** – Unit‑test agents by mocking `HookConfigLoader` to return deterministic hook callbacks. Mock the LLM provider when testing `ensureLLMInitialized()` to verify lazy creation without incurring real model load costs.
+Adhering to these conventions aligns developers with the patterns already baked into the codebase, reduces friction when adding new features, and safeguards the consistency guarantees that the singleton graph provides.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
+* **Singleton** – `GraphDatabaseAdapter` guarantees one graph instance.  
+* **Graph pattern** – Code entities modelled as vertices/edges (CodeGraph RAG).  
+* **Factory** – Copi CLI creates command objects based on user input.  
+* **Observer** – Hook dispatcher notifies constraint‑monitor observers.  
+* **Builder** – Step‑wise configuration of the MCP server.  
+* **Decorator** – Status‑line extensions augment existing UI components.  
+* **Strategy** – Pluggable constraint validation policies.
 
-1. **Hook / Plug‑in Pattern** – Centralised hook registry (`HookConfigLoader`) decouples providers from consumers.  
-2. **Lazy Initialization** – `ensureLLMInitialized()` defers heavyweight LLM construction until needed.  
-3. **Template Method** – Uniform agent lifecycle (constructor → `ensureLLMInitialized` → `execute`).  
+### Design decisions and trade‑offs  
+* **Centralised graph** simplifies consistency but creates a single point of contention; read‑heavy workloads are fine, but heavy writes may need batching or sharding.  
+* **Singleton access** removes boiler‑plate but can hinder testing unless the adapter exposes a reset or mock injection point.  
+* **Factory + decorator** keep the CLI lightweight and extensible, at the cost of slightly more indirection when tracing command flow.  
+* **Observer pattern** decouples producers and consumers of hook events, but requires careful management of observer lifecycles to avoid memory leaks.  
+* **Builder for configuration** yields clear, immutable config objects, though the chained API adds a learning curve for newcomers.
 
-### Design Decisions and Trade‑offs  
+### System structure insights  
+The system is organised around a **core data layer (graph)** surrounded by **feature modules** (RAG, CLI, constraint monitoring) that each consume the graph through well‑defined interfaces.  The sibling components—**CodingConventions**, **BestPractices**, **GraphDatabase**, **ConstraintMonitoring**—share the same underlying graph and therefore inherit its consistency guarantees.  The parent **CodingPatterns** component emphasizes data integrity, a goal reinforced by the singleton‑driven persistence strategy.
 
-* **Centralised Hook Loading** simplifies configuration management but introduces a single point of failure; the loader must be robust and handle merge conflicts gracefully.  
-* **Lazy LLM Initialization** reduces start‑up cost and memory usage, at the expense of a possible latency spike on the first LLM call. This trade‑off is acceptable for workloads where not all agents need the LLM simultaneously.  
-* **Fixed Agent Skeleton** enforces consistency and eases orchestration, yet it may limit agents that require additional lifecycle steps unless the base class is extended further.  
+### Scalability considerations  
+* **Horizontal scaling** can be achieved by partitioning the LevelDB store or migrating to a distributed graph store while preserving the singleton façade at the process level.  
+* **Read scalability** benefits from the immutable nature of many graph traversals; caching of frequent sub‑graphs could be added without breaking existing patterns.  
+* **Write scalability** may require queuing or batch updates to avoid contention on the singleton instance, especially when many constraint observers fire simultaneously.
 
-### System Structure Insights  
-
-The system is layered:  
-* **Configuration Layer** (`HookConfigLoader`) → **Agent Layer** (base‑agent + concrete agents) → **Resource Layer** (LLM factory).  
-Hooks act as the glue between external integrations (e.g., `integrations/copi`, `integrations/mcp-constraint-monitor`) and internal agents. The parent **CodingPatterns** component aggregates this structure, allowing sibling components to share the same hook contract.  
-
-### Scalability Considerations  
-
-* **Horizontal Scaling** – Because hooks are loaded into an in‑memory registry, multiple agent instances can share the same process‑level loader without contention. For a distributed deployment, the loader can be instantiated per service instance; the merge logic remains deterministic, ensuring consistent hook sets across nodes.  
-* **Hook Volume** – The merging algorithm in `HookConfigLoader` must be efficient (ideally O(n) over the number of hook files). If the number of hooks grows dramatically, consider lazy loading of individual hook definitions rather than loading all at start‑up.  
-* **LLM Load** – Lazy initialization prevents unnecessary duplication of large models across many agents, supporting better memory scaling.  
-
-### Maintainability Assessment  
-
-The design promotes high maintainability:  
-* **Clear Separation of Concerns** – Hook configuration, agent lifecycle, and LLM provisioning are isolated in distinct files/classes.  
-* **Documentation‑Driven Contracts** – Markdown specifications (`hooks.md`, `CLAUDE-CODE-HOOK-FORMAT.md`) serve as living contracts, reducing the risk of drift between code and design.  
-* **Consistent Agent Pattern** – New agents follow a predictable template, lowering the learning curve for contributors.  
-* **Potential Risks** – The central hook loader could become a maintenance hotspot if merge rules become complex; adding automated tests for configuration merging is advisable.  
-
-Overall, the **DesignPatterns** sub‑component exhibits a well‑structured, extensible architecture that aligns with the broader **CodingPatterns** ecosystem while providing clear guidance for developers and integrators.
-
-## Diagrams
-
-### Relationship
-
-![DesignPatterns Relationship](images/design-patterns-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/design-patterns-relationship.png)
+### Maintainability assessment  
+The heavy reliance on **well‑known design patterns** (singleton, factory, observer, etc.) makes the codebase approachable for developers familiar with classic OO architecture.  Documentation files explicitly name the patterns they employ, providing a living design ledger that reduces knowledge loss.  However, the **implicit nature** of some patterns (e.g., “may utilize the factory pattern”) means that developers must verify the actual implementation against the documentation, which could introduce drift.  Providing concrete unit tests that assert the presence of these patterns (e.g., checking that only one graph instance exists) would further strengthen maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
 
 ### Siblings
-- [CodingConventions](./CodingConventions.md) -- The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component
-- [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
-- [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
+- [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
+- [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
+- [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 
 ---

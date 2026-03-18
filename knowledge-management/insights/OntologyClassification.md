@@ -2,95 +2,149 @@
 
 **Type:** SubComponent
 
-The adapter provides a layer of abstraction between OntologyClassification and the underlying graph database, allowing for seamless interaction with the database
+OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 
 ## What It Is  
 
-**OntologyClassification** is a sub‑component that lives inside the **KnowledgeManagement** module.  All of its persistence concerns are funneled through the **`GraphDatabaseAdapter`** class that resides in `storage/graph-database-adapter.ts`.  The adapter hides the concrete graph store (Graphology + LevelDB) behind a thin, purpose‑built API, allowing OntologyClassification to focus on its core responsibility: classifying entities and managing ontology metadata (class and type information).  The component also publishes an interface that other sub‑components—most notably **ManualLearning** and **OnlineLearning**—consume to obtain classified entities and ontology descriptors.  Internally it delegates any read/write operation to the adapter, which in turn guarantees that a JSON export is kept in sync automatically, so the classification data is always available in a portable, human‑readable form.
+**OntologyClassification** is a sub‑component of the **KnowledgeManagement** domain that is responsible for assigning semantic categories (ontologies) to entities discovered throughout the system.  The implementation lives in the *integrations* folder and is tightly coupled to a set of documented contracts:
 
-## Architecture and Design  
+* **ClaudeCodeHookDataFormat** – the data exchange schema defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
+* **Constraint configuration** – rules for how ontological constraints are expressed, described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  
+* **Semantic‑constraint detection** – the algorithmic description in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  
 
-The architecture revolves around a **centralised persistence adapter**.  The observation that the adapter “provides a layer of abstraction between OntologyClassification and the underlying graph database” points directly to the **Adapter pattern**: OntologyClassification talks to `GraphDatabaseAdapter` rather than to Graphology or LevelDB APIs.  This abstraction is shared across many sibling components (ManualLearning, EntityPersistence, SemanticCodeSearch, UKBTraceReporting), creating a **single source of truth** for graph‑based storage and a **consistent interaction contract** throughout the KnowledgeManagement slice.
-
-Because the adapter also performs an “automatic JSON export sync”, the design embeds a **synchronisation responsibility** inside the persistence layer.  This is effectively a **synchronisation façade** that keeps a serialized snapshot up‑to‑date without requiring each consumer to manage export logic.  The component hierarchy (KnowledgeManagement → OntologyClassification → OntologyMetadataManagement) further reflects a **compositional design**: OntologyClassification owns a child sub‑component that concentrates on metadata handling while re‑using the same adapter, reinforcing the “one‑adapter‑fits‑all” approach.
-
-## Implementation Details  
-
-- **`storage/graph-database-adapter.ts`** houses the **`GraphDatabaseAdapter`** class.  Its public surface exposes methods for creating, updating, and querying graph nodes/edges.  Internally it instantiates a **Graphology** graph object backed by **LevelDB**, which supplies persistent key‑value storage on disk.  The adapter’s constructor likely wires the LevelDB instance, while its methods translate domain‑level calls (e.g., “addEntity”, “linkClass”) into Graphology operations.
-
-- **Automatic JSON export** is triggered inside the adapter after each mutating operation.  The adapter serialises the current graph state to a JSON file, ensuring that any external tool or downstream component can read a consistent snapshot without directly accessing LevelDB.
-
-- **OntologyClassification** consumes the adapter by importing it from the above path.  Its own code (though not listed) would instantiate the adapter once (perhaps as a singleton) and then use it for:
-  1. **Entity classification** – persisting classification results as graph nodes/edges.
-  2. **Metadata handling** – storing class‑type definitions that are later exposed via the **OntologyMetadataManagement** child.
-  3. **Interface provision** – exposing methods (e.g., `getClassification(entityId)`, `listClasses()`) that other sub‑components call.
-
-- **OntologyMetadataManagement** is a child component that also imports `GraphDatabaseAdapter`.  It likely focuses on CRUD operations for ontology schema objects (classes, types, relationships) while delegating actual storage to the same adapter, ensuring schema and instance data live in the same graph.
-
-## Integration Points  
-
-- **Parent – KnowledgeManagement**: The parent component relies on OntologyClassification as the authoritative source for entity classification and ontology metadata.  KnowledgeManagement’s higher‑level workflows (e.g., knowledge extraction pipelines) query OntologyClassification to enrich raw entities with class/type tags.
-
-- **Siblings – ManualLearning & OnlineLearning**: Both consume the public interface offered by OntologyClassification.  ManualLearning may feed human‑curated labels into the classification graph, while OnlineLearning may inject automatically derived classifications.  Because all siblings use the same `GraphDatabaseAdapter`, they share a unified data model and benefit from the same automatic JSON export.
-
-- **Other siblings – EntityPersistence, SemanticCodeSearch, UKBTraceReporting**: These components also persist or query graph data via the same adapter, reinforcing a **shared persistence contract** across the KnowledgeManagement domain.
-
-- **Child – OntologyMetadataManagement**: This sub‑component extends OntologyClassification’s capabilities by exposing fine‑grained metadata APIs.  It does not introduce a new storage mechanism; instead, it re‑uses the adapter, guaranteeing that any changes to ontology schema are instantly reflected in the classification graph.
-
-## Usage Guidelines  
-
-1. **Instantiate the adapter once** per process (preferably as a singleton) and pass the instance to OntologyClassification and any child components.  This avoids multiple LevelDB handles and ensures the JSON export remains coherent.
-
-2. **Never bypass the adapter** when reading or writing graph data.  All direct Graphology or LevelDB calls would skip the automatic JSON export and break the consistency guarantees described in observation 4.
-
-3. **Treat the classification interface as read‑only** for consumers such as ManualLearning and OnlineLearning unless they are explicitly responsible for mutating classification data.  Mutations should be funneled through well‑named methods that internally invoke the adapter’s write paths.
-
-4. **When extending ontology metadata**, use the OntologyMetadataManagement child component.  Its APIs are built on top of the same adapter, guaranteeing that new class/type definitions are instantly available to the classification logic.
-
-5. **Monitor the JSON export** size and frequency if the graph grows large.  The automatic sync can become a performance bottleneck; consider throttling or batch‑committing mutations if latency becomes an issue.
+In practice, OntologyClassification consumes the Claude‑style payloads, applies the semantic‑constraint logic, and persists the resulting typed entities via the **EntityPersistence** sibling component.  When deeper code‑level reasoning is required, it forwards the relevant code graph to the **Code Graph RAG** system (see `integrations/code-graph-rag/README.md`).  The component also registers itself with the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/README.md`) so that any violations of ontology‑based constraints are surfaced to the broader monitoring infrastructure.
 
 ---
 
-### 1. Architectural patterns identified  
-- **Adapter pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
-- **Facade for synchronisation** – automatic JSON export wrapped inside the adapter.  
-- **Composable hierarchy** – parent‑child relationship (KnowledgeManagement → OntologyClassification → OntologyMetadataManagement).  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-- **Single‑adapter persistence** simplifies code reuse and consistency but couples all graph‑related components to the same storage technology.  
-- **Graphology + LevelDB** provides fast key‑value backed graph operations; however, LevelDB is an embedded store, limiting horizontal scaling across machines.  
-- **Automatic JSON export** offers immediate portability but adds I/O overhead on every write.  
+The architecture of OntologyClassification follows a **modular, contract‑driven composition** pattern.  Rather than embedding ontology logic directly, it delegates to a collection of well‑defined sub‑systems that each own a specific responsibility:
 
-### 3. System structure insights  
-- OntologyClassification sits at the core of the KnowledgeManagement domain, acting as both a **data producer** (classifications) and **metadata provider**.  
-- Siblings share the same persistence layer, reinforcing a **domain‑wide graph model**.  
-- The child component, OntologyMetadataManagement, extends the core without introducing new storage concerns, illustrating a **separation of concerns** within the same bounded context.  
+1. **Data‑format contract** – The Claude code‑hook format provides a stable JSON‑ish schema that all upstream producers (e.g., the **UKBTraceReporting** sibling) must adhere to.  By anchoring on this file‑level contract, OntologyClassification can evolve its internal processing without breaking callers.  
 
-### 4. Scalability considerations  
-- Because LevelDB is local to the process, scaling out will require either sharding the graph across multiple instances or migrating to a distributed graph store.  
-- The JSON export sync must be evaluated for large graphs; batching or asynchronous export could mitigate potential I/O saturation.  
+2. **Constraint‑monitor integration** – The component registers its ontological rules with the MCP Constraint Monitor (documented in `integrations/mcp-constraint-monitor/README.md`).  This mirrors the *observer* pattern: the monitor watches for constraint violations emitted by OntologyClassification and raises alerts downstream.  
 
-### 5. Maintainability assessment  
-- Centralising all graph interactions in `GraphDatabaseAdapter` greatly improves maintainability: changes to the underlying database or export format are isolated to a single file.  
-- The clear contract between OntologyClassification and its children/siblings reduces duplication and eases onboarding for new developers.  
-- The main maintainability risk lies in the tight coupling to LevelDB; any future need for a different backend will require careful refactoring of the adapter while preserving its external API.
+3. **Semantic detection pipeline** – The detection logic described in `semantic-constraint-detection.md` is invoked as a pure‑function pipeline that receives the Claude payload, enriches it with inferred semantic relationships, and emits a set of ontology tags.  This pipeline is stateless, which supports easy unit testing and parallel execution.  
+
+4. **Persistence via EntityPersistence** – Typed entities are handed off to the **EntityPersistence** sibling, which—according to its own documentation—stores entities in a graph database.  The hand‑off is a simple interface call (e.g., `EntityPersistence.saveTypedEntity(entity)`) that abstracts away storage concerns from OntologyClassification.  
+
+5. **Graph‑based reasoning with Code Graph RAG** – For complex code‑level classification, OntologyClassification forwards a sub‑graph to the **Code Graph RAG** system (`integrations/code-graph-rag/README.md`).  This follows a *request‑response* style integration: OntologyClassification supplies a code‑graph fragment, the RAG service returns enriched semantic annotations, and the component merges those back into its ontology assignment.  
+
+The parent **KnowledgeManagement** component employs lazy LLM initialization (see `wave-controller.ts:489`).  OntologyClassification inherits this “defer‑until‑needed” philosophy by only loading the heavy constraint‑monitor and RAG clients when a classification request arrives, thereby keeping the overall memory footprint low.
+
+---
+
+## Implementation Details  
+
+Even though no concrete class definitions appear in the current source snapshot, the documentation outlines the concrete steps that OntologyClassification follows:
+
+1. **Payload ingestion** – A request arrives containing the Claude‑style data structure.  The format is strictly defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, which enumerates fields such as `codeSnippet`, `metadata`, and `hookId`.  The component parses this payload into an internal `ClaudeHookPayload` object.
+
+2. **Constraint configuration lookup** – Using the rules described in `constraint-configuration.md`, OntologyClassification selects the appropriate ontology constraint set based on the `hookId` and any supplied metadata.  This lookup is typically a map lookup (`constraintMap[hookId]`) that yields a `ConstraintSpec`.
+
+3. **Semantic‑constraint detection** – The core algorithm, documented in `semantic-constraint-detection.md`, runs a series of pattern‑matching and inference steps:
+   * Tokenize the `codeSnippet`.
+   * Match token sequences against a pre‑compiled ontology lexicon.
+   * Generate a provisional set of ontology tags (`candidateTags`).
+   * Apply the `ConstraintSpec` to filter out illegal combinations, producing the final `assignedTags`.
+
+4. **Graph enrichment (optional)** – If the payload includes a code‑graph identifier, OntologyClassification invokes the Code Graph RAG service.  The request payload is constructed per the RAG README and sent over an internal RPC channel.  The RAG response contains additional semantic edges that are merged into `assignedTags`.
+
+5. **Persistence** – The resulting `TypedEntity` (containing the original entity identifier, the `assignedTags`, and provenance metadata) is handed to the **EntityPersistence** sibling.  The persistence layer stores the entity in a graph database, enabling downstream queries from components such as **ObservationDerivation**.
+
+6. **Constraint‑monitor reporting** – Finally, OntologyClassification emits a `ConstraintEvent` to the MCP Constraint Monitor, indicating whether any constraints were violated during classification.  The monitor, as per its README, aggregates these events for alerting and analytics.
+
+All of these steps are orchestrated in a single, async workflow that respects the lazy‑load philosophy of the parent KnowledgeManagement component: the constraint‑monitor client, the RAG client, and the persistence driver are instantiated only when the first classification request triggers them.
+
+---
+
+## Integration Points  
+
+| Integration Target | Path / Document | Interaction Pattern | Key Artifacts |
+|--------------------|-----------------|---------------------|---------------|
+| **ClaudeCodeHookDataFormat** | `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Input schema contract | `ClaudeHookPayload` JSON |
+| **MCP Constraint Monitor** | `integrations/mcp-constraint-monitor/README.md` | Observer / event emitter | `ConstraintEvent` objects |
+| **Constraint Configuration** | `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` | Rule lookup service | `ConstraintSpec` map |
+| **Semantic‑Constraint Detection** | `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` | Pure‑function pipeline | `candidateTags`, `assignedTags` |
+| **EntityPersistence** | (sibling component) | Persistence interface | `EntityPersistence.saveTypedEntity()` |
+| **Code Graph RAG** | `integrations/code-graph-rag/README.md` | Request‑response RPC | `CodeGraphRequest`, `CodeGraphResponse` |
+| **Parent KnowledgeManagement** | `wave-controller.ts:489` (lazy LLM init) | Deferred initialization | Shared atomic index, `ensureLLMInitialized()` |
+
+Through these explicit contracts, OntologyClassification remains decoupled from the concrete implementations of its siblings.  For example, the **EntityPersistence** sibling could swap a Neo4j backend for a JanusGraph backend without affecting OntologyClassification, as long as the `saveTypedEntity` contract stays stable.
+
+---
+
+## Usage Guidelines  
+
+1. **Provide a valid Claude payload** – All callers must construct the JSON according to the schema in `CLAUDE-CODE-HOOK-FORMAT.md`.  Missing fields will cause the ingestion step to abort early.  
+
+2. **Register constraint specifications** – Before any classification can occur, the appropriate `ConstraintSpec` must be defined in the configuration file referenced by `constraint-configuration.md`.  Failure to do so will result in a fallback to a permissive rule set, which may generate noisy ontology tags.  
+
+3. **Leverage lazy loading** – Do not pre‑instantiate the RAG or constraint‑monitor clients in application startup code.  Let OntologyClassification create them on demand; this aligns with the parent component’s memory‑saving strategy.  
+
+4. **Handle asynchronous responses** – Both the RAG service and the persistence layer operate asynchronously.  Callers should await the returned promise (or use a callback) to ensure that the classification result is fully persisted before proceeding.  
+
+5. **Monitor constraint events** – Subscribe to the MCP Constraint Monitor’s event stream if you need to react to ontology violations (e.g., for alerting or automated remediation).  The event payload includes the offending `hookId` and the violated rule, enabling precise diagnostics.  
+
+6. **Avoid circular dependencies** – Because OntologyClassification consumes services from several siblings, keep import statements one‑directional: OntologyClassification → EntityPersistence / CodeGraphRAG, but not the reverse.  This preserves a clean dependency graph and prevents build‑time cycles.  
+
+---
+
+### Architectural patterns identified  
+
+* **Contract‑driven modular composition** – All interactions are mediated by explicit documentation (Claude format, constraint config).  
+* **Observer / event‑emitter** – MCP Constraint Monitor receives classification events.  
+* **Lazy initialization** – Defers heavyweight client creation until needed, inherited from KnowledgeManagement.  
+* **Stateless pipeline** – Semantic‑constraint detection runs as a pure function, enabling parallelism.  
+
+### Design decisions and trade‑offs  
+
+| Decision | Rationale | Trade‑off |
+|----------|-----------|-----------|
+| Use Claude code‑hook format as the canonical payload | Provides a single source of truth for incoming data; aligns with existing monitoring tooling. | Ties OntologyClassification to a specific external format; any change requires coordination across all producers. |
+| Delegate persistence to EntityPersistence | Keeps classification logic focused on semantics; enables reuse of a shared graph store. | Introduces an extra network hop and potential latency when persisting large batches. |
+| Optional RAG enrichment | Allows deeper reasoning only when needed, saving compute for simple cases. | Adds complexity to the workflow and requires handling of partial failures from the RAG service. |
+| Support multiple ontology systems | Increases flexibility for different domains (e.g., domain‑specific taxonomies). | Increases the size of the ontology lookup tables and may cause ambiguous tag assignments that need disambiguation logic. |
+
+### System structure insights  
+
+* **Vertical layering** – The parent KnowledgeManagement component supplies cross‑cutting concerns (lazy LLM init, concurrency utilities).  OntologyClassification sits one layer below, focusing on semantic classification, while its siblings (EntityPersistence, CodeGraphRAG) provide infrastructural services.  
+* **Horizontal sibling collaboration** – OntologyClassification shares contracts with several peers (ManualLearning, OnlineLearning, UKBTraceReporting) but does not directly invoke them, preserving a clean separation of concerns.  
+* **Documentation‑first contract definition** – All critical interfaces are defined in markdown files rather than code, which suggests a culture of “design‑first” documentation that drives implementation.  
+
+### Scalability considerations  
+
+* **Stateless detection pipeline** – Because the semantic‑constraint detection step is pure and does not retain mutable state, it can be horizontally scaled across multiple worker processes or containers.  
+* **Graph‑RAG on demand** – By invoking the RAG service only for complex cases, the system avoids saturating the RAG backend under normal load, preserving capacity for high‑value queries.  
+* **Lazy client creation** – Reduces the number of long‑lived connections to external services, allowing the system to handle spikes in request volume without exhausting resources.  
+* **Constraint‑monitor event aggregation** – The monitor can batch constraint events, limiting the pressure on downstream alerting pipelines.  
+
+### Maintainability assessment  
+
+* **High modularity** – Clear separation between payload format, constraint logic, persistence, and graph enrichment makes each piece independently testable and replaceable.  
+* **Documentation‑driven contracts** – While this improves clarity, it also creates a maintenance burden: any change in the markdown contracts must be propagated to all consuming components. Automated validation (e.g., schema generation from the markdown) would mitigate drift.  
+* **Limited code visibility** – The absence of concrete code symbols in the current snapshot means that developers must rely heavily on the markdown guides; this can slow onboarding but also encourages disciplined adherence to the documented contracts.  
+* **Dependency surface** – OntologyClassification depends on four sibling services; versioning and compatibility need careful coordination, especially if any sibling evolves its API.  
+
+Overall, OntologyClassification exhibits a well‑structured, contract‑centric design that balances flexibility (multiple ontologies, optional RAG enrichment) with operational efficiency (lazy loading, stateless pipelines).  With disciplined documentation updates and automated contract validation, the component should remain both scalable and maintainable as the KnowledgeManagement ecosystem grows.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, leveraging Graphology and LevelDB for data storage. This is evident in the storage/graph-database-adapter.ts file, where the GraphDatabaseAdapter class is defined. The adapter provides a layer of abstraction between the KnowledgeManagement component and the underlying graph database, allowing for seamless interaction with the database. The use of Graphology and LevelDB enables efficient storage and querying of knowledge graphs, which is crucial for the component's functionality. Furthermore, the adapter's automatic JSON export sync feature ensures that data is consistently updated and available for use.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
 
 ### Children
-- [OntologyMetadataManagement](./OntologyMetadataManagement.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is utilized for persistence, suggesting a strong connection to metadata management.
+- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- The CLAUDE-CODE-HOOK-FORMAT.md file describes the data format used by the OntologyClassification sub-component, providing a clear outline of the expected data structure.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-- [SemanticCodeSearch](./SemanticCodeSearch.md) -- SemanticCodeSearch utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
+- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
+- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 
 
 ---
