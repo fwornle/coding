@@ -2,138 +2,161 @@
 
 **Type:** SubComponent
 
-OnlineLearning pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification
+OnlineLearning could involve the use of semantic constraint detection, as mentioned in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
 
 ## What It Is  
 
-OnlineLearning is a **sub‑component** of the *KnowledgeManagement* domain that orchestrates the “learning” phase of the system’s code‑knowledge graph.  All of its concrete behaviour lives in the integration assets that sit under the repository’s `integrations/` folder.  The component pulls in three primary integrations:
+**OnlineLearning** is a sub‑component of the **KnowledgeManagement** system that focuses on continuously extracting, refining, and persisting knowledge from source‑code repositories.  The core of its functionality lives in the *batch analysis pipeline* (see the project documentation that mentions “extract knowledge from git history”) which is declared as a child component under **OnlineLearning**.  In practice, the sub‑component stitches together a handful of existing integrations:
 
-* **Code‑Graph‑RAG** – described in `integrations/code-graph-rag/README.md`, which supplies the mechanisms for constructing and querying the graph‑based Retrieval‑Augmented Generation (RAG) store that underpins the learning process.  
-* **COPI** – the logging, tmux session management and batch‑analysis facilities documented in `integrations/copi/README.md` and its supporting reference files (`integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md`, `integrations/copi/scripts/README.md`).  
-* **MCP‑Constraint‑Monitor** – the constraint‑detection and execution‑ordering logic explained in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` and `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.
+* **Code Graph RAG** – described in `integrations/code-graph-rag/README.md`, providing retrieval‑augmented generation over a graph representation of code.  
+* **MCP Constraint Monitor** – documented in `integrations/mcp-constraint-monitor/README.md` together with its constraint‑configuration guide (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) and semantic‑constraint detection (`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`).  
+* **Claude Code Hook Data Format** – the canonical payload format for communicating code‑related observations, defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
+* **copi** – a thin wrapper around the GitHub Copilot CLI, referenced in `integrations/copi/README.md`, used to enrich the learning loop with AI‑generated suggestions.
 
-Together these integrations give OnlineLearning the ability to ingest source‑code, enrich it with ontology metadata, execute a directed‑acyclic‑graph (DAG) of analysis steps, and surface semantic constraints back to the broader KnowledgeManagement system.
+Together these pieces enable **OnlineLearning** to ingest historical Git data, transform it into a code‑graph, run constraint‑based validation, and finally feed the results back into the broader KnowledgeManagement knowledge base.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of OnlineLearning is **pipeline‑centric** and relies on three interlocking design approaches that are explicitly called out in the integration READMEs:
+The architecture of **OnlineLearning** is a *pipeline‑oriented* composition rather than a monolithic block.  The design follows a **batch‑processing** pattern where the **BatchAnalysisPipeline** acts as the orchestrator: it pulls a series of commits, runs analysis steps, and persists the derived artefacts.  Each step is realized by an existing integration, allowing the sub‑component to remain thin while reusing proven capabilities.
 
-1. **Work‑Stealing Concurrency** – The `integrations/copi/scripts/README.md` describes a shared `nextIndex` counter that multiple workers poll to claim the next unit of work.  This lightweight, lock‑free scheme distributes batch‑analysis jobs across available CPU cores without a central scheduler, enabling the component to scale horizontally on a single node.
+* **Retrieval‑Augmented Generation (RAG)** – The Code Graph RAG system (`integrations/code-graph-rag/README.md`) supplies a *graph‑based index* of code entities that can be queried during the learning phase.  This RAG layer is invoked after the raw Git history is parsed, enabling semantic similarity searches that feed the constraint monitor.  
 
-2. **DAG‑Based Execution with Topological Sort** – The constraint‑monitor integration (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) defines a directed‑acyclic‑graph of analysis stages.  Before execution the system performs a topological sort, guaranteeing that dependent stages run only after their prerequisites have completed.  This model provides deterministic ordering while still allowing independent branches to be processed in parallel.
+* **Constraint‑Monitoring** – The MCP Constraint Monitor (`integrations/mcp-constraint-monitor/README.md`) provides two complementary mechanisms: a *static configuration* (see `constraint-configuration.md`) and a *semantic detection* engine (`semantic-constraint-detection.md`).  The monitor consumes the Claude Code Hook payload format (`CLAUDE-CODE-HOOK-FORMAT.md`) to standardize the data it validates, ensuring a single contract across all downstream consumers.  
 
-3. **Ontology Pre‑Population** – To avoid repetitive large‑language‑model (LLM) classification, the `STATUS‑LINE‑QUICK‑REFERENCE.md` under COPI pre‑populates ontology metadata fields for each code entity.  By seeding the graph with this information up‑front, later LLM calls can skip re‑classification, reducing latency and cost.
+* **Lazy LLM Initialization (Inherited)** – The parent **KnowledgeManagement** component employs a lazy‑loading strategy for large language models (LLMs) – a pattern observable in its `ensureLLMInitialized()` method.  **OnlineLearning** inherits this behaviour, deferring the heavy LLM startup until the first batch run needs to generate or score code snippets (e.g., via **copi**).  This reduces memory pressure and improves overall system responsiveness.  
 
-The component does **not** introduce any novel architectural style such as micro‑services or event‑driven messaging; instead it composes existing integrations into a cohesive workflow.  It inherits the **adapter** pattern used by its parent KnowledgeManagement (e.g., adapters for LevelDB persistence) and shares the same logging/tmux infrastructure as its siblings — ManualLearning, EntityPersistence, UKBTraceReporting — through the COPI integration.
+* **CLI Wrapper Integration** – The **copi** wrapper (`integrations/copi/README.md`) is used as a thin façade around the Copilot CLI, allowing the batch pipeline to request AI‑generated code suggestions without embedding Copilot directly.  This keeps the dependency surface small and isolates versioning concerns.  
+
+The overall interaction diagram can be described as:
+
+```
+BatchAnalysisPipeline
+   └─> Git history extractor  (parent KnowledgeManagement)
+   └─> Code Graph RAG (integrations/code-graph-rag)
+   └─> Claude Code Hook payload construction
+   └─> MCP Constraint Monitor (config + semantic detection)
+   └─> Optional Copi AI suggestions
+   └─> Persisted knowledge back into KnowledgeManagement
+```
 
 ---
 
 ## Implementation Details  
 
-### Code‑Graph‑RAG Integration  
-All interactions with the graph‑based RAG system are mediated through the documentation in `integrations/code-graph-rag/README.md`.  Although no concrete symbols appear in the source snapshot, the README outlines the expected API: a **graph construction** routine that ingests parsed source files and a **query interface** that returns relevant code fragments to downstream analysis stages.  OnlineLearning invokes these routines as the first step of its pipeline, feeding the resulting graph into the constraint‑monitor.
+Even though the repository currently shows “0 code symbols found,” the observable file paths give a clear picture of the implementation boundaries:
 
-### COPI Logging & Batch Pipeline  
-The COPI integration supplies two critical pieces of infrastructure:
+1. **BatchAnalysisPipeline** – The pipeline is defined as a child of **OnlineLearning** and is referenced in the project documentation.  It likely consists of a series of scripted stages (e.g., a `runBatch.sh` or a TypeScript orchestrator) that iterate over commit ranges, invoke the downstream integrations, and write results to the KnowledgeManagement store.
 
-* **Logging & tmux orchestration** – The `integrations/copi/README.md` specifies that each analysis run spawns a dedicated tmux pane, with log streams written to a shared location.  This mirrors the approach used by the sibling components (ManualLearning, EntityPersistence, UKBTraceReporting), ensuring a uniform observability surface across the KnowledgeManagement suite.  
+2. **Code Graph RAG Integration** – The `integrations/code-graph-rag/README.md` outlines the steps for building a graph of code entities (functions, classes, modules) and exposing a query API.  Within **OnlineLearning**, this API is called after the Git diff is parsed, converting raw code changes into graph nodes that can be traversed for similarity or dependency analysis.
 
-* **Batch analysis & work‑stealing** – The quick‑reference guide (`STATUS‑LINE‑QUICK‑REFERENCE.md`) details a **batch analysis pipeline** that processes code entities in chunks.  Workers read the global `nextIndex` counter (described in `integrations/copi/scripts/README.md`) to claim the next chunk, execute the assigned analysis step, and then increment the counter.  Because the counter is a simple integer stored in shared memory (or a lightweight file), contention is minimal, and the system can achieve near‑linear speed‑up on multi‑core hardware.
+3. **Constraint Configuration** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` describes a YAML/JSON schema that lists allowed patterns, prohibited APIs, and policy thresholds.  The BatchAnalysisPipeline loads this configuration at start‑up, feeding it into the monitor’s rule engine.
 
-### DAG Execution & Semantic Constraints  
-The constraint‑monitor integration introduces a **semantic‑constraint detection** stage (`semantic-constraint-detection.md`).  After the graph is populated, the system walks the DAG defined in `constraint-configuration.md`.  Each node in the DAG corresponds to a specific constraint check (e.g., naming conventions, dependency cycles).  The topological sort guarantees that lower‑level constraints are resolved before higher‑level ones, preventing false positives that could arise from incomplete context.
+4. **Semantic Constraint Detection** – The `semantic-constraint-detection.md` document explains how the monitor leverages LLM‑based embeddings to discover violations that are not expressible in static rules.  Because KnowledgeManagement lazily loads its LLM, the first time a semantic check runs the model is instantiated, after which the monitor can reuse the embeddings for subsequent commits.
 
-### Ontology Metadata Pre‑Population  
-To reduce redundant LLM classification, the `STATUS‑LINE‑QUICK‑REFERENCE.md` instructs OnlineLearning to write **ontology metadata fields** (such as `entityType`, `domain`, `confidence`) directly into the graph nodes during the initial ingestion phase.  Subsequent stages read these fields instead of re‑invoking the LLM, which both speeds up the pipeline and stabilizes the output by avoiding stochastic re‑classification.
+5. **Claude Code Hook Data Format** – The `CLAUDE-CODE-HOOK-FORMAT.md` defines a JSON envelope containing fields such as `filePath`, `codeSnippet`, `metadata`, and `diagnostics`.  OnlineLearning constructs this envelope after each analysis step, ensuring downstream consumers (including the MCP monitor and any reporting UI) receive a uniform payload.
+
+6. **copi Integration** – The `integrations/copi/README.md` shows a simple command‑line interface (`copi suggest --file <path>`) that returns AI‑generated suggestions.  The pipeline optionally invokes this command when a constraint violation is detected, using the suggestion as a remediation hint that is stored alongside the original payload.
+
+Because the sub‑component does not introduce its own bespoke classes, the bulk of its logic lives in orchestration scripts and configuration files that wire together the above integrations.
 
 ---
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement** – OnlineLearning feeds its enriched graph back into the parent’s LevelDB‑backed store.  The parent’s adapter layer consumes the graph nodes produced by the Code‑Graph‑RAG integration, while the parent’s routing logic determines where constraint‑detection results should be persisted.
+* **Parent – KnowledgeManagement**  
+  * Receives the final knowledge artefacts (graph updates, constraint reports) from **OnlineLearning**.  
+  * Supplies the lazy‑loaded LLM used by both the semantic constraint detector and any Copilot‑based suggestion generation.  
 
-* **Sibling Components** – All siblings share the COPI logging/tmux framework.  This commonality means that any change to the logging format or tmux session handling in `integrations/copi/README.md` propagates uniformly, reducing duplication of effort.  Moreover, the batch‑analysis pattern used by ManualLearning, EntityPersistence, and UKBTraceReporting is identical to that of OnlineLearning, allowing developers to reuse scripts and monitoring dashboards across components.
+* **Sibling – CodeGraphRAG**  
+  * Shares the same underlying graph‑construction logic; **OnlineLearning** simply consumes the ready‑made graph API rather than rebuilding it.  
 
-* **Child – CodeGraphRagIntegration** – The `CodeGraphRagIntegration` child is effectively a thin wrapper around the assets described in `integrations/code-graph-rag/README.md`.  OnlineLearning calls into this child to both **populate** the graph (construction) and **retrieve** relevant snippets during constraint checks.  Because the integration is documented as a separate sub‑component, it can be swapped out or versioned independently without affecting the higher‑level pipeline.
+* **Sibling – MCP Constraint Monitor**  
+  * Both **OnlineLearning** and **UKBTraceReporting** rely on the same Claude Code Hook format, promoting a unified contract for constraint data across the system.  
 
-* **External Interfaces** – The DAG execution model exposes a **configuration file** (`constraint-configuration.md`) that can be edited to add, remove, or reorder analysis steps.  This makes the pipeline extensible for future constraint types without code changes.  The semantic‑constraint detector reads this configuration at start‑up, building the execution graph dynamically.
+* **Child – BatchAnalysisPipeline**  
+  * Acts as the execution engine for the learning loop, invoking the Code Graph RAG, the constraint monitor, and optionally **copi**.  
+
+* **External – copi (GitHub Copilot CLI wrapper)**  
+  * Provides AI‑assisted remediation suggestions that are fed back into the knowledge base as actionable items.  
+
+All integration points are mediated through well‑documented README or markdown files, meaning that developers can locate the exact contract (e.g., JSON schema, CLI flags) without hunting through source code.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Follow the COPI conventions** – When adding new batch jobs, always use the shared `nextIndex` pattern documented in `integrations/copi/scripts/README.md`.  This ensures that work‑stealing continues to operate correctly and prevents race conditions.
+1. **Configure Constraints First** – Before running any batch job, ensure that `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is populated with the organization’s policy rules.  Missing or malformed configuration will cause the pipeline to abort early.  
 
-2. **Populate ontology fields early** – Any new entity type introduced into the code graph should have its metadata fields written during the ingestion step (see `STATUS‑LINE‑QUICK‑REFERENCE.md`).  Skipping this step will cause downstream LLM calls and degrade performance.
+2. **Run the Batch Pipeline Incrementally** – Because the pipeline processes Git history, it is advisable to limit each run to a reasonable commit window (e.g., one week or a feature branch).  This prevents excessive memory consumption and keeps the LLM warm for semantic checks.  
 
-3. **Maintain DAG integrity** – When editing `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, keep the graph acyclic.  Adding a circular dependency will break the topological sort and halt the pipeline.  Use the provided validation script (if any) to check for cycles before committing changes.
+3. **Maintain the Claude Code Hook Schema** – Any changes to `CLAUDE-CODE-HOOK-FORMAT.md` must be reflected in both the constraint monitor and any downstream reporting components (e.g., **UKBTraceReporting**).  Validation scripts are provided in the integration docs to catch schema mismatches early.  
 
-4. **Leverage tmux panes for observability** – Each analysis run spawns a tmux pane as per `integrations/copi/README.md`.  Do not disable this unless you have an alternative logging pipeline, because the pane provides real‑time visibility into worker progress and error messages.
+4. **Leverage copi Sparingly** – The **copi** wrapper incurs network latency and API cost.  Use it only when the constraint monitor flags a violation that cannot be auto‑resolved; otherwise, rely on static rule enforcement to keep the batch run fast.  
 
-5. **Coordinate with sibling components** – Because logging and batch‑analysis patterns are shared, any modification to the COPI scripts should be tested against ManualLearning, EntityPersistence, and UKBTraceReporting to avoid regressions that could affect their operational stability.
+5. **Monitor LLM Warm‑up** – The first batch execution after a system restart will experience a noticeable delay due to lazy LLM initialization (as described in the parent component).  Plan for this latency in CI pipelines or scheduled jobs.  
+
+6. **Version Pin Integrations** – Each integration lives under its own `integrations/` directory with its own README.  Pin the versions of these sub‑modules in the top‑level `package.json` (or equivalent) to avoid accidental breaking changes when upstream repositories evolve.
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-* Work‑stealing concurrency via a shared `nextIndex` counter.  
-* DAG‑based execution with topological sorting for deterministic, parallelizable analysis.  
-* Pre‑population of ontology metadata to reduce repetitive LLM classification.  
-* Adapter‑style integration with the parent KnowledgeManagement persistence layer.  
+* **Batch Processing Pipeline** – orchestrated by the child **BatchAnalysisPipeline**.  
+* **Retrieval‑Augmented Generation (RAG)** – via the Code Graph RAG system.  
+* **Constraint‑Monitoring (Rule‑Based + Semantic)** – implemented by the MCP Constraint Monitor.  
+* **Lazy LLM Initialization** – inherited from the parent **KnowledgeManagement** component.  
+* **Standardized Data Exchange (Claude Code Hook Format)** – a contract‑first JSON payload model.  
 
-### Design decisions and trade‑offs  
+### Design Decisions and Trade‑offs  
 
-* **Work‑stealing** provides low‑overhead parallelism but relies on a single atomic counter, which could become a bottleneck at extreme scale.  
-* **DAG execution** guarantees order and enables parallel branches, yet requires careful maintenance of acyclicity; adding new constraints introduces the risk of cycles.  
-* **Ontology pre‑population** trades upfront processing time for downstream latency savings and cost reduction (fewer LLM calls).  
-* **Shared COPI logging/tmux** promotes uniform observability across siblings but couples their lifecycle to a common infrastructure, making independent evolution harder.  
+| Decision | Benefit | Trade‑off |
+|----------|---------|-----------|
+| Reuse existing **Code Graph RAG** instead of building a custom index | Faster development, proven graph query capabilities | Introduces coupling to the RAG integration’s version and API surface |
+| Centralize constraint logic in **MCP Constraint Monitor** | Single source of truth for policies, reusable across siblings | All constraint changes affect multiple components; requires careful coordination |
+| Use **Claude Code Hook** as the universal payload format | Consistency across reporting, monitoring, and learning pipelines | Rigid schema may need extensions for future data types |
+| Lazy‑load LLMs | Lower baseline memory usage, quicker cold start for unrelated components | First‑run latency and potential “cold‑start” failures if initialization errors occur |
+| Optional **copi** AI suggestions | Adds value for remediation without embedding Copilot directly | Additional external service dependency, cost, and latency |
 
-### System structure insights  
+### System Structure Insights  
 
-OnlineLearning sits as a focused pipeline under KnowledgeManagement, reusing the COPI logging/parallelism stack common to its siblings.  Its child, CodeGraphRagIntegration, isolates the graph‑construction logic, allowing the higher‑level DAG and constraint detection to remain agnostic of the underlying graph database.  The overall structure resembles a **modular pipeline** where each integration contributes a distinct layer: ingestion (Code‑Graph‑RAG), enrichment (ontology metadata), execution control (MCP‑Constraint‑Monitor), and observability (COPI).  
+* **OnlineLearning** sits under **KnowledgeManagement**, inheriting its lazy LLM strategy and contributing enriched knowledge back to the parent.  
+* It shares the **CodeGraphRAG** and **MCP Constraint Monitor** integrations with several siblings (**ObservationDerivation**, **UKBTraceReporting**, **OntologyClassification**), indicating a design where core analysis capabilities are deliberately factored out for reuse.  
+* The child **BatchAnalysisPipeline** is the only concrete execution engine within the sub‑component, emphasizing a “pipeline‑as‑component” approach rather than a monolithic service.  
 
-### Scalability considerations  
+### Scalability Considerations  
 
-* The work‑stealing model scales well on multi‑core machines; however, for distributed scaling a more robust task queue would be required.  
-* DAG parallelism allows independent branches to run concurrently, improving throughput as the number of constraints grows.  
-* Pre‑populated metadata reduces LLM invocation frequency, directly limiting compute cost and latency as the codebase expands.  
+* **Horizontal Scaling of the Batch Pipeline** – Since the pipeline processes commits independently, multiple instances can run in parallel on different commit ranges, leveraging the shared LLM cache to avoid redundant model loads.  
+* **RAG Vector Store** – The underlying graph index can be sharded or hosted on a scalable vector database, allowing the retrieval layer to handle larger codebases without degrading query latency.  
+* **Constraint Monitor Distribution** – Rule‑based checks are cheap and can be parallelized; semantic checks can be off‑loaded to a dedicated inference service that scales horizontally.  
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-* **Strengths** – Clear separation of concerns via dedicated README‑driven integrations; shared logging and concurrency patterns reduce duplication; configuration‑driven DAG makes adding new constraints straightforward.  
-* **Weaknesses** – Absence of concrete code symbols in the snapshot hampers static analysis; reliance on README documentation means that out‑of‑date docs could lead to implementation drift; the single‑counter work‑stealing approach may need refactoring for very large workloads.  
+* **High Reuse, Low Duplication** – By delegating heavy lifting to well‑documented integrations, the sub‑component’s own codebase remains small, which eases maintenance.  
+* **Documentation‑Centric Integration** – All interaction contracts are captured in markdown files (`README.md`, `*.md`), providing clear guidance but also a risk: if documentation drifts from actual implementation, developers may encounter mismatches.  
+* **Dependency Management** – The reliance on external tools (Copilot via **copi**, LLM providers) introduces version‑compatibility concerns; regular audits of the `integrations/` directories are required.  
+* **Testing Surface** – Since the core logic is orchestration, integration tests that spin up the full pipeline (including the RAG graph and constraint monitor) are essential for regression safety.  
 
-Overall, OnlineLearning presents a well‑documented, modular pipeline that leverages proven concurrency and execution ordering techniques, while remaining tightly coupled to its parent KnowledgeManagement and sibling components through shared integration assets.
-
-## Diagrams
-
-### Relationship
-
-![OnlineLearning Relationship](images/online-learning-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/online-learning-relationship.png)
+Overall, **OnlineLearning** is a well‑orchestrated, integration‑heavy sub‑component that leverages existing analysis and monitoring capabilities to turn Git history into actionable knowledge while adhering to the architectural conventions already established in the broader **KnowledgeManagement** ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
 
 ### Children
-- [CodeGraphRagIntegration](./CodeGraphRagIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code system, a graph-based RAG system for any codebases, indicating the importance of this integration in the OnlineLearning sub-component.
+- [BatchAnalysisPipeline](./BatchAnalysisPipeline.md) -- The project documentation mentions the batch analysis pipeline in the context of OnlineLearning, implying its importance in extracting knowledge from git history.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses integrations/copi/README.md to handle logging and tmux integration for manual learning processes
-- [CodeGraphConstruction](./CodeGraphConstruction.md) -- CodeGraphConstruction uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses integrations/copi/README.md to handle logging and tmux integration for entity persistence
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting uses integrations/copi/README.md to handle logging and tmux integration for trace reporting
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses integrations/browser-access/README.md to handle browser access to the knowledge graph
+- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 
 
 ---

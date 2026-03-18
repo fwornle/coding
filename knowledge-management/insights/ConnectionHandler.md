@@ -2,103 +2,126 @@
 
 **Type:** SubComponent
 
-ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management
+The ConnectionHandler might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-The **ConnectionHandler** is a sub‑component that lives inside the **ConstraintSystem**.  Although the source repository does not expose a concrete file path for the handler (the “Code Structure” section reports *0 code symbols found*), the surrounding documentation makes its role crystal‑clear: it is the piece that **manages external connections** and does so with a **retry‑with‑back‑off** strategy.  By being housed in the same modular package that contains other sub‑components such as *ContentValidator*, *HookManager*, *ViolationCapture*, and *WorkflowManager*, the ConnectionHandler inherits the same architectural intent of the parent – a loosely‑coupled, replace‑able set of services that together enable the ConstraintSystem’s workflow.  
+**ConnectionHandler** is a sub‑component of the **Trajectory** component.  Its primary responsibility is to orchestrate the establishment and maintenance of external service connections on behalf of Trajectory.  The implementation lives alongside the other Trajectory adapters and is tightly coupled to the **SpecstoryAdapter** logic found in `lib/integrations/specstory-adapter.js`.  The adapter in that file attempts to reach the Specstory extension through three possible transports – HTTP, IPC (inter‑process communication), and a file‑watch mechanism – and ConnectionHandler leverages this flexible approach to provide a persistent, fault‑tolerant link to the extension.
 
-The observations repeatedly stress that the handler **decouples connection logic from the core system** and that its design “allows for the easy handling of connections, making it a flexible solution.”  In practice this means that any code that needs to talk to an external service (e.g., a database, a remote API, or a messaging broker) does not embed retry logic directly; instead it delegates to the ConnectionHandler, which abstracts the back‑off algorithm and any reconnection plumbing.  This makes the overall system easier to test, reason about, and evolve.
-
-## Architecture and Design  
-
-From the observations we can infer a **modular architecture**.  The ConstraintSystem is described as “integrating multiple sub‑components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService,” and the ConnectionHandler follows the same pattern: it is a self‑contained module that can be added, removed, or swapped without disturbing the rest of the system.  The modularity is reinforced by the explicit statement that the handler’s design “allows for the easy addition or removal of connection handlers,” which points to a **plug‑in style** where the parent component holds a collection of handler instances and iterates over them as needed.  
-
-The only concrete design pattern that appears in the observations is the **retry‑with‑back‑off** mechanism.  While the exact implementation details (e.g., exponential back‑off, jitter) are not enumerated, the repeated mention that the handler “enables the handling of connections with retry‑with‑back‑off” tells us that the component encapsulates this algorithm, shielding callers from the intricacies of timing and error handling.  This encapsulation is a classic example of the **Strategy pattern**—the retry policy can be viewed as a strategy that the ConnectionHandler applies whenever a connection attempt fails.  
-
-Interaction with other parts of the system is straightforward: the **ConstraintSystem** owns the ConnectionHandler and invokes it whenever a workflow step requires external communication.  Because the handler is a sibling to components such as *ContentValidator* and *HookManager*, they share the same lifecycle management (initialisation, graceful shutdown) provided by the parent, but they do not directly call each other.  This separation keeps the dependency graph shallow and reduces the risk of circular imports.
-
-## Implementation Details  
-
-The observations do not list concrete class names, method signatures, or file locations for the ConnectionHandler, so the implementation description must stay at a conceptual level.  The handler is likely realised as a **class** (e.g., `ConnectionHandler`) that exposes at least two public members:
-
-1. **`connect()` / `execute()`** – a method that initiates a connection or performs a request.  Internally it wraps the low‑level network call with a retry loop.
-2. **`configureRetryPolicy(options)`** – an optional hook that lets the parent or a consumer supply parameters such as maximum retries, initial delay, multiplier, and jitter.
-
-The retry‑with‑back‑off loop would follow a typical structure:
-
-```ts
-let attempt = 0;
-while (attempt < maxRetries) {
-  try {
-    return await lowLevelConnect();   // actual I/O
-  } catch (err) {
-    attempt++;
-    if (attempt >= maxRetries) throw err;
-    const delay = computeBackoff(attempt, baseDelay, multiplier);
-    await sleep(delay);
-  }
-}
-```
-
-Because the handler is “modular” and “allows for easy addition or removal,” the system probably registers the handler through a **dependency‑injection container** or a simple registry inside the ConstraintSystem.  This registry could be an array or map of handler instances, enabling the parent to iterate over them or replace one at runtime (e.g., swapping a mock handler for tests).  The integration point with the ConstraintSystem is therefore a **tight coupling** in terms of ownership (the parent creates the handler) but a **loose coupling** in terms of behaviour (the rest of the system only sees the abstracted `connect` interface).
-
-## Integration Points  
-
-The only explicit integration point mentioned is the **ConstraintSystem**, which “contains ConnectionHandler” and “enables the handling of connections.”  Consequently, any component that resides under the ConstraintSystem—such as *ContentValidator*, *HookManager*, *ViolationCapture*, or *WorkflowManager*—may indirectly depend on the ConnectionHandler when they need to reach external services (e.g., loading hook configurations from a remote store).  The integration is likely performed via a **service locator** pattern: the parent component exposes a getter like `getConnectionHandler()` that child components call when they need a connection.  
-
-Because the handler implements retry logic, downstream components do not need to implement their own back‑off; they simply invoke the handler and handle the eventual success or failure.  This reduces duplicated error‑handling code across siblings and centralises connection‑related configuration (timeouts, retry limits) in a single place.  No other external libraries or services are referenced in the observations, so we cannot claim any additional dependencies.
-
-## Usage Guidelines  
-
-1. **Delegate all external calls** – Whenever a sub‑component of the ConstraintSystem needs to communicate with an outside system, it should call the ConnectionHandler rather than embedding raw network code.  This guarantees that the retry‑with‑back‑off policy is consistently applied.  
-
-2. **Do not alter the retry policy locally** – The ConnectionHandler’s retry configuration is intended to be set once (typically at system start‑up) by the ConstraintSystem.  Changing the policy inside a consumer can lead to unpredictable back‑off behaviour and should be avoided.  
-
-3. **Prefer the registered instance** – Retrieve the handler through the parent’s accessor (e.g., `constraintSystem.getConnectionHandler()`).  Directly instantiating a new handler bypasses the modular registration mechanism and defeats the “easy addition or removal” design goal.  
-
-4. **Handle final failures** – Even with back‑off, the handler will eventually surface an exception after exhausting its retries.  Callers must be prepared to handle this terminal error, perhaps by logging, alerting, or falling back to a degraded path.  
-
-5. **Testing** – For unit tests, replace the real ConnectionHandler with a mock that simulates success or failure without waiting for real back‑off delays.  Because the handler is modular, this swap can be done by re‑registering a test implementation in the ConstraintSystem’s registry.
+Within the ConnectionHandler hierarchy, the **ConnectionEstablisher** child component carries out the low‑level handshake steps, while sibling components such as **LoggingManager**, **DataAdapter**, and **SpecstoryAdapter** share the same integration ecosystem (e.g., the Copi integration described in `integrations/copi/README.md`).  Together they form the connectivity layer that enables Trajectory to interact with external services like Specstory, Copi, and browser‑based tools.
 
 ---
 
-### Consolidated Answers  
+## Architecture and Design  
 
-1. **Architectural patterns identified**  
-   * Modular architecture (plug‑in style)  
-   * Strategy‑like encapsulation of retry‑with‑back‑off  
-   * Service‑locator / dependency‑injection for handler registration  
+The architecture that emerges from the observations is a **adapter‑centric, layered connectivity model**.  At the top level, Trajectory delegates connection concerns to ConnectionHandler, which in turn delegates the concrete transport details to the **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`).  This mirrors the classic **Adapter pattern**: ConnectionHandler defines a stable interface for the rest of Trajectory, while the underlying adapter knows how to speak HTTP, IPC, or file‑watch protocols.
 
-2. **Design decisions and trade‑offs**  
-   * **Decoupling connection logic** – isolates retry concerns, improves testability, but adds an indirection layer.  
-   * **Modular registration** – enables hot‑swap of handlers, at the cost of a small runtime registry overhead.  
-   * **Centralised retry policy** – ensures consistency, yet limits per‑caller customisation unless the policy is made configurable per instance.  
+A second, implicit pattern is the **Facade** provided by ConnectionHandler.  It aggregates several integration concerns – Copi hook handling (`integrations/copi/docs/hooks.md`), browser access (`integrations/browser-access/README.md`), and constraint configuration (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) – behind a single, cohesive API.  By doing so, it shields Trajectory and its siblings from the heterogeneity of those integrations.
 
-3. **System structure insights**  
-   * The ConstraintSystem acts as the parent container, hosting ConnectionHandler alongside other sub‑components (ContentValidator, HookManager, ViolationCapture, WorkflowManager).  
-   * Siblings share the same lifecycle management but remain functionally independent, each focusing on a distinct aspect of the workflow.  
+Interaction flow is straightforward:  
+1. Trajectory invokes ConnectionHandler to request a connection.  
+2. ConnectionHandler forwards the request to its child **ConnectionEstablisher**, which runs the handshake logic (e.g., trying multiple HTTP ports, falling back to IPC).  
+3. The underlying SpecstoryAdapter performs the actual transport work, using the same multi‑modal strategy described in the parent context.  
+4. Once a channel is alive, ConnectionHandler may store connection metadata using the storage approach outlined in `integrations/code‑graph‑rag/README.md`.  
+5. Other components (LoggingManager, DataAdapter) consume the established channel via the public ConnectionHandler API.
 
-4. **Scalability considerations**  
-   * Because the handler abstracts retries, scaling the number of concurrent external calls does not require each caller to implement its own back‑off; the handler can internally manage concurrency limits if needed.  
-   * Modular design allows horizontal scaling by deploying additional instances of the ConstraintSystem, each with its own ConnectionHandler, without code changes.  
+Because the design relies on well‑documented integration readmes, the system remains **declarative** about configuration – environment variables and constraint files (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) drive runtime behavior rather than hard‑coded values.
 
-5. **Maintainability assessment**  
-   * High maintainability: the single responsibility of the ConnectionHandler isolates a complex concern (retry‑with‑back‑off) into one place.  
-   * The modular plug‑in approach simplifies updates—replacing the handler or tweaking its policy does not ripple through sibling components.  
-   * Lack of exposed code symbols means developers must rely on documentation and the parent’s accessor methods, which underscores the importance of keeping the registration API stable.
+---
+
+## Implementation Details  
+
+* **File locations** – The core transport logic lives in `lib/integrations/specstory-adapter.js`.  That file defines methods such as `connectViaHTTP`, `connectViaIPC`, and `watchFileForSocket`, each trying a distinct connection strategy.  ConnectionHandler does not duplicate these methods; instead, it composes the adapter and invokes the appropriate entry point based on runtime conditions.
+
+* **ConnectionEstablisher** – As a child of ConnectionHandler, this class encapsulates the step‑by‑step protocol described in `integrations/copi/README.md`.  It likely reads the Copi hook definitions from `integrations/copi/docs/hooks.md` to know which callbacks to register once a connection is live.  The establisher also interprets constraint settings from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, ensuring that connections respect any resource limits or security policies.
+
+* **Metadata storage** – When a connection is successfully opened, ConnectionHandler may persist connection descriptors (e.g., socket paths, port numbers, timestamps) using the data‑store conventions from `integrations/code‑graph‑rag/README.md`.  This storage enables later retrieval for diagnostics or reconnection logic.
+
+* **Browser access** – If the connection target is a browser‑based service, ConnectionHandler can fall back to the helper described in `integrations/browser-access/README.md`.  That helper abstracts away Chrome DevTools Protocol (CDP) or WebSocket details, allowing ConnectionHandler to treat a browser session as just another transport endpoint.
+
+* **Dashboard exposure** – The integration described in `integrations/mcp-constraint-monitor/dashboard/README.md` suggests that ConnectionHandler may expose health or status endpoints that feed into a monitoring dashboard.  This would be achieved by publishing connection state (alive, retrying, failed) to the dashboard API.
+
+Overall, the implementation follows a **composition‑over‑inheritance** stance: ConnectionHandler assembles reusable adapters and helpers rather than embedding all logic directly.
+
+---
+
+## Integration Points  
+
+1. **SpecstoryAdapter (`lib/integrations/specstory-adapter.js`)** – The primary transport layer; ConnectionHandler calls its public methods to open/close connections.  
+
+2. **Copi Integration (`integrations/copi/README.md` & `integrations/copi/docs/hooks.md`)** – Provides hook definitions that ConnectionEstablisher registers once the connection is live, enabling Copi‑specific callbacks.  
+
+3. **Browser Access (`integrations/browser-access/README.md`)** – Optional module used when the external service is a browser instance; ConnectionHandler delegates to this module for CDP or WebSocket handling.  
+
+4. **Constraint Configuration (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`)** – Supplies environment‑variable‑driven limits (e.g., max concurrent connections) that ConnectionHandler validates before establishing a new link.  
+
+5. **Metadata Store (`integrations/code-graph-rag/README.md`)** – Used to persist connection metadata, supporting reconnection and audit trails.  
+
+6. **Monitoring Dashboard (`integrations/mcp-constraint-monitor/dashboard/README.md`)** – Receives status updates from ConnectionHandler, allowing operators to view connection health in real time.  
+
+7. **Sibling Components** – **LoggingManager** and **DataAdapter** both rely on the same Copi integration readme, meaning they share configuration conventions and may read connection state from the same metadata store.  This creates a cohesive ecosystem where each sibling consumes the same connection channel established by ConnectionHandler.
+
+---
+
+## Usage Guidelines  
+
+* **Prefer the high‑level API** – Call ConnectionHandler’s public methods (e.g., `establish()`, `close()`) rather than invoking SpecstoryAdapter directly.  This ensures that all ancillary steps—hook registration, constraint checks, and metadata persistence—are executed.  
+
+* **Configure via environment variables** – Follow the conventions in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  Typical variables include `MAX_CONNECTIONS`, `SPECSTORY_HTTP_PORTS`, and `IPC_SOCKET_PATH`.  Changing these values does not require code changes.  
+
+* **Handle retries gracefully** – ConnectionHandler already attempts multiple transports (HTTP → IPC → file watch).  When integrating, developers should listen for the `connectionFailed` event and allow the handler to retry rather than aborting the entire workflow.  
+
+* **Persist and query metadata** – Use the storage utilities described in `integrations/code-graph-rag/README.md` to retrieve connection details for debugging or for rebuilding a lost session.  
+
+* **Monitor via the dashboard** – Expose the connection health endpoint (as defined in `integrations/mcp-constraint-monitor/dashboard/README.md`) so that ops teams can see live status and trigger manual reconnections if needed.  
+
+* **Do not duplicate hook logic** – Copi hook definitions reside in `integrations/copi/docs/hooks.md`.  Register them through ConnectionEstablisher; manual registration can cause duplicate callbacks and inconsistent state.  
+
+* **Respect sibling contracts** – LoggingManager expects connection events to be emitted in a specific format (e.g., `{type: 'connected', timestamp}`); adhere to this contract to keep logs coherent.  
+
+---
+
+### Architectural Patterns Identified  
+
+1. **Adapter Pattern** – SpecstoryAdapter abstracts HTTP, IPC, and file‑watch transports behind a uniform interface.  
+2. **Facade Pattern** – ConnectionHandler presents a single, simplified API that hides the complexity of multiple integrations (Copi, browser, constraint monitor).  
+3. **Composition over Inheritance** – ConnectionHandler composes adapters, helpers, and the ConnectionEstablisher child rather than extending a monolithic base class.  
+
+### Design Decisions and Trade‑offs  
+
+* **Multi‑modal transport** – Choosing HTTP, IPC, and file watch increases resilience but adds runtime complexity (port scanning, socket cleanup).  
+* **External configuration** – Relying on environment variables and constraint files improves flexibility but requires disciplined ops processes to keep configurations in sync.  
+* **Separate metadata store** – Persisting connection info aids recovery but introduces an extra dependency (the storage solution from `code‑graph‑rag`).  
+
+### System Structure Insights  
+
+* **Hierarchical layering** – Trajectory → ConnectionHandler → ConnectionEstablisher → SpecstoryAdapter, with siblings sharing common integration readmes.  
+* **Integration convergence** – Multiple unrelated integrations (Copi, browser access, constraint monitoring) converge within ConnectionHandler, making it the connectivity hub of the system.  
+
+### Scalability Considerations  
+
+* Because ConnectionHandler can open many parallel connections (subject to `MAX_CONNECTIONS`), the underlying SpecstoryAdapter must efficiently manage socket pools and avoid port exhaustion.  
+* The file‑watch fallback scales poorly on high‑frequency change environments; monitoring should be limited to low‑traffic scenarios or replaced with IPC/HTTP when possible.  
+
+### Maintainability Assessment  
+
+* **High maintainability** – The use of well‑documented adapters and external readme‑driven configuration isolates change impact; updates to a transport method only require modifications in `lib/integrations/specstory-adapter.js`.  
+* **Potential risk** – The implicit coupling to several integration readmes means that changes in those documents (e.g., Copi hook signatures) must be propagated to ConnectionHandler and its child, otherwise runtime mismatches can occur.  
+* **Clear ownership** – The hierarchy (Trajectory owns ConnectionHandler; ConnectionHandler owns ConnectionEstablisher) provides a straightforward ownership model, simplifying debugging and future refactoring.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, HookConfigLoader, and ViolationCaptureService. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is utilized for entity content validation and refresh. This modular design allows for easier maintenance and updates, as each sub-component can be modified or replaced independently without affecting the entire system.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible connections to external services. This adapter attempts to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a persistent connection approach. For instance, the connectViaHTTP method tries multiple ports to establish a connection, showcasing the adapter's ability to handle varying connection scenarios. This flexibility is crucial for maintaining a scalable and maintainable system, enabling easier integration of new services or features as needed.
+
+### Children
+- [ConnectionEstablisher](./ConnectionEstablisher.md) -- The ConnectionHandler sub-component is likely to use the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch, as indicated by the parent context.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator uses a modular architecture, integrating multiple sub-components such as the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-- [HookManager](./HookManager.md) -- HookManager is responsible for managing hook configurations and registrations, indicating a key role in the system's workflow
-- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture is responsible for capturing and persisting constraint violations, indicating a key role in the system's workflow
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager is responsible for managing workflow definitions and interactions, indicating a key role in the system's workflow
+- [LoggingManager](./LoggingManager.md) -- LoggingManager likely utilizes the integrations/copi/README.md file to understand the logging requirements for the Copi integration.
+- [DataAdapter](./DataAdapter.md) -- DataAdapter likely utilizes the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.
+- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
 
 
 ---

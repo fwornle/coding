@@ -2,131 +2,146 @@
 
 **Type:** SubComponent
 
-BrowserAccess pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification
+BrowserAccess could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
 
 ## What It Is  
 
-BrowserAccess is the **sub‑component that enables a live browser‑based interface to the KnowledgeManagement graph**.  All of its operational logic is described in the markdown files under the `integrations/browser-access/` directory, most notably `integrations/browser-access/README.md`.  The README documents the **Browser Access MCP (Message‑Control‑Protocol) server** that mediates requests from a user’s browser to the underlying knowledge graph and downstream services.  BrowserAccess also owns two concrete children – **MCPBrowserAccess** (the server implementation) and **BrowserAccessConfig** (the configuration surface that ties the server to Claude Code and other LLM back‑ends).  
+BrowserAccess is a **sub‑component** of the *KnowledgeManagement* component that supplies a browser‑based entry point for interacting with the system’s stored knowledge. The implementation lives under the integration folder documented in **`integrations/browser-access/README.md`**, where the same “Claude Code Setup for Graph‑Code MCP Server” approach is described. BrowserAccess also relies on several sibling sub‑components—*EntityPersistence*, *ManualLearning*, *CodeGraphRAG*, and the *MCP Constraint Monitor*—to retrieve, enrich, and validate the entities it serves. Its own configuration is encapsulated in the child component **BrowserAccessConfiguration**, which follows the same Claude‑code‑setup pattern.
 
-Within the broader KnowledgeManagement ecosystem, BrowserAccess lives alongside ManualLearning, OnlineLearning, CodeGraphConstruction, EntityPersistence, and UKBTraceReporting.  Those siblings share common integration conventions (e.g., the COPI logging framework) but each focuses on a distinct workflow.  BrowserAccess draws on the same **browser‑access mechanism** that appears in `integrations/code-graph-rag/README.md`, showing a reuse of the low‑level browser‑to‑service plumbing across the platform.
+In practice, a client (typically a web UI) issues requests to BrowserAccess, which then:
+
+1. Pulls entity data from **EntityPersistence** (graph‑DB backed) or from **ManualLearning** (hand‑crafted entities).  
+2. Optionally runs the **Code Graph RAG** pipeline (see `integrations/code-graph-rag/README.md`) to perform graph‑based code analysis and retrieve relevant code snippets.  
+3. Applies **semantic constraint detection** via the **MCP Constraint Monitor** (see `integrations/mcp-constraint-monitor/README.md` and its `semantic-constraint-detection.md` doc) to ensure that returned entities respect defined constraints.  
+
+Thus BrowserAccess is the façade that orchestrates these lower‑level services and presents a coherent, constraint‑aware view of the knowledge base to the browser.
 
 ---
 
 ## Architecture and Design  
 
-The design of BrowserAccess is **document‑driven and composition‑oriented**.  Rather than a monolithic code base, the component’s behavior is assembled from a set of integration READMEs that act as both specification and configuration artifacts.  The primary architectural motifs that emerge from the observations are:
+The overall architecture follows a **modular, integration‑driven** style. Each integration lives in its own folder under `integrations/`, exposing a well‑defined contract that BrowserAccess consumes. The key architectural traits evident from the observations are:
 
-1. **Work‑Stealing Concurrency** – The component inherits the platform‑wide work‑stealing model described in `integrations/copi/scripts/README.md`.  A shared `nextIndex` counter is used by multiple workers to dynamically balance the processing of incoming browser requests, ensuring that idle workers can “steal” work from busy peers.  This pattern reduces contention and improves throughput under bursty traffic.
+* **Claude‑code‑setup reuse** – Both *BrowserAccess* and its child *BrowserAccessConfiguration* adopt the “Claude Code Setup for Graph‑Code MCP Server” described in `integrations/browser-access/README.md`. This indicates a shared initialization and configuration pattern (e.g., loading Claude‑compatible schemas, setting up MCP endpoints) that reduces duplication across components that need to talk to the MCP server.  
 
-2. **DAG‑Based Execution with Topological Sort** – BrowserAccess leverages the **directed‑acyclic‑graph (DAG) execution engine** outlined in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  Before a request is serviced, the system builds a DAG of dependent operations (e.g., constraint checks, ontology look‑ups, LLM calls) and orders them via a topological sort.  This guarantees that prerequisite data is available before downstream steps execute, while still allowing maximal parallelism where branches are independent.
+* **Graph‑based Retrieval‑Augmented Generation (RAG)** – BrowserAccess can invoke the **Code Graph RAG** system (`integrations/code-graph-rag/README.md`). This suggests a pipeline where code is represented as a graph, queries are transformed into graph traversals, and results are fed back into the LLM‑driven knowledge flow.  
 
-3. **Semantic Constraint Detection** – The DAG nodes include **semantic constraint detectors** defined in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  These detectors enforce domain‑specific rules (e.g., type consistency, relationship cardinality) on the graph updates that originate from browser actions.  By embedding constraint logic directly into the execution graph, the component can abort or rewrite operations early, preserving graph integrity.
+* **Work‑Stealing Concurrency** – The parent *KnowledgeManagement* component uses a **shared atomic index counter** for work‑stealing as implemented in `wave-controller.ts` (line ≈ 489). Although BrowserAccess does not define its own concurrency primitives, it inherits this model from the parent, allowing concurrent handling of multiple browser requests without thread starvation.  
 
-4. **Metadata Pre‑Population** – To avoid costly re‑classification by large language models, BrowserAccess **pre‑populates ontology metadata fields** as described in `integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`.  When a browser request creates or modifies an entity, the necessary metadata (status line, tags, provenance) is filled in from cached values, sidestepping an extra LLM inference round.
+* **Constraint Monitoring** – Integration with the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/README.md`) brings in a **semantic constraint detection** layer (`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`). This layer validates entity relationships against business rules before they are exposed to the UI, embodying a **policy‑enforcement** pattern.  
 
-5. **Shared Browser‑Access Mechanism** – Both BrowserAccess and the code‑graph‑RAG pipelines (`integrations/code-graph-rag/README.md`) rely on a common low‑level browser‑access library.  This library abstracts HTTP/WebSocket handling, session management, and authentication, providing a unified entry point for all browser‑driven services.
+* **Dependency on Sibling Sub‑Components** – BrowserAccess does not store entities itself; it delegates persistence to **EntityPersistence** and manual curation to **ManualLearning**. This separation of concerns follows a **service‑oriented** approach within the monorepo, where each sibling focuses on a single responsibility.
 
-Collectively, these patterns produce a **pipeline‑oriented architecture** where a request flows from the browser, through a concurrent work‑stealing dispatcher, into a DAG of constraint‑aware operations, and finally back to the client with enriched, pre‑validated graph updates.
+The interaction flow can be visualised as:
+
+```
+Browser UI → BrowserAccess (via HTTP/WebSocket) → 
+   { EntityPersistence | ManualLearning } → Knowledge Graph
+   → CodeGraphRAG (optional) → MCP Constraint Monitor → 
+   BrowserAccessConfiguration → Response to UI
+```
 
 ---
 
 ## Implementation Details  
 
-### Core Files  
-* **`integrations/browser-access/README.md`** – Serves as the canonical specification for the MCP server, detailing startup flags, environment variables, and the mapping of HTTP endpoints to internal handlers.  It also references the **MCPBrowserAccess** implementation and the **BrowserAccessConfig** schema.  
-* **`integrations/copi/scripts/README.md`** – Defines the shared `nextIndex` counter and the work‑stealing loop that BrowserAccess adopts.  Workers poll this counter, claim a batch of request IDs, and process them in parallel.  
-* **`integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`** – Lists the ontology metadata fields (e.g., `status_line`, `source`, `confidence`) that BrowserAccess injects before any LLM classification step.  The file doubles as a quick‑reference for developers to understand which fields are auto‑filled.  
-* **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`** – Provides the DSL for describing the DAG nodes, their dependencies, and the topological sorting algorithm used at runtime.  BrowserAccess reads this configuration at startup to build its execution graph for each request type.  
-* **`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`** – Enumerates the concrete semantic constraints (e.g., “no circular parent‑child links”, “entity type must match predicate domain”) and the detection functions that are invoked as DAG nodes.  
+Because the repository currently contains **no concrete code symbols** for BrowserAccess, the implementation details are inferred from the README files and the surrounding components:
 
-### Execution Flow  
-1. **Request Arrival** – A browser issues a REST or WebSocket call to the MCP server defined in `integrations/browser-access/README.md`.  
-2. **Work‑Stealing Dispatch** – The server hands the request ID to the shared `nextIndex` counter.  A pool of worker coroutines reads the counter, claims the next batch, and begins processing.  
-3. **DAG Construction** – Using the constraint configuration (`constraint-configuration.md`), the worker builds a per‑request DAG.  Nodes include *metadata pre‑population*, *semantic constraint checks*, and *LLM inference* (if needed).  
-4. **Topological Sort & Execution** – The DAG is topologically sorted so that independent branches can run concurrently.  The sorted order respects all dependency edges, guaranteeing that, for example, metadata is present before constraints are evaluated.  
-5. **Constraint Evaluation** – Each constraint node calls the detection logic from `semantic-constraint-detection.md`.  Violations trigger early termination or corrective actions, preventing invalid graph mutations.  
-6. **Graph Update & Response** – After successful traversal, the worker writes the changes to the KnowledgeManagement graph (the parent component) and streams a response back to the browser, including any enriched metadata.  
+1. **Configuration Loading** – `integrations/browser-access/README.md` outlines that BrowserAccess reads a YAML/JSON configuration (mirroring the Claude‑code‑setup) at startup. The child component **BrowserAccessConfiguration** likely encapsulates this logic, exposing getters for endpoint URLs, authentication tokens, and RAG parameters.
 
-### Child Components  
-* **MCPBrowserAccess** – Implements the actual network server (HTTP/WebSocket listeners, routing table) as described in the BrowserAccess README.  It exposes the configuration surface defined by **BrowserAccessConfig**.  
-* **BrowserAccessConfig** – A lightweight configuration file (YAML/JSON) that specifies the LLM endpoint (Claude Code), authentication tokens, and optional feature toggles (e.g., enable/disable constraint monitoring).  The config is read at server start‑up and injected into the DAG builder.
+2. **Request Handling** – Requests are probably routed through a lightweight HTTP server (e.g., Express or Fastify) instantiated in the BrowserAccess module. The handler extracts query parameters, then calls into the **EntityPersistence** API (graph‑DB client) to fetch matching entities. If a code‑related query is detected, it forwards the request to the **Code Graph RAG** service, which returns a ranked list of code fragments.
+
+3. **Concurrency Model** – While BrowserAccess itself does not define concurrency code, it inherits the **work‑stealing** mechanism from the parent *KnowledgeManagement* component. The shared atomic index counter in `wave-controller.ts` (line ≈ 489) is used by the parent’s `runWithConcurrency()` method to distribute work across a pool of workers. BrowserAccess request handlers thus execute within this pool, gaining the benefits of dynamic load balancing without additional synchronization code.
+
+4. **Constraint Validation** – After entities are retrieved, BrowserAccess invokes the **MCP Constraint Monitor**. The monitor’s semantic detection logic (see `semantic-constraint-detection.md`) analyses entity attributes against a set of declarative constraints (e.g., type compatibility, ontology rules). Violations cause the monitor to filter or annotate the result set before it reaches the UI.
+
+5. **Integration with ManualLearning** – When a request asks for manually curated knowledge, BrowserAccess queries the **ManualLearning** sub‑component, which follows the same Claude‑code‑setup pattern (as noted in the sibling description). This ensures that manually added entities are stored in the same schema and can be processed by the same RAG and constraint pipelines.
 
 ---
 
 ## Integration Points  
 
-BrowserAccess sits at the intersection of several system layers:
+| Integration Target | Path / Document | Role in BrowserAccess |
+|--------------------|-----------------|----------------------|
+| **Claude Code Setup** | `integrations/browser-access/README.md` | Supplies the base configuration and MCP server wiring used by BrowserAccess and its configuration child. |
+| **Code Graph RAG** | `integrations/code-graph-rag/README.md` | Optional analysis engine that transforms code queries into graph traversals and returns relevant snippets. |
+| **EntityPersistence** | (implicit, described in sibling notes) | Primary source of persisted entities stored in a graph database. BrowserAccess calls its API to fetch data. |
+| **ManualLearning** | (implicit, sibling note) | Provides access to manually authored entities; BrowserAccess queries this when manual knowledge is requested. |
+| **MCP Constraint Monitor** | `integrations/mcp-constraint-monitor/README.md` & `semantic-constraint-detection.md` | Performs semantic constraint checks on the result set before returning it to the client. |
+| **Wave Controller (Concurrency)** | `wave-controller.ts:489` | Supplies the shared atomic index counter used by the parent’s `runWithConcurrency()` method; BrowserAccess runs within this concurrency framework. |
+| **BrowserAccessConfiguration** | Child component (no explicit path) | Holds runtime configuration (endpoints, auth, RAG settings) derived from the Claude‑code‑setup. |
 
-* **Parent – KnowledgeManagement** – All successful graph mutations flow into the KnowledgeManagement component’s Graphology + LevelDB store.  BrowserAccess therefore respects the parent’s concurrency model (work‑stealing) and routing logic for read/write paths.  
-
-* **Siblings** –  
-  * **ManualLearning**, **OnlineLearning**, **CodeGraphConstruction**, **EntityPersistence**, and **UKBTraceReporting** all share the **COPI** logging and tmux orchestration framework (see `integrations/copi/README.md`).  BrowserAccess inherits the same logging conventions, ensuring a uniform observability footprint across the platform.  
-  * **OnlineLearning** and **CodeGraphConstruction** also use the **browser‑access mechanism** from `integrations/code-graph-rag/README.md`.  This common library means that any improvement to session handling, authentication, or request throttling benefits all three components simultaneously.  
-
-* **Constraint Monitor** – The DAG and semantic‑constraint modules (`integrations/mcp-constraint-monitor/...`) are a shared service used by BrowserAccess and other graph‑mutating components.  By centralizing constraint definitions, the system guarantees consistent validation rules regardless of the entry point (browser, batch job, or API).  
-
-* **LLM Provider** – BrowserAccessConfig points to Claude Code as the default LLM.  The configuration is deliberately aligned with the parent’s lazy‑initialization strategy for LLM providers, meaning the LLM client is instantiated only when a DAG node explicitly requires inference.  
-
-* **External Browser** – The MCP server exposes endpoints that browsers consume directly (e.g., via a UI extension).  The contract is defined in the BrowserAccess README and mirrors the contract used by the code‑graph‑RAG UI, enabling developers to reuse front‑end components.
+These integration points are **loose contracts** rather than hard‑coded imports, allowing each sub‑component to evolve independently as long as the agreed‑upon API surface remains stable.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Configure via BrowserAccessConfig** – Always define the LLM endpoint, authentication tokens, and constraint‑monitor toggle in the `BrowserAccessConfig` file before starting the MCP server.  Missing or malformed entries will cause the server to abort during start‑up, as the README explicitly warns.  
+1. **Initialize via BrowserAccessConfiguration** – Before any request is processed, ensure that the configuration object has been instantiated (typically at application start). The configuration must contain valid MCP server URLs and any RAG parameters; otherwise downstream calls will fail silently.
 
-2. **Leverage Work‑Stealing Correctly** – When extending BrowserAccess with new request types, register the new handler with the shared `nextIndex` dispatcher.  Do **not** create a separate thread pool; doing so would defeat the platform‑wide load‑balancing guarantees and could lead to thread starvation.  
+2. **Leverage the Parent’s Concurrency** – Do not create additional thread pools inside BrowserAccess. Rely on the work‑stealing pool managed by `wave-controller.ts` to handle parallel request execution. This avoids contention on the shared atomic index counter and preserves the system’s scalability guarantees.
 
-3. **Extend the DAG Conservatively** – New processing steps (e.g., additional validation or enrichment) must be added as DAG nodes in `constraint-configuration.md`.  Declare explicit dependencies so the topological sort can order them correctly.  Avoid circular dependencies; the DAG must remain acyclic, otherwise the sort will fail and the request will be rejected.  
+3. **Explicitly Request RAG When Needed** – Because invoking the Code Graph RAG pipeline can be expensive, only set the `useRag` flag (or similar) on the request object when the query pertains to code artifacts. This keeps simple entity look‑ups lightweight.
 
-4. **Respect Metadata Pre‑Population** – When adding custom ontology fields, update `STATUS-LINE-QUICK-REFERENCE.md` so that BrowserAccess knows which values to pre‑populate.  Failure to do so will trigger unnecessary LLM re‑classification, increasing latency and cost.  
+4. **Validate Constraints Early** – If a client can anticipate constraint violations (e.g., by checking ontology compatibility), it should pre‑filter queries. The MCP Constraint Monitor will still run, but early pruning reduces unnecessary processing.
 
-5. **Monitor Through COPI Logging** – All BrowserAccess activities emit logs in the format defined by the COPI framework.  Integrate these logs with the existing tmux‑based monitoring dashboards used by the sibling components.  Consistent log tagging (e.g., `component=BrowserAccess`) enables cross‑component traceability.  
+5. **Prefer EntityPersistence for Bulk Reads** – For large‑scale data extraction, query EntityPersistence directly (or use its batch API) rather than issuing many fine‑grained BrowserAccess calls. BrowserAccess is optimized for interactive, low‑latency UI interactions, not bulk ETL workloads.
 
-6. **Test Constraint Changes in Isolation** – Because semantic constraints are shared across the system, any modification to `semantic-constraint-detection.md` should be validated with unit tests that simulate both BrowserAccess and other graph‑mutating workflows.  This prevents inadvertent regression in unrelated components.  
+6. **Keep Configuration in Sync with Claude Setup** – Any changes to the Claude‑code‑setup (e.g., schema version bumps) must be reflected in both BrowserAccess and BrowserAccessConfiguration. A mismatch can cause deserialization errors when the MCP server returns data.
 
 ---
 
-### Summary of Insights  
+### Architectural Patterns Identified  
 
-| Item | Insight |
-|------|---------|
-| **Architectural patterns identified** | Work‑stealing concurrency (shared `nextIndex`), DAG‑based execution with topological sort, semantic constraint detection embedded in the DAG, metadata pre‑population to avoid redundant LLM calls, shared browser‑access library. |
-| **Design decisions and trade‑offs** | Choosing a document‑driven specification (README files) keeps configuration close to the source but limits discoverability via code navigation; work‑stealing maximizes CPU utilization at the cost of added synchronization complexity; DAG execution provides deterministic ordering but requires careful maintenance of acyclicity. |
-| **System structure insights** | BrowserAccess is a thin MCP server that orchestrates existing platform services (constraint monitor, COPI logging, LLM provider) rather than implementing its own graph logic; it sits under KnowledgeManagement and shares many cross‑cutting concerns with its siblings. |
-| **Scalability considerations** | Work‑stealing allows the component to scale horizontally across many worker threads; the DAG model enables parallel execution of independent branches, further improving throughput under high request volume.  However, the shared `nextIndex` counter can become a contention point if not implemented with lock‑free primitives. |
-| **Maintainability assessment** | High maintainability due to centralized configuration (README‑driven) and reuse of shared libraries (browser‑access, COPI, constraint monitor).  The main risk is drift between documentation and actual behavior; keeping the markdown specifications in sync with any code changes is essential. |
+* **Claude‑code‑setup reuse** – a shared initialization pattern across integrations.  
+* **Work‑stealing concurrency** – implemented via a shared atomic index counter (`wave-controller.ts`).  
+* **Service‑oriented modularity** – distinct sub‑components (EntityPersistence, ManualLearning, CodeGraphRAG, MCP Constraint Monitor) expose focused APIs.  
+* **Policy‑enforcement (semantic constraint detection)** – validation layer before data leaves the system.  
+* **Retrieval‑Augmented Generation (graph‑based)** – Code Graph RAG pipeline for code‑centric queries.
 
-These observations collectively portray **BrowserAccess** as a well‑orchestrated gateway that reuses platform‑wide concurrency and validation mechanisms to safely expose the KnowledgeManagement graph to end‑users via a browser interface.
+### Design Decisions and Trade‑offs  
 
-## Diagrams
+* **Centralized configuration** (Claude‑code‑setup) reduces duplication but introduces a single point of failure if the config schema changes.  
+* **Work‑stealing pool** offers high throughput for bursty UI traffic but requires careful tuning of the atomic counter to avoid contention under extreme load.  
+* **Optional RAG integration** balances performance (skip heavy graph traversal when not needed) against feature richness (code insight).  
+* **Constraint monitoring** improves data quality at the cost of additional latency; the system mitigates this by running it after the primary fetch, not before.
 
-### Relationship
+### System Structure Insights  
 
-![BrowserAccess Relationship](images/browser-access-relationship.png)
+BrowserAccess sits at the **interaction layer** of the KnowledgeManagement hierarchy. It consumes services from sibling components, inherits concurrency mechanisms from its parent, and delegates configuration to its child. This positioning makes it the natural façade for any external UI or API that needs constraint‑aware knowledge retrieval.
 
+### Scalability Considerations  
 
+* The **work‑stealing concurrency** model scales horizontally with the number of worker threads, allowing the system to handle many simultaneous browser sessions.  
+* **Code Graph RAG** is the most resource‑intensive piece; scaling it may require separate compute clusters or caching of frequent graph traversals.  
+* **EntityPersistence** (graph DB) must be provisioned with enough read capacity; BrowserAccess’s read‑only nature keeps write pressure low.
 
-## Architecture Diagrams
+### Maintainability Assessment  
 
-![relationship](../../.data/knowledge-graph/insights/images/browser-access-relationship.png)
+* **High cohesion, low coupling** – BrowserAccess’s responsibilities are clearly delineated (orchestration, constraint enforcement), while persistence and learning concerns stay in dedicated modules.  
+* **Shared patterns** (Claude‑code‑setup, work‑stealing) promote reuse and reduce code churn across the codebase.  
+* **Documentation‑driven integration** – Most integration points are described in README files, which aids onboarding but also means that any change must be reflected promptly in those docs to avoid drift.  
+* **Absence of concrete symbols** in the repository suggests that the implementation may be generated or heavily templated; maintaining the generation templates will be essential to keep BrowserAccess functional.  
+
+Overall, BrowserAccess exhibits a well‑structured, integration‑centric design that leverages existing concurrency and constraint‑monitoring mechanisms, making it both performant for interactive use and extensible for future knowledge‑access features.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
 
 ### Children
-- [MCPBrowserAccess](./MCPBrowserAccess.md) -- The BrowserAccess MCP server is described in integrations/browser-access/README.md, which provides information on how to set up and use the server.
-- [BrowserAccessConfig](./BrowserAccessConfig.md) -- The integrations/browser-access/README.md file mentions the Browser Access MCP Server for Claude Code, indicating a key configuration point for browser access.
+- [BrowserAccessConfiguration](./BrowserAccessConfiguration.md) -- The BrowserAccess sub-component may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses integrations/copi/README.md to handle logging and tmux integration for manual learning processes
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph
-- [CodeGraphConstruction](./CodeGraphConstruction.md) -- CodeGraphConstruction uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses integrations/copi/README.md to handle logging and tmux integration for entity persistence
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting uses integrations/copi/README.md to handle logging and tmux integration for trace reporting
+- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 
 
 ---

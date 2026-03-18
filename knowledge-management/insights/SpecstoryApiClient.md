@@ -1,143 +1,100 @@
 # SpecstoryApiClient
 
-**Type:** SubComponent
+**Type:** Detail
 
-SpecstoryApiClient provides a standardized interface for interacting with the Specstory extension, making it easier to integrate with the extension
+Given the parent component's context, the SpecstoryApiClient is likely responsible for handling the API requests and responses, although specific implementation details are not available.
 
 ## What It Is  
 
-The **SpecstoryApiClient** is a sub‑component that supplies a dedicated API client for communicating with the *Specstory* extension. Although the observations do not list a concrete file location (e.g., `lib/api/specstory-api-client.js`), its responsibilities are clearly defined in the documentation: it presents a **standardized interface** that abstracts the underlying HTTP/IPC/file‑watch details exposed by the *Specstory* extension. By centralising request construction, validation, error handling and logging, the client makes it straightforward for other parts of the system—most notably the **Trajectory** parent component—to integrate with Specstory without needing to understand the low‑level protocol specifics.
+The **SpecstoryApiClient** is the low‑level client component that mediates all communication between the application’s **SpecstoryAdapter** and the external *Specstory* browser extension.  The only concrete location referenced in the observations is the adapter implementation file **`lib/integrations/specstory-adapter.js`**, which imports or otherwise makes use of the `SpecstoryApiClient`.  While the source code of the client itself is not directly visible, the surrounding context makes it clear that its primary responsibility is to construct, send, and interpret the API requests that the extension expects, and to surface the responses back to the adapter for further processing.
 
-The client is described as **customisable**, meaning that callers can adjust configuration (such as base URLs, time‑outs, or authentication tokens) at runtime. A built‑in **validation mechanism** checks request payloads for correctness before they are dispatched, ensuring consistency across all callers. When an error occurs, a **robust error‑handling routine** captures the failure, logs the details via the shared logging infrastructure, and surfaces a predictable exception or error object to the caller. This combination of validation, error handling, and logging creates a reliable façade over the Specstory extension.
+Because the adapter “uses” the client, the `SpecstoryApiClient` can be thought of as a child entity in the integration hierarchy: the **SpecstoryAdapter** is the parent component that orchestrates higher‑level workflow (e.g., UI‑driven actions, state management), and it delegates the raw request/response handling to the client.  The client therefore acts as a thin, purpose‑built abstraction over the extension’s messaging protocol, keeping the adapter free from low‑level details.
 
-Because SpecstoryApiClient lives under the *Trajectory* component, it benefits from the same modular philosophy that drives the rest of the system. The parent component’s architecture—exemplified by the separate **SpecstoryAdapter**, **ConnectionManager**, **LoggerModule**, **RetryMechanism**, and **Configurator** siblings—provides a clear separation of concerns that the API client plugs into without tightly coupling to any single implementation detail.
+In practice, developers interact with the client indirectly—by invoking methods exposed on the `SpecstoryAdapter`.  The adapter internally creates an instance of `SpecstoryApiClient`, calls its request functions, and translates the raw payloads into domain‑specific objects that the rest of the codebase can consume.  This separation keeps the public API stable even if the underlying extension contract changes.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of SpecstoryApiClient follows a **modular, layered approach**. At the highest level, the client acts as the *presentation layer* for the Specstory extension, exposing a clean, versioned API surface. Beneath that, it delegates transport‑specific responsibilities to the **SpecstoryAdapter** (found in `lib/integrations/specstory-adapter.js`). The adapter implements the concrete connection methods—`connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`—each encapsulated in its own function. This separation mirrors the **Adapter pattern**, allowing the client to remain agnostic of whether a request travels over HTTP, an inter‑process channel, or a file‑watch mechanism.
+From the limited evidence, the architecture follows a classic **Adapter pattern**.  The `SpecstoryAdapter` serves as the façade that presents a uniform interface to the rest of the system, while the `SpecstoryApiClient` encapsulates the concrete integration details required to speak the Specstory extension’s protocol.  By delegating the communication work to a dedicated client, the design enforces **separation of concerns**: the adapter focuses on business logic and orchestration, whereas the client concentrates on transport, serialization, and error handling.
 
-Error handling is a cross‑cutting concern that is addressed both inside the adapter (e.g., the `connectViaHTTP` function contains a retry loop) and within the client itself, where a **robust error‑handling mechanism** normalises exceptions and logs them. The presence of a **central logger instance** created via `createLogger` (from `../logging/Logger.js`) demonstrates a **Singleton‑like logging facility** shared across Trajectory and its siblings. This ensures that all API interactions—requests, responses, and failures—are captured uniformly, supporting observability and troubleshooting.
+The file path **`lib/integrations/specstory-adapter.js`** suggests a modular organization where each third‑party integration lives under a common `integrations` namespace.  This modularity encourages **encapsulation**—the client and its adapter are co‑located, making it straightforward to replace or upgrade the integration without rippling changes throughout the codebase.  The hierarchy (parent → child) also implies a **composition relationship**: the adapter *contains* an instance of `SpecstoryApiClient`, rather than inheriting from it, which keeps the coupling loose and the responsibilities clear.
 
-The client’s **customisation** capability is realized through a configuration object that is likely supplied by the **Configurator** sibling. By externalising settings such as endpoint URLs, authentication headers, and retry policies, the client can be re‑used across different environments (development, CI, production) without code changes. The **validation mechanism** sits in the request‑building stage, probably implemented as a set of schema checks or type guards that guarantee the payload conforms to the Specstory contract before the request is handed off to the adapter.
-
-Overall, the design reflects **separation of concerns**, **encapsulation**, and **reusability**. Each sibling component—ConnectionManager, LoggerModule, RetryMechanism, Configurator, and SpecstoryAdapter—contributes a distinct responsibility that the API client composes, resulting in a system that is easier to evolve and test.
+Because the client is responsible for “handling the API requests and responses,” it is reasonable to infer that it abstracts the underlying messaging mechanism (e.g., Chrome extension messaging, postMessage, or a custom RPC).  The adapter likely calls high‑level methods such as `fetchStory`, `saveStory`, or `listStories`, and the client translates those calls into the exact payload format expected by the extension, then returns parsed results.  This design provides a **stable contract** for the rest of the application while allowing the client to evolve independently.
 
 ---
 
 ## Implementation Details  
 
-Even though the source tree does not list explicit symbols for SpecstoryApiClient, the observations let us infer its internal structure:
+Although no concrete symbols are listed, the observations give us a clear functional outline.  The **SpecstoryApiClient** is instantiated inside **`lib/integrations/specstory-adapter.js`** and is expected to expose a set of methods that map directly to the Specstory extension’s API surface.  Typical implementations of such a client include:
 
-1. **Public Interface** – The client likely exports a class or factory function (e.g., `SpecstoryApiClient`) that offers methods such as `fetchSpec`, `createSpec`, `updateSpec`, and `deleteSpec`. Each method accepts a typed request object, runs it through the **validation mechanism**, and then forwards the sanitized request to the adapter.
+1. **Request Builder** – A private helper that assembles the JSON payload required by the extension, inserting authentication tokens, request IDs, or version headers as needed.  
+2. **Transport Layer** – A thin wrapper around the browser’s messaging API (e.g., `chrome.runtime.sendMessage` or `window.postMessage`).  This layer handles the asynchronous nature of extension communication, returning a Promise that resolves with the raw response.  
+3. **Response Parser** – Logic that validates the response schema, extracts the useful data, and throws domain‑specific errors for malformed or failed calls.  By centralizing parsing, the client guarantees that the adapter receives clean, typed objects.  
 
-2. **Validation Layer** – Before any network call, the client validates request shape. This could be implemented with JSON schema validators, TypeScript type guards, or custom assertion functions. Validation errors are caught early and transformed into a standard error type that the caller can handle.
+Error handling is typically baked into the client: network‑level failures, timeouts, or extension‑side rejections are caught and transformed into a consistent error type (e.g., `SpecstoryApiError`).  This approach enables the adapter to implement retry or fallback strategies without needing to understand the low‑level failure modes.
 
-3. **Adapter Interaction** – The client does not perform raw HTTP or IPC calls itself. Instead, it calls into **SpecstoryAdapter** methods (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`). The adapter abstracts the transport details and returns a promise that resolves with the raw response payload.
-
-4. **Error Handling & Logging** – Errors thrown by the adapter (including network timeouts, connection refusals, or malformed responses) are intercepted by the client’s error‑handling wrapper. The wrapper logs the incident using the **LoggerModule** (`createLogger`) with context such as request ID, endpoint, and error stack. After logging, the error is re‑thrown or wrapped in a domain‑specific error class so that downstream code receives a consistent failure contract.
-
-5. **Customization Hook** – Configuration is injected, probably via the constructor or an `init` method, pulling values from the **Configurator** sibling. Options may include:
-   - `baseUrl` – the root URL for HTTP connections.
-   - `ipcPath` – the file system path for IPC sockets.
-   - `retryPolicy` – number of retries and back‑off strategy (leveraging the **RetryMechanism** used in `connectViaHTTP`).
-   - `logger` – an optional logger instance to override the default.
-
-6. **Response Normalisation** – After the adapter returns raw data, the client may normalise it into a consistent shape (e.g., converting timestamps to `Date` objects, flattening nested structures) before delivering it to the caller. This step further isolates the rest of the system from changes in the Specstory API contract.
-
-Because no concrete file paths are listed for the client itself, developers should look for a module under the *Trajectory* directory that imports `SpecstoryAdapter` and `createLogger`. The presence of the sibling components suggests a folder layout such as:
-
-```
-trajectory/
-│   specstory-api-client.js   ← (client implementation)
-│   configurator.js
-│   logger.js
-│   connection-manager.js
-│   specstory-adapter.js
-```
+Because the client is a child of the adapter, its lifecycle is likely short‑lived—created when the adapter is initialized and disposed when the adapter is torn down.  This minimizes resource usage and ensures that any per‑session state (such as a request counter) is scoped appropriately.
 
 ---
 
 ## Integration Points  
 
-SpecstoryApiClient sits at the intersection of several system modules:
+The primary integration point is the **Specstory extension** itself, which resides outside the JavaScript runtime of the host application.  The client communicates with this extension via the bridge established in **`lib/integrations/specstory-adapter.js`**.  Consequently, the client depends on:
 
-* **Parent – Trajectory** – The Trajectory component orchestrates the overall workflow and relies on SpecstoryApiClient to fetch or push spec data. Trajectory likely instantiates the client during its initialisation phase, passing in configuration supplied by the **Configurator** sibling.
+* **Browser Extension Messaging API** – The exact API (e.g., Chrome’s `runtime.sendMessage`) is not named, but the client must conform to whatever protocol the Specstory extension expects.  
+* **Extension Manifest** – The extension must expose the necessary message listeners and possibly a content script that the client can address.  
+* **Authentication/Authorization Context** – If the Specstory API requires credentials, the client will need to retrieve tokens from a shared auth module or from the adapter’s configuration.
 
-* **Sibling – SpecstoryAdapter** – All transport logic lives in `lib/integrations/specstory-adapter.js`. The client calls the adapter’s connection functions, which in turn may use the **RetryMechanism** (implemented inside `connectViaHTTP`) to recover from transient failures.
+On the internal side, the client is consumed exclusively by the **SpecstoryAdapter**, which likely passes configuration (such as endpoint identifiers or feature flags) down to the client at construction time.  No sibling components are mentioned, but the modular `integrations` folder suggests that other adapters (e.g., for different extensions) would follow the same pattern, each with its own dedicated client.
 
-* **Sibling – LoggerModule** – Logging is performed through a logger created by `../logging/Logger.js`. The client uses this logger to emit request/response traces and error details, ensuring consistency with other components that also use the same logger.
-
-* **Sibling – Configurator** – Configuration values (e.g., endpoint URLs, auth tokens, retry limits) are supplied by the Configurator. Because the client is customisable, it reads these values at construction time, allowing the rest of the system to change behaviour without touching client code.
-
-* **Sibling – ConnectionManager** – While ConnectionManager primarily coordinates the adapter’s connection methods, it may also expose higher‑level connection status events that the client can listen to (e.g., “connected”, “disconnected”) to decide whether to queue requests or fail fast.
-
-* **External – Specstory Extension** – The ultimate external dependency is the Specstory extension itself, which the client communicates with via the chosen transport. The client’s validation layer guarantees that only well‑formed requests reach this extension, reducing the risk of protocol violations.
-
-Overall, the client acts as a thin façade that hides the complexity of connection handling, retry logic, and logging, presenting a clean contract to the rest of the system while delegating specialised work to its siblings.
+Because the client abstracts the raw messaging details, other parts of the system never interact with the extension directly.  This isolation simplifies testing: the client can be mocked or stubbed, allowing the adapter’s higher‑level logic to be verified without requiring a live extension.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via Configurator** – Always create the client through the central configuration pipeline rather than hard‑coding values. This ensures that environment‑specific settings (such as `baseUrl` or IPC socket paths) are honoured and that future configuration changes propagate automatically.
+1. **Instantiate Through the Adapter** – Developers should never create a `SpecstoryApiClient` directly.  Instead, they obtain an instance of `SpecstoryAdapter`, which internally manages the client lifecycle.  This guarantees that the client is correctly configured with the current extension context.  
 
-2. **Validate Inputs Early** – Although the client performs its own validation, callers should still construct request objects that conform to the documented schema. Supplying malformed data will trigger validation errors that are logged and may incur unnecessary processing overhead.
+2. **Treat Calls as Asynchronous** – All client‑exposed methods return Promises (or async functions).  Callers must `await` the result or handle the promise rejection to capture `SpecstoryApiError` instances.  Ignoring the asynchronous nature can lead to race conditions or unhandled rejections.  
 
-3. **Handle Errors Consistently** – The client throws domain‑specific error objects (e.g., `SpecstoryApiError`). Consumers should catch these errors, inspect properties like `code` or `retryable`, and decide whether to retry, fallback, or surface the problem to the user. Do not swallow generic exceptions; rely on the client’s error‑type hierarchy.
+3. **Handle Errors at the Adapter Level** – Since the client normalizes errors, the adapter is the appropriate place to implement retry logic, user‑friendly messaging, or fallback behavior.  Propagating raw extension errors upstream would break the abstraction.  
 
-4. **Leverage Logging** – The client logs every request and response at the debug level and logs failures at error level. When debugging integration issues, enable the logger’s verbose mode (via the LoggerModule configuration) to obtain full request/response payloads.
+4. **Do Not Mutate Returned Objects** – The client likely returns plain data objects that represent the extension’s state.  Modifying these objects directly can cause inconsistencies; instead, copy or transform them before use.  
 
-5. **Respect Retry Policies** – The underlying adapter already implements retry logic for HTTP connections. Callers should avoid implementing their own retry loops around client methods, as this can lead to exponential back‑off explosion. Instead, configure the desired retry count and back‑off strategy through the Configurator.
-
-6. **Avoid Direct Adapter Calls** – The adapter is an internal implementation detail. All interactions with Specstory should go through the SpecstoryApiClient interface to guarantee that validation, logging, and error handling are applied uniformly.
-
-7. **Test with Mocked Adapter** – For unit testing, replace the real SpecstoryAdapter with a mock that returns deterministic responses. Because the client’s logic is isolated from transport concerns, tests can focus on validation, error handling, and response normalisation.
+5. **Stay Within the Integration Namespace** – All code that interacts with Specstory should import from the `lib/integrations` path.  This keeps the integration self‑contained and makes future refactoring (e.g., moving the client to a separate package) straightforward.
 
 ---
 
-### Architectural patterns identified
-- **Adapter pattern** – `SpecstoryAdapter` abstracts HTTP, IPC, and file‑watch transports.
-- **Modular layered architecture** – Separation of presentation (client), transport (adapter), configuration (Configurator), and cross‑cutting concerns (LoggerModule, RetryMechanism).
-- **Singleton‑like logging** – Central logger created via `createLogger`.
-- **Configuration‑driven design** – Client behaviour is driven by external configuration.
+### Architectural Patterns Identified
+* **Adapter Pattern** – `SpecstoryAdapter` provides a uniform façade while delegating to `SpecstoryApiClient`.
+* **Composition** – The adapter *contains* the client rather than inheriting from it.
+* **Separation of Concerns** – Distinct layers for high‑level workflow (adapter) and low‑level transport (client).
 
-### Design decisions and trade‑offs
-- **Explicit separation of transport** improves maintainability but adds an extra indirection layer.
-- **Robust validation** prevents malformed requests at the cost of a slight runtime overhead.
-- **Centralised error handling & logging** yields consistent observability, though it couples the client tightly to the logging subsystem.
-- **Customisable client** offers flexibility for different environments, but requires careful configuration management to avoid drift.
+### Design Decisions and Trade‑offs
+* **Explicit Client Layer** – Improves testability and encapsulation but adds an extra indirection.
+* **Modular `integrations` Directory** – Encourages consistency across third‑party connectors; however, it may introduce duplication if many adapters share similar client logic.
+* **Promise‑based Asynchrony** – Aligns with modern JavaScript practices, but requires careful error handling to avoid unhandled rejections.
 
-### System structure insights
-- The **Trajectory** component acts as the orchestrator, delegating spec‑related operations to SpecstoryApiClient.
-- Sibling components each own a distinct responsibility (connection, logging, retry, configuration), enabling independent evolution.
-- The client is the sole consumer of the SpecstoryAdapter, reinforcing a clear dependency direction.
+### System Structure Insights
+* Hierarchy: `SpecstoryAdapter` (parent) → `SpecstoryApiClient` (child).  
+* The client is the sole bridge to the external Specstory extension, keeping external dependencies isolated to a single module.
 
-### Scalability considerations
-- Because transport is abstracted, the system can scale horizontally by adding more HTTP endpoints or IPC sockets without changing client code.
-- The retry mechanism and configurable time‑outs allow the client to cope with increased load or transient network congestion.
-- Logging can become a bottleneck under high request volumes; the LoggerModule should support asynchronous or batched writes.
+### Scalability Considerations
+* Because the client is stateless aside from possible per‑request metadata, multiple concurrent requests can be issued without contention.
+* If the extension’s API grows, new methods can be added to the client without altering the adapter’s public contract, preserving backward compatibility.
 
-### Maintainability assessment
-- The modular design, clear interfaces, and shared logging/error handling make the codebase easy to understand and modify.
-- Validation and configuration are centralised, reducing duplicated logic across callers.
-- The only potential maintenance risk is the tight coupling to the specific logger implementation; any change to the logging API would need coordinated updates across all siblings. Overall, the architecture promotes high maintainability.
+### Maintainability Assessment
+* **High** – Clear separation and composition make the codebase easy to reason about.  
+* **Potential Risk** – Lack of visible source code for the client means that any bugs must be diagnosed through integration tests or runtime inspection.  Maintaining comprehensive mock implementations for tests will be essential to keep the adapter reliable as the extension evolves.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's modular architecture is evident in its use of separate connection methods, such as connectViaHTTP, connectViaIPC, and connectViaFileWatch, each with its own implementation in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js). This design decision allows for flexibility and maintainability, as individual connection methods can be updated or modified without affecting the overall system. For instance, the connectViaHTTP function (lib/integrations/specstory-adapter.js) implements a retry mechanism to handle connection failures, demonstrating a robust approach to error handling. The use of a separate logger instance, created via the createLogger function (../logging/Logger.js), further enhances the system's reliability by providing a centralized logging mechanism.
-
-### Siblings
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager leverages the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) for implementing connection methods
-- [LoggerModule](./LoggerModule.md) -- LoggerModule creates a separate logger instance via the createLogger function (../logging/Logger.js) for the Trajectory component
-- [RetryMechanism](./RetryMechanism.md) -- RetryMechanism is implemented in the connectViaHTTP function (lib/integrations/specstory-adapter.js) to handle connection failures
-- [Configurator](./Configurator.md) -- Configurator is responsible for managing configuration settings for the Trajectory component
-- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter is responsible for adapting the Specstory extension to the Trajectory component's architecture
+- [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

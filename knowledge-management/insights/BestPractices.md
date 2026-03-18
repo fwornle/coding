@@ -2,133 +2,131 @@
 
 **Type:** SubComponent
 
-BestPractices employs the GraphDatabaseInteractions class to handle interactions with graph databases and knowledge graph construction, as seen in the execution of queries and retrieval of results.
+The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, implying the use of best practices for data validation and testing.
 
 ## What It Is  
 
-**BestPractices** is a sub‑component of the **CodingPatterns** parent that encapsulates the knowledge about coding and software‑development best practices. All of its logic lives behind the graph‑database layer defined in `storage/graph-database-adapter.ts`. Whenever a best‑practice record (e.g., a practice name, description, or versioned metadata) needs to be read or written, the component calls the **GraphDatabaseAdapter**. The same adapter is also used by the sibling sub‑components **DesignPatterns**, **CodingConventions**, and **GraphDatabaseInteractions**, which means BestPractices participates in a shared persistence strategy across the entire **CodingPatterns** family.  
+**BestPractices** is the “how‑to‑do‑it‑right” sub‑component that lives across the repository as a collection of Markdown artefacts.  The concrete artefacts are located in the following paths:  
 
-The component’s responsibilities include:
+* `integrations/code‑graph‑rag/CONTRIBUTING.md` – contribution and code‑review guidelines.  
+* `integrations/copi/USAGE.md`, `integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md`, `integrations/copi/STATUS.md` – usage, installation, migration and status documentation for the **Copi** CLI wrapper.  
+* `copi/USAGE.md` – a second‑level usage guide that reinforces CI‑oriented best practices.  
+* `mcp‑constraint‑monitor/docs/CLAUDE‑CODE‑HOOK‑FORMAT.md` – a formal definition of the hook payload format, embodying data‑validation conventions.  
 
-* Storing best‑practice definitions and their associated metadata.  
-* Retrieving those definitions for consumption by other parts of the system (e.g., UI, analysis engines).  
-* Updating the definitions to keep them current, using the same adapter that powers the knowledge‑graph construction performed by `code-graph-constructor.ts`.  
-
-Because the component does not expose its own storage implementation, callers interact with it through the well‑defined API provided by the **GraphDatabaseAdapter** and the higher‑level **GraphDatabaseInteractions** class.
+Together these files constitute a **knowledge‑base sub‑component** that codifies the organization’s preferred ways of reviewing code, managing dependencies, ensuring backward compatibility, validating data, and monitoring runtime behaviour.  The sub‑component sits under the parent **CodingPatterns** component, inherits the “data‑consistency‑first” philosophy of the graph‑based system, and directly feeds its child **CodeReviewGuideline** (the `CONTRIBUTING.md` file) with concrete review rules.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a clear **adapter‑based architecture**. The `storage/graph-database-adapter.ts` file implements a **GraphDatabaseAdapter** that abstracts the underlying graph‑database technology (Neo4j, JanusGraph, etc.). This adapter is the single point of contact for all persistence operations, providing a uniform interface for CRUD actions on best‑practice data.  
+The architecture of **BestPractices** follows a **documentation‑as‑code** pattern.  Each integration package (e.g., `integrations/copi`, `integrations/code‑graph‑rag`) ships a set of Markdown files that are version‑controlled alongside the source they describe.  This proximity creates a **tight coupling** between implementation and its prescribed best‑practice artefacts, ensuring that updates to code can be reviewed together with the relevant guidance.
 
-BestPractices, together with its siblings, follows a **separation‑of‑concerns** design: data access is delegated to the adapter, while the domain logic for constructing and maintaining the knowledge graph lives in `code-graph-constructor.ts` (via the **CodeGraphConstructor**) and in **GraphDatabaseInteractions**. This separation reduces coupling between business rules (what constitutes a best practice) and storage mechanics (how the data is persisted).  
+Although the observations do not expose a classic software design pattern inside the BestPractices files themselves, the surrounding ecosystem reveals complementary patterns that inform its design:
 
-The component also exhibits a **repository‑like pattern**: the GraphDatabaseAdapter acts as a repository for best‑practice entities, exposing methods such as `fetchBestPractice`, `storeBestPractice`, and `updateBestPractice`. The **CodeGraphConstructor** consumes this repository to assemble a richer code‑knowledge graph, indicating a layered approach where the constructor sits above the repository layer.  
+* **Singleton‑style sharing** – the sibling **DesignPatterns** component documents the `GraphDatabaseAdapter` singleton (see `storage/graph-database-adapter.ts`).  BestPractices leverages the same principle by providing a *single source of truth* for guidelines, avoiding divergent documentation across the repo.  
+* **Modular integration** – each integration (e.g., **Copi**, **Code‑Graph‑RAG**) maintains its own folder of best‑practice docs, mirroring the modular architecture of the system (graph adapters, constraint monitors).  This modularity permits independent evolution of guidelines per integration while preserving a common naming and structuring convention.  
 
-All of these layers are orchestrated by the **CodingPatterns** parent, which coordinates the flow of data between adapters, constructors, and interaction classes. Because the same adapter is reused by multiple siblings, the design encourages **code reuse** and **consistent data modeling** across the pattern‑related sub‑components.
+Interaction between components is therefore **document‑driven**: developers read the Markdown files, tools (CI pipelines, linters) may parse them for validation hooks (e.g., the hook format in `CLAUDE‑CODE‑HOOK‑FORMAT.md`), and the **CodeReviewGuideline** child consumes the `CONTRIBUTING.md` content to enforce review policies during pull‑request checks.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes  
+The implementation of **BestPractices** is purely declarative, relying on Markdown syntax and a consistent directory layout:
 
-| Class / File | Primary Role |
-|--------------|--------------|
-| `storage/graph-database-adapter.ts` – **GraphDatabaseAdapter** | Provides low‑level methods for executing graph queries, handling connections, and translating results into domain objects. |
-| `code-graph-constructor.ts` – **CodeGraphConstructor** | Consumes the adapter to retrieve best‑practice nodes and edges, then builds a higher‑level knowledge graph that links practices to code artifacts. |
-| **GraphDatabaseInteractions** (location not explicitly given) | Acts as a façade over the adapter, exposing higher‑level operations such as “run query and map to practice model”. It is used by both BestPractices and its siblings for query execution and result handling. |
+| File | Primary Concern | Notable Content |
+|------|-----------------|-----------------|
+| `integrations/code-graph-rag/CONTRIBUTING.md` | Code‑review workflow, testing expectations | Checklist items, required unit‑test coverage thresholds, review‑turnaround SLA. |
+| `integrations/copi/INSTALL.md` | Dependency management | Steps for installing the Copi CLI, pinning versions, using `npm`/`yarn` lockfiles, and verifying checksum of binaries. |
+| `integrations/copi/MIGRATION.md` | Backwards compatibility | Version‑by‑version migration matrix, deprecation warnings, required data‑migration scripts, and testing strategy for migration. |
+| `integrations/copi/STATUS.md` | Monitoring & logging conventions | Recommended log levels, health‑check endpoints, and CI badge conventions to surface status in PRs. |
+| `integrations/copi/USAGE.md` & `copi/USAGE.md` | User documentation & CI integration | Example command invocations, environment‑variable conventions, and snippets for embedding the CLI in CI pipelines (e.g., GitHub Actions). |
+| `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Data validation | JSON schema for hook payloads, required fields, type constraints, and examples of valid/invalid payloads. |
 
-### Data Flow  
+All files follow a **uniform heading hierarchy** (`#`, `##`, `###`) and include **code fences** (` ``` `) that make them machine‑parsable.  The `CLAUDE-CODE-HOOK-FORMAT.md` file, for instance, defines a JSON schema that can be imported by runtime validators in the **ConstraintMonitoring** sibling component, ensuring that the documented format is enforced programmatically.
 
-1. **Fetch / Update** – When a client requests a best‑practice record, BestPractices calls a method on **GraphDatabaseAdapter** (e.g., `findNodeByLabel('BestPractice', id)`). The adapter runs a Cypher (or equivalent) query and returns a plain‑object representation.  
-2. **Construction** – The **CodeGraphConstructor** invokes the same adapter to pull all best‑practice nodes, then creates relationships (e.g., `APPLIES_TO`) between practices and code elements, enriching the graph for downstream analysis.  
-3. **Persistence** – To add or modify a practice, BestPractices passes a domain object to the adapter’s `saveNode` or `updateNode` methods. The adapter translates the object into the appropriate graph mutation query and commits it.  
-
-All of these operations are performed without BestPractices needing to know the specifics of the underlying graph engine, thanks to the adapter’s encapsulation.
-
-### Shared Infrastructure  
-
-Because **DesignPatterns**, **CodingConventions**, and **GraphDatabaseInteractions** also rely on the same `GraphDatabaseAdapter`, they share:
-
-* Connection pooling and transaction handling logic defined in the adapter.  
-* Consistent naming conventions for node labels and relationship types, which simplifies cross‑component queries.  
-
-This shared foundation reduces duplication and ensures that any change to the adapter (e.g., switching to a different graph database) propagates uniformly across the entire **CodingPatterns** hierarchy.
+The `CONTRIBUTING.md` file is the only one that directly references a child component: it explicitly states that every pull request must pass the **CodeReviewGuideline** checklist, which is derived from the same document.  This creates a **feedback loop** where the documentation both guides and is validated by the development workflow.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – CodingPatterns**  
-   * The parent component orchestrates the lifecycle of BestPractices, invoking its API during system start‑up to preload practice data into the global knowledge graph.  
-   * It also uses the **CodeGraphConstructor** to merge best‑practice nodes with other pattern nodes (design patterns, coding conventions) into a single cohesive graph.  
+BestPractices does not contain executable code, but it is woven into the system through several integration seams:
 
-2. **Siblings – DesignPatterns, CodingConventions, GraphDatabaseInteractions**  
-   * All siblings share the `GraphDatabaseAdapter`. When a design pattern or coding convention is added, the same adapter ensures the new node follows the same schema conventions as best‑practice nodes, enabling seamless graph queries that span multiple pattern types.  
-   * **GraphDatabaseInteractions** provides utility functions (e.g., batch query execution) that BestPractices can call for bulk updates or analytics.  
+1. **CI / CD Pipelines** – The `copi/USAGE.md` and `integrations/copi/INSTALL.md` files are referenced by GitHub Actions workflows that install the Copi CLI, run it against the codebase, and enforce the usage conventions described therein.  The migration guide (`MIGRATION.md`) is also invoked in release pipelines to trigger data‑migration scripts when a new version is published.
 
-3. **External Consumers**  
-   * Any external service (e.g., a recommendation engine or UI component) that needs best‑practice information will request it through the public API exposed by BestPractices, which internally forwards the request to the adapter.  
-   * Because the adapter returns plain objects, external consumers can remain agnostic of the graph‑database specifics.  
+2. **Code Review Automation** – The `CONTRIBUTING.md` file is consumed by the repository’s pull‑request template and by bots (e.g., a custom Lint‑PR bot) that check for the presence of required review items.  The **CodeReviewGuideline** child component is essentially the programmatic representation of this document.
 
-4. **Testing / Mocking**  
-   * The clear contract of the **GraphDatabaseAdapter** enables unit tests for BestPractices to replace the adapter with a mock that returns deterministic data, ensuring that business‑logic tests do not depend on a live graph database.
+3. **Constraint Monitoring** – The hook format defined in `CLAUDE-CODE-HOOK‑FORMAT.md` is imported by the **ConstraintMonitoring** sibling (see `mcp‑constraint-monitor`).  Runtime services validate incoming hook payloads against this schema, guaranteeing that the best‑practice data contract is upheld.
+
+4. **Documentation Generation** – Tools such as `mkdocs` or `docusaurus` can ingest the Markdown files to produce a unified “Best Practices” site, which is then linked from the parent **CodingPatterns** documentation hub.
+
+5. **Dependency Management** – The installation guide (`INSTALL.md`) references the same version‑pinning strategy used by the graph‑database adapter (`storage/graph-database-adapter.ts`) to keep external libraries deterministic, reinforcing a cross‑component consistency in dependency handling.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through the GraphDatabaseAdapter** – Direct queries against the graph store should be avoided. Use the adapter’s methods (`fetch`, `store`, `update`) to guarantee consistency with the rest of the **CodingPatterns** ecosystem.  
-* **Prefer the higher‑level GraphDatabaseInteractions façade** when you need to execute complex queries or batch operations; it encapsulates pagination, error handling, and result mapping that the adapter alone does not provide.  
-* **When adding a new best‑practice**, ensure the node label matches the convention used by the adapter (typically `BestPractice`) and include required metadata fields such as `name`, `description`, and `lastUpdated`. This keeps the knowledge graph uniform and searchable by sibling components.  
-* **Do not modify the adapter internals** unless a coordinated change is made across all siblings, because the adapter is the shared persistence contract for DesignPatterns, CodingConventions, and GraphDatabaseInteractions.  
-* **Leverage CodeGraphConstructor** for any scenario that needs the practice data to be linked with code artifacts—e.g., generating a recommendation list for a given codebase. The constructor will automatically pull the latest best‑practice nodes from the adapter.  
+Developers interacting with the repository should treat the **BestPractices** artefacts as the *canonical source* for how to work with each integration:
+
+* **Before contributing code** – Read `integrations/code-graph-rag/CONTRIBUTING.md`.  Follow its checklist: write unit tests for every new function, ensure test coverage meets the stated threshold, and request at least two reviewers who have signed the contributor license agreement.  The checklist is enforced by the repository’s CI gate.
+
+* **When adding a new Copi command** – Consult `integrations/copi/USAGE.md` for the recommended CLI syntax and flag conventions.  Mirror the examples in the file, and add a corresponding entry to the CI workflow so that the command is exercised on every push.
+
+* **During a version upgrade** – Follow the step‑by‑step migration plan in `integrations/copi/MIGRATION.md`.  The guide specifies which configuration files must be updated, which deprecated flags need removal, and which integration tests must be rerun.  Skipping this step can break backward compatibility, a risk the guide explicitly calls out.
+
+* **When emitting constraint‑monitor hooks** – Serialize payloads according to the JSON schema in `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  Validation failures will be logged by the monitoring service and cause the associated CI job to fail, protecting downstream consumers.
+
+* **For status reporting** – Use the logging conventions described in `integrations/copi/STATUS.md`.  Emit logs at the prescribed levels (`info`, `warn`, `error`) and expose the health‑check endpoint so that the monitoring dashboard can surface the component’s health in real time.
+
+By adhering to these guidelines, developers ensure that the system remains **consistent, testable, and observable** across all integrations.
 
 ---
 
-### Architectural Patterns Identified  
+### Summary of Requested Items  
 
-1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts the underlying graph‑database implementation.  
-2. **Repository‑like Pattern** – The adapter serves as a repository for best‑practice entities.  
-3. **Separation‑of‑Concerns / Layered Architecture** – Distinct layers for data access (adapter), domain logic (BestPractices), and graph construction (CodeGraphConstructor).  
+1. **Architectural patterns identified**  
+   * Documentation‑as‑Code (co‑location of docs and code).  
+   * Single Source of Truth for guidelines (akin to a singleton pattern for policy).  
+   * Modular integration‑specific documentation (mirroring the modular architecture of the codebase).  
 
-### Design Decisions and Trade‑offs  
+2. **Design decisions and trade‑offs**  
+   * **Decision** to keep best‑practice docs in Markdown alongside each integration – yields high discoverability and version alignment.  
+   * **Trade‑off**: documentation is not compiled, so static analysis must be added separately (e.g., CI bots) to enforce compliance.  
+   * **Decision** to define data contracts (hook format) in a machine‑readable schema – enables runtime validation.  
+   * **Trade‑off**: schema maintenance adds overhead when the payload evolves, but the payoff is stronger data integrity.
 
-* **Single Adapter for Multiple Sub‑components** – Maximizes reuse and consistency but creates a tight coupling; any breaking change to the adapter impacts all siblings.  
-* **Explicit Knowledge‑Graph Construction** – Using `CodeGraphConstructor` centralizes graph assembly, which simplifies maintenance but adds an extra processing step when the graph must be refreshed.  
-* **Metadata‑Centric Storage** – Storing practice names and descriptions as graph nodes enables rich relationship modeling (e.g., linking practices to code modules) at the cost of a slightly more complex query surface compared to a simple relational table.  
+3. **System structure insights**  
+   * BestPractices sits under **CodingPatterns**, inheriting the overarching emphasis on data consistency.  
+   * It shares the same naming‑convention discipline as the sibling **CodingConventions** component.  
+   * Its child **CodeReviewGuideline** is directly derived from the `CONTRIBUTING.md` file, showing a hierarchical flow from documentation to enforcement.
 
-### System Structure Insights  
+4. **Scalability considerations**  
+   * Adding new integrations simply requires a new folder with the standard set of Markdown files; the pattern scales linearly.  
+   * Because the docs are parsed by CI pipelines, the validation workload grows with the number of integrations, but this is mitigated by reusing shared parsers (e.g., the JSON schema validator).  
+   * The modular layout prevents a single massive document from becoming a bottleneck for updates or for tooling that extracts guidelines.
 
-* The **CodingPatterns** hierarchy is organized around a shared persistence layer (`storage/graph-database-adapter.ts`).  
-* Each sub‑component (BestPractices, DesignPatterns, CodingConventions) contributes its own node type to a unified graph, allowing cross‑pattern queries.  
-* The **GraphDatabaseInteractions** class acts as a utility façade, exposing common query patterns to all sub‑components, reinforcing a consistent interaction model.  
+5. **Maintainability assessment**  
+   * High maintainability: each integration’s guidelines are isolated, making localized updates safe.  
+   * Consistent heading and code‑fence usage across files eases automated tooling and reduces the risk of drift.  
+   * The only maintenance risk is divergence between the prose in the Markdown files and the actual implementation; this risk is mitigated by the CI checks that enforce the presence of required sections (e.g., migration steps) before merges.  
 
-### Scalability Considerations  
-
-* Because all persistence goes through a single adapter, scaling the underlying graph database (horizontal sharding, read replicas) will automatically benefit every sub‑component.  
-* Bulk operations (e.g., loading a large set of best practices) should use the batch capabilities provided by **GraphDatabaseInteractions** to reduce round‑trip latency.  
-* The knowledge‑graph approach naturally supports graph‑oriented queries that scale with the number of relationships rather than the number of flat records, which is advantageous for recommendation or impact‑analysis features.  
-
-### Maintainability Assessment  
-
-* **High maintainability** for business logic: BestPractices contains only domain‑specific code; storage concerns are delegated to the adapter.  
-* **Moderate risk** due to shared adapter: changes to the adapter require coordinated updates and extensive regression testing across all siblings.  
-* **Clear separation** of responsibilities (adapter, interactions façade, constructor) makes unit testing straightforward and encourages clean code reviews.  
-* Documentation should emphasize the contract of `GraphDatabaseAdapter` and the expected node schema for best‑practice entities to avoid schema drift as the system evolves.
+Overall, **BestPractices** provides a well‑structured, documentation‑driven backbone that aligns with the broader **CodingPatterns** philosophy of data integrity and modular design, while offering concrete, actionable guidance that can be automatically validated throughout the development lifecycle.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component relies heavily on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for efficient data storage and retrieval. This is evident in how it utilizes the adapter to fetch and update data across various sub-components, ultimately contributing to the overall performance of the system. For instance, when constructing the code knowledge graph using the CodeGraphConstructor (code-graph-constructor.ts), it leverages the GraphDatabaseAdapter to store and retrieve relevant graph data. Furthermore, the GraphDatabaseInteractions class is used in conjunction with the GraphDatabaseAdapter to handle interactions with graph databases and knowledge graph construction, as seen in the way it employs the adapter to execute queries and retrieve results.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
+
+### Children
+- [CodeReviewGuideline](./CodeReviewGuideline.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 
 ### Siblings
-- [DesignPatterns](./DesignPatterns.md) -- DesignPatterns utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve design pattern data.
-- [CodingConventions](./CodingConventions.md) -- CodingConventions uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve coding convention data.
-- [GraphDatabaseInteractions](./GraphDatabaseInteractions.md) -- GraphDatabaseInteractions uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve graph data.
+- [DesignPatterns](./DesignPatterns.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.
+- [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
+- [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 
 ---

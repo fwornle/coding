@@ -23,13 +23,13 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-c; LLMAbstraction: [LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.; DockerizedServices: [LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the sin; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonst; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relatio; CodingPatterns: [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-c; ConstraintSystem: [LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate ; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classi.",
+        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integ; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with differ; DockerizedServices: [LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/l; Trajectory: [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible con; KnowledgeManagement: [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agen; CodingPatterns: [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js); SemanticAnalysis: [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance.",
         "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.270Z",
-        "last_updated": "2026-03-18T05:47:31.356Z"
+        "last_updated": "2026-03-18T06:33:23.189Z"
       },
       "id": "mc4flkgxgvxje"
     },
@@ -37,16 +37,17 @@
       "name": "LiveLoggingSystem",
       "entityType": "Component",
       "observations": [
-        "[LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.",
-        "[LLM] The LiveLoggingSystem component employs a standardized logging format, which is enforced by the LSLConfigValidator in scripts/validate-lsl-config.js. This validator ensures that the LSL configuration is optimized and valid, preventing potential errors or inconsistencies in the logging data. The TranscriptAdapter in lib/agent-api/transcript-api.js serves as an abstract base class for agent-specific transcript adapters, providing a unified interface for processing transcripts. The LSLConverter in lib/agent-api/transcripts/lsl-converter.js is used to convert between agent-specific transcript formats and the unified LSL format, facilitating seamless integration with various agents and applications.",
-        "[LLM] The LiveLoggingSystem component follows a specific pattern in TranscriptAdapter implementations, as seen in the getAgentType() + getTranscriptDirectory() + readTranscripts() pattern. This pattern ensures standardized transcript processing and provides a consistent interface for working with different types of transcripts. The work-stealing concurrency mechanism via shared atomic index counter in runWithConcurrency() enables high-performance processing of large log datasets. This approach allows the system to scale efficiently and handle large volumes of logging data, making it suitable for demanding applications.",
-        "[LLM] The use of automatic JSON export sync in the LiveLoggingSystem component ensures that log data is consistently exported in a standardized format. This feature is particularly useful for integrating the logging system with other components or applications that rely on JSON data. The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT variables, defined in the project documentation, play a crucial role in configuring the Code Graph RAG system, which is used for graph-based analysis of codebases. The BROWSER_ACCESS_PORT and BROWSER_ACCESS_SSE_URL variables are used to configure the browser access MCP server, enabling communication between the logging system and the browser-based interface.",
-        "[LLM] The LiveLoggingSystem component leverages the Claude Code Hook Data Format, defined in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, to classify observations using the OntologyClassificationAgent. This format provides a standardized structure for representing hook data, enabling the system to efficiently process and analyze the data. The Semantic Constraint Detection feature, described in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md, allows the system to identify and enforce constraints on the logging data, ensuring that the data conforms to specific rules or criteria. The Constraint Configuration Guide, provided in integrations/mcp-constraint-monitor/docs/constraint-configuration.md, offers detailed instructions for configuring constraints and customizing the logging system to meet specific requirements."
+        "[LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integrations/code-graph-rag/README.md). This allows for efficient querying and retrieval of entities, which is crucial for the system's classification layers. The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) plays a key role in this process, as it classifies observations against the ontology system. The agent's constructor and the ensureLLMInitialized method demonstrate a lazy initialization approach for LLM services, which helps prevent unnecessary computations and improves overall system performance.",
+        "[LLM] The TranscriptAdapter (lib/agent-api/transcript-api.js) serves as an abstract base class, providing a unified abstraction for reading and converting transcripts from different agent formats. This design decision enables the LiveLoggingSystem to support various agent formats, making it more versatile and adaptable to different use cases. The LSLConverter (lib/agent-api/transcripts/lsl-converter.js) is used for converting between agent-specific transcript formats and the unified LSL format, which facilitates seamless integration with other components. The logging functionality, implemented through the logging.ts module (integrations/mcp-server-semantic-analysis/src/logging.ts), ensures that the system can handle logging tasks efficiently without blocking the event loop.",
+        "[LLM] The LiveLoggingSystem's architecture involves multiple integrations, including the Graph-Code system, OntologyClassificationAgent, and TranscriptAdapter. The system's use of a work-stealing concurrency model, similar to the WaveController's runWithConcurrency method, allows for efficient processing of concurrent tasks. This design choice enables the system to handle a large volume of logging data and classification tasks without compromising performance. The LSLConfigValidator (scripts/validate-lsl-config.js) is responsible for validating and optimizing LSL system configurations, which ensures that the system operates within defined parameters and maintains optimal performance.",
+        "[LLM] The OntologyClassificationAgent's classification process relies on the ontology system, which is stored in the graph database. The agent's classification logic is implemented in the classifyObservation method (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts), which takes into account the observation's context and the ontology system's constraints. The classification process is crucial for the LiveLoggingSystem, as it enables the system to capture and analyze Claude Code conversations effectively. The logging functionality, which includes an async log buffer, ensures that the system can handle logging tasks without blocking the event loop, allowing for efficient and uninterrupted classification and logging operations.",
+        "[LLM] The LiveLoggingSystem's session windowing and file routing mechanisms are designed to handle large volumes of logging data. The system's use of a graph database for storing and retrieving knowledge entities enables efficient querying and retrieval of entities, which is essential for the system's classification layers. The TranscriptAdapter and LSLConverter work together to provide a unified abstraction for reading and converting transcripts from different agent formats, facilitating seamless integration with other components. The system's lazy initialization approach for LLM services and work-stealing concurrency model contribute to its overall performance and efficiency, making it suitable for handling complex logging and classification tasks.",
+        "[LLM] The logging.ts module (integrations/mcp-server-semantic-analysis/src/logging.ts) provides an async log buffer, which prevents blocking the event loop and ensures that the system can handle logging tasks efficiently. The LSLConfigValidator (scripts/validate-lsl-config.js) is responsible for validating and optimizing LSL system configurations, which is crucial for maintaining optimal system performance. The LiveLoggingSystem's architecture and design choices, including the use of a graph database and work-stealing concurrency model, enable the system to handle complex logging and classification tasks efficiently. The system's classification logic, implemented in the OntologyClassificationAgent, relies on the ontology system and is essential for capturing and analyzing Claude Code conversations effectively."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.276Z",
-        "last_updated": "2026-03-18T05:47:29.446Z"
+        "last_updated": "2026-03-18T06:33:24.965Z"
       },
       "id": "mc4flkgp5ipmm"
     },
@@ -54,19 +55,17 @@
       "name": "KnowledgeManagement",
       "entityType": "Component",
       "observations": [
-        "The KnowledgeManagement component is responsible for managing the knowledge graph, which includes storing, querying, and updating entities and relationships. It utilizes a Graphology+LevelDB database for persistence and provides a JSON export sync feature. The component's architecture is designed to handle concurrent access and provides an intelligent routing mechanism for storing and retrieving data. Key patterns include the use of adapters for database interactions, lazy initialization of LLM (Large Language Model) providers, and work-stealing concurrency for efficient data processing.",
-        "Uses GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for Graphology+LevelDB persistence with automatic JSON export sync",
-        "Employs PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for handling entity persistence and relationship management",
-        "Utilizes CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for constructing and querying the code knowledge graph",
-        "Implements UKBTraceReport (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) for generating detailed trace reports of workflow runs",
-        "Employs migration scripts (scripts/migrate-graph-db-entity-types.js) for updating the graph database entity types",
-        "Follows a DAG-based execution model in the Pipeline sub-component, with each step declaring explicit dependencies",
-        "Utilizes the MEMGRAPH_BATCH_SIZE variable to configure the batch size for database interactions"
+        "[LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.",
+        "[LLM] The component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persisting data in a graph database, leveraging Graphology and LevelDB. This choice of storage solution allows for efficient management of complex, interconnected data structures, which is well-suited for knowledge management applications. The automatic JSON export sync feature provided by the GraphDatabaseAdapter ensures that data remains consistent across different formats and storage systems, facilitating seamless integration with other components and services.",
+        "[LLM] The PersistenceAgent (src/agents/persistence-agent.ts) plays a crucial role in the KnowledgeManagement component by overseeing the storage and management of entities within the graph database. This agent is responsible for ensuring that data is correctly persisted, updated, and retrieved, thereby maintaining the integrity and consistency of the knowledge base. By encapsulating persistence logic within a dedicated agent, the component adheres to the Single Responsibility Principle (SRP), making it easier to maintain, modify, and extend the persistence mechanism as needed.",
+        "[LLM] The UKBTraceReport generator (src/utils/ukb-trace-report.ts) is a valuable tool for analyzing workflow execution and data flow within the KnowledgeManagement component. By producing detailed reports that include ontology classification information, this generator enables developers to gain insights into the component's behavior, identify potential issues, and optimize its performance. The use of ontology classification for entity typing, with support for multiple ontology systems and confidence scoring, demonstrates the component's ability to handle complex, nuanced knowledge representations and reason about them effectively.",
+        "[LLM] The KnowledgeManagement component's implementation of data loss tracking and QA issue reporting is a testament to its focus on data quality and workflow reliability. By monitoring data loss and reporting QA issues, the component can detect and respond to potential problems, ensuring that the knowledge base remains accurate and up-to-date. This feature is particularly important in applications where data integrity is paramount, such as in coding systems where incorrect or incomplete information can have significant consequences. The component's use of work-stealing concurrency and lazy loading further underscores its commitment to efficient and reliable operation.",
+        "[LLM] The constructor-based pattern for wave agents in the KnowledgeManagement component allows for flexible and customizable initialization of these agents. By providing a standardized way to create and configure wave agents, this pattern promotes code reuse and simplifies the development process. The ensureLLMInitialized() method, which is part of this pattern, ensures that LLMs are properly initialized before they are used, preventing potential errors and inconsistencies. This attention to detail and commitment to robust design principles contribute to the overall reliability and maintainability of the component."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.279Z",
-        "last_updated": "2026-03-18T05:47:59.926Z"
+        "last_updated": "2026-03-18T06:33:41.467Z"
       },
       "id": "mc4flkg17znsjl"
     },
@@ -74,17 +73,16 @@
       "name": "CodingPatterns",
       "entityType": "Component",
       "observations": [
-        "[LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.",
-        "[LLM] The integrations/code-graph-rag/README.md file describes a graph-based RAG system, implying a structured approach to code analysis and visualization. This is reinforced by the use of the GraphDatabaseAdapter in the ContentValidationAgent, which interacts with the Graphology+LevelDB database and provides automatic JSON export synchronization. The constraint-configuration.md file provides guidance on constraint configuration, suggesting a structured approach to constraint management. This is evident in the ContentValidationAgent, which follows a standardized structure for agent development.",
-        "[LLM] The CodingPatterns component emphasizes the importance of a unified approach to development, as inferred from various code artifacts and documentation. The use of specific design patterns, such as the constructor + ensureLLMInitialized() + execute() pattern in the Wave agents, promotes maintainability, scalability, and readability. The HookConfigLoader class and the GraphDatabaseAdapter demonstrate a focus on modularity and reusability, allowing for efficient extension and modification of the system.",
-        "[LLM] The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides guidance on constraint configuration, highlighting the need for a structured approach to constraint management. This is reinforced by the ContentValidationAgent, which follows a standardized structure for agent development. The ensureLLMInitialized() method in base-agent.ts ensures lazy LLM initialization, promoting efficient resource utilization. The Wave agents follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method, demonstrating a focus on consistency and maintainability.",
-        "[LLM] The CodingPatterns component demonstrates a focus on code quality and best practices, as evident in the use of specific design patterns and coding conventions. The HookConfigLoader class and the GraphDatabaseAdapter demonstrate a focus on modularity and reusability, allowing for efficient extension and modification of the system. The constraint-configuration.md file provides guidance on constraint configuration, suggesting a structured approach to constraint management. The ContentValidationAgent follows a standardized structure for agent development, promoting maintainability, scalability, and readability.",
-        "[LLM] The use of the GraphDatabaseAdapter in the ContentValidationAgent highlights a specific database interaction pattern, which provides automatic JSON export synchronization. This pattern is also observed in the integrations/code-graph-rag/README.md file, which describes a graph-based RAG system. The HookConfigLoader class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts ensures lazy LLM initialization, promoting efficient resource utilization. The Wave agents follow a consistent structure for agent implementation, demonstrating a focus on consistency and maintainability."
+        "[LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.",
+        "[LLM] The Wave agents follow a consistent design pattern, as seen in the constructor(repoPath, team) + ensureLLMInitialized() + execute(input) pattern for lazy LLM initialization. This pattern is demonstrated in the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) which uses a lazy initialization approach and the LLMService for ontology-based classification and analysis. The agent's constructor initializes the repository path and team, while the ensureLLMInitialized function checks if the LLM is initialized before proceeding with the execution of the input. This design pattern enables efficient and modular implementation of agents, allowing for easy extension and customization of their functionality. The LLMController (lib/llm/dist/index.js) also uses the LLMService for large language model operations, illustrating the project's use of established libraries and frameworks to support advanced language processing capabilities.",
+        "[LLM] The project's use of hooks and callback functions is a notable aspect of its design, as seen in the integrations/copi/docs/hooks.md file which provides a detailed reference for hook functions. The hooks enable flexible and modular design, allowing components to interact with each other in a decoupled manner. For instance, the Copi CLI wrapper (integrations/copi/README.md) uses hooks to integrate with the Tmux status line, providing a seamless user experience. The hooks.md file provides a comprehensive list of available hooks, including the 'before-exec' and 'after-exec' hooks, which can be used to perform custom actions before and after the execution of a command. The use of hooks and callback functions enables the project to maintain a high degree of flexibility and customizability, making it easier to extend and modify its functionality.",
+        "[LLM] The BrowserAccess MCP server (integrations/browser-access/README.md) provides a browser-based interface for interacting with the project's components, highlighting the importance of user-friendly interfaces and accessibility. The server enables users to access the project's functionality through a web browser, making it easier to use and interact with the application. The BrowserAccess MCP server uses the BROWSER_ACCESS_PORT and BROWSER_ACCESS_SSE_URL environment variables to configure its settings, demonstrating the project's use of environment variables to manage its configuration. The server's README file provides a detailed overview of its features and capabilities, including its support for multiple browsers and devices.",
+        "[LLM] The project's coding standards and best practices are reflected in various parts of the codebase, including the integrations and config directories. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) and the LLMController (lib/llm/dist/index.js) demonstrate a consistent coding style, with clear and concise comments explaining their functionality. The use of established libraries and frameworks, such as Graphology and LevelDB, also highlights the project's commitment to using proven and reliable technologies. The CodeGraphRAG system (integrations/code-graph-rag/README.md) provides a detailed overview of its design and implementation, including its use of graph-based data structures and algorithms. The project's emphasis on coding standards and best practices ensures that the codebase remains maintainable, efficient, and easy to understand."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.281Z",
-        "last_updated": "2026-03-18T05:48:13.101Z"
+        "last_updated": "2026-03-18T06:33:47.481Z"
       },
       "id": "mc4flkg30u7wy5"
     },
@@ -92,17 +90,17 @@
       "name": "ConstraintSystem",
       "entityType": "Component",
       "observations": [
-        "[LLM] The ConstraintSystem component's architecture is designed to be modular and scalable, with multiple sub-components working together to validate code actions and file operations. For example, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against the current codebase, while the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from multiple sources. This modular design allows for easy maintenance and extension of the system.",
-        "[LLM] The use of a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) for persistence provides a robust and efficient way to store and retrieve data. The adapter utilizes Graphology+LevelDB for persistence and features automatic JSON export sync, ensuring that data is always up-to-date and consistent. This design decision enables the ConstraintSystem to handle large amounts of data and scale to meet the needs of the application.",
-        "[LLM] The ViolationCaptureService (scripts/violation-capture-service.js) plays a crucial role in bridging live session logging with constraint monitor dashboard persistence. By capturing and storing violations, the service provides valuable insights into the codebase and helps identify areas that require attention. The service's implementation is closely tied to the unified hook management system (lib/agent-api/hooks/hook-manager.js), which handles various hook events and ensures that the ConstraintSystem is notified of any violations.",
-        "[LLM] The mergeConfigs function (lib/agent-api/hooks/hook-config.js) is a key component of the HookConfigLoader, as it combines user and project configurations into a single, unified configuration. This function is essential for ensuring that the ConstraintSystem is configured correctly and that all relevant rules and constraints are applied. By merging configurations, the function provides a flexible and customizable way to manage hook configurations and ensures that the system is adaptable to different use cases and scenarios.",
-        "[LLM] The ConstraintSystem's constructor and execution pattern, as defined in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts), provide a clear and consistent way to initialize and execute the system. The constructor initializes the agent's dependencies and sets up the necessary configuration, while the execution pattern defines the sequence of events that occur during the validation process. This design decision ensures that the system is easy to understand and maintain, and that the validation process is predictable and reliable.",
-        "[LLM] The unified hook management system (lib/agent-api/hooks/hook-manager.js) is a critical component of the ConstraintSystem, as it handles various hook events and ensures that the system is notified of any violations. The system provides a centralized way to manage hooks and ensures that all relevant events are captured and processed. By utilizing a unified hook management system, the ConstraintSystem can handle a wide range of hook events and provide a flexible and customizable way to manage hook configurations."
+        "[LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to store and retrieve knowledge in a graph-based structure, which enables efficient querying and analysis of entity relationships. This choice of data storage allows for flexible and scalable management of complex constraints. Furthermore, the GraphDatabaseAdapter class provides methods for adding, removing, and updating graph nodes and edges, facilitating dynamic modifications to the knowledge graph.",
+        "[LLM] The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) plays a crucial role in the ConstraintSystem component by providing a centralized mechanism for managing and dispatching hook events. This allows for loose coupling between different components and facilitates the integration of new hooks without requiring significant modifications to the existing codebase. The UnifiedHookManager class also includes methods for registering and unregistering hooks, as well as invoking hook functions with specific parameters.",
+        "[LLM] The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content against configured rules, ensuring data consistency and integrity within the ConstraintSystem component. This agent leverages the SemanticAnalyzer (integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.js) to parse entity content and detect potential violations. The ContentValidationAgent class includes methods for loading validation rules, validating entity content, and reporting validation results.",
+        "[LLM] The ViolationCaptureService (scripts/violation-capture-service.js) is a critical component of the ConstraintSystem, as it captures and persists constraint violations during live sessions. This service utilizes the GraphDatabaseAdapter to store violation data in the graph database, allowing for efficient querying and analysis of violation patterns. The ViolationCaptureService class includes methods for capturing violations, storing violation data, and retrieving violation reports.",
+        "[LLM] The ConstraintSystem component follows a modular design, with separate modules for content validation, hook management, and violation capture. This design decision facilitates flexibility and maintainability, as individual modules can be updated or replaced without affecting the overall system. The HookConfigLoader (lib/agent-api/hooks/hook-config.js) is an example of this modularity, as it provides a mechanism for loading and merging user and project-level hook configurations. The HookConfigLoader class includes methods for loading configuration files, merging configurations, and providing the resulting configuration to the UnifiedHookManager.",
+        "[LLM] The SemanticAnalyzer (integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.js) is a key component of the ConstraintSystem, as it provides the capability to parse entity content and detect potential violations. This analyzer leverages natural language processing and machine learning techniques to identify semantic patterns and relationships within entity content. The SemanticAnalyzer class includes methods for parsing entity content, detecting violations, and reporting analysis results. The SemanticAnalyzer is also utilized by the ContentValidationAgent to validate entity content against configured rules."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.285Z",
-        "last_updated": "2026-03-18T05:48:12.872Z"
+        "last_updated": "2026-03-18T06:33:47.987Z"
       },
       "id": "mc4flkg12nbo98"
     },
@@ -110,16 +108,17 @@
       "name": "SemanticAnalysis",
       "entityType": "Component",
       "observations": [
-        "[LLM] The SemanticAnalysis component employs a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the LLMService, found in lib/llm/dist/index.js, for large language model operations, such as text generation and classification. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, is used for interacting with the graph database, which stores knowledge entities and their relationships.",
-        "[LLM] The SemanticAnalysisAgent, located in integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, performs comprehensive semantic analysis of code and conversation data. This agent follows the BaseAgent pattern, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, which provides a standard structure for agent development. The SemanticAnalysisAgent also leverages the LLMService for text generation and classification, and utilizes the GraphDatabaseAdapter for storing and retrieving knowledge entities. The agent's functionality is crucial for extracting and persisting structured knowledge entities from git history and LSL sessions.",
-        "[LLM] The CodeGraphAgent, located in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, is responsible for constructing a knowledge graph of code entities and their relationships. This agent uses the GraphDatabaseAdapter to store and retrieve code entities, and follows the BaseAgent pattern for implementation. The CodeGraphAgent also utilizes the LLMService for text generation and classification, which enables it to analyze code data and extract relevant information. The agent's output is a graph representation of code entities, which is stored in the graph database and used for further analysis and processing.",
-        "[LLM] The ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, is responsible for validating the accuracy and freshness of knowledge entities. This agent follows the BaseAgent pattern and utilizes the LLMService for text generation and classification. The ContentValidationAgent also uses the GraphDatabaseAdapter to retrieve knowledge entities from the graph database and verify their accuracy and freshness. The agent's functionality is crucial for ensuring the quality and reliability of the knowledge entities extracted and persisted by the SemanticAnalysis component.",
-        "[LLM] The SemanticAnalysis component's use of a graph database, interacted with through the GraphDatabaseAdapter, allows for efficient storage and retrieval of knowledge entities and their relationships. The graph database is a key component of the system's architecture, enabling the agents to store and retrieve complex relationships between code entities and other knowledge entities. The GraphDatabaseAdapter, located in storage/graph-database-adapter.js, provides a standardized interface for interacting with the graph database, making it easier to develop and maintain the agents and other components of the system. The adapter also enables the system to scale and perform well, even with large amounts of data and complex relationships between entities."
+        "[LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.",
+        "[LLM] The SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) performs comprehensive semantic analysis of code and conversation data. This agent utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to construct and query the code knowledge graph. The CodeGraphAgent is responsible for creating and updating the graph structure, which is then used by the SemanticAnalysisAgent for analysis. The graph structure is stored and retrieved using the GraphDatabaseAdapter (storage/graph-database-adapter.js), which provides a standardized interface for graph data storage and retrieval.",
+        "[LLM] The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for validating entity content and detecting staleness. This agent uses a workflow-based approach, executing in a specific order to produce a comprehensive validation result. The ContentValidationAgent's validation process involves checking entity content against a set of predefined rules and constraints, which are defined in the constraint-configuration.md (integrations/mcp-constraint-monitor/docs/constraint-configuration.md) document. The agent also uses the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve and update entity content.",
+        "[LLM] The SemanticAnalysis component's workflow-based approach ensures that agents execute in a specific order to produce a comprehensive analysis result. This approach is implemented using a combination of agent dependencies and workflow definitions. For example, the OntologyClassificationAgent depends on the SemanticAnalysisAgent, which in turn depends on the ContentValidationAgent. This dependency chain ensures that agents execute in the correct order, with each agent building on the results of the previous agent. The workflow definitions are stored in the workflow.json (integrations/mcp-server-semantic-analysis/config/workflow.json) file, which provides a centralized configuration for the workflow.",
+        "[LLM] The use of a GraphDatabaseAdapter (storage/graph-database-adapter.js) provides a standardized interface for graph data storage and retrieval. This adapter is used by multiple agents, including the OntologyClassificationAgent, SemanticAnalysisAgent, and ContentValidationAgent. The GraphDatabaseAdapter provides a layer of abstraction between the agents and the underlying graph database, allowing for easier switching between different graph databases or storage systems. The adapter also provides a set of standardized methods for graph data storage and retrieval, which simplifies the development of new agents and ensures consistency across the system.",
+        "[LLM] The SemanticAnalysis component's architecture is designed to facilitate the integration of multiple agents and workflows. This is achieved through the use of a modular design, with each agent and workflow defined as a separate module. The modules are then composed together to form the overall system, with each module providing a specific functionality. This modular design allows for easier maintenance and extension of the system, as new agents and workflows can be added or removed as needed. The modular design also enables the use of different programming languages or frameworks for each module, providing greater flexibility and choice."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.288Z",
-        "last_updated": "2026-03-18T05:48:25.869Z"
+        "last_updated": "2026-03-18T06:33:54.079Z"
       },
       "id": "mc4flkg1jyy23i"
     },
@@ -127,17 +126,17 @@
       "name": "LLMAbstraction",
       "entityType": "Component",
       "observations": [
-        "[LLM] The LLMAbstraction component's architecture is designed with dependency injection in mind, as seen in the LLMService class (lib/llm/llm-service.ts), which allows for the incorporation of various trackers and classifiers. This design decision enables a high degree of flexibility and testability, as different components can be easily swapped out or mocked. For instance, the budget tracker and sensitivity classifier can be replaced with mock implementations for testing purposes. The use of dependency injection also facilitates the addition of new providers, as the core service logic remains unchanged. The LLMService class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner.",
-        "[LLM] The DMRProvider class (lib/llm/providers/dmr-provider.ts) is responsible for local LLM inference via Docker Desktop's Model Runner. This provider supports per-agent model overrides from DMR configuration, allowing for fine-grained control over the models used for inference. The DMRProvider class also demonstrates the use of interfaces like LLMCompletionRequest and LLMCompletionResult, which facilitates a provider-agnostic approach. This enables the addition of new providers without altering the core service logic, making it easier to integrate new LLM providers into the system. The checkHealth method in DMRProvider ensures that only operational providers are utilized for requests, preventing failures due to misconfigured or unavailable providers.",
-        "[LLM] The AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) handles interactions with the Anthropic API, including message creation and content extraction according to Anthropic's API shape. This provider demonstrates the use of specific API configurations and initialization logic, which is necessary for interacting with the Anthropic API. The AnthropicProvider class also showcases the use of provider-specific error handling, which is essential for ensuring robustness in the face of transient errors. The circuit breaker pattern (lib/llm/circuit-breaker.js) is used to handle provider failures, preventing cascading failures and ensuring that the system remains operational even in the event of provider downtime.",
-        "[LLM] The LLMAbstraction component incorporates a mock service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for generating plausible mock data in testing scenarios. This mock service is configured using a progress file, which allows for the customization of mock data generation. The use of a mock service enables developers to test the system without relying on actual LLM providers, reducing the complexity and cost of testing. The mock service also facilitates the testing of edge cases and error scenarios, which is essential for ensuring the robustness of the system. The LLMService class can be easily configured to use the mock service instead of an actual provider, making it easier to switch between testing and production environments.",
-        "[LLM] The LLMAbstraction component's use of interfaces like LLMCompletionRequest and LLMCompletionResult enables a provider-agnostic approach, facilitating the addition of new providers without altering the core service logic. This design decision allows developers to focus on implementing new providers without worrying about the underlying service logic. The use of interfaces also ensures that all providers conform to a standardized API, making it easier to integrate new providers into the system. The LLMService class can be easily extended to support new providers, as the core service logic remains unchanged. This enables developers to add new providers without affecting the existing codebase, reducing the risk of introducing bugs or breaking existing functionality.",
-        "[LLM] The circuit breaker pattern (lib/llm/circuit-breaker.js) is used to handle provider failures, preventing cascading failures and ensuring that the system remains operational even in the event of provider downtime. This pattern is essential for ensuring the robustness of the system, as it prevents a single provider failure from bringing down the entire system. The circuit breaker pattern works by detecting when a provider is failing and preventing further requests from being sent to that provider until it becomes available again. This prevents a flood of requests from being sent to a failed provider, reducing the load on the system and preventing cascading failures. The circuit breaker pattern is implemented using a combination of timers and counters, which track the number of failed requests and the time since the last successful request."
+        "[LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with different LLM providers. This class employs dependency injection, allowing for flexible configuration of the component, including the injection of mock services and budget trackers. The LLMService class also defines a set of interfaces (lib/llm/types.js) for LLM providers, requests, and responses, ensuring a standardized interaction with different providers. For example, the LLMService class uses the provider registry (lib/llm/provider-registry.js) to manage the registration and retrieval of various LLM providers, such as the AnthropicProvider (lib/llm/providers/anthropic-provider.ts) and DMRProvider (lib/llm/providers/dmr-provider.ts).",
+        "[LLM] The circuit breaker pattern (lib/llm/circuit-breaker.ts) is implemented in the LLMAbstraction component to detect and prevent cascading failures when interacting with LLM providers. This pattern ensures that the system can recover from failures and maintain its overall reliability. The circuit breaker pattern is used in conjunction with the provider registry, allowing the system to switch between different providers in case of a failure. The circuit breaker pattern is also used with the mock mode, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, for testing purposes, allowing the component to generate mock LLM responses without actual provider calls.",
+        "[LLM] The LLMAbstraction component supports a mock mode, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, for testing purposes, allowing the component to generate mock LLM responses without actual provider calls. This feature is crucial for testing the component's behavior without incurring the costs associated with actual LLM provider calls. The mock mode is implemented using the LLMService class, which allows for the injection of mock services and budget trackers. The mock mode is also used in conjunction with the circuit breaker pattern, ensuring that the system can recover from failures and maintain its overall reliability.",
+        "[LLM] The provider registry (lib/llm/provider-registry.js) is used to manage the registration and retrieval of various LLM providers. This registry allows the system to switch between different providers, ensuring that the system can maintain its overall reliability. The provider registry is used in conjunction with the LLMService class, which employs dependency injection, allowing for flexible configuration of the component. The provider registry is also used with the circuit breaker pattern, ensuring that the system can recover from failures and maintain its overall reliability.",
+        "[LLM] The LLMAbstraction component defines a set of interfaces (lib/llm/types.js) for LLM providers, requests, and responses, ensuring a standardized interaction with different providers. These interfaces are used throughout the component, including in the LLMService class, the provider registry, and the concrete provider implementations. The interfaces ensure that the component can interact with different providers in a standardized way, allowing for easy switching between providers and modes. The interfaces are also used in conjunction with the mock mode, allowing the component to generate mock LLM responses without actual provider calls.",
+        "[LLM] The concrete provider implementations, such as the AnthropicProvider (lib/llm/providers/anthropic-provider.ts) and DMRProvider (lib/llm/providers/dmr-provider.ts), encapsulate the specifics of interacting with respective LLM services. These implementations use the interfaces defined in lib/llm/types.js, ensuring a standardized interaction with different providers. The concrete provider implementations are used in conjunction with the provider registry, allowing the system to switch between different providers. The concrete provider implementations are also used with the circuit breaker pattern, ensuring that the system can recover from failures and maintain its overall reliability."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.293Z",
-        "last_updated": "2026-03-18T05:47:43.796Z"
+        "last_updated": "2026-03-18T06:33:30.771Z"
       },
       "id": "mc4flkgs99eop"
     },
@@ -145,17 +144,17 @@
       "name": "DockerizedServices",
       "entityType": "Component",
       "observations": [
-        "[LLM] The DockerizedServices component utilizes a high-level facade for LLM operations, with the LLMService (lib/llm/llm-service.ts) acting as the single public entry point for all LLM operations, handling mode routing and provider fallback. This design decision allows for a clear separation of concerns and makes it easier to manage and maintain the component. The LLMService class is responsible for handling incoming requests, determining the appropriate mode and provider, and delegating the work to the corresponding provider. For example, the handleRequest function in lib/llm/llm-service.ts is responsible for handling incoming requests and delegating the work to the corresponding provider.",
-        "[LLM] The component employs a GraphDatabaseAdapter for persistence and automatic JSON export sync. Although the GraphDatabaseAdapter is not explicitly mentioned in the provided code files, its presence can be inferred from the context. The GraphDatabaseAdapter is likely responsible for interacting with the Graphology+LevelDB database, providing a layer of abstraction and making it easier to work with the database. The automatic JSON export sync feature allows for easy backup and recovery of data, which is crucial for a component that handles sensitive data. The GraphDatabaseAdapter is likely implemented in a separate file, such as lib/db/graph-database-adapter.js, and is used by the LLMService class to interact with the database.",
-        "[LLM] The CircuitBreaker (lib/llm/circuit-breaker.js) is used to prevent cascading failures when a service is not responding. The CircuitBreaker pattern is a common design pattern used in distributed systems to prevent a single failing service from bringing down the entire system. The CircuitBreaker class in lib/llm/circuit-breaker.js is responsible for monitoring the health of the services and preventing requests from being sent to a service that is not responding. For example, the isCircuitOpen function in lib/llm/circuit-breaker.js is used to determine whether the circuit is open or closed, and the resetTimeout function is used to reset the timeout for the circuit.",
-        "[LLM] The ProviderRegistry (lib/llm/provider-registry.js) is used to manage and prioritize LLM providers, including mock, local, and public providers. The ProviderRegistry class is responsible for registering and retrieving providers, as well as determining the priority of each provider. The ProviderRegistry is used by the LLMService class to determine which provider to use for a given request. For example, the getProvider function in lib/llm/provider-registry.js is used to retrieve a provider based on its name, and the registerProvider function is used to register a new provider. The ProviderRegistry also provides a way to prioritize providers, with higher-priority providers being used before lower-priority providers.",
-        "[LLM] The component follows a retry-with-backoff pattern in the ServiceStarter (lib/service-starter.js) to prevent endless loops and provide graceful degradation when optional services fail. The ServiceStarter class is responsible for starting and stopping services, and it uses a retry-with-backoff pattern to prevent endless loops when a service fails to start. The retry-with-backoff pattern involves retrying a failed operation after a certain amount of time, with the time between retries increasing exponentially. This allows the component to recover from temporary failures and prevents it from getting stuck in an endless loop. For example, the startService function in lib/service-starter.js is used to start a service, and the stopService function is used to stop a service.",
-        "[LLM] The ProcessStateManager (scripts/process-state-manager.js) is used to manage and register child processes with the Global Service Coordinator. The ProcessStateManager class is responsible for managing the lifecycle of child processes, including starting and stopping them, and registering them with the Global Service Coordinator. The ProcessStateManager is used by the ServiceStarter class to start and stop services, and it provides a way to manage the lifecycle of child processes in a centralized way. For example, the startProcess function in scripts/process-state-manager.js is used to start a child process, and the stopProcess function is used to stop a child process. The ProcessStateManager also provides a way to register child processes with the Global Service Coordinator, which allows the component to keep track of all running child processes."
+        "[LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/llm-service.ts) for managing large language model operations. This modularity allows for easier maintenance and updates, as well as scalability. For instance, the LLMService class utilizes dependency injection through the setModeResolver, setMockService, and setBudgetTracker methods, making it easier to test and extend the service. Additionally, the use of configuration files, such as YAML files, to manage settings and priorities for different providers and services, enables flexible configuration and customization.",
+        "[LLM] The component utilizes event-driven programming, as seen in the LLMService class, which employs the EventEmitter class to handle events and notifications. This approach enables loose coupling between services and allows for greater flexibility in handling different scenarios and use cases. For example, the LLMService class uses event-driven programming to handle mode routing, caching, and circuit breaking, making it more efficient and reliable. Furthermore, the use of event-driven programming enables easier integration with other services and components, such as the service starter (lib/service-starter.js), which provides robust service startup with retry logic and timeout protection.",
+        "[LLM] The DockerizedServices component follows the factory pattern for creating providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.js). This design pattern enables the creation of different providers without specifying the exact class of provider that will be created, making it more flexible and extensible. For instance, the ProviderRegistry class can create different providers, such as the GraphDatabaseAdapter, which is used for graph database persistence and retrieval of knowledge entities. This approach enables easier addition of new providers and services, without modifying the existing codebase.",
+        "[LLM] The component utilizes concurrency control through the use of promises and async/await in the service starter and LLMService class. This approach enables the component to handle multiple requests and tasks concurrently, improving its performance and responsiveness. For example, the service starter uses async/await to start services with retry logic and timeout protection, ensuring that services are started reliably and efficiently. Additionally, the use of concurrency control enables the component to handle a large number of requests and tasks, making it more scalable and reliable.",
+        "[LLM] The DockerizedServices component employs the decorator pattern to add functionality to services, as seen in the LLMService class. This design pattern enables the addition of new functionality to services without modifying their underlying code, making it more flexible and extensible. For instance, the LLMService class can be decorated with additional functionality, such as logging or caching, without modifying its underlying code. This approach enables easier addition of new features and functionality, without affecting the existing codebase. Furthermore, the use of the decorator pattern enables easier testing and maintenance of services, as the added functionality can be easily removed or modified.",
+        "[LLM] The component utilizes configuration files, such as YAML files, to manage settings and priorities for different providers and services. This approach enables flexible configuration and customization, making it easier to adapt the component to different use cases and scenarios. For example, the YAML files can be used to configure the settings for the GraphDatabaseAdapter, such as the database connection settings or the query parameters. This approach enables easier configuration and customization, without modifying the underlying code. Additionally, the use of configuration files enables easier maintenance and updates, as the configuration settings can be easily modified or updated without affecting the existing codebase."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.298Z",
-        "last_updated": "2026-03-18T05:47:46.892Z"
+        "last_updated": "2026-03-18T06:33:33.565Z"
       },
       "id": "mc4flkg22cvl1q"
     },
@@ -163,17 +162,17 @@
       "name": "Trajectory",
       "entityType": "Component",
       "observations": [
-        "[LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonstrating an adapter pattern for integration with different tools and services. This adapter pattern allows for a standardized interface to interact with various extensions, such as Specstory, facilitating the addition of new integrations with minimal modifications to the existing codebase. The SpecstoryAdapter class, specifically, employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods. This approach ensures that the most efficient and reliable connection method is used, while providing fallback options in case of failures.",
-        "[LLM] The implementation of lazy initialization of the extension API in the SpecstoryAdapter's initialize method is noteworthy, as it ensures resources are only allocated when necessary. This design decision helps optimize performance by avoiding unnecessary computations and memory allocations. Furthermore, the use of environment variables and configuration files for setting up integrations, as hinted at by the presence of various configuration files in the project structure, allows for flexible and customizable deployment options. The Logger class from '../logging/Logger.js' is also utilized for logging purposes, indicating a centralized logging mechanism that can be easily configured and managed.",
-        "[LLM] The Trajectory component's architecture is characterized by the use of work-stealing concurrency for efficient processing, as well as the employment of standardized logging formats, such as the one observed in the logConversation method of SpecstoryAdapter. This logging format facilitates the analysis and debugging of conversations, providing valuable insights into the system's behavior. Additionally, the presence of a fallback mechanism for logging when primary methods fail, such as writing to a watched directory, showcases resilience in integration and ensures that critical information is not lost in case of errors. The SpecstoryAdapter's connectViaFileWatch method, for instance, demonstrates this fallback approach, highlighting the importance of robust error handling in the system.",
-        "[LLM] The codebase's organization and structure, with files such as integrations/browser-access/README.md and integrations/copi/EXAMPLES.md, suggest a modular and component-based design. This modularity enables developers to focus on specific aspects of the system, such as browser access or code graph RAG, without being overwhelmed by the complexity of the entire project. The use of clear and descriptive file names, as well as the presence of documentation files like README.md and EXAMPLES.md, further contributes to the codebase's readability and maintainability. The SpecstoryAdapter, in particular, serves as a prime example of this modular design, as it provides a self-contained implementation of the adapter pattern for Specstory integration.",
-        "[LLM] The Trajectory component's utilization of the Code Graph RAG system, as mentioned in integrations/code-graph-rag/README.md, implies a graph-based approach to code analysis and understanding. This approach enables the system to capture complex relationships between code entities, such as functions, classes, and variables, and to reason about the code's structure and behavior. The Code Graph RAG system's SSE port, specified in CODE_GRAPH_RAG_SSE_PORT, and its port, specified in CODE_GRAPH_RAG_PORT, demonstrate the system's ability to communicate with other components and services, facilitating the exchange of information and the coordination of actions. The SpecstoryAdapter's interaction with the Code Graph RAG system, although not directly implemented, highlights the potential for integrating multiple components and services to achieve a comprehensive understanding of the codebase.",
-        "[LLM] The presence of various configuration files, such as integrations/copi/INSTALL.md and integrations/copi/MIGRATION.md, suggests that the Trajectory component is designed to be highly configurable and adaptable to different environments and use cases. The use of environment variables, such as ANTHROPIC_API_KEY and BROWSERBASE_API_KEY, further supports this notion, as it allows developers to customize the system's behavior without modifying the underlying code. The SpecstoryAdapter's reliance on configuration files and environment variables, for instance, enables developers to easily switch between different Specstory configurations or to customize the adapter's behavior for specific use cases. This flexibility is essential for a system like the Trajectory component, which must be able to accommodate diverse project requirements and workflows."
+        "[LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible connections to external services. This adapter attempts to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a persistent connection approach. For instance, the connectViaHTTP method tries multiple ports to establish a connection, showcasing the adapter's ability to handle varying connection scenarios. This flexibility is crucial for maintaining a scalable and maintainable system, enabling easier integration of new services or features as needed.",
+        "[LLM] The SpecstoryAdapter class utilizes asynchronous programming through the use of async/await in its initialize and logConversation methods. This approach, as seen in lib/integrations/specstory-adapter.js, facilitates asynchronous programming and enhances code readability. The logger created by createLogger from ../logging/Logger.js is also used for logging important events and errors, contributing to the system's transparency and debuggability. The logConversation method, for example, formats the log entry according to Specstory's requirements before sending it, highlighting the adapter's role in data transformation and compatibility.",
+        "[LLM] The connectViaIPC method in SpecstoryAdapter, located in lib/integrations/specstory-adapter.js, employs Inter-Process Communication for connecting to Specstory. This approach serves as an alternative connection strategy, demonstrating the adapter's ability to handle different connection scenarios. The SpecstoryAdapter's connectViaFileWatch method, also in lib/integrations/specstory-adapter.js, serves as a fallback, using a watched directory for logging when other connection methods fail, ensuring data persistence. This fallback mechanism is crucial for maintaining the system's reliability and data integrity.",
+        "[LLM] The modular structure of the Trajectory component, as evident in the various adapter classes and modules, contributes to the system's maintainability and scalability. The use of lazy initialization, for instance, enables efficient resource utilization, allowing the system to handle increased loads and demands. The SpecstoryAdapter class, with its flexible connection strategies and data transformation capabilities, is a prime example of this modular structure. The adapter's ability to handle different connection scenarios and log data accordingly ensures the system's reliability and data integrity.",
+        "[LLM] The Trajectory component's use of design patterns, such as the adapter pattern, facilitates the integration of new services or features. The SpecstoryAdapter class, with its connection strategies and data transformation capabilities, is an example of this pattern. The adapter's ability to handle different connection scenarios and log data accordingly enables the system to maintain its reliability and data integrity. The use of async/await and logging mechanisms, as seen in lib/integrations/specstory-adapter.js, further enhances the system's transparency and debuggability, making it easier to identify and resolve issues.",
+        "[LLM] The SpecstoryAdapter class's role in data transformation and compatibility is crucial for maintaining the system's reliability and data integrity. The logConversation method, for example, formats the log entry according to Specstory's requirements before sending it, ensuring compatibility with the Specstory extension. This data transformation capability is essential for facilitating communication between different components and services, enabling the system to handle varying data formats and structures. The adapter's ability to handle different connection scenarios and log data accordingly further enhances the system's reliability and data integrity."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.302Z",
-        "last_updated": "2026-03-18T05:47:58.751Z"
+        "last_updated": "2026-03-18T06:33:37.858Z"
       },
       "id": "mc4flkga1xqjr"
     },
@@ -567,16 +566,18 @@
       "name": "SpecstoryAdapter",
       "entityType": "SubComponent",
       "observations": [
-        "SpecstoryAdapter uses the httpRequest helper method to send HTTP requests to the Specstory extension in the connectViaHTTP method",
-        "SpecstoryAdapter provides a connectViaIPC method for establishing a connection with the Specstory extension via IPC",
-        "SpecstoryAdapter implements a connectViaFileWatch method for connecting to the Specstory extension via file watch",
-        "SpecstoryAdapter is utilized in the Trajectory component for logging conversations and tracking project progress",
-        "SpecstoryAdapter is defined in the lib/integrations/specstory-adapter.js file"
+        "SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.",
+        "The SpecstoryAdapter implements a connection protocol similar to the one described in integrations/copi/README.md to handle connections to the Specstory service.",
+        "The integrations/copi/docs/hooks.md file may provide insight into how SpecstoryAdapter handles hook functions for connection purposes.",
+        "SpecstoryAdapter could be using a library or module similar to the one mentioned in integrations/browser-access/README.md to access browser connections.",
+        "The SpecstoryAdapter might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.",
+        "The SpecstoryAdapter may use a data storage solution like the one mentioned in integrations/code-graph-rag/README.md to store connection metadata.",
+        "SpecstoryAdapter could be integrated with other components using APIs or interfaces similar to the ones described in integrations/mcp-constraint-monitor/dashboard/README.md."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.041Z",
-        "last_updated": "2026-03-12T05:57:45.706Z"
+        "last_updated": "2026-03-18T06:34:36.800Z"
       },
       "id": "mc4flkg1qsac51"
     },
@@ -584,18 +585,18 @@
       "name": "ManualLearning",
       "entityType": "SubComponent",
       "observations": [
-        "ManualLearning uses integrations/copi/README.md to handle logging and tmux integration for manual learning processes",
-        "ManualLearning utilizes integrations/copi/hooks.md for hook functions reference to handle manual learning workflows",
-        "ManualLearning relies on integrations/code-graph-rag/README.md for graph-based RAG system to construct and query the code knowledge graph",
-        "ManualLearning implements work-stealing concurrency via shared nextIndex counter in integrations/copi/scripts/README.md",
-        "ManualLearning pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification",
-        "ManualLearning uses a DAG-based execution model with topological sort in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
-        "ManualLearning handles semantic constraint detection in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md"
+        "ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md",
+        "It could leverage the ontology classification system, possibly using multiple ontology systems as mentioned in the project documentation",
+        "The sub-component might store entities in a graph database, potentially using the EntityPersistence sub-component",
+        "ManualLearning could involve deriving observations from entities, similar to the ObservationDerivation sub-component",
+        "It may also generate reports on workflow execution, similar to the UKBTraceReporting sub-component",
+        "Manual learning could be integrated with copi, a GitHub Copilot CLI wrapper, as described in integrations/copi/README.md",
+        "The sub-component might use a graph-based RAG system for code analysis, as seen in integrations/code-graph-rag/README.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.043Z",
-        "last_updated": "2026-03-18T05:50:06.810Z"
+        "last_updated": "2026-03-18T06:34:39.621Z"
       },
       "id": "mc4flkg3msrows"
     },
@@ -603,18 +604,18 @@
       "name": "OnlineLearning",
       "entityType": "SubComponent",
       "observations": [
-        "OnlineLearning uses integrations/code-graph-rag/README.md to construct and query the code knowledge graph",
-        "OnlineLearning relies on integrations/copi/README.md for logging and tmux integration for online learning processes",
-        "OnlineLearning implements batch analysis pipeline in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md",
-        "OnlineLearning utilizes work-stealing concurrency via shared nextIndex counter in integrations/copi/scripts/README.md",
-        "OnlineLearning pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification",
-        "OnlineLearning uses a DAG-based execution model with topological sort in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
-        "OnlineLearning handles semantic constraint detection in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md"
+        "OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation",
+        "It could utilize the Code Graph RAG system for code analysis, as described in integrations/code-graph-rag/README.md",
+        "The sub-component might leverage the constraint configuration guide in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
+        "OnlineLearning could involve the use of semantic constraint detection, as mentioned in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
+        "It may also use the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md",
+        "The sub-component might integrate with copi, a GitHub Copilot CLI wrapper, as seen in integrations/copi/README.md",
+        "Online learning could utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.045Z",
-        "last_updated": "2026-03-18T05:50:12.234Z"
+        "last_updated": "2026-03-18T06:34:43.718Z"
       },
       "id": "mc4flkg1aeu1jj"
     },
@@ -694,20 +695,16 @@
     },
     {
       "name": "GraphDatabaseAdapter",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        "The GraphDatabaseAdapter uses the graph database for storing and retrieving knowledge entities and their relationships.",
-        "The GraphDatabaseAdapter employs the LLMService in lib/llm/dist/index.js for large language model operations.",
-        "The GraphDatabaseAdapter implements a mechanism for resolving entity types and their relationships.",
-        "The GraphDatabaseAdapter uses the graph database to store the constructed knowledge graph.",
-        "The GraphDatabaseAdapter uses the LLMService for validating entities against the ontology system.",
-        "The GraphDatabaseAdapter uses the OntologyClassificationAgent for classifying entities against the ontology system.",
-        "The GraphDatabaseAdapter uses the CodeGraphConstructor for constructing a knowledge graph of code entities and their relationships."
+        "The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.",
+        "The GraphDatabaseAdapter is a key component in the CodingPatterns project, specifically in the GraphDatabase sub-component.",
+        "The adapter is used to interact with the graph database, allowing for the storage and retrieval of data in a graph structure."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.060Z",
-        "last_updated": "2026-03-18T05:51:57.003Z"
+        "last_updated": "2026-03-18T06:36:29.572Z"
       },
       "id": "mc4flkg1v7dxl2"
     },
@@ -861,18 +858,18 @@
       "name": "Pipeline",
       "entityType": "SubComponent",
       "observations": [
-        "The Pipeline uses the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving knowledge entities and their relationships.",
-        "The coordinator agent in the Pipeline utilizes the LLMService in lib/llm/dist/index.js for large language model operations.",
-        "The observation generation agent in the Pipeline employs the OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts for classifying observations against the ontology system.",
-        "The KG operators in the Pipeline use the CodeGraphConstructor for constructing a knowledge graph of code entities and their relationships.",
-        "The deduplication agent in the Pipeline removes duplicate entities to prevent redundant processing.",
-        "The persistence agent in the Pipeline uses the GraphDatabaseAdapter to store the processed entities in the graph database.",
-        "The Pipeline implements a work-stealing mechanism via shared nextIndex counter, allowing idle workers to pull tasks immediately."
+        "The Pipeline uses a batch processing approach, as seen in the batch-analysis.yaml file, to manage the execution of various agents.",
+        "The coordinator agent in the Pipeline is responsible for managing the execution of other agents, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The observation generation agent in the Pipeline utilizes the GraphDatabaseAdapter to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.",
+        "The KG operators in the Pipeline perform knowledge graph operations, such as entity resolution and validation, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The deduplication agent in the Pipeline removes duplicate observations to prevent redundant processing, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The persistence agent in the Pipeline is responsible for storing the results of the batch processing, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The Pipeline uses a standardized structure for agent development, as provided by the BaseAgent class, to ensure consistency across all agents."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.134Z",
-        "last_updated": "2026-03-18T05:51:22.442Z"
+        "last_updated": "2026-03-18T06:35:32.865Z"
       },
       "id": "mc4flkg53173y"
     },
@@ -880,18 +877,18 @@
       "name": "Ontology",
       "entityType": "SubComponent",
       "observations": [
-        "The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts uses the LLMService in lib/llm/dist/index.js for large language model operations.",
-        "The Ontology sub-component employs the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving ontology entities and their relationships.",
-        "The upper ontology definitions in the Ontology sub-component provide a framework for entity type resolution and validation.",
-        "The lower ontology definitions in the Ontology sub-component provide specific entity types and their relationships.",
-        "The Ontology sub-component implements an entity type resolution mechanism to determine the type of an entity.",
-        "The Ontology sub-component uses the LLMService for validating entities against the ontology system.",
-        "The Ontology sub-component uses the GraphDatabaseAdapter to store the validated entities in the graph database."
+        "The Ontology sub-component uses a hierarchical approach to manage the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The entity type resolution agent in the Ontology sub-component is responsible for resolving entity types and validating them against the ontology system, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The validation agent in the Ontology sub-component checks the consistency of the ontology system and ensures that it is up-to-date, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The Ontology sub-component utilizes the GraphDatabaseAdapter to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.",
+        "The Ontology sub-component is responsible for maintaining the integrity of the ontology system, ensuring that it is consistent and accurate, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The Ontology sub-component provides a standardized structure for ontology management, as provided by the BaseAgent class, to ensure consistency across all agents.",
+        "The Ontology sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.146Z",
-        "last_updated": "2026-03-18T05:51:32.106Z"
+        "last_updated": "2026-03-18T06:35:35.715Z"
       },
       "id": "mc4flkgti3r81"
     },
@@ -899,17 +896,18 @@
       "name": "Insights",
       "entityType": "SubComponent",
       "observations": [
-        "The Insights sub-component uses the LLMService in lib/llm/dist/index.js for generating insights and pattern catalog extraction.",
-        "The Insights sub-component employs the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving insight entities and their relationships.",
-        "The Insights sub-component generates knowledge reports based on the extracted patterns and insights.",
-        "The Insights sub-component implements a mechanism for ranking insights based on their relevance and importance.",
-        "The Insights sub-component uses the GraphDatabaseAdapter to store the generated insights and knowledge reports in the graph database.",
-        "The Insights sub-component uses the CodeGraphConstructor for constructing a knowledge graph of code entities and their relationships."
+        "The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The pattern catalog extraction agent in the Insights sub-component is responsible for extracting patterns from the data, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The knowledge report authoring agent in the Insights sub-component is responsible for generating knowledge reports based on the insights generated, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The Insights sub-component utilizes the GraphDatabaseAdapter to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.",
+        "The Insights sub-component is responsible for providing actionable insights to the user, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The Insights sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The Insights sub-component provides a standardized structure for insight generation, as provided by the BaseAgent class, to ensure consistency across all agents."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.148Z",
-        "last_updated": "2026-03-18T05:51:34.400Z"
+        "last_updated": "2026-03-18T06:35:38.204Z"
       },
       "id": "mc4flkg1oy27et"
     },
@@ -949,33 +947,29 @@
       "name": "LLMService",
       "entityType": "SubComponent",
       "observations": [
-        "The LLMService class in lib/llm/llm-service.ts handles incoming requests and delegates the work to the corresponding provider.",
-        "The handleRequest function in lib/llm/llm-service.ts determines the appropriate mode and provider for each request.",
-        "The LLMService sub-component, implemented in the LLMService.py file within the Coding/DockerizedServices/LLMService directory, utilizes the mode_routing.py module to handle incoming requests and route them to the appropriate provider based on the specified mode in the config.json file."
+        "LLMService employs the provider registry (lib/llm/provider-registry.js) to manage the registration and retrieval of various LLM providers.",
+        "The LLMService class defines a set of interfaces (lib/llm/types.js) for LLM providers, requests, and responses, ensuring a standardized interaction with different providers.",
+        "LLMService allows for the injection of mock services and budget trackers, enabling flexible configuration and testing of the component."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:25.153Z",
-        "last_updated": "2026-03-18T05:49:27.809Z"
+        "last_updated": "2026-03-18T06:34:05.420Z"
       },
       "id": "mc4flkgpzlvbs"
     },
     {
       "name": "ProviderRegistry",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        "The ProviderRegistry class is responsible for managing the registration and availability of different LLM providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.ts)",
-        "The ProviderRegistry uses a dependency injection approach to allow for the addition of new providers, as seen in the LLMService class (lib/llm/llm-service.ts)",
-        "The ProviderRegistry provides a way to retrieve the available providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.ts)",
-        "The ProviderRegistry uses a cache to improve performance and reduce the number of requests made to the providers, as seen in the LLMService class (lib/llm/llm-service.ts)",
-        "The ProviderRegistry handles errors and exceptions that occur during the registration and retrieval of providers, as seen in the LLMService class (lib/llm/llm-service.ts)",
-        "The ProviderRegistry uses the CircuitBreaker class to prevent cascading failures by detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)",
-        "The ProviderRegistry provides a way to add and remove providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.ts)"
+        "The parent analysis suggests the existence of a provider registry, which is likely implemented in a file similar to lib/llm/provider-registry.js, as mentioned in the Hierarchy Context.",
+        "The LLMService sub-component employs the provider registry to manage LLM providers, indicating a design decision to separate provider management from the core LLMService functionality.",
+        "Although no direct code evidence is available, the Hierarchy Context and parent analysis provide strong indications of the ProviderRegistry's importance in the LLMService sub-component."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:38.373Z",
-        "last_updated": "2026-03-18T05:49:09.888Z"
+        "last_updated": "2026-03-18T06:35:51.263Z"
       },
       "id": "mc4flkg22autg2"
     },
@@ -1133,14 +1127,14 @@
       "name": "OntologyClassificationAgent",
       "entityType": "Detail",
       "observations": [
-        "The OntologyClassificationAgent uses the LLMService in lib/llm/dist/index.js for large language model operations, as indicated by the parent context.",
-        "The agent's functionality is tied to the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which is mentioned in the hierarchy context.",
-        "The OntologyClassificationAgent utilizes the LLMService in the llm-service.ts module to perform large language model operations, as seen in the SemanticAnalysis component's hierarchy under Coding/SemanticAnalysis/Ontology/OntologyClassificationAgent."
+        "The OntologyClassificationAgent is implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which suggests a modular design for the ontology system.",
+        "The use of a hierarchical approach in the OntologyClassificationAgent implies a structured and organized method for managing the ontology, with upper and lower ontology definitions providing a clear framework for classification.",
+        "The OntologyClassificationAgent's implementation in the given file path indicates a separation of concerns, with the agent responsible for a specific aspect of the semantic analysis component."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:38.634Z",
-        "last_updated": "2026-03-18T05:52:58.501Z"
+        "last_updated": "2026-03-18T06:36:44.390Z"
       },
       "id": "mc4flkgkdumz4"
     },
@@ -1163,18 +1157,18 @@
       "name": "LoggingManager",
       "entityType": "SubComponent",
       "observations": [
-        "LoggingManager utilizes a queue-based system for handling log messages, as seen in the OntologyClassificationAgent's classifyObservation function, which takes an observation object as input and returns a classification result object.",
-        "The LoggingManager's buffering mechanism is designed to prevent log loss by storing log messages in memory before writing them to disk, as implied by the OntologyClassificationAgent's interaction with the graph database.",
-        "The LoggingManager's asynchronous logging capability allows it to handle high volumes of log data without impacting system performance, as suggested by the use of asynchronous programming in the OntologyClassificationAgent.",
-        "The LoggingManager's logging mechanism is designed to be flexible and configurable, allowing for different logging levels and formats to be used, as implied by the OntologyClassificationAgent's ability to classify observations against the ontology system.",
-        "The LoggingManager's interaction with the GraphDatabaseManager is critical for storing and retrieving validation metadata, as seen in the GraphDatabaseManager's interaction with the graph database.",
-        "The LoggingManager's use of a queue-based system allows it to handle log messages in a thread-safe manner, as suggested by the use of concurrent programming in the OntologyClassificationAgent.",
-        "The LoggingManager's buffering mechanism is designed to be highly efficient, using a combination of in-memory and disk-based storage to minimize log loss, as implied by the OntologyClassificationAgent's ability to handle large volumes of log data."
+        "LoggingManager likely utilizes the integrations/copi/README.md file to understand the logging requirements for the Copi integration.",
+        "The LoggingManager may implement a logging protocol similar to the one described in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to handle status line integration.",
+        "The integrations/copi/docs/hooks.md file may provide insight into how LoggingManager handles hook functions for logging purposes.",
+        "LoggingManager could be using a library or module similar to the one mentioned in integrations/browser-access/README.md to access browser logs.",
+        "The LoggingManager might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.",
+        "The LoggingManager may use a data storage solution like the one mentioned in integrations/code-graph-rag/README.md to store logged data.",
+        "LoggingManager could be integrated with other components using APIs or interfaces similar to the ones described in integrations/mcp-constraint-monitor/dashboard/README.md."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.320Z",
-        "last_updated": "2026-03-12T05:57:37.105Z"
+        "last_updated": "2026-03-18T06:34:27.630Z"
       },
       "id": "mc4flkgheis2a"
     },
@@ -1182,18 +1176,18 @@
       "name": "TranscriptManager",
       "entityType": "SubComponent",
       "observations": [
-        "TranscriptManager leverages the OntologyClassificationAgent to categorize interactions within the Claude Code environment, as seen in the LiveLoggingSystem component description.",
-        "The TranscriptManager is designed to work with the LogManager to capture and store interactions in a meaningful and organized manner.",
-        "The use of the TranscriptManager demonstrates a design decision to utilize existing infrastructure for semantic analysis, rather than implementing a custom solution.",
-        "The TranscriptManager is responsible for converting agent-specific formats into the unified LSL format, which is used by the LSLConverterUtility.",
-        "The TranscriptManager's integration with the ontology system enables the LiveLoggingSystem to capture and store interactions in a meaningful and organized manner.",
-        "The TranscriptManager's design allows for the use of different transcript adapters, providing flexibility in the types of formats that can be converted.",
-        "The TranscriptManager's conversion process is crucial for making sense of the interactions within the Claude Code environment."
+        "The TranscriptManager likely uses a data storage solution, such as a database or a file system, to store transcript data, as seen in the integrations/code-graph-rag/CONTRIBUTING.md file.",
+        "The integrations/code-graph-rag/docs/claude-code-setup.md file suggests that the TranscriptManager handles transcript data conversion between different formats, such as text or audio.",
+        "The TranscriptManager may use a library like pandas or a similar data processing framework to handle transcript data, as hinted at in the integrations/code-graph-rag/docs/claude-code-setup.md file.",
+        "The integrations/copi/README.md file implies that the TranscriptManager plays a role in the overall system's data processing pipeline, potentially by providing transcript data to other components.",
+        "The TranscriptManager might use a data serialization format, such as JSON or XML, to store or transmit transcript data, as suggested in the integrations/copi/docs/DELETE-WORKSPACES-README.md file.",
+        "The integrations/copi/docs/SEND-VULNERABILITY-EMAILS.md file hints at the TranscriptManager's role in handling transcript data related to vulnerability updates or alerts.",
+        "The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md file suggests that the TranscriptManager displays transcript-related information in the system's status line."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.323Z",
-        "last_updated": "2026-03-11T14:32:39.184Z"
+        "last_updated": "2026-03-18T06:33:59.836Z"
       },
       "id": "mc4flkg1o18du1"
     },
@@ -1403,20 +1397,16 @@
     },
     {
       "name": "SpecstoryApiClient",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        "SpecstoryApiClient is responsible for providing an API client for interacting with the Specstory extension",
-        "The SpecstoryApiClient's architecture is evident in its use of a modular approach to API client management",
-        "SpecstoryApiClient provides a standardized interface for interacting with the Specstory extension, making it easier to integrate with the extension",
-        "The SpecstoryApiClient's use of a robust error handling mechanism ensures that errors are handled and logged properly",
-        "SpecstoryApiClient's logging functionality provides insight into API requests and responses",
-        "The SpecstoryApiClient's API client is customizable, allowing for flexibility in API configuration",
-        "SpecstoryApiClient's validation mechanism ensures that API requests are valid and consistent"
+        "The SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension, implying a client interface is necessary for this connection.",
+        "Given the parent component's context, the SpecstoryApiClient is likely responsible for handling the API requests and responses, although specific implementation details are not available.",
+        "The lack of direct source code access limits the ability to provide more specific observations about the SpecstoryApiClient's implementation or behavior."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.371Z",
-        "last_updated": "2026-03-08T15:13:04.972Z"
+        "last_updated": "2026-03-18T06:36:09.198Z"
       },
       "id": "mc4flkgnh5xlh"
     },
@@ -1495,18 +1485,18 @@
       "name": "BrowserAccess",
       "entityType": "SubComponent",
       "observations": [
-        "BrowserAccess uses integrations/browser-access/README.md to handle browser access to the knowledge graph",
-        "BrowserAccess relies on integrations/browser-access/README.md for browser access mechanism",
-        "BrowserAccess implements work-stealing concurrency via shared nextIndex counter in integrations/copi/scripts/README.md",
-        "BrowserAccess pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification",
-        "BrowserAccess uses a DAG-based execution model with topological sort in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
-        "BrowserAccess handles semantic constraint detection in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
-        "BrowserAccess utilizes browser access mechanism in integrations/code-graph-rag/README.md for browser interactions"
+        "BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md",
+        "It could leverage the Code Graph RAG system for graph-based code analysis, as described in integrations/code-graph-rag/README.md",
+        "The sub-component might involve the use of a shared atomic index counter for work-stealing concurrency, as described in wave-controller.ts",
+        "BrowserAccess could integrate with the EntityPersistence sub-component to provide access to stored entities",
+        "It may also use the ManualLearning sub-component to provide access to manually created entities",
+        "The sub-component might utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md",
+        "BrowserAccess could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:25:17.432Z",
-        "last_updated": "2026-03-18T05:50:36.912Z"
+        "last_updated": "2026-03-18T06:34:58.604Z"
       },
       "id": "mc4flkg18wm0zw"
     },
@@ -1770,18 +1760,18 @@
       "name": "ConnectionHandler",
       "entityType": "SubComponent",
       "observations": [
-        "ConnectionHandler is responsible for handling connections with retry-with-backoff, indicating a key role in the system's connection management",
-        "The ConnectionHandler's design allows for the easy handling of connections, making it a flexible solution",
-        "The use of a ConnectionHandler in the ConstraintSystem suggests a decoupling of connection logic from the core system",
-        "ConnectionHandler's architecture is based on a modular design, allowing for the easy addition or removal of connection handlers",
-        "The ConnectionHandler is tightly integrated with the ConstraintSystem, enabling the handling of connections",
-        "ConnectionHandler's integration with the ConstraintSystem enables the handling of connections with retry-with-backoff",
-        "The ConnectionHandler is responsible for handling connections, indicating a key role in the system's workflow"
+        "ConnectionHandler likely uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch.",
+        "The ConnectionHandler may implement a connection protocol similar to the one described in integrations/copi/README.md to handle connections to the Copi service.",
+        "The integrations/copi/docs/hooks.md file may provide insight into how ConnectionHandler handles hook functions for connection purposes.",
+        "ConnectionHandler could be using a library or module similar to the one mentioned in integrations/browser-access/README.md to access browser connections.",
+        "The ConnectionHandler might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.",
+        "The ConnectionHandler may use a data storage solution like the one mentioned in integrations/code-graph-rag/README.md to store connection metadata.",
+        "ConnectionHandler could be integrated with other components using APIs or interfaces similar to the ones described in integrations/mcp-constraint-monitor/dashboard/README.md."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.238Z",
-        "last_updated": "2026-03-09T12:16:28.448Z"
+        "last_updated": "2026-03-18T06:34:28.911Z"
       },
       "id": "mc4flkg2dwsw44"
     },
@@ -1898,18 +1888,18 @@
       "name": "DesignPatterns",
       "entityType": "SubComponent",
       "observations": [
-        "The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system",
-        "The ensureLLMInitialized() method in base-agent.ts promotes efficient resource utilization by ensuring lazy LLM initialization",
-        "The Wave agents follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method",
-        "The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DesignPatterns sub-component",
-        "The integrations/code-graph-rag/README.md file describes a graph-based RAG system, which is an example of a design pattern utilized in the CodingPatterns component",
-        "The integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file describes the hook data format, which is used in the DesignPatterns sub-component",
-        "The integrations/copi/EXAMPLES.md file provides examples of hook usage, which are relevant to the DesignPatterns sub-component"
+        "The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.",
+        "The CodeGraphRAG system in integrations/code-graph-rag/README.md employs a graph-based approach to handle large codebases, demonstrating the use of the graph pattern.",
+        "The copi/USAGE.md file describes the usage of the Copi CLI wrapper, which may utilize the factory pattern to create instances of different classes based on user input.",
+        "The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, which could be implemented using the observer pattern to notify components of changes.",
+        "The integrations/code-graph-rag/docs/claude-code-setup.md file provides setup instructions for the Graph-Code MCP Server, potentially using design patterns like the builder pattern for configuration.",
+        "The copi/docs/STATUS-LINE-QUICK-REFERENCE.md file explains the status line integration, which might utilize the decorator pattern to extend the functionality of the status line.",
+        "The mcp-constraint-monitor/docs/constraint-configuration.md file outlines the constraint configuration guide, possibly employing the strategy pattern to manage different constraint configurations."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.338Z",
-        "last_updated": "2026-03-18T05:50:45.379Z"
+        "last_updated": "2026-03-18T06:35:04.881Z"
       },
       "id": "mc4flkg5gxjj3"
     },
@@ -1917,18 +1907,18 @@
       "name": "CodingConventions",
       "entityType": "SubComponent",
       "observations": [
-        "The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component",
-        "The integrations/code-graph-rag/CONTRIBUTING.md file describes contributing guidelines, which include coding conventions and best practices",
-        "The integrations/mcp-constraint-monitor/README.md file describes the MCP constraint monitor, which utilizes coding conventions and best practices",
-        "The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md file provides a quick reference for status line integration, which is an example of a coding convention",
-        "The integrations/copi/INSTALL.md file provides installation guidelines, which include coding conventions and best practices",
-        "The integrations/copi/MIGRATION.md file describes migration guidelines, which include coding conventions and best practices",
-        "The integrations/copi/README.md file describes the Copi project, which utilizes coding conventions and best practices"
+        "The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.",
+        "The copi/USAGE.md file demonstrates a specific code formatting style, suggesting the use of a coding convention.",
+        "The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines a commenting practice for hook data format, implying a coding convention.",
+        "The integrations/copi/INSTALL.md file provides installation instructions, potentially following a standard coding convention for documentation.",
+        "The integrations/copi/MIGRATION.md file outlines a migration guide, which may employ a consistent coding style throughout.",
+        "The integrations/copi/STATUS.md file describes the status of the Copi CLI wrapper, possibly using a standard commenting practice.",
+        "The integrations/copi/USAGE.md file explains the usage of the Copi CLI wrapper, potentially following a coding convention for user documentation."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.340Z",
-        "last_updated": "2026-03-18T05:50:46.789Z"
+        "last_updated": "2026-03-18T06:35:09.980Z"
       },
       "id": "mc4flkg39bj1s8"
     },
@@ -2393,20 +2383,16 @@
     },
     {
       "name": "RetryMechanism",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        "The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.",
-        "The RetryMechanism relies on the ServiceManager to manage the lifecycle of services and ensure they are properly initialized.",
-        "The RetryMechanism implements a maximum retry count to prevent indefinite retries.",
-        "The RetryMechanism uses a retry delay to prevent overwhelming services with retry requests.",
-        "The RetryMechanism supports multiple retry strategies, including exponential backoff and linear backoff.",
-        "The RetryMechanism monitors retry metrics to detect and respond to service issues.",
-        "The RetryMechanism uses a retry timeout to prevent indefinite waits for service responses."
+        "The parent analysis suggests the presence of a retry mechanism, as seen in the ServiceStarter class, which implies a robust startup process.",
+        "Given the context of DockerizedServices and the ServiceStarterComponent, it is reasonable to expect a retry mechanism to handle potential startup failures in a Dockerized environment.",
+        "Although no specific source files are available, the parent context strongly implies the existence of a retry mechanism, aligning with common practices in service startup components."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T06:28:40.259Z",
-        "last_updated": "2026-03-11T14:15:10.312Z"
+        "last_updated": "2026-03-18T06:35:55.071Z"
       },
       "id": "mc4flkg31t0dov"
     },
@@ -3008,18 +2994,18 @@
       "name": "OntologyClassification",
       "entityType": "SubComponent",
       "observations": [
-        "OntologyClassification utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence",
-        "The adapter provides a layer of abstraction between OntologyClassification and the underlying graph database, allowing for seamless interaction with the database",
-        "OntologyClassification uses Graphology and LevelDB for data storage, enabling efficient storage and querying of knowledge graphs",
-        "The automatic JSON export sync feature of the GraphDatabaseAdapter ensures that data is consistently updated and available for use in OntologyClassification",
-        "OntologyClassification is responsible for classifying entities, which are used by the ManualLearning and OnlineLearning sub-components",
-        "OntologyClassification handles ontology metadata, including class and type",
-        "OntologyClassification provides an interface for other sub-components to interact with the ontology system"
+        "OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md",
+        "It could leverage the constraint configuration guide, as mentioned in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
+        "The sub-component might involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
+        "OntologyClassification could integrate with the EntityPersistence sub-component to store typed entities",
+        "It may also use the Code Graph RAG system for graph-based code analysis, as described in integrations/code-graph-rag/README.md",
+        "The sub-component might utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md",
+        "OntologyClassification could involve the use of multiple ontology systems, as hinted in the project documentation"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T07:49:07.867Z",
-        "last_updated": "2026-03-17T06:44:32.418Z"
+        "last_updated": "2026-03-18T06:34:50.871Z"
       },
       "id": "mc4flkg3ahlx1"
     },
@@ -3132,14 +3118,14 @@
       "name": "ConnectionEstablisher",
       "entityType": "Detail",
       "observations": [
-        "The connectViaHTTP function in lib/integrations/specstory-adapter.js uses callbacks to handle the connection establishment process, indicating a need for a connection establishment mechanism.",
-        "The lack of explicit error handling in the provided context suggests that error handling may be a crucial aspect of the ConnectionEstablisher's behavior, potentially warranting further investigation.",
-        "Given the parent context's mention of the SpecstoryConnector, it is likely that the ConnectionEstablisher plays a key role in facilitating communication between the application and the Specstory server."
+        "The ConnectionHandler sub-component is likely to use the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch, as indicated by the parent context.",
+        "The integrations/browser-access/README.md file mentions the Browser Access MCP Server for Claude Code, which could be related to the connection establishment process.",
+        "The absence of source files limits the specific details about the ConnectionEstablisher, but its existence is inferred from the parent analysis."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T07:49:18.402Z",
-        "last_updated": "2026-03-17T15:42:46.653Z"
+        "last_updated": "2026-03-18T06:36:03.731Z"
       },
       "id": "mc4flkg3q64a48"
     },
@@ -3162,14 +3148,14 @@
       "name": "GraphDatabaseAdapterIntegration",
       "entityType": "Detail",
       "observations": [
-        "The ViolationTrackingModule relies on the GraphDatabaseAdapter in storage/graph-database-adapter.ts to handle data storage and retrieval, as indicated by the parent context.",
-        "The use of a graph database adapter suggests an architectural decision to leverage graph-based data structures for constraint violation tracking, potentially allowing for complex relationship modeling.",
-        "The GraphDatabaseAdapterIntegration utilizes the GraphDatabaseAdapter class in graph-database-adapter.ts to establish a connection with the graph database, enabling the ViolationTrackingModule to store and retrieve constraint violation data."
+        "The ContentValidator sub-component is part of the ConstraintSystem component, indicating its role in enforcing constraints based on graph relationships.",
+        "The GraphDatabaseAdapter class is used by the ContentValidator, suggesting a strong connection between the adapter and the validation process.",
+        "The absence of explicit source files limits the scope of observations, but the parent context implies a significant relationship between the ContentValidator and the GraphDatabaseAdapter."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T07:49:18.415Z",
-        "last_updated": "2026-03-08T07:49:18.415Z"
+        "last_updated": "2026-03-18T06:36:34.032Z"
       },
       "id": "mc4flkg11ggpci"
     },
@@ -3343,18 +3329,18 @@
       "name": "ContentValidator",
       "entityType": "SubComponent",
       "observations": [
-        "ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file.",
-        "The ContentValidationAgent utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) for graph data storage and retrieval.",
-        "The ContentValidator uses a modular architecture, with separate modules for different functionalities such as content validation, as seen in the ContentValidationAgent.",
-        "The ContentValidationAgent integrates with various data storage solutions, demonstrating the system's ability to adapt to different storage needs.",
-        "The ContentValidator detects staleness in entity content, ensuring that the system remains up-to-date and accurate.",
-        "The ContentValidationAgent is a key component in the ConstraintSystem, providing critical validation and detection capabilities.",
-        "The ContentValidator works in conjunction with other sub-components, such as the HookManager and ViolationCaptureHandler, to ensure seamless system operation."
+        "ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.",
+        "It implements a flexible validation framework, allowing for dynamic modification of rules and constraints through the GraphDatabaseAdapter's update methods.",
+        "The validation process involves semantic analysis, leveraging the capabilities of the SemanticAnalyzer sub-component to detect potential constraint violations.",
+        "ContentValidator's validation rules are configurable, enabling adaptability to different use cases and entity types within the ConstraintSystem.",
+        "The sub-component's validation results are persisted, allowing for auditing and tracking of validation history.",
+        "ContentValidator interacts with the ViolationCapture sub-component to capture and persist constraint violations during validation.",
+        "It follows a modular design, with separate modules for validation logic, rule configuration, and result persistence."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T08:00:46.573Z",
-        "last_updated": "2026-03-17T06:44:48.169Z"
+        "last_updated": "2026-03-18T06:35:21.703Z"
       },
       "id": "mc4flkg2r1beh"
     },
@@ -3558,18 +3544,18 @@
       "name": "BestPractices",
       "entityType": "SubComponent",
       "observations": [
-        "BestPractices uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve best practice data.",
-        "The CodeGraphConstructor in code-graph-constructor.ts leverages the GraphDatabaseAdapter to construct the code knowledge graph with best practices.",
-        "BestPractices employs the GraphDatabaseInteractions class to handle interactions with graph databases and knowledge graph construction, as seen in the execution of queries and retrieval of results.",
-        "The BestPractices sub-component identifies and implements best practices for coding and software development.",
-        "It utilizes the GraphDatabaseAdapter to fetch and update best practice data, contributing to the overall performance of the system.",
-        "BestPractices is responsible for maintaining and updating best practices, ensuring they remain relevant and effective.",
-        "It uses the GraphDatabaseAdapter to store and retrieve best practice metadata, such as practice names and descriptions."
+        "The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.",
+        "The copi/USAGE.md file describes the usage of the Copi CLI wrapper, potentially employing best practices for continuous integration.",
+        "The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, implying the use of best practices for data validation and testing.",
+        "The integrations/copi/INSTALL.md file provides installation instructions, possibly following best practices for dependency management.",
+        "The integrations/copi/MIGRATION.md file outlines a migration guide, which may employ best practices for backwards compatibility and testing.",
+        "The integrations/copi/STATUS.md file describes the status of the Copi CLI wrapper, potentially using best practices for monitoring and logging.",
+        "The integrations/copi/USAGE.md file explains the usage of the Copi CLI wrapper, possibly following best practices for user documentation and support."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T08:16:51.351Z",
-        "last_updated": "2026-03-12T05:58:11.766Z"
+        "last_updated": "2026-03-18T06:35:11.465Z"
       },
       "id": "mc4flkg14pg0ek"
     },
@@ -3972,18 +3958,18 @@
       "name": "GraphDatabase",
       "entityType": "SubComponent",
       "observations": [
-        "GraphDatabase utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to handle graph database persistence and querying.",
-        "GraphDatabase employs a modular approach, allowing for easier maintenance and updates as each database component can be modified or replaced without affecting the entire system.",
-        "GraphDatabase interacts with the ContentValidator to handle graph database persistence and querying.",
-        "GraphDatabase relies on the Logger to provide a logging mechanism for the system, with the centralLog function serving as a simple logger wrapper.",
-        "GraphDatabase serves as a central point for graph database persistence and querying, allowing for easier management and maintenance of system interactions.",
-        "GraphDatabase uses the HookManager to serve as the central orchestration point for all hook events, loading configurations and dispatching events to handlers.",
-        "GraphDatabase handles graph database persistence and querying, with automatic JSON export sync to ensure data integrity and consistency across the system."
+        "The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.",
+        "The integrations/code-graph-rag/README.md file describes the CodeGraphRAG system, which employs a graph-based approach to handle large codebases.",
+        "The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially using a graph database to store hook data.",
+        "The integrations/copi/INSTALL.md file provides installation instructions, possibly including setup for a graph database.",
+        "The integrations/copi/MIGRATION.md file outlines a migration guide, which may involve migrating data from a previous database to a graph database.",
+        "The integrations/copi/STATUS.md file describes the status of the Copi CLI wrapper, potentially using a graph database to store status information.",
+        "The integrations/copi/USAGE.md file explains the usage of the Copi CLI wrapper, possibly including interactions with a graph database."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T09:51:00.723Z",
-        "last_updated": "2026-03-08T15:13:49.316Z"
+        "last_updated": "2026-03-18T06:35:15.150Z"
       },
       "id": "mc4flkgx56b7b"
     },
@@ -4040,14 +4026,14 @@
       "name": "BatchAnalysisPipeline",
       "entityType": "Detail",
       "observations": [
-        "The OnlineLearning sub-component uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis, as described in the hierarchy context.",
-        "The integrations/code-graph-rag/README.md file mentions a Graph-Code system for any codebases, which could be related to the batch analysis pipeline's code analysis functionality.",
-        "The absence of specific source files limits the ability to provide more detailed observations about the BatchAnalysisPipeline's implementation."
+        "The project documentation mentions the batch analysis pipeline in the context of OnlineLearning, implying its importance in extracting knowledge from git history.",
+        "The presence of integrations/code-graph-rag/README.md suggests a connection between code graph analysis and the batch analysis pipeline, potentially indicating a shared processing pattern.",
+        "The mention of MEMGRAPH_BATCH_SIZE in the key documented components implies a configuration point for the batch analysis pipeline, controlling the size of batches processed."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T09:51:10.297Z",
-        "last_updated": "2026-03-17T15:42:52.416Z"
+        "last_updated": "2026-03-18T06:36:14.967Z"
       },
       "id": "mc4flkg3aemt60"
     },
@@ -5275,18 +5261,18 @@
       "name": "ViolationCapture",
       "entityType": "SubComponent",
       "observations": [
-        "ViolationCapture is responsible for capturing and persisting constraint violations, indicating a key role in the system's workflow",
-        "The ViolationCapture's design allows for the easy capture and persistence of constraint violations, making it a flexible solution",
-        "The use of a ViolationCapture in the ConstraintSystem suggests a decoupling of violation capture logic from the core system",
-        "ViolationCapture's architecture is based on a modular design, allowing for the easy addition or removal of violation capture rules",
-        "The ViolationCapture is tightly integrated with the ConstraintSystem, enabling the capture and persistence of constraint violations",
-        "ViolationCapture's integration with the ConstraintSystem enables the capture and persistence of constraint violations",
-        "The ViolationCapture is responsible for persisting constraint violations, indicating a key role in the system's data management"
+        "ViolationCapture works closely with the ContentValidator sub-component to capture validation failures and persist them for further analysis.",
+        "It utilizes the GraphDatabaseAdapter's methods for adding and updating graph nodes and edges to store violation records.",
+        "The sub-component implements a notification mechanism, alerting stakeholders of captured violations for prompt action.",
+        "ViolationCapture follows a standardized data model for representing constraint violations, ensuring consistency across the ConstraintSystem.",
+        "It supports querying and filtering of captured violations, facilitating analysis and reporting.",
+        "The sub-component is designed for scalability, handling high volumes of violation data without impacting system performance.",
+        "ViolationCapture integrates with the SemanticAnalyzer for enhanced violation detection and analysis."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T15:11:22.799Z",
-        "last_updated": "2026-03-09T12:16:26.465Z"
+        "last_updated": "2026-03-18T06:35:23.729Z"
       },
       "id": "mc4flkg1kaui67"
     },
@@ -5426,14 +5412,14 @@
       "name": "DMRProvider",
       "entityType": "SubComponent",
       "observations": [
-        "The DMRProvider class is located in lib/llm/providers/dmr-provider.ts and is an example of a provider class managed by the LLMService.",
-        "The DMRProvider class provides a specific implementation of the LLM provider interface, allowing the LLMService to interact with the DMR LLM service.",
-        "The DMRProvider class may have its own configuration and settings, such as API keys or endpoint URLs, which are managed by the LLMService."
+        "The DMRProvider is registered and retrieved through the provider registry (lib/llm/provider-registry.js).",
+        "The DMRProvider uses the LLMService class to manage interactions with the DMR API.",
+        "The DMRProvider class in llm_abstraction/dmr_provider.py implements the LLM abstraction interface by invoking the DMR API through the requestDMRData function in the same module."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T16:12:23.879Z",
-        "last_updated": "2026-03-17T10:43:42.068Z"
+        "last_updated": "2026-03-18T06:34:10.718Z"
       },
       "id": "mc4flkglkn3lm"
     },
@@ -5793,18 +5779,18 @@
       "name": "EntityPersistence",
       "entityType": "SubComponent",
       "observations": [
-        "EntityPersistence uses integrations/copi/README.md to handle logging and tmux integration for entity persistence",
-        "EntityPersistence relies on integrations/copi/hooks.md for hook functions reference to handle entity persistence workflows",
-        "EntityPersistence implements work-stealing concurrency via shared nextIndex counter in integrations/copi/scripts/README.md",
-        "EntityPersistence pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification",
-        "EntityPersistence uses a DAG-based execution model with topological sort in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
-        "EntityPersistence handles semantic constraint detection in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
-        "EntityPersistence utilizes Graphology+LevelDB database in integrations/code-graph-rag/README.md for persistence"
+        "EntityPersistence may use a graph database to store entities, as hinted in the project documentation",
+        "It could utilize the entity typing system, possibly using multiple ontology systems as mentioned in the project documentation",
+        "The sub-component might leverage the observation derivation system, as seen in the ObservationDerivation sub-component",
+        "EntityPersistence could involve the use of a shared atomic index counter for work-stealing concurrency, as described in wave-controller.ts",
+        "It may also integrate with the ManualLearning sub-component to store manually created entities",
+        "The sub-component might use the Code Graph RAG system for graph-based code analysis, as described in integrations/code-graph-rag/README.md",
+        "EntityPersistence could utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T16:52:24.753Z",
-        "last_updated": "2026-03-18T05:50:25.119Z"
+        "last_updated": "2026-03-18T06:34:45.155Z"
       },
       "id": "mc4flkgcmhgtg"
     },
@@ -6001,18 +5987,18 @@
       "name": "SemanticAnalyzer",
       "entityType": "SubComponent",
       "observations": [
-        "The SemanticAnalyzer class, located in integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.ts, is responsible for performing comprehensive semantic analysis of code and conversation data.",
-        "The SemanticAnalyzer class utilizes the BaseAgent class from integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts to provide a standardized framework for agent development and execution.",
-        "The SemanticAnalyzer class is designed to work with the CodeGraphConstructor class, found in integrations/mcp-server-semantic-analysis/src/agents/code-graph-constructor.ts, to construct the knowledge graph of code entities and their relationships.",
-        "The SemanticAnalyzer class is responsible for analyzing the semantic meaning of code and conversation data, including classes, methods, and variables.",
-        "The SemanticAnalyzer class utilizes the GraphDatabaseManager class, located in integrations/mcp-server-semantic-analysis/src/agents/graph-database-manager.ts, to manage the storage and retrieval of data from the graph database.",
-        "The SemanticAnalyzer class is designed to work with the ContentValidator class, found in integrations/mcp-server-semantic-analysis/src/agents/content-validator.ts, to ensure the accuracy and consistency of entity content.",
-        "The SemanticAnalyzer class is responsible for providing comprehensive semantic analysis of code and conversation data that can be used to improve the overall system and provide value to users."
+        "SemanticAnalyzer leverages natural language processing (NLP) techniques to parse and understand entity content.",
+        "It employs machine learning models trained on domain-specific data to detect semantic violations and anomalies.",
+        "The sub-component utilizes the GraphDatabaseAdapter to retrieve and analyze entity relationships and constraints.",
+        "SemanticAnalyzer supports incremental analysis, allowing for real-time updates to entity content and relationships.",
+        "It provides a feedback mechanism, suggesting corrections or improvements to entity content based on semantic analysis.",
+        "The sub-component is extensible, supporting integration with external NLP services and models for enhanced analysis capabilities.",
+        "SemanticAnalyzer works closely with the ContentValidator and ViolationCapture sub-components for comprehensive constraint validation."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-09T09:55:21.838Z",
-        "last_updated": "2026-03-11T14:51:39.394Z"
+        "last_updated": "2026-03-18T06:35:27.270Z"
       },
       "id": "mc4flkg1jyxx04"
     },
@@ -6761,18 +6747,18 @@
       "name": "UKBTraceReporting",
       "entityType": "SubComponent",
       "observations": [
-        "UKBTraceReporting uses integrations/copi/README.md to handle logging and tmux integration for trace reporting",
-        "UKBTraceReporting relies on integrations/copi/hooks.md for hook functions reference to handle trace reporting workflows",
-        "UKBTraceReporting implements work-stealing concurrency via shared nextIndex counter in integrations/copi/scripts/README.md",
-        "UKBTraceReporting pre-populates ontology metadata fields in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to prevent redundant LLM re-classification",
-        "UKBTraceReporting uses a DAG-based execution model with topological sort in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
-        "UKBTraceReporting handles semantic constraint detection in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
-        "UKBTraceReporting utilizes reporting mechanism in integrations/code-graph-rag/README.md for trace reporting"
+        "UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md",
+        "It could leverage the constraint configuration guide, as mentioned in integrations/mcp-constraint-monitor/docs/constraint-configuration.md",
+        "The sub-component might involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md",
+        "UKBTraceReporting could integrate with the EntityPersistence sub-component to generate reports on stored entities",
+        "It may also use the Code Graph RAG system for graph-based code analysis, as described in integrations/code-graph-rag/README.md",
+        "The sub-component might utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md",
+        "UKBTraceReporting could involve the use of multiple ontology systems, as hinted in the project documentation"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-11T17:39:35.384Z",
-        "last_updated": "2026-03-18T05:50:33.987Z"
+        "last_updated": "2026-03-18T06:34:57.523Z"
       },
       "id": "mc4flkg17tm1h1"
     },
@@ -6941,14 +6927,14 @@
       "name": "AnthropicProvider",
       "entityType": "SubComponent",
       "observations": [
-        "The AnthropicProvider class is located in lib/llm/providers/anthropic-provider.ts and is an example of a provider class managed by the LLMService.",
-        "The AnthropicProvider class provides a specific implementation of the LLM provider interface, allowing the LLMService to interact with the Anthropic LLM service.",
-        "The AnthropicProvider class may have its own configuration and settings, such as API keys or endpoint URLs, which are managed by the LLMService."
+        "The AnthropicProvider is registered and retrieved through the provider registry (lib/llm/provider-registry.js).",
+        "The AnthropicProvider uses the LLMService class to manage interactions with the Anthropic API.",
+        "The AnthropicProvider class in llm_abstraction/anthropic_provider.py utilizes the send_request method to interact with the Anthropic API, handling parameters such as model name, prompt, and temperature in the _make_api_call function."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-17T10:41:59.634Z",
-        "last_updated": "2026-03-17T10:41:59.634Z"
+        "last_updated": "2026-03-18T06:34:05.364Z"
       },
       "id": "mc4flkg26zdndv"
     },
@@ -6956,14 +6942,18 @@
       "name": "CodeGraphRAG",
       "entityType": "SubComponent",
       "observations": [
-        "The CodeGraphRAG system is described in integrations/code-graph-rag/README.md.",
-        "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables are used to configure the CodeGraphRAG sub-component.",
-        "The CodeGraphRAG sub-component utilizes the graph_operations.py module to handle code graph and RAG operations, specifically through the CodeGraphBuilder class and its build_rag() function."
+        "CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md",
+        "It could leverage the entity typing system, possibly using multiple ontology systems as mentioned in the project documentation",
+        "The sub-component might involve the use of a shared atomic index counter for work-stealing concurrency, as described in wave-controller.ts",
+        "CodeGraphRAG could integrate with the EntityPersistence sub-component to provide graph-based code analysis",
+        "It may also use the ManualLearning sub-component to provide graph-based code analysis for manually created entities",
+        "The sub-component might utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md",
+        "CodeGraphRAG could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-17T10:41:59.637Z",
-        "last_updated": "2026-03-18T05:49:39.271Z"
+        "last_updated": "2026-03-18T06:35:03.351Z"
       },
       "id": "mc4flkg11sfod3"
     },
@@ -7822,14 +7812,14 @@
       "name": "GraphDatabaseConnection",
       "entityType": "Detail",
       "observations": [
-        "The integrations/code-graph-rag/README.md file mentions the use of a graph database, indicating the importance of a GraphDatabaseConnection in the GraphDatabaseAdapter.",
-        "The MEMGRAPH_BATCH_SIZE key documented in the project documentation implies the need for a connection to the graph database, which would be handled by the GraphDatabaseConnection.",
-        "The presence of a CODE_GRAPH_RAG_PORT in the project documentation suggests that the GraphDatabaseConnection would be responsible for establishing a connection to the graph database through this port."
+        "The MEMGRAPH_BATCH_SIZE variable in the project documentation suggests that the GraphDatabaseAdapter may handle batch operations, potentially optimizing database interactions.",
+        "The presence of integrations/mcp-constraint-monitor/docs/constraint-configuration.md implies that the GraphDatabaseAdapter may be involved in constraint configuration, which could affect how data is stored and queried in the graph database.",
+        "The mention of CODE_GRAPH_RAG_PORT in the project documentation could indicate that the GraphDatabaseAdapter communicates with a Code Graph RAG system, possibly influencing how graph data is processed or visualized."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-18T05:46:56.560Z",
-        "last_updated": "2026-03-18T05:46:56.560Z"
+        "last_updated": "2026-03-18T06:36:39.258Z"
       },
       "id": "mc4flkgzak6ex"
     },
@@ -8065,6 +8055,432 @@
         "last_updated": "2026-03-18T05:52:23.476Z"
       },
       "id": "mc4flkg22pt1jb"
+    },
+    {
+      "name": "LLMServiceComponent",
+      "entityType": "SubComponent",
+      "observations": [
+        "The LLMService class utilizes dependency injection through the setModeResolver, setMockService, and setBudgetTracker methods in lib/llm/llm-service.ts, making it easier to test and extend the service.",
+        "The use of configuration files, such as YAML files, to manage settings and priorities for different providers and services, enables flexible configuration and customization.",
+        "The LLMServiceComponent likely interacts with the ProviderRegistryComponent to register and manage providers for large language model operations.",
+        "The LLMServiceComponent may utilize the GraphDatabaseComponent for knowledge entity persistence and retrieval.",
+        "The LLMServiceComponent could implement circuit breaking to prevent cascading failures in the system.",
+        "The LLMServiceComponent might use caching to improve performance and reduce the load on the system.",
+        "The LLMServiceComponent could provide mode routing to allow for different operating modes, such as training or inference."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:19.505Z",
+        "last_updated": "2026-03-18T06:32:19.505Z"
+      },
+      "id": "mc4flkg21lvhdh"
+    },
+    {
+      "name": "DataAdapter",
+      "entityType": "SubComponent",
+      "observations": [
+        "DataAdapter likely utilizes the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.",
+        "The DataAdapter may implement a data transformation protocol similar to the one described in integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md to handle data formatting.",
+        "The integrations/copi/docs/hooks.md file may provide insight into how DataAdapter handles hook functions for data transformation purposes.",
+        "DataAdapter could be using a library or module similar to the one mentioned in integrations/browser-access/README.md to access browser data.",
+        "The DataAdapter might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.",
+        "The DataAdapter may use a data storage solution like the one mentioned in integrations/code-graph-rag/README.md to store transformed data.",
+        "DataAdapter could be integrated with other components using APIs or interfaces similar to the ones described in integrations/mcp-constraint-monitor/dashboard/README.md."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:19.508Z",
+        "last_updated": "2026-03-18T06:32:19.508Z"
+      },
+      "id": "mc4flkgfxukez"
+    },
+    {
+      "name": "BrowserAccessComponent",
+      "entityType": "SubComponent",
+      "observations": [
+        "The BrowserAccessComponent likely uses a web framework, such as Express.js, to handle HTTP requests and provide a web interface.",
+        "The BrowserAccessComponent may implement authentication and authorization mechanisms to secure the web interface.",
+        "The BrowserAccessComponent could provide a RESTful API to allow other components to interact with the browser access functionality.",
+        "The BrowserAccessComponent might use a templating engine, such as Handlebars, to render web pages and provide a user-friendly interface.",
+        "The BrowserAccessComponent could interact with the LLMServiceComponent to provide large language model functionality through the web interface.",
+        "The BrowserAccessComponent might use a caching mechanism to improve performance and reduce the load on the system.",
+        "The BrowserAccessComponent could provide a notification mechanism to notify other components of browser access events and updates."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:19.532Z",
+        "last_updated": "2026-03-18T06:32:19.532Z"
+      },
+      "id": "mc4flkg7c3yz5"
+    },
+    {
+      "name": "ConstraintMonitoring",
+      "entityType": "SubComponent",
+      "observations": [
+        "The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.",
+        "The integrations/copi/INSTALL.md file provides installation instructions, possibly including setup for constraint monitoring.",
+        "The integrations/copi/MIGRATION.md file outlines a migration guide, which may involve migrating constraints from a previous system.",
+        "The integrations/copi/STATUS.md file describes the status of the Copi CLI wrapper, potentially including constraint monitoring information.",
+        "The integrations/copi/USAGE.md file explains the usage of the Copi CLI wrapper, possibly including interactions with constraint monitoring.",
+        "The mcp-constraint-monitor/docs/constraint-configuration.md file outlines the constraint configuration guide, implying the use of constraint monitoring.",
+        "The mcp-constraint-monitor/docs/semantic-constraint-detection.md file describes semantic constraint detection, potentially employing constraint monitoring."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:19.572Z",
+        "last_updated": "2026-03-18T06:32:19.572Z"
+      },
+      "id": "mc4flkg1kvhj51"
+    },
+    {
+      "name": "WorkflowOrchestrator",
+      "entityType": "SubComponent",
+      "observations": [
+        "The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The WorkflowOrchestrator sub-component is responsible for managing the execution of various agents, including the OntologyClassificationAgent, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The WorkflowOrchestrator sub-component utilizes the GraphDatabaseAdapter to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.",
+        "The WorkflowOrchestrator sub-component is responsible for ensuring that the agents are executed in the correct order, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.",
+        "The WorkflowOrchestrator sub-component provides a standardized structure for workflow management, as provided by the BaseAgent class, to ensure consistency across all agents.",
+        "The WorkflowOrchestrator sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.",
+        "The WorkflowOrchestrator sub-component is responsible for managing the execution of the workflow, including the coordination of agents and the retrieval of data."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:33.630Z",
+        "last_updated": "2026-03-18T06:32:33.630Z"
+      },
+      "id": "mc4flkgo3s73r"
+    },
+    {
+      "name": "LogRotationHandler",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/copi/INSTALL.md file mentions the use of a logging framework, which likely includes a rotating file handler.",
+        "The LoggingManager sub-component is expected to utilize a logging framework to manage log files, implying the presence of a log rotation mechanism.",
+        "The lack of specific source files means that the exact implementation details of the LogRotationHandler are unknown, but its presence can be inferred from the parent context."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.701Z",
+        "last_updated": "2026-03-18T06:32:48.701Z"
+      },
+      "id": "mc4flkg23w64t4"
+    },
+    {
+      "name": "TranscriptDataStore",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/code-graph-rag/CONTRIBUTING.md file mentions the use of a data storage solution, such as a database or file system, to store transcript data.",
+        "The lack of source files available suggests that the TranscriptDataStore may be a critical component in the TranscriptManager sub-component, as hinted by the parent context.",
+        "Without explicit source code evidence, the TranscriptDataStore's implementation details remain unclear, but its purpose can be inferred from the parent component's analysis."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.706Z",
+        "last_updated": "2026-03-18T06:32:48.706Z"
+      },
+      "id": "mc4flkg2d7dgin"
+    },
+    {
+      "name": "LLMServiceInitializer",
+      "entityType": "Detail",
+      "observations": [
+        "The lazy initialization approach is used in the OntologyClassificationAgent, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, to initialize LLM services on demand.",
+        "This approach is beneficial for the OntologyClassificationAgent as it allows for efficient resource utilization and reduces the overhead of initializing unnecessary services.",
+        "The LLMServiceInitializer, defined in the ontology-classification-agent.ts file, utilizes a lazy initialization approach in its initializeService function to efficiently manage resource utilization for LLM services."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.725Z",
+        "last_updated": "2026-03-18T06:32:48.725Z"
+      },
+      "id": "mc4flkgquxhui"
+    },
+    {
+      "name": "BrowserAccessConfiguration",
+      "entityType": "Detail",
+      "observations": [
+        "The BrowserAccess sub-component may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md",
+        "Key documented components include BROWSER_ACCESS_PORT, BROWSER_ACCESS_SSE_URL, and ANTHROPIC_API_KEY, which are essential for configuring the BrowserAccess sub-component",
+        "The integrations/browser-access/README.md file provides information on setting up the Browser Access MCP Server for Claude Code, which is relevant to the BrowserAccess sub-component"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.750Z",
+        "last_updated": "2026-03-18T06:36:24.748Z"
+      },
+      "id": "mc4flkg127dxhm"
+    },
+    {
+      "name": "LogConfigurationLoader",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/copi/README.md file provides information on logging requirements for the Copi integration, which LogConfigurationLoader likely utilizes.",
+        "The presence of integrations/copi/INSTALL.md and integrations/copi/USAGE.md suggests that logging configuration is a crucial aspect of the Copi integration, supporting the existence of LogConfigurationLoader.",
+        "The lack of explicit source code references to LogConfigurationLoader implies that its implementation details may be scattered across multiple files or embedded within other components."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.796Z",
+        "last_updated": "2026-03-18T06:32:48.796Z"
+      },
+      "id": "mc4flkgu08zdn"
+    },
+    {
+      "name": "DataMapper",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/copi/README.md file suggests the need for data transformation, implying the presence of a data mapping mechanism.",
+        "The DataAdapter sub-component likely utilizes the information in the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.",
+        "The absence of explicit source code files limits the ability to provide more specific observations about the DataMapper's implementation details."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.799Z",
+        "last_updated": "2026-03-18T06:32:48.799Z"
+      },
+      "id": "mc4flkg1eye8x7"
+    },
+    {
+      "name": "CodeReviewGuideline",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.",
+        "The presence of a dedicated CONTRIBUTING.md file suggests a strong emphasis on code quality and community involvement in the project.",
+        "The guidelines provided in CONTRIBUTING.md are likely to influence the development process, ensuring that code changes meet certain standards before being accepted."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:48.802Z",
+        "last_updated": "2026-03-18T06:32:48.802Z"
+      },
+      "id": "mc4flkg4a0xe1h"
+    },
+    {
+      "name": "ConstraintConfigurationParser",
+      "entityType": "Detail",
+      "observations": [
+        "The Claude Code Hook Data Format is defined in the mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file, which potentially includes constraints.",
+        "The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a Constraint Configuration Guide, indicating the importance of constraint configuration in the ConstraintMonitoring sub-component.",
+        "The presence of semantic-constraint-detection.md in the integrations/mcp-constraint-monitor/docs directory suggests that semantic constraint detection is a notable aspect of the ConstraintMonitoring sub-component, possibly relying on the parsed constraint configuration."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:50.417Z",
+        "last_updated": "2026-03-18T06:32:50.417Z"
+      },
+      "id": "mc4flkg11fmt8o"
+    },
+    {
+      "name": "PatternBasedInsightGeneration",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file contains the implementation of the pattern-based approach for generating insights.",
+        "The Insights sub-component relies on the parent context of SemanticAnalysis to provide the necessary data for pattern-based insight generation.",
+        "The pattern-based approach is a key aspect of the Insights sub-component, enabling the generation of meaningful insights from the provided data."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:50.426Z",
+        "last_updated": "2026-03-18T06:32:50.426Z"
+      },
+      "id": "mc4flkg1c9vrot"
+    },
+    {
+      "name": "AgentExecutionManager",
+      "entityType": "Detail",
+      "observations": [
+        "The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the parent context.",
+        "The integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file suggests that agents are a key part of the WorkflowOrchestrator's functionality.",
+        "The lack of available source files limits the specific details that can be provided about the AgentExecutionManager."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:32:50.637Z",
+        "last_updated": "2026-03-18T06:32:50.637Z"
+      },
+      "id": "mc4flkg2ye9dae"
+    },
+    {
+      "name": "GraphDatabaseLibrary",
+      "entityType": "Detail",
+      "observations": [
+        "The presence of MEMGRAPH_BATCH_SIZE in the project documentation suggests that the GraphDatabaseLibrary is used for batch operations, optimizing performance.",
+        "The integrations/code-graph-rag/README.md file mentions a Graph-Code system, implying a graph database library is utilized.",
+        "The lack of specific source files prevents further detailed analysis, but the parent context and project documentation support the existence of a GraphDatabaseLibrary."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:33:13.496Z",
+        "last_updated": "2026-03-18T06:33:13.496Z"
+      },
+      "id": "mc4flkghy7ovm"
+    },
+    {
+      "name": "GraphCodeSetup",
+      "entityType": "Detail",
+      "observations": [
+        "The Graph-Code setup is described in the integrations/code-graph-rag/docs/claude-code-setup.md file, which provides details on the configuration of the Graph-Code MCP Server.",
+        "The CodeGraphRAG sub-component may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as mentioned in the hierarchy context of the project.",
+        "The integrations/code-graph-rag/README.md file provides an overview of the Graph-Code system, which is utilized by the CodeGraphRAG sub-component."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:33:14.331Z",
+        "last_updated": "2026-03-18T06:36:24.943Z"
+      },
+      "id": "mc4flkg2o6jcaq"
+    },
+    {
+      "name": "ClaudeCodeHookDataFormat",
+      "entityType": "Detail",
+      "observations": [
+        "The CLAUDE-CODE-HOOK-FORMAT.md documentation in integrations/mcp-constraint-monitor/docs provides insight into the data format used by the UKBTraceReporting sub-component.",
+        "The integrations/mcp-constraint-monitor/README.md file mentions the MCP Constraint Monitor, which may be related to the UKBTraceReporting sub-component's functionality.",
+        "The absence of source files limits the ability to provide more specific observations about the implementation details of the ClaudeCodeHookDataFormat."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:33:14.804Z",
+        "last_updated": "2026-03-18T06:36:20.763Z"
+      },
+      "id": "mc4flkg1j7u1db"
+    },
+    {
+      "name": "GraphCodeRagIntegration",
+      "entityType": "Detail",
+      "observations": [
+        "The Code Graph RAG system is described in integrations/code-graph-rag/README.md, which outlines its graph-based approach to code analysis.",
+        "The Claude Code Setup for Graph-Code MCP Server is detailed in integrations/code-graph-rag/docs/claude-code-setup.md, indicating a specific integration point.",
+        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the key documented components suggests a defined interface for interacting with the Code Graph RAG system."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:33:14.822Z",
+        "last_updated": "2026-03-18T06:33:14.822Z"
+      },
+      "id": "mc4flkgrz86yx"
+    },
+    {
+      "name": "NaturalLanguageProcessor",
+      "entityType": "Detail",
+      "observations": [
+        "The integrations/code-graph-rag/README.md file mentions the use of natural language processing techniques, indicating the presence of a NaturalLanguageProcessor.",
+        "The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md file discusses semantic constraint detection, which is likely related to the NaturalLanguageProcessor's functionality.",
+        "The presence of NLP-related documentation suggests that the NaturalLanguageProcessor is a key component of the SemanticAnalyzer sub-component."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:33:14.829Z",
+        "last_updated": "2026-03-18T06:33:14.829Z"
+      },
+      "id": "mc4flkg23ll8tr"
+    },
+    {
+      "name": "ServiceStarterComponent",
+      "entityType": "SubComponent",
+      "observations": [
+        "The ServiceStarterComponent likely uses a retry mechanism to handle startup failures, as seen in the ServiceStarter class.",
+        "The ServiceStarterComponent may implement timeout protection to prevent services from hanging indefinitely during startup.",
+        "The ServiceStarterComponent could provide logging and monitoring to track service startup and performance.",
+        "The ServiceStarterComponent might use a configuration file to manage startup settings and priorities.",
+        "The ServiceStarterComponent could interact with the LLMServiceComponent to start and manage large language model services.",
+        "The ServiceStarterComponent might use a thread pool or executor to manage concurrent service startups.",
+        "The ServiceStarterComponent could provide a callback mechanism to notify other components of service startup completion."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:34:16.916Z",
+        "last_updated": "2026-03-18T06:34:16.916Z"
+      },
+      "id": "mc4flkgzejbbx"
+    },
+    {
+      "name": "GraphDatabaseComponent",
+      "entityType": "SubComponent",
+      "observations": [
+        "The GraphDatabaseComponent likely uses a graph database library, such as Neo4j, to store and retrieve knowledge entities.",
+        "The GraphDatabaseComponent may implement data caching to improve performance and reduce the load on the database.",
+        "The GraphDatabaseComponent could provide a query interface to allow other components to retrieve specific knowledge entities.",
+        "The GraphDatabaseComponent might use a data migration mechanism to handle changes to the database schema.",
+        "The GraphDatabaseComponent could interact with the LLMServiceComponent to store and retrieve large language model data.",
+        "The GraphDatabaseComponent might use a transactional mechanism to ensure data consistency and integrity.",
+        "The GraphDatabaseComponent could provide a backup and restore mechanism to ensure data durability."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:34:17.693Z",
+        "last_updated": "2026-03-18T06:34:17.693Z"
+      },
+      "id": "mc4flkgo8ohf8"
+    },
+    {
+      "name": "ProviderRegistryComponent",
+      "entityType": "SubComponent",
+      "observations": [
+        "The ProviderRegistryComponent likely uses a registry data structure, such as a map or dictionary, to store and manage providers.",
+        "The ProviderRegistryComponent may implement a provider interface to define the contract for providers.",
+        "The ProviderRegistryComponent could provide a registration mechanism to allow providers to register themselves.",
+        "The ProviderRegistryComponent might use a discovery mechanism to automatically detect and register providers.",
+        "The ProviderRegistryComponent could interact with the LLMServiceComponent to manage and retrieve providers for large language model operations.",
+        "The ProviderRegistryComponent might use a caching mechanism to improve performance and reduce the load on the system.",
+        "The ProviderRegistryComponent could provide a notification mechanism to notify other components of provider registration and updates."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:34:21.972Z",
+        "last_updated": "2026-03-18T06:34:21.972Z"
+      },
+      "id": "mc4flkgdxe2wf"
+    },
+    {
+      "name": "ObservationDerivation",
+      "entityType": "SubComponent",
+      "observations": [
+        "ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md",
+        "It could leverage the entity typing system, possibly using multiple ontology systems as mentioned in the project documentation",
+        "The sub-component might involve the use of a shared atomic index counter for work-stealing concurrency, as described in wave-controller.ts",
+        "ObservationDerivation could integrate with the EntityPersistence sub-component to store derived observations",
+        "It may also use the ManualLearning sub-component to derive observations from manually created entities",
+        "The sub-component might utilize the MCP Constraint Monitor, as described in integrations/mcp-constraint-monitor/README.md",
+        "ObservationDerivation could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:34:52.827Z",
+        "last_updated": "2026-03-18T06:34:52.827Z"
+      },
+      "id": "mc4flkg24k3ylf"
+    },
+    {
+      "name": "AnthropicAPIConnector",
+      "entityType": "Detail",
+      "observations": [
+        "The ANTHROPIC_API_KEY is a key component in establishing the connection to the Anthropic API, as mentioned in the project documentation.",
+        "The presence of ANTHROPIC_API_KEY in the project documentation implies that the AnthropicAPIConnector plays a crucial role in the AnthropicProvider's functionality.",
+        "The AnthropicAPIConnector's connection to the Anthropic API is likely facilitated through a specific endpoint or URL, which is not explicitly mentioned in the provided documentation but is implied by the presence of API keys and other configuration details."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:35:54.609Z",
+        "last_updated": "2026-03-18T06:35:54.609Z"
+      },
+      "id": "mc4flkg1n5iz41"
+    },
+    {
+      "name": "GraphDatabaseQueryMechanism",
+      "entityType": "Detail",
+      "observations": [
+        "The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the context of the SemanticAnalysis component.",
+        "The absence of specific source files limits the ability to provide detailed observations, but the parent context suggests a focus on data retrieval for classification purposes.",
+        "The Project Documentation references various integrations and components, such as code-graph-rag and copi, which may be related to the GraphDatabaseQueryMechanism, but without specific source files, the connection is unclear."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-18T06:36:49.031Z",
+        "last_updated": "2026-03-18T06:36:49.031Z"
+      },
+      "id": "mc4flkgfboviy"
     }
   ],
   "relations": [
@@ -12441,14 +12857,158 @@
       "to": "BrowserAccessMcpServer",
       "relationType": "related_to",
       "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "LLMServiceComponent",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "BrowserAccessComponent",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Trajectory",
+      "to": "DataAdapter",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "GraphDatabase",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ConstraintMonitoring",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "WorkflowOrchestrator",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LoggingManager",
+      "to": "LogRotationHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "TranscriptManager",
+      "to": "TranscriptDataStore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "OntologyClassificationAgent",
+      "to": "LLMServiceInitializer",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "BrowserAccessComponent",
+      "to": "BrowserAccessConfiguration",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LoggingManager",
+      "to": "LogConfigurationLoader",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConnectionHandler",
+      "to": "ConnectionEstablisher",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DataAdapter",
+      "to": "DataMapper",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SpecstoryAdapter",
+      "to": "SpecstoryApiClient",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "BestPractices",
+      "to": "CodeReviewGuideline",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "GraphDatabase",
+      "to": "GraphDatabaseAdapter",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintMonitoring",
+      "to": "ConstraintConfigurationParser",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Insights",
+      "to": "PatternBasedInsightGeneration",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "WorkflowOrchestrator",
+      "to": "AgentExecutionManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "GraphDatabase",
+      "to": "GraphDatabaseConnection",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "Ontology",
+      "to": "LLMServiceInitializer",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "LogRotationHandler",
+      "to": "LogConfigurationLoader",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "GraphDatabaseLibrary",
+      "to": "GraphDatabaseConnection",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "BrowserAccessConfiguration",
+      "to": "BrowserAccessConfiguration",
+      "relationType": "related_to",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-18T05:53:07.695Z",
-    "total_entities": 468,
-    "total_relations": 729,
+    "exported_at": "2026-03-18T06:36:54.059Z",
+    "total_entities": 494,
+    "total_relations": 753,
     "description": "Coding project infrastructure and patterns"
   }
 }

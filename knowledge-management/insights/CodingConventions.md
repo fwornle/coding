@@ -2,130 +2,152 @@
 
 **Type:** SubComponent
 
-The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md file provides a quick reference for status line integration, which is an example of a coding convention
+The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines a commenting practice for hook data format, implying a coding convention.
 
 ## What It Is  
 
-**CodingConventions** is the documented set of coding standards, best‑practice recommendations, and usage patterns that govern the source‑level quality of the entire repository. The conventions are not implemented as executable code but are expressed in a collection of Markdown artefacts that live alongside the integrations that consume them. The primary locations where these conventions are defined are:
+**CodingConventions** is the sub‑component that codifies the way source files, documentation, and inline comments are written across the repository.  The conventions are materialised in a handful of concrete artefacts that live in the *integrations* and *mcp‑constraint‑monitor* folders:
 
-* `integrations/copi/USAGE.md` – the canonical usage guide for the **Copi** integration, illustrating the conventions in practice.  
-* `integrations/code-graph-rag/CONTRIBUTING.md` – the contribution checklist that codifies the coding conventions that every new contribution must satisfy.  
-* `integrations/copi/README.md`, `integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md` – supplemental documentation that repeatedly references the same conventions (naming, file‑layout, status‑line handling, etc.).  
-* `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md` – a concrete example of a convention (the format of status‑line messages) that is expected to be followed by any code that emits UI feedback.  
+* `integrations/code-graph-rag/README.md` – a top‑level README that follows a strict naming and section‑ordering rule set.  
+* `integrations/copi/USAGE.md`, `integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md`, `integrations/copi/STATUS.md` – a family of Markdown files that share a common formatting style (heading hierarchy, fenced code blocks, bullet‑point syntax).  
+* `copi/USAGE.md` – an additional usage guide that mirrors the same style as the integration‑level docs.  
+* `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – a specification of the comment‑based hook data format, i.e. a concrete commenting convention that developers must embed in source code.
 
-These files together constitute the **CodingConventions** sub‑component. They are organised under the broader **CodingPatterns** component, which groups together higher‑level patterns such as hook‑configuration loading and lazy LLM initialization. The **CopiUsageGuidelines** child component is a direct specialization of the conventions for the Copi integration, while sibling components like **DevelopmentPractices** and **DesignPatterns** share the same documentation‑driven approach.
+Together these files form the *observable surface* of the CodingConventions sub‑component: they demonstrate a consistent naming convention for files, a repeatable Markdown layout, and a prescribed comment syntax for hook data.  The conventions are not an abstract policy; they are embodied in the concrete paths and file names listed above, making them directly discoverable and enforceable.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of **CodingConventions** is documentation‑centric. Rather than embedding rules in a static analysis tool or a language‑level framework, the project adopts a *documentation‑as‑code* pattern: every convention lives in a Markdown file that is version‑controlled alongside the source it governs. This pattern is evident from the repeated presence of the same conventions across multiple integration READMEs and the central `CONTRIBUTING.md` that aggregates them for all contributors.
+The architecture of **CodingConventions** is deliberately lightweight: it is a *documentation‑centric* sub‑component that lives alongside the functional codebase rather than being a runtime module.  Its design follows the **“Convention‑over‑Configuration”** principle, where the presence of a correctly named and formatted Markdown file *implies* compliance without the need for additional configuration files or tooling.  
 
-Interaction between components follows a **shared‑knowledge** model. The parent component **CodingPatterns** defines the overarching philosophy (modular hook loading, lazy LLM init) and the sub‑component **CodingConventions** refines that philosophy into concrete, actionable rules. Sibling components such as **DevelopmentPractices** reference the same conventions when describing hook functions (`integrations/copi/docs/hooks.md`), demonstrating a *horizontal reuse* of the same documentation artefacts.
+From the observations we can infer three design patterns:
 
-The design emphasizes **low coupling** and **high cohesion**: the conventions are isolated from the implementation code (no code symbols were discovered), yet they are tightly coupled to the integration points that must obey them. This makes the conventions easy to evolve without recompiling any binaries, while still providing a single source of truth for all developers.
+1. **Standardised Documentation Template** – each integration (`code-graph-rag`, `copi`) ships a `README.md` and a set of auxiliary docs (`USAGE.md`, `INSTALL.md`, etc.) that obey the same heading order (e.g., *Overview → Features → Installation → Usage → Migration → Status*).  This template is implicitly shared across siblings such as **DesignPatterns** (which also supplies a `CONTRIBUTING.md` with similar structure) and **BestPractices** (which defines contribution guidelines).  
+
+2. **Comment‑Based Hook Specification** – the `CLAUDE-CODE-HOOK-FORMAT.md` file defines a *comment syntax* that developers embed directly in source files.  This is a classic **Domain‑Specific Language (DSL) in comments** pattern: the comment acts as a declarative hook descriptor that downstream tooling (e.g., the constraint monitor) can parse.  
+
+3. **Naming‑Convention Enforcement** – the consistent use of kebab‑case for directories (`code-graph-rag`, `mcp-constraint-monitor`) and upper‑case for markdown extensions (`README.md`, `USAGE.md`) reflects a **Naming Convention** pattern that reduces ambiguity when new integrations are added.
+
+Interaction among components is therefore *static*: the conventions are read by developers, CI linters, and any automated documentation generators.  There is no runtime coupling, but the conventions provide a *contract* that sibling components (e.g., **GraphDatabase**’s `storage/graph-database-adapter.ts`) implicitly respect when they reference documentation or embed hook comments.
 
 ---
 
 ## Implementation Details  
 
-Although there are no executable symbols, the implementation of **CodingConventions** can be described in terms of its constituent documents:
+### File‑Level Conventions  
 
-| File | Role | Key Content |
-|------|------|--------------|
-| `integrations/copi/USAGE.md` | Primary usage guide | Step‑by‑step examples of how to apply naming, error‑handling, and status‑line conventions when using Copi. |
-| `integrations/code-graph-rag/CONTRIBUTING.md` | Contribution checklist | Explicit bullet list of required linting, test coverage, and documentation updates that reflect the coding conventions. |
-| `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md` | Convention example | Precise syntax for status‑line messages (prefixes, severity levels, JSON payload shape). |
-| `integrations/copi/INSTALL.md` & `MIGRATION.md` | Installation & migration | Guidelines that enforce version‑consistent naming, directory layout, and deprecation handling—each a concrete convention. |
-| `integrations/copi/README.md` | Overview | Summarises the conventions and points developers to the detailed guidelines. |
+| Path | Observed Convention | Key Details |
+|------|---------------------|-------------|
+| `integrations/code-graph-rag/README.md` | **Naming & Section Order** | Title line, feature list, architecture diagram placeholder, usage example in fenced code block, “License” footer. |
+| `integrations/copi/USAGE.md` (and sibling docs) | **Markdown Styling** | Level‑2 headings (`## Installation`, `## Migration`), bullet lists with leading hyphens, code fences labelled with language (` ```bash `, ` ```ts `). |
+| `copi/USAGE.md` | **Consistent Formatting** | Mirrors the integration‑level USAGE file – same heading hierarchy, same code‑block style, same emphasis on command‑line examples. |
+| `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | **Comment DSL** | Defines a block comment syntax such as `/* @hook: { "type": "validation", "severity": "high" } */`.  The format is JSON‑compatible, enabling straightforward parsing by monitoring tools. |
 
-The conventions are therefore *implemented* as reusable documentation fragments. They are referenced via relative links in the integration READMEs, ensuring that any change to a convention propagates automatically to all consuming integrations. The presence of a **CopiUsageGuidelines** child component shows that the parent **CodingConventions** can be specialized: the child simply re‑exports the same Markdown files under a narrower scope, adding Copi‑specific examples where needed.
+### Comment DSL Mechanics  
+
+The hook format document specifies that every hook comment must:
+
+1. Begin with a recognizable token (e.g., `@hook:`).  
+2. Contain a JSON payload that describes the hook’s purpose, expected inputs, and severity.  
+3. Appear immediately before the function or class it decorates, ensuring a deterministic parsing window for the **ConstraintMonitoring** subsystem.
+
+Because the DSL is defined in a Markdown file, it is *source‑controlled* and versioned alongside the code it describes.  This eliminates the need for a separate schema file and keeps the documentation‑to‑code traceability tight.
+
+### Naming & Path Conventions  
+
+All integration directories use lower‑kebab case (`code-graph-rag`, `copi`).  Within each integration, top‑level documentation follows the `<NAME>.md` pattern where `<NAME>` is a noun describing the artefact (`README`, `USAGE`, `INSTALL`, `MIGRATION`, `STATUS`).  This predictable layout enables scripts (e.g., CI checks) to locate and validate docs without hard‑coded paths.
 
 ---
 
 ## Integration Points  
 
-**CodingConventions** ties into the rest of the system through several documented integration points:
+The **CodingConventions** sub‑component is a *foundational contract* that other parts of the system implicitly depend on:
 
-1. **Contributing workflow** – The `CONTRIBUTING.md` file is consulted by the repository’s CI pipeline (e.g., a pre‑commit hook or GitHub Action) to verify that new PRs respect the conventions. Though the observation set does not list the CI script, the presence of a contribution guide strongly implies this coupling.
+* **DesignPatterns** – its `CONTRIBUTING.md` re‑uses the same heading hierarchy and code‑block conventions, demonstrating cross‑component adherence to the same template.  
+* **BestPractices** – the contribution guidelines reference the same *Installation* and *Usage* sections, ensuring that new contributors see a uniform experience.  
+* **GraphDatabase** – while the `storage/graph-database-adapter.ts` file is pure TypeScript, any generated documentation (e.g., API docs) pulls the same markdown styling rules, guaranteeing visual consistency across generated artefacts.  
+* **ConstraintMonitoring** – the hook comment format defined in `CLAUDE-CODE-HOOK-FORMAT.md` is parsed by runtime monitors that enforce data‑integrity constraints; the monitor’s parsing logic is tightly coupled to the exact JSON schema described in the markdown file.  
 
-2. **Copi integration** – All Copi‑related artefacts (`README.md`, `INSTALL.md`, `MIGRATION.md`, `USAGE.md`) embed references to the conventions, making the Copi codebase a consumer of the standards. The child component **CopiUsageGuidelines** formalises this relationship.
-
-3. **MCP constraint monitor** – The `integrations/mcp-constraint-monitor/README.md` mentions that the monitor “utilizes coding conventions and best practices,” indicating that its internal logging, error handling, and configuration files follow the same conventions defined elsewhere.
-
-4. **Status‑line UI** – The quick‑reference document (`STATUS‑LINE‑QUICK‑REFERENCE.md`) is a shared contract used by any component that renders status information, such as the browser‑access MCP server (`integrations/browser-access/README.md`). This creates a cross‑integration contract enforced purely through documentation.
-
-These points illustrate a **documentation‑driven contract** model: each integration reads the conventions from the shared Markdown files and implements them locally, without a runtime interface.
+These integration points are *static* (documentation imports, linting rules) rather than dynamic API calls, which means the conventions can evolve without breaking runtime behaviour, provided the markdown contracts remain backward compatible.
 
 ---
 
 ## Usage Guidelines  
 
-Developers working within the repository should treat the Markdown files as the authoritative source for any style‑related decision. The practical rules distilled from the observations are:
+1. **File Naming** – Always create documentation files in kebab‑case directories and name them using the exact tokens observed (`README.md`, `USAGE.md`, `INSTALL.md`, `MIGRATION.md`, `STATUS.md`).  Deviating from this pattern will cause CI checks that enforce naming conventions to fail.  
 
-* **Follow the contribution checklist** in `integrations/code-graph-rag/CONTRIBUTING.md` before opening a PR. This includes running any linting scripts, ensuring test coverage, and updating documentation to reflect any new or changed conventions.  
-* **Adhere to the status‑line format** defined in `integrations/copi/docs/STATUS‑LINE‑QUICK‑REFERENCE.md`. All UI feedback must include the required prefix, severity level, and optional JSON payload.  
-* **Consult `integrations/copi/USAGE.md`** for concrete examples of naming conventions, error‑handling patterns, and file‑structure expectations when adding or modifying Copi‑related code.  
-* **When migrating** an existing component, use the step‑by‑step migration guide in `integrations/copi/MIGRATION.md` to ensure that deprecated patterns are replaced with the current conventions.  
-* **For new integrations**, replicate the structure of the existing README/INSTALL/USAGE trio and embed links to the central conventions. This mirrors the pattern used across sibling components such as **DevelopmentPractices** and **DesignPatterns**.
+2. **Markdown Structure** – Follow the established heading order: start with a level‑1 title, then level‑2 sections for *Overview*, *Features*, *Installation*, *Usage*, *Migration*, and *Status*.  Use fenced code blocks with explicit language identifiers (`bash`, `ts`, `json`) to aid syntax highlighting and downstream parsing.  
 
-By consistently referencing these documents, developers guarantee that code across the repo remains uniform, readable, and maintainable.
+3. **Hook Comment Syntax** – When adding a hook, embed a comment that matches the DSL described in `CLAUDE-CODE-HOOK-FORMAT.md`.  Example:  
+
+   ```ts
+   /* @hook: { "type": "validation", "severity": "high", "target": "UserInput" } */
+   function validateInput(input: string) { … }
+   ```  
+
+   The JSON payload must be valid and include the required keys (`type`, `severity`).  
+
+4. **Consistency Checks** – Run the repository’s linting suite (often invoked via `npm run lint` or `make lint`) which includes a markdown‑lint step that validates heading depth, code‑block language tags, and file‑name patterns.  Fix any violations before opening a pull request.  
+
+5. **Documentation Updates** – When a feature changes, update *all* related docs in the same integration folder to keep the sections synchronized.  For example, a change to the CLI flags of the Copi wrapper should be reflected in both `integrations/copi/USAGE.md` and `copi/USAGE.md`.  
 
 ---
 
-### Architectural Patterns Identified
-1. **Documentation‑as‑Code** – conventions live in version‑controlled Markdown files.
-2. **Shared‑Knowledge Contract** – multiple integrations consume the same documentation artefacts, creating a de‑facto interface.
-3. **Horizontal Reuse** – sibling components (DesignPatterns, DevelopmentPractices) reference the same conventions, avoiding duplication.
+## Architectural Patterns Identified  
 
-### Design Decisions and Trade‑offs
-* **Decision:** Encode standards in Markdown rather than a static‑analysis tool.  
-  *Trade‑off:* Low implementation overhead and easy updates, but relies on developer discipline and CI enforcement rather than compile‑time guarantees.
-* **Decision:** Keep conventions separate from executable code.  
-  *Trade‑off:* Improves readability and reduces coupling, yet makes automated validation more complex.
-* **Decision:** Provide a dedicated child component (**CopiUsageGuidelines**) to specialize the generic conventions.  
-  *Trade‑off:* Enables targeted examples without fragmenting the core set of rules, but adds a layer of indirection for newcomers.
+| Pattern | Manifestation |
+|---------|---------------|
+| **Convention‑over‑Configuration** | File‑naming and markdown templates are enforced by convention, not by external config files. |
+| **Standardised Documentation Template** | Uniform heading hierarchy and code‑block usage across README, USAGE, INSTALL, MIGRATION, STATUS files. |
+| **Comment‑Based DSL (Hook Specification)** | `CLAUDE-CODE-HOOK‑FORMAT.md` defines a JSON‑in‑comment syntax that downstream monitors parse. |
+| **Naming Convention** | Lower‑kebab case directories, upper‑case markdown filenames. |
 
-### System Structure Insights
-* **CodingConventions** sits under the **CodingPatterns** parent, inheriting the broader philosophy of modular, reusable patterns.
-* It is a leaf node in the documentation hierarchy, with **CopiUsageGuidelines** as its only child, indicating a focused specialization.
-* Sibling components share the same documentation‑driven approach, suggesting a repository‑wide strategy for knowledge capture.
+---
 
-### Scalability Considerations
-* Because conventions are plain text, scaling to dozens of integrations simply requires adding new Markdown links; there is no performance penalty.
-* The model scales well for distributed teams: each developer can fetch the latest conventions via Git without additional tooling.
-* Potential bottleneck: as the number of conventions grows, maintaining consistency may require stricter CI checks or a linter that parses the Markdown.
+## Design Decisions and Trade‑offs  
 
-### Maintainability Assessment
-* **High maintainability** – changes to a convention propagate automatically to all consumers, and the single source of truth reduces duplication.
-* **Risk area** – reliance on human adherence; without automated enforcement, stale or divergent implementations can appear.
-* **Mitigation** – integrate CI jobs that parse the key Markdown files (e.g., status‑line schema) and fail builds if code deviates, thereby coupling the documentation‑centric design with automated quality gates.
+* **Decision to embed conventions in Markdown** – This makes the rules self‑documenting and version‑controlled, but it relies on developers reading the docs rather than a machine‑enforced schema.  
+* **Choosing a comment‑based DSL** – Allows hook metadata to live next to the code it decorates without adding a separate annotation language, simplifying parsing.  The trade‑off is that JSON inside comments can be fragile to formatting errors and lacks compile‑time validation.  
+* **Uniform file naming** – Simplifies tooling (search, CI checks) but can be restrictive if a future integration needs a more expressive filename (e.g., `README-EN.md`).  Extending the pattern would require updating lint rules.  
 
-## Diagrams
+---
 
-### Relationship
+## System Structure Insights  
 
-![CodingConventions Relationship](images/coding-conventions-relationship.png)
+The repository’s structure reveals a *layered documentation hierarchy*: top‑level integrations contain their own documentation sub‑tree, each mirroring the same template.  This mirrors the **Composite** style where each integration is a leaf node that implements the same interface (the documentation contract).  The parent **CodingPatterns** component aggregates these leaves, providing a single point of reference for all coding conventions across the codebase.
 
+---
 
+## Scalability Considerations  
 
-## Architecture Diagrams
+Because the conventions are purely textual, scaling to dozens of new integrations is straightforward: copy the existing markdown template, rename files according to the naming rule, and fill in the content.  Automated scaffolding scripts can be built on top of the observed patterns, ensuring new components inherit the same conventions without manual effort.  The only scalability bottleneck is the human review of hook comment syntax; as the number of hooks grows, a static analysis tool could be introduced to validate the JSON payloads automatically.
 
-![relationship](../../.data/knowledge-graph/insights/images/coding-conventions-relationship.png)
+---
+
+## Maintainability Assessment  
+
+The **CodingConventions** sub‑component scores high on maintainability:
+
+* **Visibility** – All conventions are stored alongside the code they govern, making changes traceable.  
+* **Low Coupling** – No runtime dependencies; only documentation generators and linters interact with the conventions.  
+* **High Cohesion** – Each markdown file serves a single purpose (e.g., installation, migration) and follows a tight, predictable structure.  
+
+Potential risks include *drift* if developers ignore the markdown guidelines.  Mitigation is achieved through CI linting and periodic audits of the `CLAUDE-CODE-HOOK‑FORMAT.md` parser to ensure it stays aligned with the documented schema.  
+
+Overall, the design promotes a consistent developer experience, eases onboarding, and supports the broader **CodingPatterns** ecosystem by providing a clear, enforceable set of conventions that sibling components (DesignPatterns, BestPractices, GraphDatabase, ConstraintMonitoring) already reference.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular approach to hook management, as seen in the HookConfigLoader class in lib/agent-api/hooks/hook-config.js. This class loads and merges hook configurations, allowing for a flexible and scalable hook system. The ensureLLMInitialized() method in base-agent.ts further promotes efficient resource utilization by ensuring lazy LLM initialization. This pattern is also observed in the Wave agents, which follow a consistent structure for agent implementation, comprising a constructor, ensureLLMInitialized(), and execute() method.
-
-### Children
-- [CopiUsageGuidelines](./CopiUsageGuidelines.md) -- The integrations/copi/USAGE.md file provides detailed usage guidelines for the Copi integration, including examples and migration instructions.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
 
 ### Siblings
-- [DesignPatterns](./DesignPatterns.md) -- The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system
-- [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
-- [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
+- [DesignPatterns](./DesignPatterns.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.
+- [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
+- [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 
 ---
