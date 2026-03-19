@@ -1,0 +1,24 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Specstory Adapter" {
+  component "SpecstoryAdapter" as sa <<core>>
+  component "Logger" as logger <<external>>
+  component "Specstory Extension API" as api <<api>>
+}
+
+sa --> logger : uses
+sa --> api : communicates
+logger ..> sa : logs
+
+package "Connection Mechanisms" {
+  component "HTTP Connection" as http <<external>>
+  component "IPC Connection" as ipc <<external>>
+  component "File Watch Connection" as fw <<external>>
+}
+
+sa --> http : uses
+sa --> ipc : uses
+sa --> fw : uses
+
+@enduml

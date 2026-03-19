@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SemanticAnalysis
+
+[Coding] as coding #FFFFDD
+[SemanticAnalysis] as semantic_analysis #LightBlue
+[LiveLoggingSystem] as live_logging_system #F0F0F0
+[LLMAbstraction] as llmabstraction #F0F0F0
+[DockerizedServices] as dockerized_services #F0F0F0
+[Trajectory] as trajectory #F0F0F0
+[KnowledgeManagement] as knowledge_management #F0F0F0
+[CodingPatterns] as coding_patterns #F0F0F0
+[ConstraintSystem] as constraint_system #F0F0F0
+[Pipeline] as pipeline #E8F5E8
+[Ontology] as ontology #E8F5E8
+[Insights] as insights #E8F5E8
+[EntityValidator] as entity_validator #E8F5E8
+[CodeGraph] as code_graph #E8F5E8
+
+coding --> semantic_analysis
+live_logging_system -[hidden]- semantic_analysis
+llmabstraction -[hidden]- semantic_analysis
+dockerized_services -[hidden]- semantic_analysis
+trajectory -[hidden]- semantic_analysis
+knowledge_management -[hidden]- semantic_analysis
+coding_patterns -[hidden]- semantic_analysis
+constraint_system -[hidden]- semantic_analysis
+semantic_analysis --> pipeline
+semantic_analysis --> ontology
+semantic_analysis --> insights
+semantic_analysis --> entity_validator
+semantic_analysis --> code_graph
+
+@enduml

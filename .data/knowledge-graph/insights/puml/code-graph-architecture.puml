@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Graph Generation" {
+  component "CodeGraphGenerator" as cgg <<core>>
+  component "CodeGraph" as cg <<storage>>
+  component "CodeGraphCache" as cgc <<storage>>
+}
+
+package "Ontology Integration" {
+  component "OntologyIntegration" as oi <<api>>
+  database "OntologyDatabase" as od
+}
+
+package "Pipeline Processing" {
+  component "SemanticAnalysisAgent" as saa <<agent>>
+}
+
+cgg --> cg : generates
+cg --> cgc : uses
+cgc --> cg : caches
+cg --> oi : integrates
+oi --> od : uses
+saa --> cg : processes
+
+@enduml

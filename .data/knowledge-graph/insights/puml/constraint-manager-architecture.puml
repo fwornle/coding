@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Constraint Management" {
+  component "ConstraintManager" as cm <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  database "GraphDatabase" as gd
+  component "ContentValidationAgent" as cva <<agent>>
+}
+
+package "Data Storage" {
+  component "LevelDB" as ld <<storage>>
+  component "Graphology" as go <<storage>>
+}
+
+cm --> gda : uses
+gda --> gd : stores
+cm --> cva : collaborates
+cva --> gda : uses
+gda --> ld : uses
+gda --> go : uses
+
+@enduml

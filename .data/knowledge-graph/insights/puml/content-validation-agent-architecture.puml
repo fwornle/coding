@@ -1,0 +1,20 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "MCP Server Semantic Analysis" {
+  component "ContentValidationAgent" as cva <<agent>>
+  component "ConstraintSystem" as cs <<core>>
+  component "Entity Content" as ec <<storage>>
+  component "Validation Rules" as vr <<storage>>
+  component "Code Actions" as ca <<api>>
+  component "File Operations" as fo <<api>>
+}
+
+cva --> cs : uses
+cva --> ec : validates
+cva --> vr : applies
+cs --> ca : triggers
+cs --> fo : triggers
+ca --> fo : uses
+
+@enduml

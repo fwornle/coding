@@ -1,122 +1,94 @@
 # TranscriptProcessing
 
-**Type:** SemanticAnalyzer
+**Type:** SubComponent
 
-The TranscriptProcessing sub-component allows for easier maintenance and updates, as each module can be modified or extended without affecting the rest of the system, as seen in the usage of the OntologyConfigManager and OntologyManager in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.
+The TranscriptAdapter class is likely used in conjunction with the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle Copilot CLI transcripts.
 
 ## What It Is  
 
-**TranscriptProcessing** is the sub‑component that lives inside the **LiveLoggingSystem** and is responsible for ingesting raw transcript data, converting it into the Log‑Streaming Language (LSL) format, and broadcasting update events to any interested watchers. The core of this capability is provided by the **`TranscriptAdapter`** class located at  
+**TranscriptProcessing** is the sub‑component responsible for normalising the raw output of various LLM‑driven agents into a unified *Live‑Logging System* (LLS) format.  Its core implementation lives in **`lib/agent-api/transcript-api.js`**, where the abstract **`TranscriptAdapter`** class is defined together with a **`TranscriptAdapterFactory`** that selects the appropriate concrete adapter at runtime.  One concrete adapter, **`ClaudeCodeTranscriptAdapter`**, resides in **`lib/agent-api/transcripts/claudia-transcript-adapter.js`** and implements the Claude Code‑specific parsing logic.  
 
-```
-lib/agent‑api/transcript‑api.js
-```  
-
-The adapter works hand‑in‑hand with the ontology‑related agents (`OntologyClassificationAgent` in `integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts`) and the LSL configuration validator (`scripts/validate‑lsl‑config.js`). Together they form a **modular pipeline** that turns raw observations into semantically enriched, LSL‑ready logs while keeping the rest of the LiveLoggingSystem agnostic of the underlying transcript format.
+The component sits inside the **LiveLoggingSystem** parent, sharing its modular philosophy with sibling sub‑components such as **LoggingMechanism**, **KnowledgeGraphManager**, and **TranscriptAdapterFactory**.  Its child, the **TranscriptAdapterFactory**, encapsulates the creation logic for the various adapters, keeping the processing pipeline extensible for future agent formats.
 
 ---
 
 ## Architecture and Design  
 
-The observations point to a **modular, layered architecture** built around clear separation of concerns:
+The design of **TranscriptProcessing** follows a classic **Adapter** pattern, exposing a stable interface (`convertTranscript()`, `parseTranscript()` – inferred from the file’s purpose) while delegating format‑specific work to subclasses like `ClaudeCodeTranscriptAdapter`.  This abstraction permits the LiveLoggingSystem to remain agnostic of the underlying agent’s transcript schema.  
 
-1. **Adapter Layer** – `TranscriptAdapter` implements an **Adapter pattern** that abstracts the source‑specific details of reading transcripts and exposing a uniform API for conversion. By doing so, the rest of the system (e.g., LiveLoggingSystem, OntologyClassificationAgent) can depend on a stable contract rather than on file‑format specifics.
+Complementing the adapter is a **Factory** pattern embodied by `TranscriptAdapterFactory`.  The factory inspects metadata (e.g., a `format` identifier) and instantiates the correct adapter, ensuring that the rest of the system interacts with a single entry point.  This two‑layer pattern (Factory → Adapter) is reflected in the hierarchy diagram and reinforces the modularity highlighted in the parent component description.  
 
-2. **Ontology Enrichment Layer** – The `OntologyClassificationAgent` (in `integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts`) uses `OntologyConfigManager` and `OntologyManager` to classify observations against a shared ontology. The adapter **pre‑populates** ontology metadata fields before the LLM is invoked, which eliminates redundant classification calls and reduces latency.
+Interaction flows are orchestrated through the **LiveLoggingSystem**.  When a new transcript arrives—whether from a Copilot CLI run (referenced in `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md`) or a Claude Code execution (see `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)—the LiveLoggingSystem forwards the payload to **TranscriptProcessing**.  The factory selects the appropriate adapter, which then normalises the data and hands it back to the logging pipeline.  
 
-3. **Validation Layer** – Before any LSL payload is emitted, the `LSLConfigValidator` (in `scripts/validate‑lsl‑config.js`) validates the generated configuration. This mirrors a **Validator/Guard** approach that ensures only well‑formed LSL reaches downstream consumers.
-
-4. **Observer/Notification Layer** – The processing sub‑component “notifies watchers of transcript updates.” Although the concrete implementation is not shown, the phrasing suggests an **Observer pattern**, where interested components register callbacks and are triggered after successful validation.
-
-5. **Parent‑Child Relationship** – `LiveLoggingSystem` acts as the container that orchestrates these modules. Sibling components such as **LoggingManager** (which also uses `LSLConfigValidator`) and **OntologyClassification** (which shares the same ontology managers) demonstrate **horizontal reuse** of utilities across the system.
-
-Overall, the design emphasizes **reusability**, **extensibility**, and **low coupling**: each module can evolve independently, and shared services (ontology managers, validators) are injected where needed rather than duplicated.
+![TranscriptProcessing — Architecture](../../.data/knowledge-graph/insights/images/transcript-processing-architecture.png)
 
 ---
 
 ## Implementation Details  
 
-### `TranscriptAdapter` (`lib/agent-api/transcript-api.js`)  
-* **Responsibility** – Reads raw transcript files, converts them to LSL, and injects ontology metadata.  
-* **Key Mechanics** –  
-  * Calls into the ontology system via `OntologyConfigManager` and `OntologyManager` to obtain classification results.  
-  * Populates metadata fields on the transcript object *before* any downstream LLM classification, thereby preventing redundant work.  
-  * Exposes methods (e.g., `getTranscript()`, `toLSL()`) that are consumed by the LiveLoggingSystem and by the OntologyClassificationAgent.
+At the heart of the implementation is the **`TranscriptAdapter`** abstract class defined in `lib/agent-api/transcript-api.js`.  Although the source code isn’t directly listed, the observations indicate it provides key methods such as `convertTranscript()` and `parseTranscript()`.  Concrete subclasses override these hooks to handle agent‑specific quirks.  
 
-### `OntologyClassificationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`)  
-* **Responsibility** – Provides a unified abstraction for classifying observations against the shared ontology.  
-* **Key Mechanics** –  
-  * Utilises `OntologyConfigManager` to fetch configuration (e.g., which ontology version to use).  
-  * Delegates actual classification to `OntologyManager`, which likely encapsulates LLM or rule‑based logic.  
-  * Works closely with `TranscriptAdapter` to receive pre‑populated metadata, reducing the need for a second classification pass.
+The **`ClaudeCodeTranscriptAdapter`** (`lib/agent-api/transcripts/claudia-transcript-adapter.js`) extends `TranscriptAdapter` and implements the parsing rules required for Claude Code’s hook format.  It likely consumes the format description in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, extracting fields such as code snippets, execution metadata, and LLM responses, then re‑structures them into the LLS schema.  
 
-### `LSLConfigValidator` (`scripts/validate-lsl-config.js`)  
-* **Responsibility** – Validates the generated LSL configuration before it is emitted.  
-* **Key Mechanics** –  
-  * Checks structural integrity, required fields, and possibly schema compliance.  
-  * Is invoked both by the **LoggingManager** sibling and by the **TranscriptProcessing** sub‑component prior to notifying watchers.
+The **`TranscriptAdapterFactory`**, also located in `lib/agent-api/transcript-api.js`, acts as a registry of available adapters.  When the LiveLoggingSystem supplies a transcript with a known `type` (e.g., `"claude-code"` or `"copilot-cli"`), the factory returns an instantiated adapter ready to process the payload.  This lazy‑instantiation approach reduces upfront coupling and keeps the memory footprint modest.  
 
-### Notification / Watcher Mechanism  
-* While the concrete code is not listed, the observation that “the TranscriptProcessing sub‑component notifies watchers of transcript updates” indicates an event‑driven hook. After `TranscriptAdapter` produces a validated LSL payload, the system likely emits an event (e.g., `transcriptUpdated`) that registered watchers receive.
+Environment variables **`ANTHROPIC_API_KEY`** and **`BROWSERBASE_API_KEY`** are mentioned as required for API interactions.  While the exact usage isn’t detailed, it is reasonable to infer that adapters may need to call external services (e.g., Anthropic’s API for post‑processing or Browserbase for session management) during conversion, and these keys are injected at runtime to keep credentials out of source code.  
 
-### Modularity Benefits  
-* Each class resides in its own logical folder (`lib/agent-api`, `integrations/mcp‑server‑semantic‑analysis/src/agents`, `scripts`). This physical separation mirrors the logical layering described above, making the codebase easier to navigate and reason about.
+Finally, the **KnowledgeGraphManager** sibling may consume the normalised transcripts to enrich the graph‑based knowledge store described in `integrations/code-graph-rag/README.md`.  This downstream flow is visualised in the relationship diagram.  
+
+![TranscriptProcessing — Relationship](../../.data/knowledge-graph/insights/images/transcript-processing-relationship.png)
 
 ---
 
 ## Integration Points  
 
-1. **LiveLoggingSystem (Parent)** – Orchestrates the flow: it invokes `TranscriptAdapter` to obtain LSL, passes the result to the logging pipeline, and registers any watchers that need to react to transcript changes. The parent also coordinates with sibling components like **LoggingManager** to set up the overall logging infrastructure.
+**TranscriptProcessing** integrates tightly with three surrounding areas:
 
-2. **OntologyClassificationAgent (Sibling Collaboration)** – Shares the same ontology managers (`OntologyConfigManager`, `OntologyManager`). The adapter pre‑populates metadata that the classification agent can consume directly, establishing a tight but well‑defined contract.
+1. **LiveLoggingSystem (parent)** – The parent orchestrates the end‑to‑end logging pipeline.  It hands raw transcripts to the `TranscriptAdapterFactory`, receives the unified LLS payload, and forwards it to the **LoggingMechanism** for persistence.  
 
-3. **LoggingManager (Sibling)** – Uses `LSLConfigValidator` just like TranscriptProcessing does, indicating a common validation contract across the logging stack. This ensures that any LSL emitted—whether from raw logging or transcript conversion—conforms to the same schema.
+2. **Copilot CLI Hooks** – Documentation in `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md` describes how Copilot CLI emits transcripts.  Those hooks feed directly into the factory, which selects a (presumed) `CopilotCliTranscriptAdapter` to perform conversion.  
 
-4. **LSLConfigValidator (Utility)** – Acts as a shared validation service for both TranscriptProcessing and LoggingManager, reinforcing consistency and reducing duplicated validation logic.
+3. **KnowledgeGraphManager (sibling)** – After conversion, the unified transcript may be indexed by the graph‑code system outlined in `integrations/code-graph-rag/README.md`.  This enables downstream RAG (retrieval‑augmented generation) queries that rely on the structured knowledge extracted from transcripts.  
 
-5. **Watchers / Consumers** – External modules (e.g., UI dashboards, downstream analytics services) can subscribe to transcript update events. Because the notification occurs **after** validation, consumers are guaranteed to receive well‑formed LSL payloads.
-
-All integration points rely on **explicit interfaces** (method signatures on `TranscriptAdapter`, event names for watchers, validator APIs) rather than implicit coupling, which simplifies testing and future refactoring.
+The component also depends on external APIs guarded by `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY`.  These keys are injected via the environment, allowing the adapters to remain stateless and testable.  No direct file‑system dependencies are observed beyond the configuration and documentation files that describe transcript formats.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via the Adapter** – When a component needs transcript data, it should obtain an instance of `TranscriptAdapter` from the `lib/agent-api` package and call its public conversion methods. Direct file parsing is discouraged; the adapter guarantees that ontology metadata is already embedded.
+* **Instantiate via the Factory** – Call `TranscriptAdapterFactory.create(format)` (or the equivalent exported function) rather than directly constructing adapters.  This guarantees that any future adapters are automatically discoverable.  
 
-* **Do Not Re‑classify** – Because the adapter pre‑populates ontology fields, developers must avoid invoking the `OntologyClassificationAgent` a second time on the same transcript. This prevents unnecessary LLM calls and keeps latency low.
+* **Supply a Known Format Identifier** – The factory expects a string that matches a supported transcript type (e.g., `"claude-code"`).  Ensure that the identifier aligns with the documentation in the respective `*_HOOK_FORMAT.md` files to avoid fallback errors.  
 
-* **Validate Before Emitting** – Always run the LSL payload through `LSLConfigValidator` (or rely on the built‑in validation performed by TranscriptProcessing) before broadcasting events. This mirrors the pattern used by the LoggingManager sibling and ensures system‑wide consistency.
+* **Provide Required API Keys** – Before processing transcripts that may invoke external services, set `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` in the environment.  Missing keys will cause runtime failures in adapters that rely on those services.  
 
-* **Register Watchers Early** – Components that need to react to transcript updates should register their callbacks with the LiveLoggingSystem’s watcher registry before the first transcript conversion occurs. This guarantees they receive the initial payload.
+* **Treat the Output as Immutable LLS Records** – Once an adapter returns the unified transcript, treat it as read‑only.  Modifications should be performed downstream (e.g., by **LoggingMechanism** or **KnowledgeGraphManager**) to preserve the integrity of the original conversion.  
 
-* **Respect Modularity** – When extending functionality (e.g., supporting a new transcript format), add a new method or subclass within `TranscriptAdapter` rather than modifying existing logic. Because the architecture isolates concerns, such changes will not ripple into OntologyClassificationAgent or LoggingManager.
-
-* **Leverage Shared Managers** – For any ontology‑related queries, use `OntologyConfigManager` and `OntologyManager` directly rather than re‑implementing classification logic. This aligns with the design decision to centralise ontology handling.
+* **Extend via New Adapter Subclasses** – When adding support for a new agent, create a subclass of `TranscriptAdapter` in `lib/agent-api/transcripts/`, implement the required methods, and register the class in `TranscriptAdapterFactory`.  Follow the same pattern used by `ClaudeCodeTranscriptAdapter` to keep the architecture consistent.  
 
 ---
 
-### Summary of Architectural Insights  
+### Summary of Insights  
 
-| Aspect | Insight (grounded in observations) |
-|--------|--------------------------------------|
-| **Architectural patterns identified** | Modular layered architecture, Adapter pattern (`TranscriptAdapter`), Observer/Watcher pattern (notification of transcript updates), Validator/Guard pattern (`LSLConfigValidator`), Manager/Facade pattern (`OntologyConfigManager` & `OntologyManager`). |
-| **Design decisions and trade‑offs** | *Separation of concerns* – transcript reading, ontology enrichment, and validation are isolated, improving testability but requiring disciplined interface contracts. *Pre‑population of metadata* reduces LLM load (performance gain) at the cost of tighter coupling between adapter and ontology managers. *Modularity* eases maintenance but introduces more moving parts that must be correctly wired by the parent LiveLoggingSystem. |
-| **System structure insights** | `LiveLoggingSystem` → (orchestrates) → `TranscriptAdapter` → (enriches) → `OntologyClassificationAgent` ↔ `OntologyConfigManager`/`OntologyManager`; validation via `LSLConfigValidator`; finally, watchers are notified. Sibling components (`LoggingManager`, `OntologyClassification`) reuse the same validator and ontology managers, demonstrating horizontal reuse. |
-| **Scalability considerations** | Because each concern is encapsulated, scaling can be done per‑module (e.g., run multiple instances of `TranscriptAdapter` for high‑throughput ingestion). Pre‑populating ontology metadata reduces external LLM calls, helping the system handle larger volumes without proportional cost growth. The observer model allows many downstream consumers without changing the core processing path. |
-| **Maintainability assessment** | High – the clear module boundaries mean changes to transcript format, ontology rules, or validation schema can be made in isolation. The reliance on shared managers ensures a single source of truth for ontology configuration, reducing duplication. However, developers must keep the contract between `TranscriptAdapter` and the ontology managers up‑to‑date to avoid mismatches. |
-
-By adhering to the guidelines above and respecting the modular contracts evident in the codebase, developers can extend, debug, and scale the **TranscriptProcessing** sub‑component with confidence.
+1. **Architectural patterns identified** – Adapter pattern for format‑specific processing; Factory pattern for adapter instantiation; modular, extensible hierarchy within LiveLoggingSystem.  
+2. **Design decisions and trade‑offs** – Centralising conversion logic behind a stable interface reduces coupling but adds an indirection layer; the factory keeps creation logic simple at the cost of maintaining a registration map.  
+3. **System structure insights** – TranscriptProcessing sits as a child of LiveLoggingSystem, shares a sibling relationship with LoggingMechanism and KnowledgeGraphManager, and owns the TranscriptAdapterFactory child that mediates adapter creation.  
+4. **Scalability considerations** – Adding new transcript formats scales linearly: only a new adapter subclass and factory entry are required.  Stateless adapters and environment‑driven API keys support horizontal scaling of the processing service.  
+5. **Maintainability assessment** – The clear separation of concerns (factory vs. adapters) and reliance on documented format specifications make the subsystem easy to maintain.  As long as adapters remain thin wrappers around format parsing, the codebase stays approachable; however, any heavy business logic should be kept out of adapters to avoid bloating them.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component's architecture is modular, with classes like OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, LSLConfigValidator in scripts/validate-lsl-config.js, and TranscriptAdapter in lib/agent-api/transcript-api.js working together to provide a unified abstraction for reading and converting transcripts. The OntologyClassificationAgent utilizes the OntologyConfigManager and OntologyManager to classify observations against the ontology system, showcasing a clear separation of concerns and a focus on reusability. This modularity allows for easier maintenance and updates, as each module can be modified or extended without affecting the rest of the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture allows for easy extension and modification of agent-specific transcript formats. This is achieved through the use of the TranscriptAdapter, which is implemented in the lib/agent-api/transcript-api.js file. The TranscriptAdapter provides a standardized interface for handling different agent formats, such as Claude Code and Copilot CLI, and converting them to the unified LSL format. For example, the ClaudeCodeTranscriptAdapter class in lib/agent-api/transcripts/claudia-transcript-adapter.js extends the TranscriptAdapter class and provides a specific implementation for handling Claude Code transcripts.
+
+### Children
+- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory is suggested by the parent analysis as a key component in the TranscriptProcessing sub-component, indicating its importance in handling agent-specific transcripts.
 
 ### Siblings
-- [LoggingManager](./LoggingManager.md) -- The LoggingManager sub-component utilizes the LSLConfigValidator in scripts/validate-lsl-config.js to validate the LSL configuration before setting up the logging system.
-- [OntologyClassification](./OntologyClassification.md) -- The OntologyClassification sub-component utilizes the OntologyConfigManager and OntologyManager in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to classify observations against the ontology system.
+- [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component may utilize the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI.
+- [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- The KnowledgeGraphManager sub-component may utilize the integrations/code-graph-rag/README.md Graph-Code system for graph-based knowledge storage and querying.
+- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
 
 
 ---

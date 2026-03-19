@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeGraphConstructor
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[CodeGraphConstructor] as code_graph_constructor #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[EntityPersistenceModule] as entity_persistence_module #F0F0F0
+[OntologyManagementSystem] as ontology_management_system #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[CodeGraphBuilder] as code_graph_builder #E8F5E8
+
+knowledge_management --> code_graph_constructor
+manual_learning -[hidden]- code_graph_constructor
+online_learning -[hidden]- code_graph_constructor
+entity_persistence_module -[hidden]- code_graph_constructor
+ontology_management_system -[hidden]- code_graph_constructor
+graph_database_adapter -[hidden]- code_graph_constructor
+code_graph_constructor --> code_graph_builder
+
+@enduml

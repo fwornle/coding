@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintManager
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintManager] as constraint_manager #LightBlue
+[HookOrchestrator] as hook_orchestrator #F0F0F0
+[ViolationLogger] as violation_logger #F0F0F0
+[GraphPersistenceModule] as graph_persistence_module #F0F0F0
+
+constraint_system --> constraint_manager
+hook_orchestrator -[hidden]- constraint_manager
+violation_logger -[hidden]- constraint_manager
+graph_persistence_module -[hidden]- constraint_manager
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SpecstoryAdapter
+
+[Trajectory] as trajectory #FFFFDD
+[SpecstoryAdapter] as specstory_adapter #LightBlue
+[LoggingMechanism] as logging_mechanism #F0F0F0
+[ConnectionManager] as connection_manager #F0F0F0
+[SpecstoryAPIWrapper] as specstory_apiwrapper #E8F5E8
+
+trajectory --> specstory_adapter
+logging_mechanism -[hidden]- specstory_adapter
+connection_manager -[hidden]- specstory_adapter
+specstory_adapter --> specstory_apiwrapper
+
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Ontology Management" {
+  component "OntologyManagementSystem" as oms <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "EntityPersistenceModule" as epm <<api>>
+  component "CodeGraphAgent" as cga <<agent>>
+}
+
+package "Learning Components" {
+  component "ManualLearning" as ml <<core>>
+  component "OnlineLearning" as ol <<core>>
+}
+
+oms --> gda : uses
+oms --> epm : uses
+oms --> cga : uses
+cga --> gda : uses
+oms --> ml : integrates
+oms --> ol : integrates
+
+@enduml

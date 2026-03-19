@@ -1,0 +1,22 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Content Validation" {
+  component "ContentValidator" as cv <<core>>
+  component "RulesEngine" as re <<core>>
+  component "ContentRepository" as cr <<storage>>
+}
+
+cv --> re : uses
+re --> cr : processes
+cr ..> cv : updates
+
+package "System Integrity" {
+  component "SystemMonitor" as sm <<agent>>
+  component "ErrorLogger" as el <<external>>
+}
+
+cv --> sm : notifies
+sm --> el : reports
+
+@enduml

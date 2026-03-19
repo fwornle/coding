@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Logging and Monitoring" {
+  component "LoggingAndMonitoring" as lam <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  database "GraphDatabase" as gd
+}
+
+package "System Management" {
+  component "CodeGraphConstructor" as cgc <<core>>
+}
+
+lam --> gda : uses
+gda --> gd : stores
+cgc --> lam : uses
+lam --> cgc : provides logging
+
+@enduml

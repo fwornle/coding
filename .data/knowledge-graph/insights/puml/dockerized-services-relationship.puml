@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerizedServices
+
+[Coding] as coding #FFFFDD
+[DockerizedServices] as dockerized_services #LightBlue
+[LiveLoggingSystem] as live_logging_system #F0F0F0
+[LLMAbstraction] as llmabstraction #F0F0F0
+[Trajectory] as trajectory #F0F0F0
+[KnowledgeManagement] as knowledge_management #F0F0F0
+[CodingPatterns] as coding_patterns #F0F0F0
+[ConstraintSystem] as constraint_system #F0F0F0
+[SemanticAnalysis] as semantic_analysis #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #E8F5E8
+[ServiceStarter] as service_starter #E8F5E8
+
+coding --> dockerized_services
+live_logging_system -[hidden]- dockerized_services
+llmabstraction -[hidden]- dockerized_services
+trajectory -[hidden]- dockerized_services
+knowledge_management -[hidden]- dockerized_services
+coding_patterns -[hidden]- dockerized_services
+constraint_system -[hidden]- dockerized_services
+semantic_analysis -[hidden]- dockerized_services
+dockerized_services --> graph_database_manager
+dockerized_services --> service_starter
+
+@enduml

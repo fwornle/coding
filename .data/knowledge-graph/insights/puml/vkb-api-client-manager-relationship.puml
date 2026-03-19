@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: VkbApiClientManager
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[VkbApiClientManager] as vkb_api_client_manager #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[WaveAgentController] as wave_agent_controller #F0F0F0
+[UkbTraceReportGenerator] as ukb_trace_report_generator #F0F0F0
+[LlmServiceManager] as llm_service_manager #F0F0F0
+
+knowledge_management --> vkb_api_client_manager
+manual_learning -[hidden]- vkb_api_client_manager
+online_learning -[hidden]- vkb_api_client_manager
+graph_database_manager -[hidden]- vkb_api_client_manager
+wave_agent_controller -[hidden]- vkb_api_client_manager
+ukb_trace_report_generator -[hidden]- vkb_api_client_manager
+llm_service_manager -[hidden]- vkb_api_client_manager
+
+@enduml

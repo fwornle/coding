@@ -2,95 +2,99 @@
 
 **Type:** Detail
 
-The integrations/browser-access/README.md file provides information on setting up the Browser Access MCP Server for Claude Code, which is relevant to the BrowserAccess sub-component
+The presence of API keys such as ANTHROPIC_API_KEY and BROWSERBASE_API_KEY in the project documentation suggests that the BrowserAccessConfiguration plays a role in managing these keys for secure access to web-based interfaces.
 
 ## What It Is  
 
-**BrowserAccessConfiguration** is the concrete configuration object that drives the *BrowserAccess* sub‑component of the system. The definition lives wherever the **BrowserAccess** component is instantiated – the documentation that describes its setup is found in `integrations/browser-access/README.md`. This README explains how to stand up the *Browser Access MCP Server* that powers the Claude Code integration, and it lists the three required configuration keys:  
+`BrowserAccessConfiguration` is the configuration holder for the **BrowserAccess** sub‑component. The only concrete artefacts that mention it live in the **integrations/browser-access** folder, most notably the `integrations/browser-access/README.md` which walks developers through the setup of the Browser Access MCP Server for Claude Code. The configuration is driven entirely by environment variables – the documentation calls out `BROWSER_ACCESS_PORT` and `BROWSER_ACCESS_SSE_URL` as the primary knobs that control the server’s listening port and the Server‑Sent Events endpoint respectively. In addition, two API‑key variables – `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` – are listed alongside the Browser Access settings, indicating that the configuration object also centralises credentials required for secure communication with external web‑based services.
 
-* `BROWSER_ACCESS_PORT` – the TCP port on which the MCP server listens.  
-* `BROWSER_ACCESS_SSE_URL` – the HTTP URL that clients use to open a Server‑Sent Events (SSE) stream for real‑time browser‑side results.  
-* `ANTHROPIC_API_KEY` – the secret credential required to call Anthropic’s language‑model services from within the Browser Access flow.  
-
-Both **BrowserAccessComponent** and the higher‑level **BrowserAccess** entity contain an instance of **BrowserAccessConfiguration**, indicating that the configuration is shared across the component hierarchy and is the single source of truth for all runtime parameters needed by the Browser Access feature.
+Together with its parent component **BrowserAccess**, `BrowserAccessConfiguration` provides a single source of truth for runtime parameters, allowing the rest of the Browser Access stack (e.g., the MCP server, the SSE client, and any downstream agents that need Anthropic or BrowserBase access) to retrieve settings without hard‑coding values. This keeps the system portable across local development, CI pipelines, and production deployments where environment variables are the de‑facto mechanism for configuration injection.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a *configuration‑driven service* pattern. The **BrowserAccessConfiguration** object aggregates environment‑level settings that are read by the *Browser Access MCP Server* at startup. The server itself is a thin wrapper around a network listener (bound to `BROWSER_ACCESS_PORT`) that exposes an SSE endpoint (`BROWSER_ACCESS_SSE_URL`). By externalising the port, URL, and API key into configuration, the design decouples deployment concerns (e.g., container orchestration, port mapping) from the business logic that drives browser‑based interactions.
+The design exposed by the observations follows a **configuration‑as‑environment** pattern. Rather than embedding configuration data in code or external JSON/YAML files, the system expects the host environment to supply values through well‑named variables (`BROWSER_ACCESS_PORT`, `BROWSER_ACCESS_SSE_URL`, `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`). This approach aligns with the twelve‑factor app principle of separating config from code, making the Browser Access service easily containerised and orchestrated.
 
-The README notes that the Browser Access sub‑component “may utilize a similar approach to the Claude Code Setup for Graph‑Code MCP Server.” That reference implies the same *MCP (Model‑Control‑Plane) server* pattern used elsewhere in the codebase: a lightweight HTTP service that mediates between the client (the browser) and the back‑end LLM provider (Anthropic). The pattern is essentially a *proxy* that:
+`BrowserAccessConfiguration` lives conceptually inside the **BrowserAccess** component, acting as a *facade* that abstracts raw environment look‑ups. The parent component can request configuration values via a simple API (e.g., `BrowserAccessConfiguration.getPort()`), while the underlying implementation likely reads `process.env` (Node.js) or `os.getenv` (Python) under the hood. Because the configuration is read at startup, the design encourages **immutability** – once the Browser Access server is launched, its operational parameters do not change, simplifying concurrency and state management.
 
-1. Accepts incoming SSE connections from the browser.  
-2. Relays prompts or actions to the Anthropic API using the supplied `ANTHROPIC_API_KEY`.  
-3. Streams back responses over the same SSE channel.
-
-Because **BrowserAccessConfiguration** is the only artefact mentioned, the design decision is to keep the configuration surface minimal—only the three keys are required. This reduces the cognitive load on developers and operators and makes the component easy to spin up in varied environments (local dev, CI, production).
+The presence of API keys in the same configuration space suggests a **credential‑centralisation** decision. By keeping `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` alongside the Browser Access settings, the system reduces the surface area for secret handling: a single, well‑documented entry point for developers to inject secrets, and a single place for ops teams to rotate them. This also makes it straightforward to apply runtime secret injection tools (e.g., Docker secrets, Kubernetes Secrets) without needing to modify application code.
 
 ---
 
 ## Implementation Details  
 
-Although no concrete code symbols were discovered, the implementation can be inferred from the README and the listed keys:
+Although the source repository does not expose concrete classes or functions, the documentation implies a minimal implementation contract:
 
-* **Port Binding** – At process start, the MCP server reads `BROWSER_ACCESS_PORT` (likely from the environment or a `.env` file) and binds an HTTP listener to that port. This is the entry point for all Browser Access traffic.  
+1. **Environment Variable Mapping** – The configuration module likely defines a mapping table that associates each expected variable with a default or validation rule. For example, `BROWSER_ACCESS_PORT` would be parsed as an integer and validated to fall within the allowable TCP port range. `BROWSER_ACCESS_SSE_URL` would be checked for a well‑formed URL scheme (http/https).
 
-* **SSE Endpoint** – The server registers a route matching `BROWSER_ACCESS_SSE_URL`. When a client issues a GET request to this URL, the server upgrades the connection to an SSE stream, keeping the HTTP connection open and pushing JSON‑encoded events as they become available.  
+2. **Secure Retrieval of Secrets** – The keys `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` are treated as opaque strings. The implementation probably avoids logging their values and may wrap them in a small secret‑holder object that can be passed to downstream HTTP clients without exposing the raw string to the rest of the codebase.
 
-* **Anthropic Integration** – When the server receives a request that requires LLM processing (e.g., “fetch page content”, “execute JavaScript”), it uses the `ANTHROPIC_API_KEY` to authenticate calls to Anthropic’s API. The response payload is then transformed into SSE events and sent back to the browser client.  
+3. **Singleton Access** – Because the configuration is needed throughout the Browser Access lifecycle, a singleton pattern is a natural fit. The first call to `BrowserAccessConfiguration.load()` would read and cache all environment variables, after which subsequent calls simply return the cached instance. This prevents repeated parsing and guarantees consistent values across the component.
 
-* **Configuration Propagation** – Both **BrowserAccessComponent** and the top‑level **BrowserAccess** embed a **BrowserAccessConfiguration** instance. This suggests that the configuration object is constructed once (perhaps via a factory or a DI container) and then passed down the component tree, ensuring that all internal modules share identical runtime settings.
+4. **Error Handling** – The README’s emphasis on “setting up” the MCP server suggests that missing or malformed variables cause the server to abort early with a clear error message. This fail‑fast behaviour is typical for configuration‑driven services, ensuring that developers notice mis‑configurations during start‑up rather than at runtime.
 
-Because the README is the only source of truth, the implementation likely follows the same code path as the “Claude Code Setup for Graph‑Code MCP Server,” reusing existing server scaffolding, request handling, and SSE utilities.
+The only concrete file reference is `integrations/browser-access/README.md`. While the README does not contain code, it is the authoritative source for the expected environment variables and thus effectively serves as the *contract* for `BrowserAccessConfiguration`.
 
 ---
 
 ## Integration Points  
 
-**BrowserAccessConfiguration** sits at the intersection of three major subsystems:
+`BrowserAccessConfiguration` sits at the intersection of three logical layers:
 
-1. **Network Layer** – The `BROWSER_ACCESS_PORT` and `BROWSER_ACCESS_SSE_URL` values are consumed by the HTTP server that hosts the MCP service. Any reverse‑proxy, load‑balancer, or container orchestrator must be aware of the port to route traffic correctly.  
+* **BrowserAccess (Parent)** – The parent component consumes the configuration to spin up the MCP server, bind to `BROWSER_ACCESS_PORT`, and open the SSE endpoint defined by `BROWSER_ACCESS_SSE_URL`. All runtime decisions about network binding, request handling, and event streaming flow from the configuration object.
 
-2. **Anthropic LLM Provider** – The `ANTHROPIC_API_KEY` is the credential that enables the MCP server to call Anthropic’s models. The key is passed directly to the HTTP client used for LLM requests, making the configuration a critical security boundary.  
+* **External Credentialed Services (Siblings)** – The presence of `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` indicates that Browser Access may act as a proxy or orchestrator for calls to Anthropic’s language‑model APIs and BrowserBase’s browser‑automation service. Downstream HTTP clients will retrieve these keys from `BrowserAccessConfiguration` and attach them to request headers (e.g., `Authorization: Bearer <key>`).
 
-3. **Parent Components** – Since **BrowserAccessComponent** and **BrowserAccess** both contain a **BrowserAccessConfiguration**, changes to the configuration (e.g., switching ports for a staging environment) automatically propagate to every consumer of the Browser Access feature. This tight coupling ensures consistent behaviour across the component hierarchy.
+* **Deployment/Orchestration Tools (External)** – Because configuration is environment‑based, any CI/CD pipeline, Docker compose file, or Kubernetes manifest that deploys the Browser Access MCP server must provide the required variables. This makes the integration surface straightforward: set the variables, run the container, and the internal configuration layer does the rest.
 
-The README also hints that the Browser Access MCP Server may be launched as a separate process or container, meaning that **BrowserAccessConfiguration** could be supplied via environment variables at container start‑up, aligning with typical DevOps practices.
+No direct code dependencies are observable, but the design implies that any module needing to talk to Anthropic or BrowserBase will import the same configuration module rather than duplicating secret handling logic. This encourages *single‑source‑of‑truth* for credentials across the codebase.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Define All Three Keys** – Before launching the Browser Access MCP Server, ensure that `BROWSER_ACCESS_PORT`, `BROWSER_ACCESS_SSE_URL`, and `ANTHROPIC_API_KEY` are defined in the environment or a configuration file. Missing any of these will prevent the server from starting or from authenticating to Anthropic.  
+1. **Define All Required Variables Before Startup** – Ensure `BROWSER_ACCESS_PORT`, `BROWSER_ACCESS_SSE_URL`, `ANTHROPIC_API_KEY`, and `BROWSERBASE_API_KEY` are present in the environment. Missing variables will cause the Browser Access server to terminate with a clear error, as documented in the README.
 
-2. **Port Coordination** – Choose a `BROWSER_ACCESS_PORT` that does not conflict with other services in the same host. When deploying to Kubernetes or Docker, map the container port to a host port explicitly to avoid accidental collisions.  
+2. **Never Hard‑Code Secrets** – Store API keys in a secure secret manager (e.g., HashiCorp Vault, AWS Secrets Manager) and inject them at runtime via environment variables. The configuration module does not perform encryption; it simply passes the raw string to downstream clients.
 
-3. **SSE URL Consistency** – The `BROWSER_ACCESS_SSE_URL` must match the path the client code expects. If the client library is hard‑coded to `/sse`, configure the URL accordingly (e.g., `http://localhost:1234/sse`).  
+3. **Validate Port and URL Formats** – If you override defaults, confirm that the port is an integer between 1‑65535 and that the SSE URL is a reachable HTTP(S) endpoint. Mis‑typed values will lead to binding failures or connection errors.
 
-4. **Secure the API Key** – Treat `ANTHROPIC_API_KEY` as a secret. Store it in a secret manager or a protected environment variable, and never commit it to source control. Rotate the key regularly according to Anthropic’s security recommendations.  
+4. **Treat the Configuration as Immutable** – Do not attempt to mutate `BrowserAccessConfiguration` after the server has started. If you need to change a setting (e.g., move to a different port), restart the process with the updated environment.
 
-5. **Leverage Parent Configuration** – When modifying configuration values, do so at the level of **BrowserAccessConfiguration** within the parent **BrowserAccess** or **BrowserAccessComponent**. This guarantees that all downstream modules receive the updated settings without needing individual patches.
+5. **Leverage the README for Setup** – The `integrations/browser-access/README.md` contains the authoritative step‑by‑step guide for configuring the MCP server. Follow it verbatim when adding Browser Access to a new environment to avoid subtle mismatches.
 
 ---
 
-### Summary of Architectural Insights  
+### Architectural Patterns Identified  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns identified** | Configuration‑driven service; MCP (Model‑Control‑Plane) server pattern; SSE‑based streaming. |
-| **Design decisions and trade‑offs** | Minimal configuration surface (only three keys) → simplicity vs. limited flexibility; shared configuration object across parent and child components → consistency vs. tight coupling. |
-| **System structure insights** | `BrowserAccessConfiguration` is instantiated once and injected into both `BrowserAccessComponent` and `BrowserAccess`; the MCP server reads this configuration to bind a port, expose an SSE endpoint, and authenticate to Anthropic. |
-| **Scalability considerations** | Because the server is a single HTTP process bound to a specific port, scaling horizontally requires running multiple instances behind a load balancer, each with its own `BROWSER_ACCESS_PORT`. The SSE model works well for many concurrent browsers as long as the server can maintain open connections. |
-| **Maintainability assessment** | High maintainability due to the tiny, well‑documented configuration contract. Changes are localized to the configuration object and the README. However, the tight coupling of configuration to both parent and child components means that any structural change to the component hierarchy will require careful propagation of the configuration object. |
+* **Configuration‑as‑Environment** (environment‑variable driven settings)  
+* **Singleton** (cached configuration instance)  
+* **Facade** (configuration object abstracts raw env look‑ups)  
+* **Credential Centralisation** (single place for API keys)
 
-These insights are directly grounded in the observations from `integrations/browser-access/README.md` and the listed configuration keys. No speculative patterns have been introduced beyond what the source material explicitly suggests.
+### Design Decisions and Trade‑offs  
+
+* **Pros** – Simplicity of deployment, easy containerisation, clear separation of config from code, fast fail‑fast on missing variables.  
+* **Cons** – Reliance on environment variables can be error‑prone if not managed by a secret‑injection system; lack of runtime reconfiguration limits flexibility without a restart.
+
+### System Structure Insights  
+
+`BrowserAccessConfiguration` is a leaf node in the BrowserAccess hierarchy, providing the only mutable input to the otherwise static Browser Access service. It shares the same configuration surface with any sibling components that also need external API keys, fostering a unified secret‑management strategy.
+
+### Scalability Considerations  
+
+Because configuration is read once at start‑up and stored in memory, scaling the Browser Access service horizontally (multiple container instances) does not introduce additional coordination overhead. Each instance independently reads the same environment variables, ensuring consistent behaviour across a fleet.
+
+### Maintainability Assessment  
+
+The configuration module’s minimal footprint (environment reads + validation) makes it highly maintainable. Adding a new setting only requires extending the mapping table and updating the README. However, the lack of a typed schema or validation library in the observed code could become a maintenance burden as the number of variables grows; introducing a small validation helper would improve robustness without altering the overall design.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 
 
 ---

@@ -1,0 +1,31 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Graph Construction" {
+  component "CodeGraphConstructor" as cgc <<core>>
+  component "GraphDatabase" as gdb <<storage>>
+  component "CodeParser" as cp <<api>>
+}
+
+component "CodeGraphConstructor" as cgc <<core>>
+component "GraphDatabase" as gdb <<storage>>
+component "CodeParser" as cp <<api>>
+
+cgc --> gdb : constructs
+cp --> cgc : provides code
+cgc --> cp : uses
+
+package "Data Management" {
+  component "DataAccessor" as da <<api>>
+  component "DataManager" as dm <<core>>
+}
+
+component "DataAccessor" as da <<api>>
+component "DataManager" as dm <<core>>
+
+dm --> da : uses
+da --> dm : provides data
+
+cgc --> dm : manages
+
+@enduml

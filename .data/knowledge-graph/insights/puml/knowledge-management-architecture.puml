@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+  component "KnowledgeManagement" as km <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "LLMService" as lls <<api>>
+  component "VkbApiClient" as vka <<external>>
+  component "Wave Agent" as wa <<agent>>
+}
+
+km --> gda : persists data
+km --> lls : uses
+lls --> wa : initializes
+wa --> km : executes
+km --> vka : interacts
+gda --> km : provides data
+
+package "Persistence" {
+  database "GraphDatabase" as gd
+  gda --> gd : stores
+}
+
+package "Integrations" {
+  component "UKB Trace Report" as utr <<cli>>
+  km --> utr : generates
+  utr --> km : reports
+}
+
+@enduml

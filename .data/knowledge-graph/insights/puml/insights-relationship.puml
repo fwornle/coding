@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: Insights
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[Insights] as insights #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraph] as code_graph #F0F0F0
+
+semantic_analysis --> insights
+pipeline -[hidden]- insights
+ontology -[hidden]- insights
+entity_validator -[hidden]- insights
+code_graph -[hidden]- insights
+
+@enduml

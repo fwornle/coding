@@ -1,0 +1,20 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Constraint System" {
+  component "ConstraintMonitor" as cm <<agent>>
+  component "ContentValidationAgent" as cva <<agent>>
+}
+
+package "System Components" {
+  component "Code Actions" as ca <<core>>
+  component "File Operations" as fo <<core>>
+}
+
+cm --> cva : collaborates
+cm --> ca : validates
+cm --> fo : validates
+cva --> ca : processes
+cva --> fo : processes
+
+@enduml

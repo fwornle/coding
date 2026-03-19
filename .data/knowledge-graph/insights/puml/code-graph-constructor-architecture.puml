@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Graph Construction" {
+  component "CodeGraphConstructor" as cgc <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "EntityPersistenceModule" as epm <<core>>
+  component "OntologyManagementSystem" as oms <<api>>
+  database "GraphDatabase" as gd
+
+  cgc --> gda : uses
+  cgc --> epm : uses
+  cgc --> oms : uses
+  gda --> gd : stores
+}
+
+package "Code Analysis" {
+  component "CodeGraphAgent" as cga <<agent>>
+  component "MCP Constraint Monitor" as mcp <<external>>
+  cga --> cgc : works with
+  mcp --> cgc : configures
+}
+
+cgc --> mcp : uses
+cgc --> oms : uses
+
+@enduml

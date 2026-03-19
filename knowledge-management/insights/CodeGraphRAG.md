@@ -1,132 +1,101 @@
-# CodeGraphRAG
+# CodeGraphRag
 
 **Type:** SubComponent
 
-CodeGraphRAG could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
+CodeGraphRag ensures that the system can handle complex codebases, providing a robust foundation for the project's functionality.
 
 ## What It Is  
 
-**CodeGraphRAG** is a sub‑component of the **KnowledgeManagement** layer that provides graph‑based Retrieval‑Augmented Generation (RAG) for source‑code artefacts. The core of its implementation lives in the *integrations/code‑graph‑rag* folder – the README and the Claude‑code setup documentation (`integrations/code-graph-rag/README.md` and `integrations/code-graph-rag/docs/claude-code-setup.md`) describe how the Graph‑Code MCP (Model‑Control‑Plane) server is configured and wired into the system.  
+CodeGraphRag is the **code‑analysis sub‑component** of the larger **CodingPatterns** module. It lives inside the `integrations/code-graph-rag/` folder (see the README referenced by the child component `CodeGraphRagConfiguration`). Its sole responsibility is to ingest source code, construct a graph representation of that code, and expose that representation for downstream retrieval and reasoning. The observations repeatedly stress that the component “provides a robust foundation for the project’s functionality” and that its **graph‑based approach** “simplifies the analysis process” while enabling the system to “handle complex codebases with ease.”  
 
-The component is not a monolithic service; it is built around the **GraphCodeSetup** child component, which encapsulates the concrete MCP server configuration. CodeGraphRAG leverages the **entity‑typing system** (potentially multiple ontologies) to tag code entities, and it cooperates with sibling services such as **EntityPersistence** (graph‑DB storage) and **ManualLearning** (hand‑crafted entity ingestion). In addition, it can tap into the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/README.md` and its semantic‑constraint documentation) to enforce domain‑specific rules on the generated graph.
+The component is tightly coupled with its **parent**, *CodingPatterns*, which already relies on the `storage/graph-database-adapter.ts` class for persisting graph data. CodeGraphRag therefore focuses on the *analysis* side of the pipeline, delegating storage concerns to the shared `GraphDatabaseAdapter`. Its **child**, `CodeGraphRagConfiguration`, supplies runtime configuration such as `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT`, ensuring that the service can be started and communicated with consistently across environments.  
+
+Together with its **siblings**—`GraphManagement`, `LLMInitialization`, `ConstraintValidation`, `CodeGraphConstruction`, `ContentValidation`, and `BrowserAccess`—CodeGraphRag forms a cohesive suite of graph‑centric services. While `GraphManagement` and `CodeGraphConstruction` also manipulate graph structures, CodeGraphRag’s niche is the *semantic* analysis of code, turning raw ASTs or source files into a navigable graph that other components can query.  
+
+![CodeGraphRag — Architecture](../../.data/knowledge-graph/insights/images/code-graph-rag-architecture.png)  
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **modular, integration‑driven** style. Each major concern—graph construction, persistence, constraint monitoring, and learning—resides in its own sibling component, and CodeGraphRAG orchestrates them through well‑defined interfaces.  
+The architecture of CodeGraphRag is **graph‑centric**. The component adopts a **graph‑based analysis pattern**, where source code is modeled as nodes (e.g., classes, functions, variables) and edges (e.g., calls, imports, inheritance). This pattern is explicitly called out in observations 1, 5, and the sibling description for `CodeGraphConstruction`. By representing code as a graph, the system can perform complex traversals and queries that would be cumbersome with linear text processing.  
 
-1. **Lazy LLM Initialization (Parent Influence)** – The parent **KnowledgeManagement** component defers LLM creation until required (`ensureLLMInitialized()`). CodeGraphRAG inherits this pattern: the RAG pipeline only spins up the language model when a retrieval request arrives, keeping memory footprints low.  
+Interaction with other parts of the system follows a **layered delegation model**. The parent component, *CodingPatterns*, supplies persistence via `GraphDatabaseAdapter` (found in `storage/graph-database-adapter.ts`). CodeGraphRag does not implement its own storage logic; instead, it hands off the constructed graph to this adapter, leveraging the existing data‑management pipeline. This separation of concerns mirrors the design of the sibling `GraphManagement` component, which also relies on the same adapter for storage and retrieval.  
 
-2. **Work‑Stealing Concurrency** – The `wave-controller.ts` file (used by KnowledgeManagement) introduces a **shared atomic index counter** for work‑stealing. CodeGraphRAG reuses this concurrency primitive in its graph‑building stage, allowing multiple worker threads to pull tasks (e.g., parsing files, extracting symbols) from a common queue without contention.  
+Configuration is externalized through `CodeGraphRagConfiguration`. By defining ports (`CODE_GRAPH_RAG_SSE_PORT`, `CODE_GRAPH_RAG_PORT`) in a dedicated configuration file, the design enables **environment‑agnostic deployment** and easy integration with orchestration tools. This mirrors the pattern used across siblings, where each sub‑component exposes its own configuration surface while sharing common infrastructure (e.g., the graph database).  
 
-3. **Entity‑Typing & Multi‑Ontology** – Observations note that CodeGraphRAG “may leverage the entity typing system, possibly using multiple ontology systems.” This suggests a **strategy pattern** where different ontology providers (e.g., Claude‑code hook format, UKB trace taxonomy) can be swapped at runtime, each supplying type definitions for code entities.  
+The relationship diagram below clarifies these connections, showing CodeGraphRag’s position relative to its parent, siblings, and child.  
 
-4. **MCP Constraint Monitoring** – The component plugs into the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`). This integration follows a **publish‑subscribe** model: after the graph is assembled, constraint detectors publish violations, and the monitor subscribes to enforce them.  
-
-5. **Graph Persistence via EntityPersistence** – CodeGraphRAG hands off the constructed graph to **EntityPersistence**, which likely uses a graph database (as hinted in its documentation). The hand‑off follows a **repository pattern**, abstracting storage details from the RAG logic.  
-
-Overall, the design emphasizes **separation of concerns**, **reusability of concurrency utilities**, and **extensibility through ontology and constraint plugins**.
+![CodeGraphRag — Relationship](../../.data/knowledge-graph/insights/images/code-graph-rag-relationship.png)  
 
 ---
 
 ## Implementation Details  
 
-### Core Files  
-- **`integrations/code-graph-rag/README.md`** – outlines the high‑level workflow: source ingestion → entity typing → graph construction → constraint checking → persistence → RAG query handling.  
-- **`integrations/code-graph-rag/docs/claude-code-setup.md`** – provides the concrete MCP server configuration (host, ports, authentication) that the **GraphCodeSetup** child component materialises.  
+Although the source symbols for CodeGraphRag are not listed, the surrounding context provides concrete implementation anchors. The **graph construction** logic is likely shared with the `CodeGraphConstruction` sibling, which “uses a graph‑based approach to construct code graphs.” This suggests that CodeGraphRag either invokes a shared library or re‑uses the same algorithms to parse source files into a graph model.  
 
-### GraphCodeSetup  
-The child component encapsulates the MCP server bootstrap. It reads the Claude‑code setup YAML, instantiates the server, and exposes an API (`startServer()`, `registerEntityHandler()`) used by CodeGraphRAG to push parsed entities into the graph.  
+Once the graph is built, CodeGraphRag hands the data off to the **`GraphDatabaseAdapter`** class (`storage/graph-database-adapter.ts`). This adapter encapsulates all persistence operations—creating vertices, edges, and running queries—so CodeGraphRag does not need to manage low‑level storage concerns. The adapter also supports “automatic JSON export sync,” meaning that any graph updates performed by CodeGraphRag are reflected in a JSON representation that other services (e.g., LLMInitialization) can consume.  
 
-### Concurrency Engine  
-`wave-controller.ts` (line ≈ 489) defines a **shared atomic index counter** (`AtomicLong workIndex`). CodeGraphRAG creates a pool of workers that each atomically fetch the next work item (`workIndex.getAndIncrement()`) and process a chunk of source files. This work‑stealing approach minimizes idle threads when the number of files is unevenly distributed.  
+Configuration is sourced from **`CodeGraphRagConfiguration`**, which lives under `integrations/code-graph-rag/README.md`. The README defines two ports: `CODE_GRAPH_RAG_SSE_PORT` for Server‑Sent Events streaming (useful for incremental analysis results) and `CODE_GRAPH_RAG_PORT` for the primary HTTP API. The component likely starts an HTTP server listening on these ports, exposing endpoints such as `/analyze` or `/graph`.  
 
-### Entity Typing & Ontology Integration  
-Although concrete class names are not listed, the observation about “multiple ontology systems” implies the existence of an **`OntologyProvider` interface** with implementations such as `ClaudeCodeHookOntology` (referenced by the sibling **OntologyClassification**) and possibly a UKB‑based provider. CodeGraphRAG registers the appropriate provider at start‑up based on configuration.  
-
-### Constraint Monitoring  
-The **MCP Constraint Monitor** supplies a `SemanticConstraintDetector` (documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`). After the graph is populated, CodeGraphRAG invokes `detector.run(graph)`; any violations are emitted as events that the monitor logs or uses to reject malformed entities.  
-
-### Persistence Layer  
-Interaction with **EntityPersistence** follows a repository‑style API (`entityRepo.saveGraph(graph)`). The persistence implementation likely maps graph nodes to vertices in a Neo4j‑like store, preserving relationships such as “calls”, “inherits”, and “defines”.  
-
-### RAG Query Path  
-When a downstream component (e.g., **OnlineLearning** or a user‑facing LLM) needs code context, it calls `CodeGraphRAG.retrieveContext(query)`. The method performs a graph traversal (e.g., shortest‑path or neighborhood expansion) to collect relevant nodes, serialises them into a prompt, and forwards the prompt to the lazily‑initialized LLM via the parent KnowledgeManagement pipeline.
+Error handling and performance considerations are implied by the emphasis on “handling complex codebases.” The graph‑based model scales with the number of symbols rather than the size of raw text, and delegating storage to the `GraphDatabaseAdapter` allows the use of optimized graph databases (e.g., Neo4j) that can index and query large graphs efficiently.  
 
 ---
 
 ## Integration Points  
 
-1. **Parent – KnowledgeManagement**  
-   - Inherits lazy LLM initialization and the work‑stealing concurrency utilities.  
-   - Contributes the `ensureLLMInitialized()` guard that wraps the final RAG call.  
+CodeGraphRag sits at the **intersection of analysis and persistence**. Its primary integration point upward is the **CodingPatterns** parent, which orchestrates the overall workflow. When a developer submits code for analysis, CodingPatterns routes the request to CodeGraphRag, which then builds the graph and pushes it through the `GraphDatabaseAdapter`. Downstream, components such as **GraphManagement** may retrieve, prune, or visualize the stored graph, while **LLMInitialization** can query the graph to provide context‑aware language model responses.  
 
-2. **Sibling – EntityPersistence**  
-   - Receives the final graph for durable storage.  
-   - Exposes a `GraphRepository` interface that CodeGraphRAG calls after constraint validation.  
+The **`GraphDatabaseAdapter`** is the shared contract used by multiple siblings. Because all graph‑related components rely on the same adapter, changes to storage semantics (e.g., switching from an in‑memory store to a distributed graph database) propagate uniformly, preserving compatibility.  
 
-3. **Sibling – ManualLearning**  
-   - Supplies manually curated entities that bypass automatic parsing but still flow through the same typing and constraint pipeline.  
+Configuration exposure via `CodeGraphRagConfiguration` means that any service needing to communicate with the analysis API can read the defined ports from a common source, avoiding hard‑coded values. This is especially important for the **BrowserAccess** sibling, which may open a web UI that streams analysis results over the SSE port.  
 
-4. **Sibling – OntologyClassification**  
-   - Provides the ontology definitions used by CodeGraphRAG’s entity‑typing stage. The Claude‑code hook format (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) is a concrete example.  
-
-5. **Sibling – MCP Constraint Monitor**  
-   - Offers semantic constraint detection; CodeGraphRAG registers its graph with the monitor to trigger validation.  
-
-6. **Child – GraphCodeSetup**  
-   - Handles low‑level MCP server bootstrapping and exposes the API for entity ingestion.  
-
-All these interactions are mediated through clearly named interfaces (e.g., `EntityRepository`, `OntologyProvider`, `ConstraintDetector`), keeping coupling low and enabling independent evolution of each sibling.
+Finally, the component’s **SSE endpoint** (`CODE_GRAPH_RAG_SSE_PORT`) provides a real‑time feed of analysis progress, enabling UI components or external monitoring tools to react instantly to large code‑base scans without polling.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize via KnowledgeManagement** – Do not instantiate CodeGraphRAG directly; obtain it from the KnowledgeManagement container so that the lazy LLM guard and shared concurrency controller are correctly wired.  
+1. **Invoke Through the Parent** – All analysis requests should be routed via the `CodingPatterns` component rather than calling CodeGraphRag directly. This ensures that any pre‑processing (e.g., authentication, request throttling) performed by the parent is respected.  
 
-2. **Select an Ontology Early** – Choose the appropriate ontology provider (Claude‑code hook, UKB, etc.) at start‑up via configuration. Changing it at runtime requires a full graph rebuild because entity types are baked into node metadata.  
+2. **Respect Configuration** – Use the ports defined in `CodeGraphRagConfiguration` (`CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT`). Do not hard‑code alternative values; instead, read them from the configuration file or environment variables that the README documents.  
 
-3. **Respect the Work‑Stealing Model** – When adding custom parsers or file walkers, use the shared atomic index counter (`AtomicLong workIndex`) rather than spawning independent thread pools. This preserves the system‑wide load‑balancing guarantees.  
+3. **Leverage SSE for Large Analyses** – For codebases that exceed a few thousand lines, subscribe to the SSE stream to receive incremental analysis updates. This reduces memory pressure on the client and improves perceived responsiveness.  
 
-4. **Validate Before Persistence** – Always invoke the MCP Constraint Monitor (`detector.run(graph)`) and handle any reported violations before calling `entityRepo.saveGraph(graph)`. Persisting a graph with constraint violations can corrupt downstream RAG queries.  
+4. **Do Not Bypass the GraphDatabaseAdapter** – All persistence interactions must go through the `GraphDatabaseAdapter`. Directly writing to the underlying store risks breaking the consistency guarantees that siblings rely on.  
 
-5. **Leverage ManualLearning for Edge Cases** – For code artefacts that cannot be auto‑parsed (generated code, proprietary DSLs), feed them through ManualLearning. The manual path still benefits from the same typing and constraint pipeline, ensuring consistency.  
-
-6. **Monitor Resource Usage** – Because the LLM is lazily loaded, the first retrieval may incur a noticeable latency. Warm‑up the model during system start‑up if low‑latency responses are required.  
+5. **Coordinate with Siblings** – When extending functionality (e.g., adding new validation rules), follow the same pattern used by `ConstraintValidation` and `ContentValidation`: implement a rules‑based module that consumes the graph rather than modifying the core analysis pipeline. This keeps responsibilities clean and preserves maintainability.  
 
 ---
 
-## Summary of Architectural Insights  
+### Summary of Key Insights  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns identified** | Modular integration, lazy initialization (parent), work‑stealing concurrency (`wave-controller.ts`), strategy for ontology providers, publish‑subscribe for constraint monitoring, repository pattern for persistence. |
-| **Design decisions and trade‑offs** | *Lazy LLM* reduces memory but adds first‑call latency; *shared atomic counter* gives high concurrency with low contention but ties all workers to a single index source; *multiple ontologies* increase flexibility at the cost of added configuration complexity; *constraint monitoring* ensures graph quality but introduces an extra validation step before persistence. |
-| **System structure insights** | CodeGraphRAG sits under KnowledgeManagement, shares concurrency utilities, and delegates storage to EntityPersistence. Its child GraphCodeSetup abstracts MCP server details, while siblings supply typing, persistence, manual data, and constraint services. |
-| **Scalability considerations** | Work‑stealing enables scaling across many CPU cores for large codebases. The graph database in EntityPersistence must be sized for the expected node/edge volume; horizontal scaling can be achieved by sharding the graph if the repository supports it. Constraint detection is a linear pass over the graph, so its cost grows with graph size – consider incremental validation for incremental updates. |
-| **Maintainability assessment** | High maintainability due to clear separation of concerns and interface‑driven contracts. The reliance on shared utilities (atomic counter, lazy LLM) centralises complexity, making updates easier. Potential risk: tight coupling to the specific Claude‑code setup format; any change in that format requires coordinated updates in GraphCodeSetup and OntologyClassification. Overall, the design is well‑structured for incremental evolution. |
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Graph‑based analysis pattern; layered delegation to `GraphDatabaseAdapter`; externalized configuration via `CodeGraphRagConfiguration`. |
+| **Design decisions and trade‑offs** | Delegating storage to a shared adapter reduces duplication but couples all graph‑related components to a single persistence contract; using SSE improves real‑time feedback at the cost of additional connection management. |
+| **System structure insights** | CodeGraphRag is the analysis leaf under the `CodingPatterns` parent, sharing storage with `GraphManagement` and graph construction logic with `CodeGraphConstruction`. Its child configuration isolates runtime parameters. |
+| **Scalability considerations** | Graph representation scales with symbol count; reliance on a dedicated graph database (via the adapter) enables efficient indexing and querying of large codebases; SSE streaming prevents client‑side bottlenecks. |
+| **Maintainability assessment** | High maintainability due to clear separation of concerns (analysis vs. storage vs. configuration). Shared adapters and consistent configuration conventions across siblings simplify updates and onboarding. |
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence, allowing for automatic JSON export sync. This design decision enables seamless data synchronization and provides a robust foundation for the project's data management. The GraphDatabaseAdapter class is responsible for handling graph data storage and retrieval, making it a critical component of the project's architecture. By using this adapter, the CodingPatterns component can focus on its primary functionality, leaving data management to the GraphDatabaseAdapter.
 
 ### Children
-- [GraphCodeSetup](./GraphCodeSetup.md) -- The Graph-Code setup is described in the integrations/code-graph-rag/docs/claude-code-setup.md file, which provides details on the configuration of the Graph-Code MCP Server.
+- [CodeGraphRagConfiguration](./CodeGraphRagConfiguration.md) -- The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT are defined as part of the CodeGraphRag configuration, as mentioned in the project documentation (integrations/code-graph-rag/README.md).
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [GraphManagement](./GraphManagement.md) -- GraphDatabaseAdapter handles graph data storage and retrieval, making it a critical component of the project's architecture.
+- [LLMInitialization](./LLMInitialization.md) -- LLMInitialization uses a lazy loading approach to initialize LLM agents, reducing computational overhead.
+- [ConstraintValidation](./ConstraintValidation.md) -- ConstraintValidation uses a rules-based approach to validate constraints, ensuring system integrity.
+- [CodeGraphConstruction](./CodeGraphConstruction.md) -- CodeGraphConstruction uses a graph-based approach to construct code graphs, enabling efficient data management.
+- [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

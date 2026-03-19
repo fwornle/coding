@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Data Storage" {
+  component "GraphDatabase" as graphdb <<storage>>
+  component "LevelDB" as leveldb <<storage>>
+}
+
+package "Adapters and Agents" {
+  component "GraphDatabaseAdapter" as gda <<core>>
+  component "CodeGraphAgent" as cga <<agent>>
+}
+
+package "Learning Components" {
+  component "ManualLearning" as ml <<core>>
+  component "OnlineLearning" as ol <<core>>
+}
+
+package "External Integrations" {
+  component "MCP Constraint Monitor" as mcp <<external>>
+  component "JSON Export" as json <<cli>>
+}
+
+graphdb --> leveldb : uses
+gda --> graphdb : uses
+cga --> gda : uses
+gda --> json : exports
+ml --> gda : uses
+ol --> gda : uses
+gda --> mcp : configures
+
+@enduml

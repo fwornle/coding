@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeGraphManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[KnowledgeGraphManager] as knowledge_graph_manager #LightBlue
+[TranscriptProcessing] as transcript_processing #F0F0F0
+[LoggingMechanism] as logging_mechanism #F0F0F0
+[TranscriptAdapterFactory] as transcript_adapter_factory #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+
+live_logging_system --> knowledge_graph_manager
+transcript_processing -[hidden]- knowledge_graph_manager
+logging_mechanism -[hidden]- knowledge_graph_manager
+transcript_adapter_factory -[hidden]- knowledge_graph_manager
+knowledge_graph_manager --> graph_database_adapter
+
+@enduml

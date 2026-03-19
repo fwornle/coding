@@ -1,0 +1,22 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "DMRProvider" {
+  component "DMRProvider" as dmr <<core>>
+  component "ModelRunner API" as mr <<api>>
+  component "Docker Desktop" as dd <<external>>
+  component "Model Runner Environment" as mre <<core>>
+  database "docker-desktop/model-runner.yml" as config
+}
+
+dmr --> mr : uses
+mr --> dd : uses
+dmr --> mre : initializes
+mre --> config : reads
+
+package "Local LLM Inference" {
+  component "LLM Inference" as lli <<core>>
+  dmr --> lli : enables
+}
+
+@enduml

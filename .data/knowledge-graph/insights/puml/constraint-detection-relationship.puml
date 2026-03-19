@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintDetection
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConstraintDetection] as constraint_detection #LightBlue
+[GraphDatabaseManagement] as graph_database_management #F0F0F0
+[CodeGraphAnalysis] as code_graph_analysis #F0F0F0
+[LoggingAndMonitoring] as logging_and_monitoring #F0F0F0
+[ProviderRegistration] as provider_registration #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[ConstraintConfiguration] as constraint_configuration #E8F5E8
+
+coding_patterns --> constraint_detection
+graph_database_management -[hidden]- constraint_detection
+code_graph_analysis -[hidden]- constraint_detection
+logging_and_monitoring -[hidden]- constraint_detection
+provider_registration -[hidden]- constraint_detection
+code_graph_rag -[hidden]- constraint_detection
+constraint_detection --> constraint_configuration
+
+@enduml

@@ -1,0 +1,14 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Web Interface" {
+  component "BrowserAccess" as ba <<core>>
+}
+
+package "System Components" {
+  component "Web-Based Interfaces" as wbi <<external>>
+}
+
+ba --> wbi : interacts with
+
+@enduml

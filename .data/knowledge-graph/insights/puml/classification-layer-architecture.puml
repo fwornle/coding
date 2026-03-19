@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Logging Mechanism" {
+  component "LoggingMechanism" as lm <<core>>
+}
+
+package "Classification Layer" {
+  component "ClassificationLayer" as cl <<core>>
+  component "Ontologies" as ont <<storage>>
+  cl --> ont : uses
+}
+
+package "Data Analysis" {
+  component "Log Data Analysis" as lda <<api>>
+  cl --> lda : provides
+  lm --> cl : provides
+  lm --> lda : uses
+}
+
+@enduml

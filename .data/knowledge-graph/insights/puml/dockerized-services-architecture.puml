@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Dockerized Services" {
+  component "LLM Service" as llm <<core>>
+  component "Service Starter" as starter <<core>>
+  component "GraphDatabaseAdapter" as graph <<storage>>
+  component "API Service Wrapper" as api <<api>>
+  component "Dashboard Service Wrapper" as dashboard <<api>>
+}
+
+package "Constraint Monitoring" {
+  component "MCP Constraint Monitor" as mcp <<agent>>
+  component "Code Graph RAG" as rag <<agent>>
+  database "Graph Database" as db <<storage>>
+}
+
+llm --> graph : uses
+llm --> api : uses
+starter --> llm : starts
+api --> graph : queries
+dashboard --> api : uses
+mcp --> graph : uses
+mcp --> db : stores
+rag --> graph : uses
+rag --> db : stores
+
+@enduml

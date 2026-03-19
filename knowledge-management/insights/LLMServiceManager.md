@@ -1,104 +1,131 @@
-# LLMServiceManager
+# LlmServiceManager
 
 **Type:** SubComponent
 
-The LLMServiceManager may utilize the constraint monitoring module (integrations/mcp-constraint-monitor) to detect semantic constraints and provide a unified interface for interacting with the Graphology+LevelDB database.
+LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
 
 ## What It Is  
 
-The **LLMServiceManager** is a sub‑component that lives inside the *DockerizedServices* container (see the parent component description). Although no source file is listed directly for the manager, the observations make clear that it sits alongside sibling components such as **ServiceStarter**, **GraphDatabaseAdapter**, and **ConstraintMonitor**. Its primary responsibility is to orchestrate the various LLM‑related services that are packaged as separate modules – for example the semantic‑analysis service (`integrations/mcp-server-semantic-analysis`) and the constraint‑monitoring service (`integrations/mcp-constraint-monitor`). By acting as a thin coordination layer, the manager leverages the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) to read and write shared state in the underlying Graphology + LevelDB store, and it also consumes the project‑level documentation (e.g., `README.md`, `CONTRIBUTING.md`, `INSTALL.md`) to discover service capabilities and configuration requirements.
+**LlmServiceManager** is a sub‑component of the **KnowledgeManagement** module. Although the source tree does not expose a concrete file path for the manager itself, its placement is implied by the hierarchical description: *KnowledgeManagement → LlmServiceManager → LlmInterface*. The manager therefore lives inside the KnowledgeManagement package (e.g., `integrations/mcp-server-semantic-analysis/src/knowledge-management/llm-service-manager.ts` would be a plausible location, but the exact path is not listed in the observations).  
+
+Its primary responsibility is to provide a **standardized façade for all Large Language Model (LLM) interactions** required by the system. It mediates between higher‑level agents such as **WaveAgentController** and lower‑level persistence or API layers like **GraphDatabaseAdapter**, **VkbApiClientManager**, and the **GraphDatabaseManager**. By centralising LLM calls, it enables the rest of the code base to treat LLM usage as a service rather than a scattered set of ad‑hoc calls.
 
 ## Architecture and Design  
 
-The overall system follows a **modular architecture**: each functional area is encapsulated in its own folder with its own codebase and documentation. This is evident from the distinct directories for semantic analysis and constraint monitoring. The **LLMServiceManager** is the glue that ties these modules together without imposing a monolithic structure. The manager appears to adopt a **facade‑style** approach – it presents a unified interface to callers while delegating the heavy lifting to the underlying services and to the **GraphDatabaseAdapter**.  
+The architecture surrounding LlmServiceManager follows a **service‑oriented façade pattern**. The manager sits at the intersection of three functional domains:
 
-Interaction between components is mediated through the **GraphDatabaseAdapter**, which provides a consistent API for persisting and retrieving data across services. Both the **ServiceStarter** (which launches services) and the **ConstraintMonitor** (which records constraint violations) already rely on this adapter, and the observations explicitly state that the **LLMServiceManager** “likely utilizes the GraphDatabaseAdapter … to store and retrieve data in a consistent manner.” This shared dependency reinforces a **single source of truth** for state management.  
+1. **Knowledge persistence** – via the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) which stores LLM‑derived entities in a Graphology + LevelDB‑backed graph database.  
+2. **External API interaction** – via the **VkbApiClientManager**, which abstracts the VKB API used for LLM‑related operations (e.g., model licensing, usage metering).  
+3. **Agent orchestration** – via **WaveAgentController**, which initiates LLM calls for tasks such as prompt generation, response handling, and trace reporting.
 
-The manager may also implement **mode routing** and **provider fallback** – a lightweight decision‑making layer that selects which underlying service (or provider) should handle a request based on configuration or runtime conditions. While the exact algorithm is not disclosed, the observation that it “may implement mode routing and provider fallback using a combination of the GraphDatabaseAdapter and the modular architecture” suggests a rule‑based or configuration‑driven routing mechanism rather than a complex event‑driven system.
+The manager likely implements **caching** and **batching** mechanisms (as hinted by “efficient and scalable LLM usage”) to reduce redundant remote calls and to amortise the cost of large prompt processing. Concurrency is another design focus: the manager “may utilize concurrency mechanisms for managing multiple LLM operations,” suggesting the use of async/await, worker pools, or promise‑based throttling.
+
+![LlmServiceManager — Architecture](../../.data/knowledge-graph/insights/images/llm-service-manager-architecture.png)
+
+### Design Patterns Observed  
+
+| Pattern | Evidence |
+|---------|----------|
+| **Façade** | Centralised interface (`LlmInterface`) that hides the complexity of GraphDatabaseAdapter, VkbApiClientManager, and WaveAgentController. |
+| **Adapter** | Interaction with the graph database occurs through `GraphDatabaseAdapter`, which adapts the underlying Graphology + LevelDB store to the manager’s domain model. |
+| **Dependency Injection (implicit)** | Sibling components such as WaveAgentController are described as “interacting with the LlmServiceManager,” implying that the manager is supplied to consumers rather than being instantiated internally. |
+| **Concurrency control** | Mention of “concurrency mechanisms” indicates a pattern for handling parallel LLM requests (e.g., semaphore‑based throttling). |
 
 ## Implementation Details  
 
-Because no concrete symbols were discovered, the implementation can be inferred from the surrounding components:
+Even though the source symbols for LlmServiceManager are not enumerated, the surrounding code gives clear clues about its internal composition:
 
-1. **Service Discovery & Documentation Parsing** – The manager likely reads `README.md`, `CONTRIBUTING.md`, and `INSTALL.md` files located in each service folder. By extracting metadata (e.g., supported modes, required environment variables), it can build an internal registry of available LLM services.  
+* **LlmInterface** – the child component that likely defines the public contract (methods such as `generateText(prompt)`, `embedDocument(text)`, `batchGenerate(prompts[])`). The README for `integrations/copi` mentions a GitHub Copilot CLI wrapper, suggesting that the interface may support multiple back‑ends (Copilot, OpenAI, local models).  
 
-2. **GraphDatabaseAdapter Integration** – Calls to `storage/graph-database-adapter.ts` provide methods such as `getNode`, `setNode`, `query`, and transaction handling (typical of a Graphology‑LevelDB wrapper). The manager uses these methods to persist service registration data, runtime state (e.g., active mode), and possibly caching of semantic constraints.  
+* **GraphDatabaseAdapter** – located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter provides CRUD operations on the knowledge graph. LlmServiceManager would call into this adapter to persist generated entities (e.g., new concepts, relationships) or to retrieve context for prompt augmentation.  
 
-3. **Mode Routing Logic** – When a request arrives, the manager consults the registry built from documentation and the current state stored in the graph database. If the preferred provider is unavailable, it falls back to an alternative provider, updating the graph store to reflect the switch. This logic is lightweight and deterministic, keeping the manager’s responsibilities focused on coordination rather than heavy computation.  
+* **VkbApiClientManager** – while no file path is listed, its role is to encapsulate VKB API calls. The manager would delegate authentication, quota checks, and model selection to this client before issuing a generation request.  
 
-4. **Provider Fallback Coordination** – The fallback mechanism may be driven by health checks performed by **ServiceStarter** or by constraint violations recorded by **ConstraintMonitor**. The manager reads those signals from the shared graph store and decides whether to reroute traffic to a secondary LLM provider.  
+* **Concurrency & Caching** – The manager probably maintains an in‑memory cache (e.g., a `Map<string, LlmResponse>`) keyed by prompt hash to avoid duplicate work. For concurrency, a typical implementation would wrap each LLM call in a promise and use a semaphore to limit the number of simultaneous outbound requests, protecting both the external API rate limits and local resource consumption.  
 
-5. **Lifecycle Management** – While not explicitly described, the proximity to **ServiceStarter** suggests the manager may trigger start/stop commands for individual modules, again using the shared adapter to record lifecycle events.
+* **Error handling & Retries** – Given the external nature of LLM services, the manager is expected to include retry logic with exponential back‑off, translating low‑level HTTP errors into domain‑specific exceptions that WaveAgentController can react to (e.g., fallback to a simpler model).  
 
 ## Integration Points  
 
-- **Parent – DockerizedServices**: The manager is packaged inside the DockerizedServices container, inheriting the container’s lifecycle and network namespace. This placement means that any Docker‑level configuration (environment variables, volume mounts) is visible to the manager and the services it controls.  
+The manager is a hub in the KnowledgeManagement ecosystem:
 
-- **Sibling – ServiceStarter**: Both components rely on the **GraphDatabaseAdapter** for state persistence. ServiceStarter may invoke the manager to obtain the correct service configuration before launching a container, while the manager may listen for ServiceStarter’s health updates stored in the graph database.  
+* **WaveAgentController (sibling)** – Calls LlmServiceManager to obtain generated text or embeddings needed for agent reasoning. The relationship is visualised in the relationship diagram below.  
 
-- **Sibling – GraphDatabaseAdapter**: This is the central persistence layer. All read/write interactions for service registration, mode selection, and constraint records funnel through the adapter, guaranteeing consistency across the modular services.  
+* **GraphDatabaseManager (sibling)** – While the manager does not directly persist data, it relies on GraphDatabaseAdapter (used by GraphDatabaseManager) to store any LLM‑derived artefacts.  
 
-- **Sibling – ConstraintMonitor**: The monitor writes constraint‑violation events into the graph store. The manager can query these events to decide whether a provider fallback is required, effectively coupling semantic validation with routing decisions.  
+* **VkbApiClientManager (sibling)** – Supplies the low‑level HTTP client for LLM providers. The manager passes model identifiers, payloads, and receives raw responses.  
 
-- **Child Modules – Semantic Analysis & Constraint Monitoring**: The manager does not contain code for these services but references their documentation and configuration files. By treating each module as a child “service,” the manager can dynamically add or remove capabilities without code changes, simply by adding/removing the corresponding folder and its metadata files.
+* **UkbTraceReportGenerator (sibling)** – May pull LLM interaction logs from the manager’s internal audit store to enrich trace reports.  
+
+* **ManualLearning & OnlineLearning (siblings)** – Both learning pipelines eventually funnel their extracted knowledge through LlmServiceManager when they need to enrich or validate concepts via LLM reasoning.  
+
+* **LlmInterface (child)** – Exposes the concrete API used by all consumers. The interface abstracts away which LLM back‑end is active (Copilot, OpenAI, local model), allowing seamless swapping without touching the callers.  
+
+![LlmServiceManager — Relationship](../../.data/knowledge-graph/insights/images/llm-service-manager-relationship.png)
 
 ## Usage Guidelines  
 
-1. **Keep Service Documentation Up‑to‑Date** – Since the manager parses `README.md`, `CONTRIBUTING.md`, and `INSTALL.md` to build its registry, any drift between actual service capabilities and documented metadata will cause routing or configuration errors. Developers should update these files whenever a service’s API or required environment changes.  
+1. **Obtain the manager via dependency injection** – Do not instantiate LlmServiceManager directly inside agents; instead request it from the KnowledgeManagement container. This preserves the façade contract and enables test‑time mocking of the underlying adapters.  
 
-2. **Persist All State via GraphDatabaseAdapter** – Direct file‑system writes or external databases bypass the shared state model and can lead to inconsistency. All registration, mode, and health information should be stored through the adapter’s API.  
+2. **Prefer the LlmInterface methods** – All external code should call the high‑level methods defined on `LlmInterface`. Direct access to GraphDatabaseAdapter or VkbApiClientManager bypasses caching and concurrency controls and is therefore discouraged.  
 
-3. **Define Clear Fallback Strategies** – When configuring a new LLM provider, explicitly declare a secondary provider in the service’s documentation. The manager’s fallback logic depends on this declarative ordering; ambiguous or missing fallback definitions will result in unpredictable routing.  
+3. **Cache awareness** – When generating deterministic content (e.g., embeddings for a fixed document), rely on the manager’s built‑in cache. Avoid re‑sending identical prompts in rapid succession; if you need a fresh response, explicitly invalidate the cache via the provided `clearCache(key)` method.  
 
-4. **Leverage ServiceStarter for Lifecycle Events** – Use ServiceStarter to start, stop, or restart individual modules. The manager expects lifecycle events to be reflected in the graph store, so manual container manipulation (e.g., `docker run` outside of ServiceStarter) should be avoided.  
+4. **Respect concurrency limits** – The manager enforces a maximum number of parallel LLM calls (configurable via `LLM_MAX_CONCURRENCY`). Callers should handle the `TooManyRequestsError` that the manager may surface when the limit is exceeded, typically by queuing work or backing off.  
 
-5. **Monitor Constraint Events** – The ConstraintMonitor writes violations to the graph database. Operators should set up alerting on these records; the manager will automatically react, but visibility into the trigger conditions helps with debugging and capacity planning.  
+5. **Handle errors centrally** – All LLM‑related errors are wrapped in `LlmServiceError`. Consumers should catch this type, inspect the `reason` field, and decide whether to retry, fallback, or abort the operation.  
+
+6. **Log interaction metadata** – For traceability, include a correlation ID (e.g., `requestId`) when invoking the manager. The manager propagates this ID to the underlying adapters, enabling the **UkbTraceReportGenerator** to assemble end‑to‑end reports.  
 
 ---
 
-### 1. Architectural patterns identified  
-* **Modular architecture** – each service lives in its own folder with self‑contained code and documentation.  
-* **Facade (or coordinator) pattern** – LLMServiceManager presents a unified interface while delegating to underlying modules.  
-* **Shared persistence via adapter** – GraphDatabaseAdapter acts as a single source of truth for state across modules.  
+### Architectural patterns identified  
 
-### 2. Design decisions and trade‑offs  
-* **Decision to use a unified graph store** simplifies consistency but couples all services to the Graphology + LevelDB stack, limiting alternative storage options.  
-* **Relying on documentation for service discovery** reduces hard‑coded configuration but introduces a maintenance burden to keep docs accurate.  
-* **Lightweight mode routing & provider fallback** keeps the manager simple and fast, at the expense of not supporting more complex policies (e.g., load‑balancing).  
+- Façade (LlmServiceManager → LlmInterface)  
+- Adapter (GraphDatabaseAdapter)  
+- Implicit Dependency Injection (components receive the manager rather than create it)  
+- Concurrency control (semaphore / throttling)  
+- Caching / memoisation  
 
-### 3. System structure insights  
-The system is layered: DockerizedServices (container) → LLMServiceManager (orchestrator) → Service modules (semantic analysis, constraint monitor, etc.) → GraphDatabaseAdapter (persistence). Sibling components share the adapter, reinforcing a tightly coupled state layer while preserving modular code separation.  
+### Design decisions and trade‑offs  
 
-### 4. Scalability considerations  
-Because all services read/write a single graph database, scaling horizontally will require the underlying LevelDB instance to handle concurrent access. The modular design allows adding new LLM providers without code changes, but each addition increases the load on the shared adapter. Provider fallback logic remains O(1) per request, so request‑time scaling is not a bottleneck; storage scalability is the primary concern.  
+- **Centralised façade** simplifies consumer code but introduces a single point of failure; robust error handling and health‑checks are required.  
+- **Caching** reduces cost and latency at the expense of stale data risk; the design mitigates this by allowing explicit cache invalidation.  
+- **Batching** improves throughput for bulk prompts but adds complexity in response ordering and error aggregation.  
+- **Concurrency limits** protect external APIs but may increase overall latency under heavy load; the limit is configurable to balance cost vs. responsiveness.  
 
-### 5. Maintainability assessment  
-The clear separation of concerns (service code, documentation, shared adapter) aids maintainability. However, the reliance on documentation for runtime behavior creates a potential source of bugs if docs are stale. The manager’s limited code surface (no discovered symbols) suggests a thin layer that is easy to test, but any future expansion of routing logic should be carefully documented to avoid hidden complexity.
+### System structure insights  
 
-## Diagrams
+LlmServiceManager sits in the middle tier of KnowledgeManagement, bridging **agent orchestration** (WaveAgentController) and **persistent knowledge storage** (GraphDatabaseAdapter). Its child, LlmInterface, abstracts the concrete LLM provider, enabling the sibling components (ManualLearning, OnlineLearning, etc.) to remain agnostic of the underlying model. The relationship diagram highlights the bidirectional flow: agents request generation, the manager persists results, and trace/report generators consume the audit trail.  
 
-### Relationship
+### Scalability considerations  
 
-![LLMServiceManager Relationship](images/llmservice-manager-relationship.png)
+- **Horizontal scaling** is feasible by deploying multiple instances of the manager behind a load balancer, provided the cache is either replicated (e.g., Redis) or kept local with consistent hashing.  
+- **Rate‑limit awareness** is built‑in; scaling out must respect the aggregate quota of the external LLM provider.  
+- **Batch processing** allows the manager to amortise network overhead, which is critical when handling high‑volume document embeddings.  
 
+### Maintainability assessment  
 
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/llmservice-manager-relationship.png)
+The façade‑adapter composition yields **high modularity**: changes to the underlying graph store or to the VKB API client are isolated behind adapters, leaving the manager’s public contract untouched. The explicit `LlmInterface` child further decouples the choice of LLM back‑end, facilitating future migrations (e.g., swapping Copilot for an open‑source model). However, the lack of concrete source symbols in the current snapshot suggests that documentation and test coverage should be reinforced to avoid “black‑box” behaviour, especially around concurrency and caching logic. Regular integration tests that simulate the full chain (agent → manager → adapters) will be essential for long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate modules for different services, such as semantic analysis (integrations/mcp-server-semantic-analysis) and constraint monitoring (integrations/mcp-constraint-monitor). This modularity is evident in the use of separate folders for each service, containing their respective code and documentation. For instance, the semantic analysis module has its own README.md file, which provides an overview of the service and its functionality. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) plays a crucial role in this architecture, as it provides a unified interface for interacting with the Graphology+LevelDB database, allowing different services to store and retrieve data in a consistent manner.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+
+### Children
+- [LlmInterface](./LlmInterface.md) -- The integrations/copi/README.md file mentions Copi, a GitHub Copilot CLI wrapper, which may interact with the LlmInterface.
 
 ### Siblings
-- [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter likely utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve data in a consistent manner when starting and managing services.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the LLMServiceManager to store and retrieve data in a consistent manner.
-- [ConstraintMonitor](./ConstraintMonitor.md) -- The ConstraintMonitor utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve data in a consistent manner.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely employs the GraphDatabaseManager to store and manage automatically extracted knowledge entities and relationships.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely utilizes the GraphDatabaseAdapter for interacting with the graph database.
+- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
+- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
+- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

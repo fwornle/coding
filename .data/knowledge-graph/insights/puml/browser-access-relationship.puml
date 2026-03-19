@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: BrowserAccess
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[BrowserAccess] as browser_access #LightBlue
+[GraphManagement] as graph_management #F0F0F0
+[LLMInitialization] as llminitialization #F0F0F0
+[ConstraintValidation] as constraint_validation #F0F0F0
+[CodeGraphConstruction] as code_graph_construction #F0F0F0
+[ContentValidation] as content_validation #F0F0F0
+[CodeGraphRag] as code_graph_rag #F0F0F0
+[BrowserAccessConfiguration] as browser_access_configuration #E8F5E8
+
+coding_patterns --> browser_access
+graph_management -[hidden]- browser_access
+llminitialization -[hidden]- browser_access
+constraint_validation -[hidden]- browser_access
+code_graph_construction -[hidden]- browser_access
+content_validation -[hidden]- browser_access
+code_graph_rag -[hidden]- browser_access
+browser_access --> browser_access_configuration
+
+@enduml

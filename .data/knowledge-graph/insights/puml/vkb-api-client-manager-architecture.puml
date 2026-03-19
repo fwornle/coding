@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "VKB API Client Management" {
+  component "VkbApiClientManager" as vkb <<core>>
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "LlmServiceManager" as lsm <<api>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+}
+
+vkb --> gdm : stores/retrieves data
+vkb --> lsm : uses for LLM operations
+vkb --> gda : persists data
+gdm --> gda : uses for data storage
+
+package "External Dependencies" {
+  cloud "VKB API" as vkbApi <<external>>
+  vkb --> vkbApi : interacts with
+}
+
+@enduml

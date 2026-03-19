@@ -2,94 +2,142 @@
 
 **Type:** SubComponent
 
-The knowledge report authoring agent in the Insights sub-component is responsible for generating knowledge reports based on the insights generated, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
+The insights are generated based on the output of the pipeline and the ontology, as seen in the integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts file.
 
 ## What It Is  
 
-The **Insights** sub‑component lives inside the **SemanticAnalysis** domain and is implemented primarily in the TypeScript agents under `integrations/mcp-server-semantic-analysis/src/agents/`.  The core of the insight‑generation logic is the **OntologyClassificationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`).  This agent applies a *pattern‑based* approach to turn raw observations into actionable insights.  Supporting the agent is the shared **BaseAgent** class (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`), which supplies a common scaffolding for all agents in the sub‑component, including the pattern‑catalog extraction and knowledge‑report authoring responsibilities.  Data required for classification is fetched through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.js`).  Together, these pieces deliver a standardized, reusable pipeline that extracts patterns, classifies them against the ontology, and produces knowledge reports that surface actionable recommendations to the end‑user.  
+The **Insights** sub‑component lives in the *semantic‑analysis* integration and is implemented primarily in the following files:  
 
-## Architecture and Design  
+* `integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts` – the **InsightGenerator** class that drives insight creation.  
+* `integrations/mcp-server-semantic-analysis/src/insights/templates.ts` – a collection of **template definitions** that drive the wording and structure of each insight.  
+* `integrations/mcp-server-semantic-analysis/src/insights/insights.ts` – the data model that stores the generated insights.  
+* `integrations/mcp-server-semantic-analysis/src/insights/insight-validator.ts` – the **InsightValidator** class that checks the syntactic and semantic correctness of each insight before it is handed to downstream processing.  
 
-Insights is built as an **agent‑oriented** architecture.  Each functional concern—pattern extraction, ontology classification, and report authoring—is encapsulated in its own agent class that extends the **BaseAgent**.  The BaseAgent provides a *standardized structure* (initialisation, execution, error handling) that enforces consistency across the sub‑component and simplifies the addition of new agents.  The **OntologyClassificationAgent** demonstrates the *pattern‑based insight generation* pattern: it pulls a catalog of known patterns from the data store, matches incoming observations against those patterns, and then maps matches to ontology concepts to produce insights.  
+Insights are derived from two sources: the **pipeline output** (the result of the various agents that process git history and LSL sessions) and the **ontology** (the structured knowledge base used throughout the SemanticAnalysis component). Once generated, the insights are consumed by the pipeline logic in `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`.  
 
-Data access is abstracted behind the **GraphDatabaseAdapter**, which offers a **querying mechanism** for retrieving ontology nodes and relationship information required for classification.  By delegating persistence concerns to this adapter, the agents remain focused on business logic and can be tested in isolation.  The **PatternBasedInsightGeneration** child component (implemented inside the OntologyClassificationAgent) concretises the pattern‑matching algorithm, while the **knowledge report authoring** capability lives in the BaseAgent, ensuring that every insight follows a uniform report format.  
-
-The surrounding sibling components illustrate complementary responsibilities: the **Pipeline** orchestrates batch execution of agents (as defined in `batch-analysis.yaml`), the **WorkflowOrchestrator** coordinates the order and conditional flow of agent runs (also referenced in `base-agent.ts`), the **Ontology** component supplies the hierarchical definitions that the classification agent consumes, and the **GraphDatabaseAdapter** provides the low‑level query interface.  This tight coupling through well‑defined interfaces keeps the overall system modular while allowing each sibling to evolve independently.  
-
-## Implementation Details  
-
-*BaseAgent* (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) defines the abstract methods `run()`, `initialize()`, and `handleError()`.  Concrete agents inherit these hooks, guaranteeing that every agent follows the same lifecycle.  The BaseAgent also implements **pattern‑catalog extraction**: it queries the GraphDatabaseAdapter for stored pattern definitions and caches them for quick lookup.  In the same file, the **knowledge report authoring** logic assembles the final insight payload, embedding metadata such as confidence scores, matched pattern identifiers, and suggested actions.  
-
-*OntologyClassificationAgent* (`ontology-classification-agent.ts`) overrides `run()` to perform three steps:  
-1. **Query** the GraphDatabaseAdapter for relevant ontology nodes using a query built from the incoming observation’s attributes.  
-2. **Match** the retrieved data against the cached pattern catalog, applying the *pattern‑based insight generation* algorithm defined in the child **PatternBasedInsightGeneration** code path.  
-3. **Delegate** to the BaseAgent’s report authoring routine to produce a structured insight that can be consumed by downstream UI or alerting services.  
-
-The **GraphDatabaseAdapter** (`storage/graph-database-adapter.js`) encapsulates the underlying graph database driver (e.g., Neo4j).  It exposes methods such as `executeQuery(query, params)` and higher‑level helpers like `fetchOntologyNode(id)` that the agents call.  This adapter isolates the rest of the codebase from database‑specific details, enabling a future swap of the graph store without touching the agent logic.  
-
-Pattern extraction and report generation are tightly coupled to the **PatternBasedInsightGeneration** child component, which lives inside the OntologyClassificationAgent file.  Although the exact matching algorithm is not spelled out in the observations, the presence of a dedicated child component signals a clear separation of concerns: the agent handles orchestration, while the child focuses on the computational heavy‑lifting of pattern detection.  
-
-## Integration Points  
-
-Insights integrates with the broader **SemanticAnalysis** system through several well‑defined interfaces.  The **Pipeline** component triggers batch runs of the agents, feeding them raw observations harvested from upstream data sources.  The **WorkflowOrchestrator** determines the execution order—ensuring, for example, that the pattern‑catalog extraction occurs before classification.  The **Ontology** sibling provides the hierarchical definitions that the OntologyClassificationAgent references when building its query strings.  All data retrieval is performed via the **GraphDatabaseAdapter**, which both the OntologyClassificationAgent and any future agents will call to obtain ontology nodes, relationships, or stored patterns.  
-
-Downstream, the structured insights produced by the BaseAgent’s report authoring step are consumed by UI layers or alerting services that present actionable recommendations to users.  Because the report format is standardized by BaseAgent, downstream consumers can rely on a stable schema regardless of which concrete agent generated the insight.  
-
-## Usage Guidelines  
-
-1. **Extend BaseAgent** – When adding a new insight‑generation capability, create a new class that extends `BaseAgent`.  Implement the `run()` method and reuse the provided `initialize()` and `handleError()` hooks to keep lifecycle management consistent.  
-2. **Leverage GraphDatabaseAdapter** – All data look‑ups must go through `storage/graph-database-adapter.js`.  Do not embed raw query strings in agents; instead, use the adapter’s helper methods to maintain database abstraction.  
-3. **Cache Patterns Early** – Follow the pattern‑catalog extraction approach used in BaseAgent: query the adapter once at initialization and cache the results.  This reduces query latency during the high‑frequency classification phase.  
-4. **Respect the Report Schema** – Populate the fields required by the BaseAgent’s report authoring routine (e.g., `insightId`, `confidence`, `matchedPatternIds`, `actionableRecommendations`).  Deviating from this schema will break downstream consumers.  
-5. **Coordinate via Pipeline and WorkflowOrchestrator** – Register new agents in the batch‑analysis YAML configuration used by the Pipeline.  If the new agent has ordering constraints, declare them in the WorkflowOrchestrator configuration so that the orchestrator can schedule it correctly.  
+![Insights — Architecture](../../.data/knowledge-graph/insights/images/insights-architecture.png)
 
 ---
 
-### 1. Architectural patterns identified  
-* Agent‑oriented architecture (agents extending a common BaseAgent)  
-* Pattern‑based insight generation (explicit pattern catalog extraction and matching)  
-* Adapter pattern for data access (GraphDatabaseAdapter)  
-* Template method pattern within BaseAgent (standardized lifecycle hooks)  
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Standardized BaseAgent** – promotes consistency and reduces duplication but adds an inheritance coupling; all agents must conform to the BaseAgent contract.  
-* **GraphDatabaseAdapter abstraction** – isolates persistence logic, enabling easier database swaps, at the cost of an extra indirection layer.  
-* **Pattern catalog caching** – improves runtime performance for classification but requires cache invalidation logic when patterns change.  
-* **Separate child component for pattern matching** – isolates computational complexity, making the OntologyClassificationAgent easier to read, but introduces an additional module to maintain.  
+The design of **Insights** follows a **template‑driven generation** pattern. The `InsightGenerator` orchestrates the creation of an insight by selecting an appropriate template from `templates.ts`, populating it with data extracted from the pipeline output and ontology, and then emitting a concrete `Insight` object that is persisted in `insights.ts`. This approach keeps the generation logic **declarative** (the template) while allowing the **imperative** data‑binding step to stay isolated in the generator.
 
-### 3. System structure insights  
-* Insights sits under **SemanticAnalysis** and is one of several sibling sub‑components (Pipeline, Ontology, WorkflowOrchestrator, GraphDatabaseAdapter).  
-* The sub‑component is further decomposed into **PatternBasedInsightGeneration**, which lives inside the OntologyClassificationAgent implementation.  
-* Interaction flows: Pipeline → WorkflowOrchestrator → BaseAgent‑derived agents → GraphDatabaseAdapter → Ontology → Insight reports.  
+A clear **separation of concerns** is evident:  
 
-### 4. Scalability considerations  
-* Agent execution can be parallelised by the Pipeline’s batch‑processing mechanism, allowing the system to handle larger volumes of observations.  
-* Caching of pattern catalogs reduces per‑observation query load on the graph database, supporting higher throughput.  
-* The adapter layer can be scaled independently (e.g., connection pooling) to accommodate increased query traffic.  
-* Adding new agents does not require changes to existing ones, preserving horizontal scalability of the insight generation pipeline.  
+* **Generation** – `InsightGenerator` focuses solely on assembling insights.  
+* **Definition** – `templates.ts` holds all reusable textual patterns, making it trivial to add new insight types without touching the generator code.  
+* **Validation** – `InsightValidator` guarantees that every insight conforms to expected shape and content rules before it is handed off.  
 
-### 5. Maintainability assessment  
-* The **BaseAgent** provides a single point of change for lifecycle behavior, simplifying updates across all agents.  
-* Clear separation of concerns (pattern extraction, classification, report authoring) makes the codebase easier to navigate and test.  
-* Reliance on concrete file paths and class names (as documented) ensures that developers can locate implementations quickly.  
-* Potential maintenance burden lies in keeping the pattern cache synchronized with updates to the underlying pattern store; introducing a cache‑refresh mechanism would mitigate stale‑data risks.  
+The component is **extensible** by design. Adding a new insight merely requires adding a new entry in `templates.ts` and, if necessary, extending the validator. No changes to the core generation algorithm are required, which reduces the risk of regression.  
 
-Overall, the **Insights** sub‑component exhibits a disciplined, agent‑centric design that balances reusability, performance, and extensibility while remaining tightly coupled to the surrounding **SemanticAnalysis** ecosystem through well‑defined adapters and orchestrators.
+The **relationship diagram** below illustrates how Insights sits within the broader SemanticAnalysis system, linking to its parent component, sibling services, and downstream consumers.  
+
+![Insights — Relationship](../../.data/knowledge-graph/insights/images/insights-relationship.png)
+
+---
+
+## Implementation Details  
+
+### Core Classes  
+
+* **`InsightGenerator`** (`insight-generator.ts`) – Exposes a public method (e.g., `generateInsights(pipelineResult, ontology)`) that iterates over the pipeline’s findings, matches each finding to a template key, and constructs an `Insight` instance. The generator pulls in the ontology to resolve entity names, classifications, and relationships, ensuring that the generated text reflects the current knowledge graph.  
+
+* **`InsightValidator`** (`insight-validator.ts`) – Implements validation rules such as non‑empty fields, correct placeholder substitution, and ontology consistency checks. It is invoked immediately after generation; any insight that fails validation is either corrected programmatically or discarded, protecting downstream agents from malformed data.  
+
+* **`Insight` Model** (`insights.ts`) – Defines the shape of an insight (e.g., `id`, `title`, `description`, `relatedEntities`, `severity`). This model is shared with the pipeline and any UI components that render insights to users.  
+
+### Template Mechanism  
+
+`templates.ts` exports a map where each key corresponds to a specific insight scenario (e.g., `UNUSED_IMPORT`, `CIRCULAR_DEPENDENCY`). The value is a string with placeholders (e.g., `${entityName}`, `${location}`). The generator performs a simple interpolation, replacing placeholders with concrete values derived from the pipeline result and ontology. Because the templates are plain TypeScript objects, they can be version‑controlled, reviewed, and extended without recompiling complex logic.  
+
+### Extensibility  
+
+To add a new insight type, a developer adds a new entry to the template map and optionally augments `InsightValidator` with rules specific to the new placeholders. The generator automatically picks up the new template because it resolves templates at runtime based on the scenario identifier supplied by the pipeline. This design minimizes code churn and encourages a **plug‑in** style evolution of insight capabilities.  
+
+### Interaction with the Pipeline  
+
+The `SemanticAnalysisAgent` (`semantic-analysis-agent.ts`) invokes `InsightGenerator` after completing its own analysis pass. The generated insights are then attached to the pipeline’s result payload, making them available to subsequent agents (e.g., reporting, alerting). This tight coupling ensures that insights reflect the most recent analysis state while keeping the generation step isolated from the core analysis logic.  
+
+---
+
+## Integration Points  
+
+* **Parent – SemanticAnalysis**: Insights is a child of the SemanticAnalysis component, which coordinates multiple agents (OntologyClassificationAgent, CodeGraphAgent, etc.). The parent supplies the **pipeline output** and the **ontology** objects that the InsightGenerator consumes.  
+
+* **Sibling – Pipeline**: The pipeline orchestrates the flow of data between agents. After the pipeline aggregates results, it calls into `InsightGenerator`. Conversely, the pipeline later consumes the validated insights for reporting or further automated actions.  
+
+* **Sibling – Ontology**: The ontology provides the canonical definitions of entities, relationships, and classifications. Insight templates often reference ontology terms, and the validator cross‑checks that any entity referenced in an insight exists in the ontology.  
+
+* **Sibling – EntityValidator**: While `EntityValidator` (`entity-validator.ts`) validates raw entities emerging from the analysis, `InsightValidator` validates the *derived* textual artifacts. Both validators share a common goal of data integrity but operate on different abstraction layers.  
+
+* **Sibling – CodeGraph**: The CodeGraph generator (`code-graph-generator.ts`) produces a graph representation of the code base that may be referenced by certain insight templates (e.g., “high‑degree node detected”). Although there is no direct import relationship, the two components exchange information via the pipeline payload.  
+
+All integration points are realized through **typed TypeScript interfaces** and **plain‑object contracts**, keeping the coupling loose and the system amenable to future refactoring.  
+
+---
+
+## Usage Guidelines  
+
+1. **Create or Update Templates Carefully** – When adding a new template in `templates.ts`, ensure that every placeholder has a corresponding value supplied by the generator. Missing placeholders will cause the `InsightValidator` to reject the insight.  
+
+2. **Validate Early** – Run `InsightValidator` immediately after generation. Do not assume that the generator produces only valid output; validation shields downstream agents from malformed insights.  
+
+3. **Keep the Ontology Synchronized** – Insight templates frequently embed ontology terms. If the ontology evolves (e.g., renaming an entity type), update the affected templates and validator rules accordingly to avoid stale references.  
+
+4. **Leverage the Pipeline Contract** – The `SemanticAnalysisAgent` expects the generator to return an array of `Insight` objects. Follow the exact return type and naming conventions defined in `insights.ts` to prevent type mismatches.  
+
+5. **Extending Functionality** – To introduce a new insight scenario, add a template entry, optionally extend `InsightValidator` with scenario‑specific checks, and ensure the pipeline supplies a matching scenario identifier. No changes to `InsightGenerator` are required, preserving existing behavior.  
+
+---
+
+### Architectural Patterns Identified  
+
+* Template‑driven generation (declarative content definition)  
+* Separation of concerns (generator, validator, model)  
+* Extensible plug‑in style (adding templates without core code changes)  
+
+### Design Decisions and Trade‑offs  
+
+* **Decision**: Use plain‑object templates for insight wording.  
+  * **Trade‑off**: Simplicity and easy extensibility versus limited expressive power compared to a full templating engine.  
+
+* **Decision**: Perform validation as a separate step (`InsightValidator`).  
+  * **Trade‑off**: Adds an extra processing pass but isolates validation logic, improving maintainability and testability.  
+
+* **Decision**: Keep insight generation tightly coupled to the pipeline output.  
+  * **Trade‑off**: Guarantees up‑to‑date insights but introduces a dependency on the pipeline’s data shape; any change to the pipeline payload requires corresponding updates in the generator.  
+
+### System Structure Insights  
+
+* Insights is a **leaf sub‑component** within the SemanticAnalysis hierarchy, receiving data from its parent agents and feeding results back into the pipeline.  
+* It shares the **typed contract** approach with sibling components (EntityValidator, CodeGraph), promoting consistency across the system.  
+* The component’s internal modules (`insight-generator.ts`, `templates.ts`, `insight-validator.ts`, `insights.ts`) map cleanly to the classic **generate‑validate‑store** workflow.  
+
+### Scalability Considerations  
+
+* **Template‑centric design** scales well as the number of insight types grows; adding new insights does not increase computational complexity of existing ones.  
+* Validation runs in linear time relative to the number of generated insights, which is acceptable for typical batch sizes. If the pipeline begins producing thousands of insights per run, the validator may become a bottleneck and could be parallelized.  
+* Because the generator works on **in‑memory objects**, memory usage scales with the size of the pipeline result; large codebases may require streaming or chunked processing to stay within memory limits.  
+
+### Maintainability Assessment  
+
+* The clear separation between generation, templating, validation, and storage makes the codebase **highly maintainable**; developers can modify one aspect without risking side effects in others.  
+* Extensibility is baked in: new insight types are introduced by editing a single file (`templates.ts`) and optionally the validator, limiting the surface area for bugs.  
+* The reliance on explicit file paths and class names (as observed) provides a **stable API surface** for other components, reducing the risk of breaking changes.  
+* Documentation should be kept up‑to‑date with template definitions, as they are the primary source of truth for the insight wording.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
-
-### Children
-- [PatternBasedInsightGeneration](./PatternBasedInsightGeneration.md) -- The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file contains the implementation of the pattern-based approach for generating insights.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to process git history and LSL sessions. This is evident in the code files, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, and integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, which define the respective agents and their responsibilities. The use of multiple agents allows for a modular and scalable design, enabling the processing of large amounts of data and the integration of new agents as needed.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a batch processing approach, as seen in the batch-analysis.yaml file, to manage the execution of various agents.
-- [Ontology](./Ontology.md) -- The Ontology sub-component uses a hierarchical approach to manage the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is responsible for classifying entities based on the ontology.
+- [EntityValidator](./EntityValidator.md) -- The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/entity-validator.ts.
+- [CodeGraph](./CodeGraph.md) -- The code graph generation is performed by the CodeGraphGenerator class in integrations/code-graph-rag/src/code-graph-generator.ts.
 
 
 ---

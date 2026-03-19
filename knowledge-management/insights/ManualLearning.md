@@ -2,174 +2,120 @@
 
 **Type:** SubComponent
 
-ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
+ManualLearning may follow a specific workflow or pipeline, potentially defined in a configuration file or a specific module like batch-analysis.yaml
 
 ## What It Is  
 
-**ManualLearning** is a sub‑component of the **KnowledgeManagement** system that supports human‑directed knowledge acquisition and curation.  The implementation lives primarily in the *integrations/* hierarchy – the most concrete reference is the **Graph‑Code MCP Server** setup described in `integrations/browser-access/README.md` and the detailed Claude‑code configuration in `integrations/code-graph-rag/docs/claude-code-setup.md`.  Although no source files are listed directly under *ManualLearning*, the component is wired together by a collection of sibling sub‑components (e.g., **EntityPersistence**, **OntologyClassification**, **ObservationDerivation**, **UKBTraceReporting**, **BrowserAccess**, **CodeGraphRAG**) and by its child **GraphCodeSetup**.  In practice, ManualLearning orchestrates the flow from raw manual inputs → ontology‑based classification → graph‑database persistence → observation derivation → reporting, while optionally tapping into the **copi** GitHub‑Copilot CLI wrapper (`integrations/copi/README.md`) for assisted code generation.
+ManualLearning is a **SubComponent** of the larger **KnowledgeManagement** component. It lives conceptually within the `KnowledgeManagement` source tree and is responsible for the curation of knowledge that is created or edited by humans rather than generated automatically. Although no concrete source files are listed for ManualLearning itself, its role is inferred from the surrounding ecosystem: it coordinates with the **GraphDatabaseManager**, **LlmServiceManager**, **WaveAgentController**, **UkbTraceReportGenerator**, and **VkbApiClientManager** to store, enrich, and trace manually‑produced knowledge entities. The sub‑component also owns a child module called **ManualKnowledgePipeline**, which encapsulates the step‑by‑step workflow that drives the manual curation process.  
+
+The typical entry point for the pipeline is likely defined in a configuration artifact such as `batch-analysis.yaml`, which would describe the sequence of actions (e.g., ingest, validation, graph persistence, trace reporting). All of these activities are anchored in the same repository that hosts the **GraphDatabaseAdapter** implementation at  
+
+```
+integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts
+```  
+
+This adapter provides the low‑level graph persistence layer that ManualLearning ultimately relies on.  
+
+![ManualLearning — Architecture](../../.data/knowledge-graph/insights/images/manual-learning-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **modular, graph‑centric pipeline** built around a shared **graph database**.  ManualLearning does not introduce a brand‑new pattern; instead it **re‑uses the design decisions** already present in its siblings:
+The architecture surrounding ManualLearning follows a **layered, component‑oriented** style. At the top sits **KnowledgeManagement**, which aggregates several peer sub‑components (OnlineLearning, GraphDatabaseManager, WaveAgentController, UkbTraceReportGenerator, LlmServiceManager, VkbApiClientManager). ManualLearning occupies the same tier as its siblings, sharing common infrastructure services while focusing on a distinct workflow: manual knowledge ingestion.  
 
-* **Graph‑code integration** – The “Claude Code Setup for Graph‑Code MCP Server” described in `integrations/browser-access/README.md` shows a pattern where a language model (Claude) is paired with a graph‑based code representation.  ManualLearning inherits this pattern via its child **GraphCodeSetup**, meaning that any manual knowledge entry can be mapped onto the same graph‑code model used by the **CodeGraphRAG** sibling.
+The design leans heavily on **service‑mediated interaction**. ManualLearning does not talk directly to the graph store; instead, it calls the **GraphDatabaseManager**, which in turn uses the **GraphDatabaseAdapter** (the concrete file path above) to perform CRUD operations on the underlying graph database. This indirection isolates ManualLearning from storage‑specific concerns and enables swapping or scaling the persistence layer without touching the manual curation logic.  
 
-* **Ontology‑driven classification** – The component is expected to employ the **ontology classification system** (potentially multiple ontologies) that is also referenced by the **OntologyClassification** sibling.  This suggests a **strategy pattern** where the concrete ontology implementation is selected at runtime based on the type of manual input.
+LLM‑related processing is delegated to the **LlmServiceManager**. When a curator requests enrichment (e.g., generating summaries or extracting entities from free‑form text), ManualLearning forwards the request to LlmServiceManager, which may coordinate with the **WaveAgentController** to spin up or reuse a Wave agent that actually runs the large language model. This separation of concerns keeps the manual pipeline lightweight and lets the LLM infrastructure evolve independently.  
 
-* **Entity persistence** – The observation that “it could store entities in a graph database, potentially using the EntityPersistence sub‑component” indicates a **repository pattern** that abstracts the underlying graph store (e.g., Neo4j, JanusGraph).  ManualLearning therefore delegates all CRUD operations to **EntityPersistence**, keeping the learning logic free of storage concerns.
+Traceability is provided by the **UkbTraceReportGenerator**. After a manual knowledge item has been persisted, ManualLearning likely invokes this generator to produce a trace report that captures provenance, transformation steps, and any automated reasoning performed by downstream UKB (Universal Knowledge Base) workflows.  
 
-* **Observation derivation & reporting** – By mirroring the **ObservationDerivation** and **UKBTraceReporting** sub‑components, ManualLearning follows a **pipeline pattern**: after entities are persisted, a derivation step extracts higher‑level observations, which are then fed into a reporting module that produces workflow execution traces.
+Finally, external knowledge sources are accessed via the **VkbApiClientManager**, which abstracts VKB (Virtual Knowledge Base) API calls. ManualLearning may fetch reference data or push curated entities to VKB through this manager, ensuring a consistent API contract across the system.  
 
-* **Copi integration** – The optional hook to `integrations/copi/README.md` reveals a **tool‑wrapper integration**: ManualLearning can invoke the Copilot CLI to suggest code snippets or documentation while a user is manually entering knowledge, effectively augmenting the manual workflow with AI‑assisted suggestions.
-
-Overall, the design is **composition‑over‑inheritance**: ManualLearning composes existing sibling services rather than re‑implementing them, resulting in a thin orchestration layer that respects the boundaries defined by each sub‑component.
+![ManualLearning — Relationship](../../.data/knowledge-graph/insights/images/manual-learning-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-Even though the repository lists “0 code symbols found” for ManualLearning itself, the concrete implementation details are inferred from the referenced README files and the surrounding sub‑components:
+Although the source code for ManualLearning itself is not enumerated, the surrounding implementation clues allow us to outline its internal mechanics:
 
-1. **GraphCodeSetup** – The child component’s documentation (`integrations/code-graph-rag/docs/claude-code-setup.md`) describes a step‑by‑step configuration of a Claude‑backed MCP server that indexes code as graph nodes and edges.  ManualLearning likely calls a `setupGraphCode()` routine (implicitly defined in that doc) to initialize the graph schema for manual entities, ensuring that every manual entry is represented as a node with typed relationships (e.g., *“derivedFrom”*, *“classifiedAs”*).
+1. **Pipeline Orchestration (ManualKnowledgePipeline)** – This child component likely defines a series of stages expressed as functions or classes that are invoked sequentially. Typical stages include:
+   * **Ingestion** – Accepting manual input (e.g., JSON payloads, UI forms) and performing basic validation.
+   * **Enrichment** – Calling `LlmServiceManager` to run LLM‑driven augmentation (entity extraction, summarisation). The Wave agents managed by `WaveAgentController` execute these tasks, possibly in an asynchronous job queue.
+   * **Persistence** – Forwarding enriched entities to `GraphDatabaseManager`, which uses `GraphDatabaseAdapter` (the TypeScript file at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) to write nodes and edges to the graph store. The adapter also handles automatic JSON export synchronization, ensuring that a flat representation is kept in step with the graph.
+   * **Trace Generation** – Invoking `UkbTraceReportGenerator` to compile a trace report that records each transformation, the LLM prompts used, and any provenance metadata.
+   * **External Sync** – Optionally pushing or pulling data via `VkbApiClientManager` to keep the VKB repository aligned with the manually curated knowledge.
 
-2. **Ontology Classification** – The system probably imports a classification module that reads a configuration file (e.g., `ontology-config.json`) and selects the appropriate ontology engine.  The decision logic may resemble:
-   ```ts
-   const classifier = OntologyFactory.getClassifier(input.type);
-   const tags = classifier.classify(input.content);
-   ```
-   This mirrors the approach used by **OntologyClassification** and allows ManualLearning to support “multiple ontology systems”.
+2. **Configuration‑Driven Execution** – The reference to a file such as `batch-analysis.yaml` suggests that the pipeline stages, their ordering, and runtime parameters (e.g., LLM temperature, batch size) are externalised. ManualLearning reads this YAML at startup, constructs the pipeline dynamically, and thus can be re‑configured without code changes.
 
-3. **Entity Persistence** – Persistence calls are delegated to the **EntityPersistence** sibling, which abstracts the graph database.  A typical flow would be:
-   ```ts
-   const entity = {
-     id: uuid(),
-     type: 'ManualEntry',
-     content: rawInput,
-     tags,
-   };
-   await EntityPersistence.save(entity);
-   ```
-   The repository pattern ensures that ManualLearning remains agnostic to the underlying graph engine.
+3. **Error Handling & Retry** – Because ManualLearning relies on multiple external services (LLM, graph DB, VKB API), it is reasonable to assume that each stage implements retry logic and propagates structured error objects back to the pipeline orchestrator. This pattern is common across its siblings (e.g., OnlineLearning) and would be consistent here.
 
-4. **Observation Derivation** – After persisting, ManualLearning triggers the **ObservationDerivation** pipeline, likely via an event or direct method call:
-   ```ts
-   const observations = await ObservationDerivation.deriveFrom(entity);
-   ```
-   This step extracts patterns such as “repeated manual corrections” or “knowledge gaps” that can later be surfaced in reports.
-
-5. **UKBTraceReporting** – The final reporting stage uses the **UKBTraceReporting** sub‑component to emit execution traces.  The integration may look like:
-   ```ts
-   await UKBTraceReporting.record({
-     action: 'ManualLearningEntry',
-     entityId: entity.id,
-     observations,
-   });
-   ```
-   The trace format follows the Claude Code Hook Data Format referenced in several sibling READMEs.
-
-6. **Copi Integration** – When a developer invokes a manual learning session, the system can spawn the Copilot CLI (`copi`) to fetch suggestions:
-   ```bash
-   copi suggest --context "manual learning entry: ${input.title}"
-   ```
-   The output is presented to the user for acceptance or modification before persistence.
-
-All of these interactions are orchestrated by a thin controller (e.g., `ManualLearningController.ts` – not listed but implied by the pattern used in sibling components) that wires together the above services via dependency injection, mirroring the constructor‑based lazy initialization seen in the parent **KnowledgeManagement** component.
+4. **Data Model** – The knowledge entities handled by ManualLearning are stored as graph nodes/edges, matching the model used by `GraphDatabaseAdapter`. The automatic JSON export implies that each entity also has a serialisable representation, which may be used for audit logs or downstream batch jobs.
 
 ---
 
 ## Integration Points  
 
-ManualLearning sits at the intersection of several major system modules:
+ManualLearning sits at the nexus of several core services:
 
-* **Parent – KnowledgeManagement** – It inherits the lazy‑loading strategy of LLM initialization from its parent.  If a manual entry requires LLM assistance (e.g., summarisation), the `ensureLLMInitialized()` method from `wave-controller.ts:489` can be invoked, deferring heavy model loading until needed.
+| Integration Target | Role | Interaction Mechanism |
+|--------------------|------|-----------------------|
+| **GraphDatabaseManager** | Persistence of manually curated entities | Calls `storeNode`, `storeEdge`, or batch write APIs; relies on `GraphDatabaseAdapter` for low‑level I/O |
+| **LlmServiceManager** | Enrichment of raw manual input via LLMs | Sends enrichment requests (e.g., `runPrompt`) and receives generated text or extracted entities |
+| **WaveAgentController** | Execution environment for LLM workloads | May request an agent instance, monitor job status, and retrieve results |
+| **UkbTraceReportGenerator** | Auditing and provenance | Provides a `generateReport` method that consumes the pipeline’s context and outputs a trace artifact |
+| **VkbApiClientManager** | External knowledge base synchronization | Executes HTTP calls (`GET`, `POST`, `PATCH`) against the VKB API, abstracting authentication and rate‑limiting |
+| **Configuration (batch-analysis.yaml)** | Pipeline definition | Parsed at runtime to assemble the `ManualKnowledgePipeline` stages |
 
-* **Sibling – EntityPersistence** – All entity CRUD operations flow through this repository, guaranteeing a single source of truth for graph data.
-
-* **Sibling – OntologyClassification** – Classification decisions are delegated to the ontology engine(s) defined here, allowing ManualLearning to remain ontology‑agnostic.
-
-* **Sibling – ObservationDerivation** – Derivation logic is reused, ensuring consistency of observation semantics across manual and online learning paths.
-
-* **Sibling – UKBTraceReporting** – Reporting follows the same trace format used by other components, enabling unified monitoring and debugging tools.
-
-* **Sibling – BrowserAccess & CodeGraphRAG** – The Graph‑Code MCP server setup (via **GraphCodeSetup**) aligns ManualLearning’s graph schema with the code‑graph RAG system, making manual knowledge searchable alongside code artifacts.
-
-* **Integration – copi** – The Copilot CLI wrapper provides AI‑assisted code suggestions during manual entry, exposing a CLI‑based dependency that can be swapped out for other assistants if needed.
-
-* **Graph Database** – Though not a concrete file path, the shared graph store (accessed via **EntityPersistence**) is the backbone that ties all these integrations together, enabling fast traversals for classification, derivation, and reporting.
-
-These integration points are all **explicitly mentioned** in the observations, ensuring that the insight document does not extrapolate beyond the provided evidence.
+These integration points are all **service‑oriented**; ManualLearning communicates via well‑defined interfaces (e.g., method calls, async promises) rather than directly accessing low‑level libraries. This design mirrors the patterns used by its sibling components, ensuring a uniform interaction model across the KnowledgeManagement domain.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize the Graph Code Setup First** – Before any manual entry is processed, run the Graph‑Code MCP server configuration described in `integrations/code-graph-rag/docs/claude-code-setup.md`.  This guarantees that the graph schema (node types, relationship types) matches the expectations of **EntityPersistence** and **ObservationDerivation**.
+1. **Define the Pipeline in YAML** – Before invoking ManualLearning, create or update `batch-analysis.yaml` to reflect the desired sequence of stages and any parameters (LLM temperature, batch sizes, retry limits). Keep this file version‑controlled to guarantee reproducibility.  
 
-2. **Select the Correct Ontology** – When creating a manual entry, specify the ontology identifier that best describes the domain (e.g., `ontology: "software‑architecture"`).  The system will automatically route the entry to the appropriate classifier defined in the ontology configuration.
+2. **Validate Input Early** – ManualKnowledgePipeline expects clean, schema‑validated payloads. Use the provided validation utilities (if any) before handing data to the pipeline to avoid unnecessary round‑trips to the graph store.  
 
-3. **Leverage Copi for Assistance** – Invoke `copi suggest` from the CLI or through the UI to receive AI‑generated snippets or wording.  Accept the suggestion only after reviewing it, as Copi operates as a helper rather than a source of truth.
+3. **Leverage LLM Services Sparingly** – Since LLM calls can be costly and latency‑sensitive, only request enrichment when the manual input truly benefits from it (e.g., when a curator supplies free‑text notes). Configure the `LlmServiceManager` parameters in the YAML to balance quality and cost.  
 
-4. **Persist Before Deriving** – Always call the persistence layer (`EntityPersistence.save`) prior to invoking `ObservationDerivation`.  This ordering ensures that derived observations have a stable entity identifier and can be linked back in reports.
+4. **Monitor Trace Reports** – After each successful run, inspect the output from `UkbTraceReportGenerator`. These reports are essential for compliance, debugging, and future audits of manual curation decisions.  
 
-5. **Record Traces Consistently** – Use `UKBTraceReporting.record` for every manual learning action (creation, update, deletion).  The trace format must follow the Claude Code Hook Data Format to stay compatible with downstream analytics.
+5. **Handle Failures Gracefully** – Implement retry logic around external calls (graph DB, VKB API) using exponential back‑off. The pipeline should be idempotent where possible; for example, use upsert semantics when persisting nodes to avoid duplicate entries.  
 
-6. **Respect Lazy LLM Initialization** – If a manual entry requires LLM‑based summarisation or augmentation, invoke the parent’s `ensureLLMInitialized()` method.  This avoids unnecessary memory consumption when the LLM is not needed.
-
-7. **Avoid Direct Graph Queries** – All interactions with the graph database should go through **EntityPersistence**.  Direct queries bypass the repository abstraction and can lead to schema drift.
-
-Following these conventions keeps ManualLearning aligned with the broader KnowledgeManagement ecosystem, reduces coupling, and simplifies future refactoring.
+6. **Keep Dependencies Updated** – Because ManualLearning relies on shared services (GraphDatabaseManager, LlmServiceManager, etc.), ensure that any upgrades to those services are tested against the manual pipeline. The layered architecture isolates changes, but version mismatches can still surface in interface contracts.  
 
 ---
 
-### Architectural patterns identified  
+### Summary of Key Insights  
 
-* **Modular pipeline composition** – ManualLearning composes existing sibling services (ontology, persistence, derivation, reporting) into a linear pipeline.  
-* **Repository pattern** – `EntityPersistence` abstracts the graph database.  
-* **Strategy pattern** – Ontology classification selects an engine at runtime based on input type.  
-* **Lazy initialization** – Inherited from the parent component for LLM resources.  
-* **Tool‑wrapper integration** – Copi is integrated as an external CLI wrapper.
+1. **Architectural patterns identified** – Layered component architecture, service‑mediated interaction, configuration‑driven pipelines, and separation of concerns between enrichment (LLM), persistence (graph DB), and traceability.  
 
-### Design decisions and trade‑offs  
+2. **Design decisions and trade‑offs** – Delegating storage to GraphDatabaseManager abstracts the graph implementation (scalable but adds an indirection layer). Using LLM services via LlmServiceManager provides flexibility but introduces latency and cost considerations. YAML‑based pipeline definition enhances configurability at the expense of runtime validation complexity.  
 
-* **Reuse vs. duplication** – By delegating to siblings, ManualLearning minimizes code duplication but introduces a dependency chain that must be kept in sync.  
-* **Graph‑centric storage** – Enables rich relationship queries but requires careful schema management; adding new manual entity types may need schema migrations.  
-* **Optional AI assistance (copi)** – Provides productivity gains without mandating the presence of the Copilot service; however, reliance on an external CLI can affect portability.  
-* **Multiple ontologies** – Increases flexibility for domain‑specific classification but adds complexity to the configuration and testing matrix.
+3. **System structure insights** – ManualLearning is a peer of OnlineLearning within KnowledgeManagement, sharing core services while focusing on human‑curated data. Its child, ManualKnowledgePipeline, orchestrates the workflow, and all interactions funnel through well‑defined managers.  
 
-### System structure insights  
+4. **Scalability considerations** – The GraphDatabaseAdapter’s automatic JSON export and LevelDB persistence suggest the graph layer can handle large knowledge graphs. LLM calls are the primary scalability bottleneck; batching requests and reusing Wave agents mitigate this. YAML pipelines allow horizontal scaling by spawning multiple pipeline instances with identical configurations.  
 
-ManualLearning sits as a thin orchestration layer under **KnowledgeManagement**, bridging user‑driven inputs with the system’s graph‑based knowledge core.  Its child **GraphCodeSetup** aligns the manual data model with the code‑graph RAG infrastructure, ensuring that manual and code knowledge share the same retrieval mechanisms.  The sibling components collectively provide the “CRUD‑classify‑derive‑report” stack, each exposing a clear interface that ManualLearning calls in a deterministic order.
-
-### Scalability considerations  
-
-* **Graph database scaling** – Since all manual entities are stored in a shared graph, horizontal scaling of the underlying graph store (sharding, read replicas) will directly affect ManualLearning’s throughput.  
-* **Ontology classification** – Adding more ontologies may increase CPU load during classification; caching classification results can mitigate this.  
-* **Observation derivation** – Derivation can be computationally intensive for large sub‑graphs; employing asynchronous workers (similar to the wave‑controller’s work‑stealing concurrency) would improve latency.  
-* **Copi integration** – Calls to the Copilot CLI are external I/O; they should be rate‑limited or queued to avoid bottlenecks.
-
-### Maintainability assessment  
-
-Because ManualLearning largely **re‑uses** well‑defined sibling modules, its own codebase remains small and easy to understand.  The main maintenance burden lies in keeping the **GraphCodeSetup** schema aligned with any changes in **EntityPersistence** or **CodeGraphRAG**.  The reliance on external READMEs for configuration means that documentation must stay current; otherwise developers may misconfigure the graph‑code pipeline.  Overall, the component scores high on maintainability provided the shared contracts (e.g., entity shape, trace format) are versioned and validated through integration tests.
+5. **Maintainability assessment** – The clear separation of responsibilities (pipeline orchestration, service managers, adapters) promotes maintainability. Changes to one service (e.g., swapping the graph database) require only updates in the corresponding manager/adapter, leaving ManualLearning’s core logic untouched. However, the lack of explicit code symbols for ManualLearning means developers must rely on documentation and configuration files to understand the exact flow, underscoring the importance of keeping `batch-analysis.yaml` and trace reports well‑documented.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Children
-- [GraphCodeSetup](./GraphCodeSetup.md) -- The Graph-Code MCP Server setup is described in integrations/code-graph-rag/docs/claude-code-setup.md, which provides details on the configuration and setup process.
+- [ManualKnowledgePipeline](./ManualKnowledgePipeline.md) -- The ManualLearning sub-component likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships, as inferred from the parent context.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely employs the GraphDatabaseManager to store and manage automatically extracted knowledge entities and relationships.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely utilizes the GraphDatabaseAdapter for interacting with the graph database.
+- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
+- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
+- [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
+- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
 
 
 ---

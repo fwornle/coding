@@ -1,0 +1,16 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Graph Persistence" {
+  component "GraphPersistenceModule" as gpm <<core>>
+  component "GraphDatabaseAdapter" as gda <<api>>
+  database "LevelDB" as ldb <<storage>>
+  component "Graphology" as graph <<external>>
+}
+
+gpm --> gda : uses
+gda --> ldb : stores/retrieves
+gpm --> graph : utilizes
+gda --> graph : integrates
+
+@enduml

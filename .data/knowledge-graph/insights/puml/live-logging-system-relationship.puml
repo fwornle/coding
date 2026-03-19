@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LiveLoggingSystem
+
+[Coding] as coding #FFFFDD
+[LiveLoggingSystem] as live_logging_system #LightBlue
+[LLMAbstraction] as llmabstraction #F0F0F0
+[DockerizedServices] as dockerized_services #F0F0F0
+[Trajectory] as trajectory #F0F0F0
+[KnowledgeManagement] as knowledge_management #F0F0F0
+[CodingPatterns] as coding_patterns #F0F0F0
+[ConstraintSystem] as constraint_system #F0F0F0
+[SemanticAnalysis] as semantic_analysis #F0F0F0
+[TranscriptProcessing] as transcript_processing #E8F5E8
+[LoggingMechanism] as logging_mechanism #E8F5E8
+[KnowledgeGraphManager] as knowledge_graph_manager #E8F5E8
+[TranscriptAdapterFactory] as transcript_adapter_factory #E8F5E8
+
+coding --> live_logging_system
+llmabstraction -[hidden]- live_logging_system
+dockerized_services -[hidden]- live_logging_system
+trajectory -[hidden]- live_logging_system
+knowledge_management -[hidden]- live_logging_system
+coding_patterns -[hidden]- live_logging_system
+constraint_system -[hidden]- live_logging_system
+semantic_analysis -[hidden]- live_logging_system
+live_logging_system --> transcript_processing
+live_logging_system --> logging_mechanism
+live_logging_system --> knowledge_graph_manager
+live_logging_system --> transcript_adapter_factory
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphDatabaseAdapter
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphDatabaseAdapter] as graph_database_adapter #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[CodeGraphConstructor] as code_graph_constructor #F0F0F0
+[EntityPersistenceModule] as entity_persistence_module #F0F0F0
+[OntologyManagementSystem] as ontology_management_system #F0F0F0
+[GraphManager] as graph_manager #E8F5E8
+[GraphManager] as graph_manager #E8F5E8
+[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+
+knowledge_management --> graph_database_adapter
+manual_learning -[hidden]- graph_database_adapter
+online_learning -[hidden]- graph_database_adapter
+code_graph_constructor -[hidden]- graph_database_adapter
+entity_persistence_module -[hidden]- graph_database_adapter
+ontology_management_system -[hidden]- graph_database_adapter
+graph_database_adapter --> graph_manager
+graph_database_adapter --> graph_manager
+graph_database_adapter --> graph_database_adapter
+
+@enduml

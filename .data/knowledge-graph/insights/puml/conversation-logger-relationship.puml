@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConversationLogger
+
+[Trajectory] as trajectory #FFFFDD
+[ConversationLogger] as conversation_logger #LightBlue
+[SpecstoryAdapterLogger] as specstory_adapter_logger #E8F5E8
+
+trajectory --> conversation_logger
+conversation_logger --> specstory_adapter_logger
+
+@enduml

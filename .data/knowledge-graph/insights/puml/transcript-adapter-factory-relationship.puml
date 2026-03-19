@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptAdapterFactory
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptAdapterFactory] as transcript_adapter_factory #LightBlue
+[TranscriptProcessing] as transcript_processing #F0F0F0
+[LoggingMechanism] as logging_mechanism #F0F0F0
+[KnowledgeGraphManager] as knowledge_graph_manager #F0F0F0
+[AgentTranscriptAdapterFactory] as agent_transcript_adapter_factory #E8F5E8
+
+live_logging_system --> transcript_adapter_factory
+transcript_processing -[hidden]- transcript_adapter_factory
+logging_mechanism -[hidden]- transcript_adapter_factory
+knowledge_graph_manager -[hidden]- transcript_adapter_factory
+transcript_adapter_factory --> agent_transcript_adapter_factory
+
+@enduml

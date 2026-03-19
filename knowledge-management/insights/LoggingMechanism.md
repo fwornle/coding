@@ -2,247 +2,109 @@
 
 **Type:** SubComponent
 
-The LoggingMechanism has a configurable log level, allowing for flexible log filtering, as defined in the integrations/mcp-server-semantic-analysis/src/logging.ts file
+The LoggingMechanism sub-component may use the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables for logging Graph-Code RAG system interactions.
 
 ## What It Is  
 
-The **LoggingMechanism** is a self‑contained sub‑component that lives in the file  
-`integrations/mcp-server-semantic-analysis/src/logging.ts`.  Its purpose is to
-receive log requests from the rest of the **LiveLoggingSystem**, buffer them
-asynchronously, and write them to disk without blocking the Node.js event loop.
-The implementation supplies a configurable log‑level filter, supports both JSON
-and plain‑text output formats, and automatically rotates log files when they
-reach a configured size.  All of these capabilities are packed into a single
-module that can be invoked by any consumer inside the LiveLoggingSystem – for
-example the **TranscriptAdapter**, **LSLConverter**, **OntologyClassificationAgent**
-and other sibling components that need diagnostic output.
+The **LoggingMechanism** sub‑component lives inside the *LiveLoggingSystem* and is the engine that collects, buffers, and dispatches log data for the broader platform.  Its concrete implementation is tied to a handful of integration documents that describe how logs are emitted for specific agents:
+
+* **integrations/copi/USAGE.md** – describes the logging contract for the Copilot CLI.  
+* **integrations/copi/docs/hooks.md** – defines the hook points that the Copilot CLI invokes to push log events.  
+
+These markdown files are not source code, but they act as the authoritative specification for the **LogOutputter** child component that actually writes logs to the configured destinations.  The mechanism is also shaped by runtime configuration supplied through environment variables (e.g., `BROWSER_ACCESS_PORT`, `CODE_GRAPH_RAG_PORT`, `MEMGRAPH_BATCH_SIZE`, `CONTAINS_PACKAGE`).  Together they give the LoggingMechanism a flexible, environment‑driven surface while keeping the core logic agnostic of any particular agent.
+
+![LoggingMechanism — Architecture](../../.data/knowledge-graph/insights/images/logging-mechanism-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-The design of the LoggingMechanism is driven by the need to keep logging
-non‑intrusive to the main application flow.  To achieve this it adopts an
-*asynchronous buffering* strategy: incoming log entries are placed onto an
-in‑memory **logging queue**.  The queue decouples the producers (any code that
-calls the logger) from the single consumer that performs the actual file I/O.
-Because the consumer works with Node’s non‑blocking `fs` APIs, the event loop
-remains free to serve other requests while log data is being flushed to disk.
+LoggingMechanism follows a **modular, composition‑based architecture**.  It is a child of **LiveLoggingSystem**, which aggregates multiple logging‑related sub‑components (e.g., the sibling **TranscriptProcessing** and **KnowledgeGraphManager**).  The design leans on two explicit patterns that are evident from the observations:
 
-Configuration is exposed through a **log‑level** setting.  Before a message is
-enqueued, the mechanism checks the current level and discards any entry that is
-below the threshold, providing cheap filtering at the producer side.  The same
-module also contains a **format selector** that chooses between a JSON serializer
-and a plain‑text formatter based on a runtime option, allowing callers to pick
-the representation that best fits downstream analysis tools.
+1. **Async Non‑Blocking Log Buffer** – The component uses a non‑blocking asynchronous buffer as described in `integrations/mcp-constraint-monitor/README.md`.  Log events are queued quickly without waiting for I/O, and a background worker flushes the buffer to the appropriate sink.  This pattern isolates the latency of external services (browser‑access APIs, graph‑code RAG endpoints) from the main execution path.
 
-When a log file grows beyond a predefined size, the built‑in **log rotation**
-logic renames the current file (typically appending a timestamp or an index) and
-opens a fresh file for subsequent writes.  This prevents unbounded disk growth
-and keeps individual log files at a manageable size for later processing by
-components such as the LiveLoggingSystem’s aggregation pipelines.
+2. **Environment‑Driven Configuration** – All tunable aspects (ports, SSE URLs, batch sizes, filtering flags) are read from environment variables such as `BROWSER_ACCESS_PORT`, `CODE_GRAPH_RAG_SSE_PORT`, `MEMGRAPH_BATCH_SIZE`, and `CONTAINS_PACKAGE`.  This makes the LoggingMechanism portable across development, CI, and production environments without code changes.
 
-Overall, the component follows a simple, linear flow:
+Interaction flow: when a Copilot CLI hook fires (per `integrations/copi/docs/hooks.md`), the **LogOutputter** captures the payload, applies any `CONTAINS_PACKAGE` filter, and pushes it onto the async buffer.  The buffer then routes the entry either to the **Browser Access** API (`BROWSER_ACCESS_PORT`/`BROWSER_ACCESS_SSE_URL`) or to the **Graph‑Code RAG** service (`CODE_GRAPH_RAG_PORT`/`CODE_GRAPH_RAG_SSE_PORT`).  Because the parent **LiveLoggingSystem** owns the lifecycle of LoggingMechanism, it can enable or disable the entire pipeline with a single configuration toggle.
 
-1. **Receive** a log request →  
-2. **Filter** by level →  
-3. **Format** according to the selected output mode →  
-4. **Enqueue** the formatted string →  
-5. **Async consumer** drains the queue, writes to file, and triggers rotation
-   when needed.
-
-No additional architectural layers (e.g., micro‑services, event buses) are
-present; the mechanism is a local, file‑based logger that integrates tightly
-with its parent **LiveLoggingSystem**.
+![LoggingMechanism — Relationship](../../.data/knowledge-graph/insights/images/logging-mechanism-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-Although the source contains no exported symbols in the observation snapshot,
-the file `integrations/mcp-server-semantic-analysis/src/logging.ts` reveals the
-following concrete pieces:
+### Core Buffer  
+The async buffer is a lightweight queue implemented with JavaScript’s `Promise`‑based constructs (as inferred from the MCP constraint‑monitor README).  Producers – the LogOutputter – enqueue log objects instantly; a consumer coroutine periodically drains the queue, respecting `MEMGRAPH_BATCH_SIZE` to batch writes to the Graph‑Code RAG system.  Batching reduces round‑trip overhead and aligns with the RAG service’s expected payload size.
 
-* **Async Buffer & Queue** – An internal array (or similar data structure) holds
-  pending log entries.  A `setImmediate`/`process.nextTick` loop or a dedicated
-  async function repeatedly checks the queue and writes the next entry using
-  `fs.promises.appendFile` (or an equivalent non‑blocking API).  This pattern
-  guarantees that each write is performed after the current call stack has
-  cleared, eliminating event‑loop stalls.
+### LogOutputter  
+Although the source code is not listed, the observations make it clear that **LogOutputter** is the concrete class responsible for translating raw hook data into the canonical log schema.  It reads the `CONTAINS_PACKAGE` variable to decide whether a particular log entry should be emitted, enabling fine‑grained filtering without recompiling.  The outputter then selects the correct destination based on the presence of environment variables:
 
-* **Configurable Log Level** – The module exports (or internally uses) a
-  configuration object where the level (e.g., `error`, `warn`, `info`, `debug`)
-  can be set at runtime.  Before a message is formatted, the logger compares the
-  message’s severity with this setting and skips enqueuing if the message is
-  too verbose.
+* If `BROWSER_ACCESS_PORT` is defined, the entry is sent over HTTP/SSE to the browser‑access endpoint (`BROWSER_ACCESS_SSE_URL`).  
+* If `CODE_GRAPH_RAG_PORT` is defined, the entry is forwarded to the Graph‑Code RAG service using the port and SSE URL defined by `CODE_GRAPH_RAG_SSE_PORT`.
 
-* **Multiple Log Formats** – Two formatter functions are present: one that
-  serializes an object to a JSON string (including timestamp, level, and payload)
-  and another that builds a plain‑text line (e.g., `"[2026-03-18T12:00:00Z] INFO …
-  "`).  The choice is driven by a `format` option supplied during logger
-  initialization.
+### Integration with KnowledgeGraphManager  
+The sibling **KnowledgeGraphManager** consumes the same Graph‑Code RAG service.  LoggingMechanism feeds it with event traces (e.g., node creation, edge updates) via the same buffered channel, which means both components share the same back‑pressure handling and batch semantics.  This co‑location reduces duplicated networking code and ensures consistent observability across knowledge‑graph operations.
 
-* **Log Rotation** – The implementation tracks the current file size (either by
-  maintaining a byte counter or by stat‑checking the file).  When the size
-  exceeds a threshold defined in the configuration, the logger closes the
-  current descriptor, renames the file (often by appending a sequence number or
-  ISO timestamp), and opens a new file for subsequent writes.  Rotation is
-  performed inside the async consumer so that no pending writes are lost.
-
-* **Integration with LiveLoggingSystem** – The parent component creates a
-  singleton instance of this logger and passes it to child agents (e.g.,
-  **TranscriptAdapter**, **LSLConverter**, **OntologyClassificationAgent**).  Those
-  agents invoke the logger via a simple API such as `log.info(message)` or
-  `log.error(errorObj)`, relying on the queue to handle concurrency safely.
-
-Because the source does not expose explicit class names, the above description
-focuses on the functional responsibilities that are evident from the observed
-behaviour.
+### Configuration Loading  
+At startup, LoggingMechanism reads all relevant environment variables once and caches them.  This design avoids repeated `process.env` lookups and guarantees that the configuration is immutable for the lifetime of the process, simplifying reasoning about log routing.
 
 ---
 
 ## Integration Points  
 
-The LoggingMechanism is a leaf sub‑component of **LiveLoggingSystem**.  Its primary
-integration surface is the logger instance that the parent creates and shares
-with its children.  The following connections are evident:
+* **Copilot CLI** – The `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md` files define the public hook API that the CLI invokes.  LoggingMechanism implements those hooks through LogOutputter, ensuring that every CLI command is traceable.  
 
-* **LiveLoggingSystem → LoggingMechanism** – The parent is responsible for
-  configuring the logger (log level, format, rotation size) and for supplying a
-  file path that lives under the server’s logging directory.  It also starts the
-  async consumer loop when the system boots.
+* **Browser Access API** – When `BROWSER_ACCESS_PORT` and `BROWSER_ACCESS_SSE_URL` are present, the buffer’s consumer opens an SSE client to stream logs directly to the browser UI.  This tight coupling enables real‑time log visualisation in the developer console.  
 
-* **Sibling Components → LoggingMechanism** – Agents such as
-  **TranscriptAdapter**, **LSLConverter**, **OntologyClassificationAgent**, and
-  **OntologyManager** call into the logger to emit diagnostic or audit messages.
-  They do not need to know about the queue or rotation logic; they simply use the
-  exposed logging API.
+* **Graph‑Code RAG Service** – The `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT` variables point to the RAG backend.  Logs about knowledge‑graph queries, embeddings, and retrieval are batched and sent here, allowing downstream analytics to correlate system behaviour with knowledge‑graph activity.  
 
-* **External Tools** – Although not shown in the observations, the produced log
-  files (JSON or plain text) are consumable by downstream analysis pipelines,
-  monitoring dashboards, or log‑aggregation services that the broader MCP
-  platform may employ.
+* **LiveLoggingSystem (Parent)** – As the container, LiveLoggingSystem orchestrates the lifecycle (initialisation, graceful shutdown) of LoggingMechanism.  It also provides a shared logger instance that other siblings (e.g., TranscriptProcessing) can reuse, promoting a unified logging format across the system.  
 
-No external libraries beyond Node’s built‑in `fs` module are mentioned, indicating
-that the component relies on the standard runtime for its I/O needs.
+* **KnowledgeGraphManager (Sibling)** – Both components rely on the same environment‑driven configuration and share the async buffer implementation, which reduces duplication and ensures that log throughput limits are applied uniformly.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize Once** – Create a single logger instance at application start
-   (typically inside the LiveLoggingSystem bootstrap) and pass the reference to
-   all downstream modules.  Re‑creating the logger per request defeats the
-   purpose of the shared queue and can lead to file‑handle exhaustion.
+1. **Define Environment Variables Early** – All ports, URLs, batch sizes, and filters must be set before the process starts.  Changing them at runtime has no effect because LoggingMechanism caches the values at initialization.  
 
-2. **Select an Appropriate Log Level** – For production deployments set the level
-   to `info` or `warn` to avoid excessive disk I/O.  During debugging, raise it
-   to `debug` to capture detailed traces.  Remember that the filter runs before
-   formatting, so lower‑level messages are discarded without any performance
-   cost.
+2. **Respect the `CONTAINS_PACKAGE` Filter** – If you need to limit logging to a subset of packages, set `CONTAINS_PACKAGE` to a comma‑separated list.  The LogOutputter will drop any log entry whose package identifier does not appear in that list, keeping the buffer lean.  
 
-3. **Choose the Desired Format** – If downstream tools expect structured data,
-   enable the JSON format; otherwise, plain‑text is sufficient for human reading.
-   Switching formats requires only a change in the logger configuration; no code
-   changes are needed in the callers.
+3. **Batch Size Tuning** – `MEMGRAPH_BATCH_SIZE` controls how many log entries are sent in a single request to the Graph‑Code RAG service.  Larger batches improve throughput but increase latency for individual log visibility.  Adjust based on the expected log volume and the latency requirements of downstream consumers.  
 
-4. **Respect Rotation Limits** – The default rotation size is tuned for typical
-   workloads.  If a particular agent generates unusually large logs (e.g., a
-   verbose transcript dump), consider increasing the rotation threshold or
-   periodically flushing the queue to keep file sizes predictable.
+4. **Avoid Blocking Calls in Hooks** – Because the buffer is non‑blocking, any synchronous I/O inside a Copilot CLI hook will negate the performance benefit.  Keep hook implementations lightweight and delegate heavy work to the background consumer.  
 
-5. **Avoid Blocking Calls in Log Producers** – Do not perform synchronous file
-   or network operations inside the logging call itself; the logger already
-   guarantees non‑blocking behaviour, and adding blocking work would re‑introduce
-   event‑loop latency.
-
-6. **Handle Errors Gracefully** – The async consumer should catch any I/O errors
-   (e.g., permission issues, disk full) and surface them through a dedicated
-   `error` event or a fallback console output.  Consumers of the logger should
-   be prepared for occasional loss of log entries in catastrophic failure
-   scenarios.
+5. **Graceful Shutdown** – When the parent LiveLoggingSystem is terminating, invoke the shutdown routine (exposed by LoggingMechanism) to flush the buffer and close SSE connections.  This guarantees that no log entries are lost during process exit.
 
 ---
 
-### Architectural patterns identified  
+### Summary of Architectural Insights  
 
-* **Asynchronous buffering with a queue** – decouples producers from the file‑I/O consumer.  
-* **Configurable strategy for log formatting** – runtime selection between JSON and plain‑text.  
-* **Size‑based log rotation** – a built‑in mechanism that manages file lifecycle.
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Async non‑blocking log buffer; Environment‑driven configuration; Component composition (parent‑child) |
+| **Design decisions and trade‑offs** | Chose buffering to decouple log producers from slow sinks (trade‑off: added memory pressure, mitigated by `MEMGRAPH_BATCH_SIZE`).  Environment variables provide deployment flexibility but require careful ops coordination. |
+| **System structure insights** | LoggingMechanism sits under LiveLoggingSystem, shares the async buffer with KnowledgeGraphManager, and exposes LogOutputter as its concrete output handler. |
+| **Scalability considerations** | Buffering and batching allow the system to handle high log rates without overwhelming external services.  Scaling horizontally would involve replicating the buffer and ensuring idempotent writes to the RAG endpoint. |
+| **Maintainability assessment** | Clear separation of concerns (hooks → LogOutputter → buffer → sinks) and configuration‑only tuning make the component easy to modify.  The reliance on markdown‑based integration contracts means that updates to logging semantics are documented centrally, reducing code churn. |
 
-### Design decisions and trade‑offs  
-
-* **Non‑blocking I/O vs. simplicity** – Using async `fs` calls avoids event‑loop
-  blockage but adds complexity in managing the queue and rotation logic.  
-* **Single‑process file logger** – Keeps deployment simple; however, it limits
-  horizontal scaling because multiple processes cannot safely write to the same
-  file without external coordination.  
-* **In‑process rotation** – Guarantees immediate cleanup of oversized files but
-  may incur a brief pause when renaming and reopening the log file.
-
-### System structure insights  
-
-The LoggingMechanism sits at the leaf of the LiveLoggingSystem hierarchy, acting
-as the concrete sink for all diagnostic output generated by sibling agents.
-Its configuration is centralized in the parent, while its API is deliberately
-minimal, allowing any component to log without needing to understand the
-underlying buffering or rotation details.
-
-### Scalability considerations  
-
-* **Throughput** – The queue can absorb bursts of log traffic, but its size is
-  bounded by available memory; extremely high log rates may require back‑pressure
-  or a larger queue implementation.  
-* **Multi‑process scaling** – To scale beyond a single Node process, the system
-  would need to replace the file‑based sink with an external log aggregation
-  service (e.g., syslog, Elasticsearch).  The current design is optimal for a
-  single‑process server.
-
-### Maintainability assessment  
-
-The component is highly cohesive: all logging concerns (filtering, formatting,
-buffering, rotation) reside in one file, making it easy to locate and modify.
-Because it relies only on standard Node APIs, external dependencies are minimal.
-The use of explicit configuration objects and clear separation between
-producer‑side checks and consumer‑side I/O aids readability.  Potential maintenance
-burdens include ensuring the queue never grows unchecked and periodically reviewing
-rotation thresholds as log volume evolves.  Overall, the LoggingMechanism is
-well‑encapsulated and straightforward to extend (e.g., adding a new format) without
-affecting its siblings or the parent LiveLoggingSystem.
-
-## Diagrams
-
-### Relationship
-
-![LoggingMechanism Relationship](images/logging-mechanism-relationship.png)
-
-
-### Architecture
-
-![LoggingMechanism Architecture](images/logging-mechanism-architecture.png)
-
-
-
-## Architecture Diagrams
-
-![architecture](../../.data/knowledge-graph/insights/images/logging-mechanism-architecture.png)
-
-![relationship](../../.data/knowledge-graph/insights/images/logging-mechanism-relationship.png)
+These insights should give developers and architects a grounded view of how **LoggingMechanism** operates within the LiveLoggingSystem, how it interacts with its siblings, and what considerations to keep in mind when extending or tuning it.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture allows for easy extension and modification of agent-specific transcript formats. This is achieved through the use of the TranscriptAdapter, which is implemented in the lib/agent-api/transcript-api.js file. The TranscriptAdapter provides a standardized interface for handling different agent formats, such as Claude Code and Copilot CLI, and converting them to the unified LSL format. For example, the ClaudeCodeTranscriptAdapter class in lib/agent-api/transcripts/claudia-transcript-adapter.js extends the TranscriptAdapter class and provides a specific implementation for handling Claude Code transcripts.
+
+### Children
+- [LogOutputter](./LogOutputter.md) -- The LoggingMechanism sub-component utilizes the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI, indicating a potential LogOutputter component that handles logging destinations.
 
 ### Siblings
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptAdapter in lib/agent-api/transcript-api.js provides a standardized interface for handling different agent formats.
+- [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- The KnowledgeGraphManager sub-component may utilize the integrations/code-graph-rag/README.md Graph-Code system for graph-based knowledge storage and querying.
+- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

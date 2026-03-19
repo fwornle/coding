@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Online Learning" {
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "LlmServiceManager" as lsm <<api>>
+  component "WaveAgentController" as wac <<agent>>
+  component "UkbTraceReportGenerator" as utrg <<core>>
+  component "VkbApiClientManager" as vacm <<external>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+}
+
+package "External Services" {
+  cloud "VKB API" as vkb <<external>>
+}
+
+gdm --> gda : persists
+lsm --> gdm : uses
+wac --> lsm : uses
+utrg --> gdm : generates reports from
+vacm --> vkb : interacts with
+OnlineLearning --> gdm : uses
+OnlineLearning --> lsm : uses
+OnlineLearning --> wac : manages
+OnlineLearning --> utrg : generates reports
+OnlineLearning --> vacm : interacts with
+
+@enduml

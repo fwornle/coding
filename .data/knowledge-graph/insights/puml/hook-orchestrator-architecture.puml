@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "HookOrchestrator" {
+  component "HookOrchestrator" as ho <<core>>
+  component "HookRegistry" as hr <<storage>>
+  component "Logger" as log <<external>>
+}
+
+package "Copi Project" {
+  component "CopiIntegration" as ci <<api>>
+  database "HookFunctions" as hf
+}
+
+ho --> hr : stores
+ho --> log : logs
+hr --> hf : retrieves
+ho --> ci : uses
+ci --> hf : processes
+
+@enduml

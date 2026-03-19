@@ -1,0 +1,36 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Manual Learning" {
+  component "ManualLearning" as ml <<core>>
+}
+
+package "Database Management" {
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  database "Graph Database" as gd
+}
+
+package "External Services" {
+  component "LlmServiceManager" as lsm <<api>>
+  component "VkbApiClientManager" as vam <<api>>
+  component "UkbTraceReportGenerator" as utrg <<external>>
+  cloud "VKB API" as vka
+  cloud "UKB" as ukb
+}
+
+package "Agent Management" {
+  component "WaveAgentController" as wac <<agent>>
+}
+
+ml --> gdm : uses
+ml --> lsm : uses
+ml --> wac : uses
+ml --> vam : uses
+ml --> utrg : uses
+gdm --> gd : stores
+gda --> gd : persists
+vam --> vka : interacts
+utrg --> ukb : generates
+
+@enduml

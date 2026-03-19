@@ -1,0 +1,18 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Graph Database Management" {
+  component "GraphDatabaseAdapter" as gda <<core>>
+  database "LevelDB" as ldb <<storage>>
+  component "Graphology" as graph <<storage>>
+}
+
+package "Code Graph Construction" {
+  component "CodeGraphConstructor" as cgc <<core>>
+}
+
+gda --> ldb : uses
+gda --> graph : uses
+cgc --> gda : uses
+
+@enduml

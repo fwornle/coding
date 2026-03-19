@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ClassificationLayer
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ClassificationLayer] as classification_layer #LightBlue
+[LoggingMechanism] as logging_mechanism #F0F0F0
+[TranscriptProcessing] as transcript_processing #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+
+live_logging_system --> classification_layer
+logging_mechanism -[hidden]- classification_layer
+transcript_processing -[hidden]- classification_layer
+graph_database_adapter -[hidden]- classification_layer
+
+@enduml
