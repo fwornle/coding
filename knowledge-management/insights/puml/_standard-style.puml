@@ -1,7 +1,11 @@
-!theme plain
+' Use plain theme styling (compatible with PlantUML 1.2020+)
 skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
+
+' Layout recommendation: prefer vertical layouts to avoid excessive width
+' This prevents users from needing to zoom and scroll horizontally
+' Vertical scrolling is acceptable and preferred over horizontal scrolling
 
 ' Component styling with professional colors
 skinparam component {

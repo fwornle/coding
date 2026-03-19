@@ -155,8 +155,12 @@ integrations/browser-access/logs/
 *.sqlite3
 
 # MCP Memory LevelDB (volatile runtime data)
-# Ignore binary database files, but track JSON exports
-.data/knowledge-graph/
+# Ignore binary database files, but track insight diagrams
+.data/knowledge-graph/*
+!.data/knowledge-graph/insights/
+.data/knowledge-graph/insights/*
+!.data/knowledge-graph/insights/puml/
+!.data/knowledge-graph/insights/images/
 .data/knowledge.db
 .data/knowledge.db-shm
 .data/knowledge.db-wal

@@ -35,6 +35,8 @@ services:
       # Bypass corporate proxy for internal Docker networking
       - no_proxy=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
       - NO_PROXY=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
+      # PlantUML include path (resolves !include _standard-style.puml in diagrams)
+      - JAVA_TOOL_OPTIONS=-Dplantuml.include.path=/coding/docs/puml
       # Project paths (mapped via volumes)
       - TARGET_REPO_PATH=/workspace
       - CODING_ROOT=/coding
@@ -70,6 +72,8 @@ services:
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
       - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
+      # PlantUML standard styles (needed for diagram generation)
+      - ${CODING_REPO:-.}/docs/puml:/coding/docs/puml:ro
       # Dashboard build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
       # VKB visualizer build (live-mounted for development)

@@ -1,4 +1,4 @@
-!theme plain
+' Use plain theme styling (compatible with PlantUML 1.2020+)
 skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
