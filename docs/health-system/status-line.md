@@ -77,7 +77,7 @@ The status line displays **live spending data** for all LLM providers using auto
 
 | Abbrev | Provider | Data Source | Env Vars Required |
 |--------|----------|-------------|-------------------|
-| `Gq` | Groq | BudgetTracker self-tracking (`.data/llm-usage-costs.json`) | `GROQ_API_KEY` |
+| `Gq` | Groq | BudgetTracker + centralized usage reporters (`.data/llm-usage-costs.json`) | `GROQ_API_KEY` |
 | `Ggl` | Google Gemini | Free tier (no tracking needed) | `GEMINI_API_KEY` |
 | `A` | Anthropic | Admin API (`/v1/organizations/cost_report`) | `ANTHROPIC_ADMIN_API_KEY` |
 | `O` | OpenAI | Admin API (`/v1/organization/costs`) | `OPENAI_ADMIN_API_KEY` |
@@ -114,7 +114,7 @@ Run the interactive setup script to configure admin/management API keys:
 node scripts/setup-api-keys.js
 ```
 
-This validates each key with a test API call before saving to `.env`. Groq requires no setup (automatic self-tracking).
+This validates each key with a test API call before saving to `.env`. Groq requires no setup (automatic centralized tracking).
 
 **Configuration**:
 
@@ -124,9 +124,11 @@ Provider credits in `config/live-logging-config.json` are used as fallbacks or f
 "provider_credits": {
   "groq": {
     "billingType": "monthly",
-    "monthlySpend": 0,
-    "billingMonth": "FEB",
-    "spendLimit": null
+    "billingMonth": "MAR",
+    "spendLimit": null,
+    "externalSpend": 13.32,
+    "autoScrape": true,
+    "scrapeIntervalMinutes": 60
   },
   "anthropic": { "prepaidCredits": 0 },
   "openai": { "prepaidCredits": null },
@@ -134,9 +136,22 @@ Provider credits in `config/live-logging-config.json` are used as fallbacks or f
 }
 ```
 
-**Groq Self-Tracking**:
+**Groq Cost Tracking (Centralized)**:
 
-Groq has no billing API. Instead, the Docker-based `BudgetTracker` (`src/inference/BudgetTracker.js`) tracks per-provider costs from every LLM call and writes them to `.data/llm-usage-costs.json`. The `api-quota-checker.js` reads this file for the Groq spend amount. The Playwright billing scraper is automatically bypassed when self-tracking data exists.
+Groq has no billing API. Spend is tracked through three complementary mechanisms:
+
+1. **BudgetTracker** (`src/inference/BudgetTracker.js`) — Tracks per-provider costs from LLM calls made through the main inference pipeline. Writes to `.data/llm-usage-costs.json` (debounced, atomic).
+
+2. **Centralized Usage Reporters** — External consumers of the Groq API key report their usage via shared reporter modules:
+   - `lib/utils/usage-cost-reporter.js` (Node.js) — Used by `mcp-constraint-monitor`
+   - `integrations/code-graph-rag/codebase_rag/utils/usage_cost_reporter.py` (Python) — Used by `code-graph-rag`
+   - Both use file locking and write to the same `.data/llm-usage-costs.json` file
+
+3. **externalSpend offset** — A manual offset in `config/live-logging-config.json` that covers usage from consumers not yet integrated with centralized reporting (e.g., `okb/rapid-automations`, Docker containers). This value is added to the tracked local spend.
+
+4. **Stagehand billing scraper** (`scripts/groq-billing-scraper.js`) — Periodic ground-truth validation against the Groq billing dashboard using AI-powered page extraction. Runs hourly when `autoScrape` is enabled; invoked as a background process by `statusline-health-monitor.js`.
+
+The `api-quota-checker.js` computes total Groq spend as: `localSpend` (from `.data/llm-usage-costs.json`) + `externalSpend` (config offset). The `externalSpend` resets to 0 on month rollover.
 
 **API Keys / Management Keys** (in `.env`):
 
@@ -146,7 +161,7 @@ Groq has no billing API. Instead, the Docker-based `BudgetTracker` (`src/inferen
 | `OPENAI_ADMIN_API_KEY` | OpenAI | platform.openai.com/settings/organization/admin-keys |
 | `XAI_MANAGEMENT_KEY` | xAI | console.x.ai → Settings → Management Keys |
 | `XAI_TEAM_ID` | xAI | console.x.ai team settings URL |
-| _(none needed)_ | Groq | Automatic via BudgetTracker self-tracking |
+| _(none needed)_ | Groq | Automatic via BudgetTracker + centralized reporters |
 
 **Environment Loading**: The `status-line-fast.cjs` cache reader automatically loads `.env` from the repo root, so admin keys defined there are available to all status line processes without needing to export them in the shell.
 
@@ -724,9 +739,11 @@ ps -eo pid,tty,comm | grep claude
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
 - `lib/api-quota-checker.js` - API quota provider (shared library, calls Admin/Management APIs)
-- `src/inference/BudgetTracker.js` - LLM cost tracking with file persistence (Docker)
+- `src/inference/BudgetTracker.js` - LLM cost tracking with file persistence
+- `lib/utils/usage-cost-reporter.js` - Shared Node.js usage cost reporter (used by external consumers)
+- `scripts/groq-billing-scraper.js` - Stagehand-based Groq billing page scraper (periodic validation)
 - `scripts/setup-api-keys.js` - Interactive admin/management API key setup
-- `.data/llm-usage-costs.json` - BudgetTracker cost output (Groq self-tracking)
+- `.data/llm-usage-costs.json` - Centralized cost output (BudgetTracker + external reporters)
 - `.lsl/global-registry.json` - LSL session registry
 - `.health/verification-status.json` - Health status cache
 - `.health/*-transcript-monitor-health.json` - Per-project health files (centralized in coding project)

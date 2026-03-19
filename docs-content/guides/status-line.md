@@ -125,7 +125,7 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 
 ## API Quota Monitoring
 
-All four LLM providers update automatically via API-based or self-tracking mechanisms. No manual spend updates needed after initial key setup.
+All four LLM providers update automatically via API-based or centralized tracking mechanisms. No manual spend updates needed after initial key setup.
 
 ### Format
 
@@ -135,7 +135,7 @@ All four LLM providers update automatically via API-based or self-tracking mecha
 
 | Abbrev | Provider | Data Source | Setup |
 |--------|----------|-------------|-------|
-| `Gq` | Groq | BudgetTracker self-tracking | Automatic (no key needed) |
+| `Gq` | Groq | BudgetTracker + centralized reporters | Automatic (no key needed) |
 | `Ggl` | Google Gemini | Free tier (no tracking) | `GEMINI_API_KEY` |
 | `A` | Anthropic | Admin API (cost report) | `ANTHROPIC_ADMIN_API_KEY` |
 | `O` | OpenAI | Admin API (costs) | `OPENAI_ADMIN_API_KEY` |
@@ -183,9 +183,22 @@ Each key is validated with a test API call before saving to `.env`. Groq require
 | `XAI_MANAGEMENT_KEY` | xAI | console.x.ai → Settings → Management Keys |
 | `XAI_TEAM_ID` | xAI | console.x.ai team settings URL |
 
-### How Groq Self-Tracking Works
+### How Groq Cost Tracking Works
 
-Groq has no billing API. The Docker-based `BudgetTracker` (`src/inference/BudgetTracker.js`) tracks costs from every LLM call and periodically writes to `.data/llm-usage-costs.json` (debounced, atomic write). The `api-quota-checker.js` reads this file for Groq spend. The legacy Playwright billing scraper is automatically bypassed when self-tracking data exists.
+Groq has no billing API. Spend is tracked through three complementary mechanisms:
+
+1. **BudgetTracker** (`src/inference/BudgetTracker.js`) — Tracks costs from LLM calls made through the main inference pipeline. Writes to `.data/llm-usage-costs.json` (debounced, atomic).
+
+2. **Centralized Usage Reporters** — External Groq API consumers report usage via shared modules:
+    - `lib/utils/usage-cost-reporter.js` (Node.js) — Used by `mcp-constraint-monitor`
+    - `integrations/code-graph-rag/codebase_rag/utils/usage_cost_reporter.py` (Python) — Used by `code-graph-rag`
+    - Both use file locking and write to the same `.data/llm-usage-costs.json`
+
+3. **externalSpend offset** — Manual offset in config for consumers not yet integrated (e.g., `okb/rapid-automations`, Docker). Resets to 0 on month rollover.
+
+4. **Stagehand billing scraper** (`scripts/groq-billing-scraper.js`) — Periodic ground-truth validation against the Groq billing dashboard using AI-powered page extraction. Runs hourly when `autoScrape` is enabled.
+
+Total spend = `localSpend` (from cost file) + `externalSpend` (config offset).
 
 ### Configuration
 
@@ -196,9 +209,11 @@ Provider credits in `config/live-logging-config.json` serve as fallbacks:
   "provider_credits": {
     "groq": {
       "billingType": "monthly",
-      "monthlySpend": 0,
-      "billingMonth": "FEB",
-      "spendLimit": null
+      "billingMonth": "MAR",
+      "spendLimit": null,
+      "externalSpend": 13.32,
+      "autoScrape": true,
+      "scrapeIntervalMinutes": 60
     },
     "anthropic": { "prepaidCredits": 0 },
     "openai": { "prepaidCredits": null },
@@ -538,9 +553,11 @@ docker compose -f docker/docker-compose.yml logs coding-services
 | `scripts/auto-restart-watcher.js` | File-change detection for daemon code reloading |
 | `scripts/health-verifier.js` | Health status provider |
 | `lib/api-quota-checker.js` | API quota provider (calls Admin/Management APIs) |
-| `src/inference/BudgetTracker.js` | LLM cost tracking with file persistence (Docker) |
+| `src/inference/BudgetTracker.js` | LLM cost tracking with file persistence |
+| `lib/utils/usage-cost-reporter.js` | Shared Node.js usage cost reporter (external consumers) |
+| `scripts/groq-billing-scraper.js` | Stagehand-based Groq billing page scraper |
 | `scripts/setup-api-keys.js` | Interactive admin/management API key setup |
-| `.data/llm-usage-costs.json` | BudgetTracker cost output (Groq self-tracking) |
+| `.data/llm-usage-costs.json` | Centralized cost output (BudgetTracker + external reporters) |
 | `.lsl/global-registry.json` | LSL session registry |
 | `.health/verification-status.json` | Health status cache |
 | `.logs/statusline-health-status.txt` | Rendered status line output |

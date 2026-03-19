@@ -225,7 +225,7 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 - **Suspicious Activity** - Detects stuck or stale monitors
 
 ### API Quota (Automatic Tracking)
-- **Groq** - Self-tracked via BudgetTracker (`Gq$0FEB`) or free tier (`Gq●`)
+- **Groq** - Centralized tracking via BudgetTracker + usage reporters (`Gq$15MAR`) or free tier (`Gq●`). External consumers (mcp-constraint-monitor, code-graph-rag) report via `usage-cost-reporter`. Periodic Stagehand billing scraper validates against Groq dashboard.
 - **Google Gemini** - Free tier quota (15 RPM, 1M TPD)
 - **Anthropic Claude** - Live spend via Admin API (`A$0`) or prepaid credits
 - **OpenAI** - Live spend via Admin API (`O$0`) or prepaid credits
@@ -380,8 +380,10 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/start-services-robust.js` - Service startup with supervisor
 - `scripts/tmux-session-wrapper.sh` - Tmux session wrapper (configures status-line-fast.cjs)
-- `lib/api-quota-checker.js` - API quota checking (Admin/Management APIs + self-tracking)
+- `lib/api-quota-checker.js` - API quota checking (Admin/Management APIs + centralized cost tracking)
 - `src/inference/BudgetTracker.js` - LLM cost tracking with `.data/llm-usage-costs.json` persistence
+- `lib/utils/usage-cost-reporter.js` - Shared Node.js usage cost reporter for external API consumers
+- `scripts/groq-billing-scraper.js` - Stagehand-based Groq billing page scraper (periodic validation)
 - `scripts/setup-api-keys.js` - Interactive admin/management API key setup
 
 **Data Files**:

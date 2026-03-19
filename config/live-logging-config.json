@@ -327,8 +327,10 @@
       "billingType": "monthly",
       "billingMonth": "MAR",
       "spendLimit": null,
-      "externalSpend": 10.81,
-      "description": "Groq monthly billing. Total = local BudgetTracker cost + externalSpend offset. Update externalSpend by checking console.groq.com and subtracting local cost. Resets to 0 on month rollover."
+      "externalSpend": 13.32,
+      "autoScrape": true,
+      "scrapeIntervalMinutes": 60,
+      "description": "Groq monthly billing. Total = local BudgetTracker cost ($1.97) + externalSpend ($13.32) = $15.29 (matches Groq dashboard as of 19-Mar-2026). externalSpend covers pre-centralized-tracking usage plus ongoing untracked consumers (okb/rapid-automations, Docker). mcp-constraint-monitor and code-graph-rag now report directly to BudgetTracker. Resets to 0 on month rollover. autoScrape enables periodic Stagehand-based billing page validation."
     },
     "google": {
       "prepaidCredits": null,
