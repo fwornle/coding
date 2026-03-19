@@ -44,8 +44,39 @@ import {
   listResourceTemplates,
   readResource,
 } from "./resources.js";
+import * as fs from "fs";
+import * as path from "path";
 
 const PORT = parseInt(process.env.BROWSER_ACCESS_PORT || '3847', 10);
+
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+
+/**
+ * Read the Anthropic standard model name from config/llm-providers.yaml.
+ * Uses a lightweight regex parse to avoid requiring a YAML dependency.
+ */
+function getAnthropicModel(): string {
+  try {
+    const codingRepo = process.env.CODING_REPO || path.resolve(process.cwd());
+    const yamlPath = path.join(codingRepo, "config", "llm-providers.yaml");
+    const yaml = fs.readFileSync(yamlPath, "utf8");
+    const anthropicMatch = yaml.match(/^\s*anthropic:\s*$/m);
+    if (anthropicMatch) {
+      const afterAnthropic = yaml.slice(
+        anthropicMatch.index! + anthropicMatch[0].length
+      );
+      const standardMatch = afterAnthropic.match(
+        /^\s+standard:\s*"?([^"\s\n]+)"?/m
+      );
+      if (standardMatch) {
+        return standardMatch[1];
+      }
+    }
+  } catch {
+    // Config unreadable — use default
+  }
+  return DEFAULT_ANTHROPIC_MODEL;
+}
 
 // Helper function to get the correct browser WebSocket URL
 async function getBrowserWebSocketUrl(cdpUrl: string): Promise<string> {
@@ -91,7 +122,7 @@ const getStagehandConfig = async (): Promise<ConstructorParams> => ({
     : undefined,
   enableCaching: true,
   browserbaseSessionID: undefined,
-  modelName: "claude-3-5-sonnet-20241022",
+  modelName: getAnthropicModel(),
   modelClientOptions: {
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseURL: "https://api.anthropic.com",

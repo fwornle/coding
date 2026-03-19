@@ -2384,15 +2384,93 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Check and run billing scraper if interval has passed
-   * Runs in background to avoid blocking health checks
+   * Check and run billing scraper if interval has passed.
+   * Spawns the Stagehand-based scraper as a background child process to avoid
+   * blocking status line updates. The scraper has its own interval gating
+   * (shouldScrape checks lastScraped + scrapeIntervalMinutes in config).
+   *
+   * Primary spend tracking is via BudgetTracker + externalSpend offset in
+   * api-quota-checker.js. The scraper provides periodic ground-truth validation
+   * against the Groq billing dashboard.
    */
   async checkBillingScraper() {
-    // No-op: Playwright scraper has been replaced by BudgetTracker + externalSpend.
-    // Groq spend is now calculated in api-quota-checker.js as:
-    //   localSpend (from .data/llm-usage-costs.json) + externalSpend (config offset)
-    // This updates in real-time as API calls are made — no browser scraping needed.
-    // To sync externalSpend, manually check console.groq.com and update config.
+    // Don't spawn if a scrape is already running
+    if (this._scraperRunning) return;
+
+    // Quick interval check to avoid spawning needlessly every 15s.
+    // The scraper also checks internally, but this saves the process spawn overhead.
+    try {
+      const configPath = path.join(this.codingRepoPath, 'config', 'live-logging-config.json');
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const groqConfig = config?.provider_credits?.groq;
+      if (!groqConfig || groqConfig.billingType !== 'monthly') return;
+      if (!groqConfig.autoScrape) return;
+
+      const intervalMs = (groqConfig.scrapeIntervalMinutes || 15) * 60 * 1000;
+      const lastScraped = groqConfig.lastScraped ? new Date(groqConfig.lastScraped).getTime() : 0;
+      if ((Date.now() - lastScraped) < intervalMs) return;
+    } catch {
+      return; // Config read error — skip this cycle
+    }
+
+    // Spawn the Stagehand scraper as a background process
+    const scraperPath = path.join(this.codingRepoPath, 'scripts', 'groq-billing-scraper.js');
+    if (!fs.existsSync(scraperPath)) {
+      this.log('Billing scraper not found, skipping', 'WARN');
+      return;
+    }
+
+    this._scraperRunning = true;
+    this.log('Spawning Groq billing scraper (background)...');
+
+    try {
+      const child = spawn('node', [scraperPath], {
+        cwd: this.codingRepoPath,
+        env: { ...process.env, CODING_REPO: this.codingRepoPath },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false, // Keep attached so we know when it finishes
+      });
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (data) => { stdout += data.toString(); });
+      child.stderr.on('data', (data) => { stderr += data.toString(); });
+
+      child.on('close', (code) => {
+        this._scraperRunning = false;
+        if (code === 0) {
+          try {
+            const result = JSON.parse(stdout.trim().split('\n').pop());
+            if (result.scraped) {
+              this.log(`Billing scraper: updated Groq spend to $${result.spend}`);
+            } else {
+              this.log(`Billing scraper: skipped (${result.reason || 'no scrape needed'})`);
+            }
+          } catch {
+            this.log('Billing scraper: completed (could not parse output)');
+          }
+        } else {
+          this.log(`Billing scraper exited with code ${code}: ${stderr.trim()}`, 'WARN');
+        }
+      });
+
+      child.on('error', (error) => {
+        this._scraperRunning = false;
+        this.log(`Billing scraper spawn error: ${error.message}`, 'WARN');
+      });
+
+      // Safety timeout: kill after 2 minutes to prevent zombie processes
+      setTimeout(() => {
+        if (this._scraperRunning) {
+          try { child.kill('SIGTERM'); } catch {}
+          this._scraperRunning = false;
+          this.log('Billing scraper killed (timeout after 2min)', 'WARN');
+        }
+      }, 120_000);
+    } catch (error) {
+      this._scraperRunning = false;
+      this.log(`Failed to spawn billing scraper: ${error.message}`, 'WARN');
+    }
   }
 
   /**
