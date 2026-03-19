@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Provider Registration" {
+  component "ProviderRegistration" as pr <<core>>
+  component "ProviderRegistry" as prr <<core>>
+  database "GraphDatabase" as gdb <<storage>>
+}
+
+package "Code Analysis" {
+  component "CodeGraphConstructor" as cgc <<core>>
+}
+
+pr --> prr : uses
+prr --> gdb : uses
+pr --> cgc : registers
+cgc --> prr : uses
+
+@enduml

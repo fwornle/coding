@@ -2,122 +2,118 @@
 
 **Type:** SubComponent
 
-The GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that GraphDatabaseManager can handle multiple concurrent requests without performance degradation.
+GraphDatabaseManager could interact with the WaveAgentController for managing Wave agents that operate on the graph database.
 
 ## What It Is  
 
-**GraphDatabaseManager** is the sub‑component responsible for exposing a clean, programmatic interface that stores and retrieves knowledge‑graph data for the broader **KnowledgeManagement** component. The manager lives alongside its sibling agents (e.g., **CodeAnalysisAgent**, **OntologyClassificationAgent**) and delegates all low‑level persistence work to the **GraphDatabaseAdapter** found at `storage/graph-database-adapter.ts`. By wrapping the adapter, GraphDatabaseManager shields the rest of the system from the intricacies of LevelDB‑based storage while still allowing higher‑level modules—such as manual‑learning pipelines or online‑learning processes—to interact with a unified graph‑database API.
+The **GraphDatabaseManager** is the core sub‑component responsible for orchestrating all interactions with the underlying knowledge graph.  It lives inside the *KnowledgeManagement* domain and is physically realized through a set of TypeScript modules, the most prominent being `graph-database-adapter.ts` (found under `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  This adapter encapsulates the low‑level calls to the graph store, while the manager itself coordinates higher‑level concerns such as schema enforcement, trace‑report generation, and LLM‑driven enrichment of graph data.  Its immediate children – **GraphStructureManager** and **GraphDatabaseAdapter** – implement the concrete graph‑manipulation logic, whereas sibling components (e.g., `WaveAgentController`, `LlmServiceManager`, `UkbTraceReportGenerator`, `VkbApiClientManager`) consume the manager’s services to fulfill their own responsibilities.
 
-The manager does not implement its own storage engine; instead, it acts as a façade that forwards calls to the adapter, which in turn handles the lock‑free LevelDB persistence and automatic JSON export synchronization described in the parent **KnowledgeManagement** documentation. Because the manager is designed to be reusable, other components (e.g., **CodeAnalysisAgent** for AST‑derived concepts or **OntologyClassificationAgent** for ontology‑based classifications) can invoke its methods without needing to understand the underlying database mechanics.
+![GraphDatabaseManager — Architecture](../../.data/knowledge-graph/insights/images/graph-database-manager-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture follows a classic **Adapter‑Facade** pattern. `GraphDatabaseAdapter` (the adapter) abstracts the concrete LevelDB implementation, providing a lock‑free interface that eliminates the usual LevelDB file‑locking contention. `GraphDatabaseManager` (the façade) builds on top of this adapter, offering domain‑specific CRUD operations that other components consume. This separation of concerns isolates persistence details from business logic, enabling each layer to evolve independently.
+The design of **GraphDatabaseManager** follows a **layered, adapter‑centric architecture**.  At the outermost layer, consumer services (ManualLearning, OnlineLearning, WaveAgentController, etc.) invoke the manager’s public API.  Internally the manager delegates persistence concerns to the **GraphDatabaseAdapter**, an implementation of the classic *Adapter* pattern that isolates the rest of the codebase from the specifics of the chosen graph store (Graphology + LevelDB).  This separation enables the KnowledgeManagement component to switch storage back‑ends with minimal ripple effect.
 
-The lock‑free design mentioned in the observations is a deliberate scalability decision: by avoiding OS‑level file locks, the system can service many concurrent requests—such as simultaneous knowledge‑graph updates from **ManualLearning** and **OnlineLearning**—without the performance penalties typical of LevelDB’s default locking strategy. This architectural choice also simplifies deployment in containerised or multi‑process environments where lock contention could otherwise become a bottleneck.
+Within the manager, the **GraphStructureManager** provides a domain‑specific façade for building and traversing graph structures.  It leverages Graphology’s in‑memory model and LevelDB for durable storage, a decision highlighted in the parent component’s documentation: “Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.”  The manager also acts as a **Coordinator** (a lightweight manager pattern) that brings together auxiliary services:
 
-Interaction flows are straightforward: a consumer (e.g., **CodeAnalysisAgent**) calls a method on GraphDatabaseManager → GraphDatabaseManager forwards the request to GraphDatabaseAdapter → the adapter performs a lock‑free write or read on LevelDB and, if configured, syncs a JSON export. The parent **KnowledgeManagement** component orchestrates these calls, ensuring that the graph‑database layer remains a single source of truth for entity persistence and knowledge‑decay tracking.
+* **LlmServiceManager** – supplies efficient LLM inference for tasks such as entity linking or relationship inference during graph updates.  
+* **WaveAgentController** – drives autonomous agents that may read from or write to the graph as part of their reasoning cycles.  
+* **UkbTraceReportGenerator** – pulls graph snapshots to produce traceability reports, ensuring auditability of knowledge‑graph modifications.  
+* **VkbApiClientManager** – mediates external VKB API calls that enrich graph nodes with external metadata.
+
+These collaborations are illustrated in the relationship diagram below, which maps the bidirectional dependencies among the manager and its siblings.
+
+![GraphDatabaseManager — Relationship](../../.data/knowledge-graph/insights/images/graph-database-manager-relationship.png)
+
+The overall architectural stance is **modular composition**: each responsibility is encapsulated in its own class/module, promoting single‑responsibility and clear boundaries.  No monolithic service layer is evident; instead, the manager stitches together well‑defined adapters and managers.
 
 ---
 
 ## Implementation Details  
 
-* **Key Path**: `storage/graph-database-adapter.ts` houses the concrete adapter class. Although the source symbols are not listed, the observation confirms that this file implements a **lock‑free architecture** for LevelDB. The lock‑free mechanism likely relies on atomic operations or a write‑ahead log to sidestep traditional file‑locking semantics, thereby allowing parallel access.
+### Core Classes  
 
-* **GraphDatabaseManager** itself is not tied to a specific file in the supplied observations, but its responsibilities are clear: it provides an **interface for storing and retrieving data**. Typical methods would include `addNode`, `addEdge`, `getNodeById`, `querySubgraph`, etc., each delegating to the adapter’s corresponding low‑level calls.
+| Class / Module | Role | Notable Path |
+|----------------|------|--------------|
+| **GraphDatabaseManager** | High‑level orchestrator; exposes CRUD‑style methods for knowledge entities, enforces schema, triggers auxiliary workflows. | Implicit – resides alongside its children in the KnowledgeManagement package. |
+| **GraphDatabaseAdapter** | Low‑level persistence adapter; translates manager calls into Graphology + LevelDB operations (e.g., `addNode`, `addEdge`, `exportJSON`). | `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` |
+| **GraphStructureManager** | Provides domain‑specific helpers for constructing graph topologies, handling versioning, and performing bulk imports/exports. | Referenced in `integrations/code-graph-rag/README.md` (Graphology usage). |
 
-* The manager can **leverage** two sibling agents:
-  * **CodeAnalysisAgent** – uses AST‑based analysis to extract concepts from source code. The manager can accept these concepts as graph nodes/edges, persisting the structural knowledge that the agent discovers.
-  * **OntologyClassificationAgent** – classifies entities against an ontology and returns confidence scores. The manager can store both the classification result and its confidence, enriching the graph with semantic metadata.
+### Data Flow  
 
-* The **automatic JSON export sync** mentioned in the parent component’s description implies that every successful write through the adapter triggers a serialization step. This ensures that a human‑readable snapshot of the graph is always available, which is useful for debugging or downstream analytics.
+1. **Invocation** – A consumer (e.g., `OnlineLearning`) calls `GraphDatabaseManager.createEntity(payload)`.  
+2. **Schema Validation** – The manager checks the payload against the predefined graph schema (observed to exist, though not enumerated).  
+3. **Structure Building** – It delegates to **GraphStructureManager** to instantiate the node/edge objects using Graphology APIs.  
+4. **Persistence** – The constructed objects are handed to **GraphDatabaseAdapter**, which writes them to LevelDB and optionally triggers an automatic JSON export for downstream sync processes.  
+5. **Post‑Processing** – If the operation requires LLM assistance (e.g., disambiguation), the manager forwards relevant context to **LlmServiceManager** and incorporates the returned annotations before final commit.  
+6. **Side‑Effects** – Upon successful commit, the manager may notify **WaveAgentController** to spawn agents that act on the new knowledge, or request **UkbTraceReportGenerator** to log the change for traceability.
 
-* Because no explicit functions are listed, the implementation likely follows a thin wrapper style: each public method on GraphDatabaseManager performs minimal validation, logs the operation, and then calls the adapter. Error handling is probably centralized in the adapter, which can translate LevelDB errors into domain‑specific exceptions.
+### Configuration  
+
+The manager respects a set of configuration files (not listed explicitly) that define:
+* The LevelDB storage location.  
+* JSON export paths for external synchronisation.  
+* Feature toggles for LLM‑assisted enrichment.  
+
+Because the observations do not enumerate concrete function signatures, the description stays at the architectural level, avoiding invented APIs.
 
 ---
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement**: The manager is a core dependency of KnowledgeManagement, which relies on it for persistent graph storage, knowledge‑decay tracking, and entity persistence. KnowledgeManagement’s description explicitly states that it “utilizes a GraphDatabaseAdapter… to efficiently store and query knowledge graphs,” confirming that GraphDatabaseManager is the primary conduit for those operations.
+**GraphDatabaseManager** sits at the nexus of several critical system interactions:
 
-* **Sibling – ManualLearning & OnlineLearning**: Both learning pipelines store extracted knowledge in the graph. They invoke GraphDatabaseManager’s API to persist entities generated from manual annotations or batch analysis of git history and LSL sessions.
+* **ManualLearning & OnlineLearning** – Both sub‑components rely on the manager to persist manually curated or automatically extracted knowledge entities.  Their usage patterns differ (batch vs. real‑time), but the underlying API remains consistent.  
+* **WaveAgentController** – Consumes graph updates to trigger autonomous agents.  The manager likely exposes event hooks or a publish‑subscribe interface that the controller subscribes to.  
+* **LlmServiceManager** – Provides on‑demand language‑model inference.  The manager passes raw textual fragments to this service, receives structured suggestions, and integrates them back into the graph.  
+* **UkbTraceReportGenerator** – Queries the manager for snapshots of graph state, using the same adapter to retrieve a consistent JSON view for reporting.  
+* **VkbApiClientManager** – Acts as a bridge to external VKB APIs; the manager forwards node identifiers that require external enrichment, receives the enriched payload, and updates the graph accordingly.  
 
-* **Sibling – CodeAnalysisAgent**: When the agent parses code and builds an abstract syntax tree, it can pass the resulting concepts to GraphDatabaseManager for insertion into the knowledge graph, enabling downstream reasoning about code structure.
-
-* **Sibling – OntologyClassificationAgent**: After classifying an entity, the agent can call GraphDatabaseManager to store the classification label together with its confidence score, enriching the graph’s semantic layer.
-
-* **External – ContentValidationAgent, TraceReportGenerator**: While not directly mentioned as consumers, these agents could query the graph via GraphDatabaseManager to validate content against stored knowledge or to generate trace reports that reference graph relationships.
-
-* **Storage Layer – LevelDB**: The adapter hides LevelDB specifics, but any component that needs to swap the storage backend would interact only with GraphDatabaseManager, preserving compatibility.
+All these interactions are mediated through well‑defined interfaces (e.g., `IGraphAdapter`, `ILlmService`, `IAgentController`) that are implied by the naming conventions and the “contains” relationships in the hierarchy.  The manager does **not** directly embed external service logic; instead, it composes them, preserving loose coupling.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always go through GraphDatabaseManager** – Direct access to `storage/graph-database-adapter.ts` should be avoided by application code. The manager encapsulates validation, logging, and any future business rules, ensuring a stable contract.
-
-2. **Prefer bulk operations for high‑throughput scenarios** – Because the adapter is lock‑free, it can handle many concurrent writes, but batching inserts (e.g., adding a set of nodes in a single call) reduces the overhead of JSON export synchronization.
-
-3. **Handle classification confidence explicitly** – When using **OntologyClassificationAgent**, store both the classification label and its confidence score via the manager’s API. This practice preserves the semantic richness needed for downstream reasoning.
-
-4. **Synchronize with the JSON export** – If a component relies on the exported JSON snapshot (e.g., for external analytics), ensure that writes are completed before reading the file. The manager’s methods are synchronous with the export step, so awaiting the manager’s promise (or callback) guarantees consistency.
-
-5. **Respect concurrency limits** – Although the lock‑free design removes traditional LevelDB lock contention, the underlying storage still has I/O limits. Monitor throughput and consider throttling if you observe saturation on disk I/O.
+1. **Prefer the Manager API** – Direct access to `GraphDatabaseAdapter` should be avoided by most developers.  All graph mutations must flow through **GraphDatabaseManager** to guarantee schema validation, LLM enrichment, and trace‑logging.  
+2. **Respect Transaction Boundaries** – When performing bulk operations (e.g., importing a batch of entities), wrap calls in a single manager transaction to ensure atomicity and to reduce LevelDB write amplification.  
+3. **Leverage LLM Assistance Judiciously** – Invoke `LlmServiceManager` only when the payload lacks sufficient disambiguation; unnecessary calls increase latency and cost.  
+4. **Handle Export Synchronisation** – After successful writes, the manager automatically emits a JSON export.  Consumers that rely on this export (e.g., downstream analytics pipelines) should monitor the export directory rather than poll the database directly.  
+5. **Maintain Schema Consistency** – When extending the knowledge graph schema, update the validation rules in the manager before altering any adapter code; this prevents runtime schema violations.  
 
 ---
 
-### Architectural Patterns Identified
-* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts LevelDB.
-* **Facade Pattern** – `GraphDatabaseManager` provides a simplified domain‑level API.
-* **Lock‑Free Concurrency** – Implemented in the adapter to avoid LevelDB file locks.
+### Summary of Architectural Insights  
 
-### Design Decisions and Trade‑offs
-* **Lock‑free persistence** trades the simplicity of LevelDB’s default locking for higher concurrency; it requires careful handling of atomic writes and may increase implementation complexity.
-* **Adapter‑Facade separation** isolates storage concerns, improving maintainability but adds an extra indirection layer that developers must understand.
-* **Automatic JSON export** ensures visibility of graph state at the cost of extra I/O on each write.
-
-### System Structure Insights
-* GraphDatabaseManager sits centrally within **KnowledgeManagement**, acting as the persistence gateway for both learning pipelines and analysis agents.
-* Sibling agents contribute data (concepts, classifications) that enrich the graph, while downstream agents (e.g., ContentValidationAgent) can query the same graph, creating a shared knowledge base.
-
-### Scalability Considerations
-* The lock‑free architecture enables horizontal scaling of request handling; multiple services can issue concurrent writes without blocking.
-* Bulk operations and careful I/O monitoring are recommended to keep LevelDB and JSON export throughput within acceptable bounds as data volume grows.
-
-### Maintainability Assessment
-* Clear separation of concerns (adapter vs. manager) makes the codebase easier to evolve; swapping LevelDB for another store would mainly affect the adapter.
-* The lack of exposed symbols in the current view suggests that documentation should be enriched with explicit method signatures and type definitions to aid future contributors.
-* Centralizing error handling in the adapter reduces duplication, but developers must keep the façade’s contract up‑to‑date as the adapter evolves.
-
-## Diagrams
-
-### Relationship
-
-![GraphDatabaseManager Relationship](images/graph-database-manager-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/graph-database-manager-relationship.png)
+| Aspect | Observation‑Based Insight |
+|--------|---------------------------|
+| **Architectural patterns identified** | Adapter pattern (`GraphDatabaseAdapter`), Manager/Coordinator pattern (`GraphDatabaseManager`), Composition of domain‑specific services (`GraphStructureManager`, `LlmServiceManager`, etc.). |
+| **Design decisions and trade‑offs** | *Separation of concerns* via adapters improves replaceability of the storage engine but adds an indirection layer.  Using Graphology + LevelDB yields high read/write performance and easy JSON export, at the cost of limited native query capabilities compared to a full‑blown graph DB.  Centralizing LLM calls in the manager simplifies enrichment but can become a bottleneck if not throttled. |
+| **System structure insights** | The manager is a hub within the KnowledgeManagement component, with children handling structure and persistence, and siblings consuming its services for learning, agent control, reporting, and external API integration. |
+| **Scalability considerations** | LevelDB scales well on a single node and supports fast key‑value writes; however, horizontal scaling would require sharding or migration to a distributed graph store.  The automatic JSON export enables downstream pipelines to process data in parallel, mitigating read pressure on the primary store. |
+| **Maintainability assessment** | High modularity (clear adapters, managers, and domain services) promotes maintainability.  The explicit “contains” relationships and single responsibility of each child component reduce the cognitive load when updating a particular concern (e.g., swapping the LLM provider).  The main risk lies in the tight coupling of trace‑report generation and agent control to the manager’s lifecycle; changes to the manager’s API may ripple to several siblings, so versioned interfaces are advisable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for storing and managing knowledge graphs. This adapter, implemented in storage/graph-database-adapter.ts, enables Graphology+LevelDB persistence with automatic JSON export sync. By using this adapter, the component can efficiently store and query knowledge graphs, which are essential for entity persistence and knowledge decay tracking. Furthermore, the GraphDatabaseAdapter employs a lock-free architecture to prevent LevelDB lock conflicts, ensuring that the component can handle multiple concurrent requests without performance degradation.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+
+### Children
+- [GraphStructureManager](./GraphStructureManager.md) -- The GraphDatabaseManager utilizes Graphology to create and manage graph structures, as mentioned in integrations/code-graph-rag/README.md
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The parent analysis suggests the GraphDatabaseAdapter is utilized by the GraphDatabaseManager for interacting with the graph database.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage knowledge graphs.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-- [CodeAnalysisAgent](./CodeAnalysisAgent.md) -- CodeAnalysisAgent uses AST-based techniques to analyze code structures and extract concepts.
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses ontology systems to classify entities and provide confidence scores for classifications.
-- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses various modes to validate content and provide validation reports.
-- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator generates detailed trace reports of UKB workflow runs, capturing data flow, concept extraction, and ontology classification.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely employs the GraphDatabaseManager to store and manage automatically extracted knowledge entities and relationships.
+- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
+- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
+- [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
+- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

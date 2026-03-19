@@ -1,0 +1,14 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Graph Analysis" {
+  component "CodeGraphConstructor" as cgc <<agent>>
+  component "CodeGraphAgent" as cga <<agent>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+}
+
+cgc --> gda : uses
+cga --> gda : uses
+cgc --> cga : analyzes
+
+@enduml

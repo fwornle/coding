@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Live Logging System" {
+  component "LiveLoggingSystem" as lls <<core>>
+  component "TranscriptAdapter" as ta <<api>>
+  component "LSLConverter" as lslc <<api>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "Logging" as log <<api>>
+}
+
+package "Agents" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+}
+
+package "Storage" {
+  database "LevelDB" as ldb
+  component "Graphology" as graph <<storage>>
+}
+
+lls --> ta : uses
+ta --> lslc : uses
+lslc --> gda : uses
+gda --> graph : uses
+gda --> ldb : uses
+log --> lls : uses
+oca --> gda : uses
+oca --> lls : uses
+
+@enduml

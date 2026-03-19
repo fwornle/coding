@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeGraphAnalysis
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[CodeGraphAnalysis] as code_graph_analysis #LightBlue
+[GraphDatabaseManagement] as graph_database_management #F0F0F0
+[ConstraintDetection] as constraint_detection #F0F0F0
+[LoggingAndMonitoring] as logging_and_monitoring #F0F0F0
+[ProviderRegistration] as provider_registration #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[CodeGraphConstructor] as code_graph_constructor #E8F5E8
+
+coding_patterns --> code_graph_analysis
+graph_database_management -[hidden]- code_graph_analysis
+constraint_detection -[hidden]- code_graph_analysis
+logging_and_monitoring -[hidden]- code_graph_analysis
+provider_registration -[hidden]- code_graph_analysis
+code_graph_rag -[hidden]- code_graph_analysis
+code_graph_analysis --> code_graph_constructor
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Data Storage" {
+  component "GraphDatabase" as graph <<storage>>
+  component "LevelDB" as leveldb <<storage>>
+}
+
+package "Entity Management" {
+  component "EntityPersistenceModule" as entity <<core>>
+  component "CodeGraphAgent" as codegraph <<agent>>
+  entity --> graph : stores and queries entities
+  entity --> leveldb : stores and queries relationships
+  codegraph --> entity : uses for code analysis
+}
+
+package "Learning and Inference" {
+  component "ManualLearning" as manual <<core>>
+  component "OnlineLearning" as online <<core>>
+  component "OntologyManagementSystem" as ontology <<core>>
+  entity --> manual : manages persistence
+  entity --> online : manages persistence
+  entity --> ontology : uses for classification and inference
+}
+
+package "Integrations" {
+  component "MCP Constraint Monitor" as mcp <<external>>
+  component "Hooks" as hooks <<cli>>
+  entity --> mcp : configures constraints
+  entity --> hooks : uses for logging and integration
+}
+
+@enduml

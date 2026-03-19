@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Logging" {
+  component "ConversationLogger" as cl <<core>>
+  component "Logger" as logger <<api>>
+  cl --> logger : uses
+}
+
+package "Specstory Adapter" {
+  component "SpecstoryAdapter" as sa <<external>>
+  cl --> sa : communicates
+  sa --> logger : logs
+}
+
+package "Specstory Extension" {
+  component "Specstory Extension" as se <<external>>
+  sa --> se : connects
+}
+
+logger --> sa : handles
+
+@enduml

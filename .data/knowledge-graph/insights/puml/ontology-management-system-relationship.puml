@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyManagementSystem
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[OntologyManagementSystem] as ontology_management_system #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[CodeGraphConstructor] as code_graph_constructor #F0F0F0
+[EntityPersistenceModule] as entity_persistence_module #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+
+knowledge_management --> ontology_management_system
+manual_learning -[hidden]- ontology_management_system
+online_learning -[hidden]- ontology_management_system
+code_graph_constructor -[hidden]- ontology_management_system
+entity_persistence_module -[hidden]- ontology_management_system
+graph_database_adapter -[hidden]- ontology_management_system
+ontology_management_system --> graph_database_adapter
+
+@enduml

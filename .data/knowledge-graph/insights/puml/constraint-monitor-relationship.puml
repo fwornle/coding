@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintMonitor
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintMonitor] as constraint_monitor #LightBlue
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[ConstraintValidationPattern] as constraint_validation_pattern #E8F5E8
+
+constraint_system --> constraint_monitor
+content_validation_agent -[hidden]- constraint_monitor
+constraint_monitor --> constraint_validation_pattern
+
+@enduml

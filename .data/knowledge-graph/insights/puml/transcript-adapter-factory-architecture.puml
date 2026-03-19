@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Transcript Adapter" {
+  component "TranscriptAdapterFactory" as taf <<core>>
+}
+
+package "API Integrations" {
+  component "Copilot CLI" as copilot <<external>>
+  component "Anthropic API" as anthropic <<api>>
+  component "BrowserBase API" as browserbase <<api>>
+}
+
+package "Graph-Code RAG System" {
+  component "Graph-Code RAG" as rag <<core>>
+  database "Code Graph Database" as cgdb <<storage>>
+}
+
+package "Knowledge Graph" {
+  component "KnowledgeGraphManager" as kgm <<core>>
+}
+
+taf --> copilot : uses
+taf --> anthropic : uses
+taf --> browserbase : uses
+taf --> rag : uses
+taf --> kgm : uses
+kgm --> cgdb : stores
+
+@enduml

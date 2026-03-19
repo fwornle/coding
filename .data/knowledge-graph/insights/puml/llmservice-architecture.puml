@@ -1,0 +1,17 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "LLM Service" {
+  component "LLMService" as llms <<core>>
+  component "Cache" as cache <<storage>>
+}
+
+package "LLM Operations" {
+  component "LLM Request" as llmreq <<api>>
+}
+
+llms --> cache : uses
+llms --> llmreq : makes request
+cache --> llmreq : stores response
+
+@enduml

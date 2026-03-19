@@ -1,0 +1,31 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "LLM Abstraction" {
+  component "LLMService" as llms <<core>>
+  component "Cache" as cache <<storage>>
+  component "Provider Registry" as pr <<core>>
+}
+
+package "Providers" {
+  component "DMRProvider" as dmr <<external>>
+  component "AnthropicProvider" as ap <<external>>
+}
+
+package "Utilities" {
+  component "Circuit Breaker" as cb <<core>>
+  component "Metrics Tracker" as mt <<core>>
+}
+
+llms --> cache : uses
+llms --> pr : uses
+pr --> dmr : manages
+pr --> ap : manages
+llms --> dmr : uses
+llms --> ap : uses
+dmr --> cb : monitored by
+ap --> cb : monitored by
+cb --> mt : reports to
+llms --> mt : reports to
+
+@enduml

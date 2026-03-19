@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMInitialization
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[LLMInitialization] as llminitialization #LightBlue
+[GraphManagement] as graph_management #F0F0F0
+[ConstraintValidation] as constraint_validation #F0F0F0
+[CodeGraphConstruction] as code_graph_construction #F0F0F0
+[ContentValidation] as content_validation #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRag] as code_graph_rag #F0F0F0
+[LazyLoadingMechanism] as lazy_loading_mechanism #E8F5E8
+
+coding_patterns --> llminitialization
+graph_management -[hidden]- llminitialization
+constraint_validation -[hidden]- llminitialization
+code_graph_construction -[hidden]- llminitialization
+content_validation -[hidden]- llminitialization
+browser_access -[hidden]- llminitialization
+code_graph_rag -[hidden]- llminitialization
+llminitialization --> lazy_loading_mechanism
+
+@enduml

@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMService
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMService] as llmservice #LightBlue
+[CacheManager] as cache_manager #E8F5E8
+
+llmabstraction --> llmservice
+llmservice --> cache_manager
+
+@enduml

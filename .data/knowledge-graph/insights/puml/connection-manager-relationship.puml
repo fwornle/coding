@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConnectionManager
+
+[Trajectory] as trajectory #FFFFDD
+[ConnectionManager] as connection_manager #LightBlue
+[LoggingMechanism] as logging_mechanism #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+trajectory --> connection_manager
+logging_mechanism -[hidden]- connection_manager
+specstory_adapter -[hidden]- connection_manager
+
+@enduml

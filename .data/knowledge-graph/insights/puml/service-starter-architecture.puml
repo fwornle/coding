@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Service Management" {
+  component "ServiceStarter" as ss <<core>>
+  component "DockerizedServices" as ds <<external>>
+  ss --> ds : manages
+}
+
+package "Service Startup" {
+  component "Health Verification" as hv <<api>>
+  component "Exponential Backoff" as eb <<core>>
+  ss --> hv : uses
+  ss --> eb : uses
+}
+
+package "Integrations" {
+  component "COPi" as copi <<external>>
+  component "Browser Access" as ba <<cli>>
+  ss --> copi : integrates
+  ss --> ba : integrates
+}
+
+ss --> ds : starts
+
+@enduml

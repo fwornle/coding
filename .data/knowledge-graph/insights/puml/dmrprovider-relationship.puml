@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DMRProvider
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[DMRProvider] as dmrprovider #LightBlue
+[LLMService] as llmservice #F0F0F0
+[AnthropicProvider] as anthropic_provider #F0F0F0
+[LocalInferenceHandler] as local_inference_handler #E8F5E8
+
+llmabstraction --> dmrprovider
+llmservice -[hidden]- dmrprovider
+anthropic_provider -[hidden]- dmrprovider
+dmrprovider --> local_inference_handler
+
+@enduml

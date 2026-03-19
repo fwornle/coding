@@ -1,0 +1,20 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Specstory Adapter" {
+  component "SpecstoryAdapter" as sa <<api>>
+  component "ConnectionManager" as cm <<core>>
+}
+
+package "Connection Mechanisms" {
+  component "HTTP" as http <<external>>
+  component "IPC" as ipc <<external>>
+  component "File Watch" as fw <<external>>
+}
+
+sa --> cm : uses
+cm --> http : connects via
+cm --> ipc : connects via
+cm --> fw : connects via
+
+@enduml

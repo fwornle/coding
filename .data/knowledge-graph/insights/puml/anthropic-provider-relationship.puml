@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AnthropicProvider
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[AnthropicProvider] as anthropic_provider #LightBlue
+[LLMService] as llmservice #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+
+llmabstraction --> anthropic_provider
+llmservice -[hidden]- anthropic_provider
+dmrprovider -[hidden]- anthropic_provider
+
+@enduml

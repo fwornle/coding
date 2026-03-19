@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Violation Logger" {
+  component "ViolationLogger" as vl <<core>>
+}
+
+package "Constraint Management" {
+  component "ConstraintManager" as cm <<core>>
+  database "Constraint Violation Log" as cvl <<storage>>
+}
+
+package "Notification" {
+  component "Notification System" as ns <<api>>
+}
+
+vl --> cm : handles
+cm --> cvl : stores
+vl --> cvl : logs
+vl --> ns : reports
+ns --> vl : notifies
+
+@enduml

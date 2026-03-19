@@ -2,161 +2,132 @@
 
 **Type:** SubComponent
 
-OnlineLearning could involve the use of semantic constraint detection, as mentioned in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
+OnlineLearning could interact with the WaveAgentController for managing the execution of Wave agents during automatic knowledge processing.
 
 ## What It Is  
 
-**OnlineLearning** is a sub‑component of the **KnowledgeManagement** system that focuses on continuously extracting, refining, and persisting knowledge from source‑code repositories.  The core of its functionality lives in the *batch analysis pipeline* (see the project documentation that mentions “extract knowledge from git history”) which is declared as a child component under **OnlineLearning**.  In practice, the sub‑component stitches together a handful of existing integrations:
+**OnlineLearning** is the automatic‑knowledge‑extraction sub‑component of the **KnowledgeManagement** domain.  It lives under the `KnowledgeManagement` folder (the exact path is not listed in the observations, but its parent component’s implementation resides in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  OnlineLearning orchestrates a pipeline that discovers, extracts, and persists knowledge entities from learning material without human intervention.  The pipeline draws on several “manager” services—`GraphDatabaseManager`, `LlmServiceManager`, `WaveAgentController`, `UkbTraceReportGenerator`, and `VkbApiClientManager`—to move data from raw sources through LLM‑driven processing into the persistent graph store.  Its child component, **CodeGraphRagIntegration**, supplies a specialized RAG (Retrieval‑Augmented Generation) capability for code‑base analysis, extending the automatic extraction logic to source‑code artifacts.  
 
-* **Code Graph RAG** – described in `integrations/code-graph-rag/README.md`, providing retrieval‑augmented generation over a graph representation of code.  
-* **MCP Constraint Monitor** – documented in `integrations/mcp-constraint-monitor/README.md` together with its constraint‑configuration guide (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) and semantic‑constraint detection (`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`).  
-* **Claude Code Hook Data Format** – the canonical payload format for communicating code‑related observations, defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
-* **copi** – a thin wrapper around the GitHub Copilot CLI, referenced in `integrations/copi/README.md`, used to enrich the learning loop with AI‑generated suggestions.
-
-Together these pieces enable **OnlineLearning** to ingest historical Git data, transform it into a code‑graph, run constraint‑based validation, and finally feed the results back into the broader KnowledgeManagement knowledge base.
+![OnlineLearning — Architecture](../../.data/knowledge-graph/insights/images/online-learning-architecture.png)  
 
 ---
 
 ## Architecture and Design  
 
-The architecture of **OnlineLearning** is a *pipeline‑oriented* composition rather than a monolithic block.  The design follows a **batch‑processing** pattern where the **BatchAnalysisPipeline** acts as the orchestrator: it pulls a series of commits, runs analysis steps, and persists the derived artefacts.  Each step is realized by an existing integration, allowing the sub‑component to remain thin while reusing proven capabilities.
+The architecture follows a **manager‑orchestrated pipeline** pattern.  Each manager encapsulates a distinct technical concern:
 
-* **Retrieval‑Augmented Generation (RAG)** – The Code Graph RAG system (`integrations/code-graph-rag/README.md`) supplies a *graph‑based index* of code entities that can be queried during the learning phase.  This RAG layer is invoked after the raw Git history is parsed, enabling semantic similarity searches that feed the constraint monitor.  
+* **GraphDatabaseManager** – abstracts CRUD operations against the graph store.  
+* **LlmServiceManager** – provides a thin façade for invoking large language models (LLMs) during extraction.  
+* **WaveAgentController** – coordinates the lifecycle of “Wave agents,” which are the runtime workers that execute LLM prompts and post‑processing steps.  
+* **UkbTraceReportGenerator** – collects execution metadata from the pipeline and produces trace reports for auditability.  
+* **VkbApiClientManager** – handles external VKB (Virtual Knowledge Base) API calls required for supplemental knowledge retrieval.
 
-* **Constraint‑Monitoring** – The MCP Constraint Monitor (`integrations/mcp-constraint-monitor/README.md`) provides two complementary mechanisms: a *static configuration* (see `constraint-configuration.md`) and a *semantic detection* engine (`semantic-constraint-detection.md`).  The monitor consumes the Claude Code Hook payload format (`CLAUDE-CODE-HOOK-FORMAT.md`) to standardize the data it validates, ensuring a single contract across all downstream consumers.  
+These managers are wired together by a configuration‑driven workflow (the observation that “OnlineLearning may follow a specific pipeline or workflow, potentially defined in a configuration file or module”).  The workflow definition lives outside the source symbols we have, but its presence explains how the components are sequenced without hard‑coded dependencies.  
 
-* **Lazy LLM Initialization (Inherited)** – The parent **KnowledgeManagement** component employs a lazy‑loading strategy for large language models (LLMs) – a pattern observable in its `ensureLLMInitialized()` method.  **OnlineLearning** inherits this behaviour, deferring the heavy LLM startup until the first batch run needs to generate or score code snippets (e.g., via **copi**).  This reduces memory pressure and improves overall system responsiveness.  
+At the data‑persistence layer, **GraphDatabaseAdapter** (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) provides the concrete bridge to a **Graphology + LevelDB** store.  This adapter is used by `GraphDatabaseManager` to write the automatically extracted knowledge graph, and the same adapter is shared with the sibling **ManualLearning** component, ensuring a consistent storage contract across manual and automatic pathways.  
 
-* **CLI Wrapper Integration** – The **copi** wrapper (`integrations/copi/README.md`) is used as a thin façade around the Copilot CLI, allowing the batch pipeline to request AI‑generated code suggestions without embedding Copilot directly.  This keeps the dependency surface small and isolates versioning concerns.  
+The overall design can be visualised as a directed graph of responsibilities, which is captured in the relationship diagram below.  
 
-The overall interaction diagram can be described as:
-
-```
-BatchAnalysisPipeline
-   └─> Git history extractor  (parent KnowledgeManagement)
-   └─> Code Graph RAG (integrations/code-graph-rag)
-   └─> Claude Code Hook payload construction
-   └─> MCP Constraint Monitor (config + semantic detection)
-   └─> Optional Copi AI suggestions
-   └─> Persisted knowledge back into KnowledgeManagement
-```
+![OnlineLearning — Relationship](../../.data/knowledge-graph/insights/images/online-learning-relationship.png)  
 
 ---
 
 ## Implementation Details  
 
-Even though the repository currently shows “0 code symbols found,” the observable file paths give a clear picture of the implementation boundaries:
+Even though the source contains **zero code symbols** directly under OnlineLearning, the surrounding ecosystem gives a clear picture of the implementation mechanics:
 
-1. **BatchAnalysisPipeline** – The pipeline is defined as a child of **OnlineLearning** and is referenced in the project documentation.  It likely consists of a series of scripted stages (e.g., a `runBatch.sh` or a TypeScript orchestrator) that iterate over commit ranges, invoke the downstream integrations, and write results to the KnowledgeManagement store.
+1. **Graph Interaction** – `GraphDatabaseAdapter` implements the low‑level API for persisting vertices and edges.  It serialises entities to JSON and stores them in LevelDB, leveraging Graphology’s in‑memory graph model for fast traversal before committing to disk.  `GraphDatabaseManager` calls this adapter for every create, update, or delete operation generated by the extraction pipeline.
 
-2. **Code Graph RAG Integration** – The `integrations/code-graph-rag/README.md` outlines the steps for building a graph of code entities (functions, classes, modules) and exposing a query API.  Within **OnlineLearning**, this API is called after the Git diff is parsed, converting raw code changes into graph nodes that can be traversed for similarity or dependency analysis.
+2. **LLM Invocation** – `LlmServiceManager` abstracts the underlying LLM provider (e.g., OpenAI, Anthropic).  It exposes methods such as `runPrompt(prompt: string, context: object)` that the Wave agents invoke.  By centralising token handling, request throttling, and response parsing, the manager shields the rest of the pipeline from provider‑specific quirks.
 
-3. **Constraint Configuration** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` describes a YAML/JSON schema that lists allowed patterns, prohibited APIs, and policy thresholds.  The BatchAnalysisPipeline loads this configuration at start‑up, feeding it into the monitor’s rule engine.
+3. **Wave Agent Execution** – `WaveAgentController` spawns lightweight agents (likely Node.js workers or containerised tasks) that perform the heavy‑weight LLM calls.  The controller monitors agent health, retries failed jobs, and reports status back to the pipeline orchestrator.
 
-4. **Semantic Constraint Detection** – The `semantic-constraint-detection.md` document explains how the monitor leverages LLM‑based embeddings to discover violations that are not expressible in static rules.  Because KnowledgeManagement lazily loads its LLM, the first time a semantic check runs the model is instantiated, after which the monitor can reuse the embeddings for subsequent commits.
+4. **Trace Reporting** – `UkbTraceReportGenerator` listens to events emitted by the manager layer (e.g., “entity‑extracted”, “graph‑write‑complete”).  It aggregates these events into a structured trace report that can be stored for debugging, compliance, or analytics.
 
-5. **Claude Code Hook Data Format** – The `CLAUDE-CODE-HOOK-FORMAT.md` defines a JSON envelope containing fields such as `filePath`, `codeSnippet`, `metadata`, and `diagnostics`.  OnlineLearning constructs this envelope after each analysis step, ensuring downstream consumers (including the MCP monitor and any reporting UI) receive a uniform payload.
+5. **External Knowledge Retrieval** – `VkbApiClientManager` encapsulates HTTP client logic for the VKB service.  During extraction, agents may request supplemental definitions or taxonomies; the manager handles authentication, pagination, and error handling.
 
-6. **copi Integration** – The `integrations/copi/README.md` shows a simple command‑line interface (`copi suggest --file <path>`) that returns AI‑generated suggestions.  The pipeline optionally invokes this command when a constraint violation is detected, using the suggestion as a remediation hint that is stored alongside the original payload.
+6. **Code‑Graph RAG Extension** – The child component **CodeGraphRagIntegration** adds a specialised RAG loop for source‑code.  Its README describes a “Graph‑Code RAG system” that analyses code repositories, extracts API calls, data flow, and maps them onto the knowledge graph.  This integration re‑uses the same managers (LLM, graph, trace) but supplies a different input adaptor that parses code ASTs.
 
-Because the sub‑component does not introduce its own bespoke classes, the bulk of its logic lives in orchestration scripts and configuration files that wire together the above integrations.
+The pipeline configuration (likely a YAML or JSON file) enumerates the sequence: *fetch raw material → invoke Wave agents → LLM extraction → enrich via VKB → persist via GraphDatabaseManager → generate trace*.  Because the configuration is external, the pipeline can be extended or reordered without code changes, supporting rapid experimentation.
 
 ---
 
 ## Integration Points  
 
-* **Parent – KnowledgeManagement**  
-  * Receives the final knowledge artefacts (graph updates, constraint reports) from **OnlineLearning**.  
-  * Supplies the lazy‑loaded LLM used by both the semantic constraint detector and any Copilot‑based suggestion generation.  
+OnlineLearning sits at the convergence of several system boundaries:
 
-* **Sibling – CodeGraphRAG**  
-  * Shares the same underlying graph‑construction logic; **OnlineLearning** simply consumes the ready‑made graph API rather than rebuilding it.  
+* **Parent – KnowledgeManagement** – The parent component supplies the overarching graph‑storage strategy (`graph-database-adapter.ts`).  OnlineLearning inherits this storage contract, ensuring that any knowledge entity it creates is immediately queryable by other KnowledgeManagement services (e.g., recommendation engines, analytics).
 
-* **Sibling – MCP Constraint Monitor**  
-  * Both **OnlineLearning** and **UKBTraceReporting** rely on the same Claude Code Hook format, promoting a unified contract for constraint data across the system.  
+* **Siblings** –  
+  * **ManualLearning** shares the `GraphDatabaseManager` and thus the same persistence semantics.  This creates a unified view of both manually curated and automatically extracted knowledge.  
+  * **WaveAgentController** and **LlmServiceManager** are co‑located siblings that together provide the compute substrate for LLM‑driven extraction.  Their tight coupling is intentional: the controller knows how to schedule LLM calls via the manager.  
+  * **UkbTraceReportGenerator** consumes events emitted by both `GraphDatabaseManager` and the Wave agents, producing cross‑component traceability.  
+  * **VkbApiClientManager** offers an external data‑enrichment hook; any knowledge entity that requires domain‑specific context can be augmented through this manager.
 
-* **Child – BatchAnalysisPipeline**  
-  * Acts as the execution engine for the learning loop, invoking the Code Graph RAG, the constraint monitor, and optionally **copi**.  
+* **Child – CodeGraphRagIntegration** – This integration adds a new input adaptor (code‑base parser) while re‑using the same manager stack.  It demonstrates the extensibility of OnlineLearning: new domains can plug in their own extractors without altering the core pipeline.
 
-* **External – copi (GitHub Copilot CLI wrapper)**  
-  * Provides AI‑assisted remediation suggestions that are fed back into the knowledge base as actionable items.  
-
-All integration points are mediated through well‑documented README or markdown files, meaning that developers can locate the exact contract (e.g., JSON schema, CLI flags) without hunting through source code.
+* **Configuration Layer** – Though not a concrete file in the observations, the pipeline configuration acts as the glue that binds these managers together.  It defines which agents run, which LLM prompts are used, and how trace reports are formatted.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Configure Constraints First** – Before running any batch job, ensure that `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is populated with the organization’s policy rules.  Missing or malformed configuration will cause the pipeline to abort early.  
+1. **Leverage the Configuration File** – When extending OnlineLearning (e.g., adding a new knowledge source), modify the pipeline configuration rather than editing manager code.  This preserves the separation of concerns and keeps the system maintainable.
 
-2. **Run the Batch Pipeline Incrementally** – Because the pipeline processes Git history, it is advisable to limit each run to a reasonable commit window (e.g., one week or a feature branch).  This prevents excessive memory consumption and keeps the LLM warm for semantic checks.  
+2. **Respect the Manager Interfaces** – All interactions with the graph, LLM, or external APIs should go through their respective managers (`GraphDatabaseManager`, `LlmServiceManager`, `VkbApiClientManager`).  Direct calls bypassing these abstractions break the retry, logging, and tracing guarantees.
 
-3. **Maintain the Claude Code Hook Schema** – Any changes to `CLAUDE-CODE-HOOK-FORMAT.md` must be reflected in both the constraint monitor and any downstream reporting components (e.g., **UKBTraceReporting**).  Validation scripts are provided in the integration docs to catch schema mismatches early.  
+3. **Monitor Wave Agents** – The `WaveAgentController` provides health metrics (agent count, error rates).  Production deployments should integrate these metrics into observability dashboards to detect back‑pressure or LLM throttling early.
 
-4. **Leverage copi Sparingly** – The **copi** wrapper incurs network latency and API cost.  Use it only when the constraint monitor flags a violation that cannot be auto‑resolved; otherwise, rely on static rule enforcement to keep the batch run fast.  
+4. **Trace Reporting is Mandatory** – Enable `UkbTraceReportGenerator` for every pipeline run.  The generated reports are the primary source for debugging extraction failures and for compliance audits.
 
-5. **Monitor LLM Warm‑up** – The first batch execution after a system restart will experience a noticeable delay due to lazy LLM initialization (as described in the parent component).  Plan for this latency in CI pipelines or scheduled jobs.  
-
-6. **Version Pin Integrations** – Each integration lives under its own `integrations/` directory with its own README.  Pin the versions of these sub‑modules in the top‑level `package.json` (or equivalent) to avoid accidental breaking changes when upstream repositories evolve.
+5. **Version the Graph Schema** – Since both OnlineLearning and ManualLearning write to the same graph, schema evolution must be coordinated.  Use the JSON export capabilities of the `GraphDatabaseAdapter` to version‑control graph snapshots.
 
 ---
 
 ### Architectural Patterns Identified  
 
-* **Batch Processing Pipeline** – orchestrated by the child **BatchAnalysisPipeline**.  
-* **Retrieval‑Augmented Generation (RAG)** – via the Code Graph RAG system.  
-* **Constraint‑Monitoring (Rule‑Based + Semantic)** – implemented by the MCP Constraint Monitor.  
-* **Lazy LLM Initialization** – inherited from the parent **KnowledgeManagement** component.  
-* **Standardized Data Exchange (Claude Code Hook Format)** – a contract‑first JSON payload model.  
+* **Manager/Facade Pattern** – Each technical domain (graph, LLM, external API) is encapsulated behind a dedicated manager class.  
+* **Pipeline/Workflow Configuration** – The extraction process is defined declaratively, allowing dynamic re‑ordering of steps.  
+* **Agent‑Based Execution** – Wave agents act as isolated workers that perform LLM‑heavy tasks, providing scalability and fault isolation.  
+* **Adapter Pattern** – `GraphDatabaseAdapter` adapts the generic Graphology API to the concrete LevelDB persistence layer.
 
 ### Design Decisions and Trade‑offs  
 
-| Decision | Benefit | Trade‑off |
-|----------|---------|-----------|
-| Reuse existing **Code Graph RAG** instead of building a custom index | Faster development, proven graph query capabilities | Introduces coupling to the RAG integration’s version and API surface |
-| Centralize constraint logic in **MCP Constraint Monitor** | Single source of truth for policies, reusable across siblings | All constraint changes affect multiple components; requires careful coordination |
-| Use **Claude Code Hook** as the universal payload format | Consistency across reporting, monitoring, and learning pipelines | Rigid schema may need extensions for future data types |
-| Lazy‑load LLMs | Lower baseline memory usage, quicker cold start for unrelated components | First‑run latency and potential “cold‑start” failures if initialization errors occur |
-| Optional **copi** AI suggestions | Adds value for remediation without embedding Copilot directly | Additional external service dependency, cost, and latency |
+* **Centralised Graph Storage** – Using a single Graphology + LevelDB store simplifies queries but couples manual and automatic knowledge pathways; any schema change impacts both.  
+* **External LLM Service** – Delegating LLM calls to `LlmServiceManager` enables provider flexibility but introduces latency and cost considerations; the Wave agents mitigate this by parallelising calls.  
+* **Configuration‑Driven Pipeline** – Gains flexibility and rapid iteration at the expense of static type safety; validation tooling is required to prevent mis‑configurations.  
+* **Trace Generation** – Adds overhead but provides essential observability; the trade‑off is acceptable for a system focused on insight generation.
 
 ### System Structure Insights  
 
-* **OnlineLearning** sits under **KnowledgeManagement**, inheriting its lazy LLM strategy and contributing enriched knowledge back to the parent.  
-* It shares the **CodeGraphRAG** and **MCP Constraint Monitor** integrations with several siblings (**ObservationDerivation**, **UKBTraceReporting**, **OntologyClassification**), indicating a design where core analysis capabilities are deliberately factored out for reuse.  
-* The child **BatchAnalysisPipeline** is the only concrete execution engine within the sub‑component, emphasizing a “pipeline‑as‑component” approach rather than a monolithic service.  
+OnlineLearning is a **sub‑component** that sits one level below **KnowledgeManagement** and shares its persistence backbone.  Its sibling components each own a distinct responsibility, yet they converge on the same manager interfaces, creating a cohesive yet modular ecosystem.  The child **CodeGraphRagIntegration** demonstrates the extensibility of the design: new domains can plug in custom extractors while re‑using the existing pipeline infrastructure.
 
 ### Scalability Considerations  
 
-* **Horizontal Scaling of the Batch Pipeline** – Since the pipeline processes commits independently, multiple instances can run in parallel on different commit ranges, leveraging the shared LLM cache to avoid redundant model loads.  
-* **RAG Vector Store** – The underlying graph index can be sharded or hosted on a scalable vector database, allowing the retrieval layer to handle larger codebases without degrading query latency.  
-* **Constraint Monitor Distribution** – Rule‑based checks are cheap and can be parallelized; semantic checks can be off‑loaded to a dedicated inference service that scales horizontally.  
+* **Graphology + LevelDB** scales horizontally for read‑heavy workloads; however, write contention can arise when many Wave agents persist simultaneously.  Sharding or moving to a distributed graph store would be a future mitigation.  
+* **Wave Agents** can be horizontally scaled (more agents = higher parallelism) limited only by LLM provider rate limits; the `LlmServiceManager` should implement back‑pressure handling.  
+* **Trace Reporting** stores metadata separately, avoiding bottlenecks on the main graph store.
 
 ### Maintainability Assessment  
 
-* **High Reuse, Low Duplication** – By delegating heavy lifting to well‑documented integrations, the sub‑component’s own codebase remains small, which eases maintenance.  
-* **Documentation‑Centric Integration** – All interaction contracts are captured in markdown files (`README.md`, `*.md`), providing clear guidance but also a risk: if documentation drifts from actual implementation, developers may encounter mismatches.  
-* **Dependency Management** – The reliance on external tools (Copilot via **copi**, LLM providers) introduces version‑compatibility concerns; regular audits of the `integrations/` directories are required.  
-* **Testing Surface** – Since the core logic is orchestration, integration tests that spin up the full pipeline (including the RAG graph and constraint monitor) are essential for regression safety.  
-
-Overall, **OnlineLearning** is a well‑orchestrated, integration‑heavy sub‑component that leverages existing analysis and monitoring capabilities to turn Git history into actionable knowledge while adhering to the architectural conventions already established in the broader **KnowledgeManagement** ecosystem.
+The **manager‑oriented** layout isolates concerns, making unit testing straightforward (each manager can be mocked).  The **configuration‑driven pipeline** reduces code churn when processes evolve.  However, the reliance on external configuration files demands robust validation and documentation to prevent runtime mis‑behaviour.  Overall, the architecture balances flexibility with clear module boundaries, supporting long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Children
-- [BatchAnalysisPipeline](./BatchAnalysisPipeline.md) -- The project documentation mentions the batch analysis pipeline in the context of OnlineLearning, implying its importance in extracting knowledge from git history.
+- [CodeGraphRagIntegration](./CodeGraphRagIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system, which is used for analyzing codebases and extracting knowledge entities and relationships.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely utilizes the GraphDatabaseAdapter for interacting with the graph database.
+- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
+- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
+- [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
+- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
 
 
 ---

@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityPersistenceModule
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[EntityPersistenceModule] as entity_persistence_module #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[CodeGraphConstructor] as code_graph_constructor #F0F0F0
+[OntologyManagementSystem] as ontology_management_system #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[GraphDatabaseAccessor] as graph_database_accessor #E8F5E8
+
+knowledge_management --> entity_persistence_module
+manual_learning -[hidden]- entity_persistence_module
+online_learning -[hidden]- entity_persistence_module
+code_graph_constructor -[hidden]- entity_persistence_module
+ontology_management_system -[hidden]- entity_persistence_module
+graph_database_adapter -[hidden]- entity_persistence_module
+entity_persistence_module --> graph_database_accessor
+
+@enduml

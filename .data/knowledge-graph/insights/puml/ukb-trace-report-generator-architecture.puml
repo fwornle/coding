@@ -1,0 +1,22 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Report Generation" {
+  component "UkbTraceReportGenerator" as utrg <<core>>
+  component "LlmServiceManager" as lsm <<api>>
+  component "VkbApiClientManager" as vacm <<external>>
+  component "WaveAgentController" as wac <<agent>>
+}
+
+package "Data Access" {
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+}
+
+utrg --> gdm : retrieves data
+utrg --> lsm : utilizes
+utrg --> vacm : interacts with
+utrg --> wac : gets information from
+utrg --> gda : accesses data
+
+@enduml

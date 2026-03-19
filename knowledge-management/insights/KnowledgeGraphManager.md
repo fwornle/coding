@@ -2,150 +2,118 @@
 
 **Type:** SubComponent
 
-KnowledgeGraphManager uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code and update the knowledge graph.
+The KnowledgeGraphManager sub-component may be implemented using the GraphDatabaseAdapter class, as described in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-**KnowledgeGraphManager** is the core sub‑component that owns and operates the knowledge graph used throughout the *CodingPatterns* suite. It lives in the same logical layer as the other pattern‑related services and is implemented by directly referencing a handful of concrete classes that appear in the source tree:
+The **KnowledgeGraphManager** sub‑component lives inside the *LiveLoggingSystem* repository and is responsible for persisting, classifying, and querying the system’s knowledge graph. Its implementation draws on the **Graph‑Code** system documented in `integrations/code-graph-rag/README.md`, which supplies the underlying graph‑based storage and retrieval capabilities. The manager is wired to the **GraphDatabaseAdapter** class (see `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) that abstracts the concrete graph database (e.g., Memgraph) behind a uniform API.  
 
-* **GraphDatabaseAdapter** – `storage/graph-database-adapter.ts`  
-* **CodeGraphAgent** – `integrations/mcp-server-semantic-analysis/src/agents/code‑graph‑agent.ts`  
+Operationally, KnowledgeGraphManager relies on several environment variables to locate and configure its external services: `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` for API‑level interactions, `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` for communicating with the Graph‑Code RAG service, and `MEMGRAPH_BATCH_SIZE` to tune batch‑write performance. Classification of ontology concepts is delegated to the **OntologyClassificationAgent** class, while all graph‑related events are emitted through the **LoggingMechanism** sub‑component, ensuring a consistent audit trail across the LiveLoggingSystem.  
 
-The manager is responsible for persisting design‑pattern entities, coding‑convention rules, and security‑standard artefacts in a graph database, and for exposing that structured knowledge to downstream analysis tools. It is declared as a child of the **CodingPatterns** component (the parent) and itself contains a **GraphStore** child that encapsulates low‑level graph‑DB interactions.
+![KnowledgeGraphManager — Architecture](../../.data/knowledge-graph/insights/images/knowledge-graph-manager-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-The observed interactions reveal a **layered, adapter‑centric architecture**. At the lowest level the **GraphDatabaseAdapter** abstracts the concrete graph‑DB implementation (e.g., Neo4j, JanusGraph) behind a simple API (`createEntity()`, `readEntity()`, etc.). This adapter is reused by several siblings—*DesignPatternManager*, *CodeGraphAgent*, and *GraphStore*—demonstrating a **shared‑adapter pattern** that prevents duplication of persistence logic.
+The architecture of KnowledgeGraphManager is **composition‑centric**: the manager composes several specialized collaborators rather than embedding their logic directly. At the core sits the **GraphDatabaseAdapter**, which follows the *Adapter* pattern to hide the specifics of the underlying graph database (e.g., connection handling, query syntax). This enables the manager to remain agnostic to whether Memgraph, Neo4j, or another graph engine is used, facilitating future swaps with minimal code change.  
 
-Above the storage layer sits **KnowledgeGraphManager**, which acts as an **orchestrator/mediator**. It coordinates three distinct concerns:
+Interaction with the external Graph‑Code RAG service occurs over dedicated ports (`CODE_GRAPH_RAG_SSE_PORT`, `CODE_GRAPH_RAG_PORT`). The manager sends graph‑mutation requests and receives streaming responses, suggesting a *client‑server* style integration where the RAG service acts as a remote knowledge‑retrieval engine. The presence of `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` indicates that KnowledgeGraphManager may also invoke LLM‑backed services (e.g., Anthropic Claude) for enrichment or reasoning tasks, positioning the component as a bridge between structured graph data and generative AI.  
 
-1. **Pattern Management** – via the **DesignPatternManager** sibling, which supplies the set of design‑pattern entities that should be represented in the graph.  
-2. **Convention Enforcement** – through collaboration with **CodingConventionEnforcer**, which queries the graph for rule definitions and validates source code accordingly.  
-3. **Code‑Graph Synchronisation** – by invoking **CodeGraphAgent** (located in `integrations/mcp-server-semantic-analysis/src/agents/code‑graph‑agent.ts`) to analyse fresh code, extract structural relationships, and push updates back into the graph.
+Logging is centralized through the **LoggingMechanism** sibling, which the manager calls whenever graph entities are created, updated, or classified. This shared logging facility aligns with the *Shared Service* pattern used across the LiveLoggingSystem, ensuring uniform telemetry and simplifying downstream analysis.  
 
-The **parent component** (*CodingPatterns*) groups all of these services under a single domain, while the **child component** (*GraphStore*) isolates direct database calls, keeping the manager’s business logic free from low‑level persistence details. This separation of concerns mirrors a classic **Domain‑Driven Design (DDD) bounded context**, where the knowledge graph is the aggregate root and the manager is the aggregate’s service layer.
+The **OntologyClassificationAgent** provides an *ontology‑driven* classification layer. By injecting this agent, KnowledgeGraphManager can map raw graph nodes to higher‑level concepts defined in the system’s ontology, supporting richer queries and downstream analytics.  
 
-No evidence of event‑driven or micro‑service boundaries appears in the observations, so the architecture is best described as a **monolithic module with well‑defined internal interfaces**.
+![KnowledgeGraphManager — Relationship](../../.data/knowledge-graph/insights/images/knowledge-graph-manager-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-### Core Classes  
+1. **GraphDatabaseAdapter** – Defined in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, this class encapsulates all low‑level graph operations (create, read, update, delete). It likely exposes methods such as `executeQuery`, `batchInsert`, and `applyConstraints`, translating generic calls into the dialect required by the configured graph store. The `MEMGRAPH_BATCH_SIZE` environment variable is read at startup to size the internal batch buffers, balancing throughput against memory pressure.  
 
-| Class / File | Role |
-|--------------|------|
-| `storage/graph-database-adapter.ts` – **GraphDatabaseAdapter** | Provides generic CRUD operations on the underlying graph DB. The parent component *CodingPatterns* explicitly uses its `createEntity()` method to store design‑pattern entities, and the same adapter is leveraged by *KnowledgeGraphManager* and its child *GraphStore*. |
-| `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` – **CodeGraphAgent** | Performs static analysis on source code, extracts graph‑relevant artefacts (e.g., classes, methods, dependencies) and writes them to the graph via the adapter. *KnowledgeGraphManager* calls this agent whenever new code is submitted for analysis. |
-| **KnowledgeGraphManager** (sub‑component) | Orchestrates the flow: <br>1. Calls **DesignPatternManager** to obtain pattern definitions.<br>2. Persists those definitions through **GraphStore** → **GraphDatabaseAdapter**.<br>3. Triggers **CodeGraphAgent** to enrich the graph with runtime code structure.<br>4. Exposes query interfaces used by **CodingConventionEnforcer** and **CodeAnalysisFramework**. |
-| **GraphStore** (child) | A thin wrapper around **GraphDatabaseAdapter**; encapsulates methods such as `storePattern()`, `storeCodeNode()`, and `fetchEntity()`. By confining all adapter calls to this child, the manager can focus on policy rather than plumbing. |
+2. **OntologyClassificationAgent** – Though the exact file path is not listed, the class name signals a dedicated agent that consumes node attributes and returns ontology labels. It probably implements an interface like `classify(node): OntologyLabel[]`, allowing KnowledgeGraphManager to enrich graph entities immediately after insertion.  
 
-### Interaction Flow  
+3. **API Credentials** – The manager reads `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` from the process environment. These keys are passed to HTTP clients that invoke external services (e.g., Anthropic’s Claude for semantic enrichment, Browserbase for web‑scraping assistance). The separation of credentials into environment variables follows the *12‑factor* configuration principle, keeping secrets out of source control.  
 
-1. **Pattern Ingestion** – When a new design pattern is defined, *DesignPatternManager* creates a representation and hands it to *KnowledgeGraphManager*. The manager forwards the entity to *GraphStore*, which invokes `GraphDatabaseAdapter.createEntity()` to persist the node and its relationships.  
-2. **Code Analysis Update** – A developer pushes a code change. *CodeAnalysisFramework* invokes *KnowledgeGraphManager*, which in turn runs **CodeGraphAgent**. The agent parses the code, builds a sub‑graph (e.g., “Class → Implements → Interface”), and writes it back through *GraphStore*.  
-3. **Convention Validation** – *CodingConventionEnforcer* queries the knowledge graph (via the manager’s read APIs) to retrieve applicable coding‑convention rules and validates the current code base.  
+4. **RAG Service Communication** – The ports `CODE_GRAPH_RAG_SSE_PORT` (Server‑Sent Events) and `CODE_GRAPH_RAG_PORT` (standard HTTP) are used to interact with the Graph‑Code RAG subsystem. KnowledgeGraphManager likely opens a persistent SSE connection for real‑time updates and falls back to synchronous HTTP calls for batch queries. This dual‑mode design provides both low‑latency streaming and reliable request‑response pathways.  
 
-All paths are concrete and traceable: `storage/graph-database-adapter.ts` for persistence, `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` for analysis, and the implicit manager‑level APIs that bind them together.
+5. **Logging Integration** – Calls to the **LoggingMechanism** sub‑component are made via a shared logger interface (e.g., `logger.info('graph.node.created', payload)`). This ensures that every graph mutation is captured in the same structured log format used by sibling components such as *TranscriptProcessing* and *TranscriptAdapterFactory*.  
+
+Because no concrete code symbols were discovered in the repository snapshot, the above details are inferred directly from the documented class names, file paths, and environment variables.
 
 ---
 
 ## Integration Points  
 
-* **Parent – CodingPatterns** – The parent aggregates the knowledge‑graph sub‑system with other pattern‑related services. It supplies the *DesignPatternManager* and expects the manager to keep the graph up‑to‑date.  
-* **Sibling – DesignPatternManager** – Provides the canonical list of design patterns; the manager consumes this list to create graph entities.  
-* **Sibling – CodingConventionEnforcer** – Reads rule definitions from the graph to enforce coding standards. The manager must expose stable query methods for this consumer.  
-* **Sibling – CodeAnalysisFramework** – Relies on the manager to supply an up‑to‑date graph that reflects the latest code structure; the framework triggers the manager’s *CodeGraphAgent* integration.  
-* **Sibling – SecurityStandardsModule** – Similar to the convention enforcer, it reads security‑related pattern nodes from the graph.  
-* **Child – GraphStore** – The only component that directly calls `GraphDatabaseAdapter`. All persistence requests from the manager flow through this child, ensuring a single point of change if the underlying DB driver evolves.  
+- **Parent – LiveLoggingSystem** – KnowledgeGraphManager is a child of LiveLoggingSystem, meaning its lifecycle is governed by the parent’s initialization sequence. LiveLoggingSystem likely starts the manager after configuring global logging and environment variables.  
 
-These integration points are all **synchronous method calls** (no messaging or event bus is mentioned), which simplifies the call graph but also creates tight coupling between the manager and its collaborators.
+- **Sibling – LoggingMechanism** – The manager delegates all event‑level logging to LoggingMechanism, sharing the same hooks and format used by *TranscriptProcessing* and *TranscriptAdapterFactory*. This tight coupling ensures that any change to logging conventions propagates uniformly.  
+
+- **Child – GraphDatabaseAdapter** – The adapter is the concrete bridge to the graph database. Any updates to constraint definitions (e.g., in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) automatically affect KnowledgeGraphManager’s behavior without code changes.  
+
+- **External Services** –  
+  * **Graph‑Code RAG** (`integrations/code-graph-rag/README.md`) – accessed via the ports mentioned above.  
+  * **Anthropic Claude** – accessed with `ANTHROPIC_API_KEY`.  
+  * **Browserbase** – accessed with `BROWSERBASE_API_KEY`.  
+
+These integrations are loosely coupled through configuration (environment variables) rather than hard‑coded URLs, allowing deployment‑time substitution of service endpoints.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Persist via GraphStore** – When adding new pattern or rule entities, always route the request through *KnowledgeGraphManager* → *GraphStore* → *GraphDatabaseAdapter*. Direct calls to the adapter bypass validation logic and should be avoided.  
-2. **Refresh the Graph After Code Changes** – After any code commit, invoke the manager’s `updateFromCode()` (or equivalent) method, which internally runs **CodeGraphAgent**. This guarantees that the knowledge graph reflects the latest code topology before any convention checks are performed.  
-3. **Read‑Only Access for Validators** – Components such as *CodingConventionEnforcer* and *SecurityStandardsModule* should treat the graph as read‑only; they must not attempt to mutate the graph directly. All mutations must be funneled through the manager to keep the data model consistent.  
-4. **Version the Pattern Definitions** – Since the manager stores design‑pattern entities, versioning them (e.g., via a `patternVersion` property) helps downstream validators handle legacy code bases without breaking.  
-5. **Handle Adapter Errors Gracefully** – `GraphDatabaseAdapter` may surface connectivity or constraint violations. The manager should translate these into domain‑specific exceptions (e.g., `PatternPersistenceError`) so that sibling components can react appropriately.  
+1. **Configuration First** – Before instantiating KnowledgeGraphManager, ensure all required environment variables are set: `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `CODE_GRAPH_RAG_SSE_PORT`, `CODE_GRAPH_RAG_PORT`, and `MEMGRAPH_BATCH_SIZE`. Missing keys will cause runtime failures when the manager attempts external calls.  
 
-Following these conventions keeps the knowledge graph coherent, avoids race conditions, and ensures that every consumer sees a consistent view of the design‑pattern and coding‑convention universe.
+2. **Batch Size Tuning** – Adjust `MEMGRAPH_BATCH_SIZE` based on the expected ingestion volume and the memory profile of the host. Larger batches improve throughput but increase heap usage; start with the default and monitor GC pauses.  
 
----
+3. **Ontology Updates** – When extending the system ontology, update the **OntologyClassificationAgent** implementation rather than modifying KnowledgeGraphManager directly. This preserves the separation of concerns and avoids recompiling the manager.  
 
-## Architectural Patterns Identified  
+4. **Logging Consistency** – Always emit events through the shared **LoggingMechanism**. Use the same event names and payload structures as sibling components to keep log aggregation pipelines simple.  
 
-| Pattern | Evidence |
-|---------|----------|
-| **Adapter** | `GraphDatabaseAdapter` abstracts the concrete graph database; used by multiple components (KnowledgeGraphManager, GraphStore, CodeGraphAgent). |
-| **Mediator/Orchestrator** | KnowledgeGraphManager coordinates between DesignPatternManager, CodingConventionEnforcer, CodeGraphAgent, and CodeAnalysisFramework. |
-| **Facade (via GraphStore)** | GraphStore offers a simplified façade over the low‑level adapter, exposing only domain‑relevant operations to the manager. |
-| **Layered Architecture** | Distinct layers – storage (adapter), domain (manager + GraphStore), integration (agents, frameworks). |
-
-No other patterns (e.g., event‑driven, micro‑services) are mentioned in the observations.
+5. **Error Handling** – Wrap calls to the RAG service and external APIs in retry logic that respects the idempotency of graph mutations. The manager should surface transient failures as structured error objects rather than raw exceptions, allowing callers to decide on back‑off strategies.  
 
 ---
 
-## Design Decisions and Trade‑offs  
+### Architectural Patterns Identified  
 
-* **Single‑Source Persistence via GraphDatabaseAdapter** – Centralising all graph‑DB interactions reduces duplication but creates a single point of failure; any change to the adapter’s API ripples through all siblings.  
-* **Synchronous Coordination** – The manager directly calls its siblings, which simplifies control flow and debugging but can lead to blocking behavior if, for example, the CodeGraphAgent performs heavy static analysis. An asynchronous queue could improve responsiveness but would add complexity.  
-* **Child Component (GraphStore) Isolation** – By delegating persistence to GraphStore, the manager remains focused on business rules. The trade‑off is an extra indirection layer, which may slightly increase latency but greatly improves maintainability.  
-* **Tight Coupling to Specific Paths** – All references are hard‑coded to concrete file locations (`storage/graph-database-adapter.ts`, `integrations/.../code-graph-agent.ts`). This makes the system easy to navigate but reduces flexibility for swapping out implementations without code changes.
+- **Adapter Pattern** – Implemented by `GraphDatabaseAdapter` to abstract the underlying graph store.  
+- **Composition over Inheritance** – KnowledgeGraphManager composes agents (OntologyClassificationAgent), adapters, and logging services rather than extending a monolithic base class.  
+- **Configuration‑Driven Integration** – All external service endpoints and credentials are supplied via environment variables, following the 12‑factor app approach.  
 
----
+### Design Decisions and Trade‑offs  
 
-## System Structure Insights  
+- **Decoupling via Adapter** – Gains flexibility to swap graph databases but adds an indirection layer that can obscure performance characteristics.  
+- **Dual RAG Communication (SSE + HTTP)** – Provides low‑latency streaming but increases implementation complexity and requires careful connection management.  
+- **Centralized Logging** – Simplifies observability but creates a runtime dependency on the LoggingMechanism; any logging outage can affect graph mutation visibility.  
 
-The overall system can be visualised as a **hub‑and‑spoke** model:
+### System Structure Insights  
 
-* **Hub** – KnowledgeGraphManager (orchestrator).  
-* **Spokes** – DesignPatternManager (pattern source), CodingConventionEnforcer (rule consumer), SecurityStandardsModule (security‑rule consumer), CodeAnalysisFramework (analysis consumer), CodeGraphAgent (analysis producer).  
+KnowledgeGraphManager sits at the intersection of **LiveLoggingSystem** (parent) and **GraphDatabaseAdapter** (child), acting as the orchestrator for graph persistence, ontology classification, and external AI enrichment. Its sibling relationships with *TranscriptProcessing* and *TranscriptAdapterFactory* indicate a broader pattern of “adapter‑style” components handling domain‑specific transformations while sharing common infrastructure (logging, configuration).  
 
-All spokes share the **GraphDatabaseAdapter** as the common persistence backbone, and the **GraphStore** child acts as the hub’s private gateway to that backbone. The parent component *CodingPatterns* groups these spokes and the hub under a single domain, reinforcing the bounded‑context concept.
+### Scalability Considerations  
 
----
+- **Batch Processing** (`MEMGRAPH_BATCH_SIZE`) allows horizontal scaling of ingestion pipelines; tuning this parameter is key when the volume of incoming knowledge spikes.  
+- **Streaming RAG Interface** (`CODE_GRAPH_RAG_SSE_PORT`) supports real‑time updates, which can be scaled out by running multiple RAG service instances behind a load balancer.  
+- **Stateless Credential Usage** – Because API keys are read from the environment, multiple instances of KnowledgeGraphManager can be deployed behind a container orchestrator without secret duplication.  
 
-## Scalability Considerations  
+### Maintainability Assessment  
 
-* **Graph Database Scaling** – Since the manager relies entirely on the graph DB, horizontal scaling of the underlying database (sharding, clustering) directly benefits the whole subsystem. The adapter pattern shields the rest of the code from the specifics of scaling.  
-* **Analysis Bottleneck** – CodeGraphAgent performs static analysis, which can be CPU‑intensive. If many code submissions arrive concurrently, the synchronous call from KnowledgeGraphManager could become a throughput limiter. Introducing a job queue or background worker for the agent would alleviate this.  
-* **Read‑Heavy Workloads** – Validators (CodingConventionEnforcer, SecurityStandardsModule) are read‑only and may generate high query volumes. Caching frequently accessed pattern sub‑graphs or employing read‑replicas of the graph DB would improve latency.  
-
----
-
-## Maintainability Assessment  
-
-The architecture scores **high on maintainability** for several reasons:
-
-1. **Clear Separation of Concerns** – Persistence, orchestration, and analysis are each encapsulated in dedicated classes (adapter, manager, agent).  
-2. **Reusability of the Adapter** – Multiple components share the same storage abstraction, reducing duplicated code and easing future DB migrations.  
-3. **Encapsulation via GraphStore** – Changes to how entities are stored (e.g., adding transaction handling) are isolated to GraphStore, leaving the manager’s public API stable.  
-4. **Explicit Dependency Graph** – The hierarchy (parent → sibling → child) is well‑documented in the observations, making impact analysis straightforward when modifying a component.  
-
-Potential maintenance challenges stem from the **tight synchronous coupling**; any change to the manager’s method signatures propagates to all siblings. Introducing interface abstractions (e.g., `IKnowledgeGraphService`) could mitigate this, but such an abstraction is not currently present in the observed code.  
-
-Overall, the design reflects a pragmatic, domain‑focused approach that balances simplicity with the need for a shared, queryable knowledge graph across the coding‑patterns ecosystem.
+The component’s reliance on well‑named adapters and agents promotes high maintainability: changes to the graph backend, ontology, or external AI services are isolated to their respective classes. The explicit environment‑variable configuration reduces hidden dependencies, making deployments reproducible. However, the lack of visible unit‑test symbols in the current snapshot suggests a potential gap in automated verification; adding tests around the adapter and classification logic would further improve long‑term reliability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to store design patterns as entities in the graph database. This facilitates the persistence and retrieval of coding conventions. For instance, when storing security standards and anti-patterns as entities, the GraphDatabaseAdapter.createEntity() method is deployed. This enables comprehensive coding guidance and is a key aspect of the component's architecture. The CodeAnalysisModule, which uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, relies on these stored patterns to analyze code.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture allows for easy extension and modification of agent-specific transcript formats. This is achieved through the use of the TranscriptAdapter, which is implemented in the lib/agent-api/transcript-api.js file. The TranscriptAdapter provides a standardized interface for handling different agent formats, such as Claude Code and Copilot CLI, and converting them to the unified LSL format. For example, the ClaudeCodeTranscriptAdapter class in lib/agent-api/transcripts/claudia-transcript-adapter.js extends the TranscriptAdapter class and provides a specific implementation for handling Claude Code transcripts.
 
 ### Children
-- [GraphStore](./GraphStore.md) -- The GraphStore utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to interact with the graph database.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The Graph-Code system is used for graph-based knowledge storage and querying as mentioned in integrations/code-graph-rag/README.md.
 
 ### Siblings
-- [DesignPatternManager](./DesignPatternManager.md) -- DesignPatternManager uses the createEntity() method in storage/graph-database-adapter.ts to store design patterns as entities in the graph database.
-- [CodingConventionEnforcer](./CodingConventionEnforcer.md) -- CodingConventionEnforcer uses the DesignPatternManager to retrieve stored design patterns for validation.
-- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
-- [SecurityStandardsModule](./SecurityStandardsModule.md) -- SecurityStandardsModule uses the DesignPatternManager to retrieve stored design patterns for security standard enforcement.
-- [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
+- [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptAdapter in lib/agent-api/transcript-api.js provides a standardized interface for handling different agent formats.
+- [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component may utilize the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI.
+- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
 
 
 ---

@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Transcript Processing" {
+  component "TranscriptAdapter" as ta <<api>>
+  component "ClaudeCodeTranscriptAdapter" as ccta <<agent>>
+  component "Transcript API" as t_api <<core>>
+}
+
+package "Data Storage" {
+  database "GraphDatabase" as gd <<storage>>
+}
+
+package "Integrations" {
+  component "Copilot CLI" as copilot <<cli>>
+  component "MCP Constraint Monitor" as mcp <<external>>
+}
+
+ta --> t_api : uses
+ccta --> ta : extends
+t_api --> gd : stores
+copilot --> t_api : uses
+mcp --> t_api : uses
+t_api --> mcp : processes
+
+@enduml

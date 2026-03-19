@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Semantic Analysis" {
+  component "SemanticAnalysisAgent" as sa <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "CodeGraphAgent" as cga <<agent>>
+  component "ContentValidationAgent" as cva <<agent>>
+  component "BaseAgent" as ba <<core>>
+}
+
+package "Storage" {
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  database "Graph Database" as gd
+}
+
+sa --> ba : extends
+oca --> ba : extends
+cga --> ba : extends
+cva --> ba : extends
+
+sa --> gda : uses
+cga --> gda : uses
+gda --> gd : connects to
+
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeGraph
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[CodeGraph] as code_graph #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraphGenerator] as code_graph_generator #E8F5E8
+
+semantic_analysis --> code_graph
+pipeline -[hidden]- code_graph
+ontology -[hidden]- code_graph
+insights -[hidden]- code_graph
+entity_validator -[hidden]- code_graph
+code_graph --> code_graph_generator
+
+@enduml

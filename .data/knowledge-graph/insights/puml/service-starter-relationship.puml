@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceStarter
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceStarter] as service_starter #LightBlue
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[RetryMechanism] as retry_mechanism #E8F5E8
+
+dockerized_services --> service_starter
+graph_database_manager -[hidden]- service_starter
+service_starter --> retry_mechanism
+
+@enduml

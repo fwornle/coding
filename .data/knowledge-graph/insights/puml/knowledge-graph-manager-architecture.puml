@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Knowledge Graph Manager" {
+  component "KnowledgeGraphManager" as kgm <<core>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "LoggingMechanism" as lm <<external>>
+}
+
+package "Graph-Code System" {
+  component "Graph-Code RAG" as gcr <<storage>>
+  database "Graph-Code Database" as gcd
+}
+
+package "API Interactions" {
+  cloud "Anthropic API" as aa <<external>>
+  cloud "BrowserBase API" as ba <<external>>
+}
+
+kgm --> gda : uses
+gda --> gcr : interacts
+gcr --> gcd : stores
+kgm --> oca : uses
+oca --> gda : uses
+kgm --> lm : logs
+kgm --> aa : uses
+kgm --> ba : uses
+
+@enduml

@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Pipeline Agents" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "CodeGraphAgent" as cga <<agent>>
+  component "PersistenceAgent" as pa <<agent>>
+}
+
+package "Message Bus" {
+  component "Message Bus" as mb <<core>>
+}
+
+package "Pipeline" {
+  component "WaveController" as wc <<core>>
+  component "Batch Analysis" as ba <<core>>
+}
+
+oca --> mb : sends
+saa --> mb : sends
+cga --> mb : sends
+pa --> mb : sends
+mb --> oca : receives
+mb --> saa : receives
+mb --> cga : receives
+mb --> pa : receives
+wc --> ba : controls
+ba --> oca : uses
+ba --> saa : uses
+ba --> cga : uses
+ba --> pa : uses
+
+@enduml

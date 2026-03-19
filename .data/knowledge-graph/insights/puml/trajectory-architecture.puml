@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Trajectory Component" {
+  component "SpecstoryAdapter" as sa <<adapter>>
+  component "Logger" as lg <<core>>
+  database "Specstory Extension" as se
+}
+
+package "Connections" {
+  component "httpRequest" as hr <<api>>
+}
+
+sa --> lg : uses
+sa --> hr : uses
+hr --> se : connects to
+sa --> se : logs conversation
+
+lg --> se : logs data
+
+@enduml

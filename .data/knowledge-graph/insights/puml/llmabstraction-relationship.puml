@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMAbstraction
+
+[Coding] as coding #FFFFDD
+[LLMAbstraction] as llmabstraction #LightBlue
+[LiveLoggingSystem] as live_logging_system #F0F0F0
+[DockerizedServices] as dockerized_services #F0F0F0
+[Trajectory] as trajectory #F0F0F0
+[KnowledgeManagement] as knowledge_management #F0F0F0
+[CodingPatterns] as coding_patterns #F0F0F0
+[ConstraintSystem] as constraint_system #F0F0F0
+[SemanticAnalysis] as semantic_analysis #F0F0F0
+[LLMService] as llmservice #E8F5E8
+
+coding --> llmabstraction
+live_logging_system -[hidden]- llmabstraction
+dockerized_services -[hidden]- llmabstraction
+trajectory -[hidden]- llmabstraction
+knowledge_management -[hidden]- llmabstraction
+coding_patterns -[hidden]- llmabstraction
+constraint_system -[hidden]- llmabstraction
+semantic_analysis -[hidden]- llmabstraction
+llmabstraction --> llmservice
+
+@enduml

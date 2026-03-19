@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Analysis" {
+  component "CodeGraphRag" as cgr <<core>>
+  component "GraphDatabase" as gd <<storage>>
+  component "CodeParser" as cp <<api>>
+}
+
+package "Data Storage" {
+  database "CodeBase" as cb
+}
+
+cgr --> gd : stores
+cgr --> cp : uses
+cp --> cb : processes
+gd --> cb : retrieves
+
+@enduml

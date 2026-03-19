@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Wave Agent" {
+  component "WaveAgentController" as wac <<core>>
+}
+
+package "Data Management" {
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  database "GraphDatabase" as gd
+  gdm --> gd
+  gda --> gd
+}
+
+package "External Services" {
+  component "LlmServiceManager" as lsm <<api>>
+  component "VkbApiClientManager" as vam <<external>>
+  component "UkbTraceReportGenerator" as utrg <<api>>
+}
+
+wac --> lsm : uses
+wac --> gdm : uses
+wac --> vam : uses
+wac --> utrg : uses
+wac --> gda : uses
+
+@enduml

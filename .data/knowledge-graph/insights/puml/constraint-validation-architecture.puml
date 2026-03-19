@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Constraint Validation" {
+  component "Constraint Validation" as cv <<core>>
+}
+
+package "System Components" {
+  component "Rules Engine" as re <<api>>
+  component "System Monitor" as sm <<agent>>
+  database "Constraint Database" as cd
+}
+
+cv --> re : uses
+re --> cd : reads
+sm --> cv : monitors
+cv --> sm : updates
+
+@enduml

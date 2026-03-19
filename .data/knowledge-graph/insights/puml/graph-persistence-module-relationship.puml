@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphPersistenceModule
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[GraphPersistenceModule] as graph_persistence_module #LightBlue
+[ConstraintManager] as constraint_manager #F0F0F0
+[HookOrchestrator] as hook_orchestrator #F0F0F0
+[ViolationLogger] as violation_logger #F0F0F0
+[GraphPersistenceAdapter] as graph_persistence_adapter #E8F5E8
+
+constraint_system --> graph_persistence_module
+constraint_manager -[hidden]- graph_persistence_module
+hook_orchestrator -[hidden]- graph_persistence_module
+violation_logger -[hidden]- graph_persistence_module
+graph_persistence_module --> graph_persistence_adapter
+
+@enduml

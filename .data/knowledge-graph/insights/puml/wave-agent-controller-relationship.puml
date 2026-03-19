@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: WaveAgentController
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[WaveAgentController] as wave_agent_controller #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[UkbTraceReportGenerator] as ukb_trace_report_generator #F0F0F0
+[LlmServiceManager] as llm_service_manager #F0F0F0
+[VkbApiClientManager] as vkb_api_client_manager #F0F0F0
+[WaveAgentInitialization] as wave_agent_initialization #E8F5E8
+
+knowledge_management --> wave_agent_controller
+manual_learning -[hidden]- wave_agent_controller
+online_learning -[hidden]- wave_agent_controller
+graph_database_manager -[hidden]- wave_agent_controller
+ukb_trace_report_generator -[hidden]- wave_agent_controller
+llm_service_manager -[hidden]- wave_agent_controller
+vkb_api_client_manager -[hidden]- wave_agent_controller
+wave_agent_controller --> wave_agent_initialization
+
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphDatabaseManagement
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[GraphDatabaseManagement] as graph_database_management #LightBlue
+[CodeGraphAnalysis] as code_graph_analysis #F0F0F0
+[ConstraintDetection] as constraint_detection #F0F0F0
+[LoggingAndMonitoring] as logging_and_monitoring #F0F0F0
+[ProviderRegistration] as provider_registration #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+
+coding_patterns --> graph_database_management
+code_graph_analysis -[hidden]- graph_database_management
+constraint_detection -[hidden]- graph_database_management
+logging_and_monitoring -[hidden]- graph_database_management
+provider_registration -[hidden]- graph_database_management
+code_graph_rag -[hidden]- graph_database_management
+graph_database_management --> graph_database_adapter
+
+@enduml

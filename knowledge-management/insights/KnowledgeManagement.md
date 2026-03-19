@@ -2,147 +2,136 @@
 
 **Type:** Component
 
-[LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
+[LLM] The KnowledgeManagement component provides comprehensive UKB trace report generation (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) for workflow analysis and debugging. This feature is essential for identifying issues or bottlenecks in the system, as it allows developers to visualize and analyze the execution of workflows and knowledge graphs. Furthermore, the use of work-stealing concurrency via runWithConcurrency (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) enables efficient parallel processing of UKB trace reports, reducing the time and resources required for workflow analysis and debugging.
 
 ## What It Is  
 
-The **KnowledgeManagement** component lives primarily in the `src/agents/`, `src/utils/`, and `storage/` folders of the code‑base.  Its core orchestration code is the **wave‑controller** (`wave-controller.ts`), where the `runWithConcurrency()` method (line 489) implements a work‑stealing loop, and the lazy‑initialisation guard `ensureLLMInitialized()` is called from the constructor of each *wave agent*.  Persistence is handled by the `PersistenceAgent` (`src/agents/persistence-agent.ts`) which talks to the `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`).  Observability is provided by the `UKBTraceReport` generator (`src/utils/ukb-trace-report.ts`).  Together these files give KnowledgeManagement the ability to ingest, store, classify, and report on complex knowledge graphs while keeping the heavy LLM services dormant until they are truly required.
+The **KnowledgeManagement** component lives under the `integrations/mcp-server-semantic-analysis` tree and is implemented primarily in three locations:  
 
-## Architecture and Design  
+* `src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** that persists knowledge entities and their relationships in a Graphology‑backed LevelDB store while automatically syncing a JSON export.  
+* `src/agents/code-graph-agent.ts` – the **Wave agent** implementation that lazily creates and runs large language model (LLM) instances only when a request arrives.  
+* `src/utils/ukb-trace-report.ts` – utilities for generating **UKB trace reports**, including a shared atomic index counter and a work‑stealing concurrency helper (`runWithConcurrency`).  
 
-The component follows a **modular, agent‑centric architecture**.  Each *wave agent* is created via a constructor‑based pattern that supplies its own configuration and then defers LLM boot‑strapping to `ensureLLMInitialized()`.  This is a classic **Lazy‑Initialization** pattern that reduces the memory footprint of multiple large language models and improves start‑up latency for the overall system.  
+Together these files give KnowledgeManagement the ability to ingest, store, query, and debug a knowledge graph that fuels the system’s “knowledge discovery and insight generation” goals. The component is a child of the top‑level **Coding** component and sits alongside siblings such as **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis**. Its own children – **ManualLearning**, **OnlineLearning**, **GraphDatabaseManager**, **WaveAgentController**, **UkbTraceReportGenerator**, **LlmServiceManager**, and **VkbApiClientManager** – each encapsulate a focused slice of the overall workflow.  
 
-Concurrency is achieved with a **work‑stealing scheduler** inside `runWithConcurrency()`.  A shared `AtomicInteger` (the “atomic index counter”) distributes work items among a pool of workers, allowing idle threads to steal tasks from busier peers.  This pattern maximises CPU utilisation without the need for a static work‑queue size.  
-
-Persistence is abstracted behind the **Adapter** pattern: `GraphDatabaseAdapter` hides the details of Graphology + LevelDB, exposing a simple API that the `PersistenceAgent` consumes.  The adapter also performs an **automatic JSON export sync**, guaranteeing that an external JSON snapshot is always consistent with the on‑disk LevelDB representation.  
-
-The **Single‑Responsibility Principle (SRP)** is evident in the `PersistenceAgent`, which is solely responsible for CRUD operations on the graph store, while the `UKBTraceReport` utility is dedicated to diagnostics and trace generation.  The component therefore cleanly separates *knowledge storage*, *LLM interaction*, and *observability* concerns.  
-
-Because the parent **Coding** component and its siblings (e.g., *LiveLoggingSystem*, *LLMAbstraction*, *DockerizedServices*) also rely on `GraphDatabaseAdapter` and lazy LLM init, KnowledgeManagement re‑uses proven infrastructure, reinforcing a **shared‑infrastructure** design across the project.
-
-## Implementation Details  
-
-1. **Lazy LLM Loading** – Every wave agent’s constructor calls `ensureLLMInitialized()` (observed in the wave‑controller pattern).  The method checks a module‑level flag; if the LLM service has not yet been instantiated, it creates the appropriate `LLMService` (or provider) and caches it.  Subsequent calls become no‑ops, guaranteeing a single shared instance per process.  
-
-2. **Work‑Stealing Concurrency** – Inside `wave-controller.ts:489` the scheduler maintains an `AtomicInteger` called `nextIndex`.  Workers atomically fetch and increment this counter to claim the next chunk of work.  When a worker’s local queue empties, it attempts to “steal” work from the tail of another worker’s queue, reducing idle time and keeping the pipeline saturated even when tasks have heterogeneous execution times.  
-
-3. **Graph Persistence** – `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`) constructs a Graphology instance backed by LevelDB.  The adapter registers event listeners that trigger a JSON export each time the underlying graph mutates, ensuring an up‑to‑date JSON file for downstream tools.  The adapter exposes methods such as `addNode`, `addEdge`, `getNode`, and `query`, which `PersistenceAgent` (`src/agents/persistence-agent.ts`) calls to persist entities, update relationships, and retrieve knowledge sub‑graphs.  
-
-4. **UKB Trace Reporting** – The utility `src/utils/ukb-trace-report.ts` walks the execution graph, extracts ontology classification results (including confidence scores), and writes a markdown/JSON report.  The report includes per‑wave timing, LLM invocation counts, and any data‑loss events flagged by the component’s QA monitor.  
-
-5. **Data‑Loss Tracking & QA** – Although the exact file is not named, the component embeds hooks that listen for failed writes or mismatched schema validations.  When a discrepancy is detected, a QA issue object is created and routed to the same trace‑reporting pipeline, giving developers immediate visibility into integrity problems.  
-
-6. **Child Sub‑Components** – The children (e.g., *ManualLearning*, *OnlineLearning*, *OntologyClassification*) are instantiated by the main KnowledgeManagement service and receive the same `GraphDatabaseAdapter` instance, allowing them to read/write the same graph without duplication.  For example, *OntologyClassification* re‑uses the ontology‑classification logic that appears in the UKB trace reports, while *CodeGraphRAG* leverages the graph store to perform retrieval‑augmented generation on code entities.
-
-## Integration Points  
-
-- **LLMAbstraction** – The lazy‑init guard ultimately creates an instance of the high‑level `LLMService` class defined in `lib/llm/llm-service.ts`.  This service is the same one used by sibling components, so any configuration changes (e.g., provider registry updates) propagate automatically to KnowledgeManagement.  
-
-- **GraphDatabaseAdapter** – Shared with *LiveLoggingSystem* and *CodingPatterns*.  Because the adapter lives under `storage/graph-database-adapter.ts`, any component that imports it automatically participates in the same LevelDB + Graphology persistence layer, ensuring a unified knowledge graph across the entire Coding project.  
-
-- **Agent Framework** – Wave agents follow the same interface used by the *OntologyClassificationAgent* in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  This common contract (e.g., `initialize()`, `process()`, `shutdown()`) allows the wave controller to schedule heterogeneous agents without bespoke glue code.  
-
-- **Trace & QA Pipeline** – The `UKBTraceReport` output is consumed by the broader **UKBTraceReporting** child component, which may forward the JSON payload to external monitoring dashboards or CI pipelines.  The same report format is used by *LiveLoggingSystem* for cross‑component observability.  
-
-- **Browser Access & CodeGraphRAG** – Both children interact with the graph via the adapter.  *BrowserAccess* provides a UI layer that reads the JSON export produced by the adapter, while *CodeGraphRAG* performs graph traversals to retrieve context for LLM prompts.  
-
-## Usage Guidelines  
-
-1. **Never instantiate an LLM directly** – Always create wave agents through the provided constructor and rely on `ensureLLMInitialized()` to lazily obtain the shared LLM instance.  Direct instantiation bypasses the singleton guard and can cause excessive memory consumption.  
-
-2. **Persist via the PersistenceAgent** – All graph mutations should be routed through `src/agents/persistence-agent.ts`.  This guarantees that the automatic JSON export sync stays consistent and that data‑loss hooks are engaged.  
-
-3. **Prefer the work‑stealing API** – When launching a batch of wave agents, use the `runWithConcurrency()` helper rather than spawning custom threads.  The atomic index counter and steal logic are tuned for the heterogeneous workloads typical of LLM inference and graph queries.  
-
-4. **Emit QA events** – If a custom agent detects a schema violation or an unexpected null value, call the QA reporting hook (exposed by the trace utility) so that the `UKBTraceReport` includes the issue.  This keeps the component’s reliability guarantees intact.  
-
-5. **Keep the adapter version aligned** – Because multiple siblings depend on `storage/graph-database-adapter.ts`, any upgrade to Graphology or LevelDB must be coordinated across the whole Coding project to avoid version skew.  
-
-## Architectural Patterns Identified  
-
-| Pattern | Where It Appears | Purpose |
-|---------|------------------|---------|
-| Lazy‑Initialization | `ensureLLMInitialized()` (wave agents) | Defers heavyweight LLM creation until first use, saving memory and start‑up time |
-| Work‑Stealing Scheduler | `runWithConcurrency()` in `wave-controller.ts:489` | Dynamically balances load across worker threads, reducing idle time |
-| Adapter | `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`) | Decouples the rest of the system from Graphology + LevelDB implementation details |
-| Single‑Responsibility (SRP) | `PersistenceAgent` (`src/agents/persistence-agent.ts`) | Isolates persistence logic from other concerns |
-| Agent‑Based Modularity | Wave agents, `OntologyClassificationAgent` (sibling) | Enables pluggable, single‑purpose workers that can be composed at runtime |
-| Dependency Injection (DI) (via shared LLMService) | LLMAbstraction sibling, indirectly used by KnowledgeManagement | Allows swapping of LLM providers, mock services, and budget trackers |
-| Observer / Reporting | `UKBTraceReport` (`src/utils/ukb-trace-report.ts`) | Provides runtime diagnostics and QA issue aggregation |
-
-## Design Decisions and Trade‑offs  
-
-| Decision | Benefit | Trade‑off |
-|----------|---------|-----------|
-| Lazy LLM init | Low memory footprint, faster cold start | First inference incurs initialization latency; must guard against race conditions |
-| Work‑stealing concurrency | High CPU utilisation for heterogeneous tasks | Added complexity in debugging race conditions; reliance on atomic counters may limit scalability on extremely high core counts |
-| Graphology + LevelDB storage | Natural fit for highly connected knowledge graphs; fast key‑value persistence | LevelDB is single‑process; horizontal scaling requires sharding or external replication |
-| Automatic JSON export sync | Guarantees an up‑to‑date, portable snapshot for UI or external tools | Synchronous export on every mutation can add I/O overhead; may need throttling for bulk updates |
-| Dedicated PersistenceAgent | Clear separation of concerns, easier unit testing | Slight indirection; any change in adapter API must be mirrored in the agent |
-
-## System Structure Insights  
-
-- **Parent‑Child Relationship** – KnowledgeManagement is a child of the root *Coding* component, inheriting the project‑wide graph database and LLM service infrastructure.  Its own children (ManualLearning, OnlineLearning, etc.) are thin wrappers that reuse the same persistence and LLM layers, ensuring a single source of truth for all knowledge entities.  
-
-- **Sibling Reuse** – The *LiveLoggingSystem* and *CodingPatterns* siblings already employ the same `GraphDatabaseAdapter` and lazy LLM pattern, which means KnowledgeManagement can be reasoned about using the same mental model as those components.  This reduces the learning curve for new contributors.  
-
-- **Layered Interaction** – At the lowest layer, the LevelDB file system stores raw graph data.  The Graphology library provides an in‑memory graph API.  The adapter bridges these, exposing CRUD methods to the `PersistenceAgent`.  Above that sits the wave controller orchestrating agents, which in turn call the shared `LLMService` only when needed.  Finally, the trace/reporting utilities observe the whole stack, feeding back into QA.  
-
-## Scalability Considerations  
-
-- **CPU‑bound scaling** is handled by the work‑stealing scheduler; adding more worker threads will automatically improve throughput until the atomic counter becomes a contention point.  If contention rises, a segmented counter or lock‑free queue could be introduced.  
-
-- **Memory scaling** is primarily governed by the number of active LLM instances.  Because lazy loading ensures only the required models are resident, the system can support many concurrent workflows as long as they do not simultaneously demand many distinct LLMs.  
-
-- **Data scaling**: LevelDB stores data on‑disk and can handle millions of nodes, but it is not a distributed store.  For truly massive knowledge graphs, the architecture would need to replace or augment the adapter with a distributed graph store (e.g., Neo4j, JanusGraph) while preserving the same adapter interface.  
-
-- **I/O scaling**: The automatic JSON export may become a bottleneck under heavy write loads.  A possible mitigation is to batch exports or write to a separate background worker, which would still keep the guarantee of eventual consistency.  
-
-## Maintainability Assessment  
-
-The component scores highly on maintainability:
-
-- **Clear separation of concerns** (agents, adapter, trace utility) makes each piece independently testable and replaceable.  
-- **Reuse of shared infrastructure** (LLMService, GraphDatabaseAdapter) reduces duplication and ensures that bug fixes in the adapter propagate automatically.  
-- **Explicit patterns** (lazy init, work‑stealing) are documented in the source (e.g., comments around `ensureLLMInitialized()` and the atomic counter), aiding future developers in understanding concurrency semantics.  
-- **Observability** via `UKBTraceReport` provides immediate feedback on performance regressions or data‑loss events, shortening the debugging cycle.  
-
-Potential maintenance risks lie in the **tight coupling to LevelDB** (single‑process) and the **complexity of the work‑stealing scheduler**, which may require careful profiling when scaling beyond a few dozen cores.  However, because these concerns are encapsulated behind well‑named functions and adapters, refactoring them later would be straightforward.
+![KnowledgeManagement — Architecture](../../.data/knowledge-graph/insights/images/knowledge-management-architecture.png)
 
 ---
 
-**Summary of Requested Items**
+## Architecture and Design  
 
-1. **Architectural patterns identified** – Lazy‑Initialization, Work‑Stealing Scheduler, Adapter, SRP, Agent‑Based Modularity, Dependency Injection, Observer/Reporting.  
-2. **Design decisions and trade‑offs** – documented in the table above.  
-3. **System structure insights** – layered graph‑store → adapter → persistence agent → wave controller → LLM service, with parent‑child and sibling reuse.  
-4. **Scalability considerations** – CPU concurrency via work‑stealing, memory via lazy LLMs, data‑scale limits of LevelDB, I/O impact of JSON sync.  
-5. **Maintainability assessment** – high due to modularity, SRP, shared infrastructure, and built‑in observability; watch points are storage choice and concurrency complexity.
+KnowledgeManagement follows a **modular, adapter‑centric architecture**. The core persistence contract is expressed by the **GraphDatabaseAdapter** ( `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` ), which abstracts the underlying Graphology + LevelDB engine. By delegating all graph reads and writes to this adapter, the component can evolve its storage strategy without rippling changes to higher‑level logic—a pattern also seen in the sibling **CodingPatterns** and **ConstraintSystem** components.  
+
+The component adopts the **Wave agent pattern** ( `src/agents/code-graph-agent.ts` ) to manage LLM resources. Each agent is a lightweight wrapper that postpones LLM initialization until a concrete request triggers it. This lazy‑initialization design reduces memory pressure and improves cold‑start latency, especially important when many agents may exist concurrently. The pattern also enforces a clear separation of concerns: the agent handles orchestration, while the **LLMService** ( `lib/llm/llm-service.ts` ) provides a unified façade for all LLM interactions.  
+
+Concurrency is handled through a **shared atomic index counter** ( `src/utils/ukb-trace-report.ts` ) and a **work‑stealing scheduler** (`runWithConcurrency`). The atomic counter guarantees that parallel trace‑report workers can safely assign unique identifiers, preventing race conditions in the UKB trace data. Work‑stealing enables the system to balance load dynamically across available threads, shortening the overall time needed for trace‑report generation—a critical factor for workflow analysis and debugging.  
+
+Finally, the **VkbApiClient** ( `lib/ukb-unified/core/VkbApiClient.js` ) acts as the gateway to the external VKB API, providing intelligent routing and serverless access to the knowledge graph. By encapsulating all API‑level concerns in this client, KnowledgeManagement maintains a clean contract with external services while allowing internal modules (e.g., **VkbApiClientManager**) to focus on business logic.  
+
+![KnowledgeManagement — Relationship](../../.data/knowledge-graph/insights/images/knowledge-management-relationship.png)
+
+---
+
+## Implementation Details  
+
+### Graph persistence  
+`graph-database-adapter.ts` creates a **Graphology** instance backed by **LevelDB**. It exposes methods such as `addNode`, `addEdge`, `getNode`, and `exportJSON`. The adapter automatically writes a JSON snapshot after each mutation, guaranteeing an up‑to‑date export that can be consumed by downstream tools or debugging utilities. Because LevelDB is an embedded key‑value store, the persistence layer remains lightweight and suitable for on‑premise deployments while still offering the scalability of a graph model.  
+
+### Wave agent lazy loading  
+`code-graph-agent.ts` defines a class (e.g., `CodeGraphAgent`) that implements the Wave agent interface. Its constructor stores only configuration metadata; the actual LLM client is instantiated inside a `run()` method the first time it is called. The agent then forwards the request to **LLMService** (`lib/llm/llm-service.ts`), which handles mode routing, caching, and provider fallback. This indirection means that multiple agents can coexist without each consuming a full LLM instance, dramatically lowering the baseline memory footprint.  
+
+### UKB trace reporting  
+`ukb-trace-report.ts` contains two pivotal constructs:  
+
+* `sharedAtomicIndex` – an `AtomicInteger` (or Node.js `worker_threads` `Atomics` wrapper) that all workers increment atomically before emitting a trace entry.  
+* `runWithConcurrency` – a helper that receives a list of trace‑generation tasks and a concurrency limit. It spawns a pool of workers, each pulling the next task from a shared queue; idle workers “steal” work from busier peers, ensuring balanced CPU utilization.  
+
+The generated trace reports are consumed by **UkbTraceReportGenerator** (a child component) to visualise workflow execution paths and pinpoint bottlenecks.  
+
+### LLM service façade  
+`llm-service.ts` implements a singleton `LLMService` class. Its public API includes `request(prompt, options)`, `warmUp()`, and `clearCache()`. Internally it selects a provider (e.g., Claude, OpenAI) based on configuration, checks an in‑memory cache, and falls back to a secondary provider if the primary fails. All LLM calls from KnowledgeManagement—whether from the Wave agent or from other child modules—go through this façade, guaranteeing consistent behaviour across the system.  
+
+### VKB API client  
+`VkbApiClient.js` wraps HTTP calls to the VKB endpoint. It provides methods like `fetchGraphNode(id)`, `searchRelations(query)`, and `batchExport()`. The client implements retry logic and exponential back‑off, which aligns with the resilience strategies seen in the **DockerizedServices** sibling. By exposing a clean TypeScript/JavaScript interface, the client enables **VkbApiClientManager** to focus on higher‑level orchestration (e.g., batching requests for bulk graph updates).  
+
+---
+
+## Integration Points  
+
+KnowledgeManagement is tightly coupled with several internal managers and external services:  
+
+* **GraphDatabaseManager** (child) directly consumes `GraphDatabaseAdapter` to perform CRUD operations on the knowledge graph. Any component that needs persistent knowledge—such as **ManualLearning** (for user‑curated entities) or **OnlineLearning** (for automated extraction)—talks to this manager rather than the adapter itself.  
+* **WaveAgentController** (child) orchestrates the lifecycle of Wave agents, delegating LLM calls to **LlmServiceManager**, which in turn uses the singleton **LLMService** (`lib/llm/llm-service.ts`). This chain ensures that lazy initialization, caching, and provider fallback are uniformly applied.  
+* **UkbTraceReportGenerator** (child) pulls data from the graph via **GraphDatabaseManager**, formats it using the atomic index utilities, and emits reports that can be visualised in developer tooling. It also respects the concurrency model defined in `runWithConcurrency`.  
+* **VkbApiClientManager** (child) is the only outward‑facing integration point, encapsulating all interactions with the VKB API through `lib/ukb-unified/core/VkbApiClient.js`. Other components—such as **OnlineLearning** when it needs to enrich a node with external metadata—call into this manager.  
+
+Because KnowledgeManagement shares the **GraphDatabaseAdapter** with siblings **CodingPatterns** and **ConstraintSystem**, any schema changes or persistence optimisations propagate across those components, fostering consistency but also requiring coordinated versioning. The component also indirectly relies on the **LLMAbstraction** sibling’s `LLMService` for any LLM‑driven reasoning, reinforcing a shared service layer across the entire **Coding** parent.  
+
+---
+
+## Usage Guidelines  
+
+1. **Persist through the manager** – Always interact with the knowledge graph via **GraphDatabaseManager** (or its child wrappers). Direct calls to `GraphDatabaseAdapter` bypass validation and may break future schema migrations.  
+2. **Leverage lazy LLM execution** – When building new agents, extend the Wave pattern (`code-graph-agent.ts`). Do not instantiate an LLM client in the constructor; defer to the `run()` method so the shared **LLMService** can apply caching and fallback logic.  
+3. **Generate trace reports responsibly** – Use the `runWithConcurrency` helper to parallelise heavy trace‑generation workloads, but respect the configured concurrency limit to avoid saturating the CPU pool. Ensure each task obtains a unique ID via the shared atomic counter before emitting events.  
+4. **Access VKB through the client manager** – All external graph queries must go through **VkbApiClientManager**. This guarantees retry semantics and centralises authentication handling. Avoid raw HTTP calls in new modules.  
+5. **Cache awareness** – The **LLMService** cache is in‑memory and process‑local. For long‑running services, consider invoking `LLMService.clearCache()` during low‑traffic windows to free memory.  
+6. **Testing considerations** – Mock the `GraphDatabaseAdapter` and `VkbApiClient` in unit tests. Because the Wave agent lazily creates the LLM, you can replace `LLMService` with a stub that returns deterministic responses, enabling fast, deterministic test runs.  
+
+---
+
+### Summary Deliverables  
+
+1. **Architectural patterns identified**  
+   * Adapter pattern – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
+   * Wave agent pattern – lazy LLM initialization in `code-graph-agent.ts`.  
+   * Singleton façade – `LLMService` provides a single entry point for all LLM operations.  
+   * Shared atomic counter – concurrency‑safe index generation in `ukb-trace-report.ts`.  
+   * Work‑stealing concurrency – `runWithConcurrency` balances parallel trace‑report tasks.  
+
+2. **Design decisions and trade‑offs**  
+   * **Lazy LLM init** reduces memory usage but adds a small first‑call latency.  
+   * **Embedded LevelDB** offers low‑overhead persistence but limits horizontal scaling; external graph stores would be needed for massive clusters.  
+   * **Shared atomic counter** guarantees uniqueness at the cost of a single point of contention (mitigated by atomic operations).  
+   * **Single LLMService façade** centralises logic, simplifying maintenance, yet creates a dependency bottleneck if the service becomes a performance hotspot.  
+
+3. **System structure insights**  
+   * KnowledgeManagement is a child of the root **Coding** component and mirrors many of its siblings’ reliance on shared adapters and services, promoting a cohesive ecosystem.  
+   * Its children each encapsulate a distinct responsibility (storage, LLM orchestration, tracing, external API), reflecting a clear separation‑of‑concerns architecture.  
+
+4. **Scalability considerations**  
+   * Graphology + LevelDB scales well for moderate graph sizes; for larger knowledge graphs, consider swapping the adapter for a distributed graph DB (e.g., Neo4j) while preserving the adapter interface.  
+   * Work‑stealing concurrency already maximises CPU utilisation for trace generation; further scaling would involve distributing trace‑report workers across multiple processes or nodes.  
+   * Lazy LLM loading allows many agents to coexist, but the underlying LLM provider must support concurrent request handling; otherwise, a request‑queue throttler may be needed.  
+
+5. **Maintainability assessment**  
+   * The heavy use of adapters and managers isolates third‑party changes, making the codebase relatively easy to evolve.  
+   * Shared utilities (atomic counter, concurrency helper) are well‑documented in a single file, reducing duplication.  
+   * However, the tight coupling to a specific persistence implementation (LevelDB) could increase maintenance effort if the project outgrows embedded storage. Regular reviews of the **LLMService** cache strategy and the Wave agent lifecycle will be essential to keep performance predictable as usage grows.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integ; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with differ; DockerizedServices: [LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/l; Trajectory: [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible con; KnowledgeManagement: [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agen; CodingPatterns: [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js); SemanticAnalysis: [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component's modular architecture allows for easy extension and modification of agent-specific transcript formats. This is ; LLMAbstraction: [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a single entry point for all LLM operations. This class i; DockerizedServices: [LLM] The DockerizedServices component utilizes a microservices architecture, with each sub-component responsible for a specific service or functional; Trajectory: [LLM] The Trajectory component's architecture is characterized by its use of adapters, such as the SpecstoryAdapter, to connect to different extension; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapte; CodingPatterns: [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence, allowing for automati; ConstraintSystem: [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts ; SemanticAnalysis: [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgen.
 
 ### Children
-- [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
+- [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely employs the GraphDatabaseManager to store and manage automatically extracted knowledge entities and relationships.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely utilizes the GraphDatabaseAdapter for interacting with the graph database.
+- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
+- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
+- [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
+- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integrations/code-graph-rag/README.md). This allows for efficient querying and retrieval of entities, which is crucial for the system's classification layers. The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) plays a key role in this process, as it classifies observations against the ontology system. The agent's constructor and the ensureLLMInitialized method demonstrate a lazy initialization approach for LLM services, which helps prevent unnecessary computations and improves overall system performance.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for managing interactions with different LLM providers. This class employs dependency injection, allowing for flexible configuration of the component, including the injection of mock services and budget trackers. The LLMService class also defines a set of interfaces (lib/llm/types.js) for LLM providers, requests, and responses, ensuring a standardized interaction with different providers. For example, the LLMService class uses the provider registry (lib/llm/provider-registry.js) to manage the registration and retrieval of various LLM providers, such as the AnthropicProvider (lib/llm/providers/anthropic-provider.ts) and DMRProvider (lib/llm/providers/dmr-provider.ts).
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular design, with separate modules for different services, such as the LLMService class (lib/llm/llm-service.ts) for managing large language model operations. This modularity allows for easier maintenance and updates, as well as scalability. For instance, the LLMService class utilizes dependency injection through the setModeResolver, setMockService, and setBudgetTracker methods, making it easier to test and extend the service. Additionally, the use of configuration files, such as YAML files, to manage settings and priorities for different providers and services, enables flexible configuration and customization.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's use of adapters, such as the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, allows for flexible connections to external services. This adapter attempts to connect to the Specstory extension via HTTP, IPC, or file watch, demonstrating a persistent connection approach. For instance, the connectViaHTTP method tries multiple ports to establish a connection, showcasing the adapter's ability to handle varying connection scenarios. This flexibility is crucial for maintaining a scalable and maintainable system, enabling easier integration of new services or features as needed.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to store and retrieve knowledge in a graph-based structure, which enables efficient querying and analysis of entity relationships. This choice of data storage allows for flexible and scalable management of complex constraints. Furthermore, the GraphDatabaseAdapter class provides methods for adding, removing, and updating graph nodes and edges, facilitating dynamic modifications to the knowledge graph.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture allows for easy extension and modification of agent-specific transcript formats. This is achieved through the use of the TranscriptAdapter, which is implemented in the lib/agent-api/transcript-api.js file. The TranscriptAdapter provides a standardized interface for handling different agent formats, such as Claude Code and Copilot CLI, and converting them to the unified LSL format. For example, the ClaudeCodeTranscriptAdapter class in lib/agent-api/transcripts/claudia-transcript-adapter.js extends the TranscriptAdapter class and provides a specific implementation for handling Claude Code transcripts.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component utilizes the LLMService class (lib/llm/llm-service.ts) as a single entry point for all LLM operations. This class is responsible for managing mode routing, caching, and provider fallback. For instance, the LLMService class includes a method for making LLM requests, which first checks the cache for a valid response before proceeding to make an actual request. This is evident in the use of the cache object within the LLMService class, where it attempts to retrieve a cached response before making a request to the provider. The cache is implemented using a simple in-memory object, where the keys are the request parameters and the values are the corresponding responses.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a microservices architecture, with each sub-component responsible for a specific service or functionality. For instance, the LLM Service (lib/llm/llm-service.ts) acts as a high-level facade for all LLM operations, handling mode routing, caching, circuit breaking, and provider fallback. This modular design enables efficient and scalable operation, as well as easier maintenance and updates. The Service Starter (lib/service-starter.js) provides robust service startup with retry, timeout, and graceful degradation, using exponential backoff and health verification. This ensures that services are started reliably and with minimal downtime.
+- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component's architecture is characterized by its use of adapters, such as the SpecstoryAdapter, to connect to different extensions and services. This is evident in the lib/integrations/specstory-adapter.js file, where the SpecstoryAdapter class is defined. The component's behavior is defined by its methods, including logConversation and connectViaHTTP, which enable logging and connection to the Specstory extension. For instance, the logConversation method in SpecstoryAdapter (lib/integrations/specstory-adapter.js:134) implements logging functionality, while the createLogger function from ../logging/Logger.js facilitates modular and flexible logging capabilities.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence, allowing for automatic JSON export sync. This design decision enables seamless data synchronization and provides a robust foundation for the project's data management. The GraphDatabaseAdapter class is responsible for handling graph data storage and retrieval, making it a critical component of the project's architecture. By using this adapter, the CodingPatterns component can focus on its primary functionality, leaving data management to the GraphDatabaseAdapter.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and manage constraints in a graph database, utilizing Graphology and LevelDB for efficient data storage and retrieval. The adapter also features automatic JSON export sync, allowing for seamless data exchange between the graph database and other components. For example, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on the GraphDatabaseAdapter to retrieve and validate entity content against configured rules.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to process git history and LSL sessions. This is evident in the code files, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, and integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, which define the respective agents and their responsibilities. The use of multiple agents allows for a modular and scalable design, enabling the processing of large amounts of data and the integration of new agents as needed.
 
 
 ---

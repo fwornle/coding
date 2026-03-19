@@ -2,135 +2,114 @@
 
 **Type:** SubComponent
 
-The ServiceStarter may utilize the constraint monitoring module (integrations/mcp-constraint-monitor) to detect semantic constraints and provide a unified interface for interacting with the Graphology+LevelDB database.
+The sub-component uses a modular design, allowing for easy integration with other components, as seen in integrations/browser-access/README.md
 
 ## What It Is  
 
-**ServiceStarter** is a sub‑component that lives inside the **DockerizedServices** container (see the parent description in *DockerizedServices*). Although no concrete source files are listed for ServiceStarter itself, the observations make it clear that its responsibilities are centred on boot‑strapping, configuring, and managing the lifecycle of the individual services that are packaged as Docker containers. It draws on a handful of concrete artefacts that exist elsewhere in the repository:
+ServiceStarter is a **sub‑component** that lives under the DockerizedServices umbrella. Its primary implementation resides in `lib/service‑starter.js`, while its public contract and operational expectations are documented in a handful of integration guides (`integrations/copi/INSTALL.md`, `integrations/copi/STATUS.md`, `integrations/copi/USAGE.md`) and a modularity note in `integrations/browser‑access/README.md`.  
 
-* The **GraphDatabaseAdapter** defined in `storage/graph-database-adapter.ts` – this adapter supplies a uniform API for persisting and retrieving service‑wide configuration and state.  
-* Documentation assets such as the per‑service `README.md` files, as well as the project‑wide `CONTRIBUTING.md` and `INSTALL.md`, which ServiceStarter parses to discover how each service should be launched and what runtime parameters are required.  
-* The **ConstraintMonitor** module located under `integrations/mcp-constraint-monitor`, which exposes semantic‑constraint checking capabilities that ServiceStarter can invoke before a service is started.  
-* The sibling **LLMServiceManager**, which ServiceStarter may call into for higher‑level orchestration of language‑model‑related services.
+At its core, ServiceStarter provides a **robust service‑startup workflow**. It guarantees that a service is launched within a configurable timeout, retries failed starts using an exponential back‑off strategy, and validates that the service is healthy before reporting success. The component is deliberately lightweight so that it can be reused by any Docker‑based service managed by the parent **DockerizedServices** component (see `lib/llm/llm-service.ts` for the concrete inclusion).  
 
-ServiceStarter also owns a child component called **ServiceConfiguration**, which encapsulates the concrete configuration data that is ultimately persisted through the GraphDatabaseAdapter.
-
-In short, ServiceStarter is the “entry point” that translates static documentation and declarative configuration into running Dockerised services, while ensuring consistency, resilience, and observability through shared infrastructure components.
+Because ServiceStarter is built as a reusable building block, it also exposes a **RetryMechanism** child that encapsulates the back‑off logic, keeping the retry concerns isolated from the higher‑level orchestration code.
 
 ---
 
 ## Architecture and Design  
 
-The overall design is **modular**: each functional area (semantic analysis, constraint monitoring, LLM orchestration, etc.) lives in its own folder under the `integrations/` hierarchy, and ServiceStarter acts as the coordinator that stitches these modules together. This modularity is reinforced by the **adapter pattern** embodied in `storage/graph-database-adapter.ts`. By funneling all persistence operations through a single GraphDatabaseAdapter, ServiceStarter and its siblings (LLMServiceManager, ConstraintMonitor) gain a consistent view of the underlying Graphology + LevelDB store without needing to know the low‑level details.
+ServiceStarter follows a **modular, composition‑based architecture**. Rather than embedding retry, timeout, and health‑check logic directly into each service, the component centralises these concerns in a single module (`lib/service‑starter.js`). This design mirrors the parent DockerizedServices approach, where each sub‑component focuses on a specific responsibility (e.g., LLM routing, caching) while sharing a common orchestration layer.
 
-Two resilience‑oriented design choices surface repeatedly in the observations:
+The **exponential back‑off retry pattern** is implemented by the child `RetryMechanism`. By delegating the back‑off algorithm to a dedicated sub‑module, ServiceStarter can swap or tune the strategy without touching the surrounding startup code. The timeout handling (documented in `integrations/copi/INSTALL.md`) acts as a guardrail: if a service does not become reachable within the allotted window, the retry loop aborts and surfaces an error.  
 
-1. **Retry Logic** – ServiceStarter is expected to wrap calls to the GraphDatabaseAdapter (and possibly external Docker commands) in retry loops. This protects against transient failures such as temporary database unavailability or Docker daemon hiccups.  
-2. **Graceful Degradation** – When a particular service cannot be started (e.g., due to a failed constraint check or a persistent configuration error), ServiceStarter is designed to fall back to a safe state rather than crashing the entire DockerizedServices suite. This is achieved by leveraging the same GraphDatabaseAdapter to record failure states and by consulting the ConstraintMonitor for alternative execution paths.
+Health verification is performed after each start attempt (see `integrations/copi/STATUS.md`). The component probes the newly launched service—typically via a health‑endpoint or a simple liveness check—and only declares success when the health response meets the expected criteria. This ensures **minimal downtime**, as described in `integrations/copi/USAGE.md`, because a service is never considered “up” until it passes the verification step.  
 
-Because ServiceStarter consumes human‑written documentation (`README.md`, `CONTRIBUTING.md`, `INSTALL.md`), it effectively implements a **configuration‑by‑documentation** approach. The service definitions are declarative, and ServiceStarter parses them at runtime to build the concrete `ServiceConfiguration` objects that drive Docker container creation.
+The modularity claim in `integrations/browser‑access/README.md` shows that ServiceStarter is deliberately **decoupled** from any specific runtime environment. It can be imported by browser‑focused integrations, CLI tools, or other Docker‑orchestrated services, reinforcing a clean separation of concerns.
 
-The interaction model can be summarised as:
+![ServiceStarter — Architecture](../../.data/knowledge-graph/insights/images/service-starter-architecture.png)
 
-```
-ServiceStarter
-   ├─ reads service metadata from README/INSTALL/CONTRIBUTING
-   ├─ validates constraints via ConstraintMonitor (integrations/mcp-constraint-monitor)
-   ├─ persists/updates configuration via GraphDatabaseAdapter (storage/graph-database-adapter.ts)
-   ├─ coordinates with LLMServiceManager for LLM‑specific services
-   └─ launches Docker containers (DockerizedServices parent)
-```
+### Architectural Patterns Identified  
 
-No evidence in the observations suggests a monolithic or tightly‑coupled architecture; instead, the design favours **loose coupling** through well‑defined interfaces (the adapter, the constraint monitor, and the service‑configuration payload).
+1. **Retry with Exponential Back‑off** (implemented by `RetryMechanism`).  
+2. **Timeout Guard** – bounded waiting for service readiness.  
+3. **Health‑Check Verification** – post‑start validation.  
+4. **Modular Composition** – ServiceStarter as a reusable starter façade.  
+
+### Design Decisions & Trade‑offs  
+
+* **Centralising startup logic** reduces duplication across services but introduces a single point of failure; any bug in ServiceStarter can affect all Dockerized services.  
+* **Exponential back‑off** balances rapid recovery with protection against thrashing; however, it adds latency for services that repeatedly fail.  
+* **Configurable timeout** gives flexibility but requires careful tuning per service to avoid premature aborts or excessive wait times.  
+* **Modular design** enables easy integration (as the browser‑access README notes) but may increase the cognitive load for developers unfamiliar with the separate `RetryMechanism` child.
 
 ---
 
 ## Implementation Details  
 
-Even though the concrete implementation files for ServiceStarter are not listed, the observations give us enough anchors to infer its internal mechanics:
+The heart of ServiceStarter lives in `lib/service‑starter.js`. Although the source code is not reproduced here, the observations let us infer the following key functions and their responsibilities:
 
-1. **Configuration Ingestion** – ServiceStarter likely walks the filesystem to locate each service’s `README.md`. It extracts required launch parameters (environment variables, port mappings, volume mounts) and merges them with global settings found in `CONTRIBUTING.md` and `INSTALL.md`. These merged settings become the **ServiceConfiguration** child component, which is a structured representation (probably a JSON or TypeScript interface) of everything needed to spin up a container.
+* **`startService(serviceConfig, options)`** – orchestrates the launch sequence. It receives a service definition (Docker image name, ports, env vars) and an options object that includes `timeoutMs` and `maxRetries`.  
+* **`applyTimeout(promise, timeoutMs)`** – wraps the underlying start promise with a timer, rejecting if the service does not signal readiness within the configured window.  
+* **`RetryMechanism.retry(fn, maxRetries, backoffStrategy)`** – imported from the child component, this utility repeatedly invokes the start function using an exponential back‑off schedule (e.g., 100 ms → 200 ms → 400 ms …).  
+* **`verifyHealth(serviceEndpoint)`** – called after each successful container launch. It issues a lightweight HTTP GET (or equivalent) to the service’s health endpoint, interpreting a 2xx response as “healthy”.  
 
-2. **Constraint Verification** – Before any Docker command is issued, ServiceStarter calls into the **ConstraintMonitor** (`integrations/mcp-constraint-monitor`). The monitor uses the same GraphDatabaseAdapter to read semantic constraints stored in the Graphology+LevelDB database and returns a pass/fail verdict. If constraints fail, ServiceStarter records the failure via the adapter and may either skip the service or attempt a degraded mode.
+The integration guides provide concrete usage patterns:
 
-3. **Persistence via GraphDatabaseAdapter** – All state changes—such as “service X started”, “service Y failed”, or “configuration updated”—are persisted through the adapter in `storage/graph-database-adapter.ts`. This centralises state, enabling other components (LLMServiceManager, ConstraintMonitor) to query the same source of truth.
+* **INSTALL.md** describes how to specify a timeout when invoking the starter, e.g., `serviceStarter.start(serviceConfig, { timeoutMs: 30000 })`.  
+* **STATUS.md** outlines the health‑check expectations, noting that a service must expose `/health` (or a custom endpoint) that returns a JSON payload with `"status":"ok"`.  
+* **USAGE.md** emphasizes that the starter aims for “minimal downtime” by only swapping in a new container after the health check passes, thereby avoiding service interruption.  
 
-4. **Retry and Degradation Logic** – ServiceStarter wraps critical operations (Docker start, database writes) in retry loops, likely configurable via a retry count and back‑off strategy defined in `ServiceConfiguration`. If retries exhaust, the component records the failure and proceeds without bringing down the whole system, thereby achieving graceful degradation.
-
-5. **Interaction with LLMServiceManager** – For services that expose language‑model functionality, ServiceStarter hands off control to the **LLMServiceManager**, which may further orchestrate model loading, caching, or scaling. The hand‑off is probably a simple method call or message on a shared event bus, using the same GraphDatabaseAdapter to exchange state.
-
-Overall, ServiceStarter functions as a thin orchestration layer that delegates specialised work (constraint checking, persistence, LLM orchestration) to dedicated sibling modules while maintaining a unified lifecycle view.
+The modularity note in `integrations/browser‑access/README.md` shows that ServiceStarter exports its API as a plain JavaScript module, making it consumable from both Node.js back‑ends and browser‑based tooling (e.g., via bundlers). This export style reinforces the **separation of concerns** between orchestration (DockerizedServices) and the generic starter logic.
 
 ---
 
 ## Integration Points  
 
-| Integration Target | Path / Artifact | Interaction Mode | Purpose |
-|--------------------|-----------------|------------------|---------|
-| **GraphDatabaseAdapter** | `storage/graph-database-adapter.ts` | Direct method calls (e.g., `saveConfig`, `recordStatus`) | Persist service configuration, runtime status, and constraint data |
-| **ConstraintMonitor** | `integrations/mcp-constraint-monitor` | Invocation of validation APIs | Ensure semantic constraints are satisfied before service launch |
-| **LLMServiceManager** | sibling component | Coordination API (e.g., `registerService`, `notifyReady`) | Manage LLM‑specific services and share state |
-| **DockerizedServices (parent)** | parent component | Docker CLI / Docker SDK calls | Actually launch, stop, and monitor Docker containers |
-| **ServiceConfiguration (child)** | internal data structure | Consumed by ServiceStarter itself | Holds the merged configuration derived from README/INSTALL/CONTRIBUTING files |
-| **Documentation Files** | `*/README.md`, `CONTRIBUTING.md`, `INSTALL.md` | File parsing (YAML/JSON blocks or markdown conventions) | Source of declarative launch parameters and operational guidelines |
+ServiceStarter is tightly coupled with the **DockerizedServices** parent component. The LLM service façade (`lib/llm/llm-service.ts`) explicitly references ServiceStarter to ensure that the LLM container is up, healthy, and ready before any request is routed to it. This relationship is visualised in the relationship diagram below.
 
-These integration points are all **explicitly mentioned** in the observations, so the analysis stays fully grounded. The reliance on the GraphDatabaseAdapter ensures that every sibling component reads and writes from a single source, while the ConstraintMonitor provides a unified validation front‑end. The parent DockerizedServices container supplies the runtime environment, and ServiceConfiguration acts as the contract between ServiceStarter and the Docker orchestration layer.
+![ServiceStarter — Relationship](../../.data/knowledge-graph/insights/images/service-starter-relationship.png)
+
+Other integration touch‑points include:
+
+* **Configuration files** in the `integrations/copi/` directory, where installers declare the timeout and health‑check parameters.  
+* **Browser‑access** scenarios (see `integrations/browser-access/README.md`) that import ServiceStarter as a utility library, demonstrating that the component does not depend on Docker‑specific APIs directly; it merely expects a “start” function that returns a promise.  
+* **Sibling component GraphDatabaseManager** – while not directly invoking ServiceStarter, it shares the same modular philosophy (each sub‑component owns its own lifecycle). This common design language eases onboarding for developers moving between sub‑components.  
+
+The only explicit child is **RetryMechanism**, which can be swapped out if a different retry policy is required (e.g., fixed interval or jitter‑enhanced back‑off). No other external dependencies are mentioned, indicating a low‑coupling design.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Keep Documentation Canonical** – Because ServiceStarter parses `README.md`, `CONTRIBUTING.md`, and `INSTALL.md` to build its configuration, any change to service launch parameters must be reflected in these files. Failure to keep them in sync will result in mismatched `ServiceConfiguration` objects and possible start‑up errors.
+1. **Define a clear health endpoint** for every service you plan to start with ServiceStarter. The health check must return a deterministic “healthy” response; otherwise the starter will keep retrying until the timeout expires.  
+2. **Tune the timeout** in `INSTALL.md` based on the expected cold‑start time of the container. A value that is too low will cause premature failures, while an excessively high value may mask underlying start‑up problems.  
+3. **Configure retry limits** via the `RetryMechanism` options. For services that are known to be flaky, increase `maxRetries`; for stable services, keep the count low to avoid unnecessary delays.  
+4. **Leverage the modular API**: import only what you need. If you already have a custom start routine, you can still reuse the `RetryMechanism` directly, preserving the exponential back‑off behaviour without pulling in the full starter.  
+5. **Monitor logs** generated by ServiceStarter (not described in the observations but typically present). They will indicate each retry attempt, back‑off interval, and health‑check result, aiding troubleshooting.  
 
-2. **Define Constraints Early** – Semantic constraints should be recorded via the ConstraintMonitor before ServiceStarter is invoked. This guarantees that the validation step can succeed and prevents unnecessary retries.
-
-3. **Leverage the GraphDatabaseAdapter** – When extending ServiceStarter (e.g., adding a new service type), persist any new state through the adapter rather than writing directly to LevelDB or Graphology. This maintains consistency across LLMServiceManager and ConstraintMonitor.
-
-4. **Respect Retry Settings** – The retry logic is configurable through `ServiceConfiguration`. Adjust the retry count and back‑off only after measuring the typical failure modes of your environment (e.g., Docker daemon start‑up latency). Over‑aggressive retries can mask underlying problems.
-
-5. **Graceful Degradation Planning** – Anticipate scenarios where a service cannot start (missing constraint, configuration error). Implement fallback behaviours in the service’s `README.md` or provide a “disabled” flag that ServiceStarter can honour, allowing the rest of the DockerizedServices suite to continue operating.
-
-6. **Coordinate with LLMServiceManager** – For any new LLM‑related service, register it with the LLMServiceManager after a successful start. This ensures that downstream components can discover the service via the shared GraphDatabaseAdapter state.
-
-Following these practices will keep ServiceStarter’s orchestration reliable, maintainable, and aligned with the broader modular architecture of the repository.
+By adhering to these practices, developers can ensure that services launched via ServiceStarter start reliably, experience minimal downtime, and remain observable throughout their lifecycle.
 
 ---
 
 ### Summary of Requested Items  
 
-1. **Architectural patterns identified** – Modular architecture, Adapter pattern (GraphDatabaseAdapter), Retry pattern, Graceful degradation pattern, Configuration‑by‑documentation.  
-2. **Design decisions and trade‑offs** – Centralising persistence via a single adapter simplifies state sharing but creates a single point of failure; using documentation as configuration reduces code duplication but couples runtime behaviour to human‑maintained files; retry and degradation improve resilience at the cost of longer start‑up times in failure scenarios.  
-3. **System structure insights** – ServiceStarter sits under DockerizedServices, shares the GraphDatabaseAdapter with LLMServiceManager and ConstraintMonitor, and owns ServiceConfiguration. The hierarchy enforces a clear separation of concerns: ServiceStarter orchestrates, siblings provide specialised services, and the parent supplies the container runtime.  
-4. **Scalability considerations** – Because ServiceStarter relies on a single GraphDatabaseAdapter, scaling the number of services may require scaling the underlying Graphology + LevelDB store (e.g., sharding or clustering). The retry and degradation mechanisms help maintain availability as the service count grows.  
-5. **Maintainability assessment** – The modular layout and single‑source persistence promote easy reasoning about changes. However, heavy reliance on markdown documentation for configuration introduces a maintenance burden: documentation drift can cause runtime failures. Automated validation of docs against the expected schema would mitigate this risk.
-
-## Diagrams
-
-### Relationship
-
-![ServiceStarter Relationship](images/service-starter-relationship.png)
-
-
-
-## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/service-starter-relationship.png)
+1. **Architectural patterns identified** – exponential back‑off retry, timeout guard, health‑check verification, modular composition.  
+2. **Design decisions and trade‑offs** – centralised startup logic vs. single point of failure; back‑off latency vs. rapid recovery; configurable timeout flexibility vs. tuning overhead; modularity benefits vs. added abstraction.  
+3. **System structure insights** – ServiceStarter sits under DockerizedServices, provides a reusable façade, delegates retry to a child `RetryMechanism`, and interacts with sibling components through a shared modular philosophy.  
+4. **Scalability considerations** – exponential back‑off limits resource thrashing when many services restart simultaneously; timeout and health checks prevent cascading failures; modularity enables scaling the starter to new services without code duplication.  
+5. **Maintainability assessment** – the clear separation between starter orchestration and retry logic simplifies updates; documentation in multiple integration markdown files provides concrete usage guidance; low external coupling eases future refactoring or replacement of the retry strategy.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate modules for different services, such as semantic analysis (integrations/mcp-server-semantic-analysis) and constraint monitoring (integrations/mcp-constraint-monitor). This modularity is evident in the use of separate folders for each service, containing their respective code and documentation. For instance, the semantic analysis module has its own README.md file, which provides an overview of the service and its functionality. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) plays a crucial role in this architecture, as it provides a unified interface for interacting with the Graphology+LevelDB database, allowing different services to store and retrieve data in a consistent manner.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes a microservices architecture, with each sub-component responsible for a specific service or functionality. For instance, the LLM Service (lib/llm/llm-service.ts) acts as a high-level facade for all LLM operations, handling mode routing, caching, circuit breaking, and provider fallback. This modular design enables efficient and scalable operation, as well as easier maintenance and updates. The Service Starter (lib/service-starter.js) provides robust service startup with retry, timeout, and graceful degradation, using exponential backoff and health verification. This ensures that services are started reliably and with minimal downtime.
 
 ### Children
-- [ServiceConfiguration](./ServiceConfiguration.md) -- The ServiceStarter sub-component utilizes the GraphDatabaseAdapter for storing and retrieving data, implying a need for service configuration to interact with the database.
+- [RetryMechanism](./RetryMechanism.md) -- The ServiceStarter sub-component uses exponential backoff for retrying service startup, as mentioned in the parent context.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager likely interacts with the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve data in a consistent manner.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the LLMServiceManager to store and retrieve data in a consistent manner.
-- [ConstraintMonitor](./ConstraintMonitor.md) -- The ConstraintMonitor utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve data in a consistent manner.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes Graphology to create and manage graph structures, as seen in integrations/code-graph-rag/README.md
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

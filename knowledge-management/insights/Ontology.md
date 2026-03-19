@@ -2,146 +2,114 @@
 
 **Type:** SubComponent
 
-The entity type resolution agent in the Ontology sub-component is responsible for resolving entity types and validating them against the ontology system, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+The ontology uses a hierarchical structure, with upper ontology concepts being more general and lower ontology concepts being more specific, as seen in the integrations/mcp-server-semantic-analysis/src/ontology/upper-ontology.ts file.
 
 ## What It Is  
 
-The **Ontology** sub‑component lives inside the **SemanticAnalysis** package and is realized primarily in two TypeScript agents:  
+The **Ontology** sub‑component lives inside the **SemanticAnalysis** parent and is implemented in the *integrations/mcp-server-semantic-analysis* package. Its core definition files are  
 
-* `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` – the **OntologyClassificationAgent** that performs entity‑type resolution, validation and hierarchical classification.  
-* `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts` – the **BaseAgent** class that supplies a common, standardized scaffold for all agents, including the Ontology agents.  
+* `integrations/mcp-server-semantic-analysis/src/ontology/upper-ontology.ts` – the top‑level, generic concepts, and  
+* `integrations/mcp-server-semantic-analysis/src/ontology/lower-ontology.ts` – the more concrete, domain‑specific extensions.  
 
-Supporting data access is provided by the graph‑database adapter located at `storage/graph-database-adapter.js`. Together these files implement a hierarchical ontology system that distinguishes upper‑level (generic) and lower‑level (domain‑specific) definitions, resolves incoming entity types against that hierarchy, and continuously validates the ontology for consistency and freshness.
+Ontology‑related logic is exercised by three key classes:  
+
+* `EntityTypeResolver` (`integrations/mcp-server-semantic-analysis/src/ontology/entity-type-resolver.ts`) – resolves an entity’s concrete type against the hierarchical ontology,  
+* `OntologyValidator` (`integrations/mcp-server-semantic-analysis/src/ontology/ontology-validator.ts`) – checks that the ontology graph is well‑formed, and  
+* `OntologyClassificationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) – the agent that drives classification of incoming entities as part of the overall semantic‑analysis pipeline (`integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`).  
+
+Together these pieces give the system a **hierarchical, extensible knowledge model** that can be consulted at runtime to tag and reason about code entities extracted from Git history and LSL sessions.
+
+![Ontology — Architecture](../../.data/knowledge-graph/insights/images/ontology-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-### Agent‑Centric Design  
-Ontology is built as a **multi‑agent system** under the parent **SemanticAnalysis** component. Each agent owns a single responsibility: the `OntologyClassificationAgent` focuses on classification, while the `BaseAgent` supplies cross‑cutting concerns such as logging, error handling, and a uniform lifecycle (`init`, `execute`, `shutdown`). This mirrors the **Agent pattern** and encourages loose coupling: new agents can be added without touching existing ones, provided they extend `BaseAgent`.
+Ontology is embedded in a **multi‑agent architecture** that the parent *SemanticAnalysis* component adopts. Each agent encapsulates a single responsibility: the `OntologyClassificationAgent` handles entity classification, the `SemanticAnalysisAgent` orchestrates the overall pipeline, and the `CodeGraphAgent` builds graph representations. This separation follows the *Single Responsibility Principle* and yields a **modular, plug‑in style** design where new agents can be introduced without touching existing ones.
 
-### Hierarchical Ontology Model  
-Observation 1 notes a “hierarchical approach” with upper and lower ontology definitions. The classification logic in `ontology-classification-agent.ts` walks this hierarchy, first attempting a match against high‑level concepts and, if needed, descending to more specific nodes. This design gives the system natural extensibility—new lower‑level concepts can be introduced without altering the upper‑level schema.
+The ontology itself follows a **hierarchical taxonomy**: the *upper ontology* provides abstract concepts (e.g., `Component`, `Service`), while the *lower ontology* refines those into concrete domain entities (e.g., `CodeGraph`, `InsightGenerator`). This hierarchy is leveraged by `EntityTypeResolver`, which walks the tree from specific to general nodes to find the best match for a given entity. The `OntologyValidator` enforces structural invariants—such as acyclic parent‑child relationships and unique identifiers—ensuring that extensions added in `lower-ontology.ts` do not corrupt the model.
 
-### Adapter for Data Access  
-All ontology queries are funneled through `storage/graph-database-adapter.js`. By abstracting the underlying graph store behind a **Adapter pattern**, the Ontology agents remain agnostic to the concrete database (Neo4j, JanusGraph, etc.). The agent simply calls methods like `queryOntologyNode()` and receives domain objects, making the data‑access layer swappable.
+Interaction flow: the `SemanticAnalysisAgent` receives raw entities, forwards them to the `OntologyClassificationAgent`, which consults `EntityTypeResolver` and, if necessary, invokes `OntologyValidator` to confirm the integrity of any newly added concepts. The result (a classified entity) is then passed downstream to other agents like `CodeGraphAgent` or the `InsightGenerator`. This pipeline is **data‑driven** and **event‑oriented** in the sense that each agent reacts to the output of its predecessor.
 
-### Validation as a Cross‑Cutting Concern  
-The validation logic lives in the same `base-agent.ts` file (Observation 3) and is reused by the Ontology agents. It checks that the ontology graph is **consistent** (no dangling references, proper type assignments) and **up‑to‑date** (e.g., after a schema migration). Embedding validation in the base class enforces a **Template Method** style: concrete agents inherit the validation step without re‑implementing it.
-
-### Interaction with Siblings  
-* **Pipeline** – drives batch execution of agents, including the OntologyClassificationAgent, as described in the `batch-analysis.yaml` workflow.  
-* **Insights** – consumes classification results to generate higher‑level patterns; the Ontology component supplies the standardized structure that Insights expects.  
-* **WorkflowOrchestrator** – orchestrates the ordering of agents; Ontology agents are scheduled after raw data ingestion and before Insight generation.  
-* **GraphDatabaseAdapter** – the sibling that actually executes the queries issued by the Ontology agents.
+![Ontology — Relationship](../../.data/knowledge-graph/insights/images/ontology-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-### BaseAgent (`base-agent.ts`)  
-`BaseAgent` defines an abstract class with methods such as `validateOntology()`, `execute()`, and lifecycle hooks. The validation step (Observation 3) traverses the ontology graph via the adapter, ensuring each node conforms to the schema and that version stamps match the expected release. Because `BaseAgent` is shared, any future agent automatically inherits this safety net.
+* **Ontology Definitions** – `upper-ontology.ts` and `lower-ontology.ts` export plain TypeScript objects (or interfaces) that describe concepts, their identifiers, parent links, and optional metadata. The lower file imports the upper definitions and augments them, illustrating the **extensibility** decision: new concepts can be added simply by extending the exported map without altering core logic.
 
-### OntologyClassificationAgent (`ontology-classification-agent.ts`)  
-This class **extends** `BaseAgent`. Its core responsibilities are:
+* **EntityTypeResolver** – This class implements a lookup algorithm that starts with an entity’s raw type string, attempts a direct match against the lower ontology, and, on failure, walks up the parent chain defined in the upper ontology. The resolver is pure (stateless) and can be reused across agents, promoting testability.
 
-1. **Entity‑type resolution** – using the hierarchical definitions (Observation 2). The agent receives an entity payload, looks up the most specific matching node in the graph, and returns a resolved type.  
-2. **Consistency enforcement** – after resolution it invokes the inherited validation routine to guarantee the ontology has not been corrupted during the operation (Observation 5).  
-3. **Querying mechanism** – leverages `GraphDatabaseAdapter` (Observation 4 & 7) to fetch candidate nodes. Typical calls look like:  
-   ```ts
-   const candidates = await graphAdapter.query(`
-       MATCH (c:Concept) WHERE c.name = $entityName RETURN c
-   `, { entityName });
-   ```
-4. **Standardized output** – because the agent follows the `BaseAgent` contract, downstream components (Insights, WorkflowOrchestrator) can rely on a predictable result shape.
+* **OntologyValidator** – Validation runs at startup and whenever a new lower‑ontology entry is introduced. It checks for duplicate IDs, ensures every child references an existing parent, and verifies that the graph remains a **tree** (no cycles). Errors are surfaced as exceptions that halt the pipeline, preventing downstream agents from operating on an inconsistent model.
 
-### GraphDatabaseAdapter (`graph-database-adapter.js`)  
-Implemented in JavaScript, this module encapsulates connection handling, query execution, and result transformation. It exposes high‑level methods such as `queryOntologyNode(id)` and `searchByLabel(label)`. By keeping all Cypher (or equivalent) strings inside this adapter, the Ontology agents remain free of database‑specific syntax.
+* **OntologyClassificationAgent** – The agent implements the `Agent` interface used throughout the SemanticAnalysis system. Its `process` method receives an `Entity` payload, calls `EntityTypeResolver` to obtain a concrete ontology node, and attaches the classification result to the entity’s metadata. If the classification fails, the agent logs the incident and forwards the entity unchanged, allowing later agents to decide how to handle unclassified items.
 
-### Hierarchical Definitions  
-Although the concrete schema files are not listed, the agents reference “upper” and “lower” ontology layers. The classification algorithm first attempts a match against the upper layer (generic concepts) and, on failure, recurses into the lower layer (domain‑specific concepts). This recursion is performed in a depth‑first manner, ensuring the most precise classification is returned.
+* **Integration with the Pipeline** – The `semantic-analysis-agent.ts` file wires the classification agent into the larger batch processing flow. It creates an instance of `OntologyClassificationAgent`, passes the shared `OntologyValidator` instance for on‑the‑fly validation, and ensures that the classified entities are emitted to downstream consumers such as the `InsightGenerator` (found in `integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts`).
 
 ---
 
 ## Integration Points  
 
-1. **Parent – SemanticAnalysis** – The Ontology sub‑component is a child of the broader SemanticAnalysis system, which orchestrates multiple agents. The parent supplies configuration (e.g., ontology version) and invokes the OntologyClassificationAgent through the pipeline defined in `batch-analysis.yaml`.  
+Ontology sits at the heart of the **SemanticAnalysis** pipeline. Its primary consumers are:
 
-2. **Sibling – GraphDatabaseAdapter** – Direct data retrieval is performed via the adapter. Any change to the underlying graph store (e.g., switching from Neo4j to a cloud‑hosted service) only requires updates inside `graph-database-adapter.js`, leaving the Ontology agents untouched.  
+* **OntologyClassificationAgent** – the direct user of `EntityTypeResolver` and `OntologyValidator`.  
+* **SemanticAnalysisAgent** – orchestrates the overall flow and injects the classification agent into the processing chain.  
+* **InsightGenerator** – consumes the classification metadata to produce higher‑level insights (e.g., “new component added”).  
 
-3. **Sibling – Pipeline** – The batch processing definition in `batch-analysis.yaml` schedules the Ontology agent after data ingestion and before Insight generation. The pipeline passes a batch of raw observations to the OntologyClassificationAgent’s `execute` method.  
+Sibling components such as **Pipeline**, **Insights**, **EntityValidator**, and **CodeGraph** all depend on the classified entity payloads produced by the ontology subsystem. For example, `EntityValidator` (`integrations/mcp-server-semantic-analysis/src/entity-validator.ts`) may reject entities whose ontology classification violates business rules, while `CodeGraphGenerator` (`integrations/code-graph-rag/src/code-graph-generator.ts`) uses the ontology to decide which nodes to render in the graph.
 
-4. **Sibling – Insights** – Insight agents consume the classification payload produced by OntologyClassificationAgent, applying pattern‑based logic (Observation 6) to surface actionable findings.  
-
-5. **Sibling – WorkflowOrchestrator** – This component manages the execution order and retries. Because Ontology agents inherit a common interface from `BaseAgent`, the orchestrator can treat them uniformly with other agents.  
-
-6. **External Interfaces** – The only external dependency exposed by Ontology is the `GraphDatabaseAdapter` API. All other interactions are internal to the SemanticAnalysis hierarchy.
+The only external dependency is the TypeScript runtime and the shared configuration that supplies the file paths for the ontology definitions. Because the ontology files are plain data structures, they can be swapped out (e.g., for a test double) without recompiling the agents, facilitating unit testing and CI pipelines.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via the BaseAgent contract** – Always create the OntologyClassificationAgent through the factory or dependency injection mechanism used by the Pipeline, ensuring the base lifecycle hooks are respected.  
-* **Keep ontology definitions versioned** – The validation step (in `BaseAgent`) compares the stored version against the expected one. Increment the version whenever you add or deprecate concepts, and run the validation suite before deploying.  
-* **Prefer upper‑level concepts when possible** – Classification logic first matches generic concepts; only fall back to lower‑level definitions when the generic match is ambiguous. This reduces unnecessary specificity and improves downstream Insight stability.  
-* **Do not embed raw queries in agents** – All graph queries must go through `GraphDatabaseAdapter`. If a new query is required, add a method to the adapter and call it from the agent; this preserves the Adapter pattern and isolates database syntax.  
-* **Run validation after bulk updates** – When bulk‑loading new ontology nodes, invoke `validateOntology()` (inherited from `BaseAgent`) before the Pipeline proceeds to the Insight stage. This prevents downstream agents from operating on an inconsistent graph.  
+1. **Adding New Concepts** – Extend `lower-ontology.ts` by importing the relevant upper‑ontology node and defining a new entry with a unique identifier and a `parent` reference. Run the application start‑up to trigger `OntologyValidator`; any structural issue will be reported immediately.  
+2. **Resolving Types** – When writing new agents that need to interpret entity types, reuse `EntityTypeResolver` instead of duplicating lookup logic. Pass the raw type string; the resolver will return the most specific ontology node or `null` if none matches.  
+3. **Validation Discipline** – Never bypass `OntologyValidator`. If a custom workflow injects ontology changes at runtime, invoke the validator explicitly before the classification step to guarantee consistency.  
+4. **Testing** – Mock the ontology data by providing a lightweight object that mimics the shape of the exported maps. Because the resolver is stateless, it can be unit‑tested in isolation.  
+5. **Performance** – The resolver performs a simple map lookup followed by parent traversal; for very large ontologies consider caching the resolved paths, but the current design expects the ontology to remain modest in size, keeping lookups fast.
 
 ---
 
-### 1. Architectural patterns identified  
+### Architectural patterns identified  
 
-* **Agent pattern** – each functional unit (e.g., OntologyClassificationAgent) is an autonomous agent with a clear responsibility.  
-* **Adapter pattern** – `GraphDatabaseAdapter` abstracts the graph database behind a uniform API.  
-* **Template Method pattern** – `BaseAgent` defines the skeleton of an agent’s lifecycle, including validation, which concrete agents extend.  
-* **Hierarchical composition** – the ontology itself is structured as upper and lower layers, enabling recursive lookup.  
+* **Agent‑Based Modular Architecture** – each functional piece (classification, semantic analysis, code graph generation) is encapsulated in its own agent.  
+* **Hierarchical Taxonomy** – the ontology follows a parent‑child tree, enabling inheritance of properties and type resolution.  
+* **Validator Pattern** – `OntologyValidator` centralizes integrity checks, preventing invalid state propagation.
 
-### 2. Design decisions and trade‑offs  
+### Design decisions and trade‑offs  
 
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Use a single `BaseAgent` for all agents | Guarantees consistent lifecycle, logging, and validation across the system. | Adds a shared coupling; changes to the base class affect every agent. |
-| Keep ontology queries inside `GraphDatabaseAdapter` | Decouples agents from the specific graph store, eases future DB swaps. | Introduces an extra indirection; performance‑critical queries must be carefully profiled. |
-| Hierarchical ontology resolution | Allows reuse of generic concepts and fine‑grained specialization without duplication. | Requires recursive traversal, which can increase latency for deep hierarchies. |
-| Validation embedded in the base class | Ensures every classification run checks consistency automatically. | May incur unnecessary overhead for read‑only operations where validation is already known to be satisfied. |
+* **Extensibility vs. Runtime Safety** – allowing developers to add concepts in `lower-ontology.ts` promotes flexibility, but requires strict validation at startup to avoid corrupting the hierarchy.  
+* **Stateless Resolver** – choosing a pure, stateless `EntityTypeResolver` simplifies testing and reuse but means every lookup walks the hierarchy anew; acceptable given the expected ontology size.  
+* **Agent Isolation** – isolating classification logic in its own agent reduces coupling with the rest of the pipeline, at the cost of a slightly longer call chain (SemanticAnalysis → Classification → downstream agents).
 
-### 3. System structure insights  
+### System structure insights  
 
-* **Vertical layering** – Ontology sits three levels deep: `SemanticAnalysis` (parent) → `Ontology` (sub‑component) → `OntologyClassificationAgent` (child). This clear vertical separation isolates ontology concerns from other semantic tasks.  
-* **Horizontal sibling collaboration** – Ontology shares the same execution platform with Pipeline, Insights, WorkflowOrchestrator, and GraphDatabaseAdapter, all of which communicate through well‑defined interfaces (pipeline YAML, agent contracts, adapter API).  
-* **Modular extensibility** – Adding a new ontology‑related agent (e.g., a “SynonymResolverAgent”) would involve extending `BaseAgent` and reusing the existing adapter, demonstrating a plug‑and‑play architecture.  
+Ontology is a **leaf sub‑component** that provides domain knowledge to the broader **SemanticAnalysis** system. Its sibling components share the same pipeline backbone but focus on different concerns (validation, insight generation, graph building). The parent component coordinates these siblings through a common batch processing framework defined in the agents directory.
 
-### 4. Scalability considerations  
+### Scalability considerations  
 
-* **Graph‑database scaling** – Since classification relies on graph queries, the system’s throughput is bounded by the performance of the underlying graph store. Horizontal scaling of the DB (sharding, read replicas) directly benefits Ontology.  
-* **Batch processing via Pipeline** – The `batch-analysis.yaml` pipeline can be parallelized across multiple worker nodes, allowing concurrent execution of many OntologyClassificationAgent instances. Care must be taken to avoid write‑conflicts when agents perform validation that mutates ontology metadata.  
-* **Caching opportunities** – Frequently accessed upper‑level concepts could be cached in memory within the adapter to reduce query latency, though cache invalidation must respect the validation step to avoid stale data.  
+* **Horizontal Scaling** – because agents are independent, additional processing nodes can run parallel instances of the classification agent, each reading the same immutable ontology files.  
+* **Ontology Growth** – the hierarchical lookup algorithm scales linearly with the depth of the tree; if the ontology becomes very deep, a memoization cache could be introduced without altering external interfaces.  
+* **Extensibility** – new lower‑ontology concepts can be added without recompiling agents, supporting continuous evolution as the codebase expands.
 
-### 5. Maintainability assessment  
+### Maintainability assessment  
 
-The Ontology sub‑component scores high on maintainability:
-
-* **Clear separation of concerns** – Classification, validation, and data access are isolated into distinct classes/files.  
-* **Standardized base class** – `BaseAgent` enforces uniform coding conventions, making onboarding of new developers straightforward.  
-* **Explicit hierarchical model** – The upper/lower ontology layers are a natural mental model that aligns with domain experts’ taxonomy, reducing the cognitive load when extending the ontology.  
-* **Potential pain points** – The recursive lookup algorithm could become complex as the hierarchy deepens; developers should monitor recursion depth and consider iterative approaches if performance degrades. Additionally, any change to the validation logic propagates to all agents, so regression testing is essential.  
-
-Overall, the Ontology sub‑component exhibits a disciplined, agent‑driven architecture with well‑defined integration points, making it both extensible and robust within the broader SemanticAnalysis ecosystem.
+The clear separation of concerns (definition files, resolver, validator, agent) makes the ontology subsystem highly maintainable. Adding or deprecating concepts requires changes in only one file (`lower-ontology.ts`). The validator acts as a safety net, catching structural regressions early. Because the resolver is stateless and the agents follow a consistent interface, unit tests remain straightforward, and the overall codebase benefits from low coupling and high cohesion.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
-
-### Children
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent is implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which suggests a modular design for the ontology system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to process git history and LSL sessions. This is evident in the code files, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, and integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, which define the respective agents and their responsibilities. The use of multiple agents allows for a modular and scalable design, enabling the processing of large amounts of data and the integration of new agents as needed.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a batch processing approach, as seen in the batch-analysis.yaml file, to manage the execution of various agents.
-- [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
+- [Insights](./Insights.md) -- The insight generation is performed by the InsightGenerator class in integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts.
+- [EntityValidator](./EntityValidator.md) -- The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/entity-validator.ts.
+- [CodeGraph](./CodeGraph.md) -- The code graph generation is performed by the CodeGraphGenerator class in integrations/code-graph-rag/src/code-graph-generator.ts.
 
 
 ---

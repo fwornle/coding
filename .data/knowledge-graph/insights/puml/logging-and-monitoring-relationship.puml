@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LoggingAndMonitoring
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[LoggingAndMonitoring] as logging_and_monitoring #LightBlue
+[GraphDatabaseManagement] as graph_database_management #F0F0F0
+[CodeGraphAnalysis] as code_graph_analysis #F0F0F0
+[ConstraintDetection] as constraint_detection #F0F0F0
+[ProviderRegistration] as provider_registration #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[AsyncLogBuffering] as async_log_buffering #E8F5E8
+
+coding_patterns --> logging_and_monitoring
+graph_database_management -[hidden]- logging_and_monitoring
+code_graph_analysis -[hidden]- logging_and_monitoring
+constraint_detection -[hidden]- logging_and_monitoring
+provider_registration -[hidden]- logging_and_monitoring
+code_graph_rag -[hidden]- logging_and_monitoring
+logging_and_monitoring --> async_log_buffering
+
+@enduml

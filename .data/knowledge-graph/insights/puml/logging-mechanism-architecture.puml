@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Logging Mechanism" {
+  component "LoggingMechanism" as lm <<core>>
+  component "Non-Blocking Async Log Buffer" as nalb <<api>>
+  lm --> nalb : uses
+}
+
+package "Environment Variables" {
+  component "BROWSER_ACCESS_PORT" as bap <<external>>
+  component "BROWSER_ACCESS_SSE_URL" as basu <<external>>
+  component "CODE_GRAPH_RAG_SSE_PORT" as cgrsp <<external>>
+  component "CODE_GRAPH_RAG_PORT" as cgrp <<external>>
+  component "MEMGRAPH_BATCH_SIZE" as mbs <<external>>
+  component "CONTAINS_PACKAGE" as cp <<external>>
+  lm --> bap : uses
+  lm --> basu : uses
+  lm --> cgrsp : uses
+  lm --> cgrp : uses
+  lm --> mbs : configured by
+  lm --> cp : filtered by
+}
+
+package "Integration" {
+  component "Copilot CLI" as ccli <<cli>>
+  component "Knowledge Graph Manager" as kgm <<core>>
+  lm --> ccli : logs
+  lm --> kgm : integrates with
+}
+
+@enduml
