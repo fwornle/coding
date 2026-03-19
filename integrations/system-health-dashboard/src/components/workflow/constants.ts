@@ -410,6 +410,7 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'final_validation': 'content_validation',
   // Wave-analysis sub-steps (map to existing agents for graph visualization)
   'wave1_init': 'batch_scheduler',
+  'wave1_docs': 'documentation_linker',
   'wave1_analyze': 'semantic_analysis',
   'wave1_qa': 'quality_assurance',
   'wave1_qa_retry': 'quality_assurance',

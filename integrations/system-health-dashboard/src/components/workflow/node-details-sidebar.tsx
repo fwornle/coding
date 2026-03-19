@@ -1281,7 +1281,7 @@ export function UKBNodeDetailsSidebar({
         </div>
 
         {/* LLM Mode Control - Only show for agents that use LLM */}
-        {agent.usesLLM && (
+        {agent.usesLLM ? (
           <>
             <Separator />
             <div className="space-y-3">
@@ -1387,7 +1387,7 @@ export function UKBNodeDetailsSidebar({
               </div>
             </div>
           </>
-        )}
+        ) : null}
 
         {/* Step Execution Details - Always show with available data */}
         <Separator />
@@ -1409,7 +1409,7 @@ export function UKBNodeDetailsSidebar({
             </div>
 
             {/* Duration - only show if we have it */}
-            {stepInfo?.duration !== undefined && stepInfo.duration > 0 && (
+            {stepInfo?.duration != null && stepInfo.duration > 0 ? (
               <div className="flex justify-between">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <Timer className="h-3 w-3" />
@@ -1417,7 +1417,7 @@ export function UKBNodeDetailsSidebar({
                 </span>
                 <span>{formatDurationMs(stepInfo.duration)}</span>
               </div>
-            )}
+            ) : null}
 
             {/* Tokens - only show if we have it */}
             {stepInfo?.tokensUsed !== undefined && stepInfo.tokensUsed > 0 && (

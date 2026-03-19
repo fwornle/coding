@@ -4,17 +4,17 @@
 **Project**: rapid-automations<br>
 **Target**: CODING<br>
 **Generated**: 2026-03-18T06:00:00.000Z<br>
-**Decisions in Window**: 1
+**Decisions in Window**: 4
 
 ---
 
 ## Statistics
 
-- **Total Prompt Sets**: 1
-- **Classified as CODING**: 1 (100%)
+- **Total Prompt Sets**: 4
+- **Classified as CODING**: 4 (100%)
 - **Classified as LOCAL**: 0 (0%)
 - **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 0
-- **[Layer 1 (Path) Decisions](#layer-1-path)**: 1
+- **[Layer 1 (Path) Decisions](#layer-1-path)**: 4
 - **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 0
 - **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 0
 - **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 0
@@ -24,7 +24,7 @@
 
 ## Layer 1: Path
 
-**Decisions**: 1
+**Decisions**: 4
 
 ### Prompt Set: [ps_1773812243968](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)
 
@@ -40,6 +40,60 @@
 - Decision: coding
 - Confidence: 0.98
 - Reasoning: Coding operations detected (1): /Users/Q284340/Agentic/coding/.specstory/history/
+- Processing Time: 2ms
+
+---
+
+### Prompt Set: [ps_1773812243968](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)
+
+**Time Range**: 2026-03-18T05:37:23.968Z → 2026-03-18T06:31:11.601Z<br>
+**LSL File**: [2026-03-18_0600-0700_c197ef_from-rapid-automations.md](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.95)
+
+#### Layer-by-Layer Trace
+
+✅ **Layer 1 (path)**
+- Decision: coding
+- Confidence: 0.98
+- Reasoning: Coding operations detected (3): /Users/Q284340/Agentic/coding/.specstory/history/, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-18_0600-0700_c197ef.md, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-17_2000-2100_c197ef.md
+- Processing Time: 1ms
+
+---
+
+### Prompt Set: [ps_1773812243968](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)
+
+**Time Range**: 2026-03-18T05:37:23.968Z → 2026-03-18T06:31:33.466Z<br>
+**LSL File**: [2026-03-18_0600-0700_c197ef_from-rapid-automations.md](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.95)
+
+#### Layer-by-Layer Trace
+
+✅ **Layer 1 (path)**
+- Decision: coding
+- Confidence: 0.98
+- Reasoning: Coding operations detected (3): /Users/Q284340/Agentic/coding/.specstory/history/, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-18_0600-0700_c197ef.md, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-17_2000-2100_c197ef.md
+- Processing Time: 1ms
+
+---
+
+### Prompt Set: [ps_1773812243968](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)
+
+**Time Range**: 2026-03-18T05:37:23.968Z → 2026-03-18T09:44:14.348Z<br>
+**LSL File**: [2026-03-18_0600-0700_c197ef_from-rapid-automations.md](../../../history/2026-03-18_0600-0700_c197ef_from-rapid-automations.md#ps_1773812243968)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.95)
+
+#### Layer-by-Layer Trace
+
+✅ **Layer 1 (path)**
+- Decision: coding
+- Confidence: 0.98
+- Reasoning: Coding operations detected (3): /Users/Q284340/Agentic/coding/.specstory/history/, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-18_0600-0700_c197ef.md, /Users/Q284340/Agentic/coding/.specstory/history/2026-03-17_2000-2100_c197ef.md
 - Processing Time: 2ms
 
 ---
