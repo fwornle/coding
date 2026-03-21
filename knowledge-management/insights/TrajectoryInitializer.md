@@ -40,7 +40,11 @@ Even though the source repository reports “0 code symbols found,” the observ
 | Element | Location / Role | Technical Mechanics |
 |---------|----------------|---------------------|
 | **SpecstoryAdapter** | `lib/integrations/specstory-adapter.js` | Encapsulates all Specstory‑specific API calls (e.g., `connect()`, `sendMessage()`). Provides a stable interface for the rest of the system. |
-| **TrajectoryInitializer** | Inside the **Trajectory** component (no explicit file path given) | Exposes an `async initialize()` method. Internally it: <br>1. Calls `ConnectionManager.getConnection()` (or similar) to retrieve a connection object. <br>2. Passes that connection to `SpecstoryAdapter` to perform any handshake required by the Specstory extension. <br>3. Wraps the whole sequence in a `try…catch` block, delegating caught errors to `ErrorManager.handle(error)`. <br>4. Returns a resolved Promise containing the fully‑initialized Trajectory instance. |
+| **TrajectoryInitializer** | Inside the **Trajectory** component (no explicit file path given) | Exposes an `async initialize()` method. Internally it:   
+1. Calls `ConnectionManager.getConnection()` (or similar) to retrieve a connection object.   
+2. Passes that connection to `SpecstoryAdapter` to perform any handshake required by the Specstory extension.   
+3. Wraps the whole sequence in a `try…catch` block, delegating caught errors to `ErrorManager.handle(error)`.   
+4. Returns a resolved Promise containing the fully‑initialized Trajectory instance. |
 | **ConnectionManager** | Sibling component | Provides abstraction over the concrete transport (WebSocket, HTTP, etc.). Its methods are invoked by the initializer to “oversee the connection methods used to establish a connection to the Specstory extension.” |
 | **ErrorManager** | Sibling component | Centralizes error logging and recovery strategies. The initializer forwards any exception here, ensuring a uniform error‑handling policy across the system. |
 

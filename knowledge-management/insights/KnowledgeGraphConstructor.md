@@ -100,9 +100,15 @@ All interactions are mediated through TypeScript interfaces defined in `knowledg
 | Item | Insight |
 |------|---------|
 | **Architectural patterns identified** | Modular layered design, façade pattern for graph access, separation of concerns via dedicated agents (parsing, caching, versioning, logging, updating). |
-| **Design decisions and trade‑offs** | • Using Memgraph gives native graph performance but adds operational overhead.<br>• Tree‑sitter provides language‑agnostic parsing at the cost of an additional native dependency.<br>• In‑memory caching improves read latency but requires careful invalidation to avoid stale data.<br>• Versioning enables auditability and time‑travel queries but increases storage and write complexity. |
+| **Design decisions and trade‑offs** | • Using Memgraph gives native graph performance but adds operational overhead.  
+• Tree‑sitter provides language‑agnostic parsing at the cost of an additional native dependency.  
+• In‑memory caching improves read latency but requires careful invalidation to avoid stale data.  
+• Versioning enables auditability and time‑travel queries but increases storage and write complexity. |
 | **System structure insights** | KnowledgeGraphConstructor sits under the parent `SemanticAnalysis` and owns a `MemgraphConnection` child. It interacts with sibling agents (Pipeline, OntologyManager, InsightGenerator, etc.) through a clean TypeScript API, fitting into the overall multi‑agent DAG workflow. |
-| **Scalability considerations** | • Memgraph’s horizontal scaling (sharding) can handle large codebases.<br>• Cache reduces read pressure, supporting high‑throughput query workloads.<br>• Versioning may become a bottleneck for extremely frequent mutations; consider snapshot pruning.<br>• The updater’s batch API mitigates write amplification. |
+| **Scalability considerations** | • Memgraph’s horizontal scaling (sharding) can handle large codebases.  
+• Cache reduces read pressure, supporting high‑throughput query workloads.  
+• Versioning may become a bottleneck for extremely frequent mutations; consider snapshot pruning.  
+• The updater’s batch API mitigates write amplification. |
 | **Maintainability assessment** | High maintainability thanks to single‑responsibility modules, explicit interfaces, and consistent naming. The clear separation of logging, versioning, and caching simplifies debugging. The main risk lies in cache coherence and version migration, which require disciplined testing and documentation. |
 
 These observations provide a grounded view of how the **KnowledgeGraphConstructor** is architected, implemented, and integrated within the broader SemanticAnalysis ecosystem, while highlighting the key trade‑offs that influence its scalability and long‑term maintainability.

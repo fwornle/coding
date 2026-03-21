@@ -86,7 +86,9 @@ Following these conventions ensures that Copi remains a reliable, observable, an
 | Item | Detail |
 |------|--------|
 | **Architectural patterns identified** | Wrapper (Adapter) pattern for CLI abstraction; Dependency Inversion for Logger and ConfigurationValidator; Modular component layout within LiveLoggingSystem. |
-| **Design decisions and trade‑offs** | • Centralized logging vs. per‑integration logs – chosen to unify observability.<br>• Configuration validation at startup – adds a validation step but prevents runtime misconfiguration.<br>• Asynchronous, non‑blocking CLI execution – favors scalability at the cost of added complexity in error handling. |
+| **Design decisions and trade‑offs** | • Centralized logging vs. per‑integration logs – chosen to unify observability.  
+• Configuration validation at startup – adds a validation step but prevents runtime misconfiguration.  
+• Asynchronous, non‑blocking CLI execution – favors scalability at the cost of added complexity in error handling. |
 | **System structure insights** | Copi lives under `integrations/copi`, exposing `CopiWrapper` as its public API. It consumes services from sibling components (Logger, ConfigurationValidator) and is orchestrated by the parent LiveLoggingSystem, which aggregates logs and coordinates transcript processing. |
 | **Scalability considerations** | High‑volume handling is achieved through asynchronous process spawning and likely a concurrency guard (semaphore/queue). Configuration can cap concurrent calls, protecting the host from resource exhaustion. |
 | **Maintainability assessment** | The clear separation of concerns (wrapper, logging, configuration) and reliance on shared interfaces make the component easy to test and evolve. Documentation (`INSTALL.md`, `USAGE.md`) and the explicit wrapper class further aid onboarding. The primary risk is tight coupling to the Copilot CLI binary; any CLI API change will require updates to `CopiWrapper` and its validation logic. |
