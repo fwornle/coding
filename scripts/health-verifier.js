@@ -47,8 +47,6 @@ function isDockerMode() {
   // can crash Docker Desktop when its engine is stopped or unstable (accessing a closed
   // network connection triggers com.docker.virtualization termination).
   return fsSync.existsSync('/.dockerenv');
-
-  return false;
 }
 
 class HealthVerifier extends EventEmitter {

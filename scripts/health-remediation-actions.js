@@ -541,69 +541,13 @@ export class HealthRemediationActions {
     try {
       this.log('Starting Qdrant vector database...');
 
-      if (this.isDocker) {
-        this.log('Docker mode: Qdrant runs as a separate container - cannot restart from here');
-        return { success: false, message: 'Docker mode: Qdrant is managed by docker-compose externally' };
-      }
-
-      // Guard: verify Docker Desktop is actually running before issuing any Docker CLI
-      // commands. Any Docker CLI call (docker ps, docker info, docker-compose) connects
-      // to the daemon socket; if Docker Desktop's engine is stopped or crashed, this
-      // triggers "com.docker.virtualization: use of closed network connection" and kills
-      // Docker Desktop entirely. Check the process list instead — zero socket contact.
-      try {
-        const { stdout } = await execAsync('pgrep -f "Docker Desktop" 2>/dev/null || true', { timeout: 3000 });
-        if (!stdout.trim()) {
-          this.log('Docker Desktop not running — skipping Qdrant auto-heal');
-          return { success: false, message: 'Docker Desktop not running — cannot start Qdrant' };
-        }
-        // Also check the engine is actually ready via the API socket with a raw ping
-        // Using curl to the socket avoids the Docker CLI layer entirely
-        const socketPath = existsSync('/var/run/docker.sock')
-          ? '/var/run/docker.sock'
-          : join(process.env.HOME || '', '.docker/run/docker.sock');
-        const { stdout: pingResult } = await execAsync(
-          `curl -sf --unix-socket "${socketPath}" http://localhost/_ping 2>/dev/null || echo "UNREACHABLE"`,
-          { timeout: 5000 }
-        );
-        if (pingResult.trim() !== 'OK') {
-          this.log('Docker engine not ready — skipping Qdrant auto-heal');
-          return { success: false, message: 'Docker engine not responsive — cannot start Qdrant' };
-        }
-      } catch {
-        this.log('Docker availability check failed — skipping Qdrant auto-heal');
-        return { success: false, message: 'Cannot verify Docker availability — skipping Qdrant' };
-      }
-
-      // Check if docker-compose file exists
-      const composeFile = `${this.codingRoot}/docker-compose.yml`;
-
-      // Start Qdrant via docker-compose
-      await execAsync(`docker-compose -f ${composeFile} up -d qdrant`, {
-        timeout: 30000
-      });
-
-      // Wait for Qdrant to be ready
-      await this.sleep(5000);
-
-      // Verify it's running
-      for (let i = 0; i < 5; i++) {
-        try {
-          const response = await fetch('http://localhost:6333/health', {
-            method: 'GET',
-            signal: AbortSignal.timeout(2000)
-          });
-
-          if (response.ok) {
-            return { success: true, message: 'Qdrant started successfully' };
-          }
-        } catch (error) {
-          // Retry
-          await this.sleep(2000);
-        }
-      }
-
-      return { success: false, message: 'Qdrant started but health check failed' };
+      // Qdrant runs as a Docker container — any Docker CLI call (docker ps, docker info,
+      // docker-compose) or Docker socket contact can crash Docker Desktop when its VM is
+      // unstable ("com.docker.virtualization: use of closed network connection"). Never
+      // attempt to start/restart Qdrant from the health monitor — it must be managed
+      // externally via docker-compose.
+      this.log('Qdrant is Docker-managed — skipping auto-heal to avoid destabilizing Docker VM');
+      return { success: false, message: 'Qdrant is Docker-managed — use docker-compose to start it' };
 
     } catch (error) {
       return { success: false, message: error.message };
