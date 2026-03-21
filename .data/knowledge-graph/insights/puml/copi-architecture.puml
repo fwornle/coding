@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Copi Component" {
+  component "Copi" as copi <<core>>
+  component "Logger" as logger <<external>>
+  component "ConfigurationValidator" as config <<core>>
+  component "Tmux" as tmux <<external>>
+  component "GitHub Copilot CLI" as ghcli <<cli>>
+  component "LiveLoggingSystem" as lls <<core>>
+}
+
+copi --> logger : logs errors
+copi --> config : uses configuration
+copi --> tmux : integrates with
+copi --> ghcli : wraps
+copi --> lls : provides interface for
+
+logger --> lls : logs to
+
+@enduml

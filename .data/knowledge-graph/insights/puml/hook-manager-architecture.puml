@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Hook Management" {
+  component "HookManager" as hm <<core>>
+  database "Configuration File" as cf
+  database "Database" as db
+  component "Hook Registration" as hr <<api>>
+  component "Hook Dispatching" as hd <<api>>
+  component "Hook Event Documentation" as hed <<external>>
+}
+
+hm --> cf : loads
+hm --> db : loads
+hm --> hr : uses
+hr --> hd : triggers
+hd --> hm : sends
+hm --> hed : uses
+hed --> hm : provides
+
+@enduml

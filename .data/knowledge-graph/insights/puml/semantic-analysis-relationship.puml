@@ -15,8 +15,12 @@ title Hierarchy Context: SemanticAnalysis
 [Pipeline] as pipeline #E8F5E8
 [Ontology] as ontology #E8F5E8
 [Insights] as insights #E8F5E8
+[OntologyManager] as ontology_manager #E8F5E8
+[CodeAnalyzer] as code_analyzer #E8F5E8
+[InsightGenerator] as insight_generator #E8F5E8
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #E8F5E8
 [EntityValidator] as entity_validator #E8F5E8
-[CodeGraph] as code_graph #E8F5E8
+[CodeGraphRAG] as code_graph_rag #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -29,7 +33,11 @@ constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> pipeline
 semantic_analysis --> ontology
 semantic_analysis --> insights
+semantic_analysis --> ontology_manager
+semantic_analysis --> code_analyzer
+semantic_analysis --> insight_generator
+semantic_analysis --> knowledge_graph_constructor
 semantic_analysis --> entity_validator
-semantic_analysis --> code_graph
+semantic_analysis --> code_graph_rag
 
 @enduml

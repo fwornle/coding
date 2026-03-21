@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptProcessor
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptProcessor] as transcript_processor #LightBlue
+[Logger] as logger #F0F0F0
+[ConfigurationValidator] as configuration_validator #F0F0F0
+[OntologyClassifier] as ontology_classifier #F0F0F0
+[Copi] as copi #F0F0F0
+[TranscriptAdapter] as transcript_adapter #E8F5E8
+
+live_logging_system --> transcript_processor
+logger -[hidden]- transcript_processor
+configuration_validator -[hidden]- transcript_processor
+ontology_classifier -[hidden]- transcript_processor
+copi -[hidden]- transcript_processor
+transcript_processor --> transcript_adapter
+
+@enduml

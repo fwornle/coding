@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: WorkStealer
+
+[Trajectory] as trajectory #FFFFDD
+[WorkStealer] as work_stealer #LightBlue
+[LazyLoader] as lazy_loader #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[EnvironmentConfigurator] as environment_configurator #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[WorkStealingMechanism] as work_stealing_mechanism #E8F5E8
+
+trajectory --> work_stealer
+lazy_loader -[hidden]- work_stealer
+graph_database_manager -[hidden]- work_stealer
+environment_configurator -[hidden]- work_stealer
+specstory_adapter -[hidden]- work_stealer
+work_stealer --> work_stealing_mechanism
+
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EnvironmentConfigurator
+
+[Trajectory] as trajectory #FFFFDD
+[EnvironmentConfigurator] as environment_configurator #LightBlue
+[LazyLoader] as lazy_loader #F0F0F0
+[WorkStealer] as work_stealer #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[ModularEnvironmentConfigurator] as modular_environment_configurator #E8F5E8
+
+trajectory --> environment_configurator
+lazy_loader -[hidden]- environment_configurator
+work_stealer -[hidden]- environment_configurator
+graph_database_manager -[hidden]- environment_configurator
+specstory_adapter -[hidden]- environment_configurator
+environment_configurator --> modular_environment_configurator
+
+@enduml

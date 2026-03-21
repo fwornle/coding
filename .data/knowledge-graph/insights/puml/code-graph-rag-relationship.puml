@@ -1,25 +1,31 @@
 @startuml
 !include _standard-style.puml
 
-title Hierarchy Context: CodeGraphRag
+title Hierarchy Context: CodeGraphRAG
 
-[CodingPatterns] as coding_patterns #FFFFDD
-[CodeGraphRag] as code_graph_rag #LightBlue
-[GraphManagement] as graph_management #F0F0F0
-[LLMInitialization] as llminitialization #F0F0F0
-[ConstraintValidation] as constraint_validation #F0F0F0
-[CodeGraphConstruction] as code_graph_construction #F0F0F0
-[ContentValidation] as content_validation #F0F0F0
-[BrowserAccess] as browser_access #F0F0F0
-[CodeGraphRagConfiguration] as code_graph_rag_configuration #E8F5E8
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[CodeGraphRAG] as code_graph_rag #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraphRAGGuide] as code_graph_ragguide #E8F5E8
+[GraphDatabaseIntegration] as graph_database_integration #E8F5E8
 
-coding_patterns --> code_graph_rag
-graph_management -[hidden]- code_graph_rag
-llminitialization -[hidden]- code_graph_rag
-constraint_validation -[hidden]- code_graph_rag
-code_graph_construction -[hidden]- code_graph_rag
-content_validation -[hidden]- code_graph_rag
-browser_access -[hidden]- code_graph_rag
-code_graph_rag --> code_graph_rag_configuration
+semantic_analysis --> code_graph_rag
+pipeline -[hidden]- code_graph_rag
+ontology -[hidden]- code_graph_rag
+insights -[hidden]- code_graph_rag
+ontology_manager -[hidden]- code_graph_rag
+code_analyzer -[hidden]- code_graph_rag
+insight_generator -[hidden]- code_graph_rag
+knowledge_graph_constructor -[hidden]- code_graph_rag
+entity_validator -[hidden]- code_graph_rag
+code_graph_rag --> code_graph_ragguide
+code_graph_rag --> graph_database_integration
 
 @enduml

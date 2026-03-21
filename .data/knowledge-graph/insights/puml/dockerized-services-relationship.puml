@@ -12,8 +12,12 @@ title Hierarchy Context: DockerizedServices
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
+[LLMManager] as llmmanager #E8F5E8
+[ServiceOrchestrator] as service_orchestrator #E8F5E8
 [GraphDatabaseManager] as graph_database_manager #E8F5E8
-[ServiceStarter] as service_starter #E8F5E8
+[WaveAgentExecutor] as wave_agent_executor #E8F5E8
+[APIService] as apiservice #E8F5E8
+[DashboardService] as dashboard_service #E8F5E8
 
 coding --> dockerized_services
 live_logging_system -[hidden]- dockerized_services
@@ -23,7 +27,11 @@ knowledge_management -[hidden]- dockerized_services
 coding_patterns -[hidden]- dockerized_services
 constraint_system -[hidden]- dockerized_services
 semantic_analysis -[hidden]- dockerized_services
+dockerized_services --> llmmanager
+dockerized_services --> service_orchestrator
 dockerized_services --> graph_database_manager
-dockerized_services --> service_starter
+dockerized_services --> wave_agent_executor
+dockerized_services --> apiservice
+dockerized_services --> dashboard_service
 
 @enduml

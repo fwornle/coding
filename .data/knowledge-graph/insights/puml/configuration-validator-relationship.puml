@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigurationValidator
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ConfigurationValidator] as configuration_validator #LightBlue
+[TranscriptProcessor] as transcript_processor #F0F0F0
+[Logger] as logger #F0F0F0
+[OntologyClassifier] as ontology_classifier #F0F0F0
+[Copi] as copi #F0F0F0
+[ConfigValidator] as config_validator #E8F5E8
+
+live_logging_system --> configuration_validator
+transcript_processor -[hidden]- configuration_validator
+logger -[hidden]- configuration_validator
+ontology_classifier -[hidden]- configuration_validator
+copi -[hidden]- configuration_validator
+configuration_validator --> config_validator
+
+@enduml

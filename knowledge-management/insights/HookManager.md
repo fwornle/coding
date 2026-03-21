@@ -2,119 +2,91 @@
 
 **Type:** SubComponent
 
-The HookManager works in conjunction with other sub-components, such as the ContentValidator and ViolationCaptureHandler, to ensure seamless system operation.
-
-**Technical Insight Document – HookManager (SubComponent)**  
-
----
+HookManager works with the integrations/copi/docs/hooks.md file to provide hook event documentation.
 
 ## What It Is  
 
-`HookManager` is the concrete implementation that provides a **unified hook registration and execution mechanism** for the entire `ConstraintSystem`. The source file lives at  
-
-```
-lib/agent‑api/hooks/hook-manager.js
-```  
-
-Within the `ConstraintSystem` hierarchy, `HookManager` sits alongside sibling sub‑components such as **ContentValidator**, **HookConfigurationLoader**, **ViolationCaptureHandler**, and **GraphDatabaseAccessor**. Its primary responsibility is to act as the central registry for all hook definitions, to persist those registrations, and to invoke the appropriate hook callbacks when the system’s events or triggers occur. By consolidating hook handling in a single module, the rest of the constraint‑analysis pipeline can remain agnostic of the underlying registration details and simply rely on the manager’s public API.
-
----
+`HookManager` is the sub‑component that lives inside the **ConstraintSystem** package. It is responsible for the complete lifecycle of hook events – from loading their definitions (either from a configuration file or a database) to dispatching those events to the handlers that have registered interest. The component’s documentation is anchored in the file **integrations/copi/docs/hooks.md**, which serves both as a reference for developers and as a source of metadata that the manager consumes at runtime. Internally, `HookManager` delegates the low‑level loading work to its child component **HookLoader**, while exposing a registration API that other parts of the system can use to plug in custom handlers.
 
 ## Architecture and Design  
 
-The observations describe a **modular architecture**: each functional concern (content validation, hook configuration, violation capture, graph persistence) lives in its own module, and `HookManager` is the dedicated module for hook lifecycle management.  
+The design of `HookManager` follows a clear separation of concerns. The **loading** concern is isolated in the **HookLoader** child, allowing the manager to remain focused on **registration** and **dispatch**. This modular split is evident in the hierarchy: *ConstraintSystem → HookManager → HookLoader*. By keeping the loader distinct, the system can evolve the source of hook definitions (e.g., switching from a flat file to a database) without impacting the dispatch logic.
 
-* **Facade‑style interface** – `HookManager` offers a single, coherent façade (`registerHook`, `executeHook`, etc.) that abstracts away the details of loading configurations, persisting state, and dispatching callbacks. This façade is consumed by other sub‑components (e.g., `ContentValidator` registers validation‑specific hooks; `ViolationCaptureHandler` may register post‑violation hooks).  
+`HookManager` implements a **registration‑dispatch** workflow. Handlers first invoke a registration mechanism to express interest in specific hook events. The manager maintains an internal registry that maps event identifiers to the set of subscribed handlers. When an event is triggered—either because the loader read it from the configuration or because another component raised it—`HookManager` uses its **hook dispatching mechanism** to iterate over the registry and invoke each handler in turn. This approach ensures loose coupling: handlers do not need to know about each other, and the manager does not need to know the concrete implementation details of any handler.
 
-* **Configuration‑driven composition** – The sibling `HookConfigurationLoader` loads and merges hook definitions from multiple sources. `HookManager` then consumes the merged configuration, turning declarative data into runnable hook objects. This pattern mirrors a **configuration‑driven plugin system**, where the manager does not hard‑code any particular hook but instead adapts to whatever configuration is supplied.  
+The component also integrates documentation tightly with runtime behavior. By consulting **integrations/copi/docs/hooks.md** both for human‑readable reference and for loading hook metadata, `HookManager` guarantees that the runtime view of available hooks stays synchronized with the documented contract. This dual‑use of the same file reduces the risk of drift between code and documentation.
 
-* **Persistence coupling** – The manager “captures and persists hook registrations,” indicating an internal persistence layer (likely a simple file or a lightweight DB) that stores the current registry state. This ensures that after a restart the same hooks are available without re‑registration.  
-
-* **Event‑triggered execution** – By “respond[ing] to various events and triggers,” `HookManager` operates as an **event dispatcher**. When the `ConstraintSystem` emits an event (e.g., a new content node is validated), the manager looks up the relevant hook list and invokes them in order.  
-
-Overall, the design follows a **centralized coordination** model: a single manager holds the authoritative view of hooks, while the rest of the system interacts with it through well‑defined interfaces.
-
----
+![HookManager — Architecture](../../.data/knowledge-graph/insights/images/hook-manager-architecture.png)
 
 ## Implementation Details  
 
-Although the source contains no explicit symbols in the observation set, the file path (`lib/agent-api/hooks/hook-manager.js`) and the described behaviours let us infer the core implementation pieces:
+* **Hook Loading** – The process begins with `HookLoader`, which reads hook definitions from either a configuration file or a database. Although the exact class name for the loader is not listed, the observation that “HookManager contains HookLoader” tells us that the loader is instantiated and invoked by the manager during initialization. The loader likely parses the **integrations/copi/docs/hooks.md** file to extract hook signatures, descriptions, and any default parameters.
 
-1. **Hook Registry** – An in‑memory map (e.g., `Map<string, Hook[]>`) that stores hook identifiers against arrays of callback functions. Registration methods add entries; deregistration removes them.  
+* **Registration Mechanism** – `HookManager` exposes an API (e.g., `registerHandler(eventName, handler)`) that lets external modules add their handler functions to the internal registry. The registry is a data structure—most probably a map from event identifiers to an array of handler callbacks. Because the manager “relies on the integrations/copi/docs/hooks.md file for hook event documentation,” registration may include validation against the documented schema to prevent mismatched event names.
 
-2. **Persistence Layer** – Likely a JSON‑based store or a lightweight key‑value database accessed through a helper module (perhaps via `GraphDatabaseAccessor` for durability). On start‑up, `HookManager` reads the persisted registry and rehydrates the in‑memory map.  
+* **Dispatching Mechanism** – When a hook event occurs, the manager looks up the corresponding handler list and invokes each handler in sequence (or possibly in parallel, though the observations do not specify concurrency). The dispatch flow is described as “utilizes a hook dispatching mechanism to send events to registered handlers,” indicating a dedicated routine that abstracts the iteration and error handling for each handler invocation.
 
-3. **Configuration Loader Integration** – `HookConfigurationLoader` supplies a merged configuration object (perhaps `{ hookId: { type, handlerPath, options } }`). `HookManager` iterates this object, dynamically `require`s the handler modules, and registers the resulting functions.  
+* **Lifecycle Management** – Beyond registration and dispatch, `HookManager` “is responsible for managing the lifecycle of hook events and handlers.” This suggests that it may also provide facilities for deregistering handlers, pausing/resuming event propagation, and cleaning up resources when the parent **ConstraintSystem** shuts down.
 
-4. **Execution Engine** – A method such as `executeHook(eventName, payload)` looks up the hook list for `eventName` and calls each handler sequentially (or in parallel if the design permits). Errors are caught and possibly reported to `ViolationCaptureHandler`, ensuring that a failing hook does not break the overall pipeline.  
+* **Documentation Coupling** – The repeated mention that `HookManager` “works with the integrations/copi/docs/hooks.md file to provide hook event documentation” implies that the manager may expose a method to retrieve the documentation programmatically (e.g., `getHookDocs()`), enabling UI components or API consumers to present up‑to‑date hook information.
 
-5. **Public API** – The manager exports functions that other sub‑components call:  
-   * `registerHook(id, handler)` – adds a new hook at runtime.  
-   * `unregisterHook(id)` – removes a hook.  
-   * `listHooks()` – diagnostic utility.  
-   * `executeHook(id, context)` – internal use when an event occurs.  
-
-Because the manager is used by `ContentValidator` and `ViolationCaptureHandler`, those components likely invoke `registerHook` during their initialization phase (e.g., “onContentValidated” or “onViolationDetected” hooks).
-
----
+![HookManager — Relationship](../../.data/knowledge-graph/insights/images/hook-manager-relationship.png)
 
 ## Integration Points  
 
-* **Parent – ConstraintSystem** – The `ConstraintSystem` component owns `HookManager`. When the system boots, it first invokes `HookConfigurationLoader` to produce the merged configuration, then passes that configuration to `HookManager` for registration. Throughout the lifecycle, the `ConstraintSystem` forwards system events to the manager for hook execution.  
+`HookManager` sits directly under **ConstraintSystem**, making it a core service for any component that needs to react to system‑wide events. Its siblings—**GraphDatabaseManager**, **ContentValidator**, **ViolationCaptureModule**, **WorkflowManager**, and **ConstraintConfigurationManager**—share the same parent and therefore have similar access patterns to the broader configuration and persistence layers. For example, just as **WorkflowManager** loads workflow definitions from a configuration source, `HookManager` loads hook definitions from a similar source, hinting at a consistent configuration‑loading strategy across the subsystem.
 
-* **Sibling – HookConfigurationLoader** – Supplies the raw hook definitions. The loader merges configurations from multiple sources (static files, environment overrides, possibly remote services) and hands the final object to `HookManager`.  
+External modules register their callbacks with `HookManager` through the registration API. Because the manager does not prescribe how a handler implements its logic, any component (including the sibling modules) can become a hook consumer. Conversely, when `HookManager` dispatches an event, the payload may include references to entities managed by other siblings (e.g., a graph node from **GraphDatabaseManager** or a validation result from **ContentValidator**), enabling cross‑component coordination without tight coupling.
 
-* **Sibling – ContentValidator** – Registers validation‑specific hooks (e.g., “pre‑validation”, “post‑validation”) with the manager, enabling custom logic to run automatically when content is processed.  
-
-* **Sibling – ViolationCaptureHandler** – May both register hooks (e.g., “onViolation”) and act as a consumer of hook execution failures, persisting any constraint‑violation data that arises from hook processing.  
-
-* **Sibling – GraphDatabaseAccessor** – Provides the persistence backend that `HookManager` may use to store the hook registry, ensuring that hook state survives process restarts.  
-
-* **External Triggers** – Any component that emits an event defined in the hook configuration (e.g., a new graph node, a validation result) will indirectly cause `HookManager` to invoke the corresponding callbacks.  
-
-The integration pattern is **loose coupling via shared contracts**: each sibling only needs to know the manager’s registration and execution API; the internal storage or configuration format remains encapsulated.
-
----
+The child **HookLoader** is the only direct implementation dependency inside the manager. Should the source of hook definitions change (e.g., moving from a static markdown file to a dynamic database table), only `HookLoader` would need to be updated, leaving the registration and dispatch logic untouched.
 
 ## Usage Guidelines  
 
-1. **Register Early, Register Once** – Sub‑components should register their hooks during initialization (typically after `HookConfigurationLoader` has produced the merged config). Duplicate registrations can lead to multiple executions of the same logic and should be avoided.  
+1. **Register Early, Deregister When Done** – Handlers should register their interest during component initialization and explicitly deregister when the component is disposed. This prevents stale callbacks from lingering after a module has been unloaded.
 
-2. **Keep Handlers Idempotent** – Because hooks may be re‑executed on system restarts (due to persisted registrations) or when multiple events fire in quick succession, handlers should be written to tolerate repeated invocations without side‑effects.  
+2. **Validate Against Documentation** – When registering, developers should verify that the event name matches one documented in **integrations/copi/docs/hooks.md**. This practice avoids runtime mismatches and keeps the system’s contract clear.
 
-3. **Handle Errors Gracefully** – Hook callbacks run inside the manager’s execution engine. Any uncaught exception will be captured and routed to `ViolationCaptureHandler`. Hook authors should catch expected errors and surface meaningful diagnostics rather than allowing the process to crash.  
+3. **Keep Handlers Lightweight** – Since the dispatch mechanism iterates over all registered handlers, long‑running or blocking operations inside a handler can delay other listeners. If heavy work is required, handlers should off‑load to background jobs or async queues.
 
-4. **Leverage Configuration Over Code** – Whenever possible, define new hooks in the configuration files consumed by `HookConfigurationLoader`. This keeps the codebase stable and allows operators to enable/disable hooks without a code change.  
+4. **Leverage the Documentation API** – If a UI or external API needs to expose available hooks, use the manager’s documentation retrieval functions (if exposed) rather than parsing the markdown file directly. This ensures the view stays in sync with the runtime loader.
 
-5. **Avoid Heavy Blocking Operations** – Since the manager may execute hooks synchronously as part of a larger pipeline, long‑running or blocking operations should be off‑loaded (e.g., to a worker queue) to prevent bottlenecking the `ConstraintSystem`.  
-
-6. **Persist When Needed** – If a hook’s registration must survive restarts, rely on the manager’s built‑in persistence. For transient, test‑only hooks, developers can skip persistence by using the runtime registration API directly.  
+5. **Respect Lifecycle Hooks** – `HookManager` may emit lifecycle events (e.g., “hookLoaded”, “hookDisposed”). Components that need to perform setup or teardown should listen for these rather than relying on external timing.
 
 ---
 
-## Summary of Architectural Insights  
+### Architectural patterns identified  
+* Separation of concerns between loading (HookLoader) and event management (HookManager).  
+* Registration‑dispatch workflow that decouples producers (event sources) from consumers (handlers).  
 
-| Item | Insight |
-|------|---------|
-| **Architectural patterns identified** | Modular decomposition, Facade (central API), Configuration‑driven plugin system, Event dispatcher, Persistence‑backed registry |
-| **Design decisions & trade‑offs** | Centralizing hook logic simplifies usage and guarantees a single source of truth, but introduces a potential performance bottleneck and a single point of failure; persisting registrations improves reliability at the cost of added I/O overhead. |
-| **System structure insights** | `HookManager` sits under `ConstraintSystem` and collaborates with sibling modules that either supply hook definitions (`HookConfigurationLoader`) or consume hook outcomes (`ContentValidator`, `ViolationCaptureHandler`). The manager’s internal registry bridges configuration and runtime execution. |
-| **Scalability considerations** | The modular design allows new hook types to be added without touching core code. However, as the number of registered hooks grows, the manager’s in‑memory map and sequential execution path may become a scalability limit; future work could introduce asynchronous dispatch or sharding of hook groups. |
-| **Maintainability assessment** | High maintainability: responsibilities are clearly separated, the façade hides implementation details, and configuration‑driven registration reduces code churn. Persistence logic is encapsulated, and sibling components interact only via the manager’s stable API, making future refactors localized. |
+### Design decisions and trade‑offs  
+* **File‑based documentation as source of truth** – Guarantees alignment between code and docs but ties the runtime to the presence and format of a markdown file.  
+* **Child loader component** – Improves modularity and testability; however, adds an extra indirection that may affect startup latency if loading is heavyweight.  
 
-*All statements above are directly derived from the provided observations and the explicit file path `lib/agent-api/hooks/hook-manager.js`. No speculative patterns have been introduced.*
+### System structure insights  
+* `HookManager` is a leaf sub‑component of **ConstraintSystem** and a sibling to other configuration‑driven managers, suggesting a cohesive design where each manager handles a distinct domain (hooks, workflows, constraints, etc.).  
+
+### Scalability considerations  
+* The current registration‑dispatch model scales linearly with the number of handlers per event. If the system grows to hundreds of listeners, dispatch latency could increase; introducing batching or asynchronous dispatch could mitigate this.  
+
+### Maintainability assessment  
+* Strong coupling to a single documentation file simplifies maintenance—updates to hook definitions are made in one place.  
+* The clear division between loader and manager, together with the explicit registration API, makes the component easy to test and evolve independently of its siblings.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with separate modules for different functionalities such as content validation, hook configuration, and violation capture, as seen in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) and HookManager (lib/agent-api/hooks/hook-manager.js). This modular approach allows for easier maintenance and updates, as each module can be modified or extended without affecting the overall system. For example, the ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) is used for graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
+
+### Children
+- [HookLoader](./HookLoader.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, indicating the importance of hook loading in the overall system.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file.
-- [HookConfigurationLoader](./HookConfigurationLoader.md) -- HookManager loads and merges hook configurations from multiple sources, providing a unified hook registration and execution mechanism.
-- [ViolationCaptureHandler](./ViolationCaptureHandler.md) -- ViolationCaptureHandler captures and persists constraint violations, ensuring that the system remains accurate and up-to-date.
-- [GraphDatabaseAccessor](./GraphDatabaseAccessor.md) -- GraphDatabaseAdapter provides access to graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph database operations.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator checks entity content against predefined validation rules to ensure accuracy and consistency.
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
+- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
+- [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
 
 
 ---

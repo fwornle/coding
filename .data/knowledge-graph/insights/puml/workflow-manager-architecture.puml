@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Workflow Management" {
+  component "WorkflowManager" as wfm <<core>>
+  component "Configuration File" as cfg <<storage>>
+  component "Database" as db <<storage>>
+  component "Workflow Engine" as we <<api>>
+  component "Workflow Registration" as wr <<api>>
+  component "Workflow Execution" as wx <<api>>
+}
+
+wfm --> cfg : loads
+wfm --> db : loads
+wfm --> we : orchestrates
+wfm --> wr : uses
+wfm --> wx : utilizes
+we --> wx : executes
+wr --> wx : registers
+
+@enduml

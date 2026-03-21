@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "GraphCodeRAG" {
+  component "Graph-Code RAG" as gcRag <<core>>
+  component "Claude Code Setup" as claude <<external>>
+  component "MCP Server" as mcp <<api>>
+  component "Code Graph Database" as db <<storage>>
+}
+
+package "Integration" {
+  component "Hooks" as hooks <<api>>
+  component "Contributing Guidelines" as contributing <<external>>
+}
+
+gcRag --> mcp : uses
+gcRag --> db : stores
+gcRag --> claude : configures
+mcp --> hooks : processes
+hooks --> gcRag : enhances
+contributing --> gcRag : guides
+
+@enduml

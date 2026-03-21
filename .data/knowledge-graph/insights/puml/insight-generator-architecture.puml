@@ -1,0 +1,24 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Insight Generation" {
+  component "InsightGenerator" as ig <<agent>>
+  component "CodeAnalyzer" as ca <<core>>
+  component "InsightValidator" as iv <<core>>
+  component "InsightCache" as ic <<storage>>
+  component "InsightRanker" as ir <<core>>
+  component "InsightLogger" as il <<external>>
+  component "InsightUpdater" as iu <<core>>
+  component "API" as api <<api>>
+}
+
+ig --> ca : uses
+ig --> iv : uses
+ig --> ic : uses
+ig --> ir : uses
+ig --> il : uses
+ig --> iu : uses
+ig --> api : provides
+api --> ig : uses
+
+@enduml

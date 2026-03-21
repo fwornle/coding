@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Analysis" {
+  component "CodeAnalysisPatterns" as cap <<core>>
+  component "Graph-Code RAG" as gcr <<storage>>
+  component "EntityValidator" as ev <<agent>>
+}
+
+package "MCP Server" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+  database "LevelDB" as ldb
+}
+
+package "Integration" {
+  cloud "Claude Code Setup" as ccs <<external>>
+  component "MCP Tools" as mcp <<cli>>
+}
+
+cap --> gcr : uses
+cap --> ev : uses
+ev --> oca : processes
+oca --> ldb : stores
+gcr --> cap : provides
+mcp --> cap : integrates
+ccs --> gcr : configures
+
+@enduml

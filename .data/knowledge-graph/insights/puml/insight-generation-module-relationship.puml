@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: InsightGenerationModule
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[InsightGenerationModule] as insight_generation_module #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[UkbTraceReportProcessor] as ukb_trace_report_processor #E8F5E8
+
+knowledge_management --> insight_generation_module
+manual_learning -[hidden]- insight_generation_module
+online_learning -[hidden]- insight_generation_module
+graph_database_module -[hidden]- insight_generation_module
+ontology_classification_module -[hidden]- insight_generation_module
+agent_framework_module -[hidden]- insight_generation_module
+utilities_module -[hidden]- insight_generation_module
+browser_access -[hidden]- insight_generation_module
+code_graph_rag -[hidden]- insight_generation_module
+insight_generation_module --> ukb_trace_report_processor
+
+@enduml

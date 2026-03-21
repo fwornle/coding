@@ -2,93 +2,83 @@
 
 **Type:** Detail
 
-The OntologyClassificationAgent uses a lazy initialization approach as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+The project documentation does not provide explicit code evidence for the OntologyLoader class, but the parent context implies its existence.
 
 ## What It Is  
 
-**OntologyLoader** is the component responsible for bringing ontology data into the *OntologyClassificationAgent*. It lives inside the **integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts** module, where the agent itself is defined. The observations make clear that the loader is *contained* by the *OntologyClassificationAgent* and is exercised through a **lazy‑initialization** strategy – the loader is instantiated only when the agent first needs an ontology, rather than at agent construction time. This on‑demand loading behaviour is the primary mechanism that enables the agent to improve its start‑up performance and to keep memory usage bounded.
+`OntologyLoader` is the component that the documentation and the surrounding context indicate is responsible for **loading ontology systems** into the broader classification pipeline. Although the repository does not expose concrete file‑system locations or source‑code symbols for this class (the “Code Structure” observation reports *0 code symbols found*), the hierarchical description makes it clear that `OntologyLoader` lives under the **OntologyClassifier** module – the parent component that orchestrates classification logic. In practice, `OntologyLoader` would be instantiated by `OntologyClassifier` and handed the raw ontology definitions (e.g., OWL, RDF, or proprietary schema files) so that they can be materialised into in‑memory structures that the classifier can query. Because the parent component is described as “modular” and “allows for easy integration of new ontology systems”, `OntologyLoader` is expected to act as the plug‑in point where new ontology formats are introduced without changing the classifier core.
 
 ## Architecture and Design  
 
-The design exposed by the observations is centered on a **lazy‑initialization pattern**. In the *ontology‑classification‑agent.ts* file the agent checks whether an instance of *OntologyLoader* already exists before creating it. By deferring the creation of the loader until the first classification request, the system avoids the cost of loading potentially large ontology files during agent startup. This pattern is a classic performance‑oriented architectural decision: it reduces the initial load time of the *OntologyClassificationAgent* and spreads the cost of ontology parsing across actual usage.
+The only architectural clue supplied by the observations is the **modular design** of `OntologyClassifier`. This suggests that the system follows a **plug‑in (or strategy) pattern**: the classifier defines an abstract contract for ontology handling, and concrete loader implementations (e.g., `OntologyLoader`) satisfy that contract. The relationship “OntologyClassifier contains OntologyLoader” reinforces the idea that the loader is a **child component** that the parent calls at initialization time. No explicit design patterns such as factories, observers, or micro‑services are mentioned, so we restrict our analysis to the modular/plug‑in approach that is directly supported by the source.
 
-Interaction wise, the agent acts as the **parent** component and holds a reference to its child *OntologyLoader*. When the agent receives a request that requires ontology knowledge, it triggers the loader’s `load()` (or equivalent) routine. Because the loader is only created once, subsequent calls reuse the same instance, providing a simple form of **instance reuse** without the overhead of a full singleton implementation (the observations do not mention a global singleton, only that the loader is lazily created inside the agent).
+Interaction flow (as inferred from the description) is straightforward:
+
+1. `OntologyClassifier` boots and discovers available ontology loader modules.  
+2. It creates an instance of `OntologyLoader`.  
+3. `OntologyLoader` reads ontology definitions from a configured source (file system, network, or embedded resources).  
+4. The loaded ontology objects are returned or registered with the classifier’s internal registry, making them available for downstream classification tasks.
+
+Because the documentation emphasizes “easy integration of new ontology systems”, the design likely isolates **parsing logic** inside the loader, keeping the classifier agnostic of file formats. This separation of concerns is a classic modular design decision that aids extensibility.
 
 ## Implementation Details  
 
-Although the source code is not listed, the observations pinpoint the exact location of the lazy‑initialization logic:
+The observations do not list any concrete class members, methods, or file paths, so the implementation description must remain high‑level and strictly grounded in what is known:
 
-```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
-```
+* **Class name** – `OntologyLoader` – is the only concrete identifier.  
+* **Parent relationship** – it is a child of `OntologyClassifier`, implying that the loader is either instantiated directly inside the classifier’s constructor or via a lazy‑load factory method defined by the classifier.  
+* **Responsibility** – loading ontology systems. The term “ontology systems” is generic, but given the context of classification, we can infer that the loader must translate external ontology representations into an internal model (perhaps a graph of classes, properties, and axioms).  
 
-Within this file the agent likely follows a structure similar to:
+Given the modular claim, `OntologyLoader` is probably abstracted behind an interface (e.g., `IOntologyLoader`) that `OntologyClassifier` depends on. Concrete subclasses could exist for specific formats (e.g., `RdfOntologyLoader`, `OwlOntologyLoader`), each implementing a `load()` method that returns a domain‑specific `Ontology` object. The loader may also expose configuration hooks (e.g., source URI, caching flags) that the classifier supplies at runtime.
 
-```ts
-class OntologyClassificationAgent {
-  private ontologyLoader?: OntologyLoader;   // child component, initially undefined
-
-  private getLoader(): OntologyLoader {
-    if (!this.ontologyLoader) {
-      this.ontologyLoader = new OntologyLoader();   // lazy creation
-    }
-    return this.ontologyLoader;
-  }
-
-  async classify(...): Promise<...> {
-    const loader = this.getLoader();   // triggers load on first use
-    const ontology = await loader.load();   // on‑demand ontology loading
-    // classification logic using the ontology …
-  }
-}
-```
-
-The key technical mechanic is the **conditional instantiation** (`if (!this.ontologyLoader) …`). This ensures that the heavy work of reading, parsing, and possibly indexing the ontology is performed only when required. The loader itself is expected to encapsulate all low‑level file‑system or network interactions needed to obtain the ontology, abstracting those details away from the agent. Because the loader is stored on the agent instance, it can also cache the loaded ontology for the lifetime of the agent, avoiding repeated I/O.
+Because no source files are listed, we cannot cite exact paths such as `src/main/java/com/example/ontology/OntologyLoader.java`. The documentation simply notes that the component exists conceptually within the OntologyClassifier module.
 
 ## Integration Points  
 
-* **Parent‑Child Relationship** – The *OntologyClassificationAgent* owns the *OntologyLoader*. The agent’s public API (e.g., `classify`) indirectly invokes the loader, making the loader an internal dependency rather than a publicly exposed service.  
-* **Performance‑Critical Path** – Since the loader is only invoked when classification logic needs ontology data, it sits on the critical path for any request that depends on semantic analysis. Its lazy nature means that the first such request will pay the loading cost; subsequent requests benefit from the cached ontology.  
-* **Potential Sibling Components** – While not detailed in the observations, any other agents that require ontology data could adopt the same lazy‑initialization approach, sharing a similar loader implementation. This would provide a consistent pattern across the semantic‑analysis integration.  
+`OntologyLoader` integrates with the system at two primary junctions:
 
-No external libraries or services are mentioned, so the loader’s dependencies appear limited to the file system or internal resources required to read the ontology definitions.
+1. **Upstream – Configuration / Discovery** – `OntologyClassifier` likely reads a configuration file (e.g., `ontology-loader.yml` or a properties block) that specifies which loader implementation to use and where the raw ontology files reside. This configuration is the entry point for the loader, and any changes here affect which ontologies are available to the classifier.  
+
+2. **Downstream – Classification Engine** – Once the loader has materialised the ontology, it hands the resulting objects to the classifier’s internal registry. The classifier then uses these objects to resolve class hierarchies, property constraints, and semantic similarity during the classification process. No other system components are mentioned, so we assume the loader does not directly interact with UI layers, persistence stores, or external services beyond the source of the ontology data.
+
+Because the loader is a child of `OntologyClassifier`, its public API is expected to be minimal – most likely a single `load()` method and perhaps a `close()` or `reset()` for resource cleanup. The classifier acts as the sole consumer of this API, reinforcing a tight coupling that nevertheless respects the modular boundary.
 
 ## Usage Guidelines  
 
-1. **Do not instantiate OntologyLoader directly** – The loader is meant to be created by the *OntologyClassificationAgent* through its lazy‑initialization logic. Direct construction bypasses the intended lifecycle and may lead to duplicated loading work.  
-2. **Treat the first classification call as a warm‑up** – Because the loader will perform the heavy load on first use, developers should anticipate a longer latency on the initial request after the agent starts. If low latency is required from the very first call, consider “warming” the agent by invoking a harmless classification request during application startup.  
-3. **Avoid mutating the loaded ontology** – The loader is expected to return a stable, read‑only representation of the ontology. Modifying it could corrupt the cached instance and affect all subsequent classifications.  
-4. **Respect the agent’s lifecycle** – If the agent is torn down and recreated (e.g., in a test harness), the loader will be re‑initialized as part of the new agent instance, ensuring a fresh ontology load.  
+* **Instantiate via the classifier** – Developers should never create `OntologyLoader` directly; instead, they should configure `OntologyClassifier` with the desired loader type and let the classifier manage its lifecycle. This respects the intended modular encapsulation.  
+
+* **Provide well‑formed ontology sources** – Since the loader’s purpose is to translate external definitions, the input files must conform to the expected format (e.g., valid RDF/XML for an `RdfOntologyLoader`). Supplying malformed data will cause the loader to raise parsing exceptions, which will propagate up to the classifier initialization phase.  
+
+* **Leverage configuration for extensibility** – To add a new ontology system, developers should implement a new subclass of the loader interface and register it in the classifier’s configuration. Because the design is modular, no changes to existing classification logic are required.  
+
+* **Handle lifecycle events** – If the loader maintains open streams or caches, ensure that the classifier’s shutdown routine invokes any cleanup method (e.g., `close()`). This prevents resource leaks in long‑running applications.  
+
+* **Testing** – Unit tests for `OntologyLoader` should focus on parsing correctness and error handling. Integration tests should verify that `OntologyClassifier` can successfully consume the loaded ontology and perform classification without additional setup.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Lazy‑initialization** – Defers creation of *OntologyLoader* until first needed, reducing startup cost.  
+### Architectural Patterns Identified  
+* **Modular / Plug‑in (Strategy) pattern** – The loader is a interchangeable component behind a common contract, enabling new ontology formats to be added without touching the classifier core.
 
-### 2. Design decisions and trade‑offs  
-* **Decision:** Keep the loader as a private child of the agent, instantiated lazily.  
-* **Trade‑off:** First classification request incurs loading latency; however, overall system start‑up is faster and memory usage is lower because the ontology is not loaded unless required.  
+### Design Decisions and Trade‑offs  
+* **Separation of concerns** – By isolating ontology parsing in `OntologyLoader`, the classifier remains format‑agnostic, improving extensibility at the cost of an extra indirection layer.  
+* **Tight coupling to the parent** – The loader is only used by `OntologyClassifier`, which simplifies the dependency graph but limits reuse of the loader in other contexts.
 
-### 3. System structure insights  
-* The system follows a **parent‑child component hierarchy**: *OntologyClassificationAgent* (parent) → *OntologyLoader* (child).  
-* The loader encapsulates all ontology acquisition concerns, allowing the agent to focus on classification logic.  
+### System Structure Insights  
+* Hierarchy: `OntologyClassifier` (parent) → `OntologyLoader` (child).  
+* No sibling components are mentioned, suggesting the loader is the sole child responsible for data ingestion.
 
-### 4. Scalability considerations  
-* Because the loader is instantiated once per agent, scaling to many concurrent classification requests does not multiply loading work – the cached ontology is reused.  
-* If the application spawns multiple agents (e.g., per request or per thread), each will hold its own loader instance, potentially increasing memory pressure. In such cases, a shared loader could be introduced, but that would alter the current lazy‑initialization design.  
+### Scalability Considerations  
+* Because loading is encapsulated, the system can scale by introducing parallel loader instances for large ontology datasets or by caching loaded models. The modular design does not inherently limit scalability, but the lack of explicit async or streaming APIs in the observations means developers must design such extensions themselves.
 
-### 5. Maintainability assessment  
-* The lazy‑initialization approach is straightforward and isolated within a single file, making it easy to locate and modify.  
-* Encapsulating ontology access within *OntologyLoader* provides a clear separation of concerns, which aids future refactoring (e.g., swapping file‑based ontologies for a remote service).  
-* The lack of a global singleton reduces hidden coupling, but developers must be aware of the implicit caching behavior to avoid unintended side effects.  
-
-Overall, the observations portray **OntologyLoader** as a purpose‑built, lazily‑initialized helper that underpins the performance of the *OntologyClassificationAgent* while keeping the codebase modular and maintainable.
+### Maintainability Assessment  
+* The clear modular boundary makes the loader easy to maintain: changes to parsing logic stay localized. However, the absence of concrete code artifacts in the repository makes automated analysis and refactoring harder; developers must rely on documentation and runtime contracts to understand the loader’s behavior. Maintaining strict adherence to the loader interface will preserve the ease of integration promised by the modular design.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 
 
 ---

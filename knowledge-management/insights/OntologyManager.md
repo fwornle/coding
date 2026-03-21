@@ -2,126 +2,155 @@
 
 **Type:** SubComponent
 
-The OntologyManager provides a configurable loading pipeline, allowing for flexible ontology loading workflows, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+The OntologyManager provides an API for querying the ontology system, allowing other sub-components to retrieve entity information, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
 
-**## What It Is**  
-OntologyManager is the core sub‑component responsible for handling ontological resources inside the **LiveLoggingSystem**. All of its logic lives in the *integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts* file, where the class (or module) is instantiated and wired into the surrounding agents. Its primary responsibilities are to load ontologies on demand, support several standard formats (OWL and RDF), validate the structural integrity of each ontology, cache the results for fast reuse, and expose a configurable loading pipeline so that callers can tailor the ingestion workflow to their needs. Because LiveLoggingSystem “contains OntologyManager”, the manager is a foundational service that other logging‑related agents (e.g., **OntologyClassificationAgent**, **TranscriptAdapter**) rely on when they need semantic knowledge about the data they process.
+## What It Is  
 
-**## Architecture and Design**  
-The design of OntologyManager is driven by performance‑first concerns, which is evident from the **lazy loading** strategy described in the observations. Rather than eagerly parsing every ontology at startup, the manager defers the I/O and parsing work until the first request for a particular ontology arrives. This mirrors the *Lazy Initialization* pattern and reduces both start‑up latency and memory pressure for the LiveLoggingSystem.  
+**OntologyManager** is the core sub‑component that governs the ontology system used throughout the **SemanticAnalysis** pipeline. Its implementation lives in the **integrations/mcp‑server‑semantic‑analysis/src/agents/** directory, most notably in the following files:  
 
-To avoid repeated parsing of the same ontology, OntologyManager couples the lazy loader with a **caching mechanism** (implemented alongside the lazy logic in the same *ontology‑classification‑agent.ts* file). The cache is materialised as the child component **OntologyCache**, which stores already‑loaded ontology objects keyed by format and source. This cache‑aside style approach enables fast retrieval for subsequent requests while keeping the cache lifecycle under the manager’s control.  
+* `ontology-manager.ts` – defines the hierarchical ontology model and exposes the public query API.  
+* `ontology-cache.ts` – implements a cache for frequently accessed ontology metadata.  
+* `entity-validator.ts` – contains the rule set that validates entity content and flags stale observations.  
+* `ontology-versioning.ts` – tracks version identifiers for every change to the ontology.  
+* `ontology-updater.ts` – provides the runtime mechanism for applying dynamic updates.  
+* `ontology-logger.ts` – records all mutation events for audit and debugging.
 
-Support for **multiple ontology formats** (OWL, RDF) is achieved through a simple *Strategy‑like* abstraction: the loading pipeline can select the appropriate parser based on the file’s MIME type or extension. The pipeline itself is **configurable**, meaning callers can inject custom steps (e.g., pre‑processing, post‑validation) before the ontology is handed off to downstream agents. This configurability aligns with the *Pipeline* architectural style, allowing the manager to be extended without modifying its core.  
+Together these files give OntologyManager the responsibilities of **organizing**, **serving**, **validating**, **version‑controlling**, **updating**, and **logging** the ontology data that the rest of the SemanticAnalysis component (e.g., the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent) relies on for accurate insight generation.
 
-Finally, the **built‑in validation** step guarantees that any ontology entering the cache complies with structural expectations (e.g., no dangling references, correct namespace usage). Validation runs immediately after loading and before the ontology is cached, ensuring that corrupted or malformed ontologies never pollute the cache or downstream processing.  
-
-All of these patterns are co‑located in *integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts*, and they interact tightly with sibling components. For example, **OntologyClassificationAgent** also uses lazy initialization and therefore shares the same lazy‑loading infrastructure, while **LoggingMechanism** provides the asynchronous I/O primitives that the manager relies on for non‑blocking file reads.
-
-**## Implementation Details**  
-The concrete implementation lives in *integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts*. Although the file does not expose a dedicated `OntologyManager` class name in the observations, the functional responsibilities are clearly partitioned:
-
-1. **Lazy Loading Logic** – A wrapper function checks `OntologyCache` for an existing entry. If none is found, it triggers an asynchronous read of the ontology file (using the non‑blocking I/O utilities from **LoggingMechanism**). The read operation is deferred until the first consumer calls the manager’s `loadOntology(id)` API.  
-
-2. **Format Dispatch** – Once the raw data is available, a dispatcher selects either the OWL parser or the RDF parser based on file extension or content sniffing. These parsers are likely imported from a third‑party library but are invoked only within the manager’s private scope, keeping the format handling encapsulated.  
-
-3. **Validation Step** – After parsing, the manager runs a validation routine that checks for required axioms, proper namespace declarations, and the absence of syntax errors. The observation explicitly mentions a “built‑in validation mechanism,” indicating that this step is part of the same module rather than an external validator.  
-
-4. **Caching** – A successful validation result is stored in **OntologyCache** (the child component). The cache object is probably a simple in‑memory map keyed by ontology identifier and format. Subsequent `loadOntology` calls hit the cache first, bypassing I/O and parsing.  
-
-5. **Configurable Pipeline** – The manager exposes a `configurePipeline(steps[])` method (or similar) that allows callers to inject additional processing functions. The pipeline runs sequentially: lazy‑load → format parse → validation → custom steps → cache store. Because the pipeline is configurable, developers can add transformations such as ontology enrichment or metric extraction without altering the core manager code.  
-
-All of these mechanisms are orchestrated within the same TypeScript file, ensuring tight cohesion and low overhead. The surrounding **OntologyClassificationAgent** consumes the manager’s API to obtain ontologies for classification tasks, while **TranscriptAdapter** and **LSLConverter** may request ontologies to enrich transcript data.
-
-**## Integration Points**  
-OntologyManager sits directly under **LiveLoggingSystem**, making it a shared service for any component that needs semantic context. Its primary integration surface is the public `loadOntology(id, options?)` (or equivalent) method, which sibling agents invoke.  
-
-* **LiveLoggingSystem** – As the parent, it is responsible for initializing OntologyManager (potentially lazily, mirroring the LLM initialization pattern described for the parent). The system may also provide configuration objects that dictate which pipeline steps are active.  
-
-* **OntologyCache** – The child component is accessed internally by the manager; however, other components could read cache statistics (hit/miss ratios) if the cache exposes a monitoring API.  
-
-* **LoggingMechanism** – Provides the async file‑read utilities that OntologyManager uses to fetch ontology files without blocking the event loop.  
-
-* **OntologyClassificationAgent**, **TranscriptAdapter**, **LSLConverter**, **LSLConfigValidator** – These sibling agents all import the same *ontology‑classification‑agent.ts* file, meaning they share the same lazy‑loading and caching infrastructure. For instance, the **OntologyClassificationAgent** may request an ontology to classify incoming logs, while **TranscriptAdapter** might need ontology terms to map transcript entities.  
-
-* **External Parsers** – Though not listed as separate components, the OWL and RDF parsers are external dependencies invoked by OntologyManager. Their selection is part of the configurable pipeline.  
-
-Overall, OntologyManager’s integration is lightweight: it offers a single, well‑defined API and relies on existing asynchronous I/O and caching utilities already present in the system.
-
-**## Usage Guidelines**  
-1. **Prefer Lazy Access** – Call `loadOntology` only when the ontology is actually required. The manager’s lazy loading ensures that unnecessary I/O is avoided, preserving system responsiveness.  
-
-2. **Validate Before Use** – Although the manager validates ontologies automatically, callers should handle validation errors gracefully (e.g., fallback to a default ontology or abort the operation with a clear log message).  
-
-3. **Leverage the Configurable Pipeline** – When custom processing is needed (e.g., adding domain‑specific annotations), inject those steps via the pipeline configuration rather than modifying the manager’s core code. This keeps the manager maintainable and respects the separation of concerns.  
-
-4. **Respect Cache Boundaries** – Do not manually mutate objects retrieved from the cache; treat them as read‑only. If a component needs to modify an ontology, clone it first to avoid contaminating the cached version.  
-
-5. **Monitor Cache Health** – Use any exposed cache metrics (hits, misses, size) to tune the caching strategy. For large deployments, consider setting eviction policies if the cache grows beyond memory constraints.  
-
-6. **Format Awareness** – When adding new ontology sources, ensure they conform to either OWL or RDF specifications, as those are the only formats the manager currently recognises. Extending support for additional formats should be done through the pipeline’s parser dispatch mechanism.  
-
-Following these practices will keep OntologyManager performant, reliable, and easy to extend within the LiveLoggingSystem.
+![OntologyManager — Architecture](../../.data/knowledge-graph/insights/images/ontology-manager-architecture.png)
 
 ---
 
-### 1. Architectural patterns identified
-* **Lazy Initialization** – Ontology loading is deferred until first use.  
-* **Cache‑aside (Caching)** – Loaded ontologies are stored in **OntologyCache** for reuse.  
-* **Pipeline (Configurable Loading Pipeline)** – A sequence of processing steps (load → parse → validate → custom) can be re‑ordered or extended.  
-* **Strategy‑like format handling** – Separate parsers for OWL and RDF are selected at runtime based on the ontology’s format.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs
-* **Performance vs. upfront cost** – Lazy loading reduces start‑up time but introduces a first‑request latency; caching mitigates the latter.  
-* **Simplicity vs. extensibility** – Keeping the pipeline configurable adds flexibility without complicating the core logic, but it requires disciplined documentation of step interfaces.  
-* **Format limitation** – Supporting only OWL and RDF simplifies the parser selection logic but restricts future adoption of other standards unless the pipeline is extended.  
-* **In‑process cache** – Storing ontologies in memory yields fast access but may increase memory usage; eviction policies are not described, so large ontology sets could pressure resources.
+OntologyManager follows a **modular, layered architecture** built around a clear separation of concerns:
 
-### 3. System structure insights
-* **Parent‑child relationship** – LiveLoggingSystem → OntologyManager → OntologyCache.  
-* **Sibling collaboration** – OntologyClassificationAgent, TranscriptAdapter, LSLConverter, LSLConfigValidator all import the same file and therefore share the manager’s lazy‑loading and caching facilities.  
-* **Single‑file concentration** – All key responsibilities (loading, format dispatch, validation, caching) are co‑located in *integrations/mcp‑server‑semantic‑analysis/src/agents/ontology‑classification‑agent.ts*, indicating a highly cohesive but tightly coupled module.
+1. **Hierarchical Ontology Layer** – `ontology-manager.ts` stores the ontology as a tree of *upper* and *lower* definitions, enabling inheritance of properties and facilitating classification tasks performed by the OntologyClassificationAgent. This hierarchy mirrors the conceptual model of the domain and avoids flat, monolithic dictionaries.
 
-### 4. Scalability considerations
-* **Horizontal scaling** – Because OntologyManager relies on an in‑process cache, scaling out to multiple Node.js instances would duplicate the cache across processes; a distributed cache would be required for true horizontal scalability.  
-* **Cache size management** – As the number of ontologies grows, memory consumption may become a bottleneck; implementing size‑based eviction or TTL policies would help.  
-* **Lazy loading concurrency** – Simultaneous requests for the same yet‑unloaded ontology could trigger duplicate loads; a promise‑based lock or load‑deduplication mechanism would improve concurrency handling.
+2. **Cache‑Aside Layer** – `ontology-cache.ts` implements a local in‑memory cache that is consulted before any expensive lookup (e.g., reading from a persisted store). The cache is populated on first access and refreshed on updates, reducing latency for high‑frequency queries from sibling agents such as **CodeAnalyzer** and **InsightGenerator**.
 
-### 5. Maintainability assessment
-* **High cohesion** – All ontology‑related concerns are encapsulated within a single module, making the codebase easy to locate and reason about.  
-* **Extensibility via pipeline** – Adding new processing steps does not require changes to existing logic, supporting maintainable evolution.  
-* **Potential coupling** – Sharing the same file among many sibling agents could lead to accidental cross‑impact if the file is refactored; isolating the manager into its own module would improve separation.  
-* **Documentation need** – Because the manager’s behavior (lazy loading, caching, validation) is implicit, thorough inline comments and API docs are essential to avoid misuse by developers unfamiliar with the lazy semantics.
+3. **Rule‑Based Validation Layer** – `entity-validator.ts` houses a static set of validation rules. These rules are applied whenever an entity is retrieved or inserted, ensuring that stale observations are detected early and that only well‑formed data propagates downstream.
 
-## Diagrams
+4. **Versioning Layer** – `ontology-versioning.ts` records a monotonically increasing version identifier each time the ontology changes. This version is exposed via the query API, allowing downstream components (e.g., **Pipeline** steps) to make deterministic decisions based on the exact ontology snapshot they processed.
 
-### Relationship
+5. **Update & Logging Layer** – `ontology-updater.ts` provides the only entry point for mutating the ontology. Every mutation passes through this updater, which subsequently invokes `ontology-logger.ts` to emit structured log entries. This design creates an implicit **audit trail** and supports rollback or replay scenarios.
 
-![OntologyManager Relationship](images/ontology-manager-relationship.png)
+The overall interaction pattern resembles a **Facade**: `ontology-manager.ts` presents a concise API (e.g., `getEntity(id)`, `search(term)`) while delegating to the underlying cache, validator, versioner, and logger. The component is **synchronously** invoked by sibling agents; there is no evidence of asynchronous messaging or micro‑service boundaries, keeping the design lightweight and tightly coupled within the same Node.js process.
 
+![OntologyManager — Relationship](../../.data/knowledge-graph/insights/images/ontology-manager-relationship.png)
 
+---
 
-## Architecture Diagrams
+## Implementation Details  
 
-![relationship](../../.data/knowledge-graph/insights/images/ontology-manager-relationship.png)
+### Core Classes / Modules  
+
+| File | Primary Export | Responsibility |
+|------|----------------|----------------|
+| `ontology-manager.ts` | `OntologyManager` | Holds the hierarchical ontology tree, resolves queries, and orchestrates cache, validation, and version checks. |
+| `ontology-cache.ts` | `OntologyCache` | Implements a simple key‑value store (likely a `Map`) with `get`, `set`, and `invalidate` methods. Cache misses trigger a fetch from the underlying data source. |
+| `entity-validator.ts` | `EntityValidator` | Exposes `validate(entity)` which runs the predefined rule set (e.g., required fields, freshness checks). Returns validation results or throws on failure. |
+| `ontology-versioning.ts` | `OntologyVersioning` | Manages a numeric or semantic version string; provides `increment()`, `currentVersion()`, and `compare(a,b)` utilities. |
+| `ontology-updater.ts` | `OntologyUpdater` | Offers `applyUpdate(patch)` that mutates the hierarchy, updates the version, clears relevant cache entries, and triggers logging. |
+| `ontology-logger.ts` | `OntologyLogger` | Wraps a logging library (e.g., Winston) with methods like `logChange(action, details)` to capture who/what changed the ontology and when. |
+
+### Query Flow  
+
+1. **Request** – A consumer (e.g., `OntologyClassificationAgent` in `ontology-classification-agent.ts`) calls `OntologyManager.getEntity(id)`.  
+2. **Cache Check** – `OntologyManager` first asks `OntologyCache` for the entity. If present, the cached copy is returned immediately.  
+3. **Cache Miss** – The manager retrieves the raw entity from the hierarchical store, then passes it through `EntityValidator`.  
+4. **Validation** – If the entity fails any rule (e.g., stale timestamp), the validator returns an error that bubbles up to the caller.  
+5. **Version Tagging** – The successful result is annotated with the current version from `OntologyVersioning`.  
+6. **Return** – The caller receives a fully validated, version‑aware entity.
+
+### Update Flow  
+
+When a new ontology fragment arrives (perhaps from an external knowledge‑graph ingestion pipeline), `OntologyUpdater.applyUpdate(patch)`:
+
+* Merges `patch` into the hierarchy respecting parent‑child relationships.  
+* Calls `OntologyVersioning.increment()` to produce a new version identifier.  
+* Invokes `OntologyCache.invalidate(affectedKeys)` to evict stale entries.  
+* Emits a structured log via `OntologyLogger.logChange('update', {patch, version})`.  
+
+All downstream agents automatically see the new version on their next query, guaranteeing consistency without needing a restart.
+
+---
+
+## Integration Points  
+
+* **Parent – SemanticAnalysis** – OntologyManager is a child of the **SemanticAnalysis** component, which coordinates multiple agents. SemanticAnalysis injects a singleton instance of OntologyManager into agents such as **OntologyClassificationAgent**, **SemanticAnalysisAgent**, and **CodeGraphAgent**. This enables those agents to classify code entities, generate insights, and build knowledge graphs against a single source of truth.
+
+* **Sibling – Pipeline** – The **Pipeline** coordinator (see `ontology-classification-agent.ts`) declares explicit dependencies on OntologyManager for the classification step. Because Pipeline uses a DAG‑based execution model, it can schedule the ontology‑dependent steps only after the OntologyManager has been initialized and any pending updates have been applied.
+
+* **Sibling – Ontology** – The **Ontology** sibling essentially mirrors the same functionality; both share the hierarchical design and caching strategy, indicating a deliberate reuse of the same implementation across the codebase.
+
+* **Sibling – Insights / InsightGenerator** – InsightGenerator pulls enriched entity data from OntologyManager to augment raw code analysis results. The version tag supplied by OntologyManager allows InsightGenerator to tag insights with the exact ontology snapshot, supporting reproducibility.
+
+* **Sibling – EntityValidator** – Although OntologyManager imports validation logic from `entity-validator.ts`, the **EntityValidator** sibling may also be used independently by other agents that need to validate raw observations before they ever touch the ontology.
+
+* **Logging & Observability** – All mutation events flow through `ontology-logger.ts`, which integrates with the system‑wide logging infrastructure. This makes OntologyManager’s activity visible to operational dashboards and aids troubleshooting across the entire SemanticAnalysis pipeline.
+
+---
+
+## Usage Guidelines  
+
+1. **Always Access via the Facade** – Call `OntologyManager`’s public methods (`getEntity`, `search`, `applyUpdate`) rather than reaching directly into the cache or hierarchy. This guarantees that validation, versioning, and logging are applied consistently.
+
+2. **Treat the Cache as Transparent** – Do not manually manipulate `OntologyCache`. If you need to force a refresh (e.g., after a bulk import), use `OntologyUpdater.applyUpdate` which automatically invalidates the affected cache entries.
+
+3. **Validate Before Insertion** – When constructing a new entity, run it through `EntityValidator.validate` first. Although the updater will re‑validate, early validation provides clearer error locations for developers.
+
+4. **Version Awareness** – When persisting insight data that references ontology entities, store the accompanying `ontologyVersion` returned by the manager. This enables future audits and potential re‑processing if the ontology evolves.
+
+5. **Logging Discipline** – Do not log ontology changes manually; rely on `OntologyUpdater` which encapsulates the logging call. Custom logs may bypass the structured format and break audit consistency.
+
+6. **Thread‑Safety** – The component runs in a single Node.js process, but if you introduce worker threads or cluster mode, ensure that the singleton instance (and its in‑memory cache) is either shared via a message‑passing protocol or replaced with a distributed cache to avoid stale reads.
+
+---
+
+### Summary of Requested Analyses  
+
+**1. Architectural patterns identified**  
+* Hierarchical data model (tree‑structured ontology)  
+* Cache‑aside pattern (`OntologyCache`)  
+* Facade pattern (`OntologyManager` exposing a unified API)  
+* Rule‑engine style validation (`EntityValidator`)  
+* Versioning/audit pattern (`OntologyVersioning` + `OntologyLogger`)  
+
+**2. Design decisions and trade‑offs**  
+* *Hierarchical ontology* simplifies inheritance but can become deep and costly to traverse if not balanced.  
+* *In‑process cache* gives low‑latency reads; however, it limits scalability across multiple processes or machines.  
+* *Centralized updater* guarantees consistency and auditability but introduces a single point of contention for write‑heavy workloads.  
+* *Rule‑based validator* provides clear extensibility (add new rules) at the cost of potential performance impact for complex rule sets.
+
+**3. System structure insights**  
+OntologyManager sits at the heart of the SemanticAnalysis component, acting as the authoritative source for entity definitions. Its sibling agents consume its API, while the Pipeline orchestrates execution order based on OntologyManager’s readiness. The hierarchical design aligns with the OntologyClassificationAgent’s need to map code observations onto upper‑ and lower‑level concepts.
+
+**4. Scalability considerations**  
+* **Read scalability** is strong due to the cache‑aside approach; most queries are served from memory.  
+* **Write scalability** is limited by the single‑process updater; large batch updates may need to be throttled or broken into smaller patches.  
+* To scale horizontally, the cache and version store would need to be externalized (e.g., Redis) and the updater made idempotent across nodes.
+
+**5. Maintainability assessment**  
+The clear separation into distinct modules (`ontology‑cache`, `entity‑validator`, `ontology‑versioning`, etc.) promotes high maintainability. Adding new validation rules or extending the hierarchy can be done in isolation. The only maintenance risk is the tight coupling to an in‑process cache; future refactoring to a distributed cache would require careful migration of the versioning and logging contracts. Overall, the design is well‑structured, testable, and aligns with the modular agent‑based philosophy of the broader SemanticAnalysis system.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
-
-### Children
-- [OntologyCache](./OntologyCache.md) -- The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file implements the lazy loading approach, which likely utilizes the OntologyCache to store loaded ontologies.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
 
 ### Siblings
-- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis steps, each step declaring explicit depends_on edges, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
+- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
+- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
+- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

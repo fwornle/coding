@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMProvider
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMProvider] as llmprovider #LightBlue
+[ProviderRegistry] as provider_registry #F0F0F0
+[AnthropicApiHandler] as anthropic_api_handler #E8F5E8
+
+llmabstraction --> llmprovider
+provider_registry -[hidden]- llmprovider
+llmprovider --> anthropic_api_handler
+
+@enduml

@@ -2,87 +2,87 @@
 
 **Type:** SubComponent
 
-The LLMManager's configuration files, such as 'docker-compose.yml', provide a clear and concise way to define the dependencies and configuration for each language model, making it easier to manage and deploy language models.
+LLMManager might be designed to work with other sub-components, such as the ServiceOrchestrator, to manage service startup and shutdown.
 
 ## What It Is  
 
-The **LLMManager** is the sub‑component responsible for orchestrating the lifecycle of the individual language‑model services that live under the `DockerizedServices` parent.  Each model is materialised in its own directory – for example `language-model-service/` – and is paired with a dedicated `docker‑compose.yml` that declares the container image, network links, environment variables and any auxiliary services it depends on.  A complementary `cache‑config.yml` sits alongside the compose file and captures the caching policy that each model must honour (e.g., time‑to‑live, cache keys, storage backend).  By treating every language model as an isolated Docker Compose stack, the LLMManager provides a clear, file‑system‑driven boundary that developers can version, build, and deploy independently of the rest of the system.
+**LLMManager** is a sub‑component that lives inside the **DockerizedServices** container. The primary source files that reveal its responsibilities are `lib/llm/llm-service.ts`—where the **LLMService** class implements high‑level language‑model operations—and `lib/service-starter.js`, which supplies the **ServiceStarter** utility used for robust service startup. Within the DockerizedServices hierarchy, LLMManager sits alongside siblings such as **ServiceOrchestrator**, **GraphDatabaseManager**, **WaveAgentExecutor**, **APIService**, and **DashboardService**. Its role is to coordinate LLM‑related workloads, apply mode routing, caching, and provider fallback, and to do so in a way that remains loosely coupled to the rest of the system.
 
 ## Architecture and Design  
 
-The observations reveal a **modular, configuration‑driven architecture**.  Rather than hard‑coding service wiring in code, the LLMManager relies on declarative artefacts (`docker‑compose.yml`, `cache‑config.yml`) that live next to the model’s source.  This pattern aligns with a *configuration‑as‑code* approach: the service topology, resource limits and caching strategy are all expressed in YAML, enabling the same tooling (Docker Compose, CI pipelines) to spin up any model in isolation.  
+The design of LLMManager follows a **dependency‑injection (DI)** approach. Observation 3 notes that the manager “may use dependency injection to manage complex workflows and handle multiple requests efficiently.” By injecting the **LLMService** (from `lib/llm/llm-service.ts`) and the **ServiceStarter** (from `lib/service-starter.js`) rather than hard‑coding their instantiation, LLMManager can swap implementations (e.g., different LLM providers) without touching its own code. This DI strategy also enables the parent **DockerizedServices** component to compose the manager together with other sub‑components, fostering loose coupling (Observation 6).
 
-Interaction between the LLMManager and the rest of the platform is mediated through Docker networking defined in the compose files.  The `docker‑compose.yml` for each language model lists its dependencies – for instance a shared Redis instance for caching or a message broker used by the sibling **ServiceOrchestrator** – allowing Docker Compose to resolve service names at runtime.  The caching layer is decoupled from the model containers; the `cache‑config.yml` is read by a lightweight caching utility (or by the model’s own entry‑point) to decide whether a request can be answered from cache or must trigger a fresh inference, thereby preventing redundant re‑classification.  
+The **ServiceStarter** class provides a **robust startup pattern** that includes retry, timeout, and graceful degradation. LLMManager leverages this pattern to ensure that the underlying LLM service is available before processing requests, aligning with the “responsive user experience” goal (Observation 7). The manager also implements **mode routing** and **caching** logic—features explicitly mentioned in Observation 4—allowing it to direct requests to the appropriate LLM mode (e.g., chat vs. completion) and to reuse prior responses when possible, reducing latency and cost.
 
-Because the LLMManager lives under the **DockerizedServices** parent, it inherits the same high‑level modular philosophy that also governs its siblings **ServiceOrchestrator**, **CodingService**, and **LanguageModelService**.  All three expose their own Dockerfiles or compose files, which means the overall system can be assembled from a collection of independently versioned units, each with a well‑defined contract expressed in its configuration files.
+LLMManager is positioned to collaborate with the **ServiceOrchestrator** sibling (Observation 5). While ServiceOrchestrator orchestrates the lifecycle of various services, LLMManager contributes the LLM‑specific lifecycle hooks (startup via ServiceStarter, shutdown via orchestrator callbacks). This division of concerns reflects a **separation‑of‑concerns** design: LLMManager focuses on domain‑specific logic, while ServiceOrchestrator handles generic service orchestration.
+
+![LLMManager — Architecture](../../.data/knowledge-graph/insights/images/llmmanager-architecture.png)
 
 ## Implementation Details  
 
-At the file‑system level the LLMManager’s implementation is centred on two artefacts:
+At the core, the **LLMService** class in `lib/llm/llm-service.ts` encapsulates the high‑level LLM operations. It likely exposes methods such as `generate`, `chat`, or `complete`, each of which can be routed based on a *mode* identifier. The manager invokes these methods after the **ServiceStarter** confirms that the LLM backend is reachable.  
 
-1. **`language-model-service/docker-compose.yml`** – This file defines a service block (e.g., `llm‑model‑x`) that pulls a pre‑built Docker image, mounts any required model artefacts, and declares environment variables such as `MODEL_NAME` or `CACHE_STRATEGY`.  It also lists `depends_on` entries that pull in shared infrastructure (e.g., `redis`, `postgres`) which are themselves defined either in the same compose file or in a higher‑level compose that aggregates all services under DockerizedServices.
+The **ServiceStarter** (found in `lib/service-starter.js`) implements a generic startup routine that accepts a callable (e.g., an async `init` function from LLMService). It repeatedly attempts the call, respects a configurable timeout, and, upon repeated failure, triggers a fallback path. LLMManager supplies the appropriate fallback logic—perhaps switching to a secondary LLM provider—fulfilling the “provider fallback logic” noted in Observation 4.
 
-2. **`language-model-service/cache-config.yml`** – The cache configuration is a concise YAML document that specifies the caching backend (often Redis), the key‑generation scheme (typically a hash of the input payload), and eviction policies.  The model container reads this file at start‑up (or on each request) to initialise a caching client.  When a request arrives, the model checks the cache first; a hit short‑circuits the inference pipeline, satisfying the “prevent redundant language model re‑classification” goal described in the observations.
+Caching is implemented within LLMManager (or delegated to LLMService) by maintaining an in‑memory map keyed by request signatures. When a request matches a cached entry, the manager returns the stored result instantly, bypassing the external LLM call. This mechanism not only improves response time but also aligns with the “handle multiple requests efficiently” goal.
 
-The modularity is reinforced by the directory layout: each language model gets its own folder (`language-model-service/model‑A/`, `language-model-service/model‑B/`, …) containing the model binaries, the two YAML files above, and optionally a `Dockerfile` if the model requires a custom build step.  The LLMManager’s orchestration scripts (not explicitly named in the observations) iterate over these directories, invoking `docker compose -f <path>/docker-compose.yml up -d` to bring each model online.  Because the caching strategy is externalised, swapping or tweaking the cache policy does not require rebuilding the model image—only an update to `cache-config.yml` and a container restart.
+The manager’s DI container (likely provided by DockerizedServices) registers **LLMService** and **ServiceStarter** as injectable tokens. When LLMManager is instantiated, it receives these dependencies via constructor injection, enabling unit tests to replace them with mocks—an explicit nod to the “loose coupling” and testability emphasis (Observation 6).
 
 ## Integration Points  
 
-The LLMManager plugs into the broader **DockerizedServices** ecosystem through several explicit interfaces:
+LLMManager interacts directly with two concrete modules:
 
-* **Service discovery** – The Docker Compose network makes each model reachable by its service name (e.g., `http://model‑x:8080`).  The sibling **ServiceOrchestrator** consumes these endpoints when routing user requests to the appropriate model based on language or task.
+1. **LLMService** (`lib/llm/llm-service.ts`) – the functional backbone for LLM calls, mode routing, caching, and provider fallback.  
+2. **ServiceStarter** (`lib/service-starter.js`) – the lifecycle helper that guarantees the LLM backend is ready before any request is processed.
 
-* **Shared infrastructure** – The compose files frequently reference common services such as a Redis cache, a PostgreSQL metadata store, or a message queue (e.g., RabbitMQ).  These dependencies are declared in `depends_on` and are satisfied by the sibling **LanguageModelService** or by global services defined at the DockerizedServices level.
+Beyond these, LLMManager is a consumer of the **ServiceOrchestrator** sibling, which coordinates start‑up and shutdown across the DockerizedServices ecosystem. When DockerizedServices boots, ServiceOrchestrator invokes ServiceStarter for each registered sub‑component, including LLMManager. Conversely, during graceful shutdown, ServiceOrchestrator signals LLMManager to flush caches and release any held resources.
 
-* **Caching layer** – The `cache-config.yml` points to the same Redis instance used by other components, ensuring a unified cache namespace.  This enables cross‑component cache hits (e.g., a request classified by the **CodingService** may reuse a model’s cached response).
+Other siblings—**GraphDatabaseManager**, **WaveAgentExecutor**, **APIService**, and **DashboardService**—do not directly couple with LLMManager but share the same DI container and service‑starter infrastructure. This common foundation ensures consistent error handling and startup semantics across the entire DockerizedServices suite.
 
-* **CI/CD pipelines** – Because each model’s definition lives in a self‑contained directory, the CI system can trigger builds and deployments on a per‑model basis.  The pipeline reads the `docker-compose.yml` to spin up a test harness, runs integration tests, and pushes the resulting image to the registry.
+![LLMManager — Relationship](../../.data/knowledge-graph/insights/images/llmmanager-relationship.png)
 
 ## Usage Guidelines  
 
-Developers extending or maintaining the LLMManager should adhere to the following conventions:
-
-1. **Isolate changes to a single model directory** – When adding a new language model, create a fresh sub‑folder under `language-model-service/`, copy the template `docker-compose.yml` and `cache-config.yml`, and adjust the image tag, environment variables, and cache keys.  Avoid editing the compose files of other models to keep deployments independent.
-
-2. **Treat caching as a first‑class concern** – The `cache-config.yml` must be kept in sync with the model’s inference semantics.  If the model’s output becomes non‑deterministic, either disable caching for that model or adjust the key generation logic to include additional context (e.g., a version stamp).
-
-3. **Leverage Docker Compose for local testing** – Use `docker compose -f language-model-service/<model>/docker-compose.yml up` to spin up a single model alongside its dependencies.  This mirrors production behaviour because the same compose file is used in CI/CD and in the deployed environment.
-
-4. **Document dependencies explicitly** – Any external service required by a model (e.g., a GPU driver, a custom library) should be listed under `depends_on` and reflected in the model’s Dockerfile.  This makes the contract visible to the **ServiceOrchestrator** and prevents runtime surprises.
-
-5. **Version control the configuration files** – Both `docker-compose.yml` and `cache-config.yml` should be committed alongside the model code.  When a caching policy changes, increment the configuration file’s version comment to aid traceability.
+1. **Instantiate via DI** – Always obtain LLMManager through the DockerizedServices dependency‑injection container. Direct `new LLMManager()` calls bypass the injected **LLMService** and **ServiceStarter**, breaking the startup guarantees.  
+2. **Respect the startup contract** – Before issuing any LLM request, ensure that the manager’s `initialize()` (or the underlying ServiceStarter) has resolved. The manager will reject calls if the LLM backend is not yet healthy.  
+3. **Leverage caching wisely** – Cache keys should be deterministic and include the full request payload plus the selected mode. Avoid caching volatile data (e.g., timestamps) to prevent stale responses.  
+4. **Provide fallback providers** – When configuring LLMManager, register at least one secondary LLM provider. The fallback logic is only effective if an alternate endpoint is available.  
+5. **Graceful shutdown** – Hook into ServiceOrchestrator’s shutdown event to call `LLMManager.shutdown()`. This flushes in‑memory caches and allows any pending LLM calls to complete, preventing data loss.  
 
 ---
 
-### 1. Architectural patterns identified  
-* **Modular, configuration‑driven architecture** – each language model lives in its own directory with dedicated `docker‑compose.yml` and `cache‑config.yml`.  
-* **Configuration‑as‑Code** – service topology, dependencies, and caching strategy are expressed declaratively in YAML.  
-* **Separation of concerns** – model inference, service orchestration, and caching are isolated into distinct artefacts.
+### Architectural patterns identified  
+* Dependency Injection (DI) for loose coupling and testability  
+* Robust Service Startup (retry/timeout) via **ServiceStarter**  
+* Mode Routing and Provider Fallback within **LLMService**  
 
-### 2. Design decisions and trade‑offs  
-* **Per‑model directories** enable independent development and deployment but increase the number of compose files to manage.  
-* **Docker Compose** provides simple orchestration and network isolation; however, scaling to large numbers of models may require more sophisticated orchestration (e.g., Kubernetes) which is not present in the current design.  
-* **External cache configuration** allows cache policy changes without rebuilding images, at the cost of an extra runtime read and the need to keep the config in sync with model semantics.
+### Design decisions and trade‑offs  
+* **DI vs. direct instantiation** – Improves flexibility but adds container complexity.  
+* **In‑memory caching** – Fast access but limited to a single container instance; scaling out requires a distributed cache.  
+* **Provider fallback** – Increases reliability but may introduce latency when switching providers.  
 
-### 3. System structure insights  
-The LLMManager sits under the **DockerizedServices** parent, sharing the same modular folder layout as its siblings (**ServiceOrchestrator**, **CodingService**, **LanguageModelService**).  Each child (individual language model) is a self‑contained Docker Compose stack, exposing a network‑addressable service and a cache policy file.  This hierarchy yields a clear, layered structure: parent provides shared infrastructure, siblings provide complementary services, and LLMManager’s children encapsulate the actual model workloads.
+### System structure insights  
+LLMManager sits as a domain‑specific leaf under **DockerizedServices**, sharing a common service‑starter and DI backbone with its siblings. Its responsibilities are narrowly scoped to LLM workflow orchestration, leaving generic lifecycle concerns to **ServiceOrchestrator**.
 
-### 4. Scalability considerations  
-Because each model runs in its own container, they can be scaled horizontally by increasing replica counts in the respective `docker‑compose.yml` (or by migrating to a higher‑level orchestrator).  The caching layer mitigates load spikes by serving repeated requests from Redis, reducing the number of expensive inference calls.  Nevertheless, the flat Docker Compose approach may become a bottleneck when the number of models grows into the dozens, at which point a service mesh or orchestrator with dynamic service discovery would be advisable.
+### Scalability considerations  
+* Horizontal scaling of DockerizedServices will duplicate the in‑memory cache; to scale efficiently, replace the local cache with a shared store (e.g., Redis).  
+* The DI container can inject different **LLMService** implementations per container, enabling multi‑tenant or region‑aware provider selection.  
 
-### 5. Maintainability assessment  
-The file‑system‑driven modularity makes the LLMManager highly maintainable: changes to one model’s code or configuration do not ripple across the system.  Clear, version‑controlled YAML files serve as living documentation of dependencies and caching rules.  The main maintenance overhead lies in managing multiple compose files and ensuring consistency of shared resources (e.g., Redis connection strings).  Overall, the design promotes low coupling and high cohesion, which are favorable for long‑term upkeep.
+### Maintainability assessment  
+The strict separation of concerns (LLM logic vs. startup logic) and the use of DI make the codebase easy to unit‑test and evolve. Adding new LLM providers or modes requires only extending **LLMService** and updating DI bindings, without touching LLMManager itself. The reliance on shared infrastructure (ServiceStarter, ServiceOrchestrator) further centralizes error handling, reducing duplicated boilerplate across siblings.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component exhibits a modular architecture, with each service having its own directory and configuration files. This is evident in the way services are organized, with separate folders for each service, such as the 'coding-service' and 'language-model-service'. Each service directory contains its own set of configuration files, including Dockerfiles and docker-compose files, allowing for independent management and deployment of each service. For example, the 'coding-service' directory contains a 'Dockerfile' that defines the build process for the service, while the 'language-model-service' directory contains a 'docker-compose.yml' file that defines the service's dependencies and configuration. This modular approach enables developers to work on individual services without affecting the entire system, promoting a more efficient and scalable development process.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evident in the lib/llm/llm-service.ts file, where the LLMService class is used for high-level LLM operations, including mode routing, caching, and provider fallback. The use of dependency injection allows for loose coupling between components, making it easier to test and maintain the codebase. Furthermore, the ServiceStarter class in lib/service-starter.js provides robust service startup with retry, timeout, and graceful degradation, ensuring that the component can recover from failures and provide a responsive user experience.
 
 ### Siblings
-- [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator utilizes a separate directory for each coding service, such as the 'coding-service' directory, containing a 'Dockerfile' that defines the build process for the service.
-- [CodingService](./CodingService.md) -- The CodingService utilizes a separate directory, such as the 'coding-service' directory, containing a 'Dockerfile' that defines the build process for the service.
-- [LanguageModelService](./LanguageModelService.md) -- The LanguageModelService utilizes a separate directory, such as the 'language-model-service' directory, containing a 'docker-compose.yml' file that defines the dependencies and configuration for the service.
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the ServiceStarter class in lib/service-starter.js to provide robust service startup with retry, timeout, and graceful degradation.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely uses Graphology and LevelDB to provide persistence and data storage capabilities.
+- [WaveAgentExecutor](./WaveAgentExecutor.md) -- WaveAgentExecutor likely uses a specific constructor and execution pattern to execute wave-based agents.
+- [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
+- [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
 
 
 ---

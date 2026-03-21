@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintConfigurationManager
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintConfigurationManager] as constraint_configuration_manager #LightBlue
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[ContentValidator] as content_validator #F0F0F0
+[HookManager] as hook_manager #F0F0F0
+[ViolationCaptureModule] as violation_capture_module #F0F0F0
+[WorkflowManager] as workflow_manager #F0F0F0
+[ConstraintLoader] as constraint_loader #E8F5E8
+
+constraint_system --> constraint_configuration_manager
+graph_database_manager -[hidden]- constraint_configuration_manager
+content_validator -[hidden]- constraint_configuration_manager
+hook_manager -[hidden]- constraint_configuration_manager
+violation_capture_module -[hidden]- constraint_configuration_manager
+workflow_manager -[hidden]- constraint_configuration_manager
+constraint_configuration_manager --> constraint_loader
+
+@enduml

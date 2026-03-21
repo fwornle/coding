@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Transcript Processing" {
+  component "TranscriptProcessor" as tp <<core>>
+  component "TranscriptAdapter" as ta <<api>>
+  component "Logger" as log <<external>>
+  component "ConfigurationValidator" as cv <<api>>
+}
+
+package "Libraries" {
+  component "lib/agent-api" as lap <<api>>
+}
+
+tp --> ta : uses
+ta --> lap : uses
+tp --> log : logs
+tp --> cv : configures
+lap --> ta : implements
+
+@enduml

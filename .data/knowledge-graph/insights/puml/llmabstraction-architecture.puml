@@ -2,30 +2,26 @@
 !include /coding/docs/puml/_standard-style.puml
 
 package "LLM Abstraction" {
-  component "LLMService" as llms <<core>>
-  component "Cache" as cache <<storage>>
-  component "Provider Registry" as pr <<core>>
+  component "LLMAbstraction" as llm <<core>>
+  component "ProviderRegistry" as pr <<api>>
+  component "LLMService" as lls <<api>>
+  component "CircuitBreaker" as cb <<api>>
 }
 
 package "Providers" {
-  component "DMRProvider" as dmr <<external>>
   component "AnthropicProvider" as ap <<external>>
+  component "DMRProvider" as dmr <<external>>
+  component "MockProvider" as mp <<external>>
 }
 
-package "Utilities" {
-  component "Circuit Breaker" as cb <<core>>
-  component "Metrics Tracker" as mt <<core>>
-}
-
-llms --> cache : uses
-llms --> pr : uses
-pr --> dmr : manages
+llm --> pr : uses
 pr --> ap : manages
-llms --> dmr : uses
-llms --> ap : uses
-dmr --> cb : monitored by
-ap --> cb : monitored by
-cb --> mt : reports to
-llms --> mt : reports to
+pr --> dmr : manages
+pr --> mp : manages
+lls --> pr : uses
+lls --> cb : uses
+cb --> ap : monitors
+cb --> dmr : monitors
+cb --> mp : monitors
 
 @enduml

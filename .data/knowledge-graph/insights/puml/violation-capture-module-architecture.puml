@@ -1,0 +1,22 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Violation Capture" {
+  component "ViolationCaptureModule" as vcm <<core>>
+  database "Violation Database" as vd
+  component "MCP Constraint Monitor" as mcm <<external>>
+  component "Dashboard" as dash <<api>>
+}
+
+vcm --> vd : stores
+vcm --> mcm : uses
+vcm --> dash : configures
+mcm --> dash : provides data
+vd --> vcm : retrieves
+
+package "Tools and Integrations" {
+  component "Tool Interactions" as ti <<agent>>
+  ti --> vcm : sends violations
+}
+
+@enduml

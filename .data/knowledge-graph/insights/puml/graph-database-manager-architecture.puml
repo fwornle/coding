@@ -4,26 +4,17 @@
 package "Graph Database Management" {
   component "GraphDatabaseManager" as gdm <<core>>
   component "GraphDatabaseAdapter" as gda <<storage>>
-  component "LlmServiceManager" as lsm <<api>>
-  component "WaveAgentController" as wac <<agent>>
-  component "UkbTraceReportGenerator" as utrg <<external>>
-  component "VkbApiClientManager" as vacm <<external>>
+  database "LevelDB" as ldb
+  component "Graphology" as graph <<api>>
 }
 
-gdm --> gda : interacts
-gdm --> lsm : uses
-gdm --> wac : manages
-gdm --> utrg : generates
-gdm --> vacm : relies
+gdm --> gda : uses
+gda --> ldb : stores
+gda --> graph : utilizes
+gdm --> graph : relies
 
-package "Database Interactions" {
-  database "Graph Database" as gd
-  gda --> gd : connects
-}
-
-package "API Interactions" {
-  cloud "VKB API" as vkb
-  vacm --> vkb : interacts
+package "Graph Operations" {
+  gda --> graph : handles
 }
 
 @enduml

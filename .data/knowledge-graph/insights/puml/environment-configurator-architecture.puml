@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Environment Configurator" {
+  component "EnvironmentConfigurator" as ec <<core>>
+  component "LazyLoader" as ll <<api>>
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "WorkStealer" as ws <<agent>>
+  component "Trajectory" as t <<external>>
+  component "SpecstoryAdapter" as sa <<cli>>
+  component "Integrations" as i <<external>>
+}
+
+ec --> ll : uses
+ec --> gdm : uses
+ec --> ws : uses
+ec --> t : notifies
+ec --> sa : notifies
+ec --> i : uses
+
+ll --> gdm : caches
+gdm --> ec : provides
+
+ws --> ec : executes
+sa --> ec : logs
+
+@enduml

@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeGraphConstructor
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[MemgraphConnection] as memgraph_connection #E8F5E8
+
+semantic_analysis --> knowledge_graph_constructor
+pipeline -[hidden]- knowledge_graph_constructor
+ontology -[hidden]- knowledge_graph_constructor
+insights -[hidden]- knowledge_graph_constructor
+ontology_manager -[hidden]- knowledge_graph_constructor
+code_analyzer -[hidden]- knowledge_graph_constructor
+insight_generator -[hidden]- knowledge_graph_constructor
+entity_validator -[hidden]- knowledge_graph_constructor
+code_graph_rag -[hidden]- knowledge_graph_constructor
+knowledge_graph_constructor --> memgraph_connection
+
+@enduml

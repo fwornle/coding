@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "LazyLoader" {
+  component "LazyLoader" as ll <<core>>
+  component "LoaderModule" as lm <<api>>
+  component "Cache" as cache <<storage>>
+}
+
+package "APIs" {
+  component "ExtensionAPI" as eapi <<api>>
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "EnvironmentConfigurator" as ec <<core>>
+}
+
+package "Integrations" {
+  component "SpecstoryAdapter" as sa <<external>>
+  component "Trajectory" as t <<core>>
+  component "WorkStealer" as ws <<agent>>
+}
+
+ll --> lm : uses
+lm --> eapi : loads
+ll --> cache : stores
+cache --> eapi : caches
+gdm --> eapi : uses
+ec --> gdm : configures
+ll --> t : notifies
+sa --> t : integrates
+ws --> gdm : executes
+
+@enduml

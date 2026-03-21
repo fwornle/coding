@@ -1,36 +1,29 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
+package "Data Storage" {
+  component "Graphology" as graph <<storage>>
+  component "LevelDB" as leveldb <<storage>>
+  database "GraphDatabase" as graphdb
+}
+
 package "Manual Learning" {
-  component "ManualLearning" as ml <<core>>
+  component "ManualLearning" as manual <<core>>
+  component "GraphDatabaseAdapter" as gda <<api>>
 }
 
-package "Database Management" {
-  component "GraphDatabaseManager" as gdm <<storage>>
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  database "Graph Database" as gd
+package "Utilities" {
+  component "UtilitiesModule" as utils <<core>>
+  component "Checkpoint System" as checkpoint <<core>>
+  component "OntologyClassificationModule" as oc <<core>>
 }
 
-package "External Services" {
-  component "LlmServiceManager" as lsm <<api>>
-  component "VkbApiClientManager" as vam <<api>>
-  component "UkbTraceReportGenerator" as utrg <<external>>
-  cloud "VKB API" as vka
-  cloud "UKB" as ukb
-}
-
-package "Agent Management" {
-  component "WaveAgentController" as wac <<agent>>
-}
-
-ml --> gdm : uses
-ml --> lsm : uses
-ml --> wac : uses
-ml --> vam : uses
-ml --> utrg : uses
-gdm --> gd : stores
-gda --> gd : persists
-vam --> vka : interacts
-utrg --> ukb : generates
+manual --> gda : uses
+gda --> graphdb : updates
+graphdb --> graph : relies on
+graphdb --> leveldb : relies on
+manual --> checkpoint : uses
+manual --> oc : uses
+gda --> utils : uses
 
 @enduml

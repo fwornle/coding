@@ -1,0 +1,24 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Constraint Configuration" {
+  component "ConstraintConfigurationManager" as ccm <<core>>
+  database "Configuration File" as cf
+  database "Database" as db
+  component "Constraint Registration" as cr <<api>>
+  component "Constraint Configuration Mechanism" as ccm2 <<storage>>
+}
+
+ccm --> cf : loads
+ccm --> db : loads
+ccm --> cr : uses
+ccm --> ccm2 : uses
+cr --> ccm : registers
+ccm2 --> ccm : provides
+
+package "Documentation" {
+  cloud "Constraint Configuration Documentation" as cd <<external>>
+  ccm --> cd : references
+}
+
+@enduml

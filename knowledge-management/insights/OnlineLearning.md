@@ -2,134 +2,151 @@
 
 **Type:** SubComponent
 
-OnlineLearning could interact with the WaveAgentController for managing the execution of Wave agents during automatic knowledge processing.
+OnlineLearning relies on the batch analysis pipeline to process data from git history, LSL sessions, and code analysis.
 
 ## What It Is  
 
-**OnlineLearning** is the automatic‑knowledge‑extraction sub‑component of the **KnowledgeManagement** domain.  It lives under the `KnowledgeManagement` folder (the exact path is not listed in the observations, but its parent component’s implementation resides in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  OnlineLearning orchestrates a pipeline that discovers, extracts, and persists knowledge entities from learning material without human intervention.  The pipeline draws on several “manager” services—`GraphDatabaseManager`, `LlmServiceManager`, `WaveAgentController`, `UkbTraceReportGenerator`, and `VkbApiClientManager`—to move data from raw sources through LLM‑driven processing into the persistent graph store.  Its child component, **CodeGraphRagIntegration**, supplies a specialized RAG (Retrieval‑Augmented Generation) capability for code‑base analysis, extending the automatic extraction logic to source‑code artifacts.  
+OnlineLearning is a **sub‑component** of the larger **KnowledgeManagement** system. Its implementation lives primarily in the **`integrations/code-graph-rag/`** directory, where the Code Graph RAG (Retrieval‑Augmented Generation) system is defined. The component orchestrates a **batch analysis pipeline** that ingests three distinct data streams—Git history, LSL (Learning Session Log) sessions, and static code analysis results. Extracted entities are persisted through the **`GraphDatabaseAdapter`** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) and later fed to the **`InsightGenerationModule`**, which produces actionable learning insights. Throughout the processing flow, the **UKB trace report** from the **UtilitiesModule** is used to log and audit each stage, ensuring traceability of the knowledge‑extraction lifecycle.  
 
-![OnlineLearning — Architecture](../../.data/knowledge-graph/insights/images/online-learning-architecture.png)  
+![OnlineLearning — Architecture](../../.data/knowledge-graph/insights/images/online-learning-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **manager‑orchestrated pipeline** pattern.  Each manager encapsulates a distinct technical concern:
+The design of OnlineLearning is deliberately **modular** and **pipeline‑centric**. A clear separation exists between **data ingestion**, **knowledge extraction**, **persistence**, and **insight generation**:
 
-* **GraphDatabaseManager** – abstracts CRUD operations against the graph store.  
-* **LlmServiceManager** – provides a thin façade for invoking large language models (LLMs) during extraction.  
-* **WaveAgentController** – coordinates the lifecycle of “Wave agents,” which are the runtime workers that execute LLM prompts and post‑processing steps.  
-* **UkbTraceReportGenerator** – collects execution metadata from the pipeline and produces trace reports for auditability.  
-* **VkbApiClientManager** – handles external VKB (Virtual Knowledge Base) API calls required for supplemental knowledge retrieval.
+1. **Batch Analysis Pipeline** – Acts as the backbone, pulling data from version‑control (Git), runtime learning sessions (LSL), and code‑analysis tools. This pipeline is scheduled in batches, allowing the system to process large histories without overwhelming resources.  
 
-These managers are wired together by a configuration‑driven workflow (the observation that “OnlineLearning may follow a specific pipeline or workflow, potentially defined in a configuration file or module”).  The workflow definition lives outside the source symbols we have, but its presence explains how the components are sequenced without hard‑coded dependencies.  
+2. **Code Graph RAG Integration** – Encapsulated in `integrations/code-graph-rag/`, this child component provides a graph‑based retrieval layer that maps code entities to semantic representations. The RAG approach enables the system to answer “code‑centric” queries using the graph built from the batch pipeline.  
 
-At the data‑persistence layer, **GraphDatabaseAdapter** (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) provides the concrete bridge to a **Graphology + LevelDB** store.  This adapter is used by `GraphDatabaseManager` to write the automatically extracted knowledge graph, and the same adapter is shared with the sibling **ManualLearning** component, ensuring a consistent storage contract across manual and automatic pathways.  
+3. **GraphDatabaseAdapter** – Implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`, this adapter abstracts the underlying **Graphology + LevelDB** store. Its presence is a textbook **Adapter pattern**, allowing OnlineLearning (and its siblings such as `GraphDatabaseModule`) to interact with the graph without coupling to a specific database implementation.  
 
-The overall design can be visualised as a directed graph of responsibilities, which is captured in the relationship diagram below.  
+4. **InsightGenerationModule** – Shared with the sibling `InsightGenerationModule`, it consumes the entity graph and leverages the **UKB trace report** from the `UtilitiesModule` to produce insights. The reliance on a common utilities package demonstrates a **shared‑services** approach within the KnowledgeManagement family.  
 
-![OnlineLearning — Relationship](../../.data/knowledge-graph/insights/images/online-learning-relationship.png)  
+5. **Traceability via UKB** – The UKB trace report is injected from `UtilitiesModule`, providing a lightweight observability layer that records processing timestamps, success/failure flags, and lineage information.  
+
+The component’s **relationship diagram** (shown below) visualizes these interactions, highlighting how OnlineLearning sits between the data ingestion side (Git, LSL, code analysis) and downstream consumers (InsightGenerationModule, GraphDatabaseAdapter).  
+
+![OnlineLearning — Relationship](../../.data/knowledge-graph/insights/images/online-learning-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-Even though the source contains **zero code symbols** directly under OnlineLearning, the surrounding ecosystem gives a clear picture of the implementation mechanics:
+### Batch Analysis Pipeline  
+The pipeline is orchestrated by scripts (not explicitly listed but implied by the “batch analysis” description). It sequentially executes three collectors:
 
-1. **Graph Interaction** – `GraphDatabaseAdapter` implements the low‑level API for persisting vertices and edges.  It serialises entities to JSON and stores them in LevelDB, leveraging Graphology’s in‑memory graph model for fast traversal before committing to disk.  `GraphDatabaseManager` calls this adapter for every create, update, or delete operation generated by the extraction pipeline.
+* **Git History Collector** – Parses commit metadata, file diffs, and author information.  
+* **LSL Session Collector** – Reads learning‑session logs, extracting timestamps, learner actions, and outcomes.  
+* **Code Analysis Collector** – Runs static analysis tools (e.g., ESLint, TypeScript compiler) to produce an AST‑level view of the codebase.
 
-2. **LLM Invocation** – `LlmServiceManager` abstracts the underlying LLM provider (e.g., OpenAI, Anthropic).  It exposes methods such as `runPrompt(prompt: string, context: object)` that the Wave agents invoke.  By centralising token handling, request throttling, and response parsing, the manager shields the rest of the pipeline from provider‑specific quirks.
+Each collector emits **entity records** (functions, classes, modules, learning events) that are fed into the **Code Graph RAG** engine.
 
-3. **Wave Agent Execution** – `WaveAgentController` spawns lightweight agents (likely Node.js workers or containerised tasks) that perform the heavy‑weight LLM calls.  The controller monitors agent health, retries failed jobs, and reports status back to the pipeline orchestrator.
+### Code Graph RAG Integration (`integrations/code-graph-rag/`)  
+The README in this folder describes a **graph‑based RAG system** that builds a knowledge graph where nodes represent code entities and edges capture relationships (e.g., imports, inheritance, call‑graph links). The RAG layer stores these nodes in the same Graphology + LevelDB store accessed via the `GraphDatabaseAdapter`. Retrieval queries are expressed as graph traversals, enabling semantic searches like “find all functions that mutate a given state variable”.
 
-4. **Trace Reporting** – `UkbTraceReportGenerator` listens to events emitted by the manager layer (e.g., “entity‑extracted”, “graph‑write‑complete”).  It aggregates these events into a structured trace report that can be stored for debugging, compliance, or analytics.
+### GraphDatabaseAdapter (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`)  
+Key responsibilities:
 
-5. **External Knowledge Retrieval** – `VkbApiClientManager` encapsulates HTTP client logic for the VKB service.  During extraction, agents may request supplemental definitions or taxonomies; the manager handles authentication, pagination, and error handling.
+* **CRUD Operations** – `createEntity`, `readEntity`, `updateEntity`, `deleteEntity`.  
+* **Batch Upserts** – Optimized for the high‑volume writes produced by the batch pipeline.  
+* **JSON Export Sync** – Automatically serializes the graph to JSON after each batch, ensuring external tools can consume a snapshot without direct DB access.  
 
-6. **Code‑Graph RAG Extension** – The child component **CodeGraphRagIntegration** adds a specialised RAG loop for source‑code.  Its README describes a “Graph‑Code RAG system” that analyses code repositories, extracts API calls, data flow, and maps them onto the knowledge graph.  This integration re‑uses the same managers (LLM, graph, trace) but supplies a different input adaptor that parses code ASTs.
+The adapter also exposes a **query interface** used by the InsightGenerationModule to fetch sub‑graphs for analysis.
 
-The pipeline configuration (likely a YAML or JSON file) enumerates the sequence: *fetch raw material → invoke Wave agents → LLM extraction → enrich via VKB → persist via GraphDatabaseManager → generate trace*.  Because the configuration is external, the pipeline can be extended or reordered without code changes, supporting rapid experimentation.
+### InsightGenerationModule (Sibling)  
+Consumes the persisted graph and runs classification rules defined in the `OntologyClassificationModule`. It then produces **learning insights** (e.g., “this module has high churn but low test coverage”). The UKB trace report from `UtilitiesModule` logs each insight generation run, providing auditability.
+
+### UtilitiesModule – UKB Trace Report  
+A lightweight logging utility that records processing metadata. The trace is attached to each batch run and each insight generation cycle, enabling developers to trace back from an insight to the exact data slice that produced it.
 
 ---
 
 ## Integration Points  
 
-OnlineLearning sits at the convergence of several system boundaries:
+| Integration | Direction | Interface / Path | Purpose |
+|-------------|-----------|------------------|---------|
+| **Parent – KnowledgeManagement** | Upward | Component hierarchy (OnlineLearning is a child of KnowledgeManagement) | Provides the overall knowledge‑graph context and shared persistence layer. |
+| **Sibling – GraphDatabaseModule** | Shared | `GraphDatabaseAdapter` (same file as above) | Both modules read/write to the same Graphology + LevelDB store, ensuring consistency. |
+| **Sibling – InsightGenerationModule** | Downward | Direct API calls to `generateInsights(entityGraph)` | Consumes the entity graph produced by OnlineLearning to emit insights. |
+| **Sibling – UtilitiesModule** | Side‑channel | `UKB trace report` (imported from UtilitiesModule) | Supplies observability data for each processing step. |
+| **Child – CodeGraphRAGIntegration** | Internal | `integrations/code-graph-rag/` files | Implements the graph‑based retrieval layer that powers the RAG queries used by OnlineLearning. |
+| **External – Git/LSL Sources** | Input | File system / remote repo APIs | Feed raw data into the batch analysis pipeline. |
+| **External – Static Code Analyzers** | Input | CLI tools invoked by the pipeline | Provide AST and metric data for graph construction. |
 
-* **Parent – KnowledgeManagement** – The parent component supplies the overarching graph‑storage strategy (`graph-database-adapter.ts`).  OnlineLearning inherits this storage contract, ensuring that any knowledge entity it creates is immediately queryable by other KnowledgeManagement services (e.g., recommendation engines, analytics).
-
-* **Siblings** –  
-  * **ManualLearning** shares the `GraphDatabaseManager` and thus the same persistence semantics.  This creates a unified view of both manually curated and automatically extracted knowledge.  
-  * **WaveAgentController** and **LlmServiceManager** are co‑located siblings that together provide the compute substrate for LLM‑driven extraction.  Their tight coupling is intentional: the controller knows how to schedule LLM calls via the manager.  
-  * **UkbTraceReportGenerator** consumes events emitted by both `GraphDatabaseManager` and the Wave agents, producing cross‑component traceability.  
-  * **VkbApiClientManager** offers an external data‑enrichment hook; any knowledge entity that requires domain‑specific context can be augmented through this manager.
-
-* **Child – CodeGraphRagIntegration** – This integration adds a new input adaptor (code‑base parser) while re‑using the same manager stack.  It demonstrates the extensibility of OnlineLearning: new domains can plug in their own extractors without altering the core pipeline.
-
-* **Configuration Layer** – Though not a concrete file in the observations, the pipeline configuration acts as the glue that binds these managers together.  It defines which agents run, which LLM prompts are used, and how trace reports are formatted.
+These connections illustrate a **layered integration**: raw data → batch pipeline → graph construction (RAG) → persistence (adapter) → insight generation, all while being observed by the UKB trace utility.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Leverage the Configuration File** – When extending OnlineLearning (e.g., adding a new knowledge source), modify the pipeline configuration rather than editing manager code.  This preserves the separation of concerns and keeps the system maintainable.
+1. **Run the Batch Pipeline on Stable Snapshots** – Because the pipeline processes large histories, schedule it during low‑traffic windows and point it at a tagged Git commit or a frozen LSL export to avoid race conditions.  
 
-2. **Respect the Manager Interfaces** – All interactions with the graph, LLM, or external APIs should go through their respective managers (`GraphDatabaseManager`, `LlmServiceManager`, `VkbApiClientManager`).  Direct calls bypassing these abstractions break the retry, logging, and tracing guarantees.
+2. **Do Not Bypass the GraphDatabaseAdapter** – Directly manipulating the underlying LevelDB files circumvents the JSON export sync and can corrupt the knowledge graph. All reads/writes should go through the adapter’s public methods.  
 
-3. **Monitor Wave Agents** – The `WaveAgentController` provides health metrics (agent count, error rates).  Production deployments should integrate these metrics into observability dashboards to detect back‑pressure or LLM throttling early.
+3. **Leverage the UKB Trace Report** – When adding new collectors or transformation steps, extend the UKB payload with custom fields (e.g., `collectorName`, `recordsProcessed`). This keeps the end‑to‑end trace complete and aids debugging.  
 
-4. **Trace Reporting is Mandatory** – Enable `UkbTraceReportGenerator` for every pipeline run.  The generated reports are the primary source for debugging extraction failures and for compliance audits.
+4. **Version the Ontology** – The `OntologyClassificationModule` expects entity types to match a known schema. If you introduce new entity kinds (e.g., “workflow”), update the ontology definitions and run the `migrate-graph-db-entity-types.js` script (found in `scripts/`) to migrate existing records.  
 
-5. **Version the Graph Schema** – Since both OnlineLearning and ManualLearning write to the same graph, schema evolution must be coordinated.  Use the JSON export capabilities of the `GraphDatabaseAdapter` to version‑control graph snapshots.
+5. **Testing the RAG Layer** – Use the sample queries from the `integrations/code-graph-rag/README.md` to validate that newly added code entities are correctly indexed and retrievable.  
+
+6. **Monitoring Scalability** – Keep an eye on the size of the LevelDB store; when it exceeds a few gigabytes, consider archiving older snapshots (the JSON export can be stored in cold storage) to maintain query performance.  
 
 ---
 
 ### Architectural Patterns Identified  
 
-* **Manager/Facade Pattern** – Each technical domain (graph, LLM, external API) is encapsulated behind a dedicated manager class.  
-* **Pipeline/Workflow Configuration** – The extraction process is defined declaratively, allowing dynamic re‑ordering of steps.  
-* **Agent‑Based Execution** – Wave agents act as isolated workers that perform LLM‑heavy tasks, providing scalability and fault isolation.  
-* **Adapter Pattern** – `GraphDatabaseAdapter` adapts the generic Graphology API to the concrete LevelDB persistence layer.
+1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
+2. **Pipeline (Batch Processing) Pattern** – Sequential ingestion, transformation, and loading steps.  
+3. **Shared‑Service / Utility Pattern** – UKB trace report from `UtilitiesModule` is used across siblings.  
+4. **Modular Integration** – Child component (`CodeGraphRAGIntegration`) encapsulates a distinct capability (graph‑based RAG).  
 
 ### Design Decisions and Trade‑offs  
 
-* **Centralised Graph Storage** – Using a single Graphology + LevelDB store simplifies queries but couples manual and automatic knowledge pathways; any schema change impacts both.  
-* **External LLM Service** – Delegating LLM calls to `LlmServiceManager` enables provider flexibility but introduces latency and cost considerations; the Wave agents mitigate this by parallelising calls.  
-* **Configuration‑Driven Pipeline** – Gains flexibility and rapid iteration at the expense of static type safety; validation tooling is required to prevent mis‑configurations.  
-* **Trace Generation** – Adds overhead but provides essential observability; the trade‑off is acceptable for a system focused on insight generation.
+* **Batch vs. Real‑time** – Opting for batch processing simplifies handling of massive Git histories but introduces latency; real‑time insights are not possible without additional streaming infrastructure.  
+* **Graphology + LevelDB Storage** – Provides fast key‑value access and flexible graph traversals but limits horizontal scaling; sharding would require a different backend.  
+* **Adapter Centralization** – Guarantees a single point of change for storage concerns, at the cost of a potential bottleneck if many components issue high‑frequency writes.  
 
 ### System Structure Insights  
 
-OnlineLearning is a **sub‑component** that sits one level below **KnowledgeManagement** and shares its persistence backbone.  Its sibling components each own a distinct responsibility, yet they converge on the same manager interfaces, creating a cohesive yet modular ecosystem.  The child **CodeGraphRagIntegration** demonstrates the extensibility of the design: new domains can plug in custom extractors while re‑using the existing pipeline infrastructure.
+* OnlineLearning sits as a **mid‑tier** component within KnowledgeManagement, bridging raw learning data and higher‑level insight services.  
+* Its sibling modules share the same persistence layer, fostering data consistency but also coupling their lifecycles.  
+* The child `CodeGraphRAGIntegration` isolates the RAG logic, making it reusable for other sub‑components that may need code‑centric retrieval.  
 
 ### Scalability Considerations  
 
-* **Graphology + LevelDB** scales horizontally for read‑heavy workloads; however, write contention can arise when many Wave agents persist simultaneously.  Sharding or moving to a distributed graph store would be a future mitigation.  
-* **Wave Agents** can be horizontally scaled (more agents = higher parallelism) limited only by LLM provider rate limits; the `LlmServiceManager` should implement back‑pressure handling.  
-* **Trace Reporting** stores metadata separately, avoiding bottlenecks on the main graph store.
+* **Horizontal Scaling** – The current LevelDB backend is not natively distributed; scaling out would require migrating to a distributed graph store (e.g., Neo4j, JanusGraph).  
+* **Batch Size Tuning** – Adjusting the size of each batch run can balance throughput against memory consumption.  
+* **Index Management** – Adding custom indexes in Graphology can improve query speed for frequently accessed entity types.  
 
 ### Maintainability Assessment  
 
-The **manager‑oriented** layout isolates concerns, making unit testing straightforward (each manager can be mocked).  The **configuration‑driven pipeline** reduces code churn when processes evolve.  However, the reliance on external configuration files demands robust validation and documentation to prevent runtime mis‑behaviour.  Overall, the architecture balances flexibility with clear module boundaries, supporting long‑term maintainability.
+* **High Cohesion** – Each module has a clear responsibility (e.g., ingestion, storage, insight generation).  
+* **Loose Coupling via Interfaces** – The `GraphDatabaseAdapter` and UKB trace utility act as contracts, reducing ripple effects of internal changes.  
+* **Documentation** – README files in `integrations/code-graph-rag/` and clear script locations (`scripts/migrate-graph-db-entity-types.js`) aid onboarding.  
+* **Potential Debt** – Reliance on a single‑node LevelDB store may become a maintenance bottleneck as data volume grows; proactive migration planning is advisable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 
 ### Children
-- [CodeGraphRagIntegration](./CodeGraphRagIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system, which is used for analyzing codebases and extracting knowledge entities and relationships.
+- [CodeGraphRAGIntegration](./CodeGraphRAGIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system as a graph-based RAG system for any codebases.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely utilizes the GraphDatabaseAdapter for interacting with the graph database.
-- [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
-- [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
-- [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
-- [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
+- [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule uses the OntologySystem to classify entities based on their types and properties.
+- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the UKB trace report from the UtilitiesModule to generate insights.
+- [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
+- [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

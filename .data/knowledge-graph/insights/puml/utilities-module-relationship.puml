@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UtilitiesModule
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[UtilitiesModule] as utilities_module #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[CheckpointSystem] as checkpoint_system #E8F5E8
+
+knowledge_management --> utilities_module
+manual_learning -[hidden]- utilities_module
+online_learning -[hidden]- utilities_module
+graph_database_module -[hidden]- utilities_module
+ontology_classification_module -[hidden]- utilities_module
+insight_generation_module -[hidden]- utilities_module
+agent_framework_module -[hidden]- utilities_module
+browser_access -[hidden]- utilities_module
+code_graph_rag -[hidden]- utilities_module
+utilities_module --> checkpoint_system
+
+@enduml

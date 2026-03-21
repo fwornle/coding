@@ -3,26 +3,24 @@
 
 package "Dockerized Services" {
   component "LLM Service" as llm <<core>>
-  component "Service Starter" as starter <<core>>
-  component "GraphDatabaseAdapter" as graph <<storage>>
-  component "API Service Wrapper" as api <<api>>
-  component "Dashboard Service Wrapper" as dashboard <<api>>
+  component "Graph Database Adapter" as gda <<storage>>
+  component "Wave Agent" as wa <<agent>>
+  component "API Service Wrapper" as apiw <<api>>
+  component "Dashboard Service Wrapper" as dsw <<api>>
+  component "Service Starter" as ss <<core>>
 }
 
-package "Constraint Monitoring" {
-  component "MCP Constraint Monitor" as mcp <<agent>>
-  component "Code Graph RAG" as rag <<agent>>
-  database "Graph Database" as db <<storage>>
+package "Data Storage" {
+  database "LevelDB" as ldb
+  gda --> ldb : stores data in
 }
 
-llm --> graph : uses
-llm --> api : uses
-starter --> llm : starts
-api --> graph : queries
-dashboard --> api : uses
-mcp --> graph : uses
-mcp --> db : stores
-rag --> graph : uses
-rag --> db : stores
+llm --> gda : uses
+wa --> gda : stores data in
+wa --> llm : uses
+apiw --> llm : uses
+dsw --> llm : uses
+ss --> apiw : starts
+ss --> dsw : starts
 
 @enduml

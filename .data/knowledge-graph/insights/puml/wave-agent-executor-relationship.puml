@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: WaveAgentExecutor
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[WaveAgentExecutor] as wave_agent_executor #LightBlue
+[LLMManager] as llmmanager #F0F0F0
+[ServiceOrchestrator] as service_orchestrator #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[APIService] as apiservice #F0F0F0
+[DashboardService] as dashboard_service #F0F0F0
+
+dockerized_services --> wave_agent_executor
+llmmanager -[hidden]- wave_agent_executor
+service_orchestrator -[hidden]- wave_agent_executor
+graph_database_manager -[hidden]- wave_agent_executor
+apiservice -[hidden]- wave_agent_executor
+dashboard_service -[hidden]- wave_agent_executor
+
+@enduml

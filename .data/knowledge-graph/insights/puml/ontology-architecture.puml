@@ -1,25 +1,23 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Ontology" {
-  component "Upper Ontology" as upper_ontology <<core>>
-  component "Lower Ontology" as lower_ontology <<core>>
-  component "Entity Type Resolver" as entity_type_resolver <<agent>>
-  component "Ontology Validator" as ontology_validator <<agent>>
-  component "Ontology Classification Agent" as ontology_cla <<agent>>
+package "Ontology Sub-Component" {
+  component "OntologyManager" as om <<core>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "EntityValidator" as ev <<agent>>
+  component "OntologyCache" as oc <<storage>>
+  component "OntologyVersioning" as ov <<core>>
 }
 
-package "Semantic Analysis" {
-  component "Semantic Analysis Agent" as semantic_analysis_agent <<agent>>
+package "External Dependencies" {
+  component "Machine Learning Model" as mlm <<external>>
 }
 
-upper_ontology --> lower_ontology : extends
-entity_type_resolver --> upper_ontology : uses
-ontology_validator --> upper_ontology : validates
-ontology_validator --> lower_ontology : validates
-ontology_classification_agent --> entity_type_resolver : uses
-ontology_classification_agent --> upper_ontology : uses
-ontology_classification_agent --> lower_ontology : uses
-semantic_analysis_agent --> ontology_classification_agent : uses
+om --> oc : uses
+om --> ov : uses
+oca --> om : uses
+oca --> mlm : uses
+ev --> om : uses
+om --> oca : provides API
 
 @enduml

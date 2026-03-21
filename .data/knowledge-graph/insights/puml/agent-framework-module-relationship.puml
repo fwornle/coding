@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentFrameworkModule
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[AgentFrameworkModule] as agent_framework_module #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[AgentDevelopmentGuide] as agent_development_guide #E8F5E8
+
+knowledge_management --> agent_framework_module
+manual_learning -[hidden]- agent_framework_module
+online_learning -[hidden]- agent_framework_module
+graph_database_module -[hidden]- agent_framework_module
+ontology_classification_module -[hidden]- agent_framework_module
+insight_generation_module -[hidden]- agent_framework_module
+utilities_module -[hidden]- agent_framework_module
+browser_access -[hidden]- agent_framework_module
+code_graph_rag -[hidden]- agent_framework_module
+agent_framework_module --> agent_development_guide
+
+@enduml

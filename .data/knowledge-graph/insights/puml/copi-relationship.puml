@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: Copi
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[Copi] as copi #LightBlue
+[TranscriptProcessor] as transcript_processor #F0F0F0
+[Logger] as logger #F0F0F0
+[ConfigurationValidator] as configuration_validator #F0F0F0
+[OntologyClassifier] as ontology_classifier #F0F0F0
+[CopiWrapper] as copi_wrapper #E8F5E8
+
+live_logging_system --> copi
+transcript_processor -[hidden]- copi
+logger -[hidden]- copi
+configuration_validator -[hidden]- copi
+ontology_classifier -[hidden]- copi
+copi --> copi_wrapper
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LazyLoader
+
+[Trajectory] as trajectory #FFFFDD
+[LazyLoader] as lazy_loader #LightBlue
+[WorkStealer] as work_stealer #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[EnvironmentConfigurator] as environment_configurator #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+trajectory --> lazy_loader
+work_stealer -[hidden]- lazy_loader
+graph_database_manager -[hidden]- lazy_loader
+environment_configurator -[hidden]- lazy_loader
+specstory_adapter -[hidden]- lazy_loader
+
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Anti-Pattern Identification" {
+  component "Code Graph RAG" as cgr <<core>>
+  component "Graph Database" as gd <<storage>>
+  component "Documentation" as doc <<external>>
+}
+
+package "Analysis" {
+  component "Code Analysis" as ca <<api>>
+  component "Pattern Recognition" as pr <<core>>
+}
+
+cgr --> gd : uses
+ca --> cgr : uses
+pr --> ca : processes
+doc --> pr : documents
+
+@enduml

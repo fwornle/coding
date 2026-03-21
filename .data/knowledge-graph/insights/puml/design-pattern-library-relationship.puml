@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DesignPatternLibrary
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[DesignPatternLibrary] as design_pattern_library #LightBlue
+[CodeAnalysisPatterns] as code_analysis_patterns #F0F0F0
+[BestPracticeRepository] as best_practice_repository #F0F0F0
+[AntiPatternIdentification] as anti_pattern_identification #F0F0F0
+[GraphCodeRAG] as graph_code_rag #F0F0F0
+[DesignPatternRegistry] as design_pattern_registry #E8F5E8
+
+coding_patterns --> design_pattern_library
+code_analysis_patterns -[hidden]- design_pattern_library
+best_practice_repository -[hidden]- design_pattern_library
+anti_pattern_identification -[hidden]- design_pattern_library
+graph_code_rag -[hidden]- design_pattern_library
+design_pattern_library --> design_pattern_registry
+
+@enduml

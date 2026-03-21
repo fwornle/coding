@@ -7,13 +7,23 @@ title Hierarchy Context: Insights
 [Insights] as insights #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Ontology] as ontology #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
 [EntityValidator] as entity_validator #F0F0F0
-[CodeGraph] as code_graph #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[InsightGenerator] as insight_generator #E8F5E8
 
 semantic_analysis --> insights
 pipeline -[hidden]- insights
 ontology -[hidden]- insights
+ontology_manager -[hidden]- insights
+code_analyzer -[hidden]- insights
+insight_generator -[hidden]- insights
+knowledge_graph_constructor -[hidden]- insights
 entity_validator -[hidden]- insights
-code_graph -[hidden]- insights
+code_graph_rag -[hidden]- insights
+insights --> insight_generator
 
 @enduml

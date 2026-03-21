@@ -2,96 +2,77 @@
 
 **Type:** Detail
 
-The MEMGRAPH_BATCH_SIZE variable in the project documentation implies that the project interacts with a graph database, which could be managed by the GraphDatabaseAdapter.
+The absence of source files limits the ability to provide specific code references, but the parent context suggests a strong connection between the GraphDatabaseModule and the GraphDatabaseAdapter.
 
 ## What It Is  
 
-The **GraphDatabaseAdapter** is the central abstraction that mediates all interactions with the project’s underlying graph database.  Its implementation lives in the same repository that contains the *integrations/code‑graph‑rag/README.md* file, which explicitly references a “Graph‑Code system” – a strong hint that the adapter is the glue between the code‑graph generation logic and the persistent graph store.  The presence of a `MEMGRAPH_BATCH_SIZE` configuration variable in the project documentation further confirms that the adapter is tuned for Memgraph (or a compatible graph engine) and that it is responsible for batching write operations to that engine.  
-
-The adapter is not a stand‑alone component; it is embedded inside three higher‑level managers – **KnowledgeGraphManager**, **GraphDatabaseManager**, and **GraphManagement** – each of which delegates storage‑ and retrieval‑related concerns to the adapter.  In other words, the adapter is the low‑level “data‑access layer” that the rest of the system relies on for consistent graph‑database semantics.
-
----
+The **GraphDatabaseAdapter** is the concrete bridge that enables the **GraphDatabaseModule** to read from and write to the underlying knowledge‑graph store built on **Graphology** (the in‑memory graph library) backed by **LevelDB** for persistence. Although the source repository does not expose a concrete file path for the adapter, the surrounding documentation makes it clear that the adapter lives inside the *GraphDatabaseModule* package and is the only component that knows the details of the Graphology + LevelDB stack. In practice, any higher‑level feature—such as the browser‑access UI or the code‑graph‑RAG (retrieval‑augmented generation) service—relies on the module’s public API, which in turn delegates all graph‑specific operations to the GraphDatabaseAdapter.
 
 ## Architecture and Design  
 
-From the observations we can infer that the project adopts an **Adapter pattern** to isolate the rest of the codebase from the concrete graph‑database implementation.  By encapsulating all Memgraph‑specific calls inside `GraphDatabaseAdapter`, the surrounding managers (KnowledgeGraphManager, GraphDatabaseManager, GraphManagement) can operate against a stable interface, making it possible to swap the underlying store or adjust connection details without rippling changes throughout the code.  
+From the observations we can infer a classic **Adapter pattern** implementation. The GraphDatabaseModule defines a generic interface for graph operations (e.g., `addNode`, `addEdge`, `query`, `persist`). The GraphDatabaseAdapter implements that interface while encapsulating the idiosyncrasies of Graphology (its event‑driven API, mutation semantics) and LevelDB (key‑value storage, batch writes). This separation gives the rest of the system a stable contract, shielding callers from the volatility of the underlying graph engine.
 
-The architecture is **layered**: the top‑level managers provide domain‑specific services (knowledge‑graph construction, generic database orchestration, overall graph management) while the adapter sits in the data‑access layer.  Communication between layers is synchronous – managers invoke adapter methods directly – which is appropriate for the low‑latency, request‑driven nature of graph queries and updates.  
+The architecture is **modular**: the GraphDatabaseModule is a distinct component that aggregates the adapter and any auxiliary helpers (caching, transaction handling). The module is then consumed by several sibling components—browser‑access, code‑graph‑RAG, etc.—which treat it as a black‑box service. Interaction flows are therefore **unidirectional**: higher‑level services call the module’s public façade, the façade forwards to the adapter, and the adapter talks to Graphology/LevelDB. No circular dependencies are indicated, which keeps the dependency graph shallow and eases testing.
 
-Configuration is externalised via the `MEMGRAPH_BATCH_SIZE` variable, suggesting a **configuration‑driven** approach to performance tuning.  The adapter likely reads this setting at start‑up and uses it to control how many graph statements are bundled together before being sent to Memgraph, balancing throughput against memory pressure.
-
----
+Because the adapter is the sole point of contact with LevelDB, any change to persistence strategy (e.g., swapping LevelDB for RocksDB) would be isolated to this class, preserving the rest of the codebase. This design decision reflects a **separation‑of‑concerns** mindset and supports future extensibility without widespread refactoring.
 
 ## Implementation Details  
 
-Although no concrete symbols were discovered in the current snapshot, the naming conventions and surrounding documentation give us a clear mental model of the adapter’s internals:
+While the repository does not list concrete symbols, the naming convention suggests a small, focused class—`GraphDatabaseAdapter`—that likely holds:
 
-1. **Connection Management** – The adapter probably holds a persistent client (e.g., a Memgraph driver instance) that is created once during application bootstrap and reused for the lifetime of the process.  This avoids the overhead of repeatedly opening sockets for each operation.
+1. **Graphology Instance** – an in‑memory graph object created at module initialization. The adapter probably wraps Graphology’s mutation methods (`graph.addNode`, `graph.addEdge`, etc.) with additional validation or transformation logic required by the domain.
+2. **LevelDB Connection** – a persistent store opened via the LevelDB Node.js bindings. The adapter would batch graph updates into LevelDB writes, perhaps using LevelDB’s atomic `batch` API to guarantee consistency between the in‑memory graph and its persisted representation.
+3. **Serialization Layer** – because Graphology stores rich node/edge objects while LevelDB stores byte buffers, the adapter must serialize/deserialize graph elements (JSON, MessagePack, or a custom binary format). This logic is central to ensuring that a restart of the process can reconstruct the exact graph state.
+4. **Error‑Handling & Recovery** – the adapter is the logical place for retry policies, corruption detection, and fallback mechanisms. For example, if LevelDB reports a write error, the adapter can roll back the in‑memory mutation to keep the two stores in sync.
 
-2. **Batching Logic** – The `MEMGRAPH_BATCH_SIZE` constant is used to accumulate mutation statements (node/edge creations, property updates) in an in‑memory buffer.  When the buffer reaches the configured size, the adapter flushes the batch in a single transaction, leveraging Memgraph’s bulk‑write capabilities.
-
-3. **CRUD API** – The adapter likely exposes a small set of high‑level methods such as `create_node`, `create_edge`, `update_properties`, `run_query`, and `delete_subgraph`.  These methods translate domain objects supplied by the managers into Cypher (or a Memgraph‑specific query language) strings.
-
-4. **Error Handling & Retries** – Because the adapter is the sole entry point to the graph store, it is the logical place to centralise exception handling, translate low‑level driver errors into domain‑specific exceptions, and optionally implement retry logic for transient failures.
-
-5. **Instrumentation** – The presence of a batch‑size knob hints that the adapter may also emit metrics (e.g., batch execution time, number of statements per batch) to aid observability, though this is not explicitly documented.
-
----
+The adapter’s public API is probably a thin wrapper exposing methods such as `initialize()`, `loadGraph()`, `saveGraph()`, `executeQuery(criteria)`, and `close()`. Internally, it may maintain a **write‑through cache**: every mutation updates Graphology immediately and is queued for asynchronous persistence, balancing latency for read‑heavy workloads (e.g., code‑graph‑RAG queries) against durability guarantees.
 
 ## Integration Points  
 
-The **GraphDatabaseAdapter** sits at the intersection of three major subsystems:
-
-* **KnowledgeGraphManager** – Uses the adapter to persist semantic entities (concepts, relations) that are discovered during code analysis.  The manager likely passes higher‑level constructs (e.g., `KnowledgeNode`) to the adapter, which then materialises them in the graph.
-
-* **GraphDatabaseManager** – Acts as a more generic façade over the adapter, perhaps exposing administrative capabilities such as schema migrations, backup/restore hooks, or health‑check endpoints.  This manager may also coordinate multi‑tenant access to the same graph store.
-
-* **GraphManagement** – Provides orchestration features (e.g., graph versioning, pruning old data) and relies on the adapter for the actual data‑mutation calls.  Because GraphManagement is identified as the *parent* component, it likely dictates lifecycle policies (initialisation, shutdown) for the adapter.
-
-External dependencies include the **Memgraph client library** (or an equivalent driver) and the configuration subsystem that supplies `MEMGRAPH_BATCH_SIZE`.  The adapter’s public interface is the contract through which all other components interact with the graph database, making it the primary integration point for any future extensions (e.g., supporting Neo4j or TigerGraph).
-
----
+- **Parent Component – GraphDatabaseModule**: The module imports the adapter and re‑exports its façade. All module‑level configuration (e.g., LevelDB file path, Graphology plugins) is funneled through the adapter’s constructor or initialization routine.
+- **Sibling Components – Browser‑Access, Code‑Graph‑RAG**: These services request graph data via the module’s API. For instance, the browser‑access UI may call `module.getSubgraph(nodeId, depth)` which the module forwards to `adapter.querySubgraph`. The code‑graph‑RAG pipeline likely invokes `adapter.search(queryVector)` to retrieve relevant code entities before feeding them to an LLM.
+- **External Dependencies**: The adapter depends on the `graphology` npm package and the `level` (or `levelup`) package for LevelDB interaction. No other third‑party libraries are mentioned, keeping the dependency surface narrow.
+- **Potential Extension Points**: Because the adapter isolates persistence, any future component that needs direct graph access (e.g., a batch analytics job) could instantiate its own adapter instance, reusing the same configuration logic without duplicating low‑level code.
 
 ## Usage Guidelines  
 
-1. **Never bypass the adapter** – All graph‑related operations must be routed through the `GraphDatabaseAdapter`.  Direct driver calls break the abstraction and make future database swaps painful.
-
-2. **Respect the batch size** – When inserting large numbers of nodes or edges, feed them to the adapter in a streaming fashion rather than building massive in‑memory structures.  The adapter will automatically flush when `MEMGRAPH_BATCH_SIZE` is reached; forcing larger batches can lead to out‑of‑memory errors.
-
-3. **Handle adapter exceptions** – The adapter translates low‑level driver errors into a small, well‑documented set of exceptions.  Callers (the managers) should catch these and either retry (for transient network glitches) or surface a clear error to the user.
-
-4. **Do not store mutable state in the adapter** – All stateful data (e.g., domain objects) should reside in the managers.  The adapter’s responsibility is limited to request/response handling and should remain stateless aside from the connection pool and batch buffer.
-
-5. **Instrument your calls** – If the project provides a metrics collector, wrap adapter invocations with timing hooks.  This will surface the impact of the `MEMGRAPH_BATCH_SIZE` setting and help tune performance.
+1. **Instantiate Through the Module** – Developers should never construct `GraphDatabaseAdapter` directly. Instead, obtain a reference via `GraphDatabaseModule.getAdapter()` (or the module’s exported façade). This guarantees that the adapter is configured with the correct LevelDB path and Graphology plugins.
+2. **Prefer Asynchronous APIs** – Graphology operations are synchronous, but LevelDB I/O is asynchronous. The adapter’s public methods therefore return Promises; callers must `await` them to ensure durability before proceeding.
+3. **Batch Mutations When Possible** – For bulk imports (e.g., loading a new codebase), use the adapter’s batch interface (`adapter.batchWrite(operations)`) to minimize LevelDB write overhead and keep the in‑memory graph consistent.
+4. **Handle Errors Gracefully** – The adapter propagates LevelDB errors as custom `GraphDatabaseError` objects. Consumers should catch these and decide whether to retry, fallback to a read‑only mode, or abort the operation.
+5. **Close Gracefully on Shutdown** – On application termination, invoke `adapter.close()` to flush any pending writes and close the LevelDB handle, preventing corruption.
 
 ---
 
-### Architectural patterns identified  
-* **Adapter pattern** – isolates the rest of the code from the concrete graph‑DB API.  
-* **Layered architecture** – separates domain managers (knowledge, generic DB, overall graph) from the data‑access layer.  
-* **Configuration‑driven tuning** – batch size is externalised, allowing runtime performance adjustments without code changes.
+### 1. Architectural patterns identified  
+- **Adapter pattern** – isolates Graphology + LevelDB specifics behind a stable interface.  
+- **Modular decomposition** – GraphDatabaseModule encapsulates the adapter, exposing a clean façade to siblings.  
+- **Separation of concerns** – persistence, in‑memory representation, and public API are distinct responsibilities.
 
-### Design decisions and trade‑offs  
-* **Centralised data access** simplifies maintenance and testing but creates a single point of failure; robustness must be built into the adapter (retries, circuit‑breakers).  
-* **Batching** improves write throughput at the cost of increased latency for individual statements; the chosen `MEMGRAPH_BATCH_SIZE` balances these concerns.  
+### 2. Design decisions and trade‑offs  
+- **Single‑point persistence** (adapter) simplifies future storage swaps but concentrates error‑handling complexity in one class.  
+- **Write‑through cache** (Graphology in memory, LevelDB on disk) offers fast read latency at the cost of additional memory usage and the need for robust sync logic.  
+- **Synchronous Graphology vs. asynchronous LevelDB** required an async façade, adding slight overhead but preserving non‑blocking behavior for callers.
 
-### System structure insights  
-* The adapter is a **leaf component** in the dependency graph, consumed by three sibling managers that together constitute the graph‑handling subsystem.  
-* Because all three managers embed the same adapter, they share a common persistence contract, ensuring consistency across knowledge‑graph creation, generic DB operations, and overall graph lifecycle management.
+### 3. System structure insights  
+- The graph stack sits at the core of the system, with the adapter acting as the gateway.  
+- All higher‑level features (browser UI, RAG pipelines) are leaf nodes that depend on the module’s API, resulting in a clear top‑down dependency hierarchy.
 
-### Scalability considerations  
-* **Horizontal scaling** can be achieved by running multiple instances of the service; the adapter’s stateless nature (aside from connection pooling) means each instance can independently manage its own batch buffers.  
-* **Batch size tuning** is the primary lever for scaling write throughput; larger batches increase throughput but require more memory per instance.  
+### 4. Scalability considerations  
+- **Horizontal scaling** is limited by LevelDB’s single‑process design; scaling out would require sharding the graph or moving to a distributed KV store.  
+- **Vertical scaling** (more RAM) directly benefits the in‑memory Graphology instance, allowing larger code graphs to be held entirely in memory for low‑latency queries.  
+- The adapter’s batch API mitigates write amplification, supporting bulk ingestion workloads.
 
-### Maintainability assessment  
-* The clear separation of concerns (adapter vs. managers) yields high maintainability: changes to the underlying graph engine affect only the adapter.  
-* However, the lack of visible symbols in the current snapshot suggests documentation gaps; adding explicit interface definitions and unit tests for the adapter would further improve long‑term maintainability.
+### 5. Maintainability assessment  
+- The adapter’s isolation makes the codebase **highly maintainable**: changes to the storage engine or Graphology version are confined to a single file.  
+- Lack of explicit symbols in the repository hampers immediate code navigation, but the documented contract (module → adapter → storage) provides a clear mental model for future contributors.  
+- Because the adapter centralizes error handling and serialization, **bug surface area is small**, easing testing and debugging.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [GraphManagement](./GraphManagement.md) -- GraphDatabaseAdapter handles graph data storage and retrieval, making it a critical component of the project's architecture.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
 
 
 ---

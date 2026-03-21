@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeAnalysisPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[CodeAnalysisPatterns] as code_analysis_patterns #LightBlue
+[DesignPatternLibrary] as design_pattern_library #F0F0F0
+[BestPracticeRepository] as best_practice_repository #F0F0F0
+[AntiPatternIdentification] as anti_pattern_identification #F0F0F0
+[GraphCodeRAG] as graph_code_rag #F0F0F0
+[GraphCodeRAGIntegration] as graph_code_ragintegration #E8F5E8
+
+coding_patterns --> code_analysis_patterns
+design_pattern_library -[hidden]- code_analysis_patterns
+best_practice_repository -[hidden]- code_analysis_patterns
+anti_pattern_identification -[hidden]- code_analysis_patterns
+graph_code_rag -[hidden]- code_analysis_patterns
+code_analysis_patterns --> graph_code_ragintegration
+
+@enduml

@@ -5,13 +5,17 @@ title Hierarchy Context: SpecstoryAdapter
 
 [Trajectory] as trajectory #FFFFDD
 [SpecstoryAdapter] as specstory_adapter #LightBlue
-[LoggingMechanism] as logging_mechanism #F0F0F0
-[ConnectionManager] as connection_manager #F0F0F0
-[SpecstoryAPIWrapper] as specstory_apiwrapper #E8F5E8
+[LazyLoader] as lazy_loader #F0F0F0
+[WorkStealer] as work_stealer #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[EnvironmentConfigurator] as environment_configurator #F0F0F0
+[ModularLogging] as modular_logging #E8F5E8
 
 trajectory --> specstory_adapter
-logging_mechanism -[hidden]- specstory_adapter
-connection_manager -[hidden]- specstory_adapter
-specstory_adapter --> specstory_apiwrapper
+lazy_loader -[hidden]- specstory_adapter
+work_stealer -[hidden]- specstory_adapter
+graph_database_manager -[hidden]- specstory_adapter
+environment_configurator -[hidden]- specstory_adapter
+specstory_adapter --> modular_logging
 
 @enduml

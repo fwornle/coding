@@ -8,12 +8,22 @@ title Hierarchy Context: EntityValidator
 [Pipeline] as pipeline #F0F0F0
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[CodeGraph] as code_graph #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[EntityValidationRules] as entity_validation_rules #E8F5E8
 
 semantic_analysis --> entity_validator
 pipeline -[hidden]- entity_validator
 ontology -[hidden]- entity_validator
 insights -[hidden]- entity_validator
-code_graph -[hidden]- entity_validator
+ontology_manager -[hidden]- entity_validator
+code_analyzer -[hidden]- entity_validator
+insight_generator -[hidden]- entity_validator
+knowledge_graph_constructor -[hidden]- entity_validator
+code_graph_rag -[hidden]- entity_validator
+entity_validator --> entity_validation_rules
 
 @enduml

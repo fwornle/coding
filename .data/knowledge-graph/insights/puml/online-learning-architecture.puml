@@ -1,28 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Online Learning" {
-  component "GraphDatabaseManager" as gdm <<storage>>
-  component "LlmServiceManager" as lsm <<api>>
-  component "WaveAgentController" as wac <<agent>>
-  component "UkbTraceReportGenerator" as utrg <<core>>
-  component "VkbApiClientManager" as vacm <<external>>
-  component "GraphDatabaseAdapter" as gda <<storage>>
+package "Data Extraction" {
+  component "Code Graph RAG" as cgr <<external>>
+  component "Git History" as gh <<external>>
+  component "LSL Sessions" as lsl <<external>>
 }
 
-package "External Services" {
-  cloud "VKB API" as vkb <<external>>
+package "Data Processing" {
+  component "Batch Analysis Pipeline" as bap <<core>>
+  component "InsightGenerationModule" as ig <<core>>
+  component "UKB Trace Report" as utr <<cli>>
 }
 
-gdm --> gda : persists
-lsm --> gdm : uses
-wac --> lsm : uses
-utrg --> gdm : generates reports from
-vacm --> vkb : interacts with
-OnlineLearning --> gdm : uses
-OnlineLearning --> lsm : uses
-OnlineLearning --> wac : manages
-OnlineLearning --> utrg : generates reports
-OnlineLearning --> vacm : interacts with
+package "Data Storage and Query" {
+  database "GraphDatabase" as gd <<storage>>
+  component "GraphDatabaseAdapter" as gda <<api>>
+}
+
+cgr --> bap : provides code analysis
+gh --> bap : provides git history
+lsl --> bap : provides LSL sessions
+bap --> ig : generates insights
+bap --> utr : uses UKB trace report
+ig --> gd : stores insights
+gda --> gd : queries database
+bap --> gda : uses adapter
 
 @enduml

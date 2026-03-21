@@ -6,20 +6,24 @@ title Hierarchy Context: OnlineLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [OnlineLearning] as online_learning #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
-[GraphDatabaseManager] as graph_database_manager #F0F0F0
-[WaveAgentController] as wave_agent_controller #F0F0F0
-[UkbTraceReportGenerator] as ukb_trace_report_generator #F0F0F0
-[LlmServiceManager] as llm_service_manager #F0F0F0
-[VkbApiClientManager] as vkb_api_client_manager #F0F0F0
-[CodeGraphRagIntegration] as code_graph_rag_integration #E8F5E8
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[CodeGraphRAGIntegration] as code_graph_ragintegration #E8F5E8
 
 knowledge_management --> online_learning
 manual_learning -[hidden]- online_learning
-graph_database_manager -[hidden]- online_learning
-wave_agent_controller -[hidden]- online_learning
-ukb_trace_report_generator -[hidden]- online_learning
-llm_service_manager -[hidden]- online_learning
-vkb_api_client_manager -[hidden]- online_learning
-online_learning --> code_graph_rag_integration
+graph_database_module -[hidden]- online_learning
+ontology_classification_module -[hidden]- online_learning
+insight_generation_module -[hidden]- online_learning
+agent_framework_module -[hidden]- online_learning
+utilities_module -[hidden]- online_learning
+browser_access -[hidden]- online_learning
+code_graph_rag -[hidden]- online_learning
+online_learning --> code_graph_ragintegration
 
 @enduml

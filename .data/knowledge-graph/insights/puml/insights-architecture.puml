@@ -1,23 +1,29 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Insights Generation" {
-  component "InsightGenerator" as ig <<core>>
-  component "InsightValidator" as iv <<core>>
-  component "Templates" as t <<storage>>
-  component "Insights" as i <<storage>>
+package "Insights Sub-Component" {
+  component "InsightGenerator" as ig <<agent>>
+  component "Pattern Catalog" as pc <<storage>>
+  component "Insight Ranker" as ir <<agent>>
+  component "Insight Cache" as ic <<storage>>
+  component "Insight API" as ia <<api>>
 }
 
-package "Semantic Analysis" {
-  component "SemanticAnalysisAgent" as saa <<agent>>
+package "Knowledge Reporting" {
+  component "KnowledgeReportAuthor" as kra <<agent>>
+  component "Knowledge Report Template" as krt <<core>>
 }
 
-package "Data Flow" {
-  ig --> i : generates
-  iv --> i : validates
-  saa --> ig : uses
-  ig --> t : uses
-  i --> saa : processed by
+package "Code Analysis" {
+  component "CodeAnalyzer" as ca <<agent>>
 }
+
+ig --> ca : uses
+ig --> pc : stores
+ir --> ig : ranks
+ic --> ig : caches
+ia --> ig : exposes
+kra --> ig : uses
+kra --> krt : uses
 
 @enduml

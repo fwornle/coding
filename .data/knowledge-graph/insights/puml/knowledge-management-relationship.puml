@@ -14,11 +14,13 @@ title Hierarchy Context: KnowledgeManagement
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [ManualLearning] as manual_learning #E8F5E8
 [OnlineLearning] as online_learning #E8F5E8
-[GraphDatabaseManager] as graph_database_manager #E8F5E8
-[WaveAgentController] as wave_agent_controller #E8F5E8
-[UkbTraceReportGenerator] as ukb_trace_report_generator #E8F5E8
-[LlmServiceManager] as llm_service_manager #E8F5E8
-[VkbApiClientManager] as vkb_api_client_manager #E8F5E8
+[GraphDatabaseModule] as graph_database_module #E8F5E8
+[OntologyClassificationModule] as ontology_classification_module #E8F5E8
+[InsightGenerationModule] as insight_generation_module #E8F5E8
+[AgentFrameworkModule] as agent_framework_module #E8F5E8
+[UtilitiesModule] as utilities_module #E8F5E8
+[BrowserAccess] as browser_access #E8F5E8
+[CodeGraphRAG] as code_graph_rag #E8F5E8
 
 coding --> knowledge_management
 live_logging_system -[hidden]- knowledge_management
@@ -30,10 +32,12 @@ constraint_system -[hidden]- knowledge_management
 semantic_analysis -[hidden]- knowledge_management
 knowledge_management --> manual_learning
 knowledge_management --> online_learning
-knowledge_management --> graph_database_manager
-knowledge_management --> wave_agent_controller
-knowledge_management --> ukb_trace_report_generator
-knowledge_management --> llm_service_manager
-knowledge_management --> vkb_api_client_manager
+knowledge_management --> graph_database_module
+knowledge_management --> ontology_classification_module
+knowledge_management --> insight_generation_module
+knowledge_management --> agent_framework_module
+knowledge_management --> utilities_module
+knowledge_management --> browser_access
+knowledge_management --> code_graph_rag
 
 @enduml

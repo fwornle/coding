@@ -12,10 +12,12 @@ title Hierarchy Context: ConstraintSystem
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [CodingPatterns] as coding_patterns #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[ConstraintManager] as constraint_manager #E8F5E8
-[HookOrchestrator] as hook_orchestrator #E8F5E8
-[ViolationLogger] as violation_logger #E8F5E8
-[GraphPersistenceModule] as graph_persistence_module #E8F5E8
+[GraphDatabaseManager] as graph_database_manager #E8F5E8
+[ContentValidator] as content_validator #E8F5E8
+[HookManager] as hook_manager #E8F5E8
+[ViolationCaptureModule] as violation_capture_module #E8F5E8
+[WorkflowManager] as workflow_manager #E8F5E8
+[ConstraintConfigurationManager] as constraint_configuration_manager #E8F5E8
 
 coding --> constraint_system
 live_logging_system -[hidden]- constraint_system
@@ -25,9 +27,11 @@ trajectory -[hidden]- constraint_system
 knowledge_management -[hidden]- constraint_system
 coding_patterns -[hidden]- constraint_system
 semantic_analysis -[hidden]- constraint_system
-constraint_system --> constraint_manager
-constraint_system --> hook_orchestrator
-constraint_system --> violation_logger
-constraint_system --> graph_persistence_module
+constraint_system --> graph_database_manager
+constraint_system --> content_validator
+constraint_system --> hook_manager
+constraint_system --> violation_capture_module
+constraint_system --> workflow_manager
+constraint_system --> constraint_configuration_manager
 
 @enduml

@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Agent Framework" {
+  component "AgentFrameworkModule" as afm <<core>>
+}
+
+package "Data Storage" {
+  component "GraphDatabaseModule" as gdm <<storage>>
+}
+
+package "Insight Generation" {
+  component "InsightGenerationModule" as igm <<api>>
+}
+
+package "Utilities" {
+  component "UtilitiesModule" as um <<core>>
+  component "Checkpoint System" as cs <<external>>
+}
+
+afm --> gdm : uses
+afm --> igm : generates insights
+afm --> um : utilizes
+um --> cs : uses
+
+@enduml
