@@ -183,7 +183,8 @@ _start_services() {
     fi
 
     # Check if containers are already healthy - skip docker compose if so
-    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    # (skip this shortcut after --force, since we just tore everything down)
+    if [ "$CODING_FORCE_CLEAN" != "true" ] && curl -sf http://localhost:8080/health >/dev/null 2>&1; then
       _agent_log "✅ coding-services already running and healthy - reusing existing containers"
     else
       _agent_log "🐳 Starting coding services via Docker..."
