@@ -41,22 +41,12 @@ const __dirname = path.dirname(__filename);
  * 3. /.dockerenv (when running inside container)
  */
 function isDockerMode() {
-  // Check environment variable first (set by launch-claude.sh)
-  if (process.env.CODING_DOCKER_MODE === 'true') {
-    return true;
-  }
-
-  // Check for .docker-mode marker file (created when user enables Docker mode)
-  const codingRoot = path.resolve(__dirname, '..');
-  const dockerModeMarker = path.join(codingRoot, '.docker-mode');
-  if (fsSync.existsSync(dockerModeMarker)) {
-    return true;
-  }
-
-  // Check /.dockerenv (when running inside the container itself)
-  if (fsSync.existsSync('/.dockerenv')) {
-    return true;
-  }
+  // Only trust /.dockerenv — it exists exclusively inside Docker containers.
+  // Environment variables (CODING_DOCKER_MODE) and marker files (.docker-mode) persist
+  // across host sessions and cause false positives. Calling `docker ps` to validate them
+  // can crash Docker Desktop when its engine is stopped or unstable (accessing a closed
+  // network connection triggers com.docker.virtualization termination).
+  return fsSync.existsSync('/.dockerenv');
 
   return false;
 }
