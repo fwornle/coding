@@ -343,7 +343,8 @@ class HealthVerifier extends EventEmitter {
     }
 
     // Check 2: Qdrant Availability
-    if (dbRules.qdrant_availability.enabled) {
+    // Skip if qdrant.available is null (not checked — Docker-managed service on host)
+    if (dbRules.qdrant_availability.enabled && dbHealth.qdrant.available !== null) {
       if (!dbHealth.qdrant.available) {
         checks.push({
           category: 'databases',
