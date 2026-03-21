@@ -34,18 +34,10 @@ const execAsync = promisify(exec);
  * 3. /.dockerenv (when running inside container)
  */
 function isDockerMode() {
-  // Environment variable takes precedence (set by launch scripts)
-  if (process.env.CODING_DOCKER_MODE === 'true') {
-    return true;
-  }
-
-  // Check for .docker-mode marker file
-  const codingRoot = process.env.CODING_REPO || scriptRoot;
-  if (existsSync(join(codingRoot, '.docker-mode'))) {
-    return true;
-  }
-
-  // Running inside container
+  // Only trust /.dockerenv — it exists exclusively inside Docker containers.
+  // Env vars and .docker-mode marker files persist across host sessions and cause
+  // false positives. Do NOT call `docker ps` to validate — it crashes Docker Desktop
+  // when the engine is stopped (accessing a closed network connection).
   return existsSync('/.dockerenv');
 }
 
