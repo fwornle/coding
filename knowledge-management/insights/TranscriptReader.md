@@ -111,12 +111,10 @@ Interaction is straightforward: `TranscriptManager → TranscriptReader.readTran
 
 Overall, **TranscriptReader** embodies a disciplined, single‑purpose design that complements its parent **TranscriptManager**. The architecture favours clarity, extensibility, and straightforward integration, while leaving room for performance optimisations (caching, async I/O) as the system scales.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager uses the readTranscript method in transcript-manager.ts to fetch transcript data from external sources
-
 
 ---
 

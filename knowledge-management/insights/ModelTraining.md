@@ -92,7 +92,6 @@ No explicit APIs, configuration files, or messaging interfaces are mentioned, so
 
 Overall, *ModelTraining* presents a well‑encapsulated, library‑driven implementation of supervised learning within the **Ontology** domain, tightly integrated with validation and pipeline orchestration components, and designed for clarity and extensibility rather than distributed scale.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Overall, *ModelTraining* presents a well‑encapsulated, library‑driven implem
 ### Siblings
 - [EntityValidation](./EntityValidation.md) -- The EntityValidation component likely employs a rule-based system, where entities are checked against a set of predefined constraints, such as data type checks or relationships between entities.
 - [OntologyClassifierTrainingPipeline](./OntologyClassifierTrainingPipeline.md) -- The OntologyClassifierTrainingPipeline likely involves a series of sequential steps, including data loading, preprocessing, model training, and evaluation, which are essential for developing an effective machine learning model.
-
 
 ---
 

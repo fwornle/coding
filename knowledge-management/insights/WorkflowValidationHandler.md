@@ -12,14 +12,11 @@ The WorkflowValidationHandler is responsible for checking workflows against the 
 
 - The WorkflowValidationHandler reports any validation errors or inconsistencies to the GsdWorkflowManager, which can then take corrective action to resolve the issues.
 
-
 ## Related Entities
 
 ### Used By
 
 - GsdWorkflowManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -28,7 +25,6 @@ The WorkflowValidationHandler is responsible for checking workflows against the 
 
 ### Siblings
 - [WorkflowDataModel](./WorkflowDataModel.md) -- The WorkflowDataModel is defined in the Workflow.js file, which specifies the structure and constraints of the workflow data.
-
 
 ---
 

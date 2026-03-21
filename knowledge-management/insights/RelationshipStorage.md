@@ -14,14 +14,11 @@ RelationshipStorageUtils in utils.py offers utility functions for working with r
 
 - RelationshipStorageExporter in exporter.py provides functionality to export relationships to external formats
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeManagement (contains)
-
-
 
 ## Hierarchy Context
 
@@ -37,7 +34,6 @@ RelationshipStorageUtils in utils.py offers utility functions for working with r
 - [PersistenceManager](./PersistenceManager.md) -- PersistenceManagerDAO in dao.py uses a repository pattern to encapsulate database access for persistence operations
 - [DataImporter](./DataImporter.md) -- DataImporterDAO in dao.py uses a repository pattern to encapsulate database access for import operations
 - [KnowledgeGraphVisualizer](./KnowledgeGraphVisualizer.md) -- KnowledgeGraphVisualizerDAO in dao.py uses a repository pattern to encapsulate database access for visualization operations
-
 
 ---
 

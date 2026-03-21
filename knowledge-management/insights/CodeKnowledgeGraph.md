@@ -87,7 +87,6 @@ The system is organized around a **knowledge graph core** that is accessed unifo
 
 The clear separation between **parsing (CodeGraphAgent)**, **persistence (EntityPersistence)**, and **storage (GraphDatabaseAdapter)** yields high modularity, making unit testing straightforward. Because all siblings share the same adapter, any change to persistence semantics is localized to a single file (`graph-database-adapter.ts`). However, this tight coupling also means that extensive changes to the storage backend require coordinated updates across many components. Documentation of the adapter’s contract and versioned interfaces will be essential to preserve maintainability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ The clear separation between **parsing (CodeGraphAgent)**, **persistence (Entity
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities.
 - [GraphDatabaseStorage](./GraphDatabaseStorage.md) -- GraphDatabaseStorage utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve graph data.
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
-
 
 ---
 

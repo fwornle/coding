@@ -112,7 +112,6 @@ The KnowledgeGraphConstructionModule sits in the middle of a **knowledge pipelin
 
 The separation into well‑named agents and an adapter yields a **highly maintainable** codebase: each concern (parsing, classification, persistence) can be unit‑tested in isolation. The reliance on concrete file paths (`agents/code-graph-agent.ts`, `agents/persistence-agent.ts`, `storage/graph-database-adapter.ts`) makes navigation straightforward. However, the tight coupling to Tree‑sitter’s AST format means that language‑grammar updates must be propagated through the CodeGraphAgent, which could become a maintenance hotspot if many languages are supported. The checkpointing logic introduces additional state to manage, but because it is encapsulated in the CheckpointManagementModule, the impact on the core graph construction code remains limited. Overall, the design balances extensibility with simplicity, supporting future growth while keeping the core implementation approachable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ The separation into well‑named agents and an adapter yields a **highly maintai
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the CodeGraphAgent (agents/code-graph-agent.ts) to construct knowledge graphs from parsed Abstract Syntax Trees (ASTs) using Tree-sitter, providing a robust foundation for analysis capabilities.
 - [CheckpointManagementModule](./CheckpointManagementModule.md) -- The CheckpointManagementModule utilizes a checkpoint manager to track analysis progress and entity updates, ensuring that knowledge graphs are properly managed and updated.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter (storage/graph-database-adapter.ts) utilizes Graphology and LevelDB for efficient storage and query capabilities.
-
 
 ---
 

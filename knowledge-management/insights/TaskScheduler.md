@@ -121,7 +121,6 @@ No child entities are described in the observations, so the scheduler appears to
 
 Overall, the **TaskScheduler** embodies a well‑defined, priority‑aware, dependency‑driven scheduling subsystem that integrates cleanly with the surrounding concurrency infrastructure while offering extensible policy hooks for fairness and rate control.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -130,7 +129,6 @@ Overall, the **TaskScheduler** embodies a well‑defined, priority‑aware, depe
 ### Siblings
 - [ThreadPoolManager](./ThreadPoolManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks, which implies the existence of a ThreadPoolManager to oversee thread creation and termination.
 - [LockManager](./LockManager.md) -- The LockManager would need to implement locking mechanisms, such as mutexes or semaphores, to synchronize access to shared resources and prevent data corruption or inconsistency.
-
 
 ---
 

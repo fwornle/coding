@@ -55,12 +55,10 @@ Because provider selection is centralized in `LLMService`, scaling to multiple c
 ### 5. Maintainability assessment  
 The explicit separation of concerns yields high maintainability. Developers can modify the LLM provisioning logic in a single file (`lib/llm/llm-service.ts`) while the rest of the codebase remains stable. The accessor serves as a clear contract point, simplifying code reviews and onboarding. Unit testing is straightforward because the accessor can be mocked, reducing reliance on external LLM APIs during test runs. Overall, the design promotes easy updates, clear ownership, and low risk of regression when swapping or upgrading LLM providers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class, specifically the getLLMProvider method, to interact with the LLM provider in lib/llm/llm-service.ts
-
 
 ---
 

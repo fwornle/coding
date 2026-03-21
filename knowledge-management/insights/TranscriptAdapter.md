@@ -101,12 +101,10 @@ Because the adapter resides in `lib/agent-api`, any other component that needs t
 
 *All statements above are derived directly from the provided observations: the existence of `TranscriptAdapter` as an abstract base class in `lib/agent-api`, its relationship to `TranscriptProcessor`, and the implied role of adapters in handling multiple agent transcript formats.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/agent-api' to read and convert transcripts from various agent formats.
-
 
 ---
 

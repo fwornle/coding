@@ -89,7 +89,6 @@ Interaction with other components is straightforward: the `ContentValidator` pro
 * Dependence on a single accessor (`GraphDatabaseAccessor`) reduces coupling to the underlying storage implementation, making future swaps of the persistence layer (e.g., moving from LevelDB to another graph store) less invasive.  
 * However, the dual collection modes and multiple filter configurations increase the surface area for bugs; comprehensive unit tests for each mode and filter combination are essential to maintain reliability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Interaction with other components is straightforward: the `ContentValidator` pro
 - [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAccessor to retrieve entity data for validation, as seen in the storage/graph-database-adapter.ts file
 - [HookManager](./HookManager.md) -- HookManager uses a registry-based approach to manage hooks, allowing for efficient registration and dispatching of events
 - [GraphDatabaseAccessor](./GraphDatabaseAccessor.md) -- GraphDatabaseAccessor uses the LevelDB database to store and retrieve graph data
-
 
 ---
 

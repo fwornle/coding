@@ -84,7 +84,6 @@ ConstraintEngine sits at the nexus of several system interactions:
 * **Moderate** – Cache invalidation and the need to keep rule definitions in sync with semantic analysis utilities introduce potential sources of bugs; thorough unit tests and integration tests are essential.  
 * **Future‑Proof** – The observer‑based hook system and modular rule catalogue provide natural extension points for new constraint types without disrupting existing consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ ConstraintEngine sits at the nexus of several system interactions:
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the hook manager in lib/agent-api/hooks/hook-manager.js to handle content validation events, allowing for customizable event handling and adaptability to different scenarios.
 - [HookManager](./HookManager.md) -- HookManager is implemented in lib/agent-api/hooks/hook-manager.js, providing a centralized location for hook event handling and management.
 - [EventDispatcher](./EventDispatcher.md) -- EventDispatcher is likely implemented in a separate module or service, such as an event dispatching service or utility class, to maintain a clean and modular architecture, as suggested by the presence of event-related files in the lib/agent-api directory.
-
 
 ---
 

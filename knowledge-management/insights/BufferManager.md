@@ -79,7 +79,6 @@ External dependencies are minimal: BufferManager relies only on core Java concur
 * **Medium** – careful tuning of buffer parameters is required to avoid memory pressure; documentation of chosen overflow strategy is essential.  
 * **Low coupling** – only simple push‑batch interfaces tie BufferManager to its siblings, reducing ripple effects when changes are made.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ External dependencies are minimal: BufferManager relies only on core Java concur
 ### Siblings
 - [AsyncLogger](./AsyncLogger.md) -- The Logger class in Logger.java utilizes an async buffering mechanism to handle log messages, reducing the impact on the main application thread.
 - [FileRotator](./FileRotator.md) -- The FileRotator would need to be implemented with considerations for factors such as file size limits, rotation schedules, and archival strategies.
-
 
 ---
 

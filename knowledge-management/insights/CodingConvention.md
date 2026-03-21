@@ -79,7 +79,6 @@ The system is organized around a **parent‑child hierarchy** (`CodingPatterns` 
 
 The clear modular boundaries and reliance on well‑defined adapters make the codebase **highly maintainable**.  Adding new conventions or adjusting existing ones requires only JSON edits and, at most, minor adjustments to the parsing logic.  However, the heavy dependence on a single graph database means that any schema changes must be coordinated across all sibling sub‑components, demanding disciplined change‑management practices.  Overall, the design balances flexibility with a manageable level of coupling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The clear modular boundaries and reliance on well‑defined adapters make the co
 - [CodeQualityEvaluator](./CodeQualityEvaluator.md) -- CodeQualityEvaluator interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve code quality evaluation results.
 - [PatternStorage](./PatternStorage.md) -- PatternStorage interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve coding patterns and entities.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter interacts with the graph database using the graph-database-config.json file in the config directory.
-
 
 ---
 

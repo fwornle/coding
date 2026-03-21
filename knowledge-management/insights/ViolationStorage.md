@@ -93,12 +93,10 @@ The hierarchy is simple: **ViolationPersistenceService** → **ViolationStorage*
 
 Overall, **ViolationStorage** embodies a disciplined, configuration‑driven persistence strategy that aligns tightly with the constraint‑monitoring domain while preserving a clean architectural boundary between validation, service orchestration, and data durability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
-
 
 ---
 

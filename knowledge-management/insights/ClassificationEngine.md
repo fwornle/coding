@@ -113,7 +113,6 @@ Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-cl
 * The single error‑handling façade centralises changes to error semantics, simplifying future adjustments.  
 * The only potential maintenance burden is the dependency on the external OntologyClassificationAgent; any breaking change in its API would ripple through the engine, so versioning and interface contracts must be managed carefully.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -126,7 +125,6 @@ Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-cl
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
 - [SessionWindowingModule](./SessionWindowingModule.md) -- SessionWindowingModule utilizes the sessionWindowManager class in session-windowing-module.ts for managing session windows.
-
 
 ---
 

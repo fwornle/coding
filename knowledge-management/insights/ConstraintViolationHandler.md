@@ -106,12 +106,10 @@ Sibling components of the logger (e.g., metrics collectors) would share the same
 
 The heavy reliance on markdown documentation for both configuration and detection semantics makes the system **highly maintainable** from a knowledge‑transfer perspective—new team members can read the docs to understand constraints without diving into code. However, the lack of visible code symbols for the handler means that **implementation details are opaque**, which can hinder debugging and extension. Introducing a small, well‑documented interface (e.g., `IConstraintViolationHandler`) and unit tests would improve maintainability without breaking the current design.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger might be related to the ConstraintManager, as it handles constraint violations.
-
 
 ---
 

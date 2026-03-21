@@ -102,12 +102,10 @@ The design, as inferred, is **highly maintainable**:
 
 The main maintenance risk is the lack of explicit type safety or compile‑time contracts for the events exchanged between registrar/unregistrar and the tracker.  Introducing well‑named interfaces (e.g., `ServiceLifecycleListener`) would further improve readability and testability, but such an addition would need to be justified by concrete code evidence.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses the Process State Manager to register, unregister, and track the state of services.
-
 
 ---
 

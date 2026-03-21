@@ -90,7 +90,6 @@ The integration is purely in‑process, with each component holding a reference 
 
 Overall, **ChangeStore** embodies a focused, well‑encapsulated design that supports the ConstraintSystem’s need for fast, reliable change‑metadata handling while remaining straightforward to extend and maintain.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Overall, **ChangeStore** embodies a focused, well‑encapsulated design that sup
 ### Siblings
 - [SessionAnalyzer](./SessionAnalyzer.md) -- The session analysis algorithm in SessionAnalyzer is designed to handle entity content changes, as implied by the parent component's context, specifically within the ConstraintSystem.
 - [PipelineManager](./PipelineManager.md) -- The PipelineManager's role in managing the pipeline-based execution model is critical, as it enables the LSLSessionProcessor to process entity content changes in a structured and scalable way, aligning with the ConstraintSystem's design principles.
-
 
 ---
 

@@ -14,7 +14,6 @@ The use of Graphology and LevelDB provides a scalable and efficient knowledge st
 
 - Core components include GraphDatabaseService, GraphKnowledgeExporter, and PersistenceAgent
 
-
 ---
 
 *Generated from 5 observations*

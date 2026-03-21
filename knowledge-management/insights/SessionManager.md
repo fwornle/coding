@@ -106,7 +106,6 @@ Interaction between components is explicit and file‑path based. SessionManager
 
 Overall, SessionManager exemplifies a well‑structured, configuration‑centric sub‑component that leverages the modular foundations of LiveLoggingSystem to deliver flexible, maintainable, and scalable live‑session logging.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ Overall, SessionManager exemplifies a well‑structured, configuration‑centric
 - [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the LSLConfigValidator (scripts/validate-lsl-config.js) to validate configuration files before processing transcripts.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a configuration file to classify observations and entities against the ontology system.
 - [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a modular architecture for easier maintenance and updates.
-
 
 ---
 

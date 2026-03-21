@@ -78,7 +78,6 @@ Because the updater is a single class, scaling the update process (e.g., paralle
 
 The SRP‑driven, modular layout yields **high maintainability**.  Changes to update logic are confined to one file, reducing regression risk.  Loose coupling minimizes ripple effects across the codebase, and the clear parent‑child relationship makes the responsibility boundaries obvious to new developers.  The main maintenance risk would be if the updater’s public interface changes without a corresponding update in OntologyManager, but the current design’s emphasis on a stable interface mitigates that risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ The SRP‑driven, modular layout yields **high maintainability**.  Changes to up
 ### Siblings
 - [OntologyMaintenancePattern](./OntologyMaintenancePattern.md) -- The OntologyManager's use of the OntologyUpdater class suggests a centralized approach to ontology maintenance, where updates are managed through a single interface.
 - [ModularOntologyDesign](./ModularOntologyDesign.md) -- The presence of the OntologyManager sub-component and its dependency on the OntologyUpdater class demonstrate a modular approach to ontology management, allowing for the addition or removal of functionality as needed.
-
 
 ---
 

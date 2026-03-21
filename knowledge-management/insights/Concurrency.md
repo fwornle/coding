@@ -106,7 +106,6 @@ The Concurrency sub‑component sits as a **service layer** beneath the high‑l
 
 The component’s **modular boundaries** (manager, scheduler, controller) keep the codebase approachable: each class has a single responsibility and can be unit‑tested in isolation.  The reliance on standard synchronization primitives (locks, atomic counters) avoids exotic concurrency libraries, easing onboarding for new developers.  Documentation is reinforced by the explicit API surface of **ConcurrencyManager**, which serves as the single entry point for external modules.  The primary maintenance risk lies in the lock implementation inside WaveController; any change to its granularity must be validated against race‑condition tests.  Overall, the design balances performance with clarity, making future extensions (e.g., adding a custom scheduling policy) straightforward.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ The component’s **modular boundaries** (manager, scheduler, controller) keep t
 - [Ontology](./Ontology.md) -- The OntologyClassificationAgent classifies observations against the ontology system, utilizing the upper and lower ontology definitions
 - [Insights](./Insights.md) -- The InsightGenerator generates insights based on the processed data, utilizing the output from the pipeline and ontology classification system
 - [CodeGraph](./CodeGraph.md) -- The CodeGraphAgent constructs the code graph, utilizing the input data and ontology definitions
-
 
 ---
 

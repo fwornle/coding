@@ -83,12 +83,10 @@ If a future implementation introduces persistence, developers must be aware of p
 - The current lack of visible implementation details hampers direct code‑level maintenance, but the high‑level contract (add → query → clear) is easy to document and test.  
 - Future changes to the persistence mechanism can be isolated within the store implementation without affecting the validator or processor, supporting good long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationProcessor](./ViolationProcessor.md) -- ViolationProcessor likely interacts with the ContentValidator sub-component to receive and process constraint violations
-
 
 ---
 

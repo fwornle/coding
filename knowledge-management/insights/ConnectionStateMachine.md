@@ -10,19 +10,15 @@ The state transitions in ConnectionStateMachine are triggered by events such as 
 
 - The ConnectionStateMachine in ConnectionManager.js utilizes the retry mechanism provided by ConnectionRetryHandler to handle connection failures and transitions to the retrying state.
 
-
 ## How It Works
 
 - The state transitions in ConnectionStateMachine are triggered by events such as connection establishment, connection failure, and retry timeouts, ensuring a robust connection management process.
-
 
 ## Related Entities
 
 ### Used By
 
 - ConnectionManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -31,7 +27,6 @@ The state transitions in ConnectionStateMachine are triggered by events such as 
 
 ### Siblings
 - [ConnectionRetryHandler](./ConnectionRetryHandler.md) -- ConnectionRetryHandler in ConnectionManager.js implements exponential backoff with a maximum of 5 retries before considering the connection failed.
-
 
 ---
 

@@ -20,7 +20,7 @@ The architecture of **DesignPatternLibrary** follows a *registry‑centric* styl
 
 The overall system is organized as a hierarchy of loosely coupled sub‑components, each responsible for a distinct knowledge domain (patterns, best practices, anti‑patterns, etc.).  This modular decomposition is evident from the sibling relationship list and from the way the **CodingPatterns** parent delegates responsibilities to its children.  The design encourages *separation of concerns*: the **DesignPatternLibrary** supplies static knowledge, while **GraphCodeRAG** focuses on graph construction and retrieval, and the **ontology‑classification‑agent** handles batch processing and validation.
 
-![DesignPatternLibrary — Architecture](../../.data/knowledge-graph/insights/images/design-pattern-library-architecture.png)
+![DesignPatternLibrary — Architecture](images/design-pattern-library-architecture.png)
 
 ### Architectural Patterns Identified  
 
@@ -58,7 +58,7 @@ The **DesignPatternLibrary** sits at the nexus of several critical flows:
 
 4. **Sibling Knowledge Bases** – The **BestPracticeRepository** and **AntiPatternIdentification** components likely share the same registry interface, enabling a unified lookup mechanism across all knowledge domains.
 
-![DesignPatternLibrary — Relationship](../../.data/knowledge-graph/insights/images/design-pattern-library-relationship.png)
+![DesignPatternLibrary — Relationship](images/design-pattern-library-relationship.png)
 
 ---
 
@@ -84,7 +84,6 @@ The **DesignPatternLibrary** sits at the nexus of several critical flows:
 4. **Scalability considerations** – Cacheable registry look‑ups and batch‑oriented processing are essential to handle large codebases without performance degradation.  
 5. **Maintainability assessment** – The abstracted registry interface, shared contribution workflow, and strict validation via `EntityValidator` collectively promote a maintainable, extensible pattern catalog, even though concrete source files are currently absent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The **DesignPatternLibrary** sits at the nexus of several critical flows:
 - [BestPracticeRepository](./BestPracticeRepository.md) -- BestPracticeRepository is acknowledged as a sub-component but lacks concrete references in the source files.
 - [AntiPatternIdentification](./AntiPatternIdentification.md) -- AntiPatternIdentification is recognized as a sub-component but lacks direct references in the provided source files.
 - [GraphCodeRAG](./GraphCodeRAG.md) -- GraphCodeRAG is described in integrations/code-graph-rag/README.md as a Graph-Code RAG system for any codebases.
-
 
 ---
 

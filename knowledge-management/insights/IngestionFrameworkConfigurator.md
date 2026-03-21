@@ -91,7 +91,6 @@ No micro‑service or event‑driven terminology appears in the observations, so
 4. **Scalability considerations** – Because the configurator only prepares static pipeline definitions, scalability hinges on the underlying framework (Beam/NiFi).  The configurator itself is lightweight and can be instantiated per ingestion job without contention.  
 5. **Maintainability assessment** – High maintainability: the clear separation of concerns (configuration vs. source handling vs. retry logic) allows independent evolution.  The only maintenance hotspot is the `buildFrameworkConfig` method, which must be kept in sync with any changes to the external framework’s API.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ No micro‑service or event‑driven terminology appears in the observations, so
 ### Siblings
 - [DataIngestionRetryPolicy](./DataIngestionRetryPolicy.md) -- The DataIngestionRetryPolicy would likely be implemented using a retry library or framework, such as the Retry library in Python, which provides a simple and flexible way to implement retry logic.
 - [IngestionAgentFactory](./IngestionAgentFactory.md) -- The IngestionAgentFactory would likely be implemented as a factory class or module, which would create and configure ingestion agents based on the specific requirements of the application.
-
 
 ---
 

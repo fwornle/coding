@@ -46,12 +46,10 @@ Because the guideline is part of the **BestPractices** hierarchy, teams should a
 4. **Scalability considerations** – Because the guideline is a plain markdown file, it scales trivially with repository size; the main scalability factor is the CI/bot infrastructure that must parse and enforce it across many integrations.  
 5. **Maintainability assessment** – High maintainability: the guideline is version‑controlled, colocated with the code it governs, and inherits from a single source of truth (**BestPractices**).  Updates are straightforward, and the lack of embedded logic reduces technical debt.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
-
 
 ---
 

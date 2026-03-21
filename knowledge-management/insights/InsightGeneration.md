@@ -70,12 +70,10 @@ Finally, any changes to the graph‑based pattern detection logic should be acco
 4. **Scalability considerations** – Heavy NLP/ML and graph computations suggest the need for input batching, possible horizontal scaling of the agent, and caching of intermediate results.  
 5. **Maintainability assessment** – Clear separation of pipeline stages aids maintainability; however, the lack of explicit code symbols means developers must rely on documentation and tests to understand internal helpers. Adding well‑named interfaces for each stage will improve long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Insights](./Insights.md) -- The InsightGenerationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
-
 
 ---
 

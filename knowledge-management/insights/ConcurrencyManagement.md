@@ -101,14 +101,7 @@ By grounding every claim in the provided observations, this document offers a cl
 
 ### Relationship
 
-![ConcurrencyManagement Relationship](images/concurrency-management-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/concurrency-management-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -121,7 +114,6 @@ By grounding every claim in the provided observations, this document offers a cl
 - [LLMIntegration](./LLMIntegration.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before data analysis execution.
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
-
 
 ---
 

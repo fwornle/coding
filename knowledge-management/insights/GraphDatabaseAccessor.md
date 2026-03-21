@@ -93,7 +93,6 @@ The ConstraintSystem acts as the *parent container* orchestrating a suite of sib
 
 The modular layout, clear separation via the adapter/facade, and dependency‑injection approach all contribute to high maintainability.  Adding a new graph back‑end or extending validation rules requires changes only in the adapter or the accessor, leaving sibling modules untouched.  However, the lack of explicit symbols in the current snapshot suggests that documentation and code comments around the accessor’s public API are essential to prevent misuse and to keep the contract understandable for future contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The modular layout, clear separation via the adapter/facade, and dependency‑in
 - [HookConfigurationLoader](./HookConfigurationLoader.md) -- HookManager loads and merges hook configurations from multiple sources, providing a unified hook registration and execution mechanism.
 - [ViolationCaptureHandler](./ViolationCaptureHandler.md) -- ViolationCaptureHandler captures and persists constraint violations, ensuring that the system remains accurate and up-to-date.
 - [HookManager](./HookManager.md) -- HookManager manages unified hook registration and execution, providing a critical function in the ConstraintSystem.
-
 
 ---
 

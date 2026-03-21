@@ -58,7 +58,6 @@ Since `LogWriter` writes in batches, developers should be aware that the most re
 * Because all three components live in the same file, refactoring into separate modules would improve readability and allow independent versioning, but the current layout keeps the contract tight and reduces the risk of mismatched entry definitions.  
 * Extending logging levels or adding new output sinks can be done by extending the formatter/filter strategy or by introducing additional consumer(s) without touching the core `QueueBasedLogger` logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -67,7 +66,6 @@ Since `LogWriter` writes in batches, developers should be aware that the most re
 ### Siblings
 - [LogQueue](./LogQueue.md) -- LogQueue (logging.ts) utilizes a First-In-First-Out (FIFO) approach to ensure log entries are processed in the order they are received.
 - [LogWriter](./LogWriter.md) -- LogWriter (logging.ts) uses a buffered writing approach to minimize disk I/O operations and improve performance.
-
 
 ---
 

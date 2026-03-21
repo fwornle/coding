@@ -94,7 +94,6 @@ Sibling components—**LSLConverterUtility**—are unrelated to logging but shar
 - However, the lack of explicit code symbols in the current snapshot suggests documentation gaps; adding interface definitions and concrete class documentation would further improve maintainability.  
 - Providing unit tests for configuration parsing, buffering logic, and error‑handling paths will safeguard against regressions as the logging requirements evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ Sibling components—**LSLConverterUtility**—are unrelated to logging but shar
 ### Siblings
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager leverages the OntologyClassificationAgent to categorize interactions within the Claude Code environment, as seen in the LiveLoggingSystem component description.
 - [LSLConverterUtility](./LSLConverterUtility.md) -- The LSLConverterUtility provides methods for converting sessions between different formats, such as markdown and JSON-Lines.
-
 
 ---
 

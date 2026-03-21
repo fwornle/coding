@@ -124,7 +124,6 @@ The overall system is organized as a **modular monolith** where each functional 
 
 The clear modular split (loading, validation, caching, API, logging) makes the codebase highly maintainable. Each concern can be updated or replaced independently, and the presence of a dedicated validation module reduces the risk of configuration‑driven bugs. The reliance on a single JSON file simplifies version control and change tracking. However, maintainers must keep the validation logic, the JSON schema, and any documentation in sync; otherwise, drift can introduce subtle runtime errors. The shared logger and caching patterns across siblings promote consistency, but any change to those cross‑cutting utilities must be evaluated for impact on all dependent components. Overall, the design supports straightforward evolution, provided that the documented conventions (use the API, respect the cache, log through LLMLogger) are adhered to.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -137,7 +136,6 @@ The clear modular split (loading, validation, caching, API, logging) makes the c
 - [LLMLogger](./LLMLogger.md) -- The LLMLogger class uses a logging library (logger-lib.js) to log LLM-related events and errors.
 - [LLMProviderRegistry](./LLMProviderRegistry.md) -- The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.
 - [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
-
 
 ---
 

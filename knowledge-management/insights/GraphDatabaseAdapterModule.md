@@ -106,7 +106,6 @@ All interactions are performed through clearly defined method signatures (`persi
 
 Overall, the **GraphDatabaseAdapterModule** provides a focused, well‑encapsulated persistence layer that aligns with the constraint‑validation domain, while offering clear integration points for the surrounding modules.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Overall, the **GraphDatabaseAdapterModule** provides a focused, well‑encapsula
 - [HookManagementModule](./HookManagementModule.md) -- The UnifiedHookManager class in the HookManagementModule loads and merges hook configurations from multiple sources, including user and project levels, as seen in the HookConfigLoader class.
 - [ViolationTrackingModule](./ViolationTrackingModule.md) -- The ViolationTrackingModule uses the GraphDatabaseAdapter class to store and retrieve constraint violations, allowing for efficient storage and retrieval of complex relationships between code entities.
 - [UnifiedHookManagerModule](./UnifiedHookManagerModule.md) -- The UnifiedHookManager class in the UnifiedHookManagerModule loads and merges hook configurations from multiple sources, including user and project levels, as seen in the HookConfigLoader class.
-
 
 ---
 

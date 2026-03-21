@@ -75,7 +75,6 @@ The system is organized as a hierarchy: **SemanticAnalysis** (parent) coordinate
 
 The clear division between ontology handling and persistence logic makes the component easy to maintain. Adding new entity types requires only ontology updates; PersistenceAgent’s generic `persistEntity`/`retrieveEntity` methods remain unchanged. The reliance on a single external library (Memgraph client) keeps the dependency surface small, further aiding long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ The clear division between ontology handling and persistence logic makes the com
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor in code-graph-constructor.ts constructs the code knowledge graph using AST parsing and Memgraph.
 - [InsightGenerationAgent](./InsightGenerationAgent.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
 - [GitHistoryAgent](./GitHistoryAgent.md) -- The GitHistoryAgent in git-history-agent.ts analyzes git history to extract relevant information for semantic analysis.
-
 
 ---
 

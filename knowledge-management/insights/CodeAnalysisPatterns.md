@@ -8,7 +8,7 @@ Entity validation is performed by the EntityValidator class in integrations/mcp-
 
 **CodeAnalysisPatterns** is the sub‑component that implements graph‑based code analysis inside the **CodingPatterns** suite. The core implementation lives in the *integrations/code‑graph‑rag* folder, where the **Graph‑Code RAG** system is described in `integrations/code-graph-rag/README.md` and configured via `integrations/code-graph-rag/docs/claude-code-setup.md`. Validation of the entities that are extracted from a codebase is performed by the `EntityValidator` class located in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. The same file also defines a batch‑processing pipeline that feeds code artefacts into the Graph‑Code RAG engine, allowing large codebases to be analysed efficiently. Hooks for extending or customizing quality checks are documented in `integrations/copi/docs/hooks.md`, and contribution conventions are outlined in `integrations/code-graph-rag/CONTRIBUTING.md`. Collectively, these pieces make **CodeAnalysisPatterns** a reusable, graph‑centric analysis engine that can be invoked by the parent **CodingPatterns** component as well as by sibling libraries such as **DesignPatternLibrary**, **BestPracticeRepository**, and **AntiPatternIdentification**.
 
-![CodeAnalysisPatterns — Architecture](../../.data/knowledge-graph/insights/images/code-analysis-patterns-architecture.png)
+![CodeAnalysisPatterns — Architecture](images/code-analysis-patterns-architecture.png)
 
 ---
 
@@ -22,7 +22,7 @@ Hooks, as described in `integrations/copi/docs/hooks.md`, are integrated via a s
 
 The component sits within the **CodingPatterns** hierarchy, sharing the graph‑centric philosophy with its sibling **GraphCodeRAG** component, while delegating concrete graph handling to its child **GraphCodeRAGIntegration**. The relationship between these entities is illustrated in the diagram below.
 
-![CodeAnalysisPatterns — Relationship](../../.data/knowledge-graph/insights/images/code-analysis-patterns-relationship.png)
+![CodeAnalysisPatterns — Relationship](images/code-analysis-patterns-relationship.png)
 
 ---
 
@@ -98,7 +98,6 @@ The system is layered: **CodeAnalysisPatterns** sits beneath the parent **Coding
 
 The clear separation of concerns (validation, batching, graph indexing) and the explicit contribution guidelines (`CONTRIBUTING.md`) promote maintainability. Hook registration centralizes extensibility, reducing the risk of divergent custom code. However, the reliance on external LLM services means that version upgrades or API changes must be tracked carefully. Regular unit tests for the validator and batch pipeline, as mandated by the contribution process, are essential to keep the system robust as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -112,7 +111,6 @@ The clear separation of concerns (validation, batching, graph indexing) and the 
 - [BestPracticeRepository](./BestPracticeRepository.md) -- BestPracticeRepository is acknowledged as a sub-component but lacks concrete references in the source files.
 - [AntiPatternIdentification](./AntiPatternIdentification.md) -- AntiPatternIdentification is recognized as a sub-component but lacks direct references in the provided source files.
 - [GraphCodeRAG](./GraphCodeRAG.md) -- GraphCodeRAG is described in integrations/code-graph-rag/README.md as a Graph-Code RAG system for any codebases.
-
 
 ---
 

@@ -74,7 +74,6 @@ From a dependency perspective, the loader only requires the CSV file path (likel
 * Reliance on a single CSV file simplifies change management but places the onus on accurate CSV maintenance; tooling (schema validators, CI checks) is advisable.  
 * Absence of explicit interfaces in the observations suggests that adding formal contracts (e.g., an `IOntologyHierarchyProvider` interface) could further improve testability and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ From a dependency perspective, the loader only requires the CSV file path (likel
 ### Siblings
 - [EntityTypeResolver](./EntityTypeResolver.md) -- The EntityTypeResolverService, mentioned in the suggested detail nodes, is likely a key part of the EntityTypeResolver's functionality, providing a service-based interface for resolving entity types
 - [OntologyHierarchyManager](./OntologyHierarchyManager.md) -- The OntologyHierarchyManager's functionality is likely closely tied to the UpperOntologyLoader, as the loader creates the hierarchical structure that the manager is responsible for maintaining
-
 
 ---
 

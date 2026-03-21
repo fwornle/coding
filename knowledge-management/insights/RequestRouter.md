@@ -86,12 +86,10 @@ No additional dependencies beyond the Node.js `events` module and the internal `
 * **Potential risk** – reliance on string‑based event names can lead to typos; using constants or TypeScript enums (if the codebase permits) would mitigate this.  
 * Documentation of the expected event payload schema is essential to prevent runtime errors, given the lack of compile‑time checks.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMController](./LLMController.md) -- The LLMController class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner, as seen in the LLMService class (lib/llm/llm-service.ts)
-
 
 ---
 

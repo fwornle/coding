@@ -58,7 +58,6 @@ No external libraries or runtime dependencies are required; the integration is p
 - High maintainability: a single source of truth (`project-structure-example.java`) and clear, documented conventions reduce cognitive load.  
 - Risk: manual enforcement; without tooling (e.g., lint rules) drift can occur, so integrating static analysis to verify the layout would further improve long‑term health.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -67,7 +66,6 @@ No external libraries or runtime dependencies are required; the integration is p
 ### Siblings
 - [PackageOrganization](./PackageOrganization.md) -- The ProjectStructure sub-component suggests a hierarchical package organization, with packages named according to their functional responsibilities, as implied by the parent context of CodingPatterns.
 - [FileNamingConventions](./FileNamingConventions.md) -- The ProjectStructure sub-component suggests a file naming convention that follows a consistent pattern, such as using camelCase or underscore notation, as implied by the parent context of CodingPatterns.
-
 
 ---
 

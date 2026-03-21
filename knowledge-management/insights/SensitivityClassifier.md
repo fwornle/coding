@@ -112,7 +112,6 @@ Although the source code is not directly visible, the observations let us infer 
 
 The clear separation between classification, mode resolution, caching, and provider management makes the codebase **highly maintainable**.  Adding a new classification rule or swapping the ML model only touches the classifier module.  However, the reliance on implicit contracts (e.g., expected sensitivity levels) means that documentation and unit tests are essential to avoid regression when thresholds or strategies change.  The façade in `lib/llm/llm-service.ts` centralises changes, simplifying future refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ The clear separation between classification, mode resolution, caching, and provi
 - [ModeResolver](./ModeResolver.md) -- ModeResolver likely uses a decision-making process, possibly implemented in a function like determineMode(), to select the appropriate LLM mode.
 - [CachingMechanism](./CachingMechanism.md) -- CachingMechanism likely uses a cache storage system, possibly implemented in a class like CacheStore, to store cached responses.
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker likely uses a budgeting system, possibly implemented in a class like BudgetManager, to track and manage costs.
-
 
 ---
 

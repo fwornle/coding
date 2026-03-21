@@ -92,7 +92,6 @@ The generator also exposes methods for the visualization framework (e.g., `getIn
 - Adding new insight types or swapping out the LLM provider only requires changes within `semantic-insight-generator.ts` and possibly the retry policy, leaving other agents untouched.  
 - The reliance on a shared ontology means that ontology evolution must be coordinated, but the dedicated `OntologyClassificationAgent` isolates that impact.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The generator also exposes methods for the visualization framework (e.g., `getIn
 - [Insights](./Insights.md) -- The InsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts, responsible for generating insights from processed data
 - [RetryManager](./RetryManager.md) -- The RetryManager is implemented in the file integrations/mcp-server-semantic-analysis/src/utils/retry-manager.ts, responsible for handling retry mechanisms
 - [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, responsible for generating code graphs
-
 
 ---
 

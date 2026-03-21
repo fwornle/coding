@@ -84,7 +84,6 @@ External integrations are minimal because the focus is on source‑code organiza
 * High maintainability due to clear, predictable conventions; developers can locate code quickly based on domain knowledge.  
 * The primary risk is drift between the documented example and actual code; regular audits or automated checks are recommended to preserve consistency.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ External integrations are minimal because the focus is on source‑code organiza
 ### Siblings
 - [DirectoryLayout](./DirectoryLayout.md) -- The ProjectStructure sub-component implies a directory layout that mirrors the package organization, with directories named according to their functional responsibilities, as suggested by the parent context of CodingPatterns.
 - [FileNamingConventions](./FileNamingConventions.md) -- The ProjectStructure sub-component suggests a file naming convention that follows a consistent pattern, such as using camelCase or underscore notation, as implied by the parent context of CodingPatterns.
-
 
 ---
 

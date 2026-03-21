@@ -67,7 +67,6 @@ Because SessionWindowing is a pure function, it can be parallelized across multi
 ### Maintainability assessment  
 The modular, function‑oriented design yields high maintainability: changes to session logic are confined to `session_windowing.py` and do not ripple to other modules. The clear naming (`window_session`) and limited public surface area simplify code reviews and onboarding. The primary risk to maintainability is the absence of explicit type contracts or documentation within the observations; adding docstrings and unit tests would further strengthen long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ The modular, function‑oriented design yields high maintainability: changes to 
 ### Siblings
 - [FileRouting](./FileRouting.md) -- FileRouting uses the 'route_file' function in 'file_routing.py' to handle file routing tasks
 - [ClassificationLayers](./ClassificationLayers.md) -- ClassificationLayers uses the 'Classifier' class in 'classification_layers.py' to handle log classification tasks
-
 
 ---
 

@@ -78,7 +78,6 @@ No direct method calls from the monitoring code into the execution engine are de
 
 5. **Maintainability assessment** – the clear separation between instrumentation points and the visualisation layer aids maintainability; however, the lack of concrete code symbols in the repository suggests that documentation and naming conventions are critical to keep the monitoring code understandable as the pipeline evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ No direct method calls from the monitoring code into the execution engine are de
 ### Siblings
 - [DagExecutionModel](./DagExecutionModel.md) -- The batch-analysis.yaml file defines the steps and their dependencies, which are used to construct the DAG
 - [EntityProcessingStage](./EntityProcessingStage.md) -- The EntityProcessor is responsible for processing individual entities within the pipeline, and is a key component of the EntityProcessingStage
-
 
 ---
 

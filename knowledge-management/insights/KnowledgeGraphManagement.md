@@ -102,7 +102,6 @@ The parent component **KnowledgeManagement** ties these pieces together, leverag
 * Shared agents across siblings reduce code duplication but increase coupling; any change to the PersistenceAgent’s contract must be vetted against ManualLearning, OnlineLearning, and other consumers.  
 * Documentation of the graph schema and the JSON export sync mechanism is essential to prevent accidental data corruption during manual interventions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ The parent component **KnowledgeManagement** ties these pieces together, leverag
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct and query the code knowledge graph.
 - [EntityClassificationService](./EntityClassificationService.md) -- EntityClassificationService uses ontology-based reasoning to classify entities, as seen in the EntityClassificationService's use of ontology libraries (src/services/entity-classification-service.ts).
 - [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and update entities in the knowledge graph.
-
 
 ---
 

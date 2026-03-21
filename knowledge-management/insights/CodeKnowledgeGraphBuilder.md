@@ -70,7 +70,6 @@ The system is organized around a **KnowledgeManagement** hub that owns several s
 ### 5. Maintainability assessment  
 The clear separation between graph construction (`CodeKnowledgeGraphBuilder`) and storage (`GraphDatabaseAdapter`) makes the codebase easy to evolve: changes to the underlying graph engine or to the persistence format can be confined to the adapter without touching the builder logic.  Shared usage of the adapter across many siblings encourages reuse but also demands rigorous versioning of the adapter’s public API.  Overall, the design promotes maintainability, provided that the adapter remains stable and that comprehensive integration tests verify the interactions among builder, ontology, and persistence layers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ The clear separation between graph construction (`CodeKnowledgeGraphBuilder`) an
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [DataImporter](./DataImporter.md) -- DataImporter uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [QueryEngine](./QueryEngine.md) -- QueryEngine uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-
 
 ---
 

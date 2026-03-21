@@ -8,7 +8,7 @@ UkbTraceReportGenerator probably relies on the WaveAgentController for informati
 
 UkbTraceReportGenerator is a **sub‑component** of the **KnowledgeManagement** layer. Although the exact source file is not listed among the observed symbols, its placement inside the KnowledgeManagement hierarchy makes it a logical partner to the other knowledge‑centric services such as **GraphDatabaseManager**, **LlmServiceManager**, **VkbApiClientManager**, and **WaveAgentController**. Its primary responsibility is to synthesize trace reports that capture the flow of information through the system – pulling graph data, enriching it with large‑language‑model (LLM) insights, and optionally augmenting the report with VKB (Virtual Knowledge Base) API data. The component therefore acts as a “reporting façade” that coordinates several lower‑level managers to produce a coherent, consumable artifact for downstream analysis or debugging.
 
-![UkbTraceReportGenerator — Architecture](../../.data/knowledge-graph/insights/images/ukb-trace-report-generator-architecture.png)
+![UkbTraceReportGenerator — Architecture](images/ukb-trace-report-generator-architecture.png)
 
 ## Architecture and Design  
 
@@ -46,7 +46,7 @@ UkbTraceReportGenerator sits at the nexus of several core services:
 
 The relationship diagram below visualises these connections:
 
-![UkbTraceReportGenerator — Relationship](../../.data/knowledge-graph/insights/images/ukb-trace-report-generator-relationship.png)
+![UkbTraceReportGenerator — Relationship](images/ukb-trace-report-generator-relationship.png)
 
 ## Usage Guidelines  
 
@@ -79,7 +79,6 @@ UkbTraceReportGenerator is positioned centrally within KnowledgeManagement, acti
 ### Maintainability Assessment  
 The clear separation between UkbTraceReportGenerator and its managers yields high maintainability: changes to graph schema, LLM provider, or VKB API can be isolated within their respective managers. The lack of embedded business logic in the generator simplifies unit testing and reduces the risk of regression. However, the absence of explicit type contracts in the observations suggests that rigorous interface definitions (e.g., TypeScript interfaces) would further improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ The clear separation between UkbTraceReportGenerator and its managers yields hig
 - [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
 - [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
 - [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
-
 
 ---
 

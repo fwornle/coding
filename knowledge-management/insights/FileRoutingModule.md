@@ -14,7 +14,6 @@ The `FileRouter` uses a file routing specification, defined in `file_routing_spe
 
 - The `FileRouter` class utilizes a queue-based system, defined in `file_queue.py`, to handle concurrent file routing, ensuring efficient use of system resources.
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ The `FileRouter` uses a file routing specification, defined in `file_routing_spe
 ### Used By
 
 - LiveLoggingSystem (contains)
-
-
 
 ## Hierarchy Context
 
@@ -47,7 +44,6 @@ The `FileRouter` uses a file routing specification, defined in `file_routing_spe
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- The `ConfigurationValidator` uses a configuration specification, defined in `configuration_specification.py`, to validate the system configuration, including logging and error tracking settings.
 - [OntologyClassificationModule](./OntologyClassificationModule.md) -- The `EntityClassifier` uses a classification algorithm, defined in `classification_algorithm.py`, to classify entities, including machine learning-based and rule-based approaches.
 - [SessionManagementModule](./SessionManagementModule.md) -- The `SessionManager` uses a session specification, defined in `session_specification.py`, to validate the session configuration, including session settings and logging options.
-
 
 ---
 

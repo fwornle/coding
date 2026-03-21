@@ -96,12 +96,10 @@ The `CONTRIBUTING.md` file signals that developers are expected to add new adapt
 
 Overall, the **CodeGraphRAGSystem** appears to be a well‑encapsulated, network‑exposed service designed for extensibility and real‑time interaction, anchored within the broader **GraphCodeRAG** integration.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphCodeRAG](./GraphCodeRAG.md) -- GraphCodeRAG is described in integrations/code-graph-rag/README.md as a Graph-Code RAG system for any codebases.
-
 
 ---
 

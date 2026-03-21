@@ -105,10 +105,9 @@ The only explicit file path is **`lib/agent-api/transcript-api.js`**, where the 
 ---
 
 > **Diagram – Factory Interaction Flow**  
-> ![Factory Interaction Flow](https://example.com/diagrams/transcript-adapter-factory.png)  
+>   
 
 *The diagram illustrates how **LiveLoggingSystem** and **TranscriptProcessing** request adapters from **TranscriptAdapterFactory**, which delegates to **AgentTranscriptAdapterFactory** to resolve the concrete implementation.*
-
 
 ## Hierarchy Context
 
@@ -117,7 +116,6 @@ The only explicit file path is **`lib/agent-api/transcript-api.js`**, where the 
 
 ### Children
 - [AgentTranscriptAdapterFactory](./AgentTranscriptAdapterFactory.md) -- The parent component analysis suggests the existence of an AgentTranscriptAdapterFactory, which may be implemented in the lib/agent-api/transcript-api.js file.
-
 
 ---
 

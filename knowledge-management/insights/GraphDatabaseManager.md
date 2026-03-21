@@ -92,7 +92,6 @@ The system is organized around a **core graph service** (`GraphDatabaseManager`)
 
 The clear separation of concerns (facade, adapter, storage module) enhances maintainability; each layer can evolve independently as long as the contracts remain stable.  The use of well‑known patterns (Adapter, Facade, Strategy) makes the codebase approachable for new developers familiar with these concepts.  The primary maintenance risk lies in the **dual‑backend adapter**, which must stay in sync with both Graphology and LevelDB APIs; comprehensive unit and integration test suites are essential to keep this component reliable.  Dockerization simplifies deployment but adds operational overhead (container versioning, environment management).  Overall, the architecture balances flexibility with reasonable complexity, supporting future extensions (new storage backends) without extensive refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ The clear separation of concerns (facade, adapter, storage module) enhances main
 ### Siblings
 - [GraphStorageModule](./GraphStorageModule.md) -- The integrations directory suggests a modular approach to data storage and management, with each graph having its own dedicated storage module.
 - [DataAccessLayer](./DataAccessLayer.md) -- The GraphDatabaseManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph database operations, indicating a need for a data access layer.
-
 
 ---
 

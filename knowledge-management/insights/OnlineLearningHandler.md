@@ -51,7 +51,6 @@ Because the handler is composed within **OnlineLearning**, its lifecycle is typi
 4. **Scalability considerations** – The handler is lightweight and can be instantiated per request, allowing horizontal scaling of the surrounding service. Core logic can be independently scaled if it becomes a bottleneck.  
 5. **Maintainability assessment** – High maintainability due to single‑responsibility design; clear boundaries simplify unit testing and future refactoring. The lack of concrete code paths limits deeper assessment, but the documented hierarchy supports modular evolution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -59,7 +58,6 @@ Because the handler is composed within **OnlineLearning**, its lifecycle is typi
 
 ### Siblings
 - [OnlineLearningCore](./OnlineLearningCore.md) -- OnlineLearningCore handles the core logic for OnlineLearning
-
 
 ---
 

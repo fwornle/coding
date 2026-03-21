@@ -116,7 +116,6 @@ All dependencies are explicit in the source files, avoiding hidden coupling. The
 * Concurrency code in `WorkflowProcessor` will require careful testing when adjusting thread‑pool parameters, but the encapsulation limits its impact on the rest of the codebase.  
 * Documentation should be kept up‑to‑date for the REST contract (`WorkflowTraceApi`) and the ontology schema to avoid mismatches during concept classification.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -135,7 +134,6 @@ All dependencies are explicit in the source files, avoiding hidden coupling. The
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses a custom EntityPersister class to persist entities in the knowledge graph, as seen in the EntityPersistenceManager.java file.
 - [BatchScheduler](./BatchScheduler.md) -- BatchScheduler uses a custom BatchSchedulerController class to schedule batch analysis pipeline runs, as seen in the BatchScheduler.java file.
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses a custom OntologyLoader class to load the ontology, as seen in the OntologyManager.java file.
-
 
 ---
 

@@ -93,12 +93,10 @@ Because no additional functions or classes are listed, the implementation is int
 
 By adhering to the observations and avoiding unfounded speculation, this insight document captures the essential architectural and design characteristics of **GraphStore** and its surrounding ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
-
 
 ---
 

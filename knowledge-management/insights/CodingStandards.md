@@ -91,7 +91,6 @@ Because the utilities are stateless, they can be safely executed in parallel; la
 * The reliance on example files for demonstration means documentation must stay in sync; automated tests that invoke each utility on the example sources will protect against drift.  
 * Future extensions should continue the pattern of thin, stateless utilities to preserve the current low‑coupling, high‑cohesion architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ Because the utilities are stateless, they can be safely executed in parallel; la
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties
 - [ConcurrencyAndParallelism](./ConcurrencyAndParallelism.md) -- WorkStealingExecutor.java implements a work-stealing algorithm for concurrent task execution, as seen in the work-stealing-example.java file
 - [ProjectStructure](./ProjectStructure.md) -- ProjectStructure.java provides a set of guidelines for project structure, such as package organization and directory layout, as seen in the project-structure-example.java file
-
 
 ---
 

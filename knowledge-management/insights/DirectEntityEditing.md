@@ -95,7 +95,6 @@ The only explicit dependency is the import of `EntityAuthoringTool` from **`enti
 * **High maintainability** for small‑to‑medium codebases: the facade centralizes entity mutation logic, making it easy to locate bugs.  
 * **Potential risk** as feature set expands: a single file may become unwieldy, and the lack of explicit interfaces could make future refactoring harder. Introducing modular sub‑components (e.g., separate validation and persistence modules) would improve long‑term maintainability without breaking existing contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The only explicit dependency is the import of `EntityAuthoringTool` from **`enti
 ### Siblings
 - [EntityAuthoring](./EntityAuthoring.md) -- The EntityAuthoringTool class is used in the ManualLearning sub-component to create and edit entities manually, as indicated by the hierarchy context.
 - [HandCraftedObservationManagement](./HandCraftedObservationManagement.md) -- The ManualLearning sub-component's focus on manual learning implies that hand-crafted observations are an important aspect of the learning process, as indicated by the hierarchy context.
-
 
 ---
 

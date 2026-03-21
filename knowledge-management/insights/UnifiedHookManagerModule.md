@@ -117,7 +117,6 @@ Overall, the UnifiedHookManagerModule sits at the nexus of configuration, valida
 
 The module’s clear separation of loading, validation, persistence, and execution makes it **highly maintainable**.  Adding a new source of hook configuration (e.g., a remote service) would involve extending `HookConfigLoader` without touching the execution path.  Because all persistence goes through the `GraphDatabaseAdapter`, swapping the underlying graph engine or adjusting the schema is isolated to a single module.  The main maintenance risk lies in the **complexity of the graph schema**; changes to relationship types must be coordinated across `ViolationTrackingModule` and `ContentValidationModule`.  Overall, the design promotes testability (each component can be mocked) and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -128,7 +127,6 @@ The module’s clear separation of loading, validation, persistence, and executi
 - [HookManagementModule](./HookManagementModule.md) -- The UnifiedHookManager class in the HookManagementModule loads and merges hook configurations from multiple sources, including user and project levels, as seen in the HookConfigLoader class.
 - [ViolationTrackingModule](./ViolationTrackingModule.md) -- The ViolationTrackingModule uses the GraphDatabaseAdapter class to store and retrieve constraint violations, allowing for efficient storage and retrieval of complex relationships between code entities.
 - [GraphDatabaseAdapterModule](./GraphDatabaseAdapterModule.md) -- The GraphDatabaseAdapter class in the GraphDatabaseAdapterModule provides a graph database adapter for persistence and query operations, as seen in the storage/graph-database-adapter.ts file.
-
 
 ---
 

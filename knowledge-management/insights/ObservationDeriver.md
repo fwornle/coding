@@ -102,7 +102,6 @@ ObservationDeriver is a leaf node under **KnowledgeManagement**, sharing the sto
 
 The component is well‑partitioned: retrieval, rule evaluation, and persistence are isolated in distinct files, which eases independent testing and future refactoring. The reliance on a single adapter for storage promotes code reuse across siblings, but it also means that changes to storage semantics ripple through many components; versioning the adapter interface could help manage this risk. Rule files are straightforward to extend, yet without a central registry or naming convention they could become disorganised as the rule set expands. Overall, the design favours clarity and extensibility, provided that developers adhere to the usage guidelines and keep the rule base disciplined.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ The component is well‑partitioned: retrieval, rule evaluation, and persistence
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the constructCodeGraph method in code-graph-constructor.ts to construct the code graph
 - [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the generateTraceReport method in trace-report-generator.ts to generate trace reports
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology library to interact with the graph database
-
 
 ---
 

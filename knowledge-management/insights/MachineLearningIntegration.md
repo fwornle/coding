@@ -148,7 +148,6 @@ Adhering to these guidelines preserves the modularity and extensibility intended
 
 *This insight document is grounded entirely in the observed source files and the surrounding architectural context, without speculative additions.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -161,7 +160,6 @@ Adhering to these guidelines preserves the modularity and extensibility intended
 - [NaturalLanguageProcessing](./NaturalLanguageProcessing.md) -- The NaturalLanguageProcessor class in natural-language-processor.py uses the Pipeline pattern to process natural language text.
 - [OntologyManagement](./OntologyManagement.md) -- The OntologyLoader class in ontology-loader.py uses the Singleton pattern to ensure only one instance is created.
 - [EntityManagement](./EntityManagement.md) -- The EntityAuthoringService class in entity-authoring-service.py employs the Factory pattern to handle manual entity creation and editing.
-
 
 ---
 

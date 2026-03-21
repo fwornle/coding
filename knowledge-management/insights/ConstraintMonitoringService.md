@@ -113,14 +113,7 @@ The heavy reliance on declarative markdown files and environment variables makes
 
 ### Relationship
 
-![ConstraintMonitoringService Relationship](images/constraint-monitoring-service-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/constraint-monitoring-service-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -133,7 +126,6 @@ The heavy reliance on declarative markdown files and environment variables makes
 ### Siblings
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
 - [CodeGraphRAGService](./CodeGraphRAGService.md) -- The CodeGraphRAGService uses the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables to configure the ports for the Code Graph RAG service.
-
 
 ---
 

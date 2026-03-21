@@ -83,7 +83,6 @@ Because **EntitySerializer** works “closely with the GraphDatabaseManager,” 
 * **Low coupling** – The repository interacts with the serializer through a simple contract (`serialize`), making unit testing straightforward.  
 * **Potential risk** – Shared configuration between serializer and deserializer must be kept consistent; a mismatch could lead to subtle data loss bugs. Regular integration tests that perform a full write‑read cycle can mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ Because **EntitySerializer** works “closely with the GraphDatabaseManager,” 
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager would likely utilize a library such as Neo4j Driver to connect to the graph database, as seen in similar implementations.
 - [EntityDeserializer](./EntityDeserializer.md) -- The EntityDeserializer would need to handle various data types and structures, potentially using a library such as Jackson or Gson for deserialization.
-
 
 ---
 

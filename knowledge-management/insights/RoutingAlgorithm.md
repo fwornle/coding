@@ -81,7 +81,6 @@ The system is organized as a thin router (**TierBasedRouter**) that delegates al
 ### 5. Maintainability assessment  
 The clear division between configuration (routing‑table.json), provider metadata (registry), and selection logic (algorithm) promotes maintainability.  Developers can adjust routing policies without touching code, and the algorithm’s encapsulated load‑balancing can be refactored or replaced independently.  The main maintenance risk lies in ensuring that the JSON schema and registry contracts remain synchronized; any drift could cause rule mismatches or selection errors.  Regular validation of the configuration file and health‑check integration are essential to keep the system reliable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The clear division between configuration (routing‑table.json), provider metada
 ### Siblings
 - [RoutingTableManager](./RoutingTableManager.md) -- The RoutingTableManager uses the routing-table.json file to define the routing rules, which is loaded during the initialization of the TierBasedRouter
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry uses a data structure to store provider information, which is populated during the registration process
-
 
 ---
 

@@ -14,14 +14,11 @@ AnthropicController's run_inference function in anthropic-runner.py asynchronous
 
 - AnthropicController's run_inference function in anthropic-runner.py asynchronously calls the Anthropic API for model inference, handling timeouts and retries
 
-
 ## Related Entities
 
 ### Used By
 
 - LLMAbstraction (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +29,6 @@ AnthropicController's run_inference function in anthropic-runner.py asynchronous
 - [DMRController](./DMRController.md) -- DMRController utilizes the Docker Python SDK in docker-controller.py to manage Docker containers for model inference
 - [LLMService](./LLMService.md) -- LLMService implements mode routing in mode-router.py, directing requests to appropriate providers based on the current mode
 - [MockService](./MockService.md) -- MockService implements mock implementations of LLM providers in mock-providers.py, simulating their behavior for testing
-
 
 ---
 

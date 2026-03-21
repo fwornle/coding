@@ -16,7 +16,7 @@ The **Pipeline** sub‑component lives inside the **SemanticAnalysis** package a
 
 Together these agents realise the Pipeline’s end‑to‑end processing chain, enabling the higher‑level **SemanticAnalysis** component to deliver actionable insights at scale.  
 
-![Pipeline — Relationship](../../.data/knowledge-graph/insights/images/pipeline-relationship.png)
+![Pipeline — Relationship](images/pipeline-relationship.png)
 
 ---
 
@@ -126,7 +126,6 @@ The Pipeline sits as a central orchestrator within **SemanticAnalysis**, bridgin
 
 The clear separation of responsibilities, coupled with explicit TypeScript interfaces, makes the Pipeline highly maintainable.  Adding new analysis steps or swapping out the graph backend requires only modifications to the corresponding agent, leaving the coordinator untouched.  The only maintenance hotspot is the shared `nextIndex` mechanism, which must remain atomic and correctly reset between pipeline runs.  Overall, the design balances extensibility with runtime efficiency, providing a solid foundation for future growth.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -141,7 +140,6 @@ The clear separation of responsibilities, coupled with explicit TypeScript inter
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

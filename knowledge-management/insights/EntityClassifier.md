@@ -104,7 +104,6 @@ The current design is **highly maintainable**:
 
 Potential maintenance risks stem from the static nature of `ontology-sources.ts`; as the taxonomy grows, developers must remember to keep this file in sync with domain experts. Introducing unit tests around `getOntologyClass` and the adapter’s export hook will further safeguard against regressions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ Potential maintenance risks stem from the static nature of `ontology-sources.ts`
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the constructCodeGraph method in code-graph-constructor.ts to construct the code graph
 - [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the generateTraceReport method in trace-report-generator.ts to generate trace reports
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology library to interact with the graph database
-
 
 ---
 

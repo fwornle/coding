@@ -10,7 +10,7 @@ WaveAgentExecutor is a **sub‑component** that lives inside the **DockerizedSer
 
 The component is deliberately lightweight: it does not embed business logic itself but acts as a façade that other sub‑systems (such as **LLMManager** and **ServiceOrchestrator**) call when they need to spin up or control a wave agent.  In this sense, WaveAgentExecutor is the execution engine that bridges the abstract agent definitions with the concrete Dockerized runtime environment.  
 
-![WaveAgentExecutor — Architecture](../../.data/knowledge-graph/insights/images/wave-agent-executor-architecture.png)
+![WaveAgentExecutor — Architecture](images/wave-agent-executor-architecture.png)
 
 ---
 
@@ -26,7 +26,7 @@ Execution is organized as a **command‑style workflow**: a caller creates an in
 
 The relationship diagram below illustrates these interaction points, showing WaveAgentExecutor at the hub of LLMManager, ServiceOrchestrator, and sibling services such as GraphDatabaseManager and APIService.  
 
-![WaveAgentExecutor — Relationship](../../.data/knowledge-graph/insights/images/wave-agent-executor-relationship.png)
+![WaveAgentExecutor — Relationship](images/wave-agent-executor-relationship.png)
 
 Because the executor does not embed persistence logic, it delegates state storage to **GraphDatabaseManager** (which uses Graphology/LevelDB) and reporting to **DashboardService**.  This separation of concerns keeps the executor focused on *execution* rather than *state management*.
 
@@ -98,7 +98,6 @@ Because the executor is stateless, multiple instances can be run in parallel ins
 ### Maintainability Assessment  
 The heavy reliance on dependency injection and clear separation of concerns makes WaveAgentExecutor **highly maintainable**.  Changes to the LLM integration or orchestration logic can be made in the respective sibling components without touching the executor’s core.  The explicit error‑handling path and standardized `ExecutionResult` contract further reduce the risk of regression when extending functionality.  The main maintenance risk lies in the lack of a dedicated test suite for the executor itself; however, the DI‑friendly design encourages straightforward mocking, mitigating that risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ The heavy reliance on dependency injection and clear separation of concerns make
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely uses Graphology and LevelDB to provide persistence and data storage capabilities.
 - [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
 - [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
-
 
 ---
 

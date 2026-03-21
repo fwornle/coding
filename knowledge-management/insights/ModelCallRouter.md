@@ -99,7 +99,6 @@ Overall, the architecture is **modular and compositional**: the parent **LLMAbst
 
 The clear division into TierBasedRouter, ErrorHandlingMechanism, and ProviderModelMapper makes the router highly maintainable. Each child can be unit‑tested in isolation, and the registry‑based approach centralizes provider configuration, reducing duplication. The only maintenance risk is the potential growth of the ProviderModelMapper map; keeping it declarative (e.g., JSON or environment‑driven) mitigates that risk. Overall, the design promotes low coupling, high cohesion, and straightforward extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ The clear division into TierBasedRouter, ErrorHandlingMechanism, and ProviderMod
 ### Siblings
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry uses a registry to manage the available providers, as seen in the lib/llm/llm-service.ts file.
 - [LLMModeManager](./LLMModeManager.md) -- The LLMModeManager uses a registry to manage the available modes, as seen in the lib/llm/llm-service.ts file.
-
 
 ---
 

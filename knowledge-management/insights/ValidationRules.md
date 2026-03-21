@@ -65,7 +65,6 @@ Additionally, the **`Ontology`** entity “contains” `ValidationRules`, sugges
 * High maintainability thanks to the single‑source‑of‑truth approach and pure functional rule implementations.  
 * Clear file boundaries (`validation‑rules.ts`, `validation‑engine.ts`, `staleness‑detection.ts`) make it straightforward for developers to locate and modify the relevant logic without unintended side effects.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ Additionally, the **`Ontology`** entity “contains” `ValidationRules`, sugges
 ### Siblings
 - [ValidationEngine](./ValidationEngine.md) -- The ValidationEngine would likely be implemented in a separate module, such as validation-engine.ts, to keep the validation logic organized and reusable.
 - [StalenessDetectionAlgorithm](./StalenessDetectionAlgorithm.md) -- The StalenessDetectionAlgorithm would likely be implemented in a separate utility file, such as staleness-detection.ts, to keep the detection logic separate from the validation engine.
-
 
 ---
 

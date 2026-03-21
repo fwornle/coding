@@ -85,7 +85,6 @@ The system is organised around a **core data layer (graph)** surrounded by **fea
 ### Maintainability assessment  
 The heavy reliance on **well‑known design patterns** (singleton, factory, observer, etc.) makes the codebase approachable for developers familiar with classic OO architecture.  Documentation files explicitly name the patterns they employ, providing a living design ledger that reduces knowledge loss.  However, the **implicit nature** of some patterns (e.g., “may utilize the factory pattern”) means that developers must verify the actual implementation against the documentation, which could introduce drift.  Providing concrete unit tests that assert the presence of these patterns (e.g., checking that only one graph instance exists) would further strengthen maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ The heavy reliance on **well‑known design patterns** (singleton, factory, obse
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
 - [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
-
 
 ---
 

@@ -75,12 +75,10 @@ Because the adapter is a *centralized* storage mechanism, all other CRUD operati
 
 Overall, `DesignPatternEntityStorage` leverages a well‑encapsulated graph‑database adapter to provide a focused, relationship‑aware storage mechanism for design‑pattern entities, aligning the system’s architecture with the inherent graph‑like nature of pattern interdependencies.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DesignPatterns](./DesignPatterns.md) -- DesignPatterns leverages the createEntity() method in storage/graph-database-adapter.ts to store and manage design pattern entities.
-
 
 ---
 

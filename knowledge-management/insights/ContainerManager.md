@@ -99,7 +99,6 @@ ContainerManager sits as a core service‑provisioning block within DockerizedSe
 ### Maintainability Assessment
 Because ContainerManager centralizes Docker interactions, state handling, and logging within a single, well‑documented module (`lib/container-manager.js`), the codebase is relatively easy to understand and extend. The use of a state machine provides a clear, testable contract for container transitions. Customizable hooks are documented, reducing the risk of hidden side effects. However, tight coupling to the Docker API means that major Docker version upgrades will require coordinated updates to this module, representing the primary maintenance burden.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ Because ContainerManager centralizes Docker interactions, state handling, and lo
 ### Siblings
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses the startServiceWithRetry function (lib/service-starter.js:104) to implement the retry-with-backoff pattern, preventing endless loops and providing a more robust solution when optional services fail.
 - [LLMFacade](./LLMFacade.md) -- LLMFacade uses a modular architecture to provide a flexible and extensible interface for LLM operations, allowing developers to easily add or remove LLMs as needed.
-
 
 ---
 

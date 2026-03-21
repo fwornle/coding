@@ -98,7 +98,6 @@ Because all these interactions are internal to the LiveLoggingSystem, the integr
 
 Overall, the **LSLConverterService** is a pivotal, well‑integrated piece of the LiveLoggingSystem, designed for high‑throughput conversion and semantic enrichment while leveraging shared agents and adapters to keep the codebase cohesive.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ Overall, the **LSLConverterService** is a pivotal, well‑integrated piece of th
 - [LoggingManager](./LoggingManager.md) -- LoggingManager implements log buffering to handle high-volume logging scenarios, preventing data loss and ensuring efficient data processing
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent utilizes the GraphDatabaseAdapter to persist classified observations in a graph database, enabling efficient querying and analysis of the data in storage/graph-database-adapter.ts
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the OntologyClassificationAgent's classification capabilities to persist classified observations in a graph database, as seen in storage/graph-database-adapter.ts
-
 
 ---
 

@@ -87,7 +87,6 @@ Interaction with other components is **horizontal** rather than hierarchical: th
 ### Maintainability Assessment
 The current monolithic `InformationRetrieval.java` provides clear cohesion but risks becoming a “god class” as more query features or output formats are added.  Refactoring into distinct sub‑modules (e.g., `QueryParser`, `CacheLayer`, `ResultFormatter`) would improve testability and future extensibility.  Because the design already respects separation of concerns (query execution vs. formatting) and reuses shared services (CacheManager, Logger), the overall maintainability is solid, provided that documentation of cache keys, index definitions, and supported query dialects is kept up‑to‑date.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The current monolithic `InformationRetrieval.java` provides clear cohesion but r
 - [Logger](./Logger.md) -- Logger uses a logging library, such as Log4j, to interact with the logging system, as defined in the logging-config.js file
 - [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph.java uses a graph database to store knowledge entities and their relationships, allowing for flexible querying and reasoning.
 - [ExpertSystem](./ExpertSystem.md) -- ExpertSystem.java uses a rule-based reasoning engine to infer conclusions and make decisions based on the knowledge stored in the graph, providing a flexible and extensible mechanism for expert reasoning.
-
 
 ---
 

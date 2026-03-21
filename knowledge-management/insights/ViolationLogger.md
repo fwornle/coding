@@ -12,7 +12,7 @@ Within the hierarchy, the ViolationLogger owns a **ConstraintViolationHandler** 
 
 The component sits alongside siblings **ConstraintManager**, **HookOrchestrator**, and **GraphPersistenceModule** inside the same parent **ConstraintSystem**.  All of these siblings share a common reliance on the **GraphDatabaseAdapter** (implemented in `storage/graph-database-adapter.ts`) for durable persistence, suggesting that the ViolationLogger may also lean on that adapter—directly or through an abstraction—to record violations in the graph database.
 
-![ViolationLogger — Architecture](../../.data/knowledge-graph/insights/images/violation-logger-architecture.png)
+![ViolationLogger — Architecture](images/violation-logger-architecture.png)
 
 ---
 
@@ -24,7 +24,7 @@ Interaction with other components follows a **pipeline** pattern.  The **Constra
 
 The component also appears to support **filtering and prioritization**.  Observations mention the ability to “filter or prioritize constraint violations based on severity or other factors.”  This suggests that the logger either stores severity as a first‑class attribute or provides query helpers that allow callers to retrieve only high‑impact violations.  Such a design enables downstream services to focus on the most critical issues without scanning the entire log.
 
-![ViolationLogger — Relationship](../../.data/knowledge-graph/insights/images/violation-logger-relationship.png)
+![ViolationLogger — Relationship](images/violation-logger-relationship.png)
 
 ---
 
@@ -106,7 +106,6 @@ The ViolationLogger is a leaf node in the **ConstraintSystem** hierarchy, direct
 
 The clear separation between **ViolationLogger**, **ConstraintViolationHandler**, and the repository interface makes the component highly modular.  Adding new storage back‑ends or extending the enrichment logic can be done in isolation, reducing regression risk.  However, the reliance on the shared `GraphDatabaseAdapter` means that changes to that adapter (e.g., schema migrations) must be coordinated across all siblings, introducing a coupling point that requires careful versioning and integration testing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -119,7 +118,6 @@ The clear separation between **ViolationLogger**, **ConstraintViolationHandler**
 - [ConstraintManager](./ConstraintManager.md) -- The ConstraintManager likely interacts with the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage constraints.
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator might be related to the Copi project in integrations/copi, which has documentation on hook functions and usage.
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- The GraphPersistenceModule might be related to the GraphDatabaseAdapter, as it utilizes Graphology and LevelDB for persistence.
-
 
 ---
 

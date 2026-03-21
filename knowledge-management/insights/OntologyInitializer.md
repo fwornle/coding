@@ -64,7 +64,6 @@ The observations do not enumerate any concrete classes, methods, or file paths f
 
 *All statements above are grounded in the supplied observations; no speculative file paths or undocumented patterns have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ The observations do not enumerate any concrete classes, methods, or file paths f
 
 ### Siblings
 - [OntologyModelLoader](./OntologyModelLoader.md) -- The integrations/code-graph-rag/README.md file mentions the use of Graph-Code, which could be related to the ontology model used in the OntologyClassificationAgent.
-
 
 ---
 

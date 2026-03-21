@@ -117,7 +117,6 @@ All interactions are synchronous or promise‑based (typical of TypeScript servi
 * Dependence on external agents means that version mismatches or API changes in **CodeGraphAgent** or **PersistenceAgent** could ripple through; maintaining a stable contract (TypeScript interfaces) is essential.  
 * Documentation should emphasise the required metadata fields for routing to prevent regressions when new entity types are added.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ All interactions are synchronous or promise‑based (typical of TypeScript servi
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing the graph database connection.
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
 - [IntelligentRoutingManager](./IntelligentRoutingManager.md) -- IntelligentRoutingManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing intelligent routing.
-
 
 ---
 

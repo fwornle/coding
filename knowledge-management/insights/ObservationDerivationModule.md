@@ -76,7 +76,6 @@ The module does not appear to expose its own public API beyond the internal call
 * The clear boundary between derivation and persistence simplifies maintenance; changes to observation rules stay within the module, while storage changes stay in the adapter.  
 * Shared reliance on a single adapter mandates disciplined versioning and thorough integration testing to avoid cascading regressions across sibling modules.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ The module does not appear to expose its own public API beyond the internal call
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage entities and their relationships.
 - [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage code-related entities and relationships.
 - [CheckpointManagementModule](./CheckpointManagementModule.md) -- CheckpointManagementModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage checkpoint-related entities and relationships.
-
 
 ---
 

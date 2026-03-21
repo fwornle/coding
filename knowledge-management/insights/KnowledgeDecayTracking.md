@@ -88,7 +88,6 @@ No explicit “micro‑service” or “event‑driven” terminology appears in
    * The clear separation of concerns (monitoring, caching, persistence) and the shared modular infrastructure promote easy updates and isolated testing.  
    * However, the reliance on cache invalidation logic introduces a potential source of bugs; rigorous unit and integration tests around the PersistenceAgent‑cache contract are essential for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ No explicit “micro‑service” or “event‑driven” terminology appears in
 - [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis uses the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to perform semantic analysis on code and other data sources
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and manage data in the graph database
 - [OntologyManagement](./OntologyManagement.md) -- OntologyManagement uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to manage the ontology and ensure data consistency and integrity
-
 
 ---
 

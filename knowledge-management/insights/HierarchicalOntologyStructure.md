@@ -124,12 +124,10 @@ Sibling ontology definitions share the same immediate upper definition. Because 
 * **Clear Separation** – By keeping the hierarchical data structure separate from the manager’s methods, developers can evolve the data model (e.g., switch to a graph database) with minimal impact on the manager’s public API.  
 * **Potential Risk** – The lack of explicit interfaces in the observations means that any change to the internal shape of `HierarchicalOntologyStructure` must be coordinated with the manager; otherwise, hidden coupling could arise. Maintaining comprehensive unit tests around the manager’s validation logic will be essential to preserve stability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-
 
 ---
 

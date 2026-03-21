@@ -96,7 +96,6 @@ Scalability hinges on the capabilities of the underlying graph database accessed
 
 The clear modular split makes the sub‑component highly maintainable. Changes to storage (e.g., switching databases) affect only `GraphDatabase`. Adjustments to query syntax are confined to `GraphQueryBuilder`. Validation rule updates are isolated in `GraphValidator`. The lack of cross‑cutting concerns and the adherence to a narrow public API reduce the risk of regressions. Documentation should emphasize the three‑step workflow (validate → build query → execute) to keep future contributors aligned with the intended usage pattern.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ The clear modular split makes the sub‑component highly maintainable. Changes t
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMServiceFactory class in llm-service-manager/factory.ts to create LLM services
 - [OntologyRepository](./OntologyRepository.md) -- OntologyRepository uses the OntologyDatabase class in ontology-repository/database.ts to store the ontology definitions and their relationships
-
 
 ---
 

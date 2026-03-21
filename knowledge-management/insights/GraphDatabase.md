@@ -102,7 +102,6 @@ All of these integrations rely on a **stable, exported interface**: a function t
 
 Overall, the GraphDatabase sub‑component presents a well‑encapsulated, consistency‑focused design that aligns with the broader goals of the **CodingPatterns** parent component while offering straightforward integration points for downstream tools like CodeGraphRAG and Copi.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ Overall, the GraphDatabase sub‑component presents a well‑encapsulated, consi
 - [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
-
 
 ---
 

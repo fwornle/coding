@@ -20,7 +20,7 @@ The component also embodies a **loader‑facade** pattern through its child **Wo
 
 All documentation references are externalised in **`integrations/copi/USAGE.md`**, which the manager reads to provide runtime help or to generate usage messages. This separation of code and documentation follows a **documentation‑as‑code** approach, keeping the operational logic clean while still offering developers clear guidance.
 
-![WorkflowManager — Architecture](../../.data/knowledge-graph/insights/images/workflow-manager-architecture.png)
+![WorkflowManager — Architecture](images/workflow-manager-architecture.png)
 
 ### Architectural Patterns Identified  
 
@@ -74,7 +74,7 @@ Because **ConstraintSystem** contains **WorkflowManager**, the manager can also 
 
 * **Workflow Engine** – Though not named, the engine is the execution backend that the manager invokes. It likely resides as a separate module or library that the manager calls via a well‑defined API.
 
-![WorkflowManager — Relationship](../../.data/knowledge-graph/insights/images/workflow-manager-relationship.png)
+![WorkflowManager — Relationship](images/workflow-manager-relationship.png)
 
 ---
 
@@ -106,7 +106,6 @@ Because **ConstraintSystem** contains **WorkflowManager**, the manager can also 
 
 **5. Maintainability assessment** – The clear separation between loading, registration, execution, and documentation promotes high maintainability. Updating a workflow definition only requires changes to the source file or DB entry, while the manager code remains untouched. However, reliance on an external markdown file for usage means that documentation hygiene is a critical maintenance task.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ Because **ConstraintSystem** contains **WorkflowManager**, the manager can also 
 - [HookManager](./HookManager.md) -- HookManager loads hook events from a configuration file or database.
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
 - [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
-
 
 ---
 

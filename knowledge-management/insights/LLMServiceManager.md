@@ -20,7 +20,7 @@ The architecture surrounding LlmServiceManager follows a **service‑oriented fa
 
 The manager likely implements **caching** and **batching** mechanisms (as hinted by “efficient and scalable LLM usage”) to reduce redundant remote calls and to amortise the cost of large prompt processing. Concurrency is another design focus: the manager “may utilize concurrency mechanisms for managing multiple LLM operations,” suggesting the use of async/await, worker pools, or promise‑based throttling.
 
-![LlmServiceManager — Architecture](../../.data/knowledge-graph/insights/images/llm-service-manager-architecture.png)
+![LlmServiceManager — Architecture](images/llm-service-manager-architecture.png)
 
 ### Design Patterns Observed  
 
@@ -61,7 +61,7 @@ The manager is a hub in the KnowledgeManagement ecosystem:
 
 * **LlmInterface (child)** – Exposes the concrete API used by all consumers. The interface abstracts away which LLM back‑end is active (Copilot, OpenAI, local model), allowing seamless swapping without touching the callers.  
 
-![LlmServiceManager — Relationship](../../.data/knowledge-graph/insights/images/llm-service-manager-relationship.png)
+![LlmServiceManager — Relationship](images/llm-service-manager-relationship.png)
 
 ## Usage Guidelines  
 
@@ -108,7 +108,6 @@ LlmServiceManager sits in the middle tier of KnowledgeManagement, bridging **age
 
 The façade‑adapter composition yields **high modularity**: changes to the underlying graph store or to the VKB API client are isolated behind adapters, leaving the manager’s public contract untouched. The explicit `LlmInterface` child further decouples the choice of LLM back‑end, facilitating future migrations (e.g., swapping Copilot for an open‑source model). However, the lack of concrete source symbols in the current snapshot suggests that documentation and test coverage should be reinforced to avoid “black‑box” behaviour, especially around concurrency and caching logic. Regular integration tests that simulate the full chain (agent → manager → adapters) will be essential for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ The façade‑adapter composition yields **high modularity**: changes to the und
 - [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
 - [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
 - [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
-
 
 ---
 

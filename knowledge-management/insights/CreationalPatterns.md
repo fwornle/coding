@@ -97,7 +97,6 @@ The Singleton does not expose any external interfaces or abstract base classes, 
 
 Overall, **`SingletonPattern.java`** exemplifies a clean, thread‑safe creational strategy that fits neatly within the **DesignPatterns** hierarchy while providing a reliable foundation for resource‑efficient components across the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ Overall, **`SingletonPattern.java`** exemplifies a clean, thread‑safe creation
 ### Siblings
 - [StructuralPatterns](./StructuralPatterns.md) -- The Adapter pattern can be used in DesignPatterns to enable objects with incompatible interfaces to work together, thus promoting code reusability and reducing the need for duplicate code
 - [BehavioralPatterns](./BehavioralPatterns.md) -- The Observer pattern in BehavioralPatterns enables objects to notify other objects about changes to their state, thus allowing for loose coupling and promoting a more modular design
-
 
 ---
 

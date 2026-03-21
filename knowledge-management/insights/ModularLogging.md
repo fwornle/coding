@@ -79,12 +79,10 @@ Because the modules are self‑documented via their README files, developers can
 
 These insights are derived directly from the observed directory layout, documentation files, and the relationship to the parent component **SpecstoryAdapter**. No external patterns were introduced beyond what the evidence supports.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a modular approach to logging and tracking conversations and events, with each conversation having its own dedicated logging module, as seen in the integrations directory.
-
 
 ---
 

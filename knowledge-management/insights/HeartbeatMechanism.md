@@ -64,12 +64,10 @@ No sibling components are identified, but any other health‑check utilities wou
 4. **Scalability considerations** – Adjustable interval and timeout values; ensure timer accuracy under high load; avoid excessive network chatter when many monitors run concurrently.  
 5. **Maintainability assessment** – Encapsulation in a single file (`lib/heartbeat.js`) makes the component easy to locate, test, and replace. The clear parent‑child contract reduces coupling, aiding future refactoring or extension.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor utilizes a heartbeat mechanism (lib/heartbeat.js) to detect disconnections
-
 
 ---
 

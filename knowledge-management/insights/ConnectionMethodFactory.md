@@ -84,7 +84,6 @@ Because the factory abstracts the transport, scaling the number of concurrent co
 ### 5. Maintainability assessment  
 The use of a dedicated factory dramatically improves maintainability: any change to connection‑creation policy is localized, and the rest of the codebase remains untouched.  The pattern also encourages unit‑testable code, as mocks can replace the factory during testing.  The primary maintenance burden lies in keeping the factory’s configuration mapping synchronized with **ConfigurationManager** and ensuring that new connection classes adhere to the shared interface contract.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ The use of a dedicated factory dramatically improves maintainability: any change
 ### Siblings
 - [SpecstoryConnectionManager](./SpecstoryConnectionManager.md) -- The SpecstoryConnectionManager utilizes the ConnectionMethodFactory to create and manage different connection methods, as suggested by the parent component analysis.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism may employ a retry policy, such as exponential backoff with jitter, to handle transient errors and improve the overall reliability of the connection.
-
 
 ---
 

@@ -89,7 +89,6 @@ Because mode switches are guarded by a single lock, the subsystem scales well fo
 
 The design is **maintainable**: the use of well‑known patterns (Strategy, Facade) and explicit synchronization makes the codebase approachable for new developers. However, the tight coupling to the registry means that any evolution of mode registration (e.g., dynamic plugin loading) will require coordinated changes in both the registry and the switching mechanism. Comprehensive unit and integration tests around the lock and rollback behavior are essential to preserve reliability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The design is **maintainable**: the use of well‑known patterns (Strategy, Faca
 ### Siblings
 - [ModeRegistryManager](./ModeRegistryManager.md) -- The mode-registry.ts file is expected to contain the ModeRegistry class, which defines the mode management interface and strategy registration mechanisms.
 - [ModeEstimationStrategy](./ModeEstimationStrategy.md) -- The ModeEstimationStrategy is expected to be implemented as a separate module or class, possibly within the mode-registry.ts file or a dedicated strategy file.
-
 
 ---
 

@@ -79,7 +79,6 @@ From a dependency perspective, `mock-response-store.py` is a leaf node – it do
 * Adding new response formats or persistence strategies can be done by extending the module without impacting `MockProvider`.  
 * The lack of complex inheritance or external services reduces the cognitive load for future contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ From a dependency perspective, `mock-response-store.py` is a leaf node – it do
 
 ### Siblings
 - [MockProvider](./MockProvider.md) -- MockProvider likely utilizes a mock-provider.py file to define the mock provider's behavior, which would contain functions that simulate provider responses.
-
 
 ---
 

@@ -106,7 +106,6 @@ The **LoggerModule** promotes high maintainability:
 
 Overall, the LoggerModule’s modular, configurable, and centralized design aligns with the observations and provides a reliable, maintainable foundation for logging throughout the Trajectory subsystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -118,7 +117,6 @@ Overall, the LoggerModule’s modular, configurable, and centralized design alig
 - [Configurator](./Configurator.md) -- Configurator is responsible for managing configuration settings for the Trajectory component
 - [SpecstoryApiClient](./SpecstoryApiClient.md) -- SpecstoryApiClient is responsible for providing an API client for interacting with the Specstory extension
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter is responsible for adapting the Specstory extension to the Trajectory component's architecture
-
 
 ---
 

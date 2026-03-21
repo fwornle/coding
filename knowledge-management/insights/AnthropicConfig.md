@@ -77,12 +77,10 @@ External dependencies are minimal: the only required secret is `ANTHROPIC_API_KE
 
 Overall, `AnthropicConfig` exemplifies a disciplined, configuration‑driven approach within the LLM abstraction hierarchy, enabling clean integration of Anthropic’s API while keeping the system extensible and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [AnthropicProvider](./AnthropicProvider.md) -- The AnthropicProvider class is located in lib/llm/providers/anthropic-provider.ts and is an example of a provider class managed by the LLMService.
-
 
 ---
 

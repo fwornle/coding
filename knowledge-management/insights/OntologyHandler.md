@@ -85,7 +85,6 @@ Because the component sits inside **SemanticAnalysis**, any other sub‑componen
 
 *Note:* The analysis is strictly derived from the supplied observations.  No additional file paths, class members, or implementation specifics were invented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ Because the component sits inside **SemanticAnalysis**, any other sub‑componen
 
 ### Siblings
 - [OntologyCore](./OntologyCore.md) -- OntologyCore handles the core logic for Ontology
-
 
 ---
 

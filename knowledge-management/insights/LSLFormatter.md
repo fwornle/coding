@@ -86,7 +86,6 @@ All interactions are **synchronous** function calls; there is no evidence of eve
 4. **Scalability considerations** – Because rendering is stateless and typically CPU‑bound, horizontal scaling can be achieved by running multiple LiveLoggingSystem instances behind a load balancer.  Template caching (in‑memory compiled templates) can mitigate repeated I/O and keep latency low as the volume of sessions grows.  
 5. **Maintainability assessment** – High maintainability: the formatter’s logic is isolated, templates are externalised, and input‑type handling is declarative.  The main maintenance risk lies in keeping the transcript schema and template expectations in sync across siblings; rigorous integration tests and schema versioning are recommended to mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ All interactions are **synchronous** function calls; there is no evidence of eve
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter, defined in lib/agent-api/transcript-api.js, to handle transcripts from various agents in a unified manner.
 - [Logger](./Logger.md) -- The Logger is expected to provide a logging API for the LiveLoggingSystem component to log events and errors.
 - [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptAdapter defines an abstract base class for agent-specific transcript adapters.
-
 
 ---
 

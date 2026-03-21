@@ -108,12 +108,10 @@ The only explicit dependency is the graph database client that the adapter wraps
 
 Overall, **ViolationMetadataRepository** appears to be a focused, rule‑centric persistence component that leverages a graph‑database adapter to store violation metadata. Its design aligns with established repository and adapter patterns, offering a clean contract for the parent `ViolationDetector` while keeping the underlying storage implementation encapsulated.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationDetector](./ViolationDetector.md) -- ViolationDetector uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve violation metadata.
-
 
 ---
 

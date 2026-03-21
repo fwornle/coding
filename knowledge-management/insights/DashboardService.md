@@ -10,7 +10,7 @@ The DashboardService might be designed to work with other sub-components, such a
 
 The service is expected to interact with the **constraint monitoring dashboard** UI, providing a “plug‑and‑play” experience for developers who need to spin up the dashboard quickly during development or testing.  It also collaborates with higher‑level orchestrators (e.g., **LLMManager**) to embed the dashboard into more complex workflows, ensuring that the user experience remains responsive even when other heavy‑weight components are active.
 
-![DashboardService — Architecture](../../.data/knowledge-graph/insights/images/dashboard-service-architecture.png)
+![DashboardService — Architecture](images/dashboard-service-architecture.png)
 
 ---
 
@@ -22,7 +22,7 @@ A second, complementary pattern is the **router façade** embodied by **Dashboar
 
 The parent component, **DockerizedServices**, employs **dependency injection** (as described in the parent’s documentation) to inject the `ServiceStarter` instance and any configuration objects into **DashboardService**.  This decouples the service from concrete implementations of retry or timeout strategies, allowing the system to swap out or mock those dependencies during testing.
 
-![DashboardService — Relationship](../../.data/knowledge-graph/insights/images/dashboard-service-relationship.png)
+![DashboardService — Relationship](images/dashboard-service-relationship.png)
 
 ---
 
@@ -102,7 +102,6 @@ Because the dashboard runs as a separate process, it can be horizontally scaled 
 
 The clear separation between startup logic, routing, and UI execution makes the codebase approachable for new developers.  Dependency injection centralizes configuration, simplifying environment changes.  The reliance on a single `ServiceStarter` class means that bug fixes or enhancements to retry behavior propagate automatically, reducing maintenance overhead.  The main risk to maintainability is the implicit coupling to the UI process; any major change to the dashboard’s runtime (e.g., moving from a Node server to a static site served by Nginx) would require updates in both the startup script and the router’s health‑check logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ The clear separation between startup logic, routing, and UI execution makes the 
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely uses Graphology and LevelDB to provide persistence and data storage capabilities.
 - [WaveAgentExecutor](./WaveAgentExecutor.md) -- WaveAgentExecutor likely uses a specific constructor and execution pattern to execute wave-based agents.
 - [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
-
 
 ---
 

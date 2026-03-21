@@ -65,7 +65,6 @@ Finally, avoid exposing the manager’s methods in public API documentation; the
 * The narrow public surface (only through `ServiceRegistry`) reduces accidental misuse, but developers must respect the abstraction boundaries to avoid coupling.  
 * Clear module boundaries and the potential for dependency injection make unit testing straightforward, supporting long‑term code health.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ Finally, avoid exposing the manager’s methods in public API documentation; the
 
 ### Siblings
 - [ServiceDiscoveryManager](./ServiceDiscoveryManager.md) -- The ServiceDiscoveryManager would need to interact with the ServiceMetadataManager to retrieve service metadata, such as service names and endpoints, to facilitate service discovery
-
 
 ---
 

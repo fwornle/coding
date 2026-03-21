@@ -75,7 +75,6 @@ The manager’s role is deliberately **passive** – it does not execute hooks i
 - The simple API surface (`subscribe`, `unsubscribe`, lookup) reduces the cognitive load for developers adding new hooks.  
 - Documentation should emphasize the need to keep topic strings consistent and to synchronize state with `HookStore` to avoid drift after restarts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ The manager’s role is deliberately **passive** – it does not execute hooks i
 ### Siblings
 - [HookPipeline](./HookPipeline.md) -- HookPipeline (HookOrchestrator.ts) utilizes a pub-sub pattern, enabling hooks to declare explicit subscription topics and facilitating loose coupling between hooks.
 - [HookStore](./HookStore.md) -- HookStore (HookOrchestrator.ts) utilizes a data storage mechanism to persist hook metadata, ensuring that hook information is retained across system restarts.
-
 
 ---
 

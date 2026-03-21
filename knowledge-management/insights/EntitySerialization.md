@@ -10,19 +10,15 @@ The choice of serialization format and algorithm may impact the performance and 
 
 - The choice of serialization format and algorithm may impact the performance and scalability of the EntityStorage sub-component, and may be influenced by factors such as data size, query patterns, and database capabilities.
 
-
 ## How It Works
 
 - The deserialization process would involve reconstructing the entity objects from the stored data, which could be implemented using a library like pickle or a custom deserialization function.
-
 
 ## Related Entities
 
 ### Used By
 
 - EntityStorage (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ The choice of serialization format and algorithm may impact the performance and 
 ### Siblings
 - [EntityIndexing](./EntityIndexing.md) -- The EntityStorageDAO in dao.py may employ an indexing strategy, such as a hash table or a tree-based index, to facilitate rapid entity lookup and retrieval.
 - [RepositoryPattern](./RepositoryPattern.md) -- The EntityStorageDAO in dao.py implements the RepositoryPattern, which defines a standardized interface for entity data access and manipulation, such as create, read, update, and delete (CRUD) operations.
-
 
 ---
 

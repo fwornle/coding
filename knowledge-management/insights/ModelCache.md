@@ -84,12 +84,10 @@ The integration flow is therefore a thin, deterministic chain: **Client → LLMI
 
 Even though the repository does not expose concrete file paths or code symbols, the documented relationship between **LLMInitializer** and **ModelCache** provides a clear picture of a lazy‑loading cache designed to keep LLM initialization inexpensive and memory usage predictable. Developers should respect the intended access pattern, be mindful of shared mutable state, and manage cache eviction explicitly to maintain system performance and stability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer may use a lazy loading approach to initialize LLMs, delaying initialization until the model is actually needed, reducing memory usage and improving system responsiveness.
-
 
 ---
 

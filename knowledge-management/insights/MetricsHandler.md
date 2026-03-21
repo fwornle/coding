@@ -110,12 +110,10 @@ Following these conventions will keep the monitoring codebase clean, testable, a
 
 Overall, **MetricsHandler** appears to be a well‑scoped, deliberately isolated component that leverages an industry‑standard library to provide robust observability while keeping the rest of the system clean and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [MonitoringService](./MonitoringService.md) -- MonitoringService uses the prometheus.js library to handle monitoring of system performance and health
-
 
 ---
 

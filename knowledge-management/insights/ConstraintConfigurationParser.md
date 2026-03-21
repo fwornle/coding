@@ -119,12 +119,10 @@ External dependencies are limited to **standard parsing libraries** (JSON/YAML) 
 
 Overall, **ConstraintConfigurationParser** embodies a well‑scoped, documentation‑driven component that enables **ConstraintMonitoring** to remain flexible and extensible while keeping the core detection logic insulated from format‑level concerns.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
-
 
 ---
 

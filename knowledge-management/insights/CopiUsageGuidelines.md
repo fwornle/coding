@@ -42,7 +42,7 @@ The implementation is entirely declarative, consisting of three markdown documen
 
 * **`integrations/copi/USAGE.md`** – The most detailed artifact. It includes concrete usage examples (e.g., code snippets showing how to invoke Copi APIs), migration instructions for moving from older versions of the integration, and possibly troubleshooting tips. Because the file is called “USAGE.md,” it is reasonable to infer that it follows a consistent structure across other integrations, reinforcing the overall **CodingConventions** documentation style.
 
-All three files are placed under the same parent directory, which simplifies relative linking (`[Installation](INSTALL.md)`, `[Usage](USAGE.md)`) and ensures that any tooling that processes the `integrations/` tree can treat the Copi documentation as a cohesive unit.
+All three files are placed under the same parent directory, which simplifies relative linking (`Installation`, `Usage`) and ensures that any tooling that processes the `integrations/` tree can treat the Copi documentation as a cohesive unit.
 
 ---
 
@@ -87,12 +87,10 @@ Developers working with the Copi integration should treat the three markdown fil
 4. **Scalability considerations** – The three‑file pattern scales well as more integrations are added; tooling can process each module uniformly, and the lightweight markdown format imposes minimal storage or processing overhead.  
 5. **Maintainability assessment** – High maintainability due to clear file responsibilities, alignment with a parent convention component, and the ability to update each aspect (overview, install, usage) independently without cross‑file impact.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodingConventions](./CodingConventions.md) -- The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component
-
 
 ---
 

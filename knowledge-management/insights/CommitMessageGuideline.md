@@ -54,7 +54,6 @@ By adhering to these conventions, developers contribute to a commit history that
 | **Scalability considerations** | The guideline is text‑based and lightweight, so scaling to large teams or many repositories only requires distributing the same hook/CI script.  No performance impact on the build. |
 | **Maintainability assessment** | High maintainability: a single source‑of‑truth document governs commit style; updates are localized and automatically reflected wherever the parent configuration is consumed. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -63,7 +62,6 @@ By adhering to these conventions, developers contribute to a commit history that
 ### Siblings
 - [CodeFormatter](./CodeFormatter.md) -- The CodeFormatter utilizes the Eclipse Code Formatter to format the code, as specified in the CodingConventions sub-component.
 - [CodeAnalysisTool](./CodeAnalysisTool.md) -- The CodeAnalysisTool utilizes static analysis techniques to examine the code and detect violations of the coding conventions.
-
 
 ---
 

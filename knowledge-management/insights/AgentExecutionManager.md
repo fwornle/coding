@@ -79,12 +79,10 @@ Other peripheral integration points may include logging facilities, configuratio
 * The lack of concrete source for **AgentExecutionManager** means documentation must stay closely aligned with the observed contracts; any future changes to `BaseAgent` should be reflected in the manager’s interface to avoid drift.  
 * As long as new agents respect the `BaseAgent` contract, the system can evolve without requiring changes to the orchestration layer, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
-
 
 ---
 

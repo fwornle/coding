@@ -80,14 +80,7 @@ The current design is **moderately maintainable**: the adapter isolates external
 
 ### Relationship
 
-![SpecstoryConnector Relationship](images/specstory-connector-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/specstory-connector-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -100,7 +93,6 @@ The current design is **moderately maintainable**: the adapter isolates external
 ### Siblings
 - [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
 - [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager sub-component is mentioned in the manifest, but its implementation details are unknown due to the lack of source code.
-
 
 ---
 

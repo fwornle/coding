@@ -72,7 +72,6 @@ Because the observations do not list specific functions, we infer that the manag
 - Consolidating implementation in `service-registry.ts` eases navigation but could become a maintenance hotspot as features grow; extracting discovery algorithms into their own file would improve readability and testability.  
 - The explicit dependency on an external networking module isolates protocol changes, reducing the impact of future transport upgrades.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ Because the observations do not list specific functions, we infer that the manag
 
 ### Siblings
 - [ServiceMetadataManager](./ServiceMetadataManager.md) -- ServiceRegistry (service-registry.ts) utilizes a registry-based approach to manage available services and their metadata, which is handled by the ServiceMetadataManager
-
 
 ---
 

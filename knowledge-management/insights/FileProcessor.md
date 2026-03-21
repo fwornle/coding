@@ -72,7 +72,6 @@ External consumers of the overall subsystem (for example, higher‑level service
 * The clear separation of concerns (watching vs. processing vs. error handling) aids readability and makes unit testing straightforward.
 * However, the lack of abstraction over the `fs` API means that any change to the persistence mechanism will ripple through all three components, raising the maintenance cost for future evolution.  Introducing a thin storage interface could mitigate this risk without sacrificing current simplicity.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ External consumers of the overall subsystem (for example, higher‑level service
 ### Siblings
 - [FileWatcher](./FileWatcher.md) -- The FileWatcher class would likely utilize the Node.js fs module's watch() function to monitor the directory for changes, as seen in the fs module documentation.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism would likely involve using try-catch blocks to catch errors thrown by the Node.js fs module, such as errors when trying to read or write to a file.
-
 
 ---
 

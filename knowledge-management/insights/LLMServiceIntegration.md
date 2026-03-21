@@ -118,12 +118,10 @@ The integration points are deliberately kept thin; each child component is respo
 - Dependence on external tools (Copilot CLI, Tmux, language parsers) introduces an upkeep burden: version compatibility must be monitored.
 - Clear READMEs for each integration aid onboarding, but the lack of concrete source symbols means that developers need to rely on the documentation to understand the exact API contracts, which could be a minor friction point.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMIntegration](./LLMIntegration.md) -- The LLMIntegration sub-component uses the LLM services to analyze the input data.
-
 
 ---
 

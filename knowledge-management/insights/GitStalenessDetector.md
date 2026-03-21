@@ -94,7 +94,6 @@ The system is organized around a **detector family** (`GitStalenessDetector`, `P
 ### Maintainability Assessment  
 The clear separation between detection strategy, orchestration, and metadata handling yields high maintainability. Adding a new detection strategy only requires implementing the same interface and registering it in the parent’s configuration. However, the reliance on external Git operations mandates robust error handling and thorough integration testing to prevent regressions caused by repository changes or network issues. Overall, the design promotes clean, testable code and straightforward future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The clear separation between detection strategy, orchestration, and metadata han
 ### Siblings
 - [StalenessMetadataHandler](./StalenessMetadataHandler.md) -- The StalenessStore suggested by the parent analysis may be responsible for handling staleness metadata, storing and retrieving information about entity staleness
 - [PipelineBasedStalenessDetector](./PipelineBasedStalenessDetector.md) -- The PipelineManager suggested by the parent analysis may be responsible for managing the pipeline-based execution model, coordinating the staleness detection process for entities
-
 
 ---
 

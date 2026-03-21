@@ -92,7 +92,6 @@ Because the configuration is pure data, scaling to larger codebases simply invol
 ### Maintainability Assessment  
 The maintainability score is high: a single, version‑controlled file makes it easy to audit and evolve quality standards. The main risk is **configuration entropy**—as exclusions and overrides accumulate, the file can become noisy. Regular reviews and the compositional pattern keep the configuration lean and understandable, ensuring long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The maintainability score is high: a single, version‑controlled file makes it 
 ### Siblings
 - [StaticCodeAnalysis](./StaticCodeAnalysis.md) -- The phpstan.neon file defines the configuration for PHPStan, specifying the paths to scan and the rules to apply, which helps in maintaining code quality and adhering to coding standards.
 - [DeprecationWarningSystem](./DeprecationWarningSystem.md) -- PHPStan's deprecation checking capability helps in identifying outdated code elements, such as functions or classes that are no longer supported, prompting developers to update or replace them.
-
 
 ---
 

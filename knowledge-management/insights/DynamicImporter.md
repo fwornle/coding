@@ -76,7 +76,6 @@ From a dependency perspective, DynamicImporter has a **runtime dependency on the
 * Future extensions (e.g., logging, caching) can be confined to ModuleLoader, limiting ripple effects.  
 * Consistency with sibling components’ error‑handling patterns (RetryMechanism) simplifies onboarding for developers familiar with the Trajectory codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ From a dependency perspective, DynamicImporter has a **runtime dependency on the
 - [RetryMechanism](./RetryMechanism.md) -- RetryMechanism uses a exponential backoff strategy in the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connection retries.
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the Specstory extension (lib/integrations/specstory-adapter.js) to log conversation entries with detailed metadata.
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connections via HTTP.
-
 
 ---
 

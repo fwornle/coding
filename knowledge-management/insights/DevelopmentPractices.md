@@ -110,14 +110,7 @@ These observations paint a clear picture of how **DevelopmentPractices** functio
 
 ### Relationship
 
-![DevelopmentPractices Relationship](images/development-practices-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/development-practices-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -131,7 +124,6 @@ These observations paint a clear picture of how **DevelopmentPractices** functio
 - [DesignPatterns](./DesignPatterns.md) -- The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system
 - [CodingConventions](./CodingConventions.md) -- The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component
 - [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
-
 
 ---
 

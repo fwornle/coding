@@ -16,7 +16,7 @@ The **ConstraintSystem** component lives at the heart of the *Coding* project an
 
 Together these files implement the functional contract expressed in the related‑entity list (GraphDatabaseManager, ContentValidator, HookManager, ViolationCaptureModule, WorkflowManager, ConstraintConfigurationManager). The component is a child of the top‑level **Coding** node and shares the same graph‑persistence philosophy as its sibling **KnowledgeManagement**, while offering a distinct constraint‑validation and monitoring focus.
 
-![ConstraintSystem — Architecture](../../.data/knowledge-graph/insights/images/constraint-system-architecture.png)
+![ConstraintSystem — Architecture](images/constraint-system-architecture.png)
 
 ---
 
@@ -37,7 +37,7 @@ The **ContentValidationAgent** (`content-validation-agent.ts`) embodies a *multi
 ### UI Integration via Hooks  
 The UI side (system‑health dashboard) accesses workflow definitions through the **useWorkflowDefinitions** hook, which pulls data from the Redux store. The **useNodeWiggle** hook adds a visual animation layer on top of the workflow graph, demonstrating a *separation of concerns*: data retrieval is handled by Redux, while presentation concerns live in React hooks.
 
-![ConstraintSystem — Relationship](../../.data/knowledge-graph/insights/images/constraint-system-relationship.png)
+![ConstraintSystem — Relationship](images/constraint-system-relationship.png)
 
 ### Design Decisions & Trade‑offs  
 
@@ -131,7 +131,6 @@ Overall, ConstraintSystem sits at the intersection of **persistence**, **validat
 4. **Scalability considerations** – Graphology + LevelDB scale well for moderate data volumes; horizontal scaling would require sharding or migration to a distributed KV store. Hook dispatch is lightweight but should be monitored for handler explosion. Validation and violation capture can be parallelised; batch writes mitigate export overhead.  
 5. **Maintainability assessment** – Strong separation of concerns (adapter, agents, hooks) promotes testability and future replacement of underlying libraries. However, reliance on a single‑node LevelDB and automatic JSON sync introduces a coupling point that must be managed during upgrades. Clear module boundaries and the documented façade pattern (e.g., GraphDatabaseManager) aid maintainability, provided developers adhere to the usage guidelines above.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -153,7 +152,6 @@ Overall, ConstraintSystem sits at the intersection of **persistence**, **validat
 - [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 - [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
-
 
 ---
 

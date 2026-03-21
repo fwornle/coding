@@ -70,7 +70,6 @@ Because the component is a transformer wrapper, scaling horizontally (multiple p
 
 The modular pipeline and clear separation of responsibilities make the system **highly maintainable**.  Adding new models or updating existing ones is a matter of swapping the plug‑in implementation.  However, maintainers must keep the interface contract stable and ensure that external library upgrades do not break the component’s expected behavior.  The lack of concrete code symbols in the current observation set suggests that documentation should be kept up‑to‑date to avoid ambiguity around the component’s API.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ The modular pipeline and clear separation of responsibilities make the system **
 ### Siblings
 - [EntityExtractionModule](./EntityExtractionModule.md) -- The NaturalLanguageProcessor class in natural-language-processor.py uses the Pipeline pattern to process natural language text, which includes entity extraction as one of its key steps
 - [SentimentAnalysisEngine](./SentimentAnalysisEngine.md) -- The NaturalLanguageProcessor class's use of the Pipeline pattern suggests that sentiment analysis is a discrete step in the text processing workflow, allowing for focused development and optimization of this component
-
 
 ---
 

@@ -96,12 +96,10 @@ From a deployment perspective, the integration can be containerised and orchestr
 
 The clear separation of configuration (environment variables), documentation (README, CONTRIBUTING), and service boundaries makes the component **highly maintainable**. The contribution guidelines encourage consistent coding standards, which reduces technical debt. The primary risk is the hidden implementation (no code symbols visible), so future maintainers must rely on the documented API contracts and tests to understand internal behavior. Adding comprehensive unit/integration test suites will further safeguard maintainability as the graph logic evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the Code Graph RAG system in integrations/code-graph-rag to extract knowledge from codebases.
-
 
 ---
 

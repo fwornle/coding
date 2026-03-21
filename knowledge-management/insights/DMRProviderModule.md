@@ -111,7 +111,6 @@ The DMRProviderModule sits in a *provider* tier beneath the high‑level **LLMAb
 
 The module’s **single‑responsibility** split across dedicated files makes the codebase approachable: each file has a clear purpose and can be unit‑tested in isolation. The reliance on well‑known patterns (factory, DI, circuit breaker) aligns with common TypeScript/Node.js practices, lowering the learning curve for new developers. The main maintenance burden lies in the Docker integration; any change to the Model Runner’s image or API requires updates to **ModelRunnerClient** and possibly the validator schema. Overall, the design is **moderately maintainable**, with clear extension points (e.g., adding new fallback models) and limited coupling to external services.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ The module’s **single‑responsibility** split across dedicated files makes th
 - [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.
 - [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts.
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
-
 
 ---
 

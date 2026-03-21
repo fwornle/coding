@@ -64,7 +64,6 @@ Developers extending or consuming the **CodeAnalysisFramework** should observe t
 4. **Scalability considerations** – The synchronous, in‑process design may become a bottleneck under heavy analysis loads; scaling could involve parallelising agent invocations or introducing read‑through caching for pattern data.  
 5. **Maintainability assessment** – Strong separation of concerns and the use of a common adapter simplify maintenance; however, the tight coupling between the framework and its siblings means changes to the graph schema or pattern model require coordinated updates across multiple components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ Developers extending or consuming the **CodeAnalysisFramework** should observe t
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
 - [SecurityStandardsModule](./SecurityStandardsModule.md) -- SecurityStandardsModule uses the DesignPatternManager to retrieve stored design patterns for security standard enforcement.
 - [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
-
 
 ---
 

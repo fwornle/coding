@@ -126,7 +126,6 @@ The clear separation of responsibilities, combined with the adapter/facade layer
 
 Potential maintenance challenges include ensuring that the ontology schema remains synchronized with the validator and that any performance optimizations in the adapter do not break the contract expected by the manager or the agent. Regular integration tests that exercise the full pipeline will mitigate these risks.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -140,7 +139,6 @@ Potential maintenance challenges include ensuring that the ontology schema remai
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [CheckpointTracker](./CheckpointTracker.md) -- CheckpointTracker uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
-
 
 ---
 

@@ -82,7 +82,6 @@ The manager’s reliance on Docker Compose means that the actual container lifec
 * Centralised configuration reduces duplication but places importance on clear documentation of required environment variables.  
 * The pattern encourages reuse across sibling components, fostering consistency and easing future refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ The manager’s reliance on Docker Compose means that the actual container lifec
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
 - [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
 - [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
-
 
 ---
 

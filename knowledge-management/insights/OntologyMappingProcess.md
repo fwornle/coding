@@ -12,14 +12,11 @@ The OntologyMappingProcess involves creating and maintaining a mapping between k
 
 - The accuracy and quality of the OntologyMappingProcess have a direct impact on the overall performance and effectiveness of the application, making it a critical component of the system
 
-
 ## Related Entities
 
 ### Used By
 
 - OntologyManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The OntologyMappingProcess involves creating and maintaining a mapping between k
 ### Siblings
 - [OntologyRepositoryPattern](./OntologyRepositoryPattern.md) -- OntologyManagerDAO in dao.py uses a repository pattern to encapsulate database access for ontology data, which helps to keep the data access logic separate from the business logic
 - [OntologyUpdateMechanism](./OntologyUpdateMechanism.md) -- The OntologyUpdateMechanism likely involves a combination of data processing, validation, and storage update operations, which are coordinated and managed by specific classes or modules within the OntologyManager sub-component
-
 
 ---
 

@@ -49,12 +49,10 @@ Since no additional classes or interfaces are observed, the current implementati
 4. **Scalability considerations** – Dedicated storage method suggests anticipation of high‑volume result writes; batching and transaction management within `createConstraintValidationResult` are essential for horizontal scalability.  
 5. **Maintainability assessment** – The clear boundary between validation and storage simplifies future changes: updates to the graph schema or migration to a different database affect only `graphdb-adapter.ts`. However, the lack of an explicit interface layer means any change to the method signature propagates directly to the ValidationModule, requiring coordinated updates.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ValidationModule](./ValidationModule.md) -- ValidationModule uses the createConstraintValidationResult method in graphdb-adapter.ts to store validation results in the graph database.
-
 
 ---
 

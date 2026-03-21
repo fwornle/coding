@@ -86,7 +86,6 @@ Because each language model runs in its own container, horizontal scaling can be
 ### Maintainability assessment  
 The clear separation of configuration, caching, and container orchestration yields high maintainability: updates are localized, and the risk of cross‑service regression is low. The lack of visible code symbols means that most logic lives inside the container image, which must be versioned and documented elsewhere. As long as the YAML contracts remain stable, the service is easy to maintain; however, any required behavioural change that cannot be expressed via configuration will necessitate rebuilding the underlying image, introducing an additional maintenance step.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ The clear separation of configuration, caching, and container orchestration yiel
 - [LLMManager](./LLMManager.md) -- The LLMManager utilizes a modular architecture, with each language model having its own directory and configuration files, such as the 'language-model-service' directory containing a 'docker-compose.yml' file.
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator utilizes a separate directory for each coding service, such as the 'coding-service' directory, containing a 'Dockerfile' that defines the build process for the service.
 - [CodingService](./CodingService.md) -- The CodingService utilizes a separate directory, such as the 'coding-service' directory, containing a 'Dockerfile' that defines the build process for the service.
-
 
 ---
 

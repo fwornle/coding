@@ -91,7 +91,6 @@ The system is organized around a clear hierarchy: **EntityContentAnalyzer** (par
 
 The decision to isolate pattern definitions and to encapsulate matching logic within a single file (`EntityContentAnalyzer.ts`) yields high maintainability for small to medium pattern sets. However, as the number of patterns grows, the regex catalogue may become unwieldy; the presence of `RegexPatternBuilder` mitigates this risk by offering a structured way to compose patterns. Clear contracts between matcher output and `AnalysisStore` further aid maintainability, as changes in one component can be validated against the shared DTO schema. Overall, the architecture balances flexibility with simplicity, making it straightforward to extend while keeping the core matching algorithm easy to test and reason about.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The decision to isolate pattern definitions and to encapsulate matching logic wi
 ### Siblings
 - [AnalysisStore](./AnalysisStore.md) -- The AnalysisStore likely uses a data storage mechanism, such as a database or a file system, to store and retrieve analysis metadata
 - [RegexPatternBuilder](./RegexPatternBuilder.md) -- The RegexPatternBuilder is likely implemented as a separate class or function, allowing for easy extension and modification of pattern matching rules
-
 
 ---
 

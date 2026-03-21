@@ -12,14 +12,11 @@ The AgentManager sub-component uses the AgentFactoryPattern to decouple agent cr
 
 - The AgentManager sub-component uses the AgentFactoryPattern to decouple agent creation from the specific agent implementation, allowing for easier extension and modification of agent types.
 
-
 ## Related Entities
 
 ### Used By
 
 - AgentManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The AgentManager sub-component uses the AgentFactoryPattern to decouple agent cr
 ### Siblings
 - [AgentConfigurationManagement](./AgentConfigurationManagement.md) -- The AgentConfig class (AgentConfig.cs) provides a Validate method to check the configuration settings for an agent, ensuring that required properties are set and values are within valid ranges.
 - [AgentExecutionLifecycle](./AgentExecutionLifecycle.md) -- The AgentExecutionLifecycle uses a threading model (Thread.cs) to execute agents concurrently, allowing multiple agents to run simultaneously and improving overall system throughput.
-
 
 ---
 

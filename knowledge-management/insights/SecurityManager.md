@@ -81,7 +81,6 @@ External dependencies are implied by the child managers: the **AuthenticationMan
 
 Overall, **SecurityManager** embodies a clean, façade‑driven security layer that aligns with the broader architectural style of the SemanticAnalysis system, offering both clarity for developers and flexibility for future security enhancements.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Overall, **SecurityManager** embodies a clean, façade‑driven security layer t
 - [Insights](./Insights.md) -- InsightGenerator.usePatternCatalog() leverages a pre-defined catalog of patterns to identify insights
 - [ConcurrencyManager](./ConcurrencyManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks
 - [DataStorage](./DataStorage.md) -- DataStorage.useDatabase() utilizes a relational database to store processed data
-
 
 ---
 

@@ -93,7 +93,6 @@ The class holds a reference to the **`KnowledgeGraphConstructor`** instance, ena
    * The optimizer is centralized; any changes to its heuristics affect all query paths, which is beneficial for consistency but requires careful testing.  
    * Reliance on accurate graph statistics means that any change to the schema or data distribution must be reflected in `KnowledgeGraphConstructor` to avoid optimizer regression.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ The class holds a reference to the **`KnowledgeGraphConstructor`** instance, ena
 ### Siblings
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- GraphConstructor in knowledge-graph.ts initializes the graph with a set of predefined node types, including ClassEntity, MethodEntity, and FieldEntity, to support various code analysis tasks
 - [EntityRelationshipUpdater](./EntityRelationshipUpdater.md) -- EntityRelationshipUpdater in entity-updater.ts employs a delta-based approach to update the graph, only modifying the affected nodes and relationships to minimize computational overhead and preserve graph integrity
-
 
 ---
 

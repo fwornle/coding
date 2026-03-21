@@ -99,7 +99,6 @@ The clear separation between detection, handling, and storage yields high mainta
 
 Overall, `StalenessMetadataHandler` embodies a clean, modular design that aligns with the observed architecture, providing a solid foundation for future extensions while keeping the core responsibilities focused and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ Overall, `StalenessMetadataHandler` embodies a clean, modular design that aligns
 ### Siblings
 - [GitStalenessDetector](./GitStalenessDetector.md) -- The StalenessDetector sub-component utilizes a git-based approach, as hinted by its parent component's context, to detect staleness in entity content
 - [PipelineBasedStalenessDetector](./PipelineBasedStalenessDetector.md) -- The PipelineManager suggested by the parent analysis may be responsible for managing the pipeline-based execution model, coordinating the staleness detection process for entities
-
 
 ---
 

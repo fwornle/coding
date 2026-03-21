@@ -16,7 +16,7 @@ The design of the ContentValidationAgent is deliberately lightweight and follows
 
 The agent is part of a **rule‑driven validation layer**. Rules are configured elsewhere in the system (the observations do not specify the exact location) and are applied by the agent’s internal validation function. The function iterates over these rules, checking the incoming entity content for compliance. Because the validation logic is encapsulated in a single function, the agent can be treated as a **pure function** from the perspective of the ConstraintSystem—no side effects other than reporting validation outcomes are introduced.  
 
-![ContentValidationAgent — Architecture](../../.data/knowledge-graph/insights/images/content-validation-agent-architecture.png)  
+![ContentValidationAgent — Architecture](images/content-validation-agent-architecture.png)  
 
 This architectural choice promotes **decoupling**: the ConstraintSystem does not need to know the internals of how validation is performed, only that the agent will return a pass/fail (or detailed error) result. The similarity to ConstraintMonitor also means that both agents can be orchestrated using the same dispatcher or pipeline, simplifying the overall system design.
 
@@ -37,7 +37,7 @@ ContentValidationAgent is tightly integrated with the **ConstraintSystem**. The 
 
 The agent also shares an execution contract with its sibling **ConstraintMonitor**, meaning that both can be registered with a common dispatcher inside the ConstraintSystem. This dispatcher abstracts the concrete agent implementations, passing the same `input` and `context` structures to whichever validation routine is appropriate.  
 
-![ContentValidationAgent — Relationship](../../.data/knowledge-graph/insights/images/content-validation-agent-relationship.png)  
+![ContentValidationAgent — Relationship](images/content-validation-agent-relationship.png)  
 
 Other integration points, inferred from the observations, include:
 
@@ -66,7 +66,6 @@ Finally, ensure that any failure returned by the agent is handled gracefully by 
 4. **Scalability considerations** – Because validation is performed synchronously via a single function, the agent can become a bottleneck under high‑throughput workloads. Scaling can be achieved by parallelizing rule evaluation or by sharding rule sets across multiple agent instances, provided the dispatcher supports concurrent execution.  
 5. **Maintainability assessment** – The clear separation of rule configuration from validation logic, combined with the uniform execute pattern, yields high maintainability. Adding or updating rules does not require code changes, and the agent’s isolated location (`content-validation-agent.ts`) makes it easy to locate and test. The main risk is the lack of visible modularization within the file (no symbols reported), so future refactoring should introduce explicit classes or interfaces to improve readability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ Finally, ensure that any failure returned by the agent is handled gracefully by 
 
 ### Siblings
 - [ConstraintMonitor](./ConstraintMonitor.md) -- The ConstraintMonitor uses an execute(input, context) pattern to validate constraints, similar to the pattern used by the ContentValidationAgent.
-
 
 ---
 

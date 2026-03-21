@@ -56,7 +56,6 @@ No explicit runtime integration mechanisms (e.g., dependency injection container
 | **Scalability considerations** | Adding new features scales linearly by creating new folders; the flat module hierarchy avoids deep nesting that could hinder navigation, but very large numbers of modules may require additional tooling (e.g., automated folder indexing) |
 | **Maintainability assessment** | High maintainability: consistent naming and indentation make diffs easy to read; modular layout simplifies impact analysis for changes; the discipline enforced by the parent and siblings reduces cognitive load for developers |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -65,7 +64,6 @@ No explicit runtime integration mechanisms (e.g., dependency injection container
 ### Siblings
 - [NamingConventions](./NamingConventions.md) -- The coding-conventions.md file defines class names in PascalCase, as seen in the Project structure, which helps in distinguishing between classes and variables.
 - [CodingStandards](./CodingStandards.md) -- The project uses a consistent indentation style, with 4 spaces used for each level of indentation, making the code more readable.
-
 
 ---
 

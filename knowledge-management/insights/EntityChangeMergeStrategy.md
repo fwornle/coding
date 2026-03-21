@@ -86,7 +86,6 @@ Because the strategy is invoked from `EntityAuthoringService`, the service likel
 * **Extensible via callbacks** – Adding new business rules does not require modifying the core merge logic; developers simply register additional validation hooks.  
 * **Potential hidden complexity** – The hybrid LWW/MVCC approach introduces branching logic that must be well‑documented; future maintainers need to understand when each path is taken.  Comprehensive unit tests and version‑history tooling are essential to keep the component maintainable over time.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Because the strategy is invoked from `EntityAuthoringService`, the service likel
 ### Siblings
 - [EntityFactoryPattern](./EntityFactoryPattern.md) -- The EntityAuthoringService class in entity-authoring-service.py employs the Factory pattern to handle manual entity creation and editing, as seen in the class definition.
 - [EntityValidationMechanism](./EntityValidationMechanism.md) -- The EntityCreation and EntityEditing techniques likely involve data validation, which is a critical step in ensuring data quality and preventing errors.
-
 
 ---
 

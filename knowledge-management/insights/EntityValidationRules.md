@@ -98,12 +98,10 @@ Developers extending or maintaining the validation logic should observe the foll
 
 The diagram above illustrates the parent‑child relationship and the direction of dependency, reinforcing the textual description of the architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
-
 
 ---
 

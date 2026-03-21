@@ -12,14 +12,11 @@ The HookRegistry's design may incorporate considerations for handling large numb
 
 - The HookRegistry's design may incorporate considerations for handling large numbers of event registrations, such as using caching or lazy loading to optimize performance
 
-
 ## Related Entities
 
 ### Used By
 
 - HookManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The HookRegistry's design may incorporate considerations for handling large numb
 ### Siblings
 - [EventDispatcher](./EventDispatcher.md) -- The EventDispatcher likely utilizes the Hooks.js file to manage event registrations and dispatches, enabling a flexible and scalable event handling mechanism
 - [PublishSubscribePattern](./PublishSubscribePattern.md) -- The PublishSubscribePattern, as implemented in the HookManager, enables loose coupling between event producers and consumers, making it easier to modify or replace individual components without affecting the overall system
-
 
 ---
 

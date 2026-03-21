@@ -13,7 +13,7 @@ The execute(input, context) pattern provides a flexible and extensible way for d
 
 The sub‑component consumes graph data via the **GraphDatabaseAdapter** (found in `storage/graph-database-adapter.ts`) and collaborates with the **CodeGraphConstructor** (see `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`). When a constraint violation is identified, it emits alerts and notifications, giving downstream tooling a concise view of the code‑base’s constraint health.
 
-![ConstraintDetection — Architecture](../../.data/knowledge-graph/insights/images/constraint-detection-architecture.png)
+![ConstraintDetection — Architecture](images/constraint-detection-architecture.png)
 
 ---
 
@@ -27,7 +27,7 @@ The design of **ConstraintDetection** is anchored on two clear architectural cho
 
 Interaction flow (illustrated in the relationship diagram below) shows **ConstraintDetection** receiving an `input` payload, consulting the **GraphDatabaseAdapter** for the relevant code graph, applying the configured constraints (via its child **ConstraintConfiguration**), and finally emitting alerts that are consumed by logging/monitoring siblings.
 
-![ConstraintDetection — Relationship](../../.data/knowledge-graph/insights/images/constraint-detection-relationship.png)
+![ConstraintDetection — Relationship](images/constraint-detection-relationship.png)
 
 ### Architectural Patterns Identified  
 
@@ -121,7 +121,6 @@ The clear separation between **execute**, **GraphDatabaseAdapter**, and **Constr
 
 Potential maintenance challenges include the risk of the `execute` function becoming a monolith if many bespoke constraints are added without proper modularization. Introducing a lightweight plugin system via **ProviderRegistration** can mitigate this risk while preserving the existing design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ Potential maintenance challenges include the risk of the `execute` function beco
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [ProviderRegistration](./ProviderRegistration.md) -- The ProviderRegistration sub-component uses the ProviderRegistry class for registering new providers.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.
-
 
 ---
 

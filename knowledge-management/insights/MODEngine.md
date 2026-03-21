@@ -112,7 +112,6 @@ Interaction flow: a consumer (e.g., BudgetTracker) calls the façade in `lib/llm
 * **Testability** – The existence of a dedicated mock mode that fully participates in the state machine makes automated testing straightforward and low‑cost.  
 * **Future‑Proofing** – Because the parent LLMAbstraction and siblings already depend on the façade, any refactor of the underlying mode implementations will have minimal impact on the broader system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ Interaction flow: a consumer (e.g., BudgetTracker) calls the façade in `lib/llm
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker utilizes the lib/llm/llm-service.ts file to fetch the current budget for LLM operations, enabling provider-agnostic budget management.
 - [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier utilizes the lib/llm/llm-service.ts file to fetch the sensitivity classification for LLM requests, enabling provider-agnostic sensitivity classification.
 - [ProviderManager](./ProviderManager.md) -- ProviderManager utilizes the lib/llm/llm-service.ts file to manage and integrate different LLM providers, enabling provider-agnostic operations.
-
 
 ---
 

@@ -16,7 +16,7 @@ The **LiveLoggingSystem** is the central component that stitches together loggin
 
 Together these pieces deliver a modular, extensible system that can ingest raw agent output, validate its configuration, classify observations, and surface them through a consistent logging API.
 
-![LiveLoggingSystem — Architecture](../../.data/knowledge-graph/insights/images/live-logging-system-architecture.png)
+![LiveLoggingSystem — Architecture](images/live-logging-system-architecture.png)
 
 ---
 
@@ -70,7 +70,7 @@ External integrations include:
 
 These connections are visualised in the relationship diagram below.
 
-![LiveLoggingSystem — Relationship](../../.data/knowledge-graph/insights/images/live-logging-system-relationship.png)
+![LiveLoggingSystem — Relationship](images/live-logging-system-relationship.png)
 
 ---
 
@@ -112,7 +112,6 @@ The hierarchy mirrors the parent **Coding** component: LiveLoggingSystem is a ch
 
 The strong modular boundaries, explicit abstract contracts, and comprehensive markdown documentation (INSTALL, USAGE, hooks) make the LiveLoggingSystem **highly maintainable**. New features can be added by extending existing adapters or agents without touching unrelated code. The only maintenance pressure lies in keeping the configuration validator and documentation aligned with any schema changes, a task mitigated by the script‑first approach and the clear location of all relevant markdown files.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ The strong modular boundaries, explicit abstract contracts, and comprehensive ma
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
 - [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
-
 
 ---
 

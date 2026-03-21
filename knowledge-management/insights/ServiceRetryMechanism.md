@@ -70,12 +70,10 @@ No other siblings or children are mentioned, so the retry component appears to b
 * **Clear ownership** – the module’s purpose is explicit, and the limited public surface (the retry method) eases testing and documentation.  
 * **Risk** – absent concrete configuration interfaces, developers may inadvertently rely on default retry settings that are unsuitable for particular services; providing explicit configuration hooks would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarterModule](./ServiceStarterModule.md) -- The ServiceStarterModule uses a retry mechanism to ensure that services are properly started, as seen in the implementation of the ServiceStarter class.
-
 
 ---
 

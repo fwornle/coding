@@ -91,7 +91,6 @@ Because no concrete class names appear in the observations, the above descriptio
 
 Overall, **FallbackHandler** embodies a clean, extensible approach to connection resilience within the **Trajectory** ecosystem, leveraging well‑understood design patterns while staying tightly aligned with the system’s fault‑tolerant goals.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Overall, **FallbackHandler** embodies a clean, extensible approach to connection
 - [DataFormatter](./DataFormatter.md) -- DataFormatter uses a set of predefined templates to format data for submission to the Specstory extension.
 - [HttpRequestHelper](./HttpRequestHelper.md) -- HttpRequestHelper uses a set of predefined HTTP request templates to simplify the request process.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a set of predefined adapters to connect to the Specstory extension via different methods.
-
 
 ---
 

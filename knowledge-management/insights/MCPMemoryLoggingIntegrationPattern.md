@@ -14,7 +14,6 @@ MCPMemoryLoggingIntegrationPattern is implemented across: src/knowledge-manageme
 
 - Pattern extracted from codebase analysis and stored as reusable knowledge entity
 
-
 ---
 
 *Generated from 9 observations*

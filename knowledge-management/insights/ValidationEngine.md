@@ -114,7 +114,6 @@ The system follows a **layered validation pipeline**: UI/API → `ContentValidat
 
 Overall, the **ValidationEngine** embodies a clean, extensible design that balances flexibility with maintainability, making it a solid foundation for the broader content‑validation ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ Overall, the **ValidationEngine** embodies a clean, extensible design that balan
 ### Siblings
 - [ValidationRules](./ValidationRules.md) -- The ValidationRules would be defined in a dedicated file, such as validation-rules.ts, to keep them separate from the validation engine logic.
 - [StalenessDetectionAlgorithm](./StalenessDetectionAlgorithm.md) -- The StalenessDetectionAlgorithm would likely be implemented in a separate utility file, such as staleness-detection.ts, to keep the detection logic separate from the validation engine.
-
 
 ---
 

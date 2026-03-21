@@ -85,7 +85,6 @@ Finally, respect the **filtering thresholds** and **normalisation parameters** (
 * **Extensibility** – The `configure` hook and clear separation of filtering/normalisation stages support straightforward addition of new metrics.  
 * **Potential risk** – Absence of explicit type safety around custom formulas (if they are raw callbacks) could introduce runtime errors; adding typed strategy interfaces would improve robustness.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Finally, respect the **filtering thresholds** and **normalisation parameters** (
 - [WorkflowLayoutComputer](./WorkflowLayoutComputer.md) -- WorkflowLayoutComputer uses a graph-based data structure in workflow-layout-computer.ts to model workflow dependencies and compute layouts
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses a rules-based approach in content-validation-agent.ts to validate entity content against predefined constraints
 - [ViolationCaptureService](./ViolationCaptureService.md) -- ViolationCaptureService uses a event-driven approach in violation-capture-service.ts to capture and process constraint violations
-
 
 ---
 

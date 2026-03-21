@@ -108,12 +108,10 @@ The lack of file paths or class definitions means we cannot point to a concrete 
 * **Negative** – The current lack of visible source symbols makes it difficult for developers to locate and modify the categorizer; introducing explicit class files and documentation would greatly aid future maintenance.  
 * **Recommendation** – Introduce a well‑named module (e.g., `src/designpatterns/DesignPatternCategorizer.ts`) exposing a concise API (`categorizeAndStore(pattern)`) and document the expected category nodes. This will align the implementation with the observed architectural intent and simplify onboarding for new contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DesignPatterns](./DesignPatterns.md) -- DesignPatterns uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database
-
 
 ---
 

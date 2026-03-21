@@ -99,7 +99,6 @@ Because the framework also defines the **metadata schema and validation rules**,
    * Centralized schema simplifies reasoning about data contracts but requires coordinated releases for schema evolution.  
    * Lack of explicit interfaces in the observations suggests that adding formal Java interfaces for `CacheManager` and `MetadataRepository` could further improve testability and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ Because the framework also defines the **metadata schema and validation rules**,
 ### Siblings
 - [CacheManager](./CacheManager.md) -- CacheManager is likely implemented as a separate module or class, responsible for caching and expiring metadata
 - [MetadataRepository](./MetadataRepository.md) -- MetadataRepository is likely implemented using a database access library or framework, such as JDBC or Hibernate
-
 
 ---
 

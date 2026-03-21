@@ -65,7 +65,6 @@ The example file (`coding-standards-example.java`) serves as a **documentation i
 
 These insights are directly derived from the observed files and their described roles, providing a grounded view of how `CommentingGuidelines` fits into the overall coding‑standards architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ These insights are directly derived from the observed files and their described 
 ### Siblings
 - [NamingConventions](./NamingConventions.md) -- The CodingStandards.java file likely contains methods or properties that enforce naming conventions, such as checking for camelCase or PascalCase naming schemes.
 - [CodeFormatting](./CodeFormatting.md) -- The CodingStandards.java file may contain methods or properties that enforce code formatting, such as checking for consistent indentation or line lengths.
-
 
 ---
 

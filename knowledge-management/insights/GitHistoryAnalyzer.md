@@ -75,7 +75,6 @@ By adhering to these practices, developers preserve the consistency that the Bas
 * By centralizing ontology classification and staleness detection in dedicated modules, the analyzer remains thin and focused, making it easier to test and evolve.  
 * The reliance on shared mutable state (`nextIndex`) introduces a small maintenance surface—developers must ensure atomic updates and avoid hidden side effects when refactoring. Overall, the design balances modularity with performance, yielding a maintainable component within the broader *SemanticAnalysis* ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ By adhering to these practices, developers preserve the consistency that the Bas
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator uses the LLM and code graph context to generate semantic insights
 - [AgentManager](./AgentManager.md) -- The AgentManager uses the BaseAgent pattern from base-agent.ts to standardize agent behavior and response envelope creation
 - [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph uses the GraphDatabase class from graph-database.ts to store and manage knowledge graph data
-
 
 ---
 

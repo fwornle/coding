@@ -69,7 +69,6 @@ These stages are typically realized as separate classes (e.g., `Lexer`, `Parser`
 * **High** – The clear separation between lexical, syntactic, and semantic responsibilities, coupled with a single entry point in `CodeKnowledgeGraphConstructor.java`, makes the codebase easy to reason about and unit‑test.
 * **Potential Risk** – The hidden implementation of *CodeParsing* (no visible file paths or symbols) could become a maintenance blind spot; documentation and interface contracts must be kept up‑to‑date to avoid drift.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ These stages are typically realized as separate classes (e.g., `Lexer`, `Parser`
 ### Siblings
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeKnowledgeGraphConstructor sub-component uses a custom CodeGraphConstructor class to construct knowledge graphs, as inferred from the parent context of KnowledgeManagement
 - [CodeEntityExtraction](./CodeEntityExtraction.md) -- CodeEntityExtraction is a suggested node from the parent component analysis, indicating its importance in the knowledge graph construction process
-
 
 ---
 

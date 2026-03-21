@@ -94,7 +94,6 @@ The component hierarchy is **Insights → KnowledgeReportGenerator**, with sibli
 
 The clear division between data extraction, insight creation, and report rendering makes the codebase approachable: changes to the report layout only affect template files, while changes to the underlying analytics stay within **InsightGeneratorService** or **PatternExtractor**.  The reliance on well‑defined contracts further reduces ripple effects across components.  However, the lack of explicit file paths or concrete class definitions in the current observations suggests that documentation and naming conventions will be crucial to keep the integration surface understandable as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The clear division between data extraction, insight creation, and report renderi
 ### Siblings
 - [InsightGeneratorService](./InsightGeneratorService.md) -- InsightGeneratorService utilizes the InsightGenerator class to generate insights based on entity data, which is defined in the SemanticAnalysis component context
 - [PatternExtractor](./PatternExtractor.md) -- PatternExtractor uses a natural language processing library to tokenize and parse entity data, which is then fed into a machine learning model to identify patterns and relationships
-
 
 ---
 

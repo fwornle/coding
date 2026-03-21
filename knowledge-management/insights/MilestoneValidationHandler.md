@@ -12,14 +12,11 @@ MilestoneValidationHandler is likely implemented as a separate module or class, 
 
 - The use of a MilestoneValidationHandler suggests a deliberate design decision to prioritize data quality and consistency in the ProjectMilestoneManager sub-component
 
-
 ## Related Entities
 
 ### Used By
 
 - ProjectMilestoneManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ MilestoneValidationHandler is likely implemented as a separate module or class, 
 ### Siblings
 - [MilestoneDataModel](./MilestoneDataModel.md) -- MilestoneDataModel is defined in the Milestone.js file, which is referenced by the ProjectMilestoneManager sub-component
 - [MilestoneLifecycleManager](./MilestoneLifecycleManager.md) -- MilestoneLifecycleManager would need to interact with the MilestoneDataModel to create, update, and delete milestones, as well as with other components and sub-components to ensure consistency
-
 
 ---
 

@@ -104,14 +104,7 @@ Finally, the **FormatMapper** child is the only internal integration point; any 
 
 ### Relationship
 
-![LSLConverter Relationship](images/lslconverter-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/lslconverter-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -127,7 +120,6 @@ Finally, the **FormatMapper** child is the only internal integration point; any 
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
 - [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

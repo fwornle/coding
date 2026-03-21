@@ -93,14 +93,7 @@ The component’s **minimal footprint** (a README, static assets, a small HTTP s
 
 ### Relationship
 
-![BrowserAccessMCP Relationship](images/browser-access-mcp-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/browser-access-mcp-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -111,7 +104,6 @@ The component’s **minimal footprint** (a README, static assets, a small HTTP s
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter is implemented in storage/graph-database-adapter.ts, showcasing a modular design for database interactions.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent is implemented in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, demonstrating a modular approach to data classification.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG is implemented in integrations/code-graph-rag/README.md, showcasing a graph-based representation of code.
-
 
 ---
 

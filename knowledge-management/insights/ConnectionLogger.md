@@ -102,7 +102,6 @@ Overall, the integration pattern is **tight‑coupling at the module level** (al
 * Because the logger is instantiated in a single place (`ConnectionManager`) and injected into all siblings, updates to configuration propagate automatically, reducing duplication.  
 * The lack of a dedicated logging interface (e.g., an abstract logger contract) means that swapping the implementation would require careful refactoring of all call sites, but the current design’s simplicity keeps the codebase approachable for developers familiar with Node.js logging patterns.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ Overall, the integration pattern is **tight‑coupling at the module level** (al
 ### Siblings
 - [ConnectionRetryHandler](./ConnectionRetryHandler.md) -- The ConnectionRetryHandler would likely be implemented in the lib/integrations/specstory-adapter.js file, where the SpecstoryAdapter class is defined as the main entry point for connection management
 - [SpecstoryAdapterIntegration](./SpecstoryAdapterIntegration.md) -- The SpecstoryAdapterIntegration would be defined in the lib/integrations/specstory-adapter.js file, where the SpecstoryAdapter class is imported and configured
-
 
 ---
 

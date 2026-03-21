@@ -79,12 +79,10 @@ Although the source contains no explicit symbols, the observed flow implies the 
 
 Overall, **ProviderRegistrar** serves as the pivotal glue that enables DMRManager’s pluggable LLM inference capability through a clean, registry‑driven design.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DMRManager](./DMRManager.md) -- DMRManager uses the DMRProvider class (lib/llm/providers/dmr-provider.ts) to register as a provider, enabling local LLM inference
-
 
 ---
 

@@ -69,12 +69,10 @@ Because persistence is delegated to a graph database, scalability largely depend
 ### 5. Maintainability assessment  
 The clear separation of responsibilities and the use of well‑defined adapters make the component highly maintainable.  Adding new pattern attributes or swapping the graph backend requires changes only in the serializer/deserializer or the adapter, leaving the manager’s orchestration code untouched.  The only maintenance risk is the tight coupling to the `CodingPatterns` contract; any breaking change there will necessitate coordinated updates across the manager and its parent.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [PatternStorage](./PatternStorage.md) -- PatternStorage interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve coding patterns and entities.
-
 
 ---
 

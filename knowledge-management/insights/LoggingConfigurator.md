@@ -76,12 +76,10 @@ No direct references to other sibling configurators are given, but the pattern s
 * **Potential risk** – Lack of schema enforcement could lead to silent misconfigurations; adding validation tooling would mitigate this.  
 * The clear parent‑child relationship (`ConfigManager` → `LoggingConfigurator`) encourages modular updates; changes to logging configuration logic are isolated from other configurators.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConfigManager](./ConfigManager.md) -- The config/ directory contains files like graph-database-config.json and logging-config.json, demonstrating a centralized configuration approach.
-
 
 ---
 

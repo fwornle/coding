@@ -66,7 +66,6 @@ Because the runner is encapsulated, scaling strategies (e.g., moving to a distri
 ### Maintainability assessment  
 The clear modular split enhances maintainability: changes to execution algorithms stay confined to `workflow_runner.py`, while monitoring or scheduling logic lives in their respective siblings.  The lack of exposed internal details (no public functions listed) further reduces the risk of accidental misuse.  The primary maintenance risk is the implicit reliance on an undocumented execution contract; documenting the runner’s expected inputs, outputs, and state transitions would solidify the design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -75,7 +74,6 @@ The clear modular split enhances maintainability: changes to execution algorithm
 ### Siblings
 - [WorkflowExecution](./WorkflowExecution.md) -- The WorkflowExecution aspect of the WorkflowManager sub-component may involve the use of specific algorithms or patterns, such as dependency resolution or task scheduling, to manage workflow execution.
 - [WorkflowLifecycleManagement](./WorkflowLifecycleManagement.md) -- The WorkflowLifecycleManagement aspect of the WorkflowManager sub-component may involve the use of specific design patterns, such as the state pattern or the observer pattern, to manage workflow state and transitions.
-
 
 ---
 

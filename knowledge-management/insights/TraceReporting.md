@@ -121,7 +121,6 @@ Every invocation of `TraceReporter.generateReport` triggers a series of log entr
 
 Overall, **TraceReporting** is a well‑structured, interface‑centric sub‑component that aligns with the architectural conventions of the broader KnowledgeManagement system while providing a clear, maintainable pathway for generating trace reports.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -141,7 +140,6 @@ Overall, **TraceReporting** is a well‑structured, interface‑centric sub‑co
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class
 - [AgentManagement](./AgentManagement.md) -- AgentManagement uses the VKB API to manage agents in the AgentManager class
 - [WorkflowManagement](./WorkflowManagement.md) -- WorkflowManagement uses the VKB API to manage workflows in the WorkflowManager class
-
 
 ---
 

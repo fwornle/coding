@@ -121,7 +121,6 @@ All dependencies are **explicitly imported** via the file paths listed above, me
 
 Overall, **EntityPersistenceManager** sits at a well‑architected intersection of domain orchestration and infrastructure abstraction, leveraging proven patterns (Adapter, Facade, Layered) to deliver a maintainable, type‑safe persistence pathway for the KnowledgeManagement ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -134,7 +133,6 @@ Overall, **EntityPersistenceManager** sits at a well‑architected intersection 
 - [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
 - [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
 - [OntologyClassificationSystem](./OntologyClassificationSystem.md) -- OntologyClassificationSystem uses the CodeGraphAgent's classifyEntity function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to classify entities.
-
 
 ---
 

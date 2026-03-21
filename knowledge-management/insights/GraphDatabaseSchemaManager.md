@@ -91,7 +91,6 @@ Because schema migrations are executed synchronously against the graph database,
 
 The use of a plain JSON schema coupled with explicit version numbers makes the schema easy to read, review, and evolve.  By encapsulating migration logic within `GraphDatabaseSchemaManager`, the codebase avoids scattered schema‑altering scripts, improving traceability.  However, the lack of visible code symbols in the observations suggests that the implementation may be lightweight; future maintainers should ensure that version persistence and diff algorithms are well‑documented and covered by tests to prevent silent drift.  Overall, the clear separation from connection and query concerns contributes positively to long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The use of a plain JSON schema coupled with explicit version numbers makes the s
 ### Siblings
 - [GraphDatabaseConnector](./GraphDatabaseConnector.md) -- GraphDatabaseConnection (graph-database-adapter.js) defines the connection settings, including the database URL and credentials, which are loaded from environment variables.
 - [GraphDatabaseQueryExecutor](./GraphDatabaseQueryExecutor.md) -- GraphDatabaseQuery (graph-database-adapter.js) implements a query builder pattern, allowing developers to construct queries using a fluent API.
-
 
 ---
 

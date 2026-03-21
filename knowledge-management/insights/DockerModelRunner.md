@@ -62,12 +62,10 @@ Error handling is crucial: any Docker‑related exception (e.g., image not found
 * However, reliance on external Docker images introduces a maintenance surface (image versioning, compatibility) that must be tracked alongside the source code.  
 * Providing a well‑documented interface in `DockerModelRunner` will reduce coupling and simplify future refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LocalLLM](./LocalLLM.md) -- LocalLLM uses the DockerModelRunner class in lib/llm/docker-model-runner.ts to run local LLM models
-
 
 ---
 

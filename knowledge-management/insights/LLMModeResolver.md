@@ -102,7 +102,6 @@ The LLM stack is deliberately modular: each concern (provider selection, caching
 
 The resolver’s responsibilities are narrowly scoped, making it easy to understand and test.  Its reliance on explicit interfaces (`LLMMode`) and simple caching logic reduces hidden coupling.  The primary maintenance burden lies in keeping the decision logic in `resolveMode()` synchronized with any new configuration options or environment variables introduced elsewhere.  Because the resolver is a single class with a clear public API (`resolveMode`, `getMode`, `updateMode`), refactoring or extending it can be done with minimal impact on sibling components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -114,7 +113,6 @@ The resolver’s responsibilities are narrowly scoped, making it easy to underst
 - [LLMErrorHandling](./LLMErrorHandling.md) -- The LLMErrorHandling class (lib/llm/llm-error-handling.ts) utilizes a try-catch approach to catch and handle errors that occur during LLM provider interactions.
 - [LLMConfigurationManager](./LLMConfigurationManager.md) -- The LLMConfigurationManager class (lib/llm/llm-configuration-manager.ts) utilizes a configuration-based approach to manage the behavior of the LLMAbstraction component.
 - [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) utilizes a facade-based approach to provide a high-level interface for LLM operations.
-
 
 ---
 

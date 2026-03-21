@@ -87,7 +87,6 @@ Even though the source code for **HookConfigurationLoader** is not directly list
 * Clear boundaries reduce the risk of unintended side effects when extending functionality.
 * The reliance on shared validation utilities (from **ContentValidator**) encourages consistency across modules, further enhancing maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Even though the source code for **HookConfigurationLoader** is not directly list
 - [ViolationCaptureHandler](./ViolationCaptureHandler.md) -- ViolationCaptureHandler captures and persists constraint violations, ensuring that the system remains accurate and up-to-date.
 - [GraphDatabaseAccessor](./GraphDatabaseAccessor.md) -- GraphDatabaseAdapter provides access to graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
 - [HookManager](./HookManager.md) -- HookManager manages unified hook registration and execution, providing a critical function in the ConstraintSystem.
-
 
 ---
 

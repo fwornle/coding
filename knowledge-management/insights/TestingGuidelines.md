@@ -86,7 +86,6 @@ Because the guidelines are static and version‑controlled, any updates to testi
 * High maintainability: clear file boundaries, explicit naming, and central aggregation via `TestingGuidelines.cs`.  
 * Potential risk: because the files contain no executable symbols, accidental omission of updates (e.g., forgetting to sync `TestingFrameworks.cs` after a framework upgrade) could propagate outdated guidance. A build‑time validation step or unit tests that assert consistency would mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ Because the guidelines are static and version‑controlled, any updates to testi
 - [CodingConventions](./CodingConventions.md) -- The CodingConventions.cs file provides guidelines for coding conventions, such as naming, commenting, and formatting.
 - [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The ArchitectureGuidelines.cs file provides guidelines for overall system architecture, including layering and separation of concerns.
 - [ErrorHandlingGuidelines](./ErrorHandlingGuidelines.md) -- The ErrorHandlingGuidelines.cs file provides guidelines for error handling, including exception handling, logging, and error reporting.
-
 
 ---
 

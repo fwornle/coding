@@ -46,21 +46,17 @@ The KnowledgePersistencePattern's maintainability is facilitated by its modular,
 
 ![KnowledgePersistencePattern Architecture](images/knowledge-persistence-pattern-architecture.png)
 
-
 ### Sequence
 
 ![KnowledgePersistencePattern Sequence](images/knowledge-persistence-pattern-sequence.png)
-
 
 ### Class
 
 ![KnowledgePersistencePattern Class](images/knowledge-persistence-pattern-class.png)
 
-
 ### Use cases
 
 ![KnowledgePersistencePattern Use cases](images/knowledge-persistence-pattern-use-cases.png)
-
 
 ---
 

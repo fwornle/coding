@@ -119,14 +119,7 @@ No additional architectural styles such as micro‑services or message queues ar
 
 ### Relationship
 
-![LLMController Relationship](images/llmcontroller-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/llmcontroller-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -142,7 +135,6 @@ No additional architectural styles such as micro‑services or message queues ar
 - [Insights](./Insights.md) -- The Insights sub-component uses the LLMService in lib/llm/dist/index.js for generating insights and pattern catalog extraction.
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor uses the GraphDatabaseAdapter in storage/graph-database-adapter.js for storing and retrieving code entities and their relationships.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter uses the graph database for storing and retrieving knowledge entities and their relationships.
-
 
 ---
 

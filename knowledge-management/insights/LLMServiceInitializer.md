@@ -77,12 +77,10 @@ If future agents require similar lazy LLM initialization, they could reuse the s
 - **Low complexity**: With only one public method (`initializeService`) and a clear lazy‑load contract, the surface area for bugs is minimal.  
 - **Potential risk**: Because the initializer is not abstracted behind an interface, any future need to inject mock LLM clients for testing will require refactoring the agent to accept a pluggable initializer or client. Nonetheless, the current design is clean and well‑aligned with its limited scope.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-
 
 ---
 

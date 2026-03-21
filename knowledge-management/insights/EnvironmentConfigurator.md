@@ -22,7 +22,7 @@ Thread safety is achieved via a **synchronization mechanism** comparable to the 
 
 Finally, the component exposes a **callback‑based notification system** for downstream consumers such as **Trajectory**. When an environment variable changes, registered callbacks are invoked, allowing the **Trajectory** component to react promptly—this mirrors the logging callback pattern used by **SpecstoryAdapter** to inform the logging pipeline of new conversation events.  
 
-![EnvironmentConfigurator — Architecture](../../.data/knowledge-graph/insights/images/environment-configurator-architecture.png)
+![EnvironmentConfigurator — Architecture](images/environment-configurator-architecture.png)
 
 ---
 
@@ -52,7 +52,7 @@ Sibling components share architectural philosophies:
 
 The relationship diagram below visualizes these connections:  
 
-![EnvironmentConfigurator — Relationship](../../.data/knowledge-graph/insights/images/environment-configurator-relationship.png)
+![EnvironmentConfigurator — Relationship](images/environment-configurator-relationship.png)
 
 ---
 
@@ -92,7 +92,6 @@ The component sits as a thin façade over a collection of specialized modules, a
 ### Maintainability Assessment  
 The strict **standardized interface** and **module‑per‑concern** layout make the codebase easy to navigate and extend. New contributors can add a module by copying an existing template and implementing the required methods, without touching core logic. The shared patterns with siblings (LazyLoader, WorkStealer, etc.) mean that best practices and bug‑fixes can be propagated across components, further enhancing maintainability. The only maintenance overhead lies in tuning cache policies as the system’s usage patterns evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ The strict **standardized interface** and **module‑per‑concern** layout make
 - [WorkStealer](./WorkStealer.md) -- WorkStealer uses a shared atomic index counter to enable work-stealing, allowing idle workers to pull tasks immediately, as seen in the WaveController's runWithConcurrency method.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a modular approach to data storage and management, with each graph having its own dedicated storage module, as seen in the integrations directory.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a modular approach to logging and tracking conversations and events, with each conversation having its own dedicated logging module, as seen in the integrations directory.
-
 
 ---
 

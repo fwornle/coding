@@ -129,14 +129,7 @@ All these integrations are **loose‑coupled** via interfaces (e.g., the adapter
 
 ### Relationship
 
-![SemanticAnalysisService Relationship](images/semantic-analysis-service-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/semantic-analysis-service-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -155,7 +148,6 @@ All these integrations are **loose‑coupled** via interfaces (e.g., the adapter
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstruction sub-component uses the CodeGraphAgent to analyze the code structure.
 - [LLMIntegration](./LLMIntegration.md) -- The LLMIntegration sub-component uses the LLM services to analyze the input data.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses the graph-database-adapter.ts module to adapt the graph database.
-
 
 ---
 

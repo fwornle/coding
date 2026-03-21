@@ -104,7 +104,6 @@ The concurrency subsystem is organised as a small, well‑defined hierarchy: **C
 ### Maintainability assessment  
 The separation of concerns (execution, scheduling, synchronization) yields a maintainable codebase: changes to task prioritisation affect only **TaskScheduler**, while tweaks to thread‑lifecycle logic stay within **ThreadPoolManager**.  The lack of concrete file paths in the observations suggests that documentation should explicitly map class names to their source locations to aid future developers.  Adding comprehensive unit tests for each component (pool lifecycle, scheduler ordering, lock acquisition) will further reinforce maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ The separation of concerns (execution, scheduling, synchronization) yields a mai
 ### Siblings
 - [TaskScheduler](./TaskScheduler.md) -- A TaskScheduler would be necessary to manage the queue of tasks to be executed by the thread pool, ensuring that high-priority tasks are executed promptly and that dependencies between tasks are respected.
 - [LockManager](./LockManager.md) -- The LockManager would need to implement locking mechanisms, such as mutexes or semaphores, to synchronize access to shared resources and prevent data corruption or inconsistency.
-
 
 ---
 

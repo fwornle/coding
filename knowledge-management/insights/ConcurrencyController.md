@@ -58,7 +58,6 @@ The child **WorkDistributor** likely encapsulates the mapping from an index to a
 4. **Scalability considerations** – The lock‑free atomic design scales well with core count; however, the global counter can become a bottleneck if task acquisition frequency is extremely high.  Work‑stealing mitigates this by allowing workers to fetch multiple indices in bursts if supported.  
 5. **Maintainability assessment** – By isolating the coordination logic (ConcurrencyController) from the task generation logic (WorkDistributor), the codebase remains modular.  Adding new task types or changing the distribution strategy only touches WorkDistributor, while the concurrency guarantees stay centralized, simplifying future maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ The child **WorkDistributor** likely encapsulates the mapping from an index to a
 - [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
 - [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
 - [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
-
 
 ---
 

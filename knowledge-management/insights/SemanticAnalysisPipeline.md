@@ -113,7 +113,6 @@ Persistence is mediated through the *graph database adapter*. The agent translat
 
 The clear modular boundaries and use of well‑known patterns (agent, adapter) make the pipeline highly maintainable. Individual agents can be unit‑tested in isolation, and the orchestrator provides a single point of change for pipeline flow adjustments. The reliance on shared adapters and configuration files promotes consistency across siblings, though it also creates a coupling point that must be managed carefully during upgrades. Overall, the design favours extensibility and ease of reasoning, aligning well with the broader multi‑agent strategy of the *SemanticAnalysis* component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ The clear modular boundaries and use of well‑known patterns (agent, adapter) m
 - [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
 - [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
-
 
 ---
 

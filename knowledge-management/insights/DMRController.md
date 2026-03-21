@@ -14,11 +14,9 @@ The controller's result processing pipeline in result-processor.py applies post-
 
 - DMRController's load_model function in model-loader.py checks the model's compatibility with the local Docker environment before proceeding with loading
 
-
 ## How It Works
 
 - The controller's result processing pipeline in result-processor.py applies post-processing techniques such as tokenization and normalization to the inference outputs
-
 
 ## Related Entities
 
@@ -34,8 +32,6 @@ The controller's result processing pipeline in result-processor.py applies post-
 
 - LLMAbstraction (contains)
 
-
-
 ## Hierarchy Context
 
 ### Parent
@@ -50,7 +46,6 @@ The controller's result processing pipeline in result-processor.py applies post-
 - [AnthropicController](./AnthropicController.md) -- AnthropicController initializes the Anthropic SDK in anthropic-init.py, setting up API keys and model configurations
 - [LLMService](./LLMService.md) -- LLMService implements mode routing in mode-router.py, directing requests to appropriate providers based on the current mode
 - [MockService](./MockService.md) -- MockService implements mock implementations of LLM providers in mock-providers.py, simulating their behavior for testing
-
 
 ---
 

@@ -72,7 +72,6 @@ Any external tooling that consumes the example file—such as a custom linter pl
 
 5. **Maintainability assessment** – High maintainability: the rule set is centralized, human‑readable, and easy to update. The lack of embedded logic means no technical debt accumulates in the code itself; the only maintenance burden is keeping the example file and any associated linter configurations in sync.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ Any external tooling that consumes the example file—such as a custom linter pl
 ### Siblings
 - [PackageOrganization](./PackageOrganization.md) -- The ProjectStructure sub-component suggests a hierarchical package organization, with packages named according to their functional responsibilities, as implied by the parent context of CodingPatterns.
 - [DirectoryLayout](./DirectoryLayout.md) -- The ProjectStructure sub-component implies a directory layout that mirrors the package organization, with directories named according to their functional responsibilities, as suggested by the parent context of CodingPatterns.
-
 
 ---
 

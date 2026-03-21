@@ -12,14 +12,11 @@ The KGTransformation (KGTransformation.ts:20) applies knowledge graph transforma
 
 - The KnowledgePersistence (KnowledgePersistence.ts:15) persists knowledge entities to a database, allowing for efficient querying and analysis
 
-
 ## Related Entities
 
 ### Used By
 
 - Pipeline (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The KGTransformation (KGTransformation.ts:20) applies knowledge graph transforma
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The PipelineCoordinator (PipelineCoordinator.ts:12) uses a DAG-based execution model, which relies on the DAGDependencyResolver to resolve dependencies between steps
 - [ObservationGenerator](./ObservationGenerator.md) -- The ObservationGeneration (ObservationGeneration.ts:5) generates observations from git history and LSL sessions, using natural language processing and machine learning algorithms
-
 
 ---
 

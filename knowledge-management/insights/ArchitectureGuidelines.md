@@ -72,7 +72,6 @@ The parent component **CodingPatterns** supplies the overarching modular philoso
 4. **Scalability considerations** – Adding new providers scales linearly; the registry can handle many providers without code changes, and mode‑based selection allows graceful degradation or feature‑flag driven rollouts.  
 5. **Maintainability assessment** – High maintainability due to explicit conventions, modular separation, and a single registry interface; developers can locate, add, or remove components quickly, and naming consistency reduces onboarding friction.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ The parent component **CodingPatterns** supplies the overarching modular philoso
 ### Siblings
 - [DesignPatterns](./DesignPatterns.md) -- The lib/llm/provider-registry.js file defines a provider registry that manages different providers, enabling provider switching based on mode and availability.
 - [CodingConventions](./CodingConventions.md) -- The use of a consistent naming convention, such as PascalCase, is evident throughout the project, as seen in the lib/llm/provider-registry.js file.
-
 
 ---
 

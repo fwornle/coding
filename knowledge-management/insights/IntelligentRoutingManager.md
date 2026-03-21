@@ -94,7 +94,6 @@ The system is organised as a **knowledge‑graph core** (KnowledgeManagement) th
 
 Because routing decisions are encapsulated in a single manager, updates to routing policies are localized, which is a strong maintainability advantage.  However, the tight coupling to the GraphDatabaseAdapter means that any change to the adapter’s API or behaviour requires coordinated updates across IntelligentRoutingManager, GraphDatabaseManager, and any other consumers.  The automatic JSON sync is a clear, observable side‑effect that simplifies debugging (the presence or absence of the JSON file is an easy health check), but developers must be aware of its impact on performance and storage.  Overall, the design balances clear separation of concerns with shared infrastructure, yielding a maintainable yet cohesive subsystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ Because routing decisions are encapsulated in a single manager, updates to routi
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing the graph database connection.
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
 - [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction.
-
 
 ---
 

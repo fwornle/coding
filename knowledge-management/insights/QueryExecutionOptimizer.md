@@ -90,7 +90,6 @@ All three layers expose a single public method `optimize(rawSql: string): Execut
 ### Maintainability assessment  
 The clear separation of concerns (cache, parser, advanced planner) makes the codebase modular and testable. However, the reliance on multiple third‑party packages means that dependency upgrades must be coordinated across layers. The explicit event‑driven cache invalidation ties the optimizer tightly to `DataStorage`’s schema‑change lifecycle, which is a maintenance hotspot; documentation and automated schema‑change tests are essential to avoid stale plan bugs. Overall, the design is maintainable provided that version pinning, thorough integration tests, and clear configuration contracts are kept up to date.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ The clear separation of concerns (cache, parser, advanced planner) makes the cod
 ### Siblings
 - [DatabaseConnectionManager](./DatabaseConnectionManager.md) -- The DatabaseConnectionManager would likely interact with a database driver, such as MySQL or PostgreSQL, to establish connections (e.g., mysql-connector-nodejs)
 - [DataSerializationHandler](./DataSerializationHandler.md) -- DataSerializationHandler would need to support multiple serialization formats, such as JSON or Avro, and might use libraries like JSON.stringify or avro-js (e.g., data-serialization.ts:27)
-
 
 ---
 

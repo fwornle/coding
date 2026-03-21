@@ -68,7 +68,6 @@ The system is organized around a **core connector** that aggregates three orthog
 ### 5. Maintainability assessment  
 The clear division of responsibilities makes the codebase approachable: security changes are confined to the AuthenticationHandler, connection logic to the ConnectionManager, and transport to the HttpApiClient. Adding a new authentication protocol only requires a new adapter inside the handler without touching the other modules. However, the lack of explicit file paths in the current observations suggests that documentation should be kept up‑to‑date to avoid ambiguity about where the handler resides, and unit tests should be enforced at the interface boundaries (handler ↔ manager, manager ↔ client) to safeguard against regressions when protocols evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -77,7 +76,6 @@ The clear division of responsibilities makes the codebase approachable: security
 ### Siblings
 - [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager would likely be implemented in a separate module, such as connection-manager.ts, to handle connection establishment and termination
 - [HttpApiClient](./HttpApiClient.md) -- The HttpApiClient would be implemented using a HTTP client library, such as Axios or Fetch, to make requests to the Specstory extension
-
 
 ---
 

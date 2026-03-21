@@ -28,8 +28,6 @@ The design that emerges from the observations is **a hook‑driven, pluggable lo
 
 The diagram below visualises this flow (illustrative only; the actual file paths are the anchors for the design).  
 
-![LogOutputter Interaction Diagram](https://example.com/diagrams/logoutputter-interaction.png)
-
 ---
 
 ## Implementation Details  
@@ -103,12 +101,10 @@ From the above we can infer the following internal mechanics:
 
 *End of insight document.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component may utilize the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI.
-
 
 ---
 

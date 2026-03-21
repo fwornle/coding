@@ -88,7 +88,6 @@ Interaction typically occurs via **well‑defined interfaces**: producers call a
 
 By adhering to the guidelines above and respecting the documented responsibilities, developers can extend the system’s event‑driven capabilities confidently, while preserving the reliability, security, and scalability that the **EventDrivenArchitecture** sub‑component promises.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ By adhering to the guidelines above and respecting the documented responsibiliti
 - [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement sub-component utilizes a graph database to store and manage knowledge graphs and ontologies
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- The GraphDatabaseManagement sub-component utilizes the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) to manage graph database connections and operations
 - [DataPersistence](./DataPersistence.md) -- The DataPersistence sub-component utilizes a database, such as a relational database or a NoSQL database, to store and manage data
-
 
 ---
 

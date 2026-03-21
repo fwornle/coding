@@ -77,7 +77,6 @@ The sibling **CacheInvalidation** (also defined in `cache-config.js` at line 3
 * **High** – Centralising all Redis interactions in a single exported module makes updates (e.g., library version bump, connection parameter change) straightforward.  
 * **Potential Risk** – Tight coupling to Redis means that swapping to a different cache technology would require rewriting the interface or adding an additional abstraction layer. However, the current design isolates that risk to one file, keeping the rest of the system stable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The sibling **CacheInvalidation** (also defined in `cache-config.js` at line 3
 ### Siblings
 - [CacheInvalidation](./CacheInvalidation.md) -- CacheInvalidation (cache-config.js:30) utilizes the Redis library to implement cache invalidation, removing outdated cache entries
 - [RedisConnection](./RedisConnection.md) -- The cache-config.js file (Line 5) imports the Redis library and establishes a connection to the Redis cache store using the RedisConnection configuration
-
 
 ---
 

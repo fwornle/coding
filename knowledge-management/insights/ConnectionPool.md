@@ -79,7 +79,6 @@ Because the pool is a thin wrapper around the driver’s internal pool, most of 
 * The clear separation of concerns (manager ↔ pool ↔ query interface) promotes modular testing and reduces the risk of side‑effects when altering one component.  
 * The only maintenance burden is keeping the Neo4j driver version compatible with the rest of the codebase and monitoring any driver‑level changes to pooling semantics.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Because the pool is a thin wrapper around the driver’s internal pool, most of 
 ### Siblings
 - [QueryInterface](./QueryInterface.md) -- The QueryInterface module is likely defined in a separate file, such as query-interface.ts, which imports the graph database library and configures the connection.
 - [GraphDatabaseConfigurator](./GraphDatabaseConfigurator.md) -- The GraphDatabaseConfigurator module is likely defined in a separate file, such as graph-database-configurator.ts, which imports the graph-database-config.js file and configures the connection settings.
-
 
 ---
 

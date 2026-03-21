@@ -68,7 +68,6 @@ External integrations may include monitoring tools that query the underlying dat
 ### Maintainability assessment
 - The abstraction keeps the logging core stable, but maintaining multiple adapters increases the maintenance surface.  Consistent error handling and unified configuration mitigate this risk.  Clear separation of concerns (formatting, storage, error handling) aids future refactoring and testing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -77,7 +76,6 @@ External integrations may include monitoring tools that query the underlying dat
 ### Siblings
 - [LogFormatter](./LogFormatter.md) -- The LogFormatter likely relies on a specific logging framework, such as Log4j or Serilog, to handle log formatting and output (e.g., Log4j's PatternLayout)
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism might use a try-catch block pattern to catch and handle exceptions, logging error messages and relevant context (e.g., error codes, stack traces)
-
 
 ---
 

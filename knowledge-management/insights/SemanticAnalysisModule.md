@@ -90,14 +90,7 @@ Another design element is the **shared ontology metadata field**.  The module wr
 
 ### Relationship
 
-![SemanticAnalysisModule Relationship](images/semantic-analysis-module-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/semantic-analysis-module-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -112,7 +105,6 @@ Another design element is the **shared ontology metadata field**.  The module wr
 - [HookManagementModule](./HookManagementModule.md) -- The HookManagementModule utilizes the integrations/copi/docs/hooks.md documentation to provide a reference for hook functions.
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
-
 
 ---
 

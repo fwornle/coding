@@ -101,12 +101,10 @@ Because the InsightGenerator resides under the *agents* namespace, it may be orc
 - The **single‑file, co‑located implementation** is easy to locate and modify, aiding maintainability.  
 - However, the lack of an abstract interface for the CodeAnalyzer means future changes to the analyzer’s API will ripple directly into the InsightGenerator, increasing the maintenance surface. Introducing a thin façade could mitigate this risk without disrupting the current design.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-
 
 ---
 

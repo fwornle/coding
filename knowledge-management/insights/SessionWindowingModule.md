@@ -104,7 +104,6 @@ Because detection is performed by lightweight pure functions, the module can sca
 
 The clear naming, strict separation of responsibilities, and centralized error handling make the SessionWindowingModule highly maintainable.  Adding new detection criteria only requires updating the relevant detector function and possibly extending the configuration schema.  Swapping storage backends is confined to the `sessionWindowStorage` implementation.  The module’s alignment with the same architectural conventions used by `LoggingModule`, `TranscriptManager`, and `ClassificationEngine` further simplifies onboarding for developers familiar with the broader LiveLoggingSystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -114,7 +113,6 @@ The clear naming, strict separation of responsibilities, and centralized error h
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
 - [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine utilizes the OntologyClassificationAgent class in ontology-classification-agent.ts for classifying observations and entities against the ontology system.
-
 
 ---
 

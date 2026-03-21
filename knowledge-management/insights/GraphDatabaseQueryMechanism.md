@@ -76,7 +76,6 @@ The integration surface is therefore limited to two public interfaces: the **ada
 * The clear separation of concerns (adapter → query mechanism → connection) yields high maintainability: changes to the graph schema affect only the adapter’s model, while query logic can be updated without touching connection code.  
 * However, the lack of explicit public symbols or file paths in the current documentation makes navigation harder for newcomers; adding concrete class/function listings would improve discoverability and reduce onboarding friction.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ The integration surface is therefore limited to two public interfaces: the **ada
 
 ### Siblings
 - [GraphDatabaseConnection](./GraphDatabaseConnection.md) -- The MEMGRAPH_BATCH_SIZE variable in the project documentation suggests that the GraphDatabaseAdapter may handle batch operations, potentially optimizing database interactions.
-
 
 ---
 

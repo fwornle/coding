@@ -108,7 +108,6 @@ The **parent component LiveLoggingSystem** provides the overall orchestration an
 * Reliance on well‑known libraries (pandas, JSON/XML) reduces the need for custom code, improving long‑term maintainability.  
 * Documentation references are scattered across several `integrations/*` markdown files; consolidating these into a dedicated design spec would further aid onboarding and reduce knowledge silos.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ The **parent component LiveLoggingSystem** provides the overall orchestration an
 ### Siblings
 - [LoggingManager](./LoggingManager.md) -- The LoggingManager likely utilizes a logging framework, such as a rotating file handler, to manage log files, as seen in the integrations/copi/INSTALL.md file.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-
 
 ---
 

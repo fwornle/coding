@@ -83,7 +83,6 @@ Because the component is a **sub‑component**, it does not expose its internal 
 
 These insights are derived directly from the provided observations and the surrounding component context. No assumptions beyond the documented facts have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ These insights are derived directly from the provided observations and the surro
 - [DataFormatter](./DataFormatter.md) -- DataFormatter uses a set of predefined templates to format data for submission to the Specstory extension.
 - [FallbackHandler](./FallbackHandler.md) -- FallbackHandler uses a set of predefined fallback strategies to handle connection failures, including retrying the connection or switching to a different connection method.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a set of predefined adapters to connect to the Specstory extension via different methods.
-
 
 ---
 

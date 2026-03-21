@@ -73,12 +73,10 @@ Because the server is a separate process, multiple instances could be spawned (e
 
 The clear separation between launch code (`AnalysisServerStarter`) and request handling (`SemanticAnalysisService`) improves maintainability: changes to the analysis engine can be made without touching the main application code, as long as the spawn interface remains stable. However, maintainers must keep the spawn command, environment, and any IPC contracts in sync with the server implementation, and they must be vigilant about handling child‑process lifecycle events to avoid orphaned processes.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the spawn function from the child_process module in scripts/semantic-analysis-service.js to start the analysis server
-
 
 ---
 

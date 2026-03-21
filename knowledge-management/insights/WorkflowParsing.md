@@ -75,7 +75,6 @@ Because the observations do not list any external libraries or services, we can 
 
 *All statements above are grounded directly in the supplied observations; no additional patterns or file locations have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ Because the observations do not list any external libraries or services, we can 
 ### Siblings
 - [WorkflowTraceGenerator](./WorkflowTraceGenerator.md) -- WorkflowTraceGenerator is referenced in the WorkflowTraceReporter.java file, indicating its integral role in generating trace reports.
 - [ConceptExtraction](./ConceptExtraction.md) -- The inclusion of ConceptExtraction as a suggested detail node suggests that it is an important aspect of the WorkflowTraceReporter, and its implementation has a significant impact on the overall tracing process.
-
 
 ---
 

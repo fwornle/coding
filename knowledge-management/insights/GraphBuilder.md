@@ -94,7 +94,6 @@ Following these conventions preserves the clean separation between parsing, grap
 
 Overall, the design captured in the observations reflects a modular, purpose‑driven approach that balances clarity with flexibility, laying a solid foundation for future growth of the GraphBuilder‑driven knowledge‑graph pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Overall, the design captured in the observations reflects a modular, purpose‑d
 
 ### Siblings
 - [AstParser](./AstParser.md) -- The CodeGraphConstructor class uses Tree-sitter AST parsing to construct the knowledge graph, as mentioned in the parent context.
-
 
 ---
 

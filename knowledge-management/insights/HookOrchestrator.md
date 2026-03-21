@@ -20,7 +20,7 @@ A lightweight **logging subsystem** is also part of the design.  Each hook execu
 
 The component sits directly under **ConstraintSystem**, sharing the same architectural layer as its siblings **ConstraintManager**, **ViolationLogger**, and **GraphPersistenceModule**.  While those siblings focus on constraint storage, validation, and violation reporting, HookOrchestrator supplies the extensibility point that allows custom logic to be injected into the constraint workflow.  
 
-![HookOrchestrator — Architecture](../../.data/knowledge-graph/insights/images/hook-orchestrator-architecture.png)
+![HookOrchestrator — Architecture](images/hook-orchestrator-architecture.png)
 
 ---
 
@@ -52,7 +52,7 @@ The component sits directly under **ConstraintSystem**, sharing the same archite
 
 * **Potential Dependencies** – The orchestrator may depend on a generic logging library (e.g., `winston` or a project‑specific logger) and on TypeScript’s type system for defining the `HookFunction` type.  No direct database access is indicated; instead, it operates in‑memory, delegating persistence concerns to its siblings.  
 
-![HookOrchestrator — Relationship](../../.data/knowledge-graph/insights/images/hook-orchestrator-relationship.png)
+![HookOrchestrator — Relationship](images/hook-orchestrator-relationship.png)
 
 ---
 
@@ -82,7 +82,6 @@ The component sits directly under **ConstraintSystem**, sharing the same archite
 
 These insights are derived directly from the supplied observations and the documented relationships within the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ These insights are derived directly from the supplied observations and the docum
 - [ConstraintManager](./ConstraintManager.md) -- The ConstraintManager likely interacts with the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage constraints.
 - [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger might be related to the ConstraintManager, as it handles constraint violations.
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- The GraphPersistenceModule might be related to the GraphDatabaseAdapter, as it utilizes Graphology and LevelDB for persistence.
-
 
 ---
 

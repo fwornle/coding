@@ -14,7 +14,6 @@ ComprehensiveSemanticAnalysis is implemented across: src/knowledge-management, l
 
 - Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
-
 ---
 
 *Generated from 4 observations*

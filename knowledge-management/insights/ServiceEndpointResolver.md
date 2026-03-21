@@ -12,14 +12,11 @@ ServiceEndpointResolver (service_registry.py) works in conjunction with the Serv
 
 - ServiceEndpointResolver (service_registry.py) works in conjunction with the ServiceRegistry to provide a comprehensive service discovery mechanism, making it easier to manage and maintain services
 
-
 ## Related Entities
 
 ### Used By
 
 - ServiceDiscovery (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ ServiceEndpointResolver (service_registry.py) works in conjunction with the Serv
 ### Siblings
 - [ServiceRegistry](./ServiceRegistry.md) -- ServiceRegistry (service_registry.py) utilizes a dictionary to store service instances, enabling fast lookup and retrieval of service endpoints
 - [ServiceDiscoveryMechanism](./ServiceDiscoveryMechanism.md) -- ServiceDiscoveryMechanism (DockerizedServices context) relies on the ServiceRegistry and ServiceEndpointResolver to facilitate service discovery, demonstrating a well-designed architecture
-
 
 ---
 

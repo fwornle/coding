@@ -55,7 +55,6 @@ All these integration points are bound together by the shared reliance on `LLMSe
 4. **Scalability considerations** – Provider‑agnostic LLM calls can be scaled horizontally by configuring `LLMService` with load‑balancing or async queues; the graph‑database adapter allows the underlying DB to be scaled (e.g., clustering) without code changes; however, the single `LLMService` instance may become a bottleneck if not instantiated per request or pooled.  
 5. **Maintainability assessment** – High maintainability due to clear separation of concerns, well‑defined interfaces (adapter, manager, service), and reuse of shared services across siblings.  The main maintenance surface lies in the `LLMService` implementation and the `GraphDatabaseAdapter`; changes to these will propagate predictably thanks to the abstraction boundaries.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -69,7 +68,6 @@ All these integration points are bound together by the shared reliance on `LLMSe
 - [CodeQualityEvaluator](./CodeQualityEvaluator.md) -- CodeQualityEvaluator uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [LLMService](./LLMService.md) -- LLMService uses the GraphDatabaseAdapter to interact with the graph database, enabling features such as data retrieval, storage, and querying.
-
 
 ---
 

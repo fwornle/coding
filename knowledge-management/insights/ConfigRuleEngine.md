@@ -61,12 +61,10 @@ No sibling components are identified in the observations, so the focus remains o
 4. **Scalability considerations** – Because validation occurs in‑process, scaling is tied to the host application’s capacity. To handle higher throughput, the rule set should remain lightweight, and any expensive ontology queries should be cached or off‑loaded. Introducing parallel validation workers could be a future enhancement, but is not presently indicated.  
 5. **Maintainability assessment** – The rule‑based design is inherently maintainable: rules are isolated, can be added or removed independently, and the engine’s location in a single source file (`ontology-classification-agent.ts`) makes discovery straightforward. The main maintenance risk lies in the coupling to ontology‑specific utilities; changes to the ontology model may require coordinated updates to the rule definitions.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

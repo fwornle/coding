@@ -8,7 +8,7 @@ The SpecstoryAdapter class in lib/integrations/specstory-adapter.js serves as a 
 
 ConversationLogger is a **sub‑component** that lives inside the **Trajectory** component. Its concrete implementation lives in the integration layer at `lib/integrations/specstory-adapter.js`, where the `SpecstoryAdapter` class is defined. The adapter is responsible for forwarding every conversation event—message sends, receives, edits, and user inputs—to the external **Specstory** extension. Logging itself is powered by the `createLogger` factory found in `../logging/Logger.js`, which supplies a modular, configurable logger instance that the ConversationLogger (and its child `SpecstoryAdapterLogger`) uses throughout the lifecycle of a conversation.
 
-![ConversationLogger — Architecture](../../.data/knowledge-graph/insights/images/conversation-logger-architecture.png)
+![ConversationLogger — Architecture](images/conversation-logger-architecture.png)
 
 ## Architecture and Design  
 
@@ -23,7 +23,7 @@ Interaction flow:
 3. **Logging** – When a conversation event occurs, `SpecstoryAdapter.logConversation` (line 134) is invoked. It receives the event payload, formats it, and forwards it through the logger created by `createLogger`.  
 4. **Error Handling** – Any exceptions raised during the HTTP call or logging are caught and processed by the adapter, preventing propagation to the parent component.
 
-![ConversationLogger — Relationship](../../.data/knowledge-graph/insights/images/conversation-logger-relationship.png)
+![ConversationLogger — Relationship](images/conversation-logger-relationship.png)
 
 ## Implementation Details  
 
@@ -99,7 +99,6 @@ These integration points keep the ConversationLogger loosely coupled: changes in
 - **Low coupling**: The parent component (Trajectory) interacts only with the adapter’s public methods, reducing the impact of changes in the Specstory API.  
 - **Potential risk**: The adapter currently handles both connection management and error handling; future growth may benefit from further splitting these responsibilities (e.g., a dedicated connection manager).
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ These integration points keep the ConversationLogger loosely coupled: changes in
 
 ### Children
 - [SpecstoryAdapterLogger](./SpecstoryAdapterLogger.md) -- The logConversation method in SpecstoryAdapter (lib/integrations/specstory-adapter.js:134) implements logging functionality for conversation entries.
-
 
 ---
 

@@ -87,7 +87,6 @@ ReportCustomization sits in the middle of the Insight generation pipeline: *Insi
 
 The clear division between templates, components, and analytical data makes the module easy to extend: new components can be added without touching the templating logic, and new templates can be introduced via the pattern catalog. The main maintenance risk lies in keeping the component library synchronized with any changes in InsightAnalysis data structures; establishing a versioned contract between the two modules mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ The clear division between templates, components, and analytical data makes the 
 ### Siblings
 - [PatternCatalogManager](./PatternCatalogManager.md) -- The InsightGenerator.usePatternCatalog() method leverages the PatternCatalogManager to load the catalog of patterns from a predefined source, such as a database or file system.
 - [InsightAnalysis](./InsightAnalysis.md) -- The InsightAnalysis module utilizes data visualization libraries to generate interactive and dynamic visualizations of the insights, such as charts and graphs.
-
 
 ---
 

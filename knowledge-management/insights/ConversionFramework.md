@@ -99,7 +99,6 @@ These integration points are **interface‑driven**: the framework depends only 
 * Centralized error handling and caching logic reduce duplication.  
 * Potential risk: the central controller can become a “god class” if additional responsibilities are added without refactoring; periodic code reviews should ensure it remains focused on orchestration.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ These integration points are **interface‑driven**: the framework depends only 
 ### Siblings
 - [CacheManager](./CacheManager.md) -- The CacheManager uses a least-recently-used (LRU) eviction policy to manage cache capacity, ensuring that the most frequently accessed data remains in the cache, as implemented in the CacheManager class.
 - [FormatValidator](./FormatValidator.md) -- The FormatValidator implements a set of format-specific validation rules, which are defined in the FormatValidator class and can be easily extended or modified to support new formats.
-
 
 ---
 

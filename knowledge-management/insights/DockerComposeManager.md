@@ -88,7 +88,6 @@ Because the manager is a child of **DockerizedServices**, it likely receives con
 * By isolating compose‑file manipulation behind a façade, the codebase avoids scattered YAML edits, improving readability and reducing bugs.
 * The clear parent‑child relationship (DockerizedServices → DockerComposeManager) and the reuse of the same compose file across siblings promote a **single source of truth**, which is a strong maintainability asset.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ Because the manager is a child of **DockerizedServices**, it likely receives con
 ### Siblings
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMService class in lib/llm/llm-service.ts handles mode routing, caching, and circuit breaking for all LLM operations.
 - [ServiceStarterModule](./ServiceStarterModule.md) -- The ServiceStarterModule uses a retry mechanism to ensure that services are properly started, as seen in the implementation of the ServiceStarter class.
-
 
 ---
 

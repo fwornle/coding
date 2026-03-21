@@ -12,14 +12,11 @@ The creational patterns are used in conjunction with the config.json file to pro
 
 - The Singleton pattern is used to ensure that only one instance of a class is created, which can be seen in the way the DesignPatterns sub-component is structured to have a single point of access.
 
-
 ## Related Entities
 
 ### Used By
 
 - DesignPatterns (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The creational patterns are used in conjunction with the config.json file to pro
 ### Siblings
 - [StructuralPatternComposite](./StructuralPatternComposite.md) -- The Adapter pattern is used to allow objects with different interfaces to work together, which can be seen in the way the DesignPatterns sub-component is designed to be adaptable to different use cases.
 - [BehavioralPatternObserver](./BehavioralPatternObserver.md) -- The Observer pattern is used to allow objects to be notified of changes to other objects, which can be seen in the way the DesignPatterns sub-component is designed to have a notification system.
-
 
 ---
 

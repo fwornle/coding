@@ -114,7 +114,6 @@ Following these conventions keeps the BatchScheduler sub‑component aligned wit
 
 These insights are derived directly from the observed class names, file locations, and documented interactions, without extrapolating beyond the provided evidence.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ These insights are derived directly from the observed class names, file location
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses a custom EntityPersister class to persist entities in the knowledge graph, as seen in the EntityPersistenceManager.java file.
 - [WorkflowTraceReporter](./WorkflowTraceReporter.md) -- WorkflowTraceReporter uses a custom WorkflowTraceGenerator class to generate trace reports, as seen in the WorkflowTraceReporter.java file.
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses a custom OntologyLoader class to load the ontology, as seen in the OntologyManager.java file.
-
 
 ---
 

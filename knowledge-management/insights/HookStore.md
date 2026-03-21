@@ -96,7 +96,6 @@ External modules that wish to add or modify hooks would interact **indirectly** 
 * A single file (`HookOrchestrator.ts`) containing all three sibling components promotes discoverability but can become a maintenance hotspot if the module grows; extracting each sibling into its own file could improve modularity.  
 * The standardized interface and encapsulation behind HookOrchestrator reduce the risk of accidental misuse, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ External modules that wish to add or modify hooks would interact **indirectly** 
 ### Siblings
 - [HookPipeline](./HookPipeline.md) -- HookPipeline (HookOrchestrator.ts) utilizes a pub-sub pattern, enabling hooks to declare explicit subscription topics and facilitating loose coupling between hooks.
 - [SubscriptionManager](./SubscriptionManager.md) -- SubscriptionManager (HookOrchestrator.ts) maintains a registry of hook subscriptions, allowing for efficient lookup and notification of subscribed hooks.
-
 
 ---
 

@@ -14,14 +14,11 @@ The `SessionManagementModule` integrates with the `TranscriptProcessingModule` t
 
 - The `SessionManager` class utilizes a queue-based system, defined in `session_queue.py`, to handle concurrent session management, ensuring efficient use of system resources.
 
-
 ## Related Entities
 
 ### Used By
 
 - LiveLoggingSystem (contains)
-
-
 
 ## Hierarchy Context
 
@@ -34,7 +31,6 @@ The `SessionManagementModule` integrates with the `TranscriptProcessingModule` t
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- The `ConfigurationValidator` uses a configuration specification, defined in `configuration_specification.py`, to validate the system configuration, including logging and error tracking settings.
 - [OntologyClassificationModule](./OntologyClassificationModule.md) -- The `EntityClassifier` uses a classification algorithm, defined in `classification_algorithm.py`, to classify entities, including machine learning-based and rule-based approaches.
 - [FileRoutingModule](./FileRoutingModule.md) -- The `FileRouter` uses a file routing specification, defined in `file_routing_specification.py`, to validate the file routing configuration, including file settings and destination options.
-
 
 ---
 

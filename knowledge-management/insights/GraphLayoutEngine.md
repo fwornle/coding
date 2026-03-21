@@ -12,14 +12,11 @@ The repository pattern used in KnowledgeGraphVisualizerDAO (dao.py) suggests a s
 
 - The GraphLayoutEngine might also consider incorporating user-defined layout preferences, such as node positioning or edge routing, to enhance the visualization experience.
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeGraphVisualizer (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The repository pattern used in KnowledgeGraphVisualizerDAO (dao.py) suggests a s
 ### Siblings
 - [GraphRenderingModule](./GraphRenderingModule.md) -- The GraphRenderingModule might utilize a library like Matplotlib (matplotlib.py) or Plotly (plotly.py) to handle the rendering of the graph, allowing for customization of visual properties and interactive features.
 - [KnowledgeGraphNodeMapper](./KnowledgeGraphNodeMapper.md) -- The KnowledgeGraphNodeMapper could be implemented as a separate class (node_mapper.py) within the KnowledgeGraphVisualizer package, allowing for easy extension or modification of mapping rules.
-
 
 ---
 

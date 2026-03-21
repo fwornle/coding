@@ -72,7 +72,6 @@ Because the registry is a simple map, it scales linearly with the number of mode
 ### Maintainability Assessment  
 The registry‑centric design isolates mode‑specific code, making it straightforward to add, remove, or replace modes without touching the manager or switcher.  As long as the registration contract remains stable, the codebase enjoys high maintainability.  The main maintenance burden is ensuring that the registration step is not omitted during new feature integration, which can be mitigated with startup tests that verify the registry contains the expected keys.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ The registry‑centric design isolates mode‑specific code, making it straightf
 ### Siblings
 - [ModeSwitcher](./ModeSwitcher.md) -- The ModeSwitcher likely relies on the ModeRegistry to retrieve available modes, as suggested by the parent component analysis.
 - [MockModeProvider](./MockModeProvider.md) -- The MockModeProvider is likely used in conjunction with the ModeRegistry and ModeSwitcher to test mode switching and management functionality.
-
 
 ---
 

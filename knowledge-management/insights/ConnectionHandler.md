@@ -109,7 +109,6 @@ Overall, the implementation follows a **composition‑over‑inheritance** stanc
 * **Potential risk** – The implicit coupling to several integration readmes means that changes in those documents (e.g., Copi hook signatures) must be propagated to ConnectionHandler and its child, otherwise runtime mismatches can occur.  
 * **Clear ownership** – The hierarchy (Trajectory owns ConnectionHandler; ConnectionHandler owns ConnectionEstablisher) provides a straightforward ownership model, simplifying debugging and future refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ Overall, the implementation follows a **composition‑over‑inheritance** stanc
 - [LoggingManager](./LoggingManager.md) -- LoggingManager likely utilizes the integrations/copi/README.md file to understand the logging requirements for the Copi integration.
 - [DataAdapter](./DataAdapter.md) -- DataAdapter likely utilizes the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
-
 
 ---
 

@@ -70,7 +70,6 @@ PhasePlanner sits as a leaf under Trajectory, sharing the `SpecstoryAdapter` wit
 ### Maintainability Assessment  
 The clear separation of concerns—adapter handling connectivity, PhasePlanner handling ordering, and MilestoneManager handling scheduling—makes the codebase relatively easy to maintain.  Because the adapter encapsulates all retry and load‑balancing logic, changes to connection strategy are localized.  However, the implicit reliance on a specific port list (7357‑7359) means that any environment‑specific changes require updates in a single place (`SpecstoryAdapter`) but must be communicated to all dependent components.  Overall, the architecture promotes maintainability while keeping the critical path (phase ordering) simple and well‑defined.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ The clear separation of concerns—adapter handling connectivity, PhasePlanner h
 - [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359) to handle potential connection failures.
 - [TaskTracker](./TaskTracker.md) -- TaskTracker could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant task data.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter implements the connectViaHTTP method to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359).
-
 
 ---
 

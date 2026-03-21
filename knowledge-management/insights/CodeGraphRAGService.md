@@ -88,14 +88,7 @@ Overall, the CodeGraphRAGService presents a well‑encapsulated, configurable, a
 
 ### Relationship
 
-![CodeGraphRAGService Relationship](images/code-graph-ragservice-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/code-graph-ragservice-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -108,7 +101,6 @@ Overall, the CodeGraphRAGService presents a well‑encapsulated, configurable, a
 ### Siblings
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
-
 
 ---
 

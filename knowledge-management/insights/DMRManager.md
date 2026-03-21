@@ -111,7 +111,6 @@ Overall, the architecture is **modular**: each provider lives in its own file un
 
 **In summary**, DMRManager is a well‑encapsulated sub‑component that leverages a registry‑based architecture to provide Docker‑backed LLM inference while remaining loosely coupled to its parent abstraction and sibling managers. The design choices favor extensibility and testability, with scalability largely dependent on the underlying Docker Model Runner and the registry’s lightweight in‑memory implementation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ Overall, the architecture is **modular**: each provider lives in its own file un
 ### Siblings
 - [CircuitBreakerManager](./CircuitBreakerManager.md) -- CircuitBreakerManager uses a circuit breaker pattern to detect and prevent cascading failures
 - [ProviderRegistryManager](./ProviderRegistryManager.md) -- ProviderRegistryManager uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage available LLM providers
-
 
 ---
 

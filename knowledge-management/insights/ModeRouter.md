@@ -98,12 +98,10 @@ Because no additional files are listed, we cannot point to exact import statemen
 
 *All statements above are directly grounded in the provided observations and the explicit parent‑child relationship between **LLMService** and **ModeRouter**.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMService](./LLMService.md) -- The LLMService class in lib/llm/llm-service.ts handles incoming requests and delegates the work to the corresponding provider.
-
 
 ---
 

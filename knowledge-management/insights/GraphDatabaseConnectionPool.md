@@ -77,7 +77,6 @@ This layered interaction keeps the pool isolated from business logic while still
 
 5. **Maintainability assessment** – High maintainability: configuration is externalised, driver support is modular, and the pool provides a single point of change for connection handling. The clear separation between adapter, pool, and consumer components reduces coupling and eases future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ This layered interaction keeps the pool isolated from business logic while still
 ### Siblings
 - [GraphQueryOptimizer](./GraphQueryOptimizer.md) -- GraphQueryOptimization techniques, such as indexing and caching, are applied in GraphDatabaseAdapter.java to improve query performance and reduce the load on the graph database
 - [GraphDatabaseOperationsManager](./GraphDatabaseOperationsManager.md) -- GraphDatabaseOperationsManager in GraphDatabaseAdapter.java provides a unified interface for basic graph database operations, such as node creation and edge traversal
-
 
 ---
 

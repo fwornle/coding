@@ -66,7 +66,6 @@ Because the parser runs asynchronously and its pipeline stages are independent, 
 ### 5. Maintainability assessment
 The clear separation of concerns—NLP tokenisation, intent detection, entity extraction, ontology mapping, and feedback—makes the codebase approachable for new developers.  The reliance on a simple dictionary for concept resolution further reduces complexity.  However, the absence of explicit code symbols in the current repository suggests that documentation and test coverage will be essential to keep the parser maintainable as the underlying NLP models or business vocabularies evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ The clear separation of concerns—NLP tokenisation, intent detection, entity ex
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to provide a unified interface for connecting to the Specstory extension.
 - [LoggerManager](./LoggerManager.md) -- LoggerManager utilizes the logConversation method in the Trajectory component to log conversations asynchronously, allowing for concurrent task handling.
 - [SpecstoryApiClient](./SpecstoryApiClient.md) -- SpecstoryApiClient utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to provide a unified interface for interacting with the Specstory extension.
-
 
 ---
 

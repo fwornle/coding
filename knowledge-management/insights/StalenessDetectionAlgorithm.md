@@ -94,7 +94,6 @@ Following these conventions ensures that the staleness detection remains accurat
 * **Configuration‑driven** – Centralizing the staleness threshold in configuration reduces the risk of divergent policies across the codebase.  
 * **Testability** – Pure function design simplifies unit testing, further supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ Following these conventions ensures that the staleness detection remains accurat
 ### Siblings
 - [ValidationEngine](./ValidationEngine.md) -- The ValidationEngine would likely be implemented in a separate module, such as validation-engine.ts, to keep the validation logic organized and reusable.
 - [ValidationRules](./ValidationRules.md) -- The ValidationRules would be defined in a dedicated file, such as validation-rules.ts, to keep them separate from the validation engine logic.
-
 
 ---
 

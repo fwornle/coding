@@ -92,14 +92,7 @@ The clear separation between loading (HookConfigLoader) and management (HookConf
 
 ### Relationship
 
-![HookConfigurationManager Relationship](images/hook-configuration-manager-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/hook-configuration-manager-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -113,7 +106,6 @@ The clear separation between loading (HookConfigLoader) and management (HookConf
 - [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 - [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-
 
 ---
 

@@ -88,7 +88,6 @@ The KnowledgeManagement hierarchy is organized around a **graph‑centric data m
 
 The use of a **single, well‑named adapter class** (`GraphDatabaseAdapter`) promotes maintainability: changes to storage technology or export format are localized.  The clear separation between SemanticCodeSearch’s query logic and the persistence layer reduces coupling, making it easier to test each piece in isolation.  However, because many sibling components share the same adapter, any modification to its public API must be coordinated across the entire KnowledgeManagement suite, introducing a coordination overhead.  Overall, the architecture balances modularity with shared responsibility, yielding a maintainable yet tightly integrated system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The use of a **single, well‑named adapter class** (`GraphDatabaseAdapter`) pro
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-
 
 ---
 

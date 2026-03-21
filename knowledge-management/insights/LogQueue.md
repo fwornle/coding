@@ -79,7 +79,6 @@ No external libraries or services are mentioned, so the queue’s dependencies a
 * Because all synchronization is encapsulated within LogQueue, changes to the concurrency model are localized, reducing ripple effects.  
 * The absence of external dependencies (as per observations) further simplifies maintenance and upgrades.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ No external libraries or services are mentioned, so the queue’s dependencies a
 ### Siblings
 - [LogWriter](./LogWriter.md) -- LogWriter (logging.ts) uses a buffered writing approach to minimize disk I/O operations and improve performance.
 - [QueueBasedLogger](./QueueBasedLogger.md) -- QueueBasedLogger (logging.ts) uses the LogQueue to decouple log entry production from consumption, allowing for more efficient logging.
-
 
 ---
 

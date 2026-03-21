@@ -14,7 +14,7 @@ integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts
 
 where two tightly‑coupled classes – **CodeGraphConstructor** and **CodeGraphAgent** – work together to build a graph representation of a codebase and then extract structural insights from that graph. Both classes depend on the **GraphDatabaseAdapter** (implemented in `storage/graph-database-adapter.ts`) for persisting and querying the graph data. In short, CodeGraphAnalysis is the orchestration layer that turns raw source code into a navigable graph and then analyses that graph to surface relationships, dependencies, and other architectural signals.
 
-![CodeGraphAnalysis — Architecture](../../.data/knowledge-graph/insights/images/code-graph-analysis-architecture.png)
+![CodeGraphAnalysis — Architecture](images/code-graph-analysis-architecture.png)
 
 ---
 
@@ -28,7 +28,7 @@ The use of the **GraphDatabaseAdapter** is an explicit **Adapter pattern**: the 
 
 Sibling components such as **GraphDatabaseManagement** also rely on the same adapter, reinforcing a shared‑service model within the **CodingPatterns** ecosystem. This shared dependency creates a natural boundary for responsibilities: GraphDatabaseManagement handles generic CRUD and lifecycle concerns, while CodeGraphAnalysis focuses on domain‑specific graph construction and analysis.
 
-![CodeGraphAnalysis — Relationship](../../.data/knowledge-graph/insights/images/code-graph-analysis-relationship.png)
+![CodeGraphAnalysis — Relationship](images/code-graph-analysis-relationship.png)
 
 ---
 
@@ -87,7 +87,6 @@ The flow is therefore: **Source → CodeGraphConstructor → GraphDatabaseAdapte
 4. **Scalability considerations** – Persistence via LevelDB is efficient for moderate graph sizes; for massive codebases, batching and potential backend swap (thanks to the adapter) are needed. Tight coupling may limit horizontal scaling; a future decoupled, message‑driven pipeline could improve throughput.  
 5. **Maintainability assessment** – Clear separation of persistence (adapter) and domain logic (constructor/agent) aids maintainability. However, the tight coupling increases the surface area for changes; any modification to the graph schema must be coordinated across both classes. Shared usage of the adapter by siblings encourages consistency but also requires careful versioning.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ The flow is therefore: **Source → CodeGraphConstructor → GraphDatabaseAdapte
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [ProviderRegistration](./ProviderRegistration.md) -- The ProviderRegistration sub-component uses the ProviderRegistry class for registering new providers.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.
-
 
 ---
 

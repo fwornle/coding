@@ -70,7 +70,6 @@ These integration points illustrate a **pipeline‑style data flow**: raw Git da
 
 Overall, the GitHistoryAgent exemplifies a well‑structured, agent‑centric design that cleanly separates data acquisition from semantic processing, enabling extensibility, testability, and scalable pipeline execution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ Overall, the GitHistoryAgent exemplifies a well‑structured, agent‑centric de
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor in code-graph-constructor.ts constructs the code knowledge graph using AST parsing and Memgraph.
 - [InsightGenerationAgent](./InsightGenerationAgent.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
 - [PersistenceAgent](./PersistenceAgent.md) -- The PersistenceAgent in persistence-agent.ts handles entity persistence and retrieval from the graph database.
-
 
 ---
 

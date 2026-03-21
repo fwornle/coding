@@ -73,7 +73,6 @@ The milestone subsystem is organized as a small, well‑bounded cluster: `Projec
 ### Maintainability Assessment  
 The clear separation of concerns—adapter for external calls, tracker for business rules, manager for persistence, and event pipeline for notifications—creates a maintainable codebase. Each piece can be unit‑tested in isolation, and changes to one (e.g., a new Specstory endpoint) are confined to a single file (`lib/integrations/specstory-adapter.js`). The primary maintenance risk lies in the shared memory cache consistency and ensuring that event listeners remain loosely coupled; disciplined documentation of event schemas and versioning will be essential as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ The clear separation of concerns—adapter for external calls, tracker for busin
 ### Siblings
 - [MilestoneManager](./MilestoneManager.md) -- The MilestoneManager may utilize a data storage mechanism, such as a database or file system, to persist project milestone information, similar to the SharedMemoryStore pattern.
 - [SpecstoryIntegration](./SpecstoryIntegration.md) -- The SpecstoryIntegration uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension, allowing it to manage project milestones.
-
 
 ---
 

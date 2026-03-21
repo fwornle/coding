@@ -90,7 +90,6 @@ Following these conventions keeps the system predictable, reduces resource leaks
 * The lack of tightly coupled code (no monolithic query executor) reduces regression risk when updating one stage.  
 * Documentation and unit‑tests should focus on the contract between stages (input/output types) to preserve the pipeline’s integrity as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Following these conventions keeps the system predictable, reduces resource leaks
 - [DatabaseQueryExecution](./DatabaseQueryExecution.md) -- The DatabaseQueryExecution module would likely utilize a graph database driver, such as the Neo4j Java Driver, to execute queries on the database, as seen in the Neo4j documentation.
 - [ConstraintSchemaManager](./ConstraintSchemaManager.md) -- The ConstraintSchemaManager module would be responsible for defining the schema for the graph database, including the creation of nodes, relationships, and indexes, as described in the graph database's schema management documentation.
 - [QueryOptimizer](./QueryOptimizer.md) -- The QueryOptimizer module would utilize the graph database's query optimization capabilities, such as the Neo4j Query Optimizer, to analyze and optimize query execution plans, as described in the Neo4j documentation.
-
 
 ---
 

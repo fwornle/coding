@@ -77,7 +77,6 @@ No external libraries or third‑party scheduling frameworks are mentioned; the 
 
 All statements above are directly grounded in the supplied observations; no additional patterns or implementation specifics have been invented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ All statements above are directly grounded in the supplied observations; no addi
 
 ### Siblings
 - [WorkflowExecution](./WorkflowExecution.md) -- The WorkflowManager class utilizes the VKB API to execute workflows, as seen in the WorkflowManagement sub-component's context, which implies a dependency on the VKB API for workflow execution.
-
 
 ---
 

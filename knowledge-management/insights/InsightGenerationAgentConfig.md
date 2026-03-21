@@ -80,12 +80,10 @@ Because no concrete symbols were listed, we can infer that the file exports a co
 
 All statements above are directly grounded in the supplied observations; no unsupported patterns or speculative details have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
-
 
 ---
 

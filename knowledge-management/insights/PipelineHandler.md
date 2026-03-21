@@ -46,7 +46,6 @@ Developers should treat `PipelineHandler` as the **canonical entry point** for a
 * The clear division between `PipelineHandler` and `PipelineCore` promotes **high maintainability**: changes to validation or API contracts stay within the handler, whereas algorithmic improvements stay inside the core.  
 * The lack of exposed code symbols means that documentation and naming conventions become critical; developers must rely on the component hierarchy and naming to understand responsibilities until concrete implementations are examined.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -54,7 +53,6 @@ Developers should treat `PipelineHandler` as the **canonical entry point** for a
 
 ### Siblings
 - [PipelineCore](./PipelineCore.md) -- PipelineCore handles the core logic for Pipeline
-
 
 ---
 

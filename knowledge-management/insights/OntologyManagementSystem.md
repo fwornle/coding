@@ -8,7 +8,7 @@ OntologyManagementSystem may leverage the automatic JSON export sync feature pro
 
 The **OntologyManagementSystem** lives inside the **KnowledgeManagement** component and is implemented as a sub‑component that orchestrates the creation, persistence, and querying of the system’s ontology. Its core responsibilities are realized through the **GraphDatabaseAdapter** (found at `storage/graph-database-adapter.ts`), which provides the low‑level graph‑store operations, and through higher‑level collaborators such as the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code‑graph‑agent.ts`) and the **EntityPersistenceModule**. The subsystem also leverages documentation‑driven configuration files – for example, `integrations/code-graph-rag/docs/claude-code-setup.md` to initialise Claude‑based code‑RAG pipelines, and `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` to enable semantic‑constraint detection. By sitting between the **ManualLearning** and **OnlineLearning** sub‑components, OntologyManagementSystem supplies the classification and inference backbone that both learning paths consume.
 
-![OntologyManagementSystem — Architecture](../../.data/knowledge-graph/insights/images/ontology-management-system-architecture.png)
+![OntologyManagementSystem — Architecture](images/ontology-management-system-architecture.png)
 
 ## Architecture and Design  
 
@@ -18,7 +18,7 @@ Interaction is orchestrated through clear **component boundaries**: OntologyMana
 
 The sibling components share the same persistence foundation, which reduces duplication and ensures a **single source of truth** for graph data. By keeping the adapter as a child component, OntologyManagementSystem delegates low‑level concerns while focusing on ontology‑specific policies such as semantic‑constraint detection (via the `semantic-constraint-detection.md` doc) and code‑graph integration (via the Claude setup doc).  
 
-![OntologyManagementSystem — Relationship](../../.data/knowledge-graph/insights/images/ontology-management-system-relationship.png)
+![OntologyManagementSystem — Relationship](images/ontology-management-system-relationship.png)
 
 ## Implementation Details  
 
@@ -78,7 +78,6 @@ Finally, OntologyManagementSystem exposes an internal API (not explicitly named 
 - **Configuration‑driven integrations** keep external service wiring declarative, easing updates to Claude or constraint definitions.  
 - However, the reliance on a single JSON export point introduces a coupling that must be monitored; any breakage in the export pipeline could impact several downstream consumers. Regular tests of the export process and clear documentation of the expected file locations will mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ Finally, OntologyManagementSystem exposes an internal API (not explicitly named 
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor likely utilizes the GraphDatabaseAdapter to store and query the constructed code graph.
 - [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule likely utilizes the GraphDatabaseAdapter to store and query entities and relationships in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter likely utilizes Graphology and LevelDB to store and query the knowledge graph.
-
 
 ---
 

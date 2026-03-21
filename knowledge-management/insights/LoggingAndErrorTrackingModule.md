@@ -14,7 +14,6 @@ The `LoggingAndErrorTrackingModule` integrates with the `ConfigurationValidation
 
 - The `ErrorTracker` utilizes a caching mechanism, implemented in `error_cache.py`, to store frequently accessed error information, reducing the load on the logging system.
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ The `LoggingAndErrorTrackingModule` integrates with the `ConfigurationValidation
 ### Used By
 
 - LiveLoggingSystem (contains)
-
-
 
 ## Hierarchy Context
 
@@ -47,7 +44,6 @@ The `LoggingAndErrorTrackingModule` integrates with the `ConfigurationValidation
 - [OntologyClassificationModule](./OntologyClassificationModule.md) -- The `EntityClassifier` uses a classification algorithm, defined in `classification_algorithm.py`, to classify entities, including machine learning-based and rule-based approaches.
 - [SessionManagementModule](./SessionManagementModule.md) -- The `SessionManager` uses a session specification, defined in `session_specification.py`, to validate the session configuration, including session settings and logging options.
 - [FileRoutingModule](./FileRoutingModule.md) -- The `FileRouter` uses a file routing specification, defined in `file_routing_specification.py`, to validate the file routing configuration, including file settings and destination options.
-
 
 ---
 

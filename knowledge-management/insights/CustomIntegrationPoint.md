@@ -81,7 +81,6 @@ Because batch processing is encapsulated, scaling the batch layer (e.g., distrib
 
 The explicit separation afforded by **CustomIntegrationPoint** yields high maintainability: changes to the batch pipeline are localized to the controller, and the rest of the OnlineLearning codebase remains stable.  The main maintenance burden lies in keeping the wrapper methods in sync with the underlying pipeline API, but this is a manageable, well‑defined task.  Overall, the design promotes clear ownership, easy reasoning about dependencies, and straightforward future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The explicit separation afforded by **CustomIntegrationPoint** yields high maint
 ### Siblings
 - [BatchAnalysisPipeline](./BatchAnalysisPipeline.md) -- The OnlineLearningController.java file utilizes the BatchAnalysisPipeline class to integrate with the batch analysis pipeline, demonstrating the sub-component's reliance on this custom class.
 - [BatchProcessingPattern](./BatchProcessingPattern.md) -- The OnlineLearning sub-component's reliance on the BatchAnalysisPipeline class implies a batch processing pattern, which is likely implemented in the OnlineLearningController.java file or related classes.
-
 
 ---
 

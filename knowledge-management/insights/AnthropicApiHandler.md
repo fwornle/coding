@@ -83,12 +83,10 @@ When extending the system (e.g., adding a new LLM vendor), follow the same patte
 - Changes to Anthropic’s API (endpoint URLs, authentication scheme) are isolated to `AnthropicApiHandler`.
 - The provider‑handler pairing encourages consistent patterns across different LLM vendors, reducing cognitive load for future contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMProvider](./LLMProvider.md) -- The AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) extends the LLMProvider class.
-
 
 ---
 

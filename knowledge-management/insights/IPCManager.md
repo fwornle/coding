@@ -93,7 +93,6 @@ Because channels are created dynamically from a JSON file, scaling to many proce
 ### Maintainability assessment  
 The combination of a clear configuration file, well‑defined factory interfaces, and a thin wrapper around a standard library (**ipc‑main**) yields high maintainability.  The explicit separation of concerns—channel provisioning (`IPCManager`), transport abstraction (`messaging‑api`), and business logic (`SpecstoryAdapter`)—makes it easy to locate bugs or extend functionality.  The main maintenance risk lies in the reliance on external libraries (ipc‑main, json‑rpc); version upgrades of those libraries must be tested against the factory contracts and cache behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The combination of a clear configuration file, well‑defined factory interfaces
 - [ConnectionRetryManager](./ConnectionRetryManager.md) -- ConnectionRetryManager utilizes a factory pattern in lib/integrations/specstory-adapter.js to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.
 - [FileWatchManager](./FileWatchManager.md) -- FileWatchManager uses a library like chokidar to watch file system events, providing a standardized way of handling file system notifications.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a factory pattern to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.
-
 
 ---
 

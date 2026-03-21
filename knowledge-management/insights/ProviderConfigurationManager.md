@@ -96,7 +96,6 @@ Because configuration is read from a single **`providers.json`** file, scaling t
 
 The explicit separation of concerns, minimal external dependencies, and straightforward JSON‑based persistence make the ProviderConfigurationManager highly maintainable.  Adding new configuration fields only requires updating the `ProviderConfiguration` POJO and the JSON schema, without touching the factory or lifecycle code.  The manager’s limited public API reduces surface area for bugs, and its placement inside ProviderRegistry provides a single point of control for future refactoring (e.g., swapping the storage backend).  Overall, the design supports easy testing, clear ownership, and low cognitive overhead for developers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The explicit separation of concerns, minimal external dependencies, and straight
 ### Siblings
 - [ProviderFactory](./ProviderFactory.md) -- ProviderFactory in ProviderFactory.java defines the createProvider method, which takes a provider configuration as input and returns a provider instance based on the configuration type
 - [ProviderInstanceLifecycleManager](./ProviderInstanceLifecycleManager.md) -- The ProviderInstanceLifecycleManager is likely implemented in a separate module or class, such as ProviderInstanceManager.java, which defines the lifecycle methods for provider instances
-
 
 ---
 

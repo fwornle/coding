@@ -70,7 +70,6 @@ External dependencies are minimal. The tracker may rely on a logging framework a
 4. **Scalability considerations** – Because tracking is performed in‑process, scaling the overall system (e.g., running multiple manager instances) requires each instance to maintain its own metrics store or to forward data to a shared backend. Lightweight, asynchronous metric handling mitigates contention.  
 5. **Maintainability assessment** – The clear separation of responsibilities aids maintainability; however, the absence of concrete source files for `WorkflowTracker` suggests a documentation gap that could hinder onboarding. Adding explicit type definitions or a stub file would improve discoverability without altering runtime behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ External dependencies are minimal. The tracker may rely on a logging framework a
 ### Siblings
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- The SpecstoryAdapter class is defined in lib/integrations/specstory-adapter.js, which suggests a modular design for integrating with external services.
 - [GSDWorkflowController](./GSDWorkflowController.md) -- While direct evidence from source code is lacking, the GSDWorkflowController's hypothetical presence is supported by the need for a component to manage the workflow's lifecycle, a common requirement in workflow management systems.
-
 
 ---
 

@@ -75,12 +75,10 @@ No other children or siblings are identified in the observations.  The engine’
 * **Potential risk** if the table format is not version‑controlled or validated; malformed entries could cause runtime failures.  
 * Centralizing validation logic in the engine reduces duplication and eases future refactoring, but the lack of visible unit tests (not observable from the current snapshot) could be a maintenance blind spot.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LSLConfigValidatorService](./LSLConfigValidatorService.md) -- LSLConfigValidatorService uses a rules-based engine to validate LSL configuration against a set of predefined rules and constraints.
-
 
 ---
 

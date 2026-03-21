@@ -16,7 +16,7 @@ The **shared atomic index counter** (exposed in `WaveController.runWithConcurren
 
 The **callback‑based notification** (observed in the `SpecstoryAdapter` logging flow) decouples task producers from consumers. Once a worker completes a unit of work, it invokes the registered callback, which propagates the completion event up to the `Trajectory` component. This promotes a clear separation of concerns: WorkStealer focuses solely on scheduling and execution, while `Trajectory` handles business‑level orchestration.  
 
-![WorkStealer — Architecture](../../.data/knowledge-graph/insights/images/work-stealer-architecture.png)
+![WorkStealer — Architecture](images/work-stealer-architecture.png)
 
 ## Implementation Details  
 
@@ -38,7 +38,7 @@ WorkStealer is tightly coupled with its **parent component, Trajectory**, which 
 
 External integration occurs through the **WorkStealingMechanism** child component, which exposes a minimal API: `enqueueTask(task, onComplete)`, `configureQueue(options)`, and `startWorkers(concurrencyLevel)`. These entry points are consumed by higher‑level services that need asynchronous processing—logging, data persistence, or environment setup. The `EnvironmentConfigurator` supplies queue configuration values, while the `GraphDatabaseManager` may enqueue persistence tasks that benefit from the same work‑stealing scheduler.  
 
-![WorkStealer — Relationship](../../.data/knowledge-graph/insights/images/work-stealer-relationship.png)
+![WorkStealer — Relationship](images/work-stealer-relationship.png)
 
 ## Usage Guidelines  
 
@@ -69,7 +69,6 @@ The atomic counter and lock‑free queue enable the system to scale horizontally
 ### Maintainability assessment  
 The design leverages well‑understood concurrency primitives and a clear callback contract, making the component relatively easy to reason about. Configuration is centralized through `EnvironmentConfigurator`, reducing scattered hard‑coded values. The primary maintenance burden lies in ensuring that all enqueued tasks respect the standardized interface and that callback handling remains robust against exceptions. Overall, the component aligns with the surrounding modular architecture, supporting straightforward evolution and debugging.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ The design leverages well‑understood concurrency primitives and a clear callba
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a modular approach to data storage and management, with each graph having its own dedicated storage module, as seen in the integrations directory.
 - [EnvironmentConfigurator](./EnvironmentConfigurator.md) -- EnvironmentConfigurator uses a modular approach to environment configuration and connectivity, with each environment variable having its own dedicated configuration module, as seen in the integrations directory.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a modular approach to logging and tracking conversations and events, with each conversation having its own dedicated logging module, as seen in the integrations directory.
-
 
 ---
 

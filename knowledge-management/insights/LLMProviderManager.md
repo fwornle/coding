@@ -110,7 +110,6 @@ Because the source snapshot reports “0 code symbols found,” the concrete met
 
 The manager’s responsibilities are well‑encapsulated: provider lifecycle, resilience, and cost policy are all handled in one place.  This separation of concerns simplifies maintenance—changes to provider‑specific logic stay within the manager, while the rest of the system continues to interact through the stable `LLMService` façade.  The reliance on explicit patterns (registry, circuit‑breaker) and external configuration further aids readability and testability.  The main maintenance risk lies in the “hot‑reload” path for configuration changes; without clear versioning or validation, a malformed config could destabilise the registry.  Providing schema validation and atomic swaps of the internal provider map would mitigate that risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ The manager’s responsibilities are well‑encapsulated: provider lifecycle, re
 - [CachingMechanism](./CachingMechanism.md) -- CachingMechanism likely uses a cache storage system, possibly implemented in a class like CacheStore, to store cached responses.
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker likely uses a budgeting system, possibly implemented in a class like BudgetManager, to track and manage costs.
 - [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier likely uses a classification system, possibly implemented in a class like Classifier, to classify input data sensitivity.
-
 
 ---
 

@@ -64,12 +64,10 @@ Because `BatchPipelineConfig` is purely declarative, it does not directly call o
 ### Maintainability Assessment  
 The declarative nature of `BatchPipelineConfig` greatly enhances maintainability: changes are isolated to a single, human‑readable file, and the orchestrator (`Pipeline`) does not need to be altered for most workflow adjustments. The primary maintenance burden lies in keeping the dependency graph accurate and ensuring that step implementations stay compatible with the configuration schema. Regular validation and thorough documentation within the YAML file mitigate the risk of configuration drift.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a batch-analysis.yaml file to define the steps and dependencies for the batch processing pipeline.
-
 
 ---
 

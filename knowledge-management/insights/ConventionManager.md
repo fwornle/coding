@@ -71,12 +71,10 @@ Because the manager is a child of **CodingConventionManager**, it likely inherit
 - The clear separation between the manager’s domain logic and the service’s communication logic improves readability and testability.  
 - However, the lack of direct visibility into the manager’s source code (no symbols found) suggests that documentation and explicit interface contracts are crucial to prevent accidental misuse.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodingConventionManager](./CodingConventionManager.md) -- CodingConventionManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
-
 
 ---
 

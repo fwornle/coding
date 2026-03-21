@@ -82,7 +82,6 @@ Potential future integration points could include analytics modules that consume
 * **Risks** – The lack of generic abstractions means any change to validation rules or data‑model requirements propagates through custom code, increasing the maintenance surface.  Tight coupling to EntityValidator also means that versioning must be coordinated across siblings.  
 * **Mitigations** – Encapsulating all VKB interactions inside EntityValidator, keeping ObservationManagement’s API stable, and documenting the validation contract will help keep the module maintainable as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Potential future integration points could include analytics modules that consume
 ### Siblings
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator class utilizes the VKB API to validate entities, as seen in the EntityValidator class of the ManualLearning sub-component
 - [EntityAuthoring](./EntityAuthoring.md) -- The EntityAuthoring module is a key component of the ManualLearning sub-component, enabling curators to create and edit entities
-
 
 ---
 

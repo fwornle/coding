@@ -67,12 +67,10 @@ Finally, because the router’s responsibilities are limited to mode selection, 
 * Adding or deprecating modes is a matter of updating the registration map, without touching caching or circuit‑breaker code.  
 * The lack of an explicit source file for `LLMRouter` in the observations suggests developers should document its location clearly to avoid future ambiguity.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMService class in lib/llm/llm-service.ts handles mode routing, caching, and circuit breaking for all LLM operations.
-
 
 ---
 

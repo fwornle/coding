@@ -63,12 +63,10 @@ Because all graph operations funnel through a single adapter, scaling the graph 
 
 The current design scores highly on maintainability: the clear separation makes it straightforward to locate and modify persistence logic, and any changes to the underlying graph technology are confined to one file. The main risk is the potential for the adapter to become a “god object” if many disparate operations are added without careful organization. Introducing a well‑defined TypeScript interface and possibly splitting the adapter into smaller, purpose‑specific services would further improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-
 
 ---
 

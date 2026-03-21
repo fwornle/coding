@@ -72,12 +72,10 @@ No other explicit dependencies are mentioned, so the integration map remains foc
 * The clear separation of concerns (authoring vs. storage) enhances maintainability: changes to business rules stay within EntityAuthoring, while storage optimizations remain in the adapter.  
 * However, the tight coupling means that any modification to the adapter’s API requires coordinated updates in EntityAuthoring, so versioned interfaces or façade layers would be advisable as the codebase grows.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing manually created knowledge graph entities.
-
 
 ---
 

@@ -73,12 +73,10 @@ Because the README is the central source of truth, developers looking to integra
 * **High maintainability** in the sense that configuration is externalized and the README serves as a single source of truth.  
 * **Potential risk** stems from the lack of visible source code or test artifacts in the observations; future contributors must locate the actual implementation files (outside the provided README) to make code changes.  Keeping the README up‑to‑date is therefore critical to preserving maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Integrations](./Integrations.md) -- The integrations/browser-access/README.md file describes the browser access MCP server, which is an example of an integration
-
 
 ---
 

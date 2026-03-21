@@ -15,7 +15,7 @@ Both versions orchestrate the Docker Desktop **Model Runner** API to launch a la
 
 The DMRProvider lives under the **LLMAbstraction** parent component, sits alongside sibling providers such as **AnthropicProvider**, and owns a child component called **LocalInferenceHandler**, which encapsulates the low‑level request/response handling for the locally‑run model.
 
-![DMRProvider — Architecture](../../.data/knowledge-graph/insights/images/dmrprovider-architecture.png)
+![DMRProvider — Architecture](images/dmrprovider-architecture.png)
 
 ---
 
@@ -27,7 +27,7 @@ Within DMRProvider, the **Model Runner API** from Docker Desktop is the core int
 
 The child component **LocalInferenceHandler** likely abstracts the streaming of token‑by‑token responses and error handling, providing a uniform interface to the higher‑level DMRProvider class. By nesting this handler, the provider keeps its public surface small while delegating the intricacies of Docker I/O to a dedicated module.
 
-![DMRProvider — Relationship](../../.data/knowledge-graph/insights/images/dmrprovider-relationship.png)
+![DMRProvider — Relationship](images/dmrprovider-relationship.png)
 
 ---
 
@@ -113,19 +113,17 @@ The child component **LocalInferenceHandler** likely abstracts the streaming of 
 * **Medium maintainability** for the Docker integration layer: changes in Docker’s API or Model Runner version may require updates to the initialization and run logic.  
 * The clear separation between `DMRProvider`, `LocalInferenceHandler`, and the configuration file makes the component easy to reason about, test, and replace if a different local inference mechanism is adopted in the future.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a high-level facade, the LLMService class (lib/llm/llm-service.ts), which handles mode routing, caching, and circuit breaking for all LLM operations. This design decision enables provider-agnostic model calls and allows for the integration of multiple LLM providers, such as Anthropic and OpenAI, without affecting the overall architecture of the component. For instance, the DMRProvider class (lib/llm/providers/dmr-provider.ts) supports local LLM inference via Docker Desktop's Model Runner, while the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) uses the Anthropic SDK for LLM operations. The LLMService class acts as a single entry point for all LLM operations, providing a unified interface for the component's clients.
 
 ### Children
-- [LocalInferenceHandler](./LocalInferenceHandler.md) -- The DMRProvider class is designed to implement local LLM inference, as suggested by the parent analysis, but without source code, we can only infer its presence based on the parent context.
+- LocalInferenceHandler -- The DMRProvider class is designed to implement local LLM inference, as suggested by the parent analysis, but without source code, we can only infer its presence based on the parent context.
 
 ### Siblings
 - [LLMService](./LLMService.md) -- LLMService class (lib/llm/llm-service.ts) acts as a single entry point for all LLM operations
 - [AnthropicProvider](./AnthropicProvider.md) -- AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) implements LLM operations using the Anthropic SDK
-
 
 ---
 

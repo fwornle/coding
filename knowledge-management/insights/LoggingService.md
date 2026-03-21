@@ -66,7 +66,6 @@ External integration occurs via **monitoring agents**.  The service’s configur
 * The main maintenance burden lies in keeping the **log4j.properties** file accurate and synchronized with operational requirements; any drift can cause silent logging failures or excessive log volume.
 * Absence of concrete code symbols in the repository suggests that the LoggingService may be defined in a small, self‑contained module, further simplifying updates and testing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -77,7 +76,6 @@ External integration occurs via **monitoring agents**.  The service’s configur
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses an ontology system to classify observations and categorize logged data.
 - [AgentIntegrationManager](./AgentIntegrationManager.md) -- AgentIntegrationManager handles the integration of new agents into the system.
 - [LSLConverter](./LSLConverter.md) -- LSLConverter uses the LSL format to convert between agent-native transcript formats.
-
 
 ---
 

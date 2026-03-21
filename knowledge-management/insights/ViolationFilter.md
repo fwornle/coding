@@ -72,7 +72,6 @@ The sibling **ViolationNotification** is described as leveraging a “messaging 
 * Because the filter’s logic is simple (metadata comparison), future developers can quickly add new criteria or replace the implementation without ripple effects.  
 * The only maintainability risk lies in the implicit reliance on the structure of the violation object; any change to field names must be reflected across the capture and filter code.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ The sibling **ViolationNotification** is described as leveraging a “messaging 
 ### Siblings
 - [ViolationStorage](./ViolationStorage.md) -- ViolationStorage would likely utilize a database or file storage system to persist captured violations, with potential considerations for data serialization, indexing, and querying
 - [ViolationNotification](./ViolationNotification.md) -- ViolationNotification would likely utilize a messaging or event-driven architecture to notify the dashboard of new violations, potentially leveraging webhooks, callbacks, or message queues
-
 
 ---
 

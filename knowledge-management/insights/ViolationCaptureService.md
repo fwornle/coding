@@ -78,7 +78,6 @@ Developers extending or using `ViolationCaptureService` should adhere to the fol
 * Adding new persistence back‑ends or modifying the capture workflow can be done in isolation, reducing regression risk.  
 * The reliance on plain JavaScript scripts may require disciplined code reviews to enforce interface contracts, but the modular layout mitigates the risk of tangled dependencies.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Developers extending or using `ViolationCaptureService` should adhere to the fol
 - [HookManager](./HookManager.md) -- HookManager uses the HookConfigLoader (lib/agent-api/hooks/hook-config.js) to load and merge hook configurations from multiple sources.
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to validate entity content.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the storage/graph-database-adapter.js to provide a flexible and scalable way to store and retrieve data.
-
 
 ---
 

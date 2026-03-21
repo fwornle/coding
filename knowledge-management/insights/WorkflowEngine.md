@@ -135,7 +135,6 @@ The rule‑engine + graph‑query design promotes **high maintainability** when 
 
 Overall, WorkflowEngine’s architecture aligns with the broader SemanticAnalysis ecosystem: a modular, rule‑centric, graph‑driven design that balances flexibility with the need for disciplined data modeling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -154,7 +153,6 @@ Overall, WorkflowEngine’s architecture aligns with the broader SemanticAnalysi
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor likely utilizes the parent component's suggested node, KnowledgeGraph, to store and query code metadata for semantic analysis, as indicated by the parent analysis.
 - [CodeInsightsGenerator](./CodeInsightsGenerator.md) -- The CodeInsightsGenerator may utilize natural language processing techniques, as suggested by the parent analysis, to analyze the code and generate human-readable insights.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule likely incorporates machine learning algorithms, as suggested by the parent analysis, to improve the accuracy and effectiveness of code analysis and insight generation.
-
 
 ---
 

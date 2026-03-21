@@ -68,7 +68,6 @@ Finally, avoid embedding persistence logic inside conversation handling code. Al
 - Clear ownership of responsibilities (CRUD in `LogEntryManager`, external transmission in the adapter) simplifies unit testing.
 - The presence of a singleton‑style `LoggingAPI` reduces boilerplate for callers but requires careful versioning to avoid hidden coupling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ Finally, avoid embedding persistence logic inside conversation handling code. Al
 
 ### Siblings
 - [LoggingAPI](./LoggingAPI.md) -- The LoggingAPI is likely implemented as a singleton or a static class, providing a global point of access for logging functionality, similar to other API-based components.
-
 
 ---
 

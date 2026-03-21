@@ -89,7 +89,6 @@ DataIngestion is a thin orchestration layer that delegates persistence to a shar
 
 The use of well‑named adapters, declarative YAML pipelines, and isolated concurrency logic makes the codebase **highly maintainable**.  Changes to storage (e.g., swapping LevelDB for another KV store) are confined to `storage/graph-database-adapter.ts`.  Adding new ingestion steps does not require touching core logic, only updating the DAG definition.  The only maintenance risk lies in the tight coupling between the adapter’s write path and `JsonExportSync`; any modification to persistence must preserve the export trigger to avoid stale data for downstream consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The use of well‑named adapters, declarative YAML pipelines, and isolated concu
 ### Siblings
 - [OntologyIntegration](./OntologyIntegration.md) -- OntologyIntegration uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve knowledge entities, providing a standardized interface for interacting with the graph database.
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to provide a standardized interface for interacting with the graph database.
-
 
 ---
 

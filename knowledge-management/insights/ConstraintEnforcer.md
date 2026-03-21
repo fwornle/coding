@@ -129,7 +129,6 @@ Overall, the design can be described as a **layered, event‑centric subsystem**
 
 Overall, ConstraintEnforcer is a well‑encapsulated, event‑centric sub‑component that leverages shared services from its parent **ConstraintSystem** and siblings, offering a clear, maintainable pathway for real‑time constraint enforcement while keeping persistence and file‑system interactions deterministic and testable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ Overall, ConstraintEnforcer is a well‑encapsulated, event‑centric sub‑comp
 ### Siblings
 - [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager utilizes the HookConfigLoader (lib/agent-api/hooks/hook-config.js) to load hook configurations from multiple sources, providing a unified and comprehensive configuration management mechanism.
 - [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, providing a robust content validation mechanism.
-
 
 ---
 

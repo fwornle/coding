@@ -77,7 +77,6 @@ The mode‑management subsystem is organized as a **vertical slice**: `LLMModeMa
 ### Maintainability assessment
 The architecture is **highly maintainable**: the switcher contains only orchestration logic, the registry owns the mode catalogue, and the mock provider isolates test concerns.  The clear separation of responsibilities means that changes to one piece (e.g., a new LLM backend) rarely ripple to others.  The main maintenance risk is keeping the environment‑variable values aligned with registry keys, which can be mitigated by defining shared constants.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The architecture is **highly maintainable**: the switcher contains only orchestr
 ### Siblings
 - [ModeRegistry](./ModeRegistry.md) -- The ModeRegistry is implemented in the lib/llm/llm-service.ts file, which suggests a modular design for mode management.
 - [MockModeProvider](./MockModeProvider.md) -- The MockModeProvider is likely used in conjunction with the ModeRegistry and ModeSwitcher to test mode switching and management functionality.
-
 
 ---
 

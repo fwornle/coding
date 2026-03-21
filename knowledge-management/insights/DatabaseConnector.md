@@ -89,12 +89,10 @@ Because the connector is tightly bound to the manager, scaling the data‑access
 
 The current design is **easy to understand** due to its straightforward composition, but **maintainability is limited** by the lack of abstraction.  Any modification to connection handling, driver upgrades, or testing requirements will likely cascade into the manager and any code that directly references the connector.  Introducing an interface or employing dependency injection would improve modularity and ease future maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DatabaseManager](./DatabaseManager.md) -- DatabaseManager uses DatabaseConnector.class to connect to databases, handling database interactions
-
 
 ---
 

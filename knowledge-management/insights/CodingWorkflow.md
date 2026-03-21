@@ -12,7 +12,6 @@ CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified,
 
 - Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
-
 ## How It Works
 
 - CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
@@ -24,7 +23,6 @@ CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified,
 - CodingWorkflow workflow details pending full codebase analysis
 
 - CodingWorkflow insight details pending full codebase analysis
-
 
 ---
 

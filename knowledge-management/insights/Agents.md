@@ -84,7 +84,6 @@ No external libraries or services are mentioned, so the integration points are l
 - **Potential risk** lies in the monolithic nature of the base class; extensive changes to shared utilities could have ripple effects.  Maintaining comprehensive unit tests for `BaseAgent` mitigates this risk.  
 - The modular layout aids code navigation and encourages adherence to the single‑responsibility principle, which is favorable for long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ No external libraries or services are mentioned, so the integration points are l
 - [Pipeline](./Pipeline.md) -- The batch processing pipeline uses a modular architecture, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.
 - [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file to classify ontologies.
 - [Insights](./Insights.md) -- The InsightGenerationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file to generate insights.
-
 
 ---
 

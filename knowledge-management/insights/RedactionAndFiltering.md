@@ -125,7 +125,6 @@ RedactionAndFiltering is a pure‑function filter placed directly after the tran
 
 The component’s reliance on external rule files and a straightforward processing pipeline makes it relatively easy to maintain.  The clear separation of concerns (watch → cache → rule engine → output) enables unit testing of each stage.  However, the lack of concrete code symbols in the repository suggests that documentation and automated tests are essential to avoid drift between the intended design (as described here) and the actual implementation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ The component’s reliance on external rule files and a straightforward processi
 - [LoggingInfrastructure](./LoggingInfrastructure.md) -- LoggingInfrastructure likely utilizes a buffering mechanism to prevent log loss during high-traffic periods.
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification likely utilizes a knowledge graph or ontology database for classification.
 - [LSLConfigurationValidator](./LSLConfigurationValidator.md) -- LSLConfigurationValidator likely checks configuration files for syntax errors and invalid settings.
-
 
 ---
 

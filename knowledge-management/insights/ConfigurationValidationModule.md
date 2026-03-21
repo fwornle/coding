@@ -97,7 +97,6 @@ All classes are deliberately decoupled: they communicate via plain data objects 
 
 5. **Maintainability assessment** – High, thanks to clear separation of concerns, declarative JSON configuration, and reusable patterns across sibling components. Adding new formats or rules requires only JSON edits, minimizing code churn and reducing regression risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ All classes are deliberately decoupled: they communicate via plain data objects 
 - [OntologyManagementModule](./OntologyManagementModule.md) -- OntologyManagementModule's OntologyLoader class loads and parses ontology definitions from JSON files, with support for multiple ontology formats, as specified in the ontology-formats.json file
 - [ConcurrencyManagementModule](./ConcurrencyManagementModule.md) -- ConcurrencyManagementModule's ThreadManager class manages a pool of threads for parallelizing log processing and storage, with thread pool configuration defined in the thread-pool-configuration.json file
 - [AgentIntegrationModule](./AgentIntegrationModule.md) -- AgentIntegrationModule's AgentFactory class creates and configures agent instances, with agent configuration defined in the agent-configuration.json file
-
 
 ---
 

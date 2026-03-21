@@ -109,7 +109,6 @@ HookManagementSystem sits **one level below** `ConstraintSystem` and **above** `
 ### Maintainability assessment
 The **clear modular split** and **single‑responsibility functions** make the codebase approachable. Reusing the `GraphDatabaseAdapter` across multiple sub‑components reduces duplication and centralises database knowledge. However, the reliance on an in‑memory registry means that any change to the startup hydration (`getHookConfigurations`) must be carefully tested to avoid state drift. Overall, the design favours **readability and extensibility**, with the main maintenance risk residing in the graph‑database schema evolution and the need to keep the registry‑persistence contract consistent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ The **clear modular split** and **single‑responsibility functions** make the c
 - [ValidationModule](./ValidationModule.md) -- ValidationModule uses the createConstraintValidationResult method in graphdb-adapter.ts to store validation results in the graph database.
 - [ViolationPersistenceModule](./ViolationPersistenceModule.md) -- ViolationPersistenceModule uses the createConstraintViolation method in graphdb-adapter.ts to store constraint violations in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the createNode method to create a new node in the graph database, as seen in the graphdb-adapter.ts file.
-
 
 ---
 

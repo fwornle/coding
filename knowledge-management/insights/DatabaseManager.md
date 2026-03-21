@@ -124,7 +124,6 @@ The component exhibits **high maintainability** thanks to:
 * Minimal coupling to sibling components; interactions occur through stable contracts (e.g., the adapter).  
 Potential maintenance challenges include keeping the configuration schema in sync with code changes and ensuring that any new database driver adheres to the `DatabaseConnector` contract.  Regular automated tests that validate factory selection, adapter translation, and error handling will mitigate these risks.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ Potential maintenance challenges include keeping the configuration schema in syn
 - [LLMFacade](./LLMFacade.md) -- LLMFacade uses CircuitBreaker.pattern to prevent cascading failures when interacting with LLM providers, protecting the system from overload
 - [MockLLMService](./MockLLMService.md) -- MockLLMService uses MockLLMResponseGenerator.class to generate mock LLM responses, simulating real LLM behavior
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses ConstraintEvaluator.class to evaluate code against defined constraints, detecting violations
-
 
 ---
 

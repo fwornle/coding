@@ -102,7 +102,6 @@ Because the file contains no additional symbols beyond the described classes, th
 
 The use of well‑known patterns (Strategy, Facade) and clear separation between routing, caching, and resilience makes the codebase **highly maintainable**. Adding new modes requires only a new strategy class, preserving the existing test suite. However, the reliance on a single `ModeManager` for all routing means that any bugs in the manager could affect all modes, so thorough unit testing of the manager and its factory logic is essential. Overall, the architecture strikes a good balance between flexibility and simplicity, supporting long‑term evolution with minimal risk of regression.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ The use of well‑known patterns (Strategy, Facade) and clear separation between
 ### Siblings
 - [CacheController](./CacheController.md) -- The CacheController uses a caching library, such as Redis or Memcached, to store and retrieve cached data, as implied by the parent component analysis.
 - [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker uses a circuit breaker pattern to detect when a service is not responding and prevent further requests from being sent to it, as seen in the lib/llm/llm-service.ts file.
-
 
 ---
 

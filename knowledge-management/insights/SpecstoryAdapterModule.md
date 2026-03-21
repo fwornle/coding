@@ -90,7 +90,6 @@ Because the adapter isolates transport logic, scaling the number of Specstory in
 
 The observed modular layout, clear responsibility boundaries, and reliance on shared utilities (logger, error handler) make the codebase **highly maintainable**. Adding new features or fixing bugs is localized to the relevant module, reducing the risk of regressions elsewhere. The only maintainability risk is the implicit coupling to the **ErrorHandlingModule**; if its API changes, every adapter must be updated accordingly, but this is mitigated by the single point of change philosophy.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ The observed modular layout, clear responsibility boundaries, and reliance on sh
 ### Siblings
 - [LoggingModule](./LoggingModule.md) -- The createLogger function from ../logging/Logger.js is used to create logger instances for standardized logging.
 - [ErrorHandlingModule](./ErrorHandlingModule.md) -- The ErrorHandlingModule handles errors and exceptions that occur during the interaction with the Specstory extension.
-
 
 ---
 

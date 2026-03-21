@@ -85,7 +85,6 @@ This hierarchy promotes clear ownership: the mechanism decides *when* to cache, 
 
 The layered approach enhances maintainability: changes to storage (e.g., moving from a dict to a database) or eviction rules can be made in isolated sibling modules without touching the manager or the parent mechanism.  The small, well‑named public API (`get_cache`, `set_cache`, `update_cache`) further reduces the surface area for bugs.  However, the lack of concrete implementation details in the current observations means that documentation and tests must be kept in sync to avoid drift as strategies evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ The layered approach enhances maintainability: changes to storage (e.g., moving 
 ### Siblings
 - [CacheInvalidationPolicy](./CacheInvalidationPolicy.md) -- CacheInvalidationPolicy is likely to be implemented in a separate module or class, with a clear interface for integrating with the CacheStoreManager
 - [CacheStorageStrategy](./CacheStorageStrategy.md) -- CacheStorageStrategy may be implemented using a dictionary or a database, with the choice of storage mechanism depending on the specific requirements of the application
-
 
 ---
 

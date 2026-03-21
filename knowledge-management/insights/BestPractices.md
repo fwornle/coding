@@ -113,7 +113,6 @@ By adhering to these guidelines, developers ensure that the system remains **con
 
 Overall, **BestPractices** provides a well‑structured, documentation‑driven backbone that aligns with the broader **CodingPatterns** philosophy of data integrity and modular design, while offering concrete, actionable guidance that can be automatically validated throughout the development lifecycle.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -127,7 +126,6 @@ Overall, **BestPractices** provides a well‑structured, documentation‑driven 
 - [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
 - [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
-
 
 ---
 

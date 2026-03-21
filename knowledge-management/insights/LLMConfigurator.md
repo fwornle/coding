@@ -76,7 +76,6 @@ Even though concrete code snippets are not provided, the observations give enoug
 - The builder/factory approach localizes configuration mutations, making it straightforward to add, deprecate, or reorder settings.  
 - Potential risk: over‑reliance on implicit ordering in the builder could become fragile if many optional steps are introduced; documenting the required order mitigates this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ Even though concrete code snippets are not provided, the observations give enoug
 ### Siblings
 - [LLMInitializer](./LLMInitializer.md) -- The LLMServiceManager.initializeModel() function likely invokes the LLMInitializer to load the model into memory, as suggested by the parent component analysis.
 - [LLMUsageTracker](./LLMUsageTracker.md) -- The LLMUsageTracker may be implemented as a separate module or class, possibly with a name like LLMUsageTracker.ts or llm_usage_tracker.py, to keep the tracking logic organized and reusable.
-
 
 ---
 

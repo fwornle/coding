@@ -75,12 +75,10 @@ The system is organised as a **parent‑child hierarchy**: `LogStorageModule` (p
 
 The **schema‑driven approach** enhances maintainability: developers can understand the data model by reading a single JSON file. The clear separation between LogStorageModule and GraphologyDatabase limits the impact of changes—modifying the graph engine’s internals does not affect callers as long as the module’s façade remains stable. However, the lack of explicit versioning or migration tooling for the schema could become a liability when the model evolves; manual coordination will be required to keep code and schema aligned. Overall, the design is **moderately maintainable**, provided disciplined schema management and clear documentation of the module’s public API.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LogStorageModule](./LogStorageModule.md) -- LogStorageModule's GraphologyDatabase class uses a graph-based data structure to store log data, with nodes and edges defined in the graph-schema.json file
-
 
 ---
 

@@ -80,7 +80,6 @@ External code interacts with `ParallelTaskManagement` primarily through the **su
 - The reliance on a thread‑safe result mechanism reduces the need for custom synchronization in client code, lowering the surface area for bugs.  
 - Absence of extensive public APIs (only submit/retrieve) keeps the contract simple, but any future extension must respect the existing concurrency guarantees to preserve correctness.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ External code interacts with `ParallelTaskManagement` primarily through the **su
 ### Siblings
 - [WorkStealingAlgorithm](./WorkStealingAlgorithm.md) -- WorkStealingExecutor (WorkStealingExecutor.java:10) implements the work-stealing algorithm, allowing threads to steal tasks from other threads when their own task queue is empty
 - [DagBasedExecutionModel](./DagBasedExecutionModel.md) -- The GraphBasedExecution (GraphBasedExecution.java:15) class implements the DAG-based execution model, allowing developers to define complex task dependencies and execute them efficiently
-
 
 ---
 

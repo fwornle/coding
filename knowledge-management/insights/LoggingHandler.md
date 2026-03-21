@@ -96,7 +96,6 @@ Because the current design is monolithic and synchronous, scaling to multi‑pro
 * **Documentation‑driven** – The clear guidance in README, EXAMPLES, and USAGE files reduces onboarding friction.  
 * **Potential risk** – Absence of explicit tests or versioned API contracts in the observations could make future changes risky; adding a stable public API for the handler would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ Because the current design is monolithic and synchronous, scaling to multi‑pro
 
 ### Siblings
 - [TmuxIntegration](./TmuxIntegration.md) -- The integrations/copi/README.md file describes Copi as a GitHub Copilot CLI wrapper with logging and Tmux integration, indicating the importance of Tmux in the UKBTraceReporting sub-component.
-
 
 ---
 

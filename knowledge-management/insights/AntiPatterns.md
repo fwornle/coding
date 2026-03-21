@@ -93,7 +93,6 @@ Interaction between components is **event‑free and synchronous**: the parent c
 - Shared adapter reduces duplication but mandates careful change management; comprehensive unit and integration tests around the adapter are essential to safeguard against regressions.
 - Automatic JSON export reduces manual export code, lowering maintenance overhead for reporting features.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Interaction between components is **event‑free and synchronous**: the parent c
 
 ### Siblings
 - [ProjectTemplates](./ProjectTemplates.md) -- ProjectTemplates uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving template data.
-
 
 ---
 

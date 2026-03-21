@@ -109,12 +109,10 @@ Because the observations do not list concrete symbols, the above steps are infer
 * **Potential Technical Debt** – Absence of explicit code symbols means developers must rely on documentation to understand the detector’s contract; adding strong type definitions or an interface file would improve discoverability.  
 * **Documentation Dependency** – The health of the detector is directly tied to the accuracy and consistency of the Markdown file; investing in linting or validation tooling for the specification would further boost maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
-
 
 ---
 

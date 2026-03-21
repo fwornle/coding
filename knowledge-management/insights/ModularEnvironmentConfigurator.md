@@ -84,12 +84,10 @@ Because each module is isolated, other parts of the codebase can import only the
 4. **Scalability considerations** – Adding dozens of modules scales linearly; the discovery process is I/O‑bound and can be cached if needed.  External‑tool dependencies must be managed at scale (e.g., ensuring all agents have `tmux` installed).  
 5. **Maintainability assessment** – High maintainability thanks to self‑documenting modules and clear separation of concerns.  The primary risk is divergence between README documentation and actual implementation, which can be mitigated by linting or CI checks that verify schema consistency.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [EnvironmentConfigurator](./EnvironmentConfigurator.md) -- EnvironmentConfigurator uses a modular approach to environment configuration and connectivity, with each environment variable having its own dedicated configuration module, as seen in the integrations directory.
-
 
 ---
 

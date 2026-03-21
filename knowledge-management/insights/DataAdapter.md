@@ -107,7 +107,6 @@ All of these pieces would be wired together in a constructor or factory function
 
 *All statements above are derived directly from the supplied observations and the surrounding component context; no unsupported assumptions have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ All of these pieces would be wired together in a constructor or factory function
 - [LoggingManager](./LoggingManager.md) -- LoggingManager likely utilizes the integrations/copi/README.md file to understand the logging requirements for the Copi integration.
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler likely uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
-
 
 ---
 

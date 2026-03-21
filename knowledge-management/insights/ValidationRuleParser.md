@@ -10,19 +10,15 @@ The ContentValidator's rules-engine based approach implies that the ValidationRu
 
 - The parser's implementation would likely involve a deserialization mechanism, such as JSON parsing, to convert the ValidationRules.json content into an in-memory representation that the ContentValidator can use.
 
-
 ## Usage Guidelines
 
 - The ContentValidator's rules-engine based approach implies that the ValidationRuleParser must be able to handle a variety of rule types and configurations, potentially involving recursive parsing or dynamic rule loading.
-
 
 ## Related Entities
 
 ### Used By
 
 - ContentValidator (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ The ContentValidator's rules-engine based approach implies that the ValidationRu
 ### Siblings
 - [EntityContentValidator](./EntityContentValidator.md) -- EntityContentValidator would operate on entity content data structures, potentially involving complex data types or nested objects, which it must traverse and validate according to the parsed rules.
 - [ValidationRulesEngine](./ValidationRulesEngine.md) -- ValidationRulesEngine would serve as an intermediary between the ValidationRuleParser and the EntityContentValidator, coordinating the flow of validation rules and entity content to facilitate the validation process.
-
 
 ---
 

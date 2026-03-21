@@ -103,7 +103,6 @@ Potential maintenance challenges include the need to keep the **service registry
 
 **In summary**, `APIServiceWrapper` is the resilient, façade‑style gateway that unifies API interactions within the Dockerized micro‑service ecosystem.  It leans on the retry‑with‑backoff logic of `ServiceStarter`, collaborates closely with sibling wrappers, and enforces cross‑cutting concerns such as auth, logging, and monitoring—all while preserving the modularity and scalability inherent to the parent micro‑services architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -114,7 +113,6 @@ Potential maintenance challenges include the need to keep the **service registry
 - [DashboardServiceWrapper](./DashboardServiceWrapper.md) -- DashboardServiceWrapper likely utilizes the retry-with-backoff pattern in the Service Starter (lib/service-starter.js) to handle dashboard service failures.
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry utilizes the LLM Mock Service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to provide mock LLM responses for testing frontend logic without actual API calls.
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the retry-with-backoff pattern to handle service failures.
-
 
 ---
 

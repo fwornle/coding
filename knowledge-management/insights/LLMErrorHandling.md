@@ -102,7 +102,6 @@ Logging is performed through a generic logger (e.g., `logger.error(...)`), altho
 
 *All statements above are directly grounded in the provided observations; no external patterns or undocumented behavior have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Logging is performed through a generic logger (e.g., `logger.error(...)`), altho
 - [LLMCachingMechanism](./LLMCachingMechanism.md) -- The LLMCachingMechanism class (lib/llm/llm-caching-mechanism.ts) utilizes a cache-based approach to store frequently accessed data, reducing the number of requests to LLM providers.
 - [LLMConfigurationManager](./LLMConfigurationManager.md) -- The LLMConfigurationManager class (lib/llm/llm-configuration-manager.ts) utilizes a configuration-based approach to manage the behavior of the LLMAbstraction component.
 - [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) utilizes a facade-based approach to provide a high-level interface for LLM operations.
-
 
 ---
 

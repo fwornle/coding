@@ -81,7 +81,6 @@ The **FileSystemWatcher** child encapsulates the raw chokidar instance, exposing
 | **Scalability considerations** | The event‑driven approach scales well as more listeners are added; chokidar can handle thousands of watched paths but may need tuning of OS limits (e.g., `max_user_watches`).  The cache helps keep CPU usage low under high‑frequency change bursts, but memory consumption grows with the number of watched files. |
 | **Maintainability assessment** | Clear separation between watcher (child), manager (parent), and file‑system adapter (sibling) makes the codebase modular.  Reliance on well‑known libraries (chokidar, lodash, fs‑extra) reduces the need for custom low‑level code.  The factory pattern centralizes adapter creation, simplifying future swaps.  The primary maintenance burden lies in keeping `config.json` accurate and managing cache invalidation when external processes bypass chokidar. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ The **FileSystemWatcher** child encapsulates the raw chokidar instance, exposing
 - [ConnectionRetryManager](./ConnectionRetryManager.md) -- ConnectionRetryManager utilizes a factory pattern in lib/integrations/specstory-adapter.js to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.
 - [IPCManager](./IPCManager.md) -- IPCManager uses a library like ipc-main to establish IPC channels between processes or threads.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a factory pattern to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.
-
 
 ---
 

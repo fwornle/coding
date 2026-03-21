@@ -47,12 +47,10 @@ No sibling entities are listed, but any future modules that require coordination
 4. **Scalability considerations** – Centralized lock can become a bottleneck under high parallelism; scaling would require either lock sharding or moving to a distributed lock service, which is not currently indicated.  
 5. **Maintainability assessment** – With a single, well‑named entry point (`acquireLock()`) and limited public surface, the component is easy to understand and test. However, the lack of visible implementation details means future maintainers must locate the concrete logic in `locking‑mechanism.ts` to assess correctness and performance.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConcurrencyControlModule](./ConcurrencyControlModule.md) -- ConcurrencyControlModule uses a locking mechanism, such as acquireLock() in locking-mechanism.ts, to prevent data inconsistencies when multiple components are accessing the knowledge graph simultaneously.
-
 
 ---
 

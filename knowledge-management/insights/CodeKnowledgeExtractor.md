@@ -69,7 +69,6 @@ No other external libraries or services are mentioned, so the integration surfac
 
 5. **Maintainability assessment** – High maintainability is supported by the clear separation of concerns and the configuration‑driven approach.  The main risk is the implicit coupling to the data shape emitted by **GitHistoryAnalyzer**; careful versioning of that contract will be essential to keep the extractor stable over time.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ No other external libraries or services are mentioned, so the integration surfac
 ### Siblings
 - [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- GitHistoryAnalyzer uses the git_history_analyzer.py module to extract knowledge from git history, specifically the GitHistoryAnalyzer class
 - [KnowledgeGraphBuilder](./KnowledgeGraphBuilder.md) -- The KnowledgeGraphBuilder uses the extracted knowledge from the GitHistoryAnalyzer and CodeKnowledgeExtractor to build a knowledge graph
-
 
 ---
 

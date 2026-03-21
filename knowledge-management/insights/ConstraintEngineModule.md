@@ -85,7 +85,6 @@ The interaction with **ViolationTrackingModule** follows a **publish‑subscribe
 * Shared use of the GraphDatabaseAdapter across multiple modules ensures consistent data handling but also means changes to the adapter impact many components; careful versioning and testing are required.  
 * The caching layer adds complexity; proper documentation of cache keys and invalidation rules is critical to avoid stale evaluation results.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The interaction with **ViolationTrackingModule** follows a **publish‑subscribe
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- GraphPersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve graph data.
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a logging framework to handle log messages and exceptions, providing a standardized logging approach.
 - [DashboardModule](./DashboardModule.md) -- DashboardModule utilizes a web-based interface to display constraint violations and system performance metrics, supporting customizable dashboard layouts and visualizations.
-
 
 ---
 

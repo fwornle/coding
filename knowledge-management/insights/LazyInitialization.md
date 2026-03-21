@@ -74,12 +74,10 @@ External modules that consume LLM capabilities interact only with the *LLMServic
 * **Low coupling** – External code interacts only with the manager’s public API, insulating it from changes in how services are constructed or verified.  
 * **Potential hidden complexity** – The synchronization and health‑check mechanisms, while encapsulated, may become intricate; clear documentation and unit tests around the manager are essential to keep maintenance effort low.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager is responsible for managing LLM services, including lazy initialization and health verification.
-
 
 ---
 

@@ -16,7 +16,7 @@ The **DockerizedServices** component lives under the `lib/` and `scripts/` direc
 
 Collectively, DockerizedServices provides a **flexible, extensible framework** for coordinating LLM‑driven workflows, persisting execution artefacts, and exposing management APIs—all inside Docker containers that can be started, stopped, and recovered automatically.
 
-![DockerizedServices — Architecture](../../.data/knowledge-graph/insights/images/dockerized-services-architecture.png)
+![DockerizedServices — Architecture](images/dockerized-services-architecture.png)
 
 ## Architecture and Design  
 
@@ -30,7 +30,7 @@ DockerizedServices is built around three tightly coupled architectural choices t
 
 These patterns are complemented by **Facade/Wrapper** scripts (`api-service.js`, `dashboard-service.js`) that expose a minimal, uniform interface for launching auxiliary services. The wrappers hide Docker‑specific command‑line intricacies and present a clean entry point to the rest of the system, a design decision echoed across the sibling **LiveLoggingSystem** and **ConstraintSystem** components.
 
-![DockerizedServices — Relationship](../../.data/knowledge-graph/insights/images/dockerized-services-relationship.png)
+![DockerizedServices — Relationship](images/dockerized-services-relationship.png)
 
 ## Implementation Details  
 
@@ -101,7 +101,6 @@ DockerizedServices functions as the orchestration hub within the **Coding** pare
 ### Maintainability assessment
 The heavy use of DI and clear façade boundaries makes the codebase **highly maintainable**: new providers, services, or storage back‑ends can be introduced with minimal ripple effects. Event‑driven code is readable thanks to consistent naming (`ensureLLMInitialized`, `execute`, `WaveComplete`). However, the reliance on custom adapters (Graphology + LevelDB) introduces a niche dependency that may require specialized knowledge for future contributors. Overall, the component balances flexibility with disciplined separation of concerns, positioning it well for ongoing evolution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ The heavy use of DI and clear façade boundaries makes the codebase **highly mai
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
 - [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
-
 
 ---
 

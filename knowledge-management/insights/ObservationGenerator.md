@@ -10,19 +10,15 @@ The ObservationGeneration (ObservationGeneration.ts:5) generates observations fr
 
 - The LSL sessions (lsl-sessions.log:10) provide additional context for analysis, including user interactions and system events
 
-
 ## How It Works
 
 - The ObservationGeneration (ObservationGeneration.ts:5) generates observations from git history and LSL sessions, using natural language processing and machine learning algorithms
-
 
 ## Related Entities
 
 ### Used By
 
 - Pipeline (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ The ObservationGeneration (ObservationGeneration.ts:5) generates observations fr
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The PipelineCoordinator (PipelineCoordinator.ts:12) uses a DAG-based execution model, which relies on the DAGDependencyResolver to resolve dependencies between steps
 - [KnowledgeGraphTransformer](./KnowledgeGraphTransformer.md) -- The KGTransformation (KGTransformation.ts:20) applies knowledge graph transformations to the data, including entity deduplication and knowledge persistence
-
 
 ---
 

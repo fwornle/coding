@@ -65,7 +65,6 @@ The sibling components share the same AST contract, ensuring that any enhancemen
 * **Weaknesses** – lack of finer‑grained modularization within `ParserGenerator.ts` could make future extensions (e.g., supporting additional languages) harder to isolate.  
 * Overall, maintainability is good as long as changes to the AST schema are coordinated across all dependent siblings, and the parser generator tool’s versioning is managed centrally.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ The sibling components share the same AST contract, ensuring that any enhancemen
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor likely utilizes the parent component's suggested node, KnowledgeGraph, to store and query code metadata for semantic analysis, as indicated by the parent analysis.
 - [CodeInsightsGenerator](./CodeInsightsGenerator.md) -- The CodeInsightsGenerator may utilize natural language processing techniques, as suggested by the parent analysis, to analyze the code and generate human-readable insights.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule likely incorporates machine learning algorithms, as suggested by the parent analysis, to improve the accuracy and effectiveness of code analysis and insight generation.
-
 
 ---
 

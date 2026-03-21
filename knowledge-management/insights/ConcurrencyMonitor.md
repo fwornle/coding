@@ -99,7 +99,6 @@ No external libraries or services are mentioned, so the monitor’s dependencies
 * Absence of complex inheritance or cross‑module dependencies makes the monitor easy to extend (e.g., adding new metrics) while preserving existing behaviour.  
 * The reliance on well‑defined callbacks and a read‑only consumption API reduces the risk of accidental side effects, supporting stable long‑term maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ No external libraries or services are mentioned, so the monitor’s dependencies
 ### Siblings
 - [WorkStealingConcurrencyManager](./WorkStealingConcurrencyManager.md) -- The ConcurrencyControlModule utilizes a work-stealing concurrency mechanism, as seen in the parent component analysis, to manage concurrent access to shared resources.
 - [LockingMechanism](./LockingMechanism.md) -- The LockingMechanism would be used to protect shared resources from concurrent access, ensuring that only one thread can modify the resource at a time.
-
 
 ---
 

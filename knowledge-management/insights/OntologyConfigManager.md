@@ -77,12 +77,10 @@ External dependencies are limited to the YAML parsing library and the file syste
 
 By anchoring the analysis strictly to the provided observations, this document captures the essential architectural and design characteristics of **OntologyConfigManager**, clarifying how it fits within the broader **Ontology** and **SemanticAnalysis** ecosystem while offering concrete guidance for developers who will maintain or extend it.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
-
 
 ---
 

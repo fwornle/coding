@@ -108,7 +108,6 @@ All siblings sit on the same three‑tier stack, sharing code and storage but di
 
 The design’s heavy reliance on configuration and a single adapter class yields **high maintainability**: new idioms or analysis steps are added by editing JSON/YAML files, not by touching core logic.  The clear separation between workflow construction and data access simplifies unit testing (mock the adapter, feed a stubbed workflow config).  The main risk is **configuration drift** across siblings; a shared schema validator and automated tests for each workflow file would mitigate this.  Overall, the architecture balances reuse with clear boundaries, making future evolution manageable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ The design’s heavy reliance on configuration and a single adapter class yields
 - [CodingConventions](./CodingConventions.md) -- The createWorkflow function in workflows/createWorkflow.ts demonstrates how workflows are created and managed, which is essential for coding convention implementation.
 - [AntiPatterns](./AntiPatterns.md) -- The createWorkflow function in workflows/createWorkflow.ts demonstrates how workflows are created and managed, which is essential for anti-pattern identification.
 - [WorkflowManager](./WorkflowManager.md) -- The createWorkflow function in workflows/createWorkflow.ts demonstrates how workflows are created and managed.
-
 
 ---
 

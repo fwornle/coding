@@ -87,7 +87,6 @@ No explicit external dependencies are mentioned, so the integration surface is l
 * The clear separation of concerns and reliance on interfaces make the behavioral package highly maintainable. Adding new observers or strategies does not require changes to existing code, adhering to the Open/Closed Principle.  
 * The primary maintenance risk lies in unmanaged observer lifecycles and insufficient documentation of strategy contracts, which can lead to memory leaks or incorrect algorithm usage. Proper adherence to the usage guidelines mitigates these risks.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ No explicit external dependencies are mentioned, so the integration surface is l
 ### Siblings
 - [CreationalPatterns](./CreationalPatterns.md) -- SingletonPattern.java uses a double-checked locking mechanism to ensure thread safety in getInstance() method, demonstrating a creational pattern for object creation
 - [StructuralPatterns](./StructuralPatterns.md) -- The Adapter pattern can be used in DesignPatterns to enable objects with incompatible interfaces to work together, thus promoting code reusability and reducing the need for duplicate code
-
 
 ---
 

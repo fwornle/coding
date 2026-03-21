@@ -12,7 +12,6 @@ KnowledgeBaseUpdatesPattern is implemented across: src/knowledge-management, lib
 
 - Core components: GraphDatabaseService, GraphKnowledgeExporter, GraphDatabaseAdapter
 
-
 ---
 
 *Generated from 3 observations*

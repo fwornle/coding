@@ -74,12 +74,10 @@ Beyond its parent, **DataMapper** may indirectly interact with downstream servic
 * **Positive** – Clear separation and documentation‑driven rules make the mapper easy to understand and modify.  
 * **Negative** – Absence of visible source code and tests hampers automated verification; reliance on external documentation increases the chance of drift. Introducing explicit schema definitions or code‑level contracts would improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DataAdapter](./DataAdapter.md) -- DataAdapter likely utilizes the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.
-
 
 ---
 

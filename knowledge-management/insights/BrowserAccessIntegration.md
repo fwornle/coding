@@ -86,12 +86,10 @@ Within the codebase, **BrowserAccessIntegration** is nested inside the **BestPra
 * Documentation in the README provides a single source of truth for integration setup, which aids onboarding and reduces the risk of misconfiguration.  
 * Absence of concrete code symbols means that any future changes must be carefully coordinated with the repository’s public API to avoid breaking downstream consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [BestPracticeRepository](./BestPracticeRepository.md) -- The integrations/browser-access/README.md file suggests that the BestPracticeRepository may be used in conjunction with the Browser Access MCP Server.
-
 
 ---
 

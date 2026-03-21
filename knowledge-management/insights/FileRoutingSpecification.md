@@ -12,14 +12,11 @@ The FileRoutingSpecification is likely to be used in conjunction with other comp
 
 - The FileRoutingSpecification is likely to be used in conjunction with other components, such as the FileCache, to ensure consistent and efficient file routing.
 
-
 ## Related Entities
 
 ### Used By
 
 - FileRoutingModule (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The FileRoutingSpecification is likely to be used in conjunction with other comp
 ### Siblings
 - [FileRouter](./FileRouter.md) -- The FileRouter uses a file routing specification, defined in file_routing_specification.py, to validate the file routing configuration, including file settings and destination options.
 - [FileCache](./FileCache.md) -- The FileCache is likely to be implemented as a separate module or class, such as FileCache.py, to store and retrieve file information.
-
 
 ---
 

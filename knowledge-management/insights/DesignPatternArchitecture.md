@@ -72,7 +72,6 @@ Sibling components such as **SingletonPatternImplementation** and **CreationalPa
 4. **Scalability considerations** – Adding new patterns or extending existing ones is straightforward because each lives in its own module; the singleton’s single‑instance nature prevents resource contention as the system grows.  
 5. **Maintainability assessment** – High maintainability due to clear separation of concerns, explicit pattern contracts, and reuse of canonical implementations (e.g., `OntologyLoader`). The primary risk is the potential for hidden coupling through the singleton if used indiscriminately.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ Sibling components such as **SingletonPatternImplementation** and **CreationalPa
 ### Siblings
 - [SingletonPatternImplementation](./SingletonPatternImplementation.md) -- The OntologyLoader class in ontology-loader.py utilizes the Singleton pattern to ensure only one instance is created, as seen in the class definition.
 - [CreationalPatternUsage](./CreationalPatternUsage.md) -- The DesignPatterns sub-component utilizes creational patterns, including the Singleton pattern, to manage object instantiation and ensure efficient resource allocation.
-
 
 ---
 

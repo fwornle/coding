@@ -106,7 +106,6 @@ Because the module is **in‑process**, scaling horizontally requires replicatin
 
 The strict separation of concerns and reliance on declarative JSON files make the module **highly maintainable**. Adding a new agent type or protocol only requires a new entry in the relevant JSON and, if necessary, a small adapter class. Validation tooling from ConfigurationValidationModule further reduces the risk of configuration drift. The main maintenance burden lies in keeping the JSON schemas in sync with any underlying code changes, a task that can be mitigated by automated schema tests.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -118,7 +117,6 @@ The strict separation of concerns and reliance on declarative JSON files make th
 - [OntologyManagementModule](./OntologyManagementModule.md) -- OntologyManagementModule's OntologyLoader class loads and parses ontology definitions from JSON files, with support for multiple ontology formats, as specified in the ontology-formats.json file
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- ConfigurationValidationModule's ConfigurationLoader class loads and parses the system configuration from JSON files, with support for multiple configuration formats, as specified in the configuration-formats.json file
 - [ConcurrencyManagementModule](./ConcurrencyManagementModule.md) -- ConcurrencyManagementModule's ThreadManager class manages a pool of threads for parallelizing log processing and storage, with thread pool configuration defined in the thread-pool-configuration.json file
-
 
 ---
 

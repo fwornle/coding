@@ -79,7 +79,6 @@ All interactions are mediated through well‑defined method signatures (e.g., `i
 ### Maintainability Assessment  
 The modular decomposition (single‑responsibility children) and the clear state‑machine model make the **TrajectoryController** highly maintainable.  Changes to connection logic, logging format, or initialization steps are isolated to their respective child classes, reducing regression risk.  The reliance on an external JSON configuration reduces code churn for behavioural tweaks.  The primary maintenance burden lies in keeping the state‑machine definitions and transition rules accurate as new workflow states are introduced; however, this is mitigated by the explicit, observable nature of state transitions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ The modular decomposition (single‑responsibility children) and the clear state
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes the SpecstoryAdapter class to log conversations, providing methods for formatting log entries and handling errors.
 - [FileWatchHandler](./FileWatchHandler.md) -- FileWatchHandler utilizes the Node.js fs module to watch a directory for new log files, providing methods for handling file system events.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
-
 
 ---
 

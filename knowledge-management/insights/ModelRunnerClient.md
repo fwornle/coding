@@ -82,12 +82,10 @@ No sibling modules are explicitly mentioned, so the client’s interaction surfa
 
 Overall, the `ModelRunnerClient` provides a focused, well‑encapsulated bridge between the DMRProviderModule and the Docker runtime, aligning with clean‑code principles while keeping the system ready for future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DMRProviderModule](./DMRProviderModule.md) -- The DMRProviderModule uses a Docker API client to interact with the Model Runner, as seen in lib/llm/dmr-provider-module.ts.
-
 
 ---
 

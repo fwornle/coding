@@ -108,7 +108,6 @@ Thus, the design cleanly separates **caching concerns** from **provider orchestr
 * Centralising all cache interactions in `llm-service.ts` reduces the surface area for bugs and makes the API discoverable.  
 * However, the reliance on implicit conventions (e.g., request signature composition) requires thorough documentation to prevent cache key collisions.  Adding typed request‑key helpers would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -119,7 +118,6 @@ Thus, the design cleanly separates **caching concerns** from **provider orchestr
 - [ModeResolver](./ModeResolver.md) -- ModeResolver likely uses a decision-making process, possibly implemented in a function like determineMode(), to select the appropriate LLM mode.
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker likely uses a budgeting system, possibly implemented in a class like BudgetManager, to track and manage costs.
 - [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier likely uses a classification system, possibly implemented in a class like Classifier, to classify input data sensitivity.
-
 
 ---
 

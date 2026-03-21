@@ -104,12 +104,10 @@ No explicit external library dependencies are mentioned, so the integration appe
 
 Overall, the **TaskQueue**—though not directly visible in source files—appears to be a central, well‑designed element that enables the **ConcurrencyManager** to efficiently schedule and execute parallel work using a proven work‑stealing approach.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager may use a work-stealing concurrency model, allowing idle workers to pull tasks immediately, similar to the WaveController.runWithConcurrency() method.
-
 
 ---
 

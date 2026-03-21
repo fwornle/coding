@@ -102,7 +102,6 @@ No other modules are mentioned, so the integration surface is limited to the thr
 
 The design’s emphasis on **strategy encapsulation** and **registry‑based lookup** makes the codebase highly maintainable: new modes are added by creating a new strategy class and registering it, with no need to touch existing logic.  The clear separation also aids readability—developers can locate mode‑related code in three predictable places (`mode-registry.ts`, strategy modules, and the switching mechanism).  The primary maintenance risk is the tight coupling between `ModeSwitchingMechanism` and the manager; any change to the manager’s API could ripple into the switching component.  Keeping the manager’s public contract stable and providing thin adapters for the switching logic will mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ The design’s emphasis on **strategy encapsulation** and **registry‑based loo
 ### Siblings
 - [ModeEstimationStrategy](./ModeEstimationStrategy.md) -- The ModeEstimationStrategy is expected to be implemented as a separate module or class, possibly within the mode-registry.ts file or a dedicated strategy file.
 - [ModeSwitchingMechanism](./ModeSwitchingMechanism.md) -- The ModeSwitchingMechanism is anticipated to be tightly coupled with the ModeRegistryManager, as it relies on the registry to determine the active mode and retrieve the associated strategy.
-
 
 ---
 

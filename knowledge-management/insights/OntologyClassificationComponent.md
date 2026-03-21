@@ -112,7 +112,6 @@ The component is a self‑contained sub‑system within `LiveLoggingSystem`, wit
 ### Maintainability assessment  
 The component’s clear separation of concerns (classification, persistence, caching, concurrency, feedback) makes the codebase easy to navigate and extend.  The use of well‑known patterns (Adapter, Cache‑Aside, Thread‑Pool) lowers the learning curve for new developers.  However, the reliance on a static properties file for runtime tuning and the lack of a pluggable heuristic interface could hinder rapid experimentation.  Adding an interface for `HeuristicStrategy` and externalising configuration to a dynamic source (e.g., Spring Cloud Config) would improve adaptability without sacrificing the current simplicity.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -130,7 +129,6 @@ The component’s clear separation of concerns (classification, persistence, cac
 - [SemanticAnalysisComponent](./SemanticAnalysisComponent.md) -- SemanticAnalysisComponent uses a semantic analysis framework in SemanticAnalysisFramework.java to perform semantic analysis of observations
 - [AgentIntegrationComponent](./AgentIntegrationComponent.md) -- AgentIntegrationComponent uses an agent integration framework in AgentIntegrationFramework.java to integrate with various agents
 - [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
-
 
 ---
 

@@ -99,12 +99,10 @@ Potential external integration points include any higher‑level request handlin
 * The manager’s isolation makes the caching logic easy to locate and modify, supporting good maintainability.  
 * However, because the cache is inferred rather than explicitly coded in the observed repository, developers must ensure that the manager’s API remains stable; any change will ripple to all validators that depend on it. Clear documentation and unit tests around the manager’s contract are essential to keep the subsystem maintainable as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve validation metadata.
-
 
 ---
 

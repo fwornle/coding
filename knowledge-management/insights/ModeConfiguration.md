@@ -54,12 +54,10 @@ Because the resolver “loads the appropriate configuration,” it is plausible 
 * High maintainability: the configuration‑centric approach isolates mode changes to data files, reducing code churn.  
 * Maintainability hinges on disciplined schema validation and clear documentation of the context‑to‑mode mapping, preventing hidden coupling between request attributes and mode selection.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMModeResolver](./LLMModeResolver.md) -- The LLMModeResolver uses configuration files to determine the current LLM mode.
-
 
 ---
 

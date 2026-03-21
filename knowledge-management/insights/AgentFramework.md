@@ -71,7 +71,6 @@ Interaction with other system parts is explicit. Agents are **children of Semant
 - Clear file organization and single‑responsibility agents simplify code navigation and future extensions.  
 - The reliance on explicit initialization and dependency injection makes unit testing straightforward, further supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ Interaction with other system parts is explicit. Agents are **children of Semant
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
 - [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the classify method in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to classify observations against the ontology system
 - [Insights](./Insights.md) -- The Insights sub-component uses the generateInsights method in a hypothetical integrations/mcp-server-semantic-analysis/src/agents/insights-agent.ts to generate insights from the processed data
-
 
 ---
 

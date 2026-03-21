@@ -75,7 +75,6 @@ Because ProviderManager centralises credential handling, any addition of a new p
 | **Scalability considerations** | Adding new providers scales linearly – only the registry and a new provider class are needed.  Provider instances can be cached or pooled to handle high request volumes without recreating objects per call |
 | **Maintainability assessment** | High – clear separation of concerns, single location for API‑key configuration, and a uniform provider interface make future changes localized and low‑risk |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Because ProviderManager centralises credential handling, any addition of a new p
 
 ### Siblings
 - [LLMConnectionManager](./LLMConnectionManager.md) -- The parent component analysis suggests the existence of LLMConnectionManager, which is a crucial aspect of the LLMService sub-component.
-
 
 ---
 

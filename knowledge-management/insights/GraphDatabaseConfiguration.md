@@ -114,7 +114,6 @@ The system is organised around **database service families** (graph, relational,
 
 The clear separation between **configuration**, **connection management**, and **data‑access logic** yields high maintainability. Adding new graph‑database features (e.g., query time‑outs, read‑only mode) only requires extending `GraphDatabaseConfiguration` and adjusting the adapter’s usage points. The lack of hard‑coded values and the reliance on DI patterns further simplify testing and future refactoring. The main maintenance risk lies in the need to keep the configuration schema in sync with any changes to the underlying graph driver’s connection API. Regular schema validation and integration tests can mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ The clear separation between **configuration**, **connection management**, and *
 ### Siblings
 - [DatabaseConfiguration](./DatabaseConfiguration.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields, implying a need for database configuration to connect to the correct database instance.
 - [DatabaseConnectionManager](./DatabaseConnectionManager.md) -- The parent analysis suggests the existence of a DatabaseConnectionManager, which is a common pattern in database-driven applications.
-
 
 ---
 

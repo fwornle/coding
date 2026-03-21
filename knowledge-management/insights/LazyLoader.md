@@ -20,7 +20,7 @@ A **caching layer** sits between the loader modules and the consuming components
 
 To close the loop, LazyLoader emits a **callback** once an API is ready. The callback is consumed by the **Trajectory** component, which can then wire the freshly loaded API into its processing pipeline (for example, passing a logging client to **SpecstoryAdapter**). This callback‑based notification pattern enables timely integration while keeping the loader decoupled from its consumers.  
 
-![LazyLoader — Architecture](../../.data/knowledge-graph/insights/images/lazy-loader-architecture.png)
+![LazyLoader — Architecture](images/lazy-loader-architecture.png)
 
 ---
 
@@ -52,7 +52,7 @@ LazyLoader sits at the heart of **Trajectory**, acting as the bridge between the
 
 Because the loader modules follow the same interface as **WorkStealer** tasks, they can be scheduled on the same work‑stealing thread pool if needed, further unifying the concurrency model across the codebase.  
 
-![LazyLoader — Relationship](../../.data/knowledge-graph/insights/images/lazy-loader-relationship.png)
+![LazyLoader — Relationship](images/lazy-loader-relationship.png)
 
 ---
 
@@ -98,7 +98,6 @@ LazyLoader is a leaf sub‑component under **Trajectory**, yet it shares archite
 
 The clear separation of concerns—individual loader modules, a central caching layer, and configuration driven by **EnvironmentConfigurator**—makes the codebase highly maintainable. Adding or removing an API requires only a new file in the integrations directory and optional configuration entries. The standardized interface reduces the learning curve for new contributors, and the callback pattern isolates LazyLoader from downstream logic, limiting the impact of changes. The primary maintenance burden lies in keeping cache configuration in sync with the operational characteristics of each external service.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The clear separation of concerns—individual loader modules, a central caching 
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a modular approach to data storage and management, with each graph having its own dedicated storage module, as seen in the integrations directory.
 - [EnvironmentConfigurator](./EnvironmentConfigurator.md) -- EnvironmentConfigurator uses a modular approach to environment configuration and connectivity, with each environment variable having its own dedicated configuration module, as seen in the integrations directory.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a modular approach to logging and tracking conversations and events, with each conversation having its own dedicated logging module, as seen in the integrations directory.
-
 
 ---
 

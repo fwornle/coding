@@ -79,7 +79,6 @@ Any external module that wishes to contribute new bindings only needs to modify 
 * The main risk is configuration drift; enforcing schema validation and documentation of keys mitigates this.  
 * Adding new component types only requires updating the JSON and, optionally, a concrete class; no changes to the DI core are needed.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Any external module that wishes to contribute new bindings only needs to modify 
 ### Siblings
 - [ComponentRegistry](./ComponentRegistry.md) -- The ComponentRegistry is expected to be implemented using a data structure such as a dictionary or a map, allowing for efficient registration and retrieval of components.
 - [DependencyResolver](./DependencyResolver.md) -- The DependencyResolver may employ a recursive approach to resolve dependencies, handling cases where components have multiple dependencies.
-
 
 ---
 

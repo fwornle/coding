@@ -62,7 +62,6 @@ Because provider instances are cached, the system can scale to handle many concu
 ### Maintainability Assessment  
 The combination of well‑known patterns (Factory, DI, caching) and a clearly defined interface makes the component highly maintainable.  Adding or removing providers is a low‑risk operation, and the centralized factory reduces duplication of instantiation logic across the codebase.  The explicit cache and configuration paths are visible in `llm-provider-factory.ts`, aiding future debugging.  The main maintenance burden lies in keeping the provider interface up‑to‑date and ensuring that any new provider adheres to it, but the pluggable design mitigates ripple effects across the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -71,7 +70,6 @@ The combination of well‑known patterns (Factory, DI, caching) and a clearly de
 ### Siblings
 - [LLMModeResolver](./LLMModeResolver.md) -- LLMModeResolver uses a modular design in lib/llm/llm-mode-resolver.ts to determine the current LLM mode, handling different modes such as mock, local, or public.
 - [LLMService](./LLMService.md) -- LLMService uses a modular design in lib/llm/llm-service.ts to handle LLM operations, including mode routing, caching, and circuit breaking.
-
 
 ---
 

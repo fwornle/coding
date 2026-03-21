@@ -12,14 +12,11 @@ The combination of NeuralNetwork and InsightGenerator classes enables the Semant
 
 - The InsightGenerator class in the InsightGenerator module generates semantic insights from the processed code analysis and LLM output, as indicated by the suggested detail nodes.
 
-
 ## Related Entities
 
 ### Used By
 
 - SemanticInsightGenerator (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The combination of NeuralNetwork and InsightGenerator classes enables the Semant
 ### Siblings
 - [LLMOutputAnalyzer](./LLMOutputAnalyzer.md) -- The LLMOutputProcessing node suggested by the parent analysis is likely implemented using the InsightGenerator class, which processes the LLM output to generate semantic insights.
 - [CodeAnalysisConnector](./CodeAnalysisConnector.md) -- The CodeAnalysis node suggested by the parent analysis is likely connected to the NeuralNetwork class, which uses the code analysis output to generate semantic insights.
-
 
 ---
 

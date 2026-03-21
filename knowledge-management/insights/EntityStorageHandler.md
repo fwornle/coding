@@ -96,7 +96,6 @@ All interactions are mediated through clearly defined interfaces (e.g., `store(e
 * **Negative** – Tight coupling to `EntityClassificationManager` can increase maintenance effort when classification rules evolve, as the storage handler may need updates to accommodate new classification outputs.  
 * **Overall** – The layered approach promotes clear responsibilities, but future extensibility (e.g., supporting alternative classification or storage strategies) will require careful refactoring to loosen the existing dependencies.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ All interactions are mediated through clearly defined interfaces (e.g., `store(e
 ### Siblings
 - [EntityClassificationManager](./EntityClassificationManager.md) -- The EntityClassifier class in entity_classifier.py is utilized to classify entities, which implies a tight coupling between the EntityPersistenceManager and the entity_classifier module
 - [ObservationDerivationModule](./ObservationDerivationModule.md) -- The ObservationDerivationModule likely relies on the classifications provided by the EntityClassificationManager to derive meaningful observations, underlining the interconnectedness of these components
-
 
 ---
 

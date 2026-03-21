@@ -89,7 +89,6 @@ Because the LogRotator is a child of **LoggingMechanism**, it likely shares the 
 * Lack of complex inter‑component messaging reduces coupling, simplifying future refactors.
 * However, the absence of explicit unit‑test hooks (e.g., injectable scheduler) could make testing rotation timing harder; adding such hooks would improve maintainability without altering the core design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Because the LogRotator is a child of **LoggingMechanism**, it likely shares the 
 ### Siblings
 - [LogWriter](./LogWriter.md) -- The LogWriter likely utilizes a logging framework, such as Log4j or Logback, to handle log output, as seen in similar logging mechanisms in other components.
 - [LogFilter](./LogFilter.md) -- The LogFilter may use a rules-based approach, allowing administrators to define custom filtering rules based on log attributes such as severity, source, or message content.
-
 
 ---
 

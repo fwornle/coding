@@ -12,14 +12,11 @@ The GraphRenderingModule might utilize a library like Matplotlib (matplotlib.py)
 
 - The module may also incorporate user input handling, such as zooming, panning, or node selection, to enable a more immersive and interactive experience.
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeGraphVisualizer (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The GraphRenderingModule might utilize a library like Matplotlib (matplotlib.py)
 ### Siblings
 - [GraphLayoutEngine](./GraphLayoutEngine.md) -- The repository pattern used in KnowledgeGraphVisualizerDAO (dao.py) suggests a separation of concerns, allowing the GraphLayoutEngine to focus on layout calculations without worrying about database access.
 - [KnowledgeGraphNodeMapper](./KnowledgeGraphNodeMapper.md) -- The KnowledgeGraphNodeMapper could be implemented as a separate class (node_mapper.py) within the KnowledgeGraphVisualizer package, allowing for easy extension or modification of mapping rules.
-
 
 ---
 

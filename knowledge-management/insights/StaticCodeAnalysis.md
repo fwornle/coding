@@ -58,7 +58,6 @@ Finally, keep the PHPStan version up to date via Composer to benefit from newer 
 - High maintainability: a single, well‑documented `phpstan.neon` file centralizes all static‑analysis settings, making updates straightforward.  
 - The reliance on a mature external tool (PHPStan) further reduces internal code churn, while the shared‑configuration approach prevents divergent quality rules among related components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -67,7 +66,6 @@ Finally, keep the PHPStan version up to date via Composer to benefit from newer 
 ### Siblings
 - [CodeQualityConfiguration](./CodeQualityConfiguration.md) -- The phpstan.neon file serves as a central configuration point for PHPStan, allowing developers to easily manage and adjust the analysis settings without delving into complex code changes.
 - [DeprecationWarningSystem](./DeprecationWarningSystem.md) -- PHPStan's deprecation checking capability helps in identifying outdated code elements, such as functions or classes that are no longer supported, prompting developers to update or replace them.
-
 
 ---
 

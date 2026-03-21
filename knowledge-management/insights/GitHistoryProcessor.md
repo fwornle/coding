@@ -131,7 +131,6 @@ Following these conventions keeps the processor performant, predictable, and eas
    * Concurrency logic is encapsulated in `runWithConcurrency()`, limiting the spread of threading concerns.  
    * Overall, the component is well‑structured for future extension, provided that developers adhere to the usage guidelines and keep the pipeline definition synchronized with code changes.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -148,7 +147,6 @@ Following these conventions keeps the processor performant, predictable, and eas
 - [StalenessDetector](./StalenessDetector.md) -- StalenessDetector uses a git-based staleness detection algorithm, as seen in StalenessDetector.ts, to identify outdated entity content
 - [EntityContentAnalyzer](./EntityContentAnalyzer.md) -- EntityContentAnalyzer uses a regex-based pattern matching algorithm, as seen in EntityContentAnalyzer.ts, to extract file paths and commands from entity content
 - [LSLSessionProcessor](./LSLSessionProcessor.md) -- LSLSessionProcessor uses a session-based processing algorithm, as seen in LSLSessionProcessor.ts, to detect changes and updates in entity content
-
 
 ---
 

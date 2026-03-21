@@ -107,7 +107,6 @@ The **ServiceStarterComponent** therefore operates as a thin façade that wires 
 * The clear separation between orchestration (ServiceStarterComponent) and policy (RetryMechanism) facilitates unit testing and future extensions (e.g., adding circuit‑breaker logic).  
 * The primary risk to maintainability is the lack of concrete code symbols in the current snapshot; however, the documented patterns provide a solid blueprint for future implementation and documentation efforts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ The **ServiceStarterComponent** therefore operates as a thin façade that wires 
 - [GraphDatabaseComponent](./GraphDatabaseComponent.md) -- The GraphDatabaseComponent likely uses a graph database library, such as Neo4j, to store and retrieve knowledge entities.
 - [ProviderRegistryComponent](./ProviderRegistryComponent.md) -- The ProviderRegistryComponent likely uses a registry data structure, such as a map or dictionary, to store and manage providers.
 - [BrowserAccessComponent](./BrowserAccessComponent.md) -- The BrowserAccessComponent likely uses a web framework, such as Express.js, to handle HTTP requests and provide a web interface.
-
 
 ---
 

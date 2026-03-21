@@ -84,7 +84,6 @@ No external services beyond these siblings are mentioned, so the integration sur
 
 These insights are derived directly from the provided observations and the named entities; no ungrounded assumptions have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ These insights are derived directly from the provided observations and the named
 ### Siblings
 - [CodeAnalysisResultProcessor](./CodeAnalysisResultProcessor.md) -- CodeAnalysisResultProcessor utilizes the output of the SemanticAnalysis component to generate a structured representation of the code analysis results.
 - [LargeLanguageModelManager](./LargeLanguageModelManager.md) -- LargeLanguageModelManager is expected to handle the initialization, configuration, and invocation of large language models, possibly through APIs or libraries.
-
 
 ---
 

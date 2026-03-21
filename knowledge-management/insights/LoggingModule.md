@@ -47,7 +47,6 @@ From an architectural perspective, the module’s only external dependency is th
 4. **Scalability considerations** – because the logging logic is centralized, scaling the logging backend (e.g., adding asynchronous batching or remote transport) can be done by updating the internal `logger` function without touching any consumer code.  However, the current single‑file design may need to be refactored into a more layered architecture if the logging pipeline grows substantially.  
 5. **Maintainability assessment** – the modular layout and unified interface make the LoggingModule highly maintainable.  Changes to logging behaviour are confined to one file, reducing regression risk for transcript processing and LSL conversion.  The clear separation also simplifies unit testing and future refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -56,7 +55,6 @@ From an architectural perspective, the module’s only external dependency is th
 ### Siblings
 - [TranscriptApi](./TranscriptApi.md) -- TranscriptApi provides a defined interface for accessing and manipulating transcripts.
 - [LslConverter](./LslConverter.md) -- LslConverter uses a specific conversion algorithm to transform transcripts into LSL format.
-
 
 ---
 

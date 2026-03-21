@@ -80,12 +80,10 @@ No sibling components are explicitly listed, but any other sub‑modules of Wave
 
 *No diagram images were supplied in the source observations; therefore none are embedded.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
-
 
 ---
 

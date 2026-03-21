@@ -74,7 +74,6 @@ Because the observations do not list any additional services, message queues, or
 
 5. **Maintainability assessment** – The single‑point‑of‑coordination design makes the codebase easy to understand and debug, which is a strong maintainability advantage. However, the tight coupling between the orchestrator and its two siblings means that changes to the data contract or step order can have ripple effects, requiring careful regression testing whenever the ingestion framework or analysis algorithm evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Because the observations do not list any additional services, message queues, or
 ### Siblings
 - [SemanticAnalysisAlgorithm](./SemanticAnalysisAlgorithm.md) -- The SemanticAnalysisAlgorithm is called by the PipelineOrchestrator after data ingestion, indicating that the algorithm's execution is dependent on the successful completion of the data ingestion step.
 - [DataIngestionFramework](./DataIngestionFramework.md) -- The DataIngestionFramework is responsible for providing input data to the PipelineOrchestrator, which then executes the pipeline steps, highlighting the framework's importance in the pipeline's execution.
-
 
 ---
 

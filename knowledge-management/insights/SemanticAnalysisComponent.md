@@ -130,7 +130,6 @@ Whenever an exception occurs—whether during cache access, framework execution,
 | **Scalability considerations** | Concurrency is achieved via the thread pool; horizontal scaling would involve multiple component instances sharing a distributed cache (e.g., Redis) and a common knowledge‑graph backend. Cache hit‑rate and graph query latency are the primary scalability knobs. |
 | **Maintainability assessment** | Strong separation of concerns (framework, cache, graph) aids maintainability. Centralised configuration and logging simplify troubleshooting. However, reliance on external libraries (NLP, graph DB) introduces version‑compatibility risk, and the feedback loop adds a moving target for model stability. Regular reviews of the properties file and cache eviction policy are recommended to keep the component healthy. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -148,7 +147,6 @@ Whenever an exception occurs—whether during cache access, framework execution,
 - [LSLConverterComponent](./LSLConverterComponent.md) -- LSLConverterComponent uses a conversion framework in ConversionFramework.java to convert between agent-specific formats and the unified LSL format
 - [AgentIntegrationComponent](./AgentIntegrationComponent.md) -- AgentIntegrationComponent uses an agent integration framework in AgentIntegrationFramework.java to integrate with various agents
 - [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
-
 
 ---
 

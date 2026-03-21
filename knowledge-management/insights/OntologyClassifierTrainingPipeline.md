@@ -133,7 +133,6 @@ The **OntologyClassifierTrainingPipeline** sits at the intersection of several s
 
 By adhering to the guidelines above and leveraging the identified patterns, the **OntologyClassifierTrainingPipeline** can serve as a robust, extensible backbone for ontology‑based machine‑learning workflows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -142,7 +141,6 @@ By adhering to the guidelines above and leveraging the identified patterns, the 
 ### Siblings
 - [ModelTraining](./ModelTraining.md) -- The OntologyClassifier's trainModel function implements a supervised learning approach, leveraging labeled data to train the model, as seen in the high-level description of the Ontology sub-component.
 - [EntityValidation](./EntityValidation.md) -- The EntityValidation component likely employs a rule-based system, where entities are checked against a set of predefined constraints, such as data type checks or relationships between entities.
-
 
 ---
 

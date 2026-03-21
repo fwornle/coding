@@ -121,12 +121,10 @@ No explicit sibling components are identified in the observations, but any other
 
 The configuration‑centric approach is highly maintainable: adding a new setting simply involves updating the README and extending the data class. Because the keys are explicit and documented, developers can quickly locate the source of a mis‑behaving service. The main maintainability risk lies in the handling of secrets; without a dedicated secret‑management wrapper, developers might inadvertently expose keys. Additionally, the lack of explicit defaults in the observations means that future contributors must rely on external documentation to understand expected values, which could lead to inconsistencies if the README drifts from the code. Introducing validation logic and automated tests that assert the presence of required keys would mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

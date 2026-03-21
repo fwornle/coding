@@ -59,12 +59,10 @@ No other sibling components are identified, but any consumer of **MockLLMService
 - The clear boundary between service and generator promotes maintainability; changes to mock logic are isolated to **MockLLMResponseGenerator**.  
 - Lack of publicly visible source files limits external auditability, so internal documentation and unit tests for the generator are essential to keep the component reliable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [MockLLMService](./MockLLMService.md) -- MockLLMService uses MockLLMResponseGenerator.class to generate mock LLM responses, simulating real LLM behavior
-
 
 ---
 

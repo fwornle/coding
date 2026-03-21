@@ -104,7 +104,6 @@ External dependencies include the JSON library (Jackson/Gson) and possibly valid
 * The reliance on external libraries (Jackson/Gson) reduces the need for custom parsing logic, improving maintainability.
 * However, any change to the JSON contract must be propagated across both serializer and deserializer, requiring disciplined versioning and thorough integration testing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ External dependencies include the JSON library (Jackson/Gson) and possibly valid
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager would likely utilize a library such as Neo4j Driver to connect to the graph database, as seen in similar implementations.
 - [EntitySerializer](./EntitySerializer.md) -- The EntitySerializer would need to handle various data types and structures, potentially using a library such as Jackson or Gson for serialization.
-
 
 ---
 

@@ -50,7 +50,6 @@ Because the controller lives in the same file as its parent, there is no externa
 | **Scalability considerations** | Tight coupling may hinder scaling the scheduler independently (e.g., distributing across nodes). However, the controller’s fine‑grained control can be tuned to limit concurrent runs, aiding resource management. |
 | **Maintainability assessment** | Encapsulation of scheduling logic improves maintainability of that concern, but the lack of clear interface boundaries between controller and parent increases the risk of ripple changes. Clear usage guidelines and disciplined API evolution are essential to keep the component maintainable. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -59,7 +58,6 @@ Because the controller lives in the same file as its parent, there is no externa
 ### Siblings
 - [WorkflowExecution](./WorkflowExecution.md) -- The execution of workflows is a critical aspect of the BatchScheduler sub-component, as it directly impacts the processing of batch analysis results
 - [ResultProcessing](./ResultProcessing.md) -- The ResultProcessing node is likely to interact with the WorkflowExecution node, as it relies on the successful execution of workflows to produce results for processing
-
 
 ---
 

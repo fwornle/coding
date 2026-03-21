@@ -10,19 +10,15 @@ The pattern-based approach may involve regular expressions or other string match
 
 - InsightGenerator class likely utilizes the extracted patterns to generate insights, with the pattern extraction logic possibly residing in a method like extractPatterns in insight-generator.ts
 
-
 ## How It Works
 
 - The pattern-based approach may involve regular expressions or other string matching techniques, as seen in similar natural language processing tasks, potentially in a utility file like string-utils.ts
-
 
 ## Related Entities
 
 ### Used By
 
 - Insights (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ The pattern-based approach may involve regular expressions or other string match
 ### Siblings
 - [InsightGeneration](./InsightGeneration.md) -- The InsightGenerator class is anticipated to contain a method like generateInsights, which takes the extracted patterns and knowledge entities as input, possibly in insight-generator.ts
 - [KnowledgeReporting](./KnowledgeReporting.md) -- A KnowledgeReporter class or function might be responsible for generating the knowledge reports, possibly using a templating engine or a reporting library, as seen in report-generator.ts
-
 
 ---
 

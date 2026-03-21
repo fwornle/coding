@@ -12,14 +12,11 @@ The ClassificationPreventer's logic could be implemented using a set data struct
 
 - The ClassificationPreventer's logic could be implemented using a set data structure or a hash table to efficiently store and look up processed metadata.
 
-
 ## Related Entities
 
 ### Used By
 
 - PersistenceAgent (contains)
-
-
 
 ## Hierarchy Context
 
@@ -28,7 +25,6 @@ The ClassificationPreventer's logic could be implemented using a set data struct
 
 ### Siblings
 - [MetadataParser](./MetadataParser.md) -- The MetadataParser likely interacts with the GraphDatabaseAdapter, which is a key component in the ConstraintSystem, to fetch the necessary metadata.
-
 
 ---
 

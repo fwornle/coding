@@ -12,14 +12,11 @@ The EntityStore's design may incorporate data indexing or querying capabilities,
 
 - The EntityStore's interaction with the GraphDatabaseAdapter may involve transactional operations, ensuring data consistency and integrity across the system.
 
-
 ## Related Entities
 
 ### Used By
 
 - EntityRefresher (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The EntityStore's design may incorporate data indexing or querying capabilities,
 ### Siblings
 - [EntityParser](./EntityParser.md) -- EntityParser likely interacts with the GraphDatabaseAdapter to fetch entity data, which is then processed and stored in the EntityStore.
 - [SchedulingManager](./SchedulingManager.md) -- SchedulingManager may employ a timer-based or event-driven scheduling mechanism, triggering the EntityRefresher to perform refresh and update operations at specified intervals or in response to specific events.
-
 
 ---
 

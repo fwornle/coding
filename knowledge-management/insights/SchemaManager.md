@@ -133,7 +133,6 @@ No external services or databases are mentioned, so the integration surface is c
 
 Overall, the architecture balances **flexibility** (dynamic updates) with **performance** (caching) while keeping the codebase **modular** through the resolver pattern, making `SchemaManager` a well‑encapsulated and maintainable component within the `GraphQLAPI` ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -142,7 +141,6 @@ Overall, the architecture balances **flexibility** (dynamic updates) with **perf
 ### Siblings
 - [QueryResolver](./QueryResolver.md) -- The QueryResolver likely utilizes a modular design, with separate resolvers for different query types, to ensure maintainability and scalability.
 - [MutationHandler](./MutationHandler.md) -- The MutationHandler likely employs a transactional approach to mutation processing, ensuring data consistency and integrity.
-
 
 ---
 

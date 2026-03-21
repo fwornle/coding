@@ -25,7 +25,7 @@ The **Builder** aspect is embodied by the child component **CodeGraphBuilder**, 
 
 Interaction with siblings such as **EntityPersistenceModule** and **OntologyManagementSystem** follows a *service‑oriented* approach: the constructor calls into these modules via well‑defined interfaces (e.g., `EntityPersistenceModule.persistEntity()` and `OntologyManagementSystem.classifyNode()`). This mirrors the pattern used by the parent **KnowledgeManagement** component, where multiple sub‑systems share the same GraphDatabaseAdapter for consistency across the knowledge graph.
 
-![CodeGraphConstructor — Architecture](../../.data/knowledge-graph/insights/images/code-graph-constructor-architecture.png)
+![CodeGraphConstructor — Architecture](images/code-graph-constructor-architecture.png)
 
 The overall flow can be visualized as a pipeline: source → **CodeGraphBuilder** → enrichment (ontology, entity persistence) → **GraphDatabaseAdapter** → storage & JSON export → consumption by agents (e.g., **CodeGraphAgent**).
 
@@ -69,7 +69,7 @@ The constructor’s internal algorithm can be inferred as follows:
 
 * **Configuration Docs** – The `claude-code-setup.md` file outlines how Claude‑based LLMs are prompted with the exported JSON, while `constraint-configuration.md` details how semantic constraints are defined and enforced against the graph. These docs act as contract specifications for external teams integrating the constructor into their pipelines.
 
-![CodeGraphConstructor — Relationship](../../.data/knowledge-graph/insights/images/code-graph-constructor-relationship.png)
+![CodeGraphConstructor — Relationship](images/code-graph-constructor-relationship.png)
 
 ---
 
@@ -110,14 +110,13 @@ The component forms a layered pipeline (parsing → building → enrichment → 
 ### Maintainability Assessment  
 The clear separation between construction, enrichment, and storage, combined with well‑documented configuration files, yields high maintainability. The reliance on shared adapters and services means that updates to the underlying graph store propagate automatically, but also require coordinated versioning across siblings. Comprehensive docs (`claude-code-setup.md`, `constraint-configuration.md`) further aid onboarding and reduce accidental misconfiguration.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component's utilization of the GraphDatabaseAdapter for persistence is a notable architectural aspect. This adapter, located in storage/graph-database-adapter.ts, enables the use of Graphology and LevelDB for storing and querying the knowledge graph. The automatic JSON export sync feature provided by this adapter simplifies the process of exporting graph data in JSON format, which can be beneficial for further analysis or integration with other components. For instance, the CodeGraphAgent, found in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, can leverage this adapter to store and retrieve code analysis results, thereby facilitating the management of entities and relationships within the knowledge graph.
 
 ### Children
-- [CodeGraphBuilder](./CodeGraphBuilder.md) -- The presence of integrations/code-graph-rag/README.md suggests a graph-based system, which is likely utilized by the CodeGraphBuilder.
+- CodeGraphBuilder -- The presence of integrations/code-graph-rag/README.md suggests a graph-based system, which is likely utilized by the CodeGraphBuilder.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning likely utilizes the GraphDatabaseAdapter for persistence, as seen in storage/graph-database-adapter.ts, to store and query the knowledge graph.
@@ -125,7 +124,6 @@ The clear separation between construction, enrichment, and storage, combined wit
 - [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule likely utilizes the GraphDatabaseAdapter to store and query entities and relationships in the graph database.
 - [OntologyManagementSystem](./OntologyManagementSystem.md) -- OntologyManagementSystem likely utilizes the GraphDatabaseAdapter to store and query the ontology.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter likely utilizes Graphology and LevelDB to store and query the knowledge graph.
-
 
 ---
 

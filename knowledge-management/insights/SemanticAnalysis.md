@@ -15,7 +15,7 @@ The **SemanticAnalysis** component lives under the `integrations/mcp-server-sema
 
 Together these agents form a **multi‑agent architecture** that turns raw source files into a persistent, queryable graph of code concepts, classifications, and derived insights.  The component is a child of the top‑level **Coding** node and shares its ecosystem with siblings such as **LiveLoggingSystem**, **LLMAbstraction**, and **KnowledgeManagement**.  Its own children – Pipeline, Ontology, Insights, OntologyManager, CodeAnalyzer, InsightGenerator, KnowledgeGraphConstructor, EntityValidator, and CodeGraphRAG – realize the end‑to‑end workflow from raw code to actionable insight.
 
-![SemanticAnalysis — Architecture](../../.data/knowledge-graph/insights/images/semantic-analysis-architecture.png)
+![SemanticAnalysis — Architecture](images/semantic-analysis-architecture.png)
 
 ---
 
@@ -89,7 +89,7 @@ SemanticAnalysis sits at the intersection of several system‑wide services:
 
 The relationship diagram below visualizes these connections, highlighting the flow from source files → agents → graph → insights → external consumers.
 
-![SemanticAnalysis — Relationship](../../.data/knowledge-graph/insights/images/semantic-analysis-relationship.png)
+![SemanticAnalysis — Relationship](images/semantic-analysis-relationship.png)
 
 ---
 
@@ -144,7 +144,6 @@ The relationship diagram below visualizes these connections, highlighting the fl
 
 Overall, the design favors **extensibility and performance** at the cost of added coordination overhead, a trade‑off that aligns with the component’s goal of delivering fast, semantic insights over massive code repositories.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -169,7 +168,6 @@ Overall, the design favors **extensibility and performance** at the cost of adde
 - [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
-
 
 ---
 

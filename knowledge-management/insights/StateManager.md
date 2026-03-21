@@ -121,12 +121,10 @@ The explicit separation into three managers makes the codebase **highly maintain
 
 Overall, the design inferred from the observations demonstrates a clean, modular approach that balances flexibility with simplicity, while staying grounded in the concrete file `lib/llm/circuit-breaker.ts` and its constituent managers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker class is responsible for detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)
-
 
 ---
 

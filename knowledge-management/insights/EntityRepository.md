@@ -92,12 +92,10 @@ No micro‑service, event‑driven, or other architectural styles are mentioned,
 
 The clear separation of concerns (adapter vs. repository) and the use of a well‑known repository interface make the codebase **highly maintainable**. Adding new entity types or swapping the graph engine only requires new repository implementations; the rest of the system remains untouched. The only maintenance risk lies in the cache layer—developers must keep invalidation logic in sync with write operations to prevent stale relationship data. Proper unit testing, guided by the usage guidelines above, will help keep the contract stable over time.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the createEntity() method to store and manage entities in the graph database, as seen in storage/graph-database-adapter.ts.
-
 
 ---
 

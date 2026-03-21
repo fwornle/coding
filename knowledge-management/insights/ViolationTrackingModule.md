@@ -109,7 +109,6 @@ All dependencies are expressed through well‑named interfaces (e.g., `IGraphDat
    * The rule‑registration mechanism, while powerful, requires disciplined documentation to prevent rule drift.  
    * Overall, the module’s architecture balances extensibility with a clear, observable data‑flow, making it maintainable for future feature growth.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -125,7 +124,6 @@ All dependencies are expressed through well‑named interfaces (e.g., `IGraphDat
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a logging framework to handle log messages and exceptions, providing a standardized logging approach.
 - [ConstraintEngineModule](./ConstraintEngineModule.md) -- ConstraintEngineModule utilizes a rule-based approach to evaluate and enforce constraints, supporting customizable constraint definitions and validation logic.
 - [DashboardModule](./DashboardModule.md) -- DashboardModule utilizes a web-based interface to display constraint violations and system performance metrics, supporting customizable dashboard layouts and visualizations.
-
 
 ---
 

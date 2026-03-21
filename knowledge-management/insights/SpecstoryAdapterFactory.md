@@ -97,7 +97,6 @@ Interaction with sibling components is minimal but intentional.  **SpecstoryConn
 * **Clear Ownership** – The factory’s sole responsibility is to produce adapters, making its codebase small and easy to review.  The lack of scattered instantiation points reduces the risk of bugs introduced by inconsistent configuration.  
 * **Potential Technical Debt** – The current design mentions only a “specific” implementation, which may become a hidden assumption if future requirements demand multiple adapter variants.  Planning for an extensible selection strategy now would mitigate future refactoring effort.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ Interaction with sibling components is minimal but intentional.  **SpecstoryConn
 - [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
 - [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
 - [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
-
 
 ---
 

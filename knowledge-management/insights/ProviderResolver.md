@@ -98,12 +98,10 @@ The system is organized around a **module‑centric hierarchy**: `LLMServiceModu
 
 The resolver’s **single‑responsibility** nature makes it highly maintainable: changes to provider selection logic are localized. The reliance on DI ensures that consumer code does not need to be updated when providers change. However, maintainers must keep the registration map synchronized with the actual provider implementations and ensure that the shared interface evolves in a backward‑compatible way to avoid breaking the abstraction. Regular unit tests for the resolver (e.g., “given config X, resolves to provider Y”) will further safeguard maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
-
 
 ---
 

@@ -96,7 +96,6 @@ The LLMAbstraction component is organized around three core layers: (1) the **fa
 
 The modular, plug‑in architecture of LLMAbstraction makes DMRService easy to maintain. Adding or updating a provider does not affect the facade or other providers, as evidenced by the clear separation in the file hierarchy. The use of a shared registry centralizes provider discovery, reducing the risk of divergent registration logic. However, the repetition of caching and circuit‑breaker code across providers could become a maintenance burden as the provider set grows; extracting those concerns into a reusable base class or utility module would improve long‑term maintainability. Overall, the design promotes robustness, testability (via MockService), and straightforward onboarding for new local LLM providers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The modular, plug‑in architecture of LLMAbstraction makes DMRService easy to m
 ### Siblings
 - [MockService](./MockService.md) -- MockService uses the llm-mock-service.ts file to simulate LLM responses for testing and development purposes.
 - [LLMService](./LLMService.md) -- LLMService uses the lib/llm/llm-service.ts file to provide a high-level facade for all LLM operations.
-
 
 ---
 

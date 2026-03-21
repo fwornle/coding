@@ -16,7 +16,7 @@ The **Insights** sub‑component lives inside the **SemanticAnalysis** module of
 
 Together these agents form a focused pipeline that turns raw code analysis (provided by the sibling **CodeAnalyzer**) into consumable, prioritized insights and, ultimately, into human‑readable reports. The sub‑component is a child of **SemanticAnalysis**, which itself follows a multi‑agent architecture, and it collaborates closely with siblings such as **Ontology**, **Pipeline**, and **KnowledgeGraphConstructor**.
 
-![Insights — Architecture](../../.data/knowledge-graph/insights/images/insights-architecture.png)
+![Insights — Architecture](images/insights-architecture.png)
 
 ---
 
@@ -32,7 +32,7 @@ The design of **Insights** is driven by an **agent‑based modular architecture*
 
 The agents interact in a linear but loosely coupled sequence: **CodeAnalyzer → InsightGenerator → InsightRanker → InsightCache → KnowledgeReportAuthor**. This flow respects the **separation of concerns** principle and aligns with the DAG‑based execution model used by the sibling **Pipeline** component.
 
-![Insights — Relationship](../../.data/knowledge-graph/insights/images/insights-relationship.png)
+![Insights — Relationship](images/insights-relationship.png)
 
 ---
 
@@ -116,7 +116,6 @@ All interactions are mediated through well‑defined TypeScript interfaces, keep
 
 Overall, the **Insights** sub‑component exhibits a well‑structured, agent‑centric design that balances extensibility, performance, and clarity, fitting neatly into the larger **SemanticAnalysis** ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -134,7 +133,6 @@ Overall, the **Insights** sub‑component exhibits a well‑structured, agent‑
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

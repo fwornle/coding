@@ -108,7 +108,6 @@ No explicit third‑party libraries or services are mentioned, so the integratio
 
 Overall, the **DataIngestionFramework** provides a well‑encapsulated, extensible foundation for feeding data into the *SemanticAnalysisPipeline*, while its tight integration with the orchestrator ensures that data quality and availability remain central concerns throughout the pipeline’s execution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Overall, the **DataIngestionFramework** provides a well‑encapsulated, extensib
 ### Siblings
 - [PipelineOrchestrator](./PipelineOrchestrator.md) -- PipelineOrchestrator.orchestratePipeline() defines the main pipeline execution logic, which is responsible for calling each pipeline step in sequence, as seen in the parent component context.
 - [SemanticAnalysisAlgorithm](./SemanticAnalysisAlgorithm.md) -- The SemanticAnalysisAlgorithm is called by the PipelineOrchestrator after data ingestion, indicating that the algorithm's execution is dependent on the successful completion of the data ingestion step.
-
 
 ---
 

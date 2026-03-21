@@ -87,7 +87,6 @@ Because the exact implementation of **CodeAnalyzer** is not supplied, we treat i
 - **Dependency Visibility** – Because the underlying CodeAnalyzer implementation is opaque in the current context, future maintainers must rely on the integration layer’s contract; any changes to the analyzer will require updates only to CodeAnalyzerIntegration, preserving InsightGenerator stability.  
 - **Documentation Needs** – The lack of concrete code symbols and examples in the current repository suggests that additional inline documentation (e.g., JSDoc comments) would be beneficial to guide developers on expected inputs, error handling, and performance characteristics.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Because the exact implementation of **CodeAnalyzer** is not supplied, we treat i
 
 ### Children
 - [CodeAnalyzerIntegration](./CodeAnalyzerIntegration.md) -- The InsightGenerator utilizes the CodeAnalyzer as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file, indicating a tight integration between the two components.
-
 
 ---
 

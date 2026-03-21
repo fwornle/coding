@@ -133,7 +133,6 @@ SoftwarePatterns does not define its own design‑principle enforcement code; in
    * The presence of dedicated **cleanup** logic reduces technical debt from resource leaks.  
    * Ongoing collaboration with **AntiPatterns** provides a safety net that catches regressions early, further protecting maintainability over time.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -144,7 +143,6 @@ SoftwarePatterns does not define its own design‑principle enforcement code; in
 - [AntiPatterns](./AntiPatterns.md) -- The AntiPatterns sub-component uses the SoftwarePatterns sub-component to identify and avoid common pitfalls in software design.
 - [IntegrationModules](./IntegrationModules.md) -- The integrations/browser-access/ module provides a modular structure for browser-based coding environments, demonstrating the integration pattern of environment abstraction.
 - [TeamConfiguration](./TeamConfiguration.md) -- The config/teams/*.json files store team-specific settings and coding conventions, allowing for flexible project configuration.
-
 
 ---
 

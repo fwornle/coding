@@ -108,7 +108,6 @@ Because no concrete symbols were discovered, the implementation can be inferred 
 
 Overall, the **AuthorizationManager** follows a well‑understood security pattern that balances flexibility (through external rule storage) with clarity (via RBAC).  Its placement within the **SecurityManager** hierarchy provides a clean orchestration point while preserving modularity across authentication, authorization, and encryption concerns.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Overall, the **AuthorizationManager** follows a well‑understood security patte
 ### Siblings
 - [AuthenticationManager](./AuthenticationManager.md) -- The SecurityManager sub-component utilizes the AuthenticationManager to authenticate users, as seen in the SecurityManager.useAuthentication() method, which implies a design decision to centralize authentication logic.
 - [EncryptionManager](./EncryptionManager.md) -- The EncryptionManager likely utilizes industry-standard encryption algorithms, such as AES for symmetric encryption and RSA for asymmetric encryption, to ensure the security of data, reflecting a decision to adhere to established cryptographic standards.
-
 
 ---
 

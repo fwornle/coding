@@ -52,12 +52,10 @@ No sibling components are mentioned, so we cannot describe cross‑module intera
 4. **Scalability considerations** – Because all heavy lifting (graph storage, indexing) is delegated to the VKB service, VKBQueryEngine’s scalability hinges on the VKB API’s capacity and on proper connection‑pooling, retry logic, and rate‑limit handling within the engine.  
 5. **Maintainability assessment** – High maintainability: the engine encapsulates all VKB‑specific code, allowing independent evolution of both the intelligent‑query layer and the external service integration.  The main risk is the lack of visible unit tests or concrete interfaces; adding explicit contracts and comprehensive tests would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [IntelligentQuerying](./IntelligentQuerying.md) -- IntelligentQuerying uses the VKB API to provide intelligent querying capabilities for the knowledge graph.
-
 
 ---
 

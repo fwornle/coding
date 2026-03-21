@@ -12,14 +12,11 @@ BatchProcessingController would be responsible for orchestrating the interaction
 
 - The design of BatchProcessingController could incorporate monitoring or logging capabilities to track the progress and performance of the batch-processing tasks, facilitating debugging and optimization
 
-
 ## Related Entities
 
 ### Used By
 
 - ViolationCapture (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ BatchProcessingController would be responsible for orchestrating the interaction
 ### Siblings
 - [ViolationParser](./ViolationParser.md) -- ViolationParser would likely interact with the GraphDatabaseAdapter in the ViolationCapture.js file to fetch violation data, although the exact implementation details are not available
 - [ViolationStore](./ViolationStore.md) -- ViolationStore would be implemented in the ViolationCapture.js file and would utilize the GraphDatabaseAdapter for storing violation data, following the batch-processing approach
-
 
 ---
 

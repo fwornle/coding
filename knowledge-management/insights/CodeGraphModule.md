@@ -82,7 +82,6 @@ The child **CodeGraphStorage** abstracts the adapter for the rest of the module,
 * Shared adapter logic means changes propagate automatically, reducing the maintenance surface but also requiring rigorous regression testing.
 * The clear separation between **CodeGraphStorage** and the adapter provides a stable contract for future extensions (e.g., swapping the underlying graph engine) without touching the parsing layer.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The child **CodeGraphStorage** abstracts the adapter for the rest of the module,
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage entities and their relationships.
 - [CheckpointManagementModule](./CheckpointManagementModule.md) -- CheckpointManagementModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage checkpoint-related entities and relationships.
 - [ObservationDerivationModule](./ObservationDerivationModule.md) -- ObservationDerivationModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage observation-related entities and relationships.
-
 
 ---
 

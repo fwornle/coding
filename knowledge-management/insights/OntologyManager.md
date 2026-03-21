@@ -17,7 +17,7 @@ The OntologyManager provides an API for querying the ontology system, allowing o
 
 Together these files give OntologyManager the responsibilities of **organizing**, **serving**, **validating**, **version‑controlling**, **updating**, and **logging** the ontology data that the rest of the SemanticAnalysis component (e.g., the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent) relies on for accurate insight generation.
 
-![OntologyManager — Architecture](../../.data/knowledge-graph/insights/images/ontology-manager-architecture.png)
+![OntologyManager — Architecture](images/ontology-manager-architecture.png)
 
 ---
 
@@ -37,7 +37,7 @@ OntologyManager follows a **modular, layered architecture** built around a clear
 
 The overall interaction pattern resembles a **Facade**: `ontology-manager.ts` presents a concise API (e.g., `getEntity(id)`, `search(term)`) while delegating to the underlying cache, validator, versioner, and logger. The component is **synchronously** invoked by sibling agents; there is no evidence of asynchronous messaging or micro‑service boundaries, keeping the design lightweight and tightly coupled within the same Node.js process.
 
-![OntologyManager — Relationship](../../.data/knowledge-graph/insights/images/ontology-manager-relationship.png)
+![OntologyManager — Relationship](images/ontology-manager-relationship.png)
 
 ---
 
@@ -134,7 +134,6 @@ OntologyManager sits at the heart of the SemanticAnalysis component, acting as t
 **5. Maintainability assessment**  
 The clear separation into distinct modules (`ontology‑cache`, `entity‑validator`, `ontology‑versioning`, etc.) promotes high maintainability. Adding new validation rules or extending the hierarchy can be done in isolation. The only maintenance risk is the tight coupling to an in‑process cache; future refactoring to a distributed cache would require careful migration of the versioning and logging contracts. Overall, the design is well‑structured, testable, and aligns with the modular agent‑based philosophy of the broader SemanticAnalysis system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -149,7 +148,6 @@ The clear separation into distinct modules (`ontology‑cache`, `entity‑valida
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

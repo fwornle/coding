@@ -83,7 +83,6 @@ Because WorkflowManagement depends on **AgentManagement** for the agents that ac
 
 Overall, WorkflowManagement presents a clean, interface‑driven design that leverages a state machine for execution control and a timer‑driven scheduler for orchestration.  Its integration with the VKB API and AgentManagement positions it as a central orchestrator within the KnowledgeManagement ecosystem, while its current architectural choices favor simplicity and clarity over raw scalability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Overall, WorkflowManagement presents a clean, interface‑driven design that lev
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class
 - [TraceReporting](./TraceReporting.md) -- TraceReporting uses the VKB API to generate trace reports in the TraceReporter class
 - [AgentManagement](./AgentManagement.md) -- AgentManagement uses the VKB API to manage agents in the AgentManager class
-
 
 ---
 

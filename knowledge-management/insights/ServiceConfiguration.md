@@ -68,12 +68,10 @@ The absence of explicit code symbols forces us to focus on the contract between 
 * The lack of concrete source files for **ServiceConfiguration** suggests that documentation and explicit type definitions are crucial to prevent drift between the model and its usage.  
 * Future changes to the graph schema must be coordinated with both the adapter and the starter, but the clear separation of concerns mitigates ripple effects.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter likely utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve data in a consistent manner when starting and managing services.
-
 
 ---
 

@@ -95,7 +95,6 @@ The LLM service is organized around a **router‑centric core** (`ModelCallRoute
 * The clear separation between mapping, routing, and error handling makes each piece testable in isolation.  
 * Potential risk: the monolithic `llm-service.ts` file could become unwieldy. Future refactoring into dedicated modules (e.g., `provider-model-mapper.ts`, `tier-based-router.ts`) would improve readability without altering the underlying design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The LLM service is organized around a **router‑centric core** (`ModelCallRoute
 ### Siblings
 - [TierBasedRouter](./TierBasedRouter.md) -- The TierBasedRouter strategy is implemented in the lib/llm/llm-service.ts file, which suggests a modular design for the ModelCallRouter sub-component.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism likely involves try-catch blocks or error callbacks to catch and handle exceptions that occur during model calls, which could be implemented in the lib/llm/llm-service.ts file.
-
 
 ---
 

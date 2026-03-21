@@ -8,7 +8,7 @@ The SpecstoryAdapter follows the execute(input, context) pattern for lazy initia
 
 **ConnectionManager** is a sub‑component that lives inside the **Trajectory** package and is responsible for orchestrating the low‑level communication channels used by the **SpecstoryAdapter**. All of the concrete usage of this manager is observed in the file `lib/integrations/specstory-adapter.js`, where the adapter calls into ConnectionManager to establish and maintain connections to the Specstory extension API. The manager abstracts three distinct transport mechanisms—**HTTP**, **IPC**, and **file‑watch**—allowing the rest of the system to remain agnostic about how messages are delivered. Because the manager is invoked by the SpecstoryAdapter, it indirectly supports the lazy‑initialisation pattern (`execute(input, context)`) that the adapter follows for efficient component startup.
 
-> ![ConnectionManager — Architecture](../../.data/knowledge-graph/insights/images/connection-manager-architecture.png)
+> ![ConnectionManager — Architecture](images/connection-manager-architecture.png)
 
 ---
 
@@ -20,7 +20,7 @@ The manager is tightly coupled to the **SpecstoryAdapter**, which itself follows
 
 The three transport options also provide **fault isolation**. If the HTTP endpoint is unreachable, the adapter can fall back to IPC or file‑watch without crashing the whole system. This design choice trades a small amount of runtime decision‑making overhead for higher resilience and easier testing (each transport can be mocked independently).
 
-> ![ConnectionManager — Relationship](../../.data/knowledge-graph/insights/images/connection-manager-relationship.png)
+> ![ConnectionManager — Relationship](images/connection-manager-relationship.png)
 
 ---
 
@@ -82,7 +82,6 @@ Because no explicit symbols were discovered, the manager likely exists as a plai
 
 By grounding every observation in the actual file paths (`lib/integrations/specstory-adapter.js` and `../logging/Logger.js`) and respecting the documented relationships, this insight document provides a reliable reference for developers working with **ConnectionManager** and its surrounding ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ By grounding every observation in the actual file paths (`lib/integrations/specs
 ### Siblings
 - [LoggingMechanism](./LoggingMechanism.md) -- The createLogger function from ../logging/Logger.js enables modular and flexible logging capabilities.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- The SpecstoryAdapter follows the execute(input, context) pattern for lazy initialization and execution, which is implemented in the lib/integrations/specstory-adapter.js file.
-
 
 ---
 

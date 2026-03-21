@@ -14,11 +14,9 @@ Uses multi-agent architecture: GitHistoryAgent, VibeHistoryAgent, ObservationGen
 
 - Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
-
 ## How It Works
 
 - SemanticAnalysisWorkflowIssue is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
-
 
 ---
 

@@ -72,7 +72,6 @@ Finally, the `CONTRIBUTING.md` file signals that external contributors can add n
 * Centralizing configuration in environment variables simplifies updates and environment‑specific overrides.  
 * However, the lack of visible source‑code references in the observations means that future maintainers must locate the actual implementation files (likely adjacent to the guide) to understand internal mechanics; ensuring those files are well‑documented will be critical for long‑term health.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ Finally, the `CONTRIBUTING.md` file signals that external contributors can add n
 
 ### Siblings
 - [GraphDatabaseIntegration](./GraphDatabaseIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code system, a graph-based RAG system for any codebases, indicating the purpose of the CodeGraphRAG sub-component.
-
 
 ---
 

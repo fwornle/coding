@@ -90,7 +90,6 @@ Because the **LSLConverterComponent** “contains” the validator, the componen
 
 Overall, the **FormatValidator** exemplifies a clean, extensible validation layer that fits neatly into the broader modular conversion ecosystem anchored by `LSLConverterComponent`, `ConversionFramework`, and `CacheManager`.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Overall, the **FormatValidator** exemplifies a clean, extensible validation laye
 ### Siblings
 - [ConversionFramework](./ConversionFramework.md) -- The ConversionFramework utilizes a modular design, with each conversion module implemented as a separate class in ConversionFramework.java, allowing for easy extension and modification of supported formats.
 - [CacheManager](./CacheManager.md) -- The CacheManager uses a least-recently-used (LRU) eviction policy to manage cache capacity, ensuring that the most frequently accessed data remains in the cache, as implemented in the CacheManager class.
-
 
 ---
 

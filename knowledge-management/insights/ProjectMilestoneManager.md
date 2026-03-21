@@ -123,7 +123,6 @@ The use of an **Adapter** layer isolates external‑service changes, making the 
 
 Overall, the architecture balances **resilience** (through retries) and **reuse** (via a common adapter) while keeping the domain logic of ProjectMilestoneManager cleanly separated from transport concerns.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ Overall, the architecture balances **resilience** (through retries) and **reuse*
 - [PhasePlanner](./PhasePlanner.md) -- PhasePlanner could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant phase planning data.
 - [TaskTracker](./TaskTracker.md) -- TaskTracker could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant task data.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter implements the connectViaHTTP method to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359).
-
 
 ---
 

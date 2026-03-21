@@ -91,7 +91,6 @@ The only direct dependency of `ValidationReporter` is on the **logging abstracti
 * The reliance on standard abstractions (SLF4J, listener interfaces, formatter strategy) aligns with common Java best practices, reducing the learning curve for new developers.  
 * Absence of hard‑coded paths or concrete formatter implementations ensures that future extensions (new output formats, additional IDEs) can be added by implementing the existing interfaces, preserving backward compatibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The only direct dependency of `ValidationReporter` is on the **logging abstracti
 ### Siblings
 - [ValidationRulesEngine](./ValidationRulesEngine.md) -- ValidationRulesEngine would utilize a rules engine like Drools, which is a popular open-source business rules management system, to define and execute validation rules.
 - [IDEIntegrationModule](./IDEIntegrationModule.md) -- IDEIntegrationModule would use APIs and plugins provided by popular IDEs like Eclipse, IntelliJ, or Visual Studio Code to integrate the validation engine with the development environment.
-
 
 ---
 

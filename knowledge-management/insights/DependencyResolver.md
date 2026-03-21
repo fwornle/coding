@@ -96,7 +96,6 @@ The only outward interface the resolver exposes is the recursive resolve method;
 * **Extensibility** – Adding new lifecycle strategies (e.g., transient, scoped) will require extending the resolver’s creation logic and possibly augmenting the registry, but the core recursive algorithm remains unchanged.  
 * **Potential technical debt** – Lack of explicit cycle‑detection mechanisms in the observations suggests that future developers must be vigilant about introducing circular dependencies; adding a dedicated cycle‑check utility would improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The only outward interface the resolver exposes is the recursive resolve method;
 ### Siblings
 - [DependencyConfiguration](./DependencyConfiguration.md) -- The dependency-injection-config.json file defines the dependencies between components, allowing for flexible and modular configuration.
 - [ComponentRegistry](./ComponentRegistry.md) -- The ComponentRegistry is expected to be implemented using a data structure such as a dictionary or a map, allowing for efficient registration and retrieval of components.
-
 
 ---
 

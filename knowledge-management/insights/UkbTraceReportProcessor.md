@@ -24,7 +24,7 @@ Because the processor is nested within InsightGenerationModule, it also function
 
 The relationship to its parent is explicit: InsightGenerationModule *uses* the UKB trace report from UtilitiesModule, feeds it to `UkbTraceReportProcessor`, and then passes the resulting model to sibling components that perform analysis, ranking, or visualization.  This tight coupling to the parent’s data‑flow suggests a **cohesive** design where the processor is not a reusable standalone service but a specialized component that exists solely to serve the insight‑generation pipeline.
 
-![UkbTraceReportProcessor Flow](https://example.com/diagrams/ukb-processor-flow.png)  
+  
 *Figure: High‑level flow – UtilitiesModule → InsightGenerationModule (UkbTraceReportProcessor) → Insight analysis components.*
 
 ---
@@ -97,12 +97,10 @@ The only documented external contract is the data format described in `CLAUDE-CO
 
 Overall, `UkbTraceReportProcessor` embodies a focused, well‑scoped component that serves as the gateway between raw UKB trace data and the insight generation pipeline, adhering to documented data contracts and leveraging classic adapter/facade patterns to keep the surrounding architecture clean and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the UKB trace report from the UtilitiesModule to generate insights.
-
 
 ---
 

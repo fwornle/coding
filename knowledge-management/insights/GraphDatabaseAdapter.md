@@ -68,12 +68,10 @@ The adapter’s public API is probably a thin wrapper exposing methods such as `
 - Lack of explicit symbols in the repository hampers immediate code navigation, but the documented contract (module → adapter → storage) provides a clear mental model for future contributors.  
 - Because the adapter centralizes error handling and serialization, **bug surface area is small**, easing testing and debugging.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
-
 
 ---
 

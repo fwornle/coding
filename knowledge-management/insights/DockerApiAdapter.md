@@ -12,14 +12,11 @@ The DockerApiAdapter may wrap the Docker API's create_container method to provid
 
 - The DockerApiAdapter may wrap the Docker API's create_container method to provide a standardized interface for creating containers, handling differences in API versions or configurations.
 
-
 ## Related Entities
 
 ### Used By
 
 - DockerContainerManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The DockerApiAdapter may wrap the Docker API's create_container method to provid
 ### Siblings
 - [ContainerFactory](./ContainerFactory.md) -- The ContainerFactory likely utilizes the Docker API in docker.py to create containers with specific configurations, such as setting environment variables or mounting volumes.
 - [ContainerMonitor](./ContainerMonitor.md) -- The ContainerMonitor may use the Docker API to query container status, such as checking for running or exited containers, and report any issues to the DockerContainerManager.
-
 
 ---
 

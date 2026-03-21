@@ -61,12 +61,10 @@ From the observations we can infer a **composition** relationship: BrowserAccess
 
 Overall, TeamSettings provides a simple yet effective mechanism for delivering per‑team customisation to BrowserAccess, leveraging JSON’s readability while requiring disciplined validation and caching strategies to remain robust as the system scales.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [BrowserAccess](./BrowserAccess.md) -- The integrations/browser-access/ module relies on config/teams/*.json files to store team-specific settings and coding conventions.
-
 
 ---
 

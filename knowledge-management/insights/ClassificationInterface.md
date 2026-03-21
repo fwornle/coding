@@ -82,7 +82,6 @@ The interface’s implementation would be deliberately thin: it validates input,
    * Adding new classification strategies only requires implementing a new engine that conforms to the existing interface contract.  
    * The lack of concrete file paths in the observations suggests documentation should explicitly map the logical components to their physical locations to aid future developers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ The interface’s implementation would be deliberately thin: it validates input,
 ### Siblings
 - [OntologyReasoningEngine](./OntologyReasoningEngine.md) -- The ontology-config.js file defines the ontology library configuration, which is used by the OntologyReasoningEngine to interact with the ontology
 - [OntologyConfigLoader](./OntologyConfigLoader.md) -- The ontology-config.js file is loaded by the OntologyConfigLoader, which provides the configuration to the OntologyReasoningEngine and other components
-
 
 ---
 

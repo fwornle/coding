@@ -93,12 +93,10 @@ Thus, the only explicit dependency is the parent‑child link to LoggingManager;
 - **Limited Surface Area** – Since only LoggingManager interacts with the writer, changes to the async mechanism have minimal ripple effect.  
 - **Potential Hidden Complexity** – The internal queue and thread‑pool logic, while encapsulated, can become a source of bugs (e.g., deadlocks, race conditions) if not well‑documented and unit‑tested. Maintaining clear logs about queue state and worker health will aid future maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingManager](./LoggingManager.md) -- LoggingManager uses async logging (integrations/mcp-server-semantic-analysis/src/logging.ts) to prevent the system from waiting for logging operations to complete before proceeding with other tasks.
-
 
 ---
 

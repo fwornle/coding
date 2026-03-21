@@ -100,7 +100,6 @@ The **IntelligentRouter** centralises routing concerns, which is a strong mainta
 
 Overall, the design balances performance optimisation with architectural clarity, but future work should focus on surfacing the router’s code, documenting the ML feedback loop, and establishing robust test suites that cover both routing paths.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -112,7 +111,6 @@ Overall, the design balances performance optimisation with architectural clarity
 - [WaveController](./WaveController.md) -- WaveController implements work-stealing via a shared nextIndex counter, allowing idle workers to pull tasks immediately, as seen in the runWithConcurrency method.
 - [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator probably utilizes a report generation mechanism to create detailed trace reports for UKB workflow runs.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology+LevelDB database for storing and querying knowledge graphs, as seen in the storeEntity method.
-
 
 ---
 

@@ -8,7 +8,7 @@ Each LLMProvider implementation is responsible for handling the specifics of int
 
 `LLMProvider` is the core abstraction that enables the **LLMAbstraction** component to talk to any large‑language‑model service in a provider‑agnostic way. The concrete provider implementations live under `lib/llm/providers/` – for example `anthropic-provider.ts` defines **AnthropicProvider** and `dmr-provider.ts` defines **DMRProvider**. Both classes **extend** the `LLMProvider` interface, inheriting a common contract of methods that the rest of the system can rely on. Instances of these providers are not created ad‑hoc; they are constructed and cached by the **ProviderRegistry** (`lib/llm/provider-registry.js`). This arrangement lets the higher‑level `LLMAbstraction` component switch between providers (Anthropic, DMR, or future ones) without any code changes outside the registry.  
 
-![LLMProvider — Architecture](../../.data/knowledge-graph/insights/images/llmprovider-architecture.png)  
+![LLMProvider — Architecture](images/llmprovider-architecture.png)  
 
 ## Architecture and Design  
 
@@ -18,7 +18,7 @@ Management of the concrete strategies is handled by a **Registry pattern** embod
 
 The relationship between the components is visualised in the relationship diagram:  
 
-![LLMProvider — Relationship](../../.data/knowledge-graph/insights/images/llmprovider-relationship.png)  
+![LLMProvider — Relationship](images/llmprovider-relationship.png)  
 
 Together, these patterns give the system a clean separation of concerns: the abstraction layer knows *what* it wants (generate text, stream completions, etc.), while each provider knows *how* to fulfil those requests for a particular service.
 
@@ -77,7 +77,6 @@ Because the contract is interface‑driven, any other system module that needs L
 - Strong interface boundaries and the registry centralisation make the codebase easy to navigate and modify.  
 - Keeping provider‑specific logic in dedicated handler classes limits the blast radius of API changes, enhancing long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Because the contract is interface‑driven, any other system module that needs L
 
 ### Siblings
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class (lib/llm/provider-registry.js) uses a provider-agnostic approach to manage LLM providers.
-
 
 ---
 

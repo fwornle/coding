@@ -81,14 +81,7 @@ The use of **dependency injection** and a **well‑defined interface** makes `Bu
 
 ### Relationship
 
-![BudgetTracker Relationship](images/budget-tracker-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/budget-tracker-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -99,7 +92,6 @@ The use of **dependency injection** and a **well‑defined interface** makes `Bu
 - [LLMController](./LLMController.md) -- The LLMController class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner, as seen in the LLMService class (lib/llm/llm-service.ts)
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class is responsible for managing the registration and availability of different LLM providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.ts)
 - [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker class is responsible for detecting when a provider is not responding and preventing further requests, as seen in the CircuitBreaker class (lib/llm/circuit-breaker.ts)
-
 
 ---
 

@@ -126,7 +126,6 @@ Potential maintenance risks include:
 
 Overall, MockMode’s architecture balances testability, simplicity, and integration coherence within the *LLMAbstraction* ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -141,7 +140,6 @@ Overall, MockMode’s architecture balances testability, simplicity, and integra
 - [CircuitBreaker](./CircuitBreaker.md) -- CircuitBreaker uses a state machine (circuit-breaker-state-machine.py) to manage the state of the circuit
 - [CachingMechanism](./CachingMechanism.md) -- CachingMechanism uses a cache store (cache-store.py) to store cached data
 - [TierBasedRouter](./TierBasedRouter.md) -- TierBasedRouter uses a routing table (routing-table.json) to define the routing rules
-
 
 ---
 

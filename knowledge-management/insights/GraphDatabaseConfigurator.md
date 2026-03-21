@@ -63,7 +63,6 @@ Because the Neo4j driver already implements connection pooling, scalability larg
 ### Maintainability assessment  
 The design is highly maintainable: configuration changes are isolated, driver creation is centralized, and all consumers share the same instance.  Adding new graph‑related features only requires importing the manager’s driver, preserving a low‑impact change surface.  As long as the configurator remains thin and well‑documented, future upgrades to the Neo4j driver or migration to a different graph store can be performed with minimal ripple effect.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ The design is highly maintainable: configuration changes are isolated, driver cr
 ### Siblings
 - [QueryInterface](./QueryInterface.md) -- The QueryInterface module is likely defined in a separate file, such as query-interface.ts, which imports the graph database library and configures the connection.
 - [ConnectionPool](./ConnectionPool.md) -- The ConnectionPool module is likely implemented using a library like Neo4j's official JavaScript driver, which provides a connection pooling mechanism.
-
 
 ---
 

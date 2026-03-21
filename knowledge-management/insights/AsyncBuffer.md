@@ -74,12 +74,10 @@ No other system modules are mentioned, so we treat AsyncBuffer as a tightly coup
 
 *All analysis above is grounded strictly in the supplied observations; no additional patterns or code artifacts have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism uses async buffering to handle high-volume logging scenarios.
-
 
 ---
 

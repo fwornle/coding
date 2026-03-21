@@ -12,14 +12,11 @@ The hierarchical classification model implemented in the UpperOntologyClassifier
 
 - The UpperOntologyClassifier is a key component of the OntologyClassifier, as it provides the foundational structure for the lower ontology classes and entity resolution.
 
-
 ## Related Entities
 
 ### Used By
 
 - Ontology (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The hierarchical classification model implemented in the UpperOntologyClassifier
 ### Siblings
 - [LowerOntologyResolver](./LowerOntologyResolver.md) -- The LowerOntologyResolver utilizes the upper ontology classes defined by the UpperOntologyClassifier to establish more specific and detailed relationships between entities.
 - [EntityTypeResolver](./EntityTypeResolver.md) -- The EntityTypeResolver relies on the definitions in ontology-definition.yaml to determine the entity types and their relationships.
-
 
 ---
 

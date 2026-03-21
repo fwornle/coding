@@ -85,7 +85,6 @@ No source files were enumerated in the observations, so the exact method signatu
 4. **Scalability considerations** – Because the connector can be configured with different protocol implementations, scaling strategies such as connection pooling, read‑replica routing, or asynchronous drivers can be introduced without altering higher‑level logic.  
 5. **Maintainability assessment** – High maintainability: the clear separation between adapter, connector, and protocol isolates changes.  Adding support for a new graph database only requires a new protocol class and config entry, leaving query and update engines untouched.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ No source files were enumerated in the observations, so the exact method signatu
 ### Siblings
 - [DatabaseQueryProcessor](./DatabaseQueryProcessor.md) -- The DatabaseQueryEngine suggested by the parent analysis likely interacts with the DatabaseQueryProcessor to execute queries against the graph database.
 - [EntityRelationshipUpdater](./EntityRelationshipUpdater.md) -- The DatabaseUpdateEngine suggested by the parent analysis likely interacts with the EntityRelationshipUpdater to perform updates to the graph database.
-
 
 ---
 

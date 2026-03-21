@@ -119,7 +119,6 @@ These functions hide the adapter and classifier internals, presenting a clean co
 * **Potential risk** – The tight coupling to a single storage adapter means that any refactor of `graph-database-adapter.ts` must be coordinated across all siblings, increasing the integration testing burden.  
 * Overall, the design promotes maintainability through clear boundaries, but disciplined versioning of shared adapters is essential to keep the system stable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -132,7 +131,6 @@ These functions hide the adapter and classifier internals, presenting a clean co
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
 - [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the CodeGraphModule to access the code knowledge graph and generate insights.
 - [TraceReportModule](./TraceReportModule.md) -- TraceReportModule uses the CodeGraphModule to access the code knowledge graph and generate trace reports.
-
 
 ---
 

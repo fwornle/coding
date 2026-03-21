@@ -81,7 +81,6 @@ If ML/NLP is employed, the component probably follows a **pipeline pattern** int
 
 Overall, CodeInsights serves as the semantic bridge between raw syntactic information and the higher‑level knowledge graph that powers the system’s insight ecosystem, leveraging both deterministic structure analysis and optional intelligent enrichment while fitting neatly into the modular, DAG‑driven architecture of **SemanticAnalysis**.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Overall, CodeInsights serves as the semantic bridge between raw syntactic inform
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor likely utilizes the parent component's suggested node, KnowledgeGraph, to store and query code metadata for semantic analysis, as indicated by the parent analysis.
 - [CodeInsightsGenerator](./CodeInsightsGenerator.md) -- The CodeInsightsGenerator may utilize natural language processing techniques, as suggested by the parent analysis, to analyze the code and generate human-readable insights.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule likely incorporates machine learning algorithms, as suggested by the parent analysis, to improve the accuracy and effectiveness of code analysis and insight generation.
-
 
 ---
 

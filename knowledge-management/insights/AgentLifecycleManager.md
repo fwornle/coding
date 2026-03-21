@@ -65,7 +65,6 @@ No explicit mention is made of event‑driven or micro‑service patterns, so th
 
 All statements above are directly derived from the supplied observations and the explicitly described sibling components. No additional patterns or implementation details have been invented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ All statements above are directly derived from the supplied observations and the
 ### Siblings
 - [AgentRegistryHandler](./AgentRegistryHandler.md) -- The AgentRegistryHandler would require a data structure, such as a dictionary or a database, to store the registry of available agents, with each agent having a unique identifier.
 - [VkbApiAgentGateway](./VkbApiAgentGateway.md) -- The VkbApiAgentGateway would encapsulate the VKB API's agent-related functionality, providing a simplified interface for the AgentLifecycleManager and AgentRegistryHandler to perform operations.
-
 
 ---
 

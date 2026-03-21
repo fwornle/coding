@@ -86,7 +86,6 @@ No other modules were mentioned, so the integration surface is limited to the th
 ### Maintainability Assessment  
 * The explicit separation of initialization duties makes the codebase easier to maintain.  Changes to the connection protocol or logging format are confined to the handler and its immediate dependencies, leaving the core trajectory algorithms untouched.  The lack of visible source code, however, means that maintainers must rely on documentation and tests to understand the exact contract; adding clear interface definitions and comprehensive unit tests will be essential to keep the component maintainable as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ No other modules were mentioned, so the integration surface is limited to the th
 ### Siblings
 - [SpecstoryConnectionManager](./SpecstoryConnectionManager.md) -- The TrajectoryController utilizes the SpecstoryConnectionManager to connect to the Specstory extension, as indicated by the parent context.
 - [ConversationLogger](./ConversationLogger.md) -- The ConversationLogger would likely be used in conjunction with the SpecstoryConnectionManager to log conversations, as implied by the parent context.
-
 
 ---
 

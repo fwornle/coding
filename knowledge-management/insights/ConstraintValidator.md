@@ -95,7 +95,6 @@ The ConstraintSystem forms a hub where each sibling component contributes a dist
 
 The modular decomposition yields high maintainability: each component can be unit‑tested in isolation, and updates to one (e.g., enhancing the ContentValidationAgent’s parser) do not ripple into the others. The explicit rule registry and hook manager simplify adding new validation logic without touching core code, reducing regression risk. The main maintenance challenge lies in coordinating version compatibility across the modules—especially if the HookManager’s event contract evolves—so clear versioning and contract tests are advisable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ The modular decomposition yields high maintainability: each component can be uni
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager utilizes a graph database to store and retrieve validation metadata, constraint configurations, and other relevant data.
 - [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger utilizes the GraphDatabaseManager to store and retrieve violation data, including metadata and error messages.
 - [ContentValidationAgent](./ContentValidationAgent.md) -- The ContentValidationAgent utilizes the ConstraintValidator to validate entity content against configured constraints.
-
 
 ---
 

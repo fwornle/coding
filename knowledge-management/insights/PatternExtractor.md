@@ -75,7 +75,6 @@ External dependencies include the **NLP library** (e.g., spaCy, NLTK, Stanford C
 
 These observations collectively portray **PatternExtractor** as a focused, horizontally scalable component that forms the backbone of the pattern‑discovery stage within the broader Insights system. Its clean separation from downstream insight generation and reporting services supports both modular evolution and operational elasticity.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ These observations collectively portray **PatternExtractor** as a focused, horiz
 ### Siblings
 - [InsightGeneratorService](./InsightGeneratorService.md) -- InsightGeneratorService utilizes the InsightGenerator class to generate insights based on entity data, which is defined in the SemanticAnalysis component context
 - [KnowledgeReportGenerator](./KnowledgeReportGenerator.md) -- KnowledgeReportGenerator uses a templating engine to generate reports based on insights and patterns extracted from entity data, which is defined in the SemanticAnalysis component context
-
 
 ---
 

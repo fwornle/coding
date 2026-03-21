@@ -82,7 +82,6 @@ Even though the source snapshot does not expose concrete class or function names
 * The strategy pattern centralizes format‑specific logic, making it straightforward to add, deprecate, or refactor converters without touching the core pipeline.
 * Robust error handling and reliance on the stable LSL schema further reduce the risk of regressions as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Even though the source snapshot does not expose concrete class or function names
 ### Siblings
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager leverages the OntologyClassificationAgent to categorize interactions within the Claude Code environment, as seen in the LiveLoggingSystem component description.
 - [LogManager](./LogManager.md) -- The LogManager is designed to work with the TranscriptManager to capture and store interactions in a meaningful and organized manner.
-
 
 ---
 

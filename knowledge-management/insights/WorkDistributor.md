@@ -97,12 +97,10 @@ Because the observations do not list specific function names, the above descript
 
 Overall, *WorkDistributor* embodies a focused, lock‑free work‑stealing scheduler that enables the *Trajectory* subsystem to exploit parallelism efficiently while keeping concurrency concerns encapsulated within the *ConcurrencyController* hierarchy.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
-
 
 ---
 

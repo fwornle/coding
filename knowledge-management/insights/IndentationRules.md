@@ -43,7 +43,6 @@ Developers should treat the `CodeFormatter` as the authoritative source for inde
 ### Maintainability Assessment  
 - Maintaining indentation standards is straightforward: a single constant change updates the entire system.  The co‑location of parsing logic and rule definition aids readability but can become a maintenance hotspot if the file expands to host many unrelated conventions.  Periodic extraction of each convention into its own class (while preserving the `CodeFormatter` façade) would improve separation of concerns without disrupting the existing rule‑engine flow.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -52,7 +51,6 @@ Developers should treat the `CodeFormatter` as the authoritative source for inde
 ### Siblings
 - [CodeFormatter](./CodeFormatter.md) -- The CodeFormatter class in code-formatter.py defines the formatting rules, including indentation and naming conventions, which are applied to the codebase.
 - [NamingConventions](./NamingConventions.md) -- The CodeFormatter class in code-formatter.py checks for naming conventions, such as camelCase or PascalCase, and corrects them if necessary.
-
 
 ---
 

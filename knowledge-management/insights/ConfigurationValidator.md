@@ -14,7 +14,7 @@ The overall design follows a **modular architecture** that is explicitly describ
 
 The validator adopts a **configuration‑driven strategy**: validation rules and optimization heuristics are supplied via external settings, allowing the same LSLConfigValidator script to be reused across environments with different performance goals.  The reliance on the **unified logging interface** (`integrations/mcp-server-semantic-analysis/src/logging.ts`) demonstrates a **cross‑cutting concern** implementation—logging is factored out of the validator and injected via the Logger component, keeping the validation code focused on its domain.
 
-![ConfigurationValidator — Architecture](../../.data/knowledge-graph/insights/images/configuration-validator-architecture.png)
+![ConfigurationValidator — Architecture](images/configuration-validator-architecture.png)
 
 ## Implementation Details  
 
@@ -34,7 +34,7 @@ When an issue is discovered, the validator logs the event through the **Logger**
 
 * **External Interfaces**: Because the validator is configurable, it expects a configuration descriptor (likely a file path or environment variable) that specifies which rule bundles to activate.  This descriptor is read at runtime, making the validator adaptable to different deployment contexts (development, staging, production).
 
-![ConfigurationValidator — Relationship](../../.data/knowledge-graph/insights/images/configuration-validator-relationship.png)
+![ConfigurationValidator — Relationship](images/configuration-validator-relationship.png)
 
 ## Usage Guidelines  
 
@@ -74,7 +74,6 @@ When an issue is discovered, the validator logs the event through the **Logger**
 * The reliance on external configuration for rule selection reduces code churn when adapting to new environments.  
 * Potential maintenance burden arises if the rule set grows large; organizing rules into logical groups within ConfigValidator will be essential.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ When an issue is discovered, the validator logs the event through the **Logger**
 - [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
-
 
 ---
 

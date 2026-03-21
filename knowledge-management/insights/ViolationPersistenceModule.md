@@ -114,7 +114,6 @@ The child `ConstraintViolationStorage` is a thin wrapper that directly invokes `
 
 The clear separation of concerns, small focused files, and a shared adapter make the module **highly maintainable**.  Adding a new type of violation or changing the persistence schema only requires modifications in `ConstraintViolationStorage` or the adapter, leaving capture, queuing, and caching untouched.  However, the reliance on an in‑memory cache and queue introduces stateful components that must be monitored and possibly replaced as the system grows, which adds a modest operational maintenance burden.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -127,7 +126,6 @@ The clear separation of concerns, small focused files, and a shared adapter make
 - [ValidationModule](./ValidationModule.md) -- ValidationModule uses the createConstraintValidationResult method in graphdb-adapter.ts to store validation results in the graph database.
 - [HookManagementSystem](./HookManagementSystem.md) -- HookManagementSystem uses the createHookConfiguration method in graphdb-adapter.ts to store hook configurations in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the createNode method to create a new node in the graph database, as seen in the graphdb-adapter.ts file.
-
 
 ---
 

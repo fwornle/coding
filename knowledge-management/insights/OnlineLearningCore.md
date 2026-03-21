@@ -86,7 +86,6 @@ Because **OnlineLearningCore** centralizes domain logic, scaling the component h
 
 The explicit split between **OnlineLearningCore** and **OnlineLearningHandler** promotes high maintainability: domain changes are confined to the core, while UI or API adjustments stay in the handler.  The lack of concrete symbols in the observations means developers must rely on naming conventions and folder structure to locate the core, so consistent naming and documentation become critical.  Overall, the design encourages clean unit testing, easy refactoring, and straightforward onboarding for new team members, assuming the implied interfaces are well defined.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ The explicit split between **OnlineLearningCore** and **OnlineLearningHandler** 
 
 ### Siblings
 - [OnlineLearningHandler](./OnlineLearningHandler.md) -- OnlineLearningHandler handles the handler logic for OnlineLearning
-
 
 ---
 

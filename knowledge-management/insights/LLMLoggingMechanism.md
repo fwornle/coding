@@ -107,7 +107,6 @@ Exports a stable set of functions (e.g., `logInfo(message)`, `logError(message)`
    * The stable API (`llm-logging-api.ts`) decouples callers from implementation details, reducing ripple effects when internal modules evolve.  
    * Consistent naming and colocated files aid discoverability for future contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Exports a stable set of functions (e.g., `logInfo(message)`, `logError(message)`
 - [LLMProviderManager](./LLMProviderManager.md) -- LLMProviderManager uses the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback.
 - [LLMModeResolver](./LLMModeResolver.md) -- LLMModeResolver uses a global mode configuration in lib/llm/llm-mode-config.ts to determine the default LLM mode.
 - [LLMCachingMechanism](./LLMCachingMechanism.md) -- LLMCachingMechanism uses a caching library in lib/llm/llm-cache.ts to store and retrieve cached responses.
-
 
 ---
 

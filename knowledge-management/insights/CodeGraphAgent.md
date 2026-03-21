@@ -109,12 +109,10 @@ The overall system is a **hierarchical pipeline**: OnlineLearning (parent) orche
 
 The agent’s **clear separation of concerns** (analysis logic vs. transport layer) and **environment‑driven configuration** make it straightforward to update or replace individual pieces.  However, the reliance on external port contracts means that any change to the API surface must be coordinated with all RAG consumers, necessitating versioned endpoints or backward‑compatible response formats to keep the ecosystem stable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the CodeAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code repositories and extract insights
-
 
 ---
 

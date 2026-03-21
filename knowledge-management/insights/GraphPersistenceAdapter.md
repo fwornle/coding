@@ -118,12 +118,10 @@ The adapter’s interface is likely defined in TypeScript (or plain JavaScript) 
 * **Lack of source visibility** – The absence of concrete source files hampers direct code review; documentation and unit tests become critical for maintainability.  
 * **Potential technical debt** – Custom serialization and manual schema management in LevelDB could become a source of bugs if not rigorously tested. Adding a thin schema‑definition layer or adopting a higher‑level store (e.g., a graph‑oriented DB) could reduce this risk in future iterations.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- The GraphPersistenceModule might be related to the GraphDatabaseAdapter, as it utilizes Graphology and LevelDB for persistence.
-
 
 ---
 

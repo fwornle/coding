@@ -139,7 +139,6 @@ The agent provides a **single, unified interface** for all source types (Git, vi
 
 Overall, the ObservationDerivationAgent exemplifies a well‑structured, purpose‑driven component that leverages shared infrastructure while keeping its own responsibilities narrowly defined. This design supports reliable knowledge‑graph growth, offers clear extension points for new source types, and balances performance with maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -154,7 +153,6 @@ Overall, the ObservationDerivationAgent exemplifies a well‑structured, purpose
 - [EntityPersistenceAgent](./EntityPersistenceAgent.md) -- EntityPersistenceAgent uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle persistence with automatic JSON export sync.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle persistence with automatic JSON export sync.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the Graphology library to provide a robust and reliable foundation for knowledge management.
-
 
 ---
 

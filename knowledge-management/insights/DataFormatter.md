@@ -79,7 +79,6 @@ Because formatting is asynchronous and promise‑driven, the component can handl
 ### Maintainability Assessment  
 Encapsulation via classes and clear delegation to adapter, error, and connection managers yields high maintainability.  Changes to the Specstory contract are isolated to `lib/integrations/specstory-adapter.js`.  The promise‑based API enforces a uniform error‑handling contract across the codebase.  The main maintenance risk lies in the implicit coupling to the adapter’s interface; thorough unit tests around DataFormatter’s `format` method and the adapter’s schema mapping are essential to guard against regression as Specstory evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Encapsulation via classes and clear delegation to adapter, error, and connection
 - [ErrorManager](./ErrorManager.md) -- ErrorManager uses the ConnectionManager sub-component to oversee the connection methods used to log errors
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
 - [TrajectoryInitializer](./TrajectoryInitializer.md) -- TrajectoryInitializer uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to initialize the Trajectory component
-
 
 ---
 

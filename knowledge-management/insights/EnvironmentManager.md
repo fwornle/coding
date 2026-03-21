@@ -109,7 +109,6 @@ All of these interactions are mediated through the **`SpecstoryAdapter`** locate
 
 Overall, the design presents a clean, modular approach that balances robustness with extensibility, provided that the adapter layer is kept well‑tested and that protocol‑selection logic remains the sole domain of EnvironmentManager.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ Overall, the design presents a clean, modular approach that balances robustness 
 - [LoggerManager](./LoggerManager.md) -- LoggerManager utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversation entries and manage logging activities.
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to external services.
 - [ProtocolManager](./ProtocolManager.md) -- ProtocolManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to manage the different protocols used by the Trajectory component.
-
 
 ---
 

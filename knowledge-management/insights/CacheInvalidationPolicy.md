@@ -63,7 +63,6 @@ The **CacheStoreManager** supplies the policy with a callback or reference that 
 ### Maintainability assessment
 - The clear interface and dedicated module make the invalidation policy **easy to evolve**; new expiration strategies can be added without touching storage code.  However, the lack of concrete file paths in the current documentation means developers must locate the module manually; adding explicit module documentation and naming conventions would further improve discoverability and maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ The **CacheStoreManager** supplies the policy with a callback or reference that 
 ### Siblings
 - [CacheStoreManager](./CacheStoreManager.md) -- CacheStoreManager utilizes a cache store (cache-store.py) to store cached data, allowing for efficient data retrieval and storage
 - [CacheStorageStrategy](./CacheStorageStrategy.md) -- CacheStorageStrategy may be implemented using a dictionary or a database, with the choice of storage mechanism depending on the specific requirements of the application
-
 
 ---
 

@@ -23,7 +23,7 @@ The design emphasizes **separation of concerns** and **composition**:
 
 The component also follows a **configuration‑driven pattern**.  All logging settings—such as enabled log levels, destinations, and filter rules—are validated by the `ConfigurationValidator` before the Logger is instantiated.  This ensures that mis‑configurations are caught early, improving reliability.
 
-![Logger — Architecture](../../.data/knowledge-graph/insights/images/logger-architecture.png)
+![Logger — Architecture](images/logger-architecture.png)
 
 ---
 
@@ -58,7 +58,7 @@ The Logger interacts with several other parts of the system:
 
 The relationship diagram below visualizes these connections:
 
-![Logger — Relationship](../../.data/knowledge-graph/insights/images/logger-relationship.png)
+![Logger — Relationship](images/logger-relationship.png)
 
 ---
 
@@ -95,7 +95,6 @@ The relationship diagram below visualizes these connections:
 * Centralized configuration validation reduces the risk of runtime mis‑configurations.  
 * Adding new logging mechanisms or formats requires only new modules that conform to existing interfaces, minimizing the impact on existing code.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The relationship diagram below visualizes these connections:
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
-
 
 ---
 

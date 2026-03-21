@@ -112,12 +112,10 @@ While the exact file for **GraphModeler** is not listed, the relationship is exp
 * **Documentation Gap** – The absence of concrete source files for **GraphModeler** limits immediate understandability; adding interface documentation and unit tests for the graph API would improve maintainability.
 * **Extensibility** – New workflow features (e.g., conditional branches) can be introduced by extending the graph model, provided the layout algorithm can interpret the added semantics. The current composition design supports such extensions with minimal ripple effect.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [WorkflowLayoutComputer](./WorkflowLayoutComputer.md) -- WorkflowLayoutComputer uses a graph-based data structure in workflow-layout-computer.ts to model workflow dependencies and compute layouts
-
 
 ---
 

@@ -59,7 +59,6 @@ Because the manager is a child of `EntityPersistenceManager`, it can also expose
 - High maintainability: clear boundaries, single‑responsibility classes, and explicit dependencies make the codebase easy to understand and modify.  
 - The only maintenance risk is accidental direct access to storage bypassing the manager; enforcing usage through code reviews or static analysis can mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -68,7 +67,6 @@ Because the manager is a child of `EntityPersistenceManager`, it can also expose
 ### Siblings
 - [EntityStorageHandler](./EntityStorageHandler.md) -- The EntityStorageHandler would need to interact with the EntityClassificationManager to ensure that classified entities are stored correctly, indicating a potential dependency between these two components
 - [ObservationDerivationModule](./ObservationDerivationModule.md) -- The ObservationDerivationModule likely relies on the classifications provided by the EntityClassificationManager to derive meaningful observations, underlining the interconnectedness of these components
-
 
 ---
 

@@ -12,14 +12,11 @@ Without source files, it's likely that GraphQuerying is implemented as a separat
 
 - Without source files, it's likely that GraphQuerying is implemented as a separate component or service, possibly with its own set of query optimization techniques and caching mechanisms.
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeGraph (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ Without source files, it's likely that GraphQuerying is implemented as a separat
 ### Siblings
 - [GraphConstruction](./GraphConstruction.md) -- GraphConstruction likely utilizes the GraphDB library, as seen in the parent component's context, to create and manage graph entities.
 - [GraphManagement](./GraphManagement.md) -- GraphManagement likely interacts with the GraphDB library to perform CRUD (create, read, update, delete) operations on graph entities and relationships.
-
 
 ---
 

@@ -65,12 +65,10 @@ Following these practices ensures that the lazy‑loading behavior remains predi
 * **High maintainability:** The implementation relies on a single, well‑understood language feature (`import()`) with no custom loader logic, making the code easy to read and modify.  
 * **Risk areas:** Path construction logic resides outside the observed snippet; ensuring that module identifiers remain valid and that error handling is consistent across callers is essential to keep the system robust.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DynamicImporter](./DynamicImporter.md) -- DynamicImporter uses the import() function (lib/integrations/specstory-adapter.js:10) to load modules dynamically, allowing for flexible module loading.
-
 
 ---
 

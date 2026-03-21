@@ -125,7 +125,6 @@ The ProviderRegistryModule sits at the heart of the LLM abstraction, acting as a
 
 The separation of concerns (registry, factory, cache, fallback, circuit breaker, logger) makes the codebase approachable: each file has a narrow focus, and changes to one concern rarely ripple to others. The reliance on explicit registration and DI reduces hidden couplings, aiding onboarding and future extensions. The main maintenance burden lies in keeping provider descriptors synchronized with actual implementations and ensuring that cache eviction/refresh policies evolve alongside provider lifecycle changes. Overall, the architecture is **highly maintainable**, provided that new providers adhere to the established registration and factory contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ The separation of concerns (registry, factory, cache, fallback, circuit breaker,
 - [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts.
 - [DMRProviderModule](./DMRProviderModule.md) -- The DMRProviderModule uses a Docker API client to interact with the Model Runner, as seen in lib/llm/dmr-provider-module.ts.
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
-
 
 ---
 

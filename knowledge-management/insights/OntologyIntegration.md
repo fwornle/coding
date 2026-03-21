@@ -124,7 +124,6 @@ LevelDB is chosen for its **high‑throughput reads/writes** and low‑latency r
    * Reusing the WaveController concurrency primitive reduces duplicated logic and eases future refactors.  
    * The reliance on correct metadata introduces a potential source of bugs; thorough validation and unit tests are recommended.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ LevelDB is chosen for its **high‑throughput reads/writes** and low‑latency r
 ### Siblings
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to provide a standardized interface for interacting with the graph database.
 - [DataIngestion](./DataIngestion.md) -- DataIngestion uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve knowledge entities, providing a standardized interface for interacting with the graph database.
-
 
 ---
 

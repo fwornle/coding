@@ -90,7 +90,6 @@ Because the module also contains **`GraphDatabaseCaching`** and **`VkbApiIntegra
 * **Error handling is consistent** across all paths, which aids debugging, but the fallback strategy must be documented to avoid silent data quality issues.  
 * The co‑location of caching and API‑integration siblings promotes discoverability but also risks tight coupling; clear interfaces between the router and its siblings will be essential as the feature set evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Because the module also contains **`GraphDatabaseCaching`** and **`VkbApiIntegra
 ### Siblings
 - [GraphDatabaseCaching](./GraphDatabaseCaching.md) -- The GraphDatabaseCaching module (GraphDatabaseInteraction.ts) uses a caching library to store graph database data, as seen in the import statement where it imports the caching library
 - [VkbApiIntegration](./VkbApiIntegration.md) -- The VkbApiIntegration module (GraphDatabaseInteraction.ts) imports the VKB API library and initializes the API connection, as seen in the constructor where it sets the API endpoint and authentication credentials
-
 
 ---
 

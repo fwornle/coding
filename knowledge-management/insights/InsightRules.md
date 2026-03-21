@@ -86,7 +86,6 @@ Insights.generateInsights()
 
 These insights are derived directly from the provided observations and file references, without introducing unsupported architectural concepts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ These insights are derived directly from the provided observations and file refe
 ### Siblings
 - [PatternMiner](./PatternMiner.md) -- PatternMiner (PatternMiner.ts) employs a graph-based data structure to represent entity relationships, facilitating efficient pattern discovery through the use of graph traversal algorithms
 - [ReportGenerator](./ReportGenerator.md) -- ReportGenerator (ReportGenerator.ts) utilizes a template-based approach to create reports, allowing for easy customization of the report structure and content through the use of template variables
-
 
 ---
 

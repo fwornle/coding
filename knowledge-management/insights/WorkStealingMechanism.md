@@ -67,12 +67,10 @@ void WaveController::runWithConcurrency() {
 4. **Scalability considerations** – Lock‑free atomic increments scale well up to dozens of threads; beyond that, the single counter may saturate cache‑coherency traffic, suggesting a possible future refinement (e.g., per‑worker ranges).  
 5. **Maintainability assessment** – Current implementation is concise and easy to reason about because the stealing logic is confined to a few lines in `runWithConcurrency`. However, the lack of abstraction around the atomic counter could hinder future extensions; encapsulating the counter would improve modularity without sacrificing performance.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [WorkStealer](./WorkStealer.md) -- WorkStealer uses a shared atomic index counter to enable work-stealing, allowing idle workers to pull tasks immediately, as seen in the WaveController's runWithConcurrency method.
-
 
 ---
 

@@ -76,12 +76,10 @@ No external libraries, services, or APIs are mentioned, so the integration surfa
 * **Negative:** Absence of a formal class or test harness may lead to hidden bugs; adding unit tests around the script’s entry point is recommended.  
 * Keeping the script versioned and documenting its expected input/output formats will improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
-
 
 ---
 

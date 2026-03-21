@@ -82,7 +82,6 @@ DesignPatternManager sits at the nexus of several integration pathways:
 * **Potential fragility** – Shared use of `GraphDatabaseAdapter` means that a breaking change to the adapter propagates to all dependent components; versioned adapters or interface segregation could mitigate this risk.  
 * **Documentation clarity** – The explicit naming of paths and classes in the observations provides a strong anchor for future developers to locate implementation details quickly.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ DesignPatternManager sits at the nexus of several integration pathways:
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
 - [SecurityStandardsModule](./SecurityStandardsModule.md) -- SecurityStandardsModule uses the DesignPatternManager to retrieve stored design patterns for security standard enforcement.
 - [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
-
 
 ---
 

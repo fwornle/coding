@@ -93,7 +93,6 @@ Overall, the manager interacts upward with its parent for input data, laterally 
 ### Maintainability Assessment
 The component’s clear separation of concerns, limited public surface, and reliance on standard patterns (observer, configuration) make it **highly maintainable**.  Because the internal algorithm and data structure are encapsulated, future improvements (e.g., swapping to a more sophisticated layout engine) can be introduced with minimal impact on consumers.  The main maintenance risk lies in the management of callbacks and ensuring that any changes to visibility logic remain consistent across the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The component’s clear separation of concerns, limited public surface, and reli
 
 ### Siblings
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes a graph database to store and retrieve entity content, allowing for efficient querying and validation of complex relationships between entities.
-
 
 ---
 

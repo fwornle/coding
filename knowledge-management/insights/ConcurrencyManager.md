@@ -97,14 +97,7 @@ Overall, the **ConcurrencyManager** embodies a pragmatic, high‑performance con
 
 ### Relationship
 
-![ConcurrencyManager Relationship](images/concurrency-manager-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/concurrency-manager-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -118,7 +111,6 @@ Overall, the **ConcurrencyManager** embodies a pragmatic, high‑performance con
 - [AdapterPattern](./AdapterPattern.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods.
 - [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer may use a lazy loading approach to initialize LLMs, delaying initialization until the model is actually needed, reducing memory usage and improving system responsiveness.
 - [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
-
 
 ---
 

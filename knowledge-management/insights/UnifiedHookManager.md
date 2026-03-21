@@ -102,7 +102,6 @@ UnifiedHookManager sits at the heart of the ConstraintSystem’s extensibility l
 ### Maintainability assessment  
 The modular separation of concerns (configuration loading, caching, logging, handler registry) makes the codebase approachable. The explicit `registerHandler` API provides a clear contract for new components. However, the reliance on a singleton can make unit testing harder unless the manager is designed to allow injection of mock dependencies (config loader, cache, logger). Adding comprehensive unit tests around registration, dispatch ordering, and error handling will further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -112,7 +111,6 @@ The modular separation of concerns (configuration loading, caching, logging, han
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
 - [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to load and merge hook configurations.
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
-
 
 ---
 

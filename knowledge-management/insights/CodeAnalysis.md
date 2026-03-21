@@ -100,14 +100,7 @@ Interaction with other parts of the platform is explicit: the agent consumes con
 
 ### Relationship
 
-![CodeAnalysis Relationship](images/code-analysis-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/code-analysis-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -123,7 +116,6 @@ Interaction with other parts of the platform is explicit: the agent consumes con
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
-
 
 ---
 

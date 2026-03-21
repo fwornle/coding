@@ -87,12 +87,10 @@ Because the client is a child of *EntityPersistence*, it inherits any configurat
 * However, the tight coupling between graph writes and JSON export means any modification to the export pipeline requires careful updates to the client, increasing the maintenance surface.  
 * Documentation that explicitly maps client methods to the JSON synchronization flow will be essential to keep future contributors aligned.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-
 
 ---
 

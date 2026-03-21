@@ -106,7 +106,6 @@ The integration is configuration‑driven: the YAML file defines step names, dep
 
 Overall, `PipelineStepExecutor` embodies a focused, DAG‑oriented execution engine that balances deterministic ordering, resilience, and optional performance optimisation through critical‑path awareness.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ Overall, `PipelineStepExecutor` embodies a focused, DAG‑oriented execution eng
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges, as seen in the parent context
 - [PipelineConfigurationParser](./PipelineConfigurationParser.md) -- The PipelineConfigurationParser would need to use a library like yamljs to parse the pipeline-configuration.yaml file, handling errors and exceptions that occur during parsing
-
 
 ---
 

@@ -82,7 +82,6 @@ Although the source code was not enumerated, the observations describe the essen
 * Centralising registration logic in the JSON file and a single registration method reduces duplication.  
 * Encapsulation behind the `DependencyInjector` façade limits the surface area for accidental misuse, further supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Although the source code was not enumerated, the observations describe the essen
 ### Siblings
 - [DependencyConfiguration](./DependencyConfiguration.md) -- The dependency-injection-config.json file defines the dependencies between components, allowing for flexible and modular configuration.
 - [DependencyResolver](./DependencyResolver.md) -- The DependencyResolver may employ a recursive approach to resolve dependencies, handling cases where components have multiple dependencies.
-
 
 ---
 

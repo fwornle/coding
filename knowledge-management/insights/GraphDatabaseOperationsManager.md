@@ -83,7 +83,6 @@ Following these conventions keeps the graph subsystem stable, performant, and ea
 
 These observations collectively paint a picture of a well‑structured, transaction‑aware graph access layer that balances extensibility with operational safety.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ These observations collectively paint a picture of a well‑structured, transact
 ### Siblings
 - [GraphDatabaseConnectionPool](./GraphDatabaseConnectionPool.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties, allowing for flexible configuration of connection settings
 - [GraphQueryOptimizer](./GraphQueryOptimizer.md) -- GraphQueryOptimization techniques, such as indexing and caching, are applied in GraphDatabaseAdapter.java to improve query performance and reduce the load on the graph database
-
 
 ---
 

@@ -106,7 +106,6 @@ All these integration points are mediated through well‑named methods; no ad‑
 
 These insights are entirely derived from the supplied observations and the explicit relationships described in the hierarchy context.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ These insights are entirely derived from the supplied observations and the expli
 - [Insights](./Insights.md) -- InsightGenerator.usePatternCatalog() leverages a pre-defined catalog of patterns to identify insights
 - [ConcurrencyManager](./ConcurrencyManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks
 - [SecurityManager](./SecurityManager.md) -- SecurityManager.useAuthentication() utilizes authentication mechanisms to verify user identities
-
 
 ---
 

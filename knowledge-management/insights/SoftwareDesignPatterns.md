@@ -87,7 +87,6 @@ Because the JSON files are the sole source of pattern data, any change—adding 
 * High maintainability: pattern changes are isolated to declarative JSON, reducing regression risk.  
 * Consistent naming and centralized validation further lower the cognitive load for developers, making the system easy to understand and evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Because the JSON files are the sole source of pattern data, any change—adding 
 - [BestPractices](./BestPractices.md) -- The use of design principles, such as separation of concerns, enables efficient and scalable code.
 - [ProjectOrganization](./ProjectOrganization.md) -- The use of directories, such as config/teams, enables efficient organization and layout of the project.
 - [ConfigurationManagement](./ConfigurationManagement.md) -- The use of JSON files for configuration and data storage enables easy modification and extension of project settings without altering the core code.
-
 
 ---
 

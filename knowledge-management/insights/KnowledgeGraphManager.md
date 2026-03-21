@@ -10,7 +10,7 @@ The **KnowledgeGraphManager** sub‑component lives inside the *LiveLoggingSyste
 
 Operationally, KnowledgeGraphManager relies on several environment variables to locate and configure its external services: `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` for API‑level interactions, `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` for communicating with the Graph‑Code RAG service, and `MEMGRAPH_BATCH_SIZE` to tune batch‑write performance. Classification of ontology concepts is delegated to the **OntologyClassificationAgent** class, while all graph‑related events are emitted through the **LoggingMechanism** sub‑component, ensuring a consistent audit trail across the LiveLoggingSystem.  
 
-![KnowledgeGraphManager — Architecture](../../.data/knowledge-graph/insights/images/knowledge-graph-manager-architecture.png)
+![KnowledgeGraphManager — Architecture](images/knowledge-graph-manager-architecture.png)
 
 ---
 
@@ -24,7 +24,7 @@ Logging is centralized through the **LoggingMechanism** sibling, which the manag
 
 The **OntologyClassificationAgent** provides an *ontology‑driven* classification layer. By injecting this agent, KnowledgeGraphManager can map raw graph nodes to higher‑level concepts defined in the system’s ontology, supporting richer queries and downstream analytics.  
 
-![KnowledgeGraphManager — Relationship](../../.data/knowledge-graph/insights/images/knowledge-graph-manager-relationship.png)
+![KnowledgeGraphManager — Relationship](images/knowledge-graph-manager-relationship.png)
 
 ---
 
@@ -101,7 +101,6 @@ KnowledgeGraphManager sits at the intersection of **LiveLoggingSystem** (parent)
 
 The component’s reliance on well‑named adapters and agents promotes high maintainability: changes to the graph backend, ontology, or external AI services are isolated to their respective classes. The explicit environment‑variable configuration reduces hidden dependencies, making deployments reproducible. However, the lack of visible unit‑test symbols in the current snapshot suggests a potential gap in automated verification; adding tests around the adapter and classification logic would further improve long‑term reliability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -114,7 +113,6 @@ The component’s reliance on well‑named adapters and agents promotes high mai
 - [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptAdapter in lib/agent-api/transcript-api.js provides a standardized interface for handling different agent formats.
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component may utilize the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI.
 - [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
-
 
 ---
 

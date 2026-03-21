@@ -10,7 +10,7 @@ APIService is a **sub‑component** that lives inside the `DockerizedServices` c
 
 The primary purpose of APIService is to provide a **robust, easy‑to‑use entry point** for other parts of the application (for example the LLMManager) that need to interact with the constraint‑monitoring API server.  It abstracts away the complexities of service startup, error handling, and graceful shutdown, allowing callers to focus on business logic rather than infrastructure concerns.
 
-![APIService — Architecture](../../.data/knowledge-graph/insights/images/apiservice-architecture.png)
+![APIService — Architecture](images/apiservice-architecture.png)
 
 ---
 
@@ -22,7 +22,7 @@ APIService is **composed** of a single child component, **APIServerManager**, wh
 
 Because APIService lives inside `DockerizedServices`, it inherits the **dependency‑injection** approach described for the parent component.  This means that the concrete implementation of APIServerManager (or any other collaborator) can be swapped at runtime, facilitating testing and future extension without changing APIService’s core logic.  The sibling components—most notably **ServiceOrchestrator**, which also uses `ServiceStarter`—share this same robust startup mechanism, indicating a **cross‑component consistency** in how services are brought online.
 
-![APIService — Relationship](../../.data/knowledge-graph/insights/images/apiservice-relationship.png)
+![APIService — Relationship](images/apiservice-relationship.png)
 
 ---
 
@@ -91,7 +91,6 @@ APIService sits at the intersection of several system boundaries:
 - Shared `ServiceStarter` reduces code churn but creates a single point of change; updates to its behavior must be vetted against all dependent services.
 - Dependency injection from DockerizedServices promotes testability and future refactoring (e.g., swapping APIServerManager implementations).
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ APIService sits at the intersection of several system boundaries:
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager likely uses Graphology and LevelDB to provide persistence and data storage capabilities.
 - [WaveAgentExecutor](./WaveAgentExecutor.md) -- WaveAgentExecutor likely uses a specific constructor and execution pattern to execute wave-based agents.
 - [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
-
 
 ---
 

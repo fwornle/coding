@@ -95,7 +95,6 @@ The siblings **CacheInvalidationHandler** and **CacheHitHandler** do not directl
 
 5. **Maintainability assessment** – The clear separation between detection (**CacheInvalidationHandler**), retrieval (**CacheHitHandler**), and remediation (**LLMCallCoordinator**) promotes modularity and unit‑testability.  The only coupling is the callback registration, which is a lightweight interface.  As long as the queue and retry logic remain encapsulated, future changes (e.g., swapping the queue implementation or adjusting back‑off policy) should have limited ripple effects.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The siblings **CacheInvalidationHandler** and **CacheHitHandler** do not directl
 ### Siblings
 - [CacheInvalidationHandler](./CacheInvalidationHandler.md) -- CacheInvalidationHandler would likely utilize the ClassificationCache class in classification_cache.py to store and retrieve classification results, implementing a mechanism to track cache validity
 - [CacheHitHandler](./CacheHitHandler.md) -- CacheHitHandler would work closely with the ClassificationCache class to retrieve cached results, using a cache key to identify and fetch the relevant entry
-
 
 ---
 

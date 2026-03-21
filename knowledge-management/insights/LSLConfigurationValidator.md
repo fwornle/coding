@@ -86,7 +86,6 @@ Because **LiveLoggingSystem** also contains the **TranscriptManagement** and **R
 * **Moderate** – the auto‑repair feature adds complexity; careful documentation and comprehensive tests are required to keep it safe.
 * **Low Coupling** – interaction with other subsystems is limited to well‑defined logging calls and shared configuration schemas, which eases future refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ Because **LiveLoggingSystem** also contains the **TranscriptManagement** and **R
 - [LoggingInfrastructure](./LoggingInfrastructure.md) -- LoggingInfrastructure likely utilizes a buffering mechanism to prevent log loss during high-traffic periods.
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification likely utilizes a knowledge graph or ontology database for classification.
 - [RedactionAndFiltering](./RedactionAndFiltering.md) -- RedactionAndFiltering likely utilizes regular expressions or natural language processing for identifying sensitive information.
-
 
 ---
 

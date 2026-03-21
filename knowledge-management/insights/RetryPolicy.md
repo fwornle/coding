@@ -60,12 +60,10 @@ The only external dependency explicitly mentioned is the `calculateBackoff` func
 4. **Scalability considerations** – Exponential backoff limits rapid retry storms, helping the system scale under failure conditions; however, the maximum retry count must be tuned to avoid long‑running start attempts that could block resource allocation.  
 5. **Maintainability assessment** – Clear separation of policy, executor, and backoff calculation makes the codebase easy to test and evolve; the limited coupling (only through well‑defined interfaces) supports straightforward updates and replacement of the backoff algorithm.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the startServiceWithRetry function in lib/service-starter.js to start services with retry logic and exponential backoff.
-
 
 ---
 

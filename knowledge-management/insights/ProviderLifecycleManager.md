@@ -86,7 +86,6 @@ No explicit file paths beyond `provider-registry.ts` are mentioned for the lifec
 
 Overall, the **ProviderLifecycleManager** provides a disciplined, pattern‑driven approach to managing heterogeneous LLM providers, ensuring that higher‑level services can rely on a stable, observable set of active providers while still supporting robust error handling and graceful scaling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Overall, the **ProviderLifecycleManager** provides a disciplined, pattern‑driv
 ### Siblings
 - [ProviderRegistryManager](./ProviderRegistryManager.md) -- The provider-registry.ts file is expected to contain the implementation of the ProviderRegistryManager, which would define the interface for provider registration and retrieval.
 - [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy would be implemented as a separate module or class, potentially utilizing a factory pattern to create instances of different mode resolver implementations.
-
 
 ---
 

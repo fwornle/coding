@@ -80,12 +80,10 @@ External dependencies are limited to standard Node.js HTTP libraries (or a highe
 * **High maintainability** – The clear separation of concerns and single location for retry logic make future changes straightforward.  
 * **Potential fragility** – Tight coupling to `specstory-adapter.js` means that API changes in that file require coordinated updates in the handler. Proper versioning and comprehensive integration tests are essential to mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses a retry-with-backoff pattern in connectViaHTTP to establish a connection to the Specstory extension, as implemented in lib/integrations/specstory-adapter.js.
-
 
 ---
 

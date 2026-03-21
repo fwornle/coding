@@ -69,12 +69,10 @@ Even though the concrete definition of **ProviderInterface** is not present in t
 * **High** – The clear contract enforced by **ProviderInterface** means changes are localized.  As long as the interface remains stable, existing providers and consuming services do not need modification.  
 * **Risk** – Because the interface definition is not directly visible in the current observation set, developers must rely on documentation or TypeScript typings to avoid drift.  Keeping the interface file in version control and exposing it to IDEs would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry uses a registry pattern to decouple provider implementations from the service class, as seen in lib/llm/provider-registry.js.
-
 
 ---
 

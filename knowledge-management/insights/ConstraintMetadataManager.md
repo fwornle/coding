@@ -129,7 +129,6 @@ The clear modularization yields high maintainability: each file has a single res
 
 Overall, `ConstraintMetadataManager` demonstrates a disciplined, pattern‑driven design that balances performance (caching) with correctness (validation) while keeping integration points well‑defined and replaceable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -141,7 +140,6 @@ Overall, `ConstraintMetadataManager` demonstrates a disciplined, pattern‑drive
 - [ViolationDetector](./ViolationDetector.md) -- ViolationDetector uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve violation metadata.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LevelDB database in leveldb-database.ts to store graph data.
 - [AgentManager](./AgentManager.md) -- AgentManager uses an agent repository in agent-repository.ts to store agent configuration and registration data.
-
 
 ---
 

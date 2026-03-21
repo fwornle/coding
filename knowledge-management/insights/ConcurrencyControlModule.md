@@ -124,7 +124,6 @@ The ConcurrencyControlModule sits at the heart of *KnowledgeManagement*, acting 
 
 The module’s responsibilities are well‑encapsulated: lock acquisition/release, deadlock detection, timeout handling, and logging are each isolated in their own files.  This separation of concerns makes the codebase easy to navigate and test.  The primary maintenance risk lies in the in‑memory lock store; any change to process lifecycle (e.g., graceful shutdown, hot reload) must ensure that all held locks are released to avoid stale entries.  Adding a persistent lock backend or extending the API for read‑only/shared locks would be straightforward given the current modular layout.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -140,7 +139,6 @@ The module’s responsibilities are well‑encapsulated: lock acquisition/releas
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store entities in the knowledge graph.
 - [OntologyModule](./OntologyModule.md) -- OntologyModule uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store ontology information in the knowledge graph.
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses a dynamic import mechanism in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to load the VkbApiClient module, allowing for flexibility in the component's dependencies.
-
 
 ---
 

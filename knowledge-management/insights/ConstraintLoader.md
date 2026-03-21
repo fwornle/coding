@@ -77,12 +77,10 @@ No sibling components are explicitly named, but any other loaders (e.g., for pol
 ### Maintainability assessment
 * The clear division between manager and loader, coupled with thorough documentation, yields high maintainability.  The main risk is divergence between the documented schema and the loader’s parsing logic; keeping the markdown file up‑to‑date mitigates this.  Adding new constraint types will primarily involve extending the loader’s parsing rules and updating the documentation, without impacting the manager’s core logic.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
-
 
 ---
 

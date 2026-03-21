@@ -90,7 +90,6 @@ Following these practices will keep the SecurityStandardsModule aligned with the
    - Potential technical debt lies in the tight coupling to the specific graph schema; future schema migrations will need coordinated updates across all siblings.  
    - Documentation should capture the contract between SecurityStandardsModule and DesignPatternManager to prevent mismatched pattern definitions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Following these practices will keep the SecurityStandardsModule aligned with the
 - [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
 - [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
-
 
 ---
 

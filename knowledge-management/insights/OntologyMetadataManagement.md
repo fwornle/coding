@@ -93,12 +93,10 @@ No external APIs, message queues, or UI components are referenced, so the integr
 
 Overall, **OntologyMetadataManagement** leverages a straightforward, adapter‑driven persistence strategy that aligns tightly with its parent **OntologyClassification**, delivering a clean, maintainable approach to ontology‑related metadata handling.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence
-
 
 ---
 

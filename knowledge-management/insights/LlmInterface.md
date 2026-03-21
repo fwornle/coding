@@ -98,12 +98,10 @@ Beyond these, the **parent manager** likely exposes an initialization API that r
 * However, the lack of visible implementation (no code symbols) suggests that documentation should be enriched with concrete interface definitions and usage examples to aid new contributors.  
 * Adding unit tests that mock `LlmInterface` will allow integration modules (Copi, RAG) to be tested without external API calls, further improving maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
-
 
 ---
 

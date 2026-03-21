@@ -70,7 +70,6 @@ Because the engine is a child of **OntologyManagement**, it likely receives its 
 
 All statements above are derived directly from the supplied observations; no speculative file paths or undocumented classes have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ All statements above are derived directly from the supplied observations; no spe
 ### Siblings
 - [OntologyLoader](./OntologyLoader.md) -- OntologyManager.loadOntology() in the parent context suggests the existence of a dedicated loader, which is likely implemented as a separate module or class to encapsulate the loading logic.
 - [EntityClassifier](./EntityClassifier.md) -- The hierarchical classification model implies a tree-like structure, where entities are classified based on their relationships and properties defined in the ontology, potentially using techniques like recursive traversal or depth-first search.
-
 
 ---
 

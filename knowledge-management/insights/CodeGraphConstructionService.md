@@ -77,7 +77,6 @@ External callers (e.g., CI pipelines, developer tools) interact with the service
 * The configurable nature means new graph‑construction strategies can be added without touching core service code, supporting **extensibility**.  
 * However, the reliance on external LLM responses introduces **runtime variability**; comprehensive unit tests should mock `LLMService` to ensure deterministic behaviour.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ External callers (e.g., CI pipelines, developer tools) interact with the service
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class, specifically the getLLMProvider method, to interact with the LLM provider in lib/llm/llm-service.ts
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses API Service Wrapper to interact with external APIs and monitor constraint violations
 - [LLMServiceProvider](./LLMServiceProvider.md) -- LLMServiceProvider uses the LLMService class to manage LLM providers and handle mode routing
-
 
 ---
 

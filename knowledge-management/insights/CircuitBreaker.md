@@ -99,14 +99,7 @@ The cache in `LLMService` is the only other shared artifact; it reduces the numb
 
 ### Relationship
 
-![CircuitBreaker Relationship](images/circuit-breaker-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/circuit-breaker-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -120,7 +113,6 @@ The cache in `LLMService` is the only other shared artifact; it reduces the numb
 - [LLMController](./LLMController.md) -- The LLMController class extends EventEmitter, which provides a way to handle initialization, mode resolution, and completion requests in an event-driven manner, as seen in the LLMService class (lib/llm/llm-service.ts)
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class is responsible for managing the registration and availability of different LLM providers, as seen in the ProviderRegistry class (lib/llm/provider-registry.ts)
 - [BudgetTracker](./BudgetTracker.md) -- The BudgetTracker class is responsible for managing the budget and tracking the costs associated with the LLM requests, as seen in the LLMService class (lib/llm/llm-service.ts)
-
 
 ---
 

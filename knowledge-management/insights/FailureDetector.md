@@ -70,7 +70,6 @@ No other system modules are mentioned, so the above points constitute the full i
 * **Clear Separation of Concerns** – Health collection, detection, state transition, and back‑off are each handled by distinct classes, which simplifies unit testing and future refactoring.  
 * **Potential Technical Debt** – The lack of a dedicated source file for the detector (observations show “0 code symbols found”) could lead to code‑sprawl within the state‑machine module, making future navigation harder.  Introducing a dedicated `failure_detector.py` (or analogous) would improve discoverability without altering existing behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ No other system modules are mentioned, so the above points constitute the full i
 - [BackoffStrategy](./BackoffStrategy.md) -- The BackoffStrategy (circuit-breaker-state-machine.py:300) implements an exponential backoff algorithm, increasing the delay between retries to prevent cascading failures and allow the service time to recover.
 - [CircuitBreakerState](./CircuitBreakerState.md) -- The CircuitBreakerState would likely be implemented in the CircuitBreaker.js file, utilizing a finite state machine to manage the different states.
 - [BackoffStrategy](./BackoffStrategy.md) -- The BackoffStrategy would be implemented as a separate module, allowing for easy modification or replacement of the backoff algorithm.
-
 
 ---
 

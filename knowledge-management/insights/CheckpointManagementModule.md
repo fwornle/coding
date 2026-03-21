@@ -66,7 +66,6 @@ The checkpoint module itself does not define new classes or functions in the obs
 - The clear separation between the checkpoint logic and storage logic (via the utilizer role) makes the module easy to test and evolve.  
 - Shared reliance on the adapter across many siblings means that any adapter modification must be backward compatible, imposing disciplined versioning but also ensuring consistency across the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ The checkpoint module itself does not define new classes or functions in the obs
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage entities and their relationships.
 - [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage code-related entities and relationships.
 - [ObservationDerivationModule](./ObservationDerivationModule.md) -- ObservationDerivationModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage observation-related entities and relationships.
-
 
 ---
 

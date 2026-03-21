@@ -116,7 +116,6 @@ ContentValidationManager sits in a **modular hierarchy** under ConstraintSystem,
 ### 5. Maintainability assessment  
 The heavy reliance on **configuration files** (`references.json`, filter configs) makes the component **highly maintainable** from a code‑change perspective—most adjustments are data‑driven. The clear delegation to ConstraintValidator and the use of well‑encapsulated modules (reporting, filtering, logging) further aid maintainability, as each module can be updated or replaced independently. The main maintenance risk lies in **schema drift** between the reference model, validator rules, and any downstream consumers (e.g., GraphDatabaseManager). Regular integration tests that validate the end‑to‑end flow are essential to keep the system coherent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ The heavy reliance on **configuration files** (`references.json`, filter configs
 - [HookManager](./HookManager.md) -- HookManager uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling hook events
 - [ConstraintAgent](./ConstraintAgent.md) -- ConstraintAgent uses a data-driven approach with a custom data model defined in constraint-model.json, providing a flexible framework for managing constraint-related data
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling constraint-related events
-
 
 ---
 

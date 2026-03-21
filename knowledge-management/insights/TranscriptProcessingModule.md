@@ -84,7 +84,6 @@ The module also publishes its own health and metrics (not explicitly observed bu
 * High maintainability stems from clear separation of concerns, declarative configuration files, and a comprehensive integration test suite.  Adding new agents or adjusting rules rarely touches core logic, limiting regression risk.
 * The reliance on external JSON/YAML files does introduce a dependency on correct file versioning and validation; automated schema checks (as performed by ConfigurationValidationModule) are advisable to keep the module robust.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ The module also publishes its own health and metrics (not explicitly observed bu
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- ConfigurationValidationModule's ConfigurationLoader class loads and parses the system configuration from JSON files, with support for multiple configuration formats, as specified in the configuration-formats.json file
 - [ConcurrencyManagementModule](./ConcurrencyManagementModule.md) -- ConcurrencyManagementModule's ThreadManager class manages a pool of threads for parallelizing log processing and storage, with thread pool configuration defined in the thread-pool-configuration.json file
 - [AgentIntegrationModule](./AgentIntegrationModule.md) -- AgentIntegrationModule's AgentFactory class creates and configures agent instances, with agent configuration defined in the agent-configuration.json file
-
 
 ---
 

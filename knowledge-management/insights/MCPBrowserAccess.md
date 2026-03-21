@@ -91,7 +91,6 @@ Because the README mentions “Browser Access MCP Server for Claude Code,” we 
 
 Overall, **MCPBrowserAccess** follows a minimalistic, configuration‑driven design that is easy to deploy but places a heavy reliance on accurate external documentation and disciplined environment management.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Overall, **MCPBrowserAccess** follows a minimalistic, configuration‑driven des
 
 ### Siblings
 - [BrowserAccessConfig](./BrowserAccessConfig.md) -- The integrations/browser-access/README.md file mentions the Browser Access MCP Server for Claude Code, indicating a key configuration point for browser access.
-
 
 ---
 

@@ -110,7 +110,6 @@ Maintainability is high thanks to:
 
 The main risk is **human error** (forgetting to run the cleanup script). This can be mitigated by wrapping both steps in a higher‑level orchestration script or CI job that guarantees execution order.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ The main risk is **human error** (forgetting to run the cleanup script). This ca
 - [SoftwarePatterns](./SoftwarePatterns.md) -- The integrations/browser-access/ module provides a reusable solution for browser-based coding environments, demonstrating the software pattern of environment abstraction.
 - [AntiPatterns](./AntiPatterns.md) -- The AntiPatterns sub-component uses the SoftwarePatterns sub-component to identify and avoid common pitfalls in software design.
 - [TeamConfiguration](./TeamConfiguration.md) -- The config/teams/*.json files store team-specific settings and coding conventions, allowing for flexible project configuration.
-
 
 ---
 

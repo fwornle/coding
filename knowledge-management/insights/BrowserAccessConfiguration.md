@@ -90,12 +90,10 @@ Because configuration is read once at start‑up and stored in memory, scaling t
 
 The configuration module’s minimal footprint (environment reads + validation) makes it highly maintainable. Adding a new setting only requires extending the mapping table and updating the README. However, the lack of a typed schema or validation library in the observed code could become a maintenance burden as the number of variables grows; introducing a small validation helper would improve robustness without altering the overall design.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
-
 
 ---
 

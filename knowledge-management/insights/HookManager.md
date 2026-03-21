@@ -16,7 +16,7 @@ The design of `HookManager` follows a clear separation of concerns. The **loadin
 
 The component also integrates documentation tightly with runtime behavior. By consulting **integrations/copi/docs/hooks.md** both for human‑readable reference and for loading hook metadata, `HookManager` guarantees that the runtime view of available hooks stays synchronized with the documented contract. This dual‑use of the same file reduces the risk of drift between code and documentation.
 
-![HookManager — Architecture](../../.data/knowledge-graph/insights/images/hook-manager-architecture.png)
+![HookManager — Architecture](images/hook-manager-architecture.png)
 
 ## Implementation Details  
 
@@ -30,7 +30,7 @@ The component also integrates documentation tightly with runtime behavior. By co
 
 * **Documentation Coupling** – The repeated mention that `HookManager` “works with the integrations/copi/docs/hooks.md file to provide hook event documentation” implies that the manager may expose a method to retrieve the documentation programmatically (e.g., `getHookDocs()`), enabling UI components or API consumers to present up‑to‑date hook information.
 
-![HookManager — Relationship](../../.data/knowledge-graph/insights/images/hook-manager-relationship.png)
+![HookManager — Relationship](images/hook-manager-relationship.png)
 
 ## Integration Points  
 
@@ -72,7 +72,6 @@ The child **HookLoader** is the only direct implementation dependency inside the
 * Strong coupling to a single documentation file simplifies maintenance—updates to hook definitions are made in one place.  
 * The clear division between loader and manager, together with the explicit registration API, makes the component easy to test and evolve independently of its siblings.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ The child **HookLoader** is the only direct implementation dependency inside the
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
 - [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
-
 
 ---
 

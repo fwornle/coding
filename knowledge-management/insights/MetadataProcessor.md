@@ -73,7 +73,6 @@ The processor’s output is then handed back to the SpecstoryAdapter, which imme
 * The lack of direct coupling to transport code reduces the surface area for bugs.  
 * However, the implicit contract between MetadataProcessor and LoggingManager must be documented and versioned; any drift can cause silent logging failures. Regular integration tests that exercise the full pipeline (SpecstoryAdapter → MetadataProcessor → LoggingManager) will mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ The processor’s output is then handed back to the SpecstoryAdapter, which imme
 ### Siblings
 - [LoggingManager](./LoggingManager.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js uses the LoggingManager to log metadata such as project and session information.
 - [ConnectionHandler](./ConnectionHandler.md) -- The ConnectionHandler uses a retry-with-backoff pattern in the connectViaHTTP method of the SpecstoryAdapter class to establish a stable connection.
-
 
 ---
 

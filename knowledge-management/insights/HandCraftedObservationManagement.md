@@ -106,7 +106,6 @@ No external libraries, databases, or messaging systems are referenced, so the in
 * However, the **tight coupling** between ManualLearning, its siblings, and the shared EntityAuthoringTool means that changes to the authoring API ripple through multiple components, demanding careful versioning and thorough regression testing.  
 * The absence of explicit file paths or module boundaries beyond *entity_authoring_tool.py* suggests that the codebase may be **compact**; documentation of the observation schema and the manager’s API will be critical to keep the system understandable as it grows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ No external libraries, databases, or messaging systems are referenced, so the in
 ### Siblings
 - [EntityAuthoring](./EntityAuthoring.md) -- The EntityAuthoringTool class is used in the ManualLearning sub-component to create and edit entities manually, as indicated by the hierarchy context.
 - [DirectEntityEditing](./DirectEntityEditing.md) -- The ManualLearning sub-component's focus on manual learning suggests that direct editing of entities is a crucial feature, as indicated by the hierarchy context.
-
 
 ---
 

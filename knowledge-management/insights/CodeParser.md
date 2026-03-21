@@ -117,12 +117,10 @@ Potential external dependencies (e.g., a third‑party TypeScript parser library
 
 *Note:* The analysis strictly follows the provided observations. No additional patterns, file structures, or code symbols were invented beyond what the source text explicitly states.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
-
 
 ---
 

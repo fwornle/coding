@@ -58,12 +58,10 @@ If the system grows to include additional routing strategies (e.g., based on fil
 - The lack of additional symbols (classes, interfaces) reduces surface area for bugs.  
 - Future enhancements should preserve the `route_file` signature to avoid cascading changes across the code base.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [FileRouting](./FileRouting.md) -- FileRouting uses the 'route_file' function in 'file_routing.py' to handle file routing tasks
-
 
 ---
 

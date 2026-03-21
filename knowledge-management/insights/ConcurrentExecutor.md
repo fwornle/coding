@@ -76,7 +76,6 @@ The executor does not expose a public API beyond its constructor and a `run()`/`
 * Because the executor’s core logic (dependency tracking, work‑stealing) is algorithmic, changes to scheduling policies can be isolated without touching the configuration layer.  
 * Lack of explicit file paths or public interfaces in the observations limits traceability, so documentation should explicitly map class names to source files to aid future developers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ The executor does not expose a public API beyond its constructor and a `run()`/`
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The pipeline-configuration.json file defines the steps and their dependencies, which are then used by the DAGDependencyResolver to determine the execution order
 - [PipelineConfigurator](./PipelineConfigurator.md) -- The PipelineConfigurator class has a method called configurePipeline that takes the pipeline-configuration.json file as input and returns a configured pipeline graph
-
 
 ---
 

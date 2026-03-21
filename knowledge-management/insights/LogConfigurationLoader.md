@@ -90,7 +90,6 @@ Because the loader is tightly coupled to the documentation format, any change in
 
 Overall, **LogConfigurationLoader** embodies a pragmatic, documentation‑centric approach to logging configuration, tightly coupled to its parent **LoggingManager** and coordinated with its sibling **LogRotationHandler** to deliver a cohesive logging experience for the Copi integration.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Overall, **LogConfigurationLoader** embodies a pragmatic, documentation‑centri
 
 ### Siblings
 - [LogRotationHandler](./LogRotationHandler.md) -- The integrations/copi/INSTALL.md file mentions the use of a logging framework, which likely includes a rotating file handler.
-
 
 ---
 

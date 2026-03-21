@@ -78,7 +78,6 @@ Interaction flows are straightforward: higher‑level components (Trajectory, Lo
 * **Moderate maintainability** for selection logic: as more criteria (security, performance tiers) are added, ProtocolManager’s decision matrix may become complex and benefit from refactoring into a rule‑engine or configuration file.  
 * Documentation should clearly state the contract of each adapter method and the expected input from EnvironmentManager to keep the system robust as it evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ Interaction flows are straightforward: higher‑level components (Trajectory, Lo
 - [LoggerManager](./LoggerManager.md) -- LoggerManager utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversation entries and manage logging activities.
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to external services.
 - [EnvironmentManager](./EnvironmentManager.md) -- EnvironmentManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to manage the environment and requirements for the Trajectory component.
-
 
 ---
 

@@ -75,7 +75,6 @@ Because the sibling `ApiRequestHandler` lives in the same file, the two helpers 
 4. **Scalability considerations** – Because parsing is isolated, the system can scale to additional endpoints or more complex payloads by extending the handler without impacting request logic.  However, the single‑file implementation may become unwieldy if the number of endpoints grows dramatically, at which point extracting the handlers into their own modules could be warranted.  
 5. **Maintainability assessment** – High maintainability for the current scope: clear separation, localized error handling, and shared configuration reduce duplication.  Future maintenance hinges on keeping the handler’s contract stable; any change to the external Specstory API will be confined to this component, preserving the rest of the client.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Because the sibling `ApiRequestHandler` lives in the same file, the two helpers 
 
 ### Siblings
 - [ApiRequestHandler](./ApiRequestHandler.md) -- The ApiRequestHandler is implemented in the specstory-adapter.js file, which exports the SpecstoryApiClient class, indicating a tight coupling between the request handling and the client implementation.
-
 
 ---
 

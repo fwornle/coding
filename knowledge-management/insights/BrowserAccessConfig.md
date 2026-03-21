@@ -97,7 +97,6 @@ Because the server binds to a single port and serves SSE streams, scaling horizo
 
 The configuration surface is minimal, which simplifies maintenance. Documentation lives in a single README and a related Claude‑Code setup guide, reducing the cognitive load for developers. However, the lack of explicit validation or versioned configuration schemas could become a maintenance burden as the feature evolves. Adding a small validation layer inside **BrowserAccessConfig** would improve robustness without sacrificing the current simplicity.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The configuration surface is minimal, which simplifies maintenance. Documentatio
 
 ### Siblings
 - [MCPBrowserAccess](./MCPBrowserAccess.md) -- The BrowserAccess MCP server is described in integrations/browser-access/README.md, which provides information on how to set up and use the server.
-
 
 ---
 

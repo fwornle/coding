@@ -65,12 +65,10 @@ Following these conventions will preserve the intended separation of concerns an
 ### Maintainability assessment  
 * The explicit separation between raw HTTP handling (`connectViaHTTP`) and lifecycle management (the manager) promotes maintainability: changes to the HTTP protocol affect only the integration layer, while connection‑state logic stays isolated. However, the current lack of concrete implementation details makes it difficult to assess test coverage or extensibility; documenting the manager’s public API and expected behaviours would be a valuable next step.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryIntegration](./SpecstoryIntegration.md) -- SpecstoryAdapter uses the connectViaHTTP function to facilitate HTTP requests to the Specstory extension, allowing for seamless data retrieval and exchange.
-
 
 ---
 

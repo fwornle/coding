@@ -77,12 +77,10 @@ All of these steps reside inside the `AnthropicAPIConnector` and are invoked by 
 
 All statements above are derived directly from the supplied observations and the explicit relationship between **AnthropicProvider** and **AnthropicAPIConnector**. No additional assumptions have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [AnthropicProvider](./AnthropicProvider.md) -- The AnthropicProvider is registered and retrieved through the provider registry (lib/llm/provider-registry.js).
-
 
 ---
 

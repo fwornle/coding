@@ -66,7 +66,6 @@ From a system‑wide perspective, `ConceptExtractor` sits between the parsing la
 4. **Scalability considerations** – Extraction cost grows linearly with AST size; large projects may need incremental parsing or result caching.  Tight AST coupling may limit parallelization across different language front‑ends.  
 5. **Maintainability assessment** – The clear responsibility boundaries aid maintainability, but the tight coupling to the AST means that any change to the parser requires coordinated updates in the extractor, raising the maintenance burden when the language grammar evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ From a system‑wide perspective, `ConceptExtractor` sits between the parsing la
 
 ### Siblings
 - [AstParser](./AstParser.md) -- The CodeAnalyzer class in CodeAnalysis uses the AST-based approach to analyze code, as indicated by the presence of the AstParser in its implementation.
-
 
 ---
 

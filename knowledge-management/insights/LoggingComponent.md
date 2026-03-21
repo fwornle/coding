@@ -73,7 +73,6 @@ The LoggingComponent sits as a leaf under **LiveLoggingSystem**, sharing lifecyc
 ### Maintainability assessment  
 The clear separation of concerns, use of standard Java concurrency utilities, and configuration‑driven parameters make the component relatively easy to maintain. Adding new log destinations (e.g., a remote syslog server) would involve extending the worker logic without touching the buffering layer. However, reliance on a single properties file for all settings can become a maintenance bottleneck as the number of tunable parameters grows; modularizing configuration sections would improve readability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ The clear separation of concerns, use of standard Java concurrency utilities, an
 - [SemanticAnalysisComponent](./SemanticAnalysisComponent.md) -- SemanticAnalysisComponent uses a semantic analysis framework in SemanticAnalysisFramework.java to perform semantic analysis of observations
 - [AgentIntegrationComponent](./AgentIntegrationComponent.md) -- AgentIntegrationComponent uses an agent integration framework in AgentIntegrationFramework.java to integrate with various agents
 - [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
-
 
 ---
 

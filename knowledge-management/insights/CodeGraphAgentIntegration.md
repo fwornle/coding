@@ -72,12 +72,10 @@ Because the observation notes “0 code symbols found” and “Key files: ”, 
 
 *All statements above are grounded in the provided observations: the hierarchy context, the README reference, and the explicit relationship “CodeGraphConstruction contains CodeGraphAgentIntegration.” No additional patterns or implementation details have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstruction sub-component uses the CodeGraphAgent to analyze the code structure.
-
 
 ---
 

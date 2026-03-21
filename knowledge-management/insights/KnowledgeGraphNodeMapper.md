@@ -12,14 +12,11 @@ To handle complex node properties or relationships, the KnowledgeGraphNodeMapper
 
 - The KnowledgeGraphNodeMapper could be implemented as a separate class (node_mapper.py) within the KnowledgeGraphVisualizer package, allowing for easy extension or modification of mapping rules.
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeGraphVisualizer (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ To handle complex node properties or relationships, the KnowledgeGraphNodeMapper
 ### Siblings
 - [GraphLayoutEngine](./GraphLayoutEngine.md) -- The repository pattern used in KnowledgeGraphVisualizerDAO (dao.py) suggests a separation of concerns, allowing the GraphLayoutEngine to focus on layout calculations without worrying about database access.
 - [GraphRenderingModule](./GraphRenderingModule.md) -- The GraphRenderingModule might utilize a library like Matplotlib (matplotlib.py) or Plotly (plotly.py) to handle the rendering of the graph, allowing for customization of visual properties and interactive features.
-
 
 ---
 

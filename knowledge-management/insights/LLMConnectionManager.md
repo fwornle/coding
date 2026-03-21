@@ -91,7 +91,6 @@ Because the source observations do not expose concrete method signatures or file
 
 *All statements above are directly derived from the provided observations and the explicit hierarchy linking `LLMConnectionManager` to its parent `LLMService`, its sibling `ProviderManager`, and its child provider classes.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Because the source observations do not expose concrete method signatures or file
 
 ### Siblings
 - [ProviderManager](./ProviderManager.md) -- The parent analysis suggests the existence of a provider management mechanism, which is a critical aspect of the LLMService sub-component.
-
 
 ---
 

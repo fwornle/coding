@@ -69,7 +69,6 @@ Because the mock adheres to the same interface, it does not introduce new depend
 - Interface conformity enforces compile‑time safety, reducing runtime bugs when swapping implementations.  
 - The primary maintenance burden is keeping the mock’s canned responses aligned with any changes to the provider interface or response schema.  With proper test coverage and a disciplined update process, this overhead remains modest.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ Because the mock adheres to the same interface, it does not introduce new depend
 ### Siblings
 - [ProviderMetadataCache](./ProviderMetadataCache.md) -- The ProviderMetadataCache is likely to be implemented in the lib/llm/llm-service.ts file, where the ProviderRegistry is defined, to manage the available providers
 - [CircuitBreakerPattern](./CircuitBreakerPattern.md) -- The CircuitBreakerPattern would be implemented in the lib/llm/llm-service.ts file, where the ProviderRegistry is defined, to detect and prevent cascading failures
-
 
 ---
 

@@ -129,14 +129,7 @@ The clear separation of responsibilities, reuse of `BaseAgent`, and centralised 
 
 ### Relationship
 
-![OntologyManagement Relationship](images/ontology-management-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/ontology-management-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -155,7 +148,6 @@ The clear separation of responsibilities, reuse of `BaseAgent`, and centralised 
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstruction sub-component uses the CodeGraphAgent to analyze the code structure.
 - [LLMIntegration](./LLMIntegration.md) -- The LLMIntegration sub-component uses the LLM services to analyze the input data.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses the graph-database-adapter.ts module to adapt the graph database.
-
 
 ---
 

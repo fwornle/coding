@@ -100,7 +100,6 @@ The system is organized as a hierarchy under **Insights**, with **InsightGenerat
 ### Maintainability assessment  
 The clear separation of concerns (insight generation, pattern extraction, reporting) and the explicit extensibility point for ML models make the codebase relatively maintainable.  However, the reliance on a single shared data definition means that schema evolution must be managed carefully, and any change requires coordinated updates across three services.  Proper documentation of the **SemanticAnalysis** contract and automated integration tests for all siblings will be essential to keep maintenance overhead low.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The clear separation of concerns (insight generation, pattern extraction, report
 ### Siblings
 - [PatternExtractor](./PatternExtractor.md) -- PatternExtractor uses a natural language processing library to tokenize and parse entity data, which is then fed into a machine learning model to identify patterns and relationships
 - [KnowledgeReportGenerator](./KnowledgeReportGenerator.md) -- KnowledgeReportGenerator uses a templating engine to generate reports based on insights and patterns extracted from entity data, which is defined in the SemanticAnalysis component context
-
 
 ---
 

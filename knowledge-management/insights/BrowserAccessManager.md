@@ -91,14 +91,7 @@ These insights are drawn directly from the supplied observations and the known s
 
 ### Relationship
 
-![BrowserAccessManager Relationship](images/browser-access-manager-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/browser-access-manager-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -111,7 +104,6 @@ These insights are drawn directly from the supplied observations and the known s
 - [LLMService](./LLMService.md) -- The LLMService sub-component is likely responsible for managing the lifecycle of LLM services, including setup and teardown.
 - [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager sub-component is likely responsible for optimizing task execution, ensuring efficient data processing.
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component is likely responsible for optimizing logging, ensuring efficient data exchange and retrieval.
-
 
 ---
 

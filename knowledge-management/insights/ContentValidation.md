@@ -14,11 +14,11 @@ The design of ContentValidation is anchored in a **rules‑based architecture**.
 
 Interaction-wise, ContentValidation sits under the **CodingPatterns** parent, which itself relies on the `GraphDatabaseAdapter` (found in `storage/graph-database-adapter.ts`) for persistence.  While ContentValidation does not directly manage data storage, it can leverage the parent’s persistence layer when rules need to be persisted or audited.  The **ContentValidationRules** child provides the concrete rule definitions; these are likely loaded at runtime and fed into the validation engine.  The overall flow can be visualised in the architecture diagram below:
 
-![ContentValidation — Architecture](../../.data/knowledge-graph/insights/images/content-validation-architecture.png)
+![ContentValidation — Architecture](images/content-validation-architecture.png)
 
 The relationship diagram further clarifies how ContentValidation connects to its parent, siblings, and child:
 
-![ContentValidation — Relationship](../../.data/knowledge-graph/insights/images/content-validation-relationship.png)
+![ContentValidation — Relationship](images/content-validation-relationship.png)
 
 ### Architectural patterns identified  
 * **Rules‑based validation** – centralised, declarative rule definitions that drive the validation process.  
@@ -79,7 +79,6 @@ Because validation is rule‑driven, scaling horizontally is straightforward: ea
 
 The rules‑based design enhances maintainability: updates to validation logic are confined to the markdown rule file, eliminating the need to modify source code.  However, the lack of explicit code symbols in the current snapshot suggests that developers must rely on documentation and the rule file to understand behaviour.  Adding a thin wrapper class (e.g., `ContentValidator`) with well‑named methods would further improve discoverability and IDE support.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ The rules‑based design enhances maintainability: updates to validation logic a
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- CodeGraphConstruction uses a graph-based approach to construct code graphs, enabling efficient data management.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

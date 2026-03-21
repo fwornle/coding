@@ -95,12 +95,10 @@ Because the format is a lightweight JSON‑like contract, scaling the data flow 
 
 The maintainability hinges on disciplined documentation practices. With a single source of truth (`CLAUDE-CODE-HOOK-FORMAT.md`), updates are straightforward if the team enforces a process where spec changes precede code changes. However, the lack of generated schema code means developers must manually keep parsers in sync, which can be error‑prone. Introducing schema generation tools (e.g., JSON Schema → code) could improve maintainability, but such a step would be a future design enhancement beyond the current observations.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-
 
 ---
 

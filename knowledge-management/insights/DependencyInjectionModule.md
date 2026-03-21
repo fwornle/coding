@@ -96,7 +96,6 @@ The module also exposes a **public API** (e.g., `getContainer(): Container`) tha
 * The main maintenance burden lies in keeping the registration config in sync with Docker definitions and ensuring all concrete classes carry the required decorators.  
 * Documentation of each binding (type token → concrete class) is essential to prevent “magic strings” from drifting unnoticed.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The module also exposes a **public API** (e.g., `getContainer(): Container`) tha
 ### Siblings
 - [ServiceStarter](./ServiceStarter.md) -- Service starter scripts (scripts/api-service.js, scripts/dashboard-service.js) implement retry logic with backoff to ensure robust service initialization
 - [DockerContainerizer](./DockerContainerizer.md) -- DockerContainerizer uses docker-compose.yaml files to define and manage Docker containers for services
-
 
 ---
 

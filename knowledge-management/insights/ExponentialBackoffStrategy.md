@@ -76,12 +76,10 @@ The **RetryMechanism** component, which “contains” this strategy, likely hol
 - Because the back‑off algorithm is isolated, updates (e.g., adding jitter) affect a single location, improving maintainability.  
 - However, the lack of explicit code symbols in the current observations means that developers must rely on documentation and the `RetryMechanism` interface to understand exact behavior, underscoring the importance of keeping the strategy’s contract well‑documented.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [RetryMechanism](./RetryMechanism.md) -- RetryMechanism uses a exponential backoff strategy in the connectViaHTTP method (lib/integrations/specstory-adapter.js:45) to handle connection retries.
-
 
 ---
 

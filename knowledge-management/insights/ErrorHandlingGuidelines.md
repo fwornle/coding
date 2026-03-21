@@ -85,7 +85,6 @@ By adhering to this disciplined approach, teams ensure that error handling acros
 | **Scalability considerations** | Because the sub‑component is purely declarative, adding new error‑handling topics (e.g., distributed tracing) is straightforward: create a new `.cs` file and reference it from `ErrorHandlingGuidelines.cs`. The lack of runtime code means the guidelines impose no performance overhead. |
 | **Maintainability assessment** | High maintainability: the clear file‑per‑concern layout simplifies updates, and the central master file provides a single entry point for reviewers. The main risk is drift between the textual guidelines and actual implementation; this can be mitigated by automated compliance checks integrated into the build pipeline. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ By adhering to this disciplined approach, teams ensure that error handling acros
 - [CodingConventions](./CodingConventions.md) -- The CodingConventions.cs file provides guidelines for coding conventions, such as naming, commenting, and formatting.
 - [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The ArchitectureGuidelines.cs file provides guidelines for overall system architecture, including layering and separation of concerns.
 - [TestingGuidelines](./TestingGuidelines.md) -- The TestingGuidelines.cs file provides guidelines for testing the system, including unit testing, integration testing, and acceptance testing.
-
 
 ---
 

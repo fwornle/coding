@@ -106,12 +106,10 @@ All such dependencies would be encapsulated within the converter, keeping its pu
 
 *No concrete file paths, class names, or function signatures are available in the supplied observations; the analysis above is strictly derived from the stated role of **TranscriptConverter** within the **TranscriptProcessing** sub‑component.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptProcessing converts transcripts from various agents into a standardized format for unified logging and analysis.
-
 
 ---
 

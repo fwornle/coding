@@ -142,7 +142,6 @@ Following these guidelines ensures that the concurrency layer remains predictabl
 
 Overall, the ConcurrencyManagementModule exhibits a disciplined, configuration‑driven design that aligns with the broader modular philosophy of the LiveLoggingSystem while offering the flexibility needed for high‑throughput log processing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -154,7 +153,6 @@ Overall, the ConcurrencyManagementModule exhibits a disciplined, configuration�
 - [OntologyManagementModule](./OntologyManagementModule.md) -- OntologyManagementModule's OntologyLoader class loads and parses ontology definitions from JSON files, with support for multiple ontology formats, as specified in the ontology-formats.json file
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- ConfigurationValidationModule's ConfigurationLoader class loads and parses the system configuration from JSON files, with support for multiple configuration formats, as specified in the configuration-formats.json file
 - [AgentIntegrationModule](./AgentIntegrationModule.md) -- AgentIntegrationModule's AgentFactory class creates and configures agent instances, with agent configuration defined in the agent-configuration.json file
-
 
 ---
 

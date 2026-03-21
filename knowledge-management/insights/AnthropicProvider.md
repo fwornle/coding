@@ -20,7 +20,7 @@ Both files expose a class named **AnthropicProvider** that conforms to the provi
 The AnthropicProvider sits inside the **LLMAbstraction** component, whose purpose is to hide the details of individual LLM back‑ends behind a unified interface. The parent component, **LLMService** (`lib/llm/llm-service.ts`), is described as a *high‑level façade* that performs mode routing, caching, and circuit‑breaking for **all** LLM operations. This architectural choice makes the system **provider‑agnostic**: each concrete provider (Anthropic, OpenAI, DMR) implements the same contract, and LLMService selects the appropriate one at runtime.
 
 > **Architecture diagram**  
-> ![AnthropicProvider — Architecture](../../.data/knowledge-graph/insights/images/anthropic-provider-architecture.png)
+> ![AnthropicProvider — Architecture](images/anthropic-provider-architecture.png)
 
 From the description we can infer two well‑known design patterns that are explicitly supported by the code base:
 
@@ -100,7 +100,7 @@ AnthropicProvider is one of several sibling providers registered under **LLMAbst
 2. **Circuit Breaking & Caching** – Before invoking the provider, LLMService may consult a cache or apply a circuit‑breaker guard; the provider itself does not implement these concerns.  
 
 > **Relationship diagram**  
-> ![AnthropicProvider — Relationship](../../.data/knowledge-graph/insights/images/anthropic-provider-relationship.png)
+> ![AnthropicProvider — Relationship](images/anthropic-provider-relationship.png)
 
 AnthropicProvider also shares a common contract (`LLMProvider` interface) with its sibling **DMRProvider** (`lib/llm/providers/dmr-provider.ts`). This contract defines the method signatures (e.g., `generate`, `chat`) that LLMService relies on, guaranteeing interchangeable behavior across providers.
 
@@ -135,7 +135,6 @@ No child components are defined under AnthropicProvider; it is a leaf node in th
 
 These insights are drawn directly from the observed file paths, class names, and the documented role of LLMService within the **LLMAbstraction** component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -144,7 +143,6 @@ These insights are drawn directly from the observed file paths, class names, and
 ### Siblings
 - [LLMService](./LLMService.md) -- LLMService class (lib/llm/llm-service.ts) acts as a single entry point for all LLM operations
 - [DMRProvider](./DMRProvider.md) -- DMRProvider class (lib/llm/providers/dmr-provider.ts) implements local LLM inference
-
 
 ---
 

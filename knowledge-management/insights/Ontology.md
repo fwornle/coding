@@ -29,7 +29,7 @@ Ontology follows a **modular, agent‑based architecture** that mirrors the over
 
 These design choices produce a clear separation of concerns: the manager handles data organization, the classification agent focuses on inference, and the validator enforces integrity.  The **pipeline** sibling component, which uses a DAG‑based execution model, can schedule these agents in a deterministic order, ensuring that the cache is primed before classification runs.
 
-![Ontology — Architecture](../../.data/knowledge-graph/insights/images/ontology-architecture.png)
+![Ontology — Architecture](images/ontology-architecture.png)
 
 ---
 
@@ -94,11 +94,9 @@ Following these practices ensures that the Ontology sub‑component remains perf
 
 These observations provide a grounded view of how the **Ontology** sub‑component is architected, implemented, and integrated within the broader SemanticAnalysis system.
 
-
 ## Diagrams
 
-![Ontology — Relationship](../../.data/knowledge-graph/insights/images/ontology-relationship.png)
-
+![Ontology — Relationship](images/ontology-relationship.png)
 
 ## Hierarchy Context
 
@@ -117,7 +115,6 @@ These observations provide a grounded view of how the **Ontology** sub‑compone
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

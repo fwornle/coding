@@ -12,14 +12,11 @@ The MetadataParser's implementation might involve parsing specific metadata form
 
 - The MetadataParser's implementation might involve parsing specific metadata formats, such as JSON or XML, to extract relevant information for the PersistenceAgent.
 
-
 ## Related Entities
 
 ### Used By
 
 - PersistenceAgent (contains)
-
-
 
 ## Hierarchy Context
 
@@ -28,7 +25,6 @@ The MetadataParser's implementation might involve parsing specific metadata form
 
 ### Siblings
 - [ClassificationPreventer](./ClassificationPreventer.md) -- The ClassificationPreventer might use a caching mechanism or a unique identifier system to keep track of processed metadata and prevent duplicates.
-
 
 ---
 

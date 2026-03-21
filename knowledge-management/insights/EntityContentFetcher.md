@@ -87,12 +87,10 @@ No sibling components are explicitly mentioned, but any other data‑access util
 * The clear separation between fetching and validation improves maintainability: changes to graph query syntax are confined to the adapter/fetcher, leaving validation rules untouched.  
 * However, the current lack of concrete implementation details (no visible file paths or method signatures) suggests documentation gaps; adding explicit interface definitions for `EntityContentFetcher` would further strengthen maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAdapter's query method to fetch entity content for validation, as seen in the ContentValidationAgent's constructor.
-
 
 ---
 

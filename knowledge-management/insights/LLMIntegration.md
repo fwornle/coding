@@ -107,21 +107,9 @@ The presence of the two environment variables (`ANTHROPIC_API_KEY`, `BROWSERBASE
 
 ### Relationship
 
-![LLMIntegration Relationship](images/llmintegration-relationship.png)
-
-
 ### Architecture
 
-![LLMIntegration Architecture](images/llmintegration-architecture.png)
-
-
-
 ## Architecture Diagrams
-
-![architecture](../../.data/knowledge-graph/insights/images/llmintegration-architecture.png)
-
-![relationship](../../.data/knowledge-graph/insights/images/llmintegration-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -134,7 +122,6 @@ The presence of the two environment variables (`ANTHROPIC_API_KEY`, `BROWSERBASE
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
-
 
 ---
 

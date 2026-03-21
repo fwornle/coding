@@ -107,7 +107,6 @@ While concrete class signatures are not listed, the observations allow us to inf
    * Reliance on a common serializer reduces duplication but creates a tight coupling; any serializer change must be coordinated across both sides.  
    * The lack of explicit file paths or concrete interfaces in the observations suggests that documentation should capture the exact contracts (`ILogger`, filter objects, cache interfaces) to avoid ambiguity as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ While concrete class signatures are not listed, the observations allow us to inf
 ### Siblings
 - [LogWriter](./LogWriter.md) -- The Logger class implements the ILogger interface, which declares methods for logging and log entry retrieval, indicating a clear separation of concerns between logging and storage.
 - [LogEntrySerializer](./LogEntrySerializer.md) -- The LogEntrySerializer would need to handle various data types, such as strings, numbers, and objects, to accommodate different types of log data and ensure proper serialization.
-
 
 ---
 

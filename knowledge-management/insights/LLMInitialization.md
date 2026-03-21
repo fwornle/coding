@@ -8,7 +8,7 @@ LLMInitialization ensures that LLM agents are initialized only when required, op
 
 `LLMInitialization` is the **SubComponent** inside the **CodingPatterns** component that is dedicated to the lifecycle management of Large Language Model (LLM) agents. Although the observations do not expose an explicit source‑file location, its logical placement is within the `CodingPatterns` hierarchy, alongside siblings such as **GraphManagement**, **ConstraintValidation**, **CodeGraphConstruction**, **ContentValidation**, **BrowserAccess**, and **CodeGraphRag**. The sub‑component’s sole responsibility is to **initialize LLM agents lazily**—that is, an agent is instantiated only at the moment it is first required by the system. This approach reduces both the computational overhead and the memory footprint, while still allowing the system to support **multiple LLM agents** with minimal resource consumption.
 
-![LLMInitialization — Architecture](../../.data/knowledge-graph/insights/images/llminitialization-architecture.png)  
+![LLMInitialization — Architecture](images/llminitialization-architecture.png)  
 
 The architecture diagram above shows `LLMInitialization` nested under **CodingPatterns** and owning the child component **LazyLoadingMechanism**, which implements the actual lazy‑loading logic.
 
@@ -26,7 +26,7 @@ Interaction flow:
 
 The **relationship diagram** below visualizes these connections, highlighting how `LLMInitialization` sits between its parent **CodingPatterns** and its child **LazyLoadingMechanism**, while also interfacing with sibling components that may request LLM services.
 
-![LLMInitialization — Relationship](../../.data/knowledge-graph/insights/images/llminitialization-relationship.png)  
+![LLMInitialization — Relationship](images/llminitialization-relationship.png)  
 
 Because the component is isolated to the initialization concern, it respects the **single‑responsibility principle** and keeps the initialization logic separate from the functional logic found in siblings such as **ConstraintValidation** or **ContentValidation**.
 
@@ -77,7 +77,6 @@ Following these conventions ensures that the system continues to benefit from th
 4. **Scalability considerations** – The registry‑based approach allows the system to support many distinct LLM agents concurrently without a proportional increase in baseline memory; thread‑safe lazy creation ensures safe scaling under concurrent workloads.  
 5. **Maintainability assessment** – By adhering to single‑responsibility and clear API boundaries, the component is easy to test and evolve. Future changes to agent construction (e.g., swapping model providers) can be confined to **LazyLoadingMechanism** without rippling into siblings or the parent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ Following these conventions ensures that the system continues to benefit from th
 - [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

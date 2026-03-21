@@ -91,7 +91,6 @@ The **MachineLearningIntegrationPoint** is a middle tier that bridges NLP prepro
 ### Maintainability assessment  
 The abstraction layer and configuration‑driven model selection enhance maintainability by decoupling the core script from specific ML implementations.  However, the lack of explicit type contracts and the reliance on external libraries mean that version upgrades must be tested thoroughly.  Clear documentation of the expected feature schema and robust error handling will further reduce maintenance burden.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The abstraction layer and configuration‑driven model selection enhance maintai
 ### Siblings
 - [HierarchicalPhasePlanner](./HierarchicalPhasePlanner.md) -- The HierarchicalPhasePlanner utilizes a hierarchical structure, with each phase building upon the previous one, as suggested by the parent component analysis.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule is likely to be implemented using a library or framework, such as NLTK or spaCy, given the complexity of natural language processing tasks.
-
 
 ---
 

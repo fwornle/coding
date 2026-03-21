@@ -82,12 +82,10 @@ No external libraries, services, or data stores are mentioned, so the integratio
 - **Potential risk**: Tight coupling to `BaseAgent` means that any refactor of the base class must consider the impact on confidence calculation. Clear documentation of the method’s contract mitigates this risk.  
 - Adding new agents is low‑effort as long as they inherit from `BaseAgent`, supporting extensibility without sacrificing consistency.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- The GitHistoryAnalyzerAgent analyzes git history to extract relevant information, utilizing the calculateConfidence method from the BaseAgent class to determine confidence scores
-
 
 ---
 

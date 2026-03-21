@@ -49,12 +49,10 @@ When extending the system, developers should create a new agent file inside `int
 * As long as the `BaseAgent` interface remains stable, agents can evolve independently, supporting high maintainability.  
 * Potential risk: if `BaseAgent` accumulates many responsibilities, future agents may inherit unnecessary complexity, so keeping the base class lean is advisable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents.
-
 
 ---
 

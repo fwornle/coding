@@ -16,7 +16,7 @@ The component is tightly coupled with the **LoggingMechanism** – both “work 
 
 The surrounding ecosystem reinforces this modular stance. Sibling components such as **TranscriptProcessing** (which normalises agent transcripts) and **GraphDatabaseAdapter** (which stores graph data using Graphology and LevelDB) all feed into the same logging pipeline, suggesting a **shared‑service architecture** where each sub‑component provides a focused capability that the LiveLoggingSystem orchestrates.
 
-![ClassificationLayer — Architecture](../../.data/knowledge-graph/insights/images/classification-layer-architecture.png)
+![ClassificationLayer — Architecture](images/classification-layer-architecture.png)
 
 ## Implementation Details  
 
@@ -32,7 +32,7 @@ Although the source code does not expose concrete symbols, the observations give
 
 Because the LiveLoggingSystem’s modularity “facilitates integration with other sub‑components” (Obs 5), ClassificationLayer is probably packaged as an independent module with a well‑defined interface, making it straightforward for siblings like **TranscriptProcessing** to feed pre‑processed data into it if needed.
 
-![ClassificationLayer — Relationship](../../.data/knowledge-graph/insights/images/classification-layer-relationship.png)
+![ClassificationLayer — Relationship](images/classification-layer-relationship.png)
 
 ## Integration Points  
 
@@ -81,7 +81,6 @@ ClassificationLayer sits as a child of LiveLoggingSystem, bridging raw logging (
 ### Maintainability Assessment
 The reliance on explicit ontologies and rule files makes the component **highly maintainable**: changes are localized to configuration rather than code. The modular interface with LoggingMechanism and the parent LiveLoggingSystem further isolates impact, allowing teams to evolve ClassificationLayer independently while preserving overall system stability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ The reliance on explicit ontologies and rule files makes the component **highly 
 - [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph data using Graphology and LevelDB.
 - [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptProcessing converts transcripts from various agents into a standardized format for unified logging and analysis.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses Graphology to manage graph data, providing an efficient and scalable solution.
-
 
 ---
 

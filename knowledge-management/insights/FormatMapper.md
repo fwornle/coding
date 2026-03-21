@@ -76,12 +76,10 @@ The mapping tables themselves act as a contract between FormatMapper and any con
 * High maintainability due to the declarative nature of mappings; developers can adjust conversion behavior without touching core logic.  
 * The single point of truth (the mapping tables) simplifies testing but introduces a risk: a malformed map can break all conversions, so automated schema‑validation pipelines are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

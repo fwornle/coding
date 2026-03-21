@@ -112,14 +112,7 @@ The initializer’s responsibilities are well‑encapsulated: lazy loading, cach
 
 ### Relationship
 
-![LLMInitializer Relationship](images/llminitializer-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/llminitializer-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -133,7 +126,6 @@ The initializer’s responsibilities are well‑encapsulated: lazy loading, cach
 - [AdapterPattern](./AdapterPattern.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods.
 - [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager may use a work-stealing concurrency model, allowing idle workers to pull tasks immediately, similar to the WaveController.runWithConcurrency() method.
 - [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
-
 
 ---
 

@@ -75,7 +75,6 @@ Because LLM calls and graph queries are both I/O‑bound, the system can scale h
 ### Maintainability assessment  
 The heavy reliance on shared abstractions (adapter, service, managers) promotes **high maintainability**: changes to database drivers or LLM providers are localized.  However, the tight coupling means that any breaking change to the adapter’s contract forces coordinated updates across all siblings, so versioning and thorough integration tests are essential.  Clear documentation of the contracts and the orchestration flow mitigates this risk and keeps the codebase approachable for new contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The heavy reliance on shared abstractions (adapter, service, managers) promotes 
 - [CodingConventionManager](./CodingConventionManager.md) -- CodingConventionManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [LLMService](./LLMService.md) -- LLMService uses the GraphDatabaseAdapter to interact with the graph database, enabling features such as data retrieval, storage, and querying.
-
 
 ---
 

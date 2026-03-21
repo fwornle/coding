@@ -119,7 +119,6 @@ The integration surface is therefore limited to a well‑defined TypeScript inte
 
 Overall, the design of **GraphDatabaseInteractions**—anchored by a well‑defined adapter—offers a maintainable, extensible foundation for graph‑centric features across the CodingPatterns domain, while leaving clear pathways for future scaling and optimisation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ Overall, the design of **GraphDatabaseInteractions**—anchored by a well‑defi
 - [DesignPatterns](./DesignPatterns.md) -- DesignPatterns utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve design pattern data.
 - [CodingConventions](./CodingConventions.md) -- CodingConventions uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve coding convention data.
 - [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve best practice data.
-
 
 ---
 
