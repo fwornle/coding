@@ -42,7 +42,7 @@ Every conversation is captured automatically with intelligent 5-layer classifica
 
 A 14-agent AI system extracts insights from your git history and conversation logs, building a searchable knowledge graph.
 
-![VKB Viewer](images/viewer.png)
+![VKB Viewer — interactive knowledge graph with 281 entities across Project, Component, SubComponent, and Detail hierarchy](images/viewer.png)
 
 **Update Knowledge Base (UKB)**:
 ```bash
