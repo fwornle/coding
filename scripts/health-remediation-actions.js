@@ -546,6 +546,35 @@ export class HealthRemediationActions {
         return { success: false, message: 'Docker mode: Qdrant is managed by docker-compose externally' };
       }
 
+      // Guard: verify Docker Desktop is actually running before issuing any Docker CLI
+      // commands. Any Docker CLI call (docker ps, docker info, docker-compose) connects
+      // to the daemon socket; if Docker Desktop's engine is stopped or crashed, this
+      // triggers "com.docker.virtualization: use of closed network connection" and kills
+      // Docker Desktop entirely. Check the process list instead — zero socket contact.
+      try {
+        const { stdout } = await execAsync('pgrep -f "Docker Desktop" 2>/dev/null || true', { timeout: 3000 });
+        if (!stdout.trim()) {
+          this.log('Docker Desktop not running — skipping Qdrant auto-heal');
+          return { success: false, message: 'Docker Desktop not running — cannot start Qdrant' };
+        }
+        // Also check the engine is actually ready via the API socket with a raw ping
+        // Using curl to the socket avoids the Docker CLI layer entirely
+        const socketPath = existsSync('/var/run/docker.sock')
+          ? '/var/run/docker.sock'
+          : join(process.env.HOME || '', '.docker/run/docker.sock');
+        const { stdout: pingResult } = await execAsync(
+          `curl -sf --unix-socket "${socketPath}" http://localhost/_ping 2>/dev/null || echo "UNREACHABLE"`,
+          { timeout: 5000 }
+        );
+        if (pingResult.trim() !== 'OK') {
+          this.log('Docker engine not ready — skipping Qdrant auto-heal');
+          return { success: false, message: 'Docker engine not responsive — cannot start Qdrant' };
+        }
+      } catch {
+        this.log('Docker availability check failed — skipping Qdrant auto-heal');
+        return { success: false, message: 'Cannot verify Docker availability — skipping Qdrant' };
+      }
+
       // Check if docker-compose file exists
       const composeFile = `${this.codingRoot}/docker-compose.yml`;
 
@@ -930,6 +959,14 @@ export class HealthRemediationActions {
     const programName = DOCKER_SERVICE_MAP[actionName];
     if (!programName) {
       return { success: false, message: `No Docker service mapping for: ${actionName}` };
+    }
+
+    // Guard: supervisorctl only works inside Docker containers where supervisord runs.
+    // On the host, calling supervisorctl hits the Docker daemon socket and can crash
+    // Docker Desktop when its VM is unstable (closed network connection).
+    if (!existsSync('/.dockerenv')) {
+      this.log(`Skipping supervisorctl restart — not running inside a Docker container`);
+      return { success: false, message: 'supervisorctl unavailable — not inside Docker container' };
     }
 
     try {
