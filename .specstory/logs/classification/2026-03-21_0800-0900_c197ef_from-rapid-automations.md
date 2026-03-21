@@ -4,21 +4,21 @@
 **Project**: rapid-automations<br>
 **Target**: CODING<br>
 **Generated**: 2026-03-21T08:00:00.000Z<br>
-**Decisions in Window**: 4
+**Decisions in Window**: 5
 
 ---
 
 ## Statistics
 
-- **Total Prompt Sets**: 4
-- **Classified as CODING**: 4 (100%)
+- **Total Prompt Sets**: 5
+- **Classified as CODING**: 5 (100%)
 - **Classified as LOCAL**: 0 (0%)
 - **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 0
 - **[Layer 1 (Path) Decisions](#layer-1-path)**: 3
-- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 1
+- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 2
 - **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 0
 - **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 0
-- **Average Processing Time**: 186ms
+- **Average Processing Time**: 161ms
 
 ---
 
@@ -82,7 +82,7 @@
 
 ## Layer 2: Keyword
 
-**Decisions**: 1
+**Decisions**: 2
 
 ### Prompt Set: [ps_1774076632863](../../../history/2026-03-21_0800-0900_c197ef_from-rapid-automations.md#ps_1774076632863)
 
@@ -105,6 +105,30 @@
 - Confidence: 0.57
 - Reasoning: Keyword analysis: 2 matches, score: 5/1
 - Processing Time: 2ms
+
+---
+
+### Prompt Set: [ps_1774076632863](../../../history/2026-03-21_0800-0900_c197ef_from-rapid-automations.md#ps_1774076632863)
+
+**Time Range**: 2026-03-21T07:03:52.863Z → 2026-03-21T12:08:04.350Z<br>
+**LSL File**: [2026-03-21_0800-0900_c197ef_from-rapid-automations.md](../../../history/2026-03-21_0800-0900_c197ef_from-rapid-automations.md#ps_1774076632863)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.57)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/index.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/cli.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/viewer.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/architecture.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/deployment.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/api-reference.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/ingestion.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/intelligence.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/ontology.md, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/skill-integration.md
+- Processing Time: 62ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.57
+- Reasoning: Keyword analysis: 2 matches, score: 5/1
+- Processing Time: 1ms
 
 ---
 
