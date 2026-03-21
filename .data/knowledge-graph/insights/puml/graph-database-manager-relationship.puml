@@ -3,25 +3,25 @@
 
 title Hierarchy Context: GraphDatabaseManager
 
-[KnowledgeManagement] as knowledge_management #FFFFDD
+[ConstraintSystem] as constraint_system #FFFFDD
 [GraphDatabaseManager] as graph_database_manager #LightBlue
-[ManualLearning] as manual_learning #F0F0F0
-[OnlineLearning] as online_learning #F0F0F0
-[WaveAgentController] as wave_agent_controller #F0F0F0
-[UkbTraceReportGenerator] as ukb_trace_report_generator #F0F0F0
-[LlmServiceManager] as llm_service_manager #F0F0F0
-[VkbApiClientManager] as vkb_api_client_manager #F0F0F0
-[GraphStructureManager] as graph_structure_manager #E8F5E8
-[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+[ContentValidator] as content_validator #F0F0F0
+[HookManager] as hook_manager #F0F0F0
+[ViolationCaptureModule] as violation_capture_module #F0F0F0
+[WorkflowManager] as workflow_manager #F0F0F0
+[ConstraintConfigurationManager] as constraint_configuration_manager #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #E8F5E8
+[GraphStorageModule] as graph_storage_module #E8F5E8
+[DataAccessLayer] as data_access_layer #E8F5E8
 
-knowledge_management --> graph_database_manager
-manual_learning -[hidden]- graph_database_manager
-online_learning -[hidden]- graph_database_manager
-wave_agent_controller -[hidden]- graph_database_manager
-ukb_trace_report_generator -[hidden]- graph_database_manager
-llm_service_manager -[hidden]- graph_database_manager
-vkb_api_client_manager -[hidden]- graph_database_manager
-graph_database_manager --> graph_structure_manager
-graph_database_manager --> graph_database_adapter
+constraint_system --> graph_database_manager
+content_validator -[hidden]- graph_database_manager
+hook_manager -[hidden]- graph_database_manager
+violation_capture_module -[hidden]- graph_database_manager
+workflow_manager -[hidden]- graph_database_manager
+constraint_configuration_manager -[hidden]- graph_database_manager
+graph_database_manager --> graph_database_manager
+graph_database_manager --> graph_storage_module
+graph_database_manager --> data_access_layer
 
 @enduml

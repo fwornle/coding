@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeAnalyzer
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[CodeAnalyzer] as code_analyzer #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[CodeParser] as code_parser #E8F5E8
+
+semantic_analysis --> code_analyzer
+pipeline -[hidden]- code_analyzer
+ontology -[hidden]- code_analyzer
+insights -[hidden]- code_analyzer
+ontology_manager -[hidden]- code_analyzer
+insight_generator -[hidden]- code_analyzer
+knowledge_graph_constructor -[hidden]- code_analyzer
+entity_validator -[hidden]- code_analyzer
+code_graph_rag -[hidden]- code_analyzer
+code_analyzer --> code_parser
+
+@enduml

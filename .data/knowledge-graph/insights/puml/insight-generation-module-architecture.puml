@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Insight Generation" {
+  component "InsightGenerationModule" as igm <<core>>
+  component "UtilitiesModule" as um <<external>>
+  component "UKB Trace Report" as ukb <<storage>>
+  component "Checkpoint System" as cps <<storage>>
+}
+
+package "Data Storage" {
+  component "GraphDatabaseModule" as gdm <<storage>>
+}
+
+package "Entity Classification" {
+  component "OntologyClassificationModule" as ocm <<api>>
+}
+
+package "Task Execution" {
+  component "AgentFrameworkModule" as afm <<agent>>
+}
+
+igm --> um : uses
+igm --> ukb : uses
+igm --> gdm : uses
+igm --> ocm : uses
+igm --> afm : uses
+igm --> cps : uses
+
+@enduml

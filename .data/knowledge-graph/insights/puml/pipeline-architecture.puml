@@ -1,34 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Pipeline Agents" {
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "SemanticAnalysisAgent" as saa <<agent>>
-  component "CodeGraphAgent" as cga <<agent>>
-  component "PersistenceAgent" as pa <<agent>>
+package "Pipeline Components" {
+  component "Pipeline Coordinator" as coordinator <<agent>>
+  component "Code Analyzer" as codeAnalyzer <<agent>>
+  component "Knowledge Graph Constructor" as kgConstructor <<agent>>
+  component "EntityValidator" as entity Validator <<agent>>
+  component "Ontology Manager" as ontologyManager <<agent>>
+  component "Observation Generation Agent" as observationAgent <<agent>>
+  component "Deduplication Agent" as deduplicationAgent <<agent>>
+  component "Persistence Agent" as persistenceAgent <<agent>>
 }
 
-package "Message Bus" {
-  component "Message Bus" as mb <<core>>
+package "Data Storage" {
+  database "Memgraph" as memgraph <<storage>>
+  database "Tree-sitter AST" as treeSitter <<storage>>
 }
 
-package "Pipeline" {
-  component "WaveController" as wc <<core>>
-  component "Batch Analysis" as ba <<core>>
-}
-
-oca --> mb : sends
-saa --> mb : sends
-cga --> mb : sends
-pa --> mb : sends
-mb --> oca : receives
-mb --> saa : receives
-mb --> cga : receives
-mb --> pa : receives
-wc --> ba : controls
-ba --> oca : uses
-ba --> saa : uses
-ba --> cga : uses
-ba --> pa : uses
+coordinator --> codeAnalyzer : uses
+codeAnalyzer --> kgConstructor : uses
+kgConstructor --> memgraph : uses
+kgConstructor --> treeSitter : uses
+observationAgent --> codeAnalyzer : uses
+deduplicationAgent --> entity Validator : uses
+persistenceAgent --> ontologyManager : uses
+ontologyManager --> memgraph : uses
+observationAgent --> ontologyManager : uses
 
 @enduml

@@ -12,7 +12,8 @@ title Hierarchy Context: LLMAbstraction
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[LLMService] as llmservice #E8F5E8
+[ProviderRegistry] as provider_registry #E8F5E8
+[LLMProvider] as llmprovider #E8F5E8
 
 coding --> llmabstraction
 live_logging_system -[hidden]- llmabstraction
@@ -22,6 +23,7 @@ knowledge_management -[hidden]- llmabstraction
 coding_patterns -[hidden]- llmabstraction
 constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
-llmabstraction --> llmservice
+llmabstraction --> provider_registry
+llmabstraction --> llmprovider
 
 @enduml

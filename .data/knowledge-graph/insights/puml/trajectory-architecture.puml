@@ -1,21 +1,27 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Trajectory Component" {
-  component "SpecstoryAdapter" as sa <<adapter>>
-  component "Logger" as lg <<core>>
-  database "Specstory Extension" as se
+package "Trajectory" {
+  component "Trajectory Component" as tc <<core>>
 }
 
-package "Connections" {
-  component "httpRequest" as hr <<api>>
+package "Data Storage" {
+  component "Graphology" as graph <<storage>>
+  component "LevelDB" as leveldb <<storage>>
+  component "JSON Export" as json <<storage>>
 }
 
-sa --> lg : uses
-sa --> hr : uses
-hr --> se : connects to
-sa --> se : logs conversation
+package "External Services" {
+  component "Specstory" as spec <<external>>
+  component "Browser Access MCP Server" as bamcp <<external>>
+  component "Code Graph RAG System" as cgr <<external>>
+}
 
-lg --> se : logs data
+tc --> graph : uses
+tc --> leveldb : uses
+tc --> json : uses
+tc --> spec : logs conversations
+tc --> bamcp : connects via BROWSER_ACCESS_PORT
+tc --> cgr : connects via CODE_GRAPH_RAG_SSE_PORT
 
 @enduml

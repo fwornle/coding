@@ -688,8 +688,9 @@ export function TraceModal({
           </div>
         )}
 
-        {/* Current Run Tab Content */}
-        {activeTab === 'current' && <>
+        {/* Current Run Tab Content — wrapped in a single grid child so grid-rows-[auto_auto_1fr] applies correctly */}
+        {activeTab === 'current' && (
+        <div className="flex flex-col gap-3 min-h-0 overflow-hidden">
         {/* Summary Stats Bar - enhanced with wave breakdown */}
         <div className="flex-shrink-0 space-y-2 border-b pb-3">
           {/* Wave-level breakdown */}
@@ -1232,7 +1233,8 @@ export function TraceModal({
             </ScrollArea>
           </div>
         </div>
-        </>}
+        </div>
+        )}
       </DialogContent>
     </Dialog>
   )

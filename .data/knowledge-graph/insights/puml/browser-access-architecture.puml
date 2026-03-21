@@ -1,14 +1,21 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Web Interface" {
+package "Browser Access" {
   component "BrowserAccess" as ba <<core>>
+  component "GraphDatabaseModule" as gdm <<storage>>
+  component "InsightGenerationModule" as igm <<api>>
+  component "UtilitiesModule" as um <<core>>
 }
 
-package "System Components" {
-  component "Web-Based Interfaces" as wbi <<external>>
-}
+ba --> gdm : stores and queries browser access data
+ba --> igm : generates insights from browser access data
+ba --> um : utilizes utility functions
+um --> gdm : uses for checkpoint system
 
-ba --> wbi : interacts with
+package "External" {
+  component "MCP Server" as mcp <<external>>
+  ba --> mcp : provides browser access to
+}
 
 @enduml

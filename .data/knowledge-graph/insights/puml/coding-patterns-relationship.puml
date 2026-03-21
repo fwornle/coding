@@ -12,13 +12,11 @@ title Hierarchy Context: CodingPatterns
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[GraphManagement] as graph_management #E8F5E8
-[LLMInitialization] as llminitialization #E8F5E8
-[ConstraintValidation] as constraint_validation #E8F5E8
-[CodeGraphConstruction] as code_graph_construction #E8F5E8
-[ContentValidation] as content_validation #E8F5E8
-[BrowserAccess] as browser_access #E8F5E8
-[CodeGraphRag] as code_graph_rag #E8F5E8
+[CodeAnalysisPatterns] as code_analysis_patterns #E8F5E8
+[DesignPatternLibrary] as design_pattern_library #E8F5E8
+[BestPracticeRepository] as best_practice_repository #E8F5E8
+[AntiPatternIdentification] as anti_pattern_identification #E8F5E8
+[GraphCodeRAG] as graph_code_rag #E8F5E8
 
 coding --> coding_patterns
 live_logging_system -[hidden]- coding_patterns
@@ -28,12 +26,10 @@ trajectory -[hidden]- coding_patterns
 knowledge_management -[hidden]- coding_patterns
 constraint_system -[hidden]- coding_patterns
 semantic_analysis -[hidden]- coding_patterns
-coding_patterns --> graph_management
-coding_patterns --> llminitialization
-coding_patterns --> constraint_validation
-coding_patterns --> code_graph_construction
-coding_patterns --> content_validation
-coding_patterns --> browser_access
-coding_patterns --> code_graph_rag
+coding_patterns --> code_analysis_patterns
+coding_patterns --> design_pattern_library
+coding_patterns --> best_practice_repository
+coding_patterns --> anti_pattern_identification
+coding_patterns --> graph_code_rag
 
 @enduml

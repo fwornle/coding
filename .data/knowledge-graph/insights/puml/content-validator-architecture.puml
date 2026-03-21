@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Validation" {
+  component "ContentValidator" as cv <<core>>
+}
+
+package "Data Storage" {
+  database "GraphDatabase" as gdm <<storage>>
+}
+
+package "Validation Framework" {
+  component "Validation Rules" as vr <<api>>
+}
+
+cv --> gdm : retrieves entity content
+cv --> vr : uses validation rules
+gdm --> cv : provides entity content
+cv --> cv : generates refresh reports
+
+@enduml

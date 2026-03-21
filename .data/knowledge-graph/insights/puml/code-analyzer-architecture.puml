@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Code Analysis" {
+  component "CodeAnalyzer" as ca <<agent>>
+  component "CodeParser" as cp <<core>>
+  component "CodeValidator" as cv <<core>>
+  component "CodeCache" as cc <<storage>>
+  ca --> cp : parses
+  ca --> cv : validates
+  ca --> cc : stores
+}
+
+package "Code Management" {
+  component "CodeVersioning" as cvn <<core>>
+  component "CodeLogger" as cl <<core>>
+  component "CodeUpdater" as cu <<core>>
+  ca --> cvn : versions
+  ca --> cl : logs
+  ca --> cu : updates
+}
+
+ca --> CodeCache : retrieves
+CodeValidator --> CodeCache : uses
+
+@enduml

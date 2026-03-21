@@ -1,0 +1,25 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Data Storage" {
+  component "GraphDatabaseModule" as gdm <<storage>>
+}
+
+package "Data Processing" {
+  component "UtilitiesModule" as um <<core>>
+  component "InsightGenerationModule" as igm <<core>>
+}
+
+package "External Dependencies" {
+  component "UKB Trace Report" as ukb <<external>>
+  component "Checkpoint System" as cs <<external>>
+  component "Agent Development Guide" as adg <<external>>
+}
+
+um --> gdm : stores and queries
+um --> igm : generates insights
+um --> ukb : uses report
+um --> cs : tracks progress
+um --> adg : provides utility functions
+
+@enduml

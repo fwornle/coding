@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphDatabaseModule
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphDatabaseModule] as graph_database_module #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+
+knowledge_management --> graph_database_module
+manual_learning -[hidden]- graph_database_module
+online_learning -[hidden]- graph_database_module
+ontology_classification_module -[hidden]- graph_database_module
+insight_generation_module -[hidden]- graph_database_module
+agent_framework_module -[hidden]- graph_database_module
+utilities_module -[hidden]- graph_database_module
+browser_access -[hidden]- graph_database_module
+code_graph_rag -[hidden]- graph_database_module
+graph_database_module --> graph_database_adapter
+
+@enduml

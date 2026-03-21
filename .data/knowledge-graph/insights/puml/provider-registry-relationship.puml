@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProviderRegistry
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ProviderRegistry] as provider_registry #LightBlue
+[LLMProvider] as llmprovider #F0F0F0
+[ProviderConfig] as provider_config #E8F5E8
+
+llmabstraction --> provider_registry
+llmprovider -[hidden]- provider_registry
+provider_registry --> provider_config
+
+@enduml

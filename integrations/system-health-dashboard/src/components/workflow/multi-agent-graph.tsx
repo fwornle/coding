@@ -793,6 +793,11 @@ export function MultiAgentGraph({
 
   // Filter edges to only show relevant connections
   const shouldShowEdge = useCallback((edge: EdgeDefinition): boolean => {
+    // Hide edges to/from inactive agents (not part of current workflow)
+    const fromInactive = edge.from !== 'orchestrator' && !agentsInWorkflow.has(edge.from)
+    const toInactive = edge.to !== 'orchestrator' && !agentsInWorkflow.has(edge.to)
+    if (fromInactive || toInactive) return false
+
     // Control edges from orchestrator: only show to touched agents
     if (edge.type === 'control' && edge.from === 'orchestrator') {
       return touchedAgents.has(edge.to)
@@ -809,7 +814,7 @@ export function MultiAgentGraph({
       return true
     }
     return true // Other edge types always shown
-  }, [touchedAgents, stepStatusMap])
+  }, [touchedAgents, stepStatusMap, agentsInWorkflow])
 
   // Check if two agents are adjacent in the circular ring layout
   const areAdjacentInRing = useCallback((fromId: string, toId: string): boolean => {
@@ -1326,9 +1331,14 @@ export function MultiAgentGraph({
           })()}
         </g>
 
-        {/* Render nodes */}
+        {/* Render nodes — hide inactive agents (not used in current workflow) */}
         <g className="nodes">
-          {layout.positions.map(pos => renderNode(pos))}
+          {layout.positions
+            .filter(pos => {
+              if (pos.agent.isOrchestrator || pos.agent.id === 'orchestrator') return true
+              return getNodeStatus(pos.agent.id) !== 'inactive'
+            })
+            .map(pos => renderNode(pos))}
         </g>
 
         {/* Render expanded sub-steps arc overlay (above all nodes for z-order) */}

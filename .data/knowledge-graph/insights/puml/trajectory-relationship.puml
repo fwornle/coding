@@ -12,7 +12,11 @@ title Hierarchy Context: Trajectory
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[ConversationLogger] as conversation_logger #E8F5E8
+[LazyLoader] as lazy_loader #E8F5E8
+[WorkStealer] as work_stealer #E8F5E8
+[GraphDatabaseManager] as graph_database_manager #E8F5E8
+[EnvironmentConfigurator] as environment_configurator #E8F5E8
+[SpecstoryAdapter] as specstory_adapter #E8F5E8
 
 coding --> trajectory
 live_logging_system -[hidden]- trajectory
@@ -22,6 +26,10 @@ knowledge_management -[hidden]- trajectory
 coding_patterns -[hidden]- trajectory
 constraint_system -[hidden]- trajectory
 semantic_analysis -[hidden]- trajectory
-trajectory --> conversation_logger
+trajectory --> lazy_loader
+trajectory --> work_stealer
+trajectory --> graph_database_manager
+trajectory --> environment_configurator
+trajectory --> specstory_adapter
 
 @enduml

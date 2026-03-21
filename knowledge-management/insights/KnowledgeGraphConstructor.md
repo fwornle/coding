@@ -2,147 +2,131 @@
 
 **Type:** SubComponent
 
-The KnowledgeGraphConstructor, located in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file, uses the GraphDatabaseAdapter to interact with the graph database.
+The KnowledgeGraphConstructor provides an API for querying the knowledge graph, allowing other sub-components to retrieve knowledge graph information, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 
 ## What It Is  
 
-The **KnowledgeGraphConstructor** is an agent‑level sub‑component that lives in the SemanticAnalysis domain. Its concrete implementation resides in  
-`integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts`.  
-Its sole responsibility is to materialise a knowledge graph from the semantic artefacts produced by the surrounding analysis pipeline. To do so it delegates all persistence concerns to the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/adapters/graph-database-adapter.ts`), which abstracts over the concrete graph‑database engine(s) used by the platform. The constructor emits its results inside a **standard response envelope**, the same envelope pattern employed by sibling agents such as `OntologyClassificationAgent` and `InsightGenerationAgent`, guaranteeing a uniform API surface for downstream consumers.  
+The **KnowledgeGraphConstructor** lives under the SemanticAnalysis component and is implemented across a set of focused TypeScript modules in the `integrations/mcp-server-semantic-analysis/src/agents/` directory. The core orchestration lives in `knowledge-graph-constructor.ts`, which wires together a **MemgraphConnection** (its child) for persistence, a **Tree‑sitter parser** (`tree-sitter-parser.ts`) for AST extraction, a **cache layer** (`knowledge-graph-cache.ts`), a **versioning subsystem** (`knowledge-graph-versioning.ts`), a **logger** (`knowledge-graph-logger.ts`), and an **updater** (`knowledge-graph-updater.ts`). Together these modules expose an API that other sub‑components—such as the OntologyManager, InsightGenerator, or CodeGraphRAG—can call to query or mutate the knowledge graph.
 
-In addition to building the graph, the constructor participates in a **transactional workflow**—each batch of graph mutations is wrapped in a transaction to guarantee atomicity and consistency. Once the graph is updated, the component notifies the **InsightGenerationAgent** (found under `agents/insight-generation-agent.ts`) so that newly‑added entities can be turned into actionable insights.
+> **Location of implementation**  
+> - `integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts`  
+> - `integrations/mcp-server-semantic-analysis/src/agents/tree-sitter-parser.ts`  
+> - `integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-cache.ts`  
+> - `integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-versioning.ts`  
+> - `integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-logger.ts`  
+> - `integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-updater.ts`
+
+The constructor therefore acts as the **graph‑engine façade** for the broader multi‑agent SemanticAnalysis pipeline, translating raw code artefacts into a persisted, query‑able graph representation.
+
+![KnowledgeGraphConstructor — Architecture](../../.data/knowledge-graph/insights/images/knowledge-graph-constructor-architecture.png)
 
 ---
 
 ## Architecture and Design  
 
-### Modular Agent Architecture  
-SemanticAnalysis follows a modular, agent‑centric architecture: each agent encapsulates a single, well‑defined task. KnowledgeGraphConstructor is one such agent, sitting alongside peers such as **OntologyClassificationAgent**, **ObservationClassifier**, and **Pipeline**’s **CoordinatorAgent**. This modularity encourages clear separation of concerns—graph construction is isolated from classification, pipeline orchestration, or insight generation.
+The design follows a **modular, layered architecture** that isolates distinct responsibilities into dedicated agents. The parent `SemanticAnalysis` component already adopts a multi‑agent pattern, and KnowledgeGraphConstructor extends this by treating each concern—parsing, persistence, caching, versioning, logging, and updating—as its own agent‑module.  
 
-### Adapter Pattern  
-Interaction with the underlying graph store is mediated through **GraphDatabaseAdapter**. By exposing a *standardised interface* for CRUD and transaction operations, the adapter decouples the constructor from any particular graph‑database implementation (e.g., Neo4j, JanusGraph). The observation that “GraphDatabaseAdapter supports multiple graph database implementations” confirms the use of the **Adapter pattern**, enabling plug‑and‑play substitution of the storage engine without touching the constructor logic.
+* **Persistence Layer** – `knowledge-graph-constructor.ts` creates and owns a `MemgraphConnection` instance, delegating all graph writes and reads to Memgraph, a native graph database optimized for high‑velocity edge traversal.  
+* **Parsing Layer** – The `TreeSitterParser` (implemented in `tree-sitter-parser.ts`) leverages the Tree‑sitter library to produce language‑agnostic ASTs. These ASTs become the raw material for graph nodes and relationships.  
+* **Caching Layer** – Frequently accessed metadata (e.g., node IDs, schema fragments) are stored in an in‑memory cache defined in `knowledge-graph-cache.ts`. The cache reduces round‑trips to Memgraph and speeds up read‑heavy workloads.  
+* **Versioning Layer** – `knowledge-graph-versioning.ts` records each mutation as a versioned snapshot, enabling time‑travel queries and audit trails.  
+* **Logging Layer** – `knowledge-graph-logger.ts` writes structured logs for every graph change, supporting observability and debugging.  
+* **Update Layer** – `knowledge-graph-updater.ts` exposes mutation APIs that allow other agents to apply dynamic changes (e.g., adding new code entities after a git push).  
 
-### Transactional Consistency  
-The constructor “uses a transactional approach to ensure data consistency.” This indicates that the component explicitly begins, commits, or rolls back a transaction via the adapter for each logical unit of work. The pattern mirrors classic **Unit of Work** semantics: a set of node/edge creations is treated as a single atomic operation, protecting the graph from partial updates caused by failures.
+These layers interact through well‑defined TypeScript interfaces, with the constructor acting as the façade that other agents call. The **API** surface is declared in `knowledge-graph-constructor.ts`, offering methods such as `queryGraph()`, `addNode()`, and `getVersion()`.  
 
-### Standard Response Envelope  
-Both KnowledgeGraphConstructor and its sibling agents “follow a standard response envelope creation pattern.” This is effectively a **Template Method** or **Builder** pattern for response objects: each agent populates a common envelope structure (status, payload, metadata) before returning it. The envelope guarantees that downstream consumers—most notably the InsightGenerationAgent—can parse results uniformly.
-
-### Inter‑Agent Communication  
-The constructor “communicates with the insight generation component to provide relevant data.” The communication is likely synchronous (direct method call) or asynchronous via a shared message contract, but the observation only confirms the *dependency* on InsightGenerationAgent. This relationship reflects a **pipeline‑style** data flow where the graph is a producer of knowledge and the insight engine is a consumer.
+![KnowledgeGraphConstructor — Relationship](../../.data/knowledge-graph/insights/images/knowledge-graph-constructor-relationship.png)
 
 ---
 
 ## Implementation Details  
 
-The core class in `knowledge-graph-constructor.ts` orchestrates three primary responsibilities:
+### Core Orchestration (`knowledge-graph-constructor.ts`)  
+The file defines a `KnowledgeGraphConstructor` class that holds references to all supporting agents. Its constructor instantiates `MemgraphConnection`, injects the `TreeSitterParser`, and wires the cache, versioning, logger, and updater. Typical workflow:  
 
-1. **Data Ingestion** – It receives semantic artefacts (e.g., classified observations, ontology nodes) from upstream agents. The exact method signatures are not listed, but the constructor likely implements a `process(input: SemanticPayload): ResponseEnvelope` entry point, mirroring the signature used by other agents.
+1. **Parse** – Source files are fed to `TreeSitterParser.parse(fileContent)`, returning an AST.  
+2. **Transform** – The AST is traversed to produce graph entities (nodes/edges).  
+3. **Cache Check** – Before persisting, the constructor queries `KnowledgeGraphCache` for existing metadata to avoid duplicate inserts.  
+4. **Persist** – Using `MemgraphConnection.executeCypher(query, params)`, the graph is updated.  
+5. **Version & Log** – After a successful write, `KnowledgeGraphVersioning.recordChange()` creates a new version entry, and `KnowledgeGraphLogger.logChange()` emits a structured log entry.  
 
-2. **Graph Persistence** – Using the **GraphDatabaseAdapter**, the constructor translates the incoming payload into graph operations:
-   * **Node creation** – Calls like `adapter.createNode(label, properties)` for entities such as “Observation”, “Concept”, or “CodeArtifact”.
-   * **Relationship creation** – Calls like `adapter.createRelationship(sourceId, targetId, type, properties)`.
-   * **Transaction handling** – The constructor wraps the above calls in a transaction block:
-     ```ts
-     const tx = this.graphAdapter.beginTransaction();
-     try {
-       // multiple createNode / createRelationship calls
-       tx.commit();
-     } catch (e) {
-       tx.rollback();
-       throw e;
-     }
-     ```
-   This ensures the “transactional approach” highlighted in the observations.
+### Tree‑sitter Parser (`tree-sitter-parser.ts`)  
+Exports a `TreeSitterParser` class with a `parse(content: string): ASTNode` method. The parser abstracts the underlying Tree‑sitter bindings, exposing a uniform AST shape that the constructor can consume regardless of the source language.
 
-3. **Response Envelope Generation** – After a successful commit, the constructor builds a response envelope (likely via a helper utility shared across agents). The envelope contains:
-   * `status: "success"` or an error code,
-   * `payload: { nodesCreated, relationshipsCreated }`,
-   * `metadata: { transactionId, timestamp }`.
+### Caching (`knowledge-graph-cache.ts`)  
+Implements a simple LRU or TTL‑based in‑memory map (`Map<string, any>`). Public methods include `get(key)`, `set(key, value)`, and `invalidate(key)`. The cache is refreshed automatically after each successful graph mutation.
 
-Once the envelope is ready, the constructor invokes a method on the **InsightGenerationAgent** (e.g., `insightAgent.consumeGraphUpdate(envelope)`) to trigger downstream insight derivation.
+### Versioning (`knowledge-graph-versioning.ts`)  
+Maintains a version counter stored in Memgraph (e.g., a `Version` node). Each mutation appends a `CHANGE` relationship from the previous version node to a new version node, preserving the full change history. The module provides `getCurrentVersion()` and `checkoutVersion(versionId)`.
 
-The **GraphDatabaseAdapter** (`graph-database-adapter.ts`) defines an abstract interface such as:
-```ts
-interface GraphDatabaseAdapter {
-  beginTransaction(): Transaction;
-  createNode(label: string, props: Record<string, any>): Promise<Node>;
-  createRelationship(src: string, dst: string, type: string, props?: Record<string, any>): Promise<Relationship>;
-  // ... other CRUD utilities
-}
-```
-Concrete implementations for each supported graph engine inherit from this interface, allowing the constructor to remain agnostic of the actual storage backend.
+### Logging (`knowledge-graph-logger.ts`)  
+Wraps a structured logger (e.g., Winston) to emit JSON logs that include operation type, affected node IDs, timestamps, and version numbers. This log stream can be consumed by the broader Observability stack of the platform.
+
+### Updater (`knowledge-graph-updater.ts`)  
+Exposes high‑level mutation functions such as `addCodeEntity(entity)`, `removeObsoleteNode(nodeId)`, and `batchUpdate(changes[])`. These functions coordinate cache invalidation, version bumping, and logging, ensuring atomicity at the application level.
+
+### Memgraph Connection (`MemgraphConnection`)  
+Although not listed as a separate file, the child component encapsulates the low‑level driver for Memgraph, handling connection pooling, retry logic, and Cypher query execution. All other agents rely on this abstraction rather than speaking directly to the database.
 
 ---
 
 ## Integration Points  
 
-1. **Upstream Agents** – The constructor consumes the output of agents like **ObservationClassifier**, **OntologyClassificationAgent**, and **CodeAnalyzer**. These agents emit classified observations, ontology mappings, and code‑analysis artefacts that become nodes/edges in the graph.
+* **Parent – SemanticAnalysis** – The constructor is instantiated by the SemanticAnalysis orchestrator and participates in its DAG‑based execution model. Other agents such as `OntologyClassificationAgent` or `CodeGraphAgent` invoke the constructor’s API to enrich the graph with classification results or code‑graph edges.  
+* **Sibling Components** –  
+  * **Pipeline** – The DAG scheduler may place the KnowledgeGraphConstructor step after code parsing, ensuring that the graph is built before downstream validation.  
+  * **Ontology / OntologyManager** – These agents consume the graph via the constructor’s query API to align extracted entities with the hierarchical ontology definitions.  
+  * **Insights / InsightGenerator** – Insight generation queries the graph for patterns (e.g., “high‑fan‑out nodes”) using the constructor’s read methods.  
+  * **CodeAnalyzer & CodeGraphRAG** – These agents provide raw code artefacts that are parsed by the Tree‑sitter component before being fed into the graph.  
+* **External Dependencies** – Memgraph (graph DB), Tree‑sitter (AST library), and the internal structured logger. The caching layer is internal but may be swapped for a distributed cache if needed.  
 
-2. **GraphDatabaseAdapter** – This adapter is the sole persistence contract. Any change to the underlying graph technology (e.g., switching from Neo4j to Amazon Neptune) requires only a new adapter implementation; KnowledgeGraphConstructor remains untouched.
-
-3. **InsightGenerationAgent** – After graph construction, the constructor forwards the response envelope to the insight engine (`agents/insight-generation-agent.ts`). This downstream dependency ensures that newly added knowledge is immediately available for insight derivation.
-
-4. **Pipeline Coordinator** – The **CoordinatorAgent** (`agents/coordinator-agent.ts`) likely schedules the execution order of agents, placing KnowledgeGraphConstructor after classification and before insight generation. This positioning enforces a logical data‑flow within the **Pipeline** sibling.
-
-5. **Standard Response Envelope** – Because every sibling agent adheres to the same envelope format, any component that consumes agent responses (e.g., API layers, UI dashboards) can treat KnowledgeGraphConstructor’s output identically to that of OntologyClassificationAgent or Pipeline status reports.
+All interactions are mediated through TypeScript interfaces defined in `knowledge-graph-constructor.ts`, guaranteeing compile‑time safety across the component boundary.
 
 ---
 
 ## Usage Guidelines  
 
-* **Invoke via the standard agent interface** – Call the constructor’s entry method (e.g., `process(payload)`) and expect a `ResponseEnvelope`. Do not bypass the envelope; downstream components rely on its structure.  
-* **Supply fully classified payloads** – The constructor assumes that upstream agents have already performed ontology classification and observation labeling. Feeding raw, unclassified data may result in incomplete graph structures.  
-* **Maintain transactional integrity** – When extending the constructor, always wrap additional graph operations inside the existing transaction block provided by `GraphDatabaseAdapter`. Avoid committing partial changes outside the transaction scope.  
-* **Do not hard‑code graph‑engine specifics** – All graph interactions must go through the adapter. Direct driver calls (e.g., Neo4j driver APIs) would break the “multiple graph database implementations” guarantee.  
-* **Notify the InsightGenerationAgent** – After a successful transaction, ensure the response envelope is passed to the insight agent. Skipping this step will prevent newly created knowledge from being surfaced as insights.  
-* **Follow the envelope pattern** – Populate `status`, `payload`, and `metadata` consistently. Use the same keys as sibling agents to keep logging, monitoring, and error‑handling uniform across the SemanticAnalysis module.
+1. **Prefer the façade API** – Directly calling Memgraph or the cache from other agents bypasses versioning and logging. Always use the methods exposed by `KnowledgeGraphConstructor`.  
+2. **Cache Discipline** – After any mutation, invoke the updater’s `invalidateCache(key)` (or rely on the updater’s built‑in invalidation) to keep the in‑memory view consistent.  
+3. **Version Awareness** – When performing long‑running analyses, fetch the current version (`getCurrentVersion()`) before starting and re‑validate after the analysis completes to avoid stale reads.  
+4. **Error Handling** – All async methods return promises that reject on Cypher errors or parsing failures. Wrap calls in `try/catch` and log via `KnowledgeGraphLogger` to maintain the audit trail.  
+5. **Batch Updates** – For bulk code imports, use `KnowledgeGraphUpdater.batchUpdate(changes[])` to reduce round‑trips and trigger a single version bump.  
+6. **Testing** – Mock `MemgraphConnection` and the cache when unit‑testing agents that depend on the constructor; integration tests should spin up a local Memgraph instance to verify Cypher semantics.  
 
 ---
 
-### Architectural patterns identified  
-* **Adapter pattern** – GraphDatabaseAdapter abstracts concrete graph stores.  
-* **Modular agent architecture** – Each functional piece (e.g., KnowledgeGraphConstructor, OntologyClassificationAgent) is an independent agent.  
-* **Transactional/Unit‑of‑Work pattern** – Graph updates are wrapped in a transaction to guarantee atomicity.  
-* **Standard response envelope (Template/Builder)** – Uniform output format across agents.
+## Summary of Architectural Insights  
 
-### Design decisions and trade‑offs  
-* **Decoupling via adapter** trades a small amount of indirection for the ability to swap graph databases without code changes.  
-* **Transactional approach** adds latency for large batches but protects against partial graph states.  
-* **Standard envelope** simplifies downstream consumption at the cost of a rigid response schema that must be extended carefully.  
-* **Agent‑centric modularity** improves testability and separation of concerns but can increase orchestration complexity, requiring a coordinator (Pipeline) to manage execution order.
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Modular layered design, façade pattern for graph access, separation of concerns via dedicated agents (parsing, caching, versioning, logging, updating). |
+| **Design decisions and trade‑offs** | • Using Memgraph gives native graph performance but adds operational overhead.<br>• Tree‑sitter provides language‑agnostic parsing at the cost of an additional native dependency.<br>• In‑memory caching improves read latency but requires careful invalidation to avoid stale data.<br>• Versioning enables auditability and time‑travel queries but increases storage and write complexity. |
+| **System structure insights** | KnowledgeGraphConstructor sits under the parent `SemanticAnalysis` and owns a `MemgraphConnection` child. It interacts with sibling agents (Pipeline, OntologyManager, InsightGenerator, etc.) through a clean TypeScript API, fitting into the overall multi‑agent DAG workflow. |
+| **Scalability considerations** | • Memgraph’s horizontal scaling (sharding) can handle large codebases.<br>• Cache reduces read pressure, supporting high‑throughput query workloads.<br>• Versioning may become a bottleneck for extremely frequent mutations; consider snapshot pruning.<br>• The updater’s batch API mitigates write amplification. |
+| **Maintainability assessment** | High maintainability thanks to single‑responsibility modules, explicit interfaces, and consistent naming. The clear separation of logging, versioning, and caching simplifies debugging. The main risk lies in cache coherence and version migration, which require disciplined testing and documentation. |
 
-### System structure insights  
-* KnowledgeGraphConstructor sits one level below the **SemanticAnalysis** parent and shares the same response‑envelope infrastructure as its siblings.  
-* It acts as a bridge between classification‑heavy agents (OntologyClassificationAgent, ObservationClassifier) and the insight‑focused agent (InsightGenerationAgent).  
-* The **GraphDatabase** sibling provides the concrete persistence layer, while the **Pipeline** sibling orchestrates the overall flow.
-
-### Scalability considerations  
-* Because the adapter supports multiple graph databases, scaling can be achieved by swapping to a horizontally‑scalable backend (e.g., a clustered Neo4j or a distributed graph store).  
-* Transactional batches may need tuning: larger batches reduce round‑trip overhead but increase lock contention; the system should expose configurable batch sizes.  
-* The modular agent model permits parallel execution of independent agents (e.g., classification and code analysis) before the constructor runs, improving pipeline throughput.
-
-### Maintainability assessment  
-* **High maintainability** – Clear separation between graph logic (constructor) and storage specifics (adapter) reduces coupling.  
-* Uniform response envelopes and shared base‑agent utilities (as seen in `BaseAgent`) promote code reuse and consistent error handling.  
-* The only maintenance risk lies in the transaction boundary; developers must ensure any future graph mutations respect the existing transaction pattern to avoid subtle consistency bugs.
+These observations provide a grounded view of how the **KnowledgeGraphConstructor** is architected, implemented, and integrated within the broader SemanticAnalysis ecosystem, while highlighting the key trade‑offs that influence its scalability and long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. This agent utilizes a confidence calculation mechanism, as defined in the BaseAgent class, located in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, to determine the accuracy of its classifications. Furthermore, the OntologyClassificationAgent follows a standard response envelope creation pattern, ensuring consistency in its output.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+
+### Children
+- [MemgraphConnection](./MemgraphConnection.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as mentioned in the project context.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a coordinator agent, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts file, to manage the execution of other agents.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, uses a confidence calculation mechanism to determine the accuracy of its classifications.
-- [Insights](./Insights.md) -- The InsightGenerationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
-- [ObservationClassifier](./ObservationClassifier.md) -- The ObservationClassifier, located in the integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts file, uses the OntologyClassificationAgent to classify observations.
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer, located in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file, uses the SemanticAnalysisAgent to analyze code files.
-- [ContentValidator](./ContentValidator.md) -- The ContentValidator, located in the integrations/mcp-server-semantic-analysis/src/agents/content-validator.ts file, uses the ContentValidationAgent to validate entity content.
-- [GraphDatabase](./GraphDatabase.md) -- The GraphDatabase, located in the integrations/mcp-server-semantic-analysis/src/adapters/graph-database-adapter.ts file, uses a graph-based data structure to store and manage the knowledge graph.
+- [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis steps, each step declaring explicit depends_on edges, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
+- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
+- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
+- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

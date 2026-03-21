@@ -2,132 +2,116 @@
 
 **Type:** SubComponent
 
-OntologyClassificationModule's classification process involves calling the identifyRelationships method in the RelationshipIdentifier (relationship-identifier.ts) class to extract relationships between entities.
+OntologyClassificationModule relies on the constraint configuration guide in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-The **OntologyClassificationModule** lives in `ontology-classification-module.ts` and is a core sub‑component of the **KnowledgeManagement** domain. Its primary responsibility is to take raw entities, run a classification routine, discover semantic relationships, and persist the resulting ontology fragments in the graph database. The module orchestrates several collaborators: it reads and writes through the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`), delegates relationship extraction to the **RelationshipIdentifier** (`relationship-identifier.ts`), validates the output with **EntityValidator** (`entity-validator.ts`), and hands the produced JSON payload to the **NaturalLanguageProcessingModule** (`natural-language-processing-module.ts`) for downstream text analysis. The final classification artefacts are stored using the **Graphology** library (`graphology.ts`), which provides efficient in‑memory graph structures that are synchronised back to the persistent store via the shared adapter.
+The **OntologyClassificationModule** lives inside the **KnowledgeManagement** component and is the engine that assigns semantic classifications to incoming entities. It draws on the central **OntologySystem** to evaluate an entity’s declared type and its associated properties, producing a structured classification that downstream services can consume. The module’s behavior is governed by the constraint definitions found in the **integrations/mcp-constraint-monitor/docs/constraint-configuration.md** file, ensuring that only entities meeting the prescribed rules are accepted into the knowledge graph. Once classified, the module hands the results off to the **GraphDatabaseModule** for persistence and later retrieval, and it also supplies the classified payload to the **InsightGenerationModule**, which turns the raw classifications into higher‑level insights. Throughout this pipeline the **UtilitiesModule** provides the UKB trace report, a diagnostic artifact that records each processing step for auditability.
 
 ---
 
 ## Architecture and Design  
 
-The observed design follows a **layered, adapter‑centric architecture**. The **GraphDatabaseAdapter** acts as the persistence façade for every component that needs graph storage, including the OntologyClassificationModule, its siblings (ManualLearning, OnlineLearning, EntityPersistenceModule, CodeAnalysisModule, NaturalLanguageProcessingModule) and the parent **KnowledgeManagement** component. This common adapter enforces a uniform API for CRUD operations and automatically synchronises JSON exports with Graphology and LevelDB, as described in the parent’s documentation.  
+OntologyClassificationModule is built as a **modular, pipeline‑oriented component** that sits between raw data ingestion and downstream knowledge‑graph services.  Its design follows a clear **separation‑of‑concerns** strategy:
 
-Within the OntologyClassificationModule itself, the workflow is decomposed into distinct responsibilities:
+1. **Classification Layer** – leverages the OntologySystem to map entity types and properties to ontology concepts.  
+2. **Constraint Layer** – consults the constraint‑configuration guide ( `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` ) to enforce business rules before an entity is admitted.  
+3. **Persistence Layer** – delegates storage and query responsibilities to the GraphDatabaseModule, which itself uses the GraphDatabaseAdapter described in the KnowledgeManagement parent component.  
+4. **Insight Layer** – forwards classified data to InsightGenerationModule, which enriches it with actionable observations.  
 
-1. **Classification Logic** – encapsulated in the `classifyEntity` method.  
-2. **Relationship Extraction** – delegated to `RelationshipIdentifier.identifyRelationships`.  
-3. **Validation** – performed by the `EntityValidator`.  
-4. **Persistence** – handled by the GraphDatabaseAdapter and the Graphology library.  
+The module also incorporates **observability** via the UKB trace report supplied by UtilitiesModule, allowing developers to trace the exact path an entity took through the classification pipeline.  
 
-These separations reflect an **adapter pattern** (GraphDatabaseAdapter) combined with a **pipeline pattern** (classification → relationship identification → validation → persistence). The module does not embed persistence logic directly; instead, it calls the adapter, keeping the classification core testable and independent of the underlying storage technology.  
+This arrangement yields a **layered architecture** where each responsibility is encapsulated behind a well‑defined interface, minimizing coupling and making it straightforward to swap or extend any layer independently.
 
-The use of **Graphology** provides an in‑memory graph model that the module can query efficiently before committing results. This mirrors a **repository‑style abstraction** where the adapter hides the concrete graph engine (Graphology + LevelDB) behind a simple interface. Because the same adapter is shared across siblings, the system achieves **horizontal reuse** and consistency in how graph entities are stored, exported, and queried.
+![OntologyClassificationModule — Architecture](../../.data/knowledge-graph/insights/images/ontology-classification-module-architecture.png)
 
-No higher‑level distributed patterns (e.g., micro‑services) are evident in the observations, so the design remains monolithic but modular, with clear internal boundaries.
+### Architectural Patterns Identified  
+
+- **Modular decomposition** – each functional concern (ontology lookup, constraint validation, persistence, insight generation) lives in its own module.  
+- **Pipeline processing** – entities flow sequentially through classification → validation → storage → insight generation.  
+- **Configuration‑driven validation** – constraints are externalized in a markdown file, allowing non‑code changes to affect runtime behavior.  
 
 ---
 
 ## Implementation Details  
 
-### Core Entry Point – `classifyEntity`  
-Located in `ontology-classification-module.ts`, `classifyEntity` receives an entity (or a batch) and initiates the classification pipeline. It first invokes the **RelationshipIdentifier** (`relationship-identifier.ts`) via its `identifyRelationships` method. This method analyses the entity’s attributes and returns a set of relationship descriptors (e.g., “is‑a”, “part‑of”).  
+Although the source repository does not expose concrete class or function names for OntologyClassificationModule, the observations reveal the key implementation touch‑points:
 
-### Relationship Extraction – `RelationshipIdentifier`  
-The `RelationshipIdentifier` class encapsulates the logic for detecting semantic links between entities. By isolating this concern, the OntologyClassificationModule can remain agnostic to the specific heuristics or machine‑learning models used for relationship discovery.  
+* **OntologySystem integration** – the module calls into the OntologySystem API (likely a service or library) to resolve an entity’s semantic type based on its properties. This step produces a canonical classification that other components understand.  
 
-### Validation – `EntityValidator`  
-Before any data touches the graph store, the module hands the intermediate classification payload to `EntityValidator` (`entity-validator.ts`). The validator checks for structural integrity (required fields, correct types) and semantic consistency (no contradictory relationships). Validation failures abort the pipeline, preventing corrupt data from entering the graph.  
+* **Constraint configuration** – before persisting a classification, the module reads the **constraint‑configuration.md** document. The file enumerates allowed type‑property combinations, required fields, and any business‑logic limits. By parsing this markdown at startup (or on‑demand), the module can enforce rules without recompilation.  
 
-### Persistence – GraphDatabaseAdapter & Graphology  
-The final classification result is serialized into a **specific JSON format**. This JSON is passed to the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`), which translates the payload into Graphology’s node/edge structures. Graphology (`graphology.ts`) then enables fast in‑memory queries (e.g., neighbor look‑ups, sub‑graph extraction) while the adapter synchronises the changes to LevelDB for durable storage. The same JSON format is later consumed by the **NaturalLanguageProcessingModule** (`natural-language-processing-module.ts`) for text‑centric analysis, demonstrating a shared contract across components.  
+* **GraphDatabaseModule interaction** – once an entity passes validation, the module invokes GraphDatabaseModule’s storage APIs. Because GraphDatabaseModule relies on the **GraphDatabaseAdapter** (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`), OntologyClassificationModule indirectly benefits from the adapter’s automatic JSON export sync and LevelDB/Graphology consistency guarantees.  
 
-### Interaction with EntityPersistenceModule  
-The OntologyClassificationModule also calls into the **EntityPersistenceModule** (`entity-persistence-module.ts`) to guarantee that any newly created or updated entities are reflected across the broader knowledge base. This step ensures that the classification results are not isolated but become part of the system‑wide entity catalogue.
+* **InsightGenerationModule hand‑off** – the classified entity payload is forwarded to InsightGenerationModule, which uses the same UKB trace report (from UtilitiesModule) to enrich its output with provenance data.  
+
+* **UKB trace report usage** – UtilitiesModule provides a trace report that logs each processing stage (e.g., “ontology lookup completed”, “constraint check passed”). The module captures this report and attaches it to the stored entity, enabling downstream debugging and audit trails.  
+
+These interactions form a tightly coordinated workflow that maximizes reuse of existing infrastructure while keeping the classification logic focused and testable.
+
+![OntologyClassificationModule — Relationship](../../.data/knowledge-graph/insights/images/ontology-classification-module-relationship.png)
 
 ---
 
 ## Integration Points  
 
-1. **Parent – KnowledgeManagement**  
-   - The parent component supplies the GraphDatabaseAdapter, which the OntologyClassificationModule uses for all persistence actions. KnowledgeManagement’s design of automatic JSON export sync with Graphology and LevelDB is directly leveraged here, allowing classification results to be instantly queryable across the entire knowledge graph.  
+1. **Constraint Configuration (Integrations → mcp‑constraint‑monitor)** – the markdown file acts as the source of truth for validation rules. Any change to this file immediately influences classification outcomes.  
 
-2. **Sibling Modules**  
-   - **ManualLearning**, **OnlineLearning**, **EntityPersistenceModule**, **CodeAnalysisModule**, and **NaturalLanguageProcessingModule** all share the same storage adapter. This commonality means that any ontology node created by OntologyClassificationModule becomes instantly visible to these siblings, enabling cross‑module queries (e.g., a code analysis result can reference a newly classified ontology concept).  
-   - The **NaturalLanguageProcessingModule** consumes the JSON payload produced by OntologyClassificationModule, illustrating a downstream data flow where classification informs NLP tasks such as entity linking or summarisation.  
+2. **GraphDatabaseModule** – the primary persistence partner. Because GraphDatabaseModule itself depends on the GraphDatabaseAdapter, OntologyClassificationModule indirectly inherits the adapter’s durability guarantees and JSON export sync behavior described in the KnowledgeManagement parent.  
 
-3. **Internal Collaborators**  
-   - **RelationshipIdentifier** (`relationship-identifier.ts`) is the source of relationship data.  
-   - **EntityValidator** (`entity-validator.ts`) guarantees data quality before persistence.  
-   - **EntityPersistenceModule** (`entity-persistence-module.ts`) synchronises entity state across the knowledge base.  
+3. **InsightGenerationModule** – consumes the classified entities to produce higher‑level insights. This sibling relationship means that any enhancements to InsightGenerationModule (e.g., new insight types) can be leveraged without altering OntologyClassificationModule.  
 
-4. **External Library – Graphology** (`graphology.ts`)  
-   - Provides the graph data structures and query capabilities used by the module. All read/write operations funnel through the adapter, which internally maps JSON to Graphology nodes/edges.  
+4. **UtilitiesModule (UKB trace report)** – provides observability data that both OntologyClassificationModule and InsightGenerationModule embed in their outputs, facilitating cross‑component tracing.  
 
-Overall, the OntologyClassificationModule sits at the intersection of classification logic, graph persistence, and downstream NLP consumption, acting as a bridge between raw entity data and the enriched knowledge graph maintained by KnowledgeManagement.
+5. **Parent Component – KnowledgeManagement** – the module contributes classified entities to the broader knowledge graph managed by KnowledgeManagement, aligning with the component’s overall goal of maintaining a consistent, queryable ontology‑driven data store.  
+
+Developers integrating new entity sources should ensure that those sources produce data compatible with the OntologySystem’s expected schema and that any required constraints are reflected in the configuration markdown.
 
 ---
 
 ## Usage Guidelines  
 
-* **Invoke via `classifyEntity`** – All classification work should start with the `classifyEntity` method. Pass a fully‑formed entity object; the method will handle relationship extraction, validation, and persistence automatically.  
+* **Keep the constraint configuration up‑to‑date** – before deploying new entity types, edit `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to reflect the allowed property sets. This avoids runtime rejections and keeps validation logic transparent to non‑engineers.  
 
-* **Respect the JSON contract** – The module emits a predefined JSON schema that downstream components (e.g., NaturalLanguageProcessingModule) expect. Do not modify the structure unless the contract is updated across the whole system.  
+* **Leverage the UKB trace report** – when debugging classification failures, consult the trace attached to the entity. It pinpoints whether the failure occurred during ontology lookup, constraint validation, or persistence.  
 
-* **Validate before persisting** – Although the module internally runs `EntityValidator`, callers should ensure that input entities already satisfy basic schema requirements (required IDs, type fields) to avoid unnecessary validation failures.  
+* **Treat the module as a black‑box service** – callers should supply raw entities and rely on the module to return a classified object (or an error). Do not attempt to bypass the constraint checks; instead, adjust the configuration if a new rule is needed.  
 
-* **Leverage the shared GraphDatabaseAdapter** – When extending functionality (e.g., adding custom queries), use the same adapter instance as other siblings. This guarantees that any changes are reflected across ManualLearning, OnlineLearning, etc., and that LevelDB sync remains consistent.  
+* **Version‑control the ontology definitions** – because OntologyClassificationModule depends on the OntologySystem, any changes to the underlying ontology should be versioned and coordinated with the module’s deployment schedule.  
 
-* **Handle errors gracefully** – Validation or persistence errors bubble up from `classifyEntity`. Catch these exceptions at the call‑site, log context (entity ID, validation messages), and decide whether to retry, skip, or abort the batch.  
-
-* **Do not bypass Graphology** – Direct manipulation of the underlying graph store outside the adapter is discouraged. All graph mutations should go through the module’s pipeline to keep the JSON export in sync.  
-
-* **Testing** – Because the classification logic is decoupled from persistence, unit tests can mock the GraphDatabaseAdapter and focus on the behaviour of `classifyEntity` and `identifyRelationships`. Integration tests should verify that the JSON produced is correctly stored and retrievable via Graphology queries.
+* **Monitor GraphDatabaseModule health** – since persistence is a downstream dependency, ensure that the GraphDatabaseAdapter’s LevelDB/Graphology store is healthy; otherwise, classification will succeed but storage will fail, leading to inconsistencies.  
 
 ---
 
-### Architectural patterns identified  
-1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts persistence details for all components.  
-2. **Pipeline / Chain‑of‑Responsibility** – Classification → Relationship Identification → Validation → Persistence.  
-3. **Repository‑style abstraction** – Graphology + adapter together act as a repository for graph entities.  
+### Summary of Key Insights  
 
-### Design decisions and trade‑offs  
-* **Centralised storage adapter** simplifies code reuse and ensures data consistency across siblings, but it creates a single point of failure; any change to the adapter impacts many modules.  
-* **JSON as the interchange format** provides language‑agnostic compatibility (e.g., NLP module) yet incurs serialization overhead for large graphs.  
-* **Delegating relationship extraction to a separate class** improves testability and allows swapping out heuristics, at the cost of an extra indirection layer.  
+| Aspect | Insight |
+|--------|---------|
+| **Architectural patterns identified** | Modular decomposition, pipeline processing, configuration‑driven validation |
+| **Design decisions and trade‑offs** | Externalizing constraints to markdown enables rapid rule changes (trade‑off: runtime parsing overhead). Relying on shared GraphDatabaseAdapter centralizes persistence logic but creates an indirect dependency that must be kept stable. |
+| **System structure insights** | OntologyClassificationModule sits at the nexus of ontology lookup, validation, persistence, and insight generation, acting as the semantic “gatekeeper” for KnowledgeManagement. |
+| **Scalability considerations** | The pipeline can be parallelized per entity because each stage is stateless aside from the shared graph store; however, the GraphDatabaseAdapter’s LevelDB backend may become a bottleneck under very high write loads, suggesting the need for sharding or write‑batching strategies. |
+| **Maintainability assessment** | High maintainability due to clear separation of concerns and configuration‑driven rules. The lack of hard‑coded constraints reduces code churn. The main maintenance burden lies in keeping the OntologySystem and constraint markdown in sync with evolving business requirements. |
 
-### System structure insights  
-* The OntologyClassificationModule is a leaf sub‑component under **KnowledgeManagement**, but it tightly couples to the parent’s persistence strategy.  
-* Sibling modules share the same storage backbone, forming a cohesive graph‑centric ecosystem where classification results become first‑class citizens in the knowledge graph.  
-* No direct file‑system or network boundaries are present; the entire stack operates within a monolithic process, relying on in‑memory Graphology for speed and LevelDB for durability.  
-
-### Scalability considerations  
-* **Graphology** enables fast in‑memory queries, which scales well for moderate graph sizes. For very large knowledge graphs, memory pressure could become a bottleneck, suggesting the need for sharding or an external graph database.  
-* The **adapter’s automatic JSON export** may become a performance hotspot if many concurrent classifications generate large payloads; batching or streaming JSON could mitigate this.  
-* Validation and relationship identification are synchronous within `classifyEntity`; parallelising these steps for batch processing would improve throughput.  
-
-### Maintainability assessment  
-* **High cohesion** – each class (RelationshipIdentifier, EntityValidator, etc.) has a single responsibility, easing future modifications.  
-* **Low coupling** – persistence is abstracted behind the adapter, allowing the underlying graph engine to be swapped with minimal impact.  
-* **Shared contracts** (JSON schema) provide a clear interface between modules, but they also require disciplined versioning to avoid breaking downstream consumers.  
-* Overall, the module’s design promotes maintainability, provided that changes to the adapter or JSON format are coordinated across all dependent siblings.
+By adhering to the guidelines above and respecting the documented integration contracts, developers can extend or replace parts of the OntologyClassificationModule with minimal impact on the surrounding KnowledgeManagement ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which allows for automatic JSON export sync with Graphology and LevelDB. This design choice enables efficient storage and retrieval of graph data, facilitating the construction of knowledge graphs. For instance, the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) leverages this adapter to store and retrieve code analysis results, which are then used to construct the knowledge graph. Furthermore, the use of Graphology and LevelDB provides a robust and scalable storage solution, allowing the KnowledgeManagement component to handle large amounts of data.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve manually created knowledge entities.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history, which is then stored in the graph database using the GraphDatabaseAdapter (storage/graph-database-adapter.ts).
-- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities in the graph database.
-- [CodeAnalysisModule](./CodeAnalysisModule.md) -- CodeAnalysisModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code analysis results in the graph database.
-- [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- NaturalLanguageProcessingModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve natural language processing results in the graph database.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology library (graphology.ts) to interact with the graph database.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the Code Graph RAG system in integrations/code-graph-rag to extract knowledge from codebases.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
+- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the UKB trace report from the UtilitiesModule to generate insights.
+- [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
+- [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
+- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
+- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

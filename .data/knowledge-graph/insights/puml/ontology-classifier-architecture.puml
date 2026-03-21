@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "OntologyClassifier" {
+  component "OntologyClassifier" as oc <<core>>
+}
+
+package "Supporting Components" {
+  component "ConfigurationValidator" as cv <<api>>
+  component "Logger" as logger <<external>>
+}
+
+package "Data Flow" {
+  database "Classification Database" as cd <<storage>>
+}
+
+oc --> cv : uses
+oc --> logger : logs
+oc --> cd : stores
+cv --> oc : configures
+logger --> oc : monitors
+
+@enduml

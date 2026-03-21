@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Best Practice Repository" {
+  component "BestPracticeRepository" as bpr <<core>>
+  component "Coding Standards" as cs <<api>>
+  component "Testing Methodologies" as tm <<api>>
+  component "Deployment Strategies" as ds <<api>>
+}
+
+package "GitHub" {
+  component "GitHub Copilot" as gc <<external>>
+  component "Copi CLI" as copi <<cli>>
+}
+
+package "Code Graph RAG" {
+  component "Code Graph RAG System" as cgr <<core>>
+  component "Code Graph Database" as cgdb <<storage>>
+}
+
+bpr --> cs : uses
+bpr --> tm : uses
+bpr --> ds : uses
+copi --> gc : uses
+cgr --> cgdb : uses
+bpr ..> cgr : related
+
+@enduml

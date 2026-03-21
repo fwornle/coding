@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Ontology Management" {
+  component "OntologyManager" as om <<core>>
+  component "OntologyCache" as oc <<storage>>
+  component "OntologyVersioning" as ov <<storage>>
+  component "EntityValidator" as ev <<agent>>
+  component "OntologyUpdater" as ou <<agent>>
+  component "OntologyLogger" as ol <<agent>>
+}
+
+package "API and Querying" {
+  component "Ontology API" as oapi <<api>>
+}
+
+om --> oapi : provides
+om --> oc : uses
+om --> ov : uses
+om --> ev : uses
+om --> ou : uses
+om --> ol : uses
+oapi --> om : queries
+ev --> om : validates
+ou --> om : updates
+ol --> om : logs
+
+@enduml

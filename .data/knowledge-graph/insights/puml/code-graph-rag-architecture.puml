@@ -1,19 +1,27 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Code Analysis" {
-  component "CodeGraphRag" as cgr <<core>>
-  component "GraphDatabase" as gd <<storage>>
-  component "CodeParser" as cp <<api>>
+package "CodeGraphRAG" {
+  component "Graph Database" as graphDB <<storage>>
+  component "Caching Mechanism" as cache <<core>>
+  component "API" as api <<api>>
+  component "Versioning System" as versioning <<core>>
+  component "Logging Mechanism" as logging <<core>>
 }
 
-package "Data Storage" {
-  database "CodeBase" as cb
+package "Data Flow" {
+  graphDB --> cache : stores
+  cache --> api : provides
+  api --> graphDB : queries
+  versioning --> graphDB : tracks
+  logging --> graphDB : logs
 }
 
-cgr --> gd : stores
-cgr --> cp : uses
-cp --> cb : processes
-gd --> cb : retrieves
+package "Update Mechanism" {
+  component "Code Graph Updater" as updater <<core>>
+  updater --> graphDB : updates
+}
+
+api --> updater : triggers
 
 @enduml

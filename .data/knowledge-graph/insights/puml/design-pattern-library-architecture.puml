@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Design Pattern Library" {
+  component "DesignPatternLibrary" as dpl <<core>>
+}
+
+package "Code Graph RAG System" {
+  component "GraphDatabase" as gd <<storage>>
+  component "Code Graph RAG" as cgr <<api>>
+}
+
+package "Batch Processing Pipeline" {
+  component "BatchProcessor" as bp <<core>>
+  component "MCP tools" as mcp <<external>>
+}
+
+dpl --> cgr : applies
+dpl --> bp : applies
+cgr --> gd : uses
+bp --> mcp : uses
+
+@enduml

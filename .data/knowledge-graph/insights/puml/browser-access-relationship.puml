@@ -3,23 +3,25 @@
 
 title Hierarchy Context: BrowserAccess
 
-[CodingPatterns] as coding_patterns #FFFFDD
+[KnowledgeManagement] as knowledge_management #FFFFDD
 [BrowserAccess] as browser_access #LightBlue
-[GraphManagement] as graph_management #F0F0F0
-[LLMInitialization] as llminitialization #F0F0F0
-[ConstraintValidation] as constraint_validation #F0F0F0
-[CodeGraphConstruction] as code_graph_construction #F0F0F0
-[ContentValidation] as content_validation #F0F0F0
-[CodeGraphRag] as code_graph_rag #F0F0F0
-[BrowserAccessConfiguration] as browser_access_configuration #E8F5E8
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
 
-coding_patterns --> browser_access
-graph_management -[hidden]- browser_access
-llminitialization -[hidden]- browser_access
-constraint_validation -[hidden]- browser_access
-code_graph_construction -[hidden]- browser_access
-content_validation -[hidden]- browser_access
+knowledge_management --> browser_access
+manual_learning -[hidden]- browser_access
+online_learning -[hidden]- browser_access
+graph_database_module -[hidden]- browser_access
+ontology_classification_module -[hidden]- browser_access
+insight_generation_module -[hidden]- browser_access
+agent_framework_module -[hidden]- browser_access
+utilities_module -[hidden]- browser_access
 code_graph_rag -[hidden]- browser_access
-browser_access --> browser_access_configuration
 
 @enduml

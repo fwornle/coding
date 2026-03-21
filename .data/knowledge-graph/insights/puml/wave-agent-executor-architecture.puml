@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Agent Management" {
+  component "WaveAgentExecutor" as wae <<agent>>
+}
+
+package "LLM Functionality" {
+  component "LLMManager" as llm <<core>>
+  wae --> llm : initializes
+}
+
+package "Service Orchestration" {
+  component "ServiceOrchestrator" as so <<api>>
+  wae --> so : manages
+}
+
+database "Agent Storage" as as <<storage>>
+wae --> as : stores
+
+cloud "External Services" as es <<external>>
+so --> es : interacts
+
+wae --> wae : executes
+llm --> as : updates
+
+@enduml

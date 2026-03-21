@@ -2,97 +2,111 @@
 
 **Type:** Detail
 
-The presence of 'constraint-configuration' documentation implies that the system allows for customizable constraint configurations, which is a notable aspect of the ConstraintValidation sub-component's design.
+The CLAUDE-CODE-HOOK-FORMAT.md file describes the Claude Code Hook Data Format, which may be related to how constraints are defined and communicated within the system.
 
 ## What It Is  
 
-`ConstraintConfiguration` lives in the **integrations/mcp-constraint-monitor/docs/constraint-configuration.md** file.  The markdown guide is the sole concrete artifact we have, and it frames *ConstraintConfiguration* as the **configuration surface** for the **ConstraintValidation** sub‑component.  In practice, this means that the system’s rule‑based validator does not have hard‑coded constraints; instead, the constraints are described, enabled, or tuned through a dedicated configuration document.  The presence of this file signals that the designers expect operators or developers to edit the configuration to reflect business rules, thresholds, or policy changes without recompiling code.
+**ConstraintConfiguration** lives in the documentation layer of the code‑base and is described in three markdown assets:
 
-Because the documentation explicitly calls out “customizable constraint configurations,” we can infer that *ConstraintConfiguration* is a **first‑class artifact** whose contents are read at start‑up (or on‑demand) and fed into the validation engine.  Its role is therefore **declarative**: it declares *what* constraints exist and *how* they should behave, while the **ConstraintValidation** component supplies the *how* – the rule‑engine that interprets those declarations.
+* `constraint-configuration.md` – a step‑by‑step guide that explains **how to declare and organise constraints** for the system.  
+* `semantic-constraint-detection.md` – a companion guide that details **the semantic detection workflow** that consumes the configuration produced by the former file.  
+* `CLAUDE-CODE-HOOK-FORMAT.md` – a specification of the **Claude Code Hook data format**, which is the interchange format used when constraints are persisted, exchanged, or fed into downstream analysis tools.
+
+These files sit under the **AntiPatternIdentification** component (the parent), which aggregates several anti‑pattern‑related artefacts. Within that hierarchy, **ConstraintConfiguration** is the concrete “detail” element that supplies the declarative model for constraints that the anti‑pattern detection engine will later evaluate.
 
 ---
 
 ## Architecture and Design  
 
-The architecture around *ConstraintConfiguration* follows a **configuration‑driven, rules‑based** pattern.  The parent component, **ConstraintValidation**, is described as “using a rules‑based approach to validate constraints, ensuring system integrity.”  Within that paradigm, *ConstraintConfiguration* acts as the **external data source** that populates the rule set.  The design therefore separates **policy (configuration)** from **mechanism (validation engine)**, a classic **Separation of Concerns** technique that improves flexibility.
+The architecture that emerges from the three markdown sources is **configuration‑driven**. Rather than hard‑coding constraint logic, the system expects a **structured configuration document** (as described in `constraint-configuration.md`) that is interpreted by the **semantic detection pipeline** (`semantic-constraint-detection.md`). This separation of concerns follows a classic *declarative* pattern: the *what* (the constraints) is expressed in a static artefact, while the *how* (the detection algorithm) lives elsewhere.
 
-From the documentation path we can deduce a **layered interaction**:
+The **Claude Code Hook format** (`CLAUDE-CODE-HOOK-FORMAT.md`) acts as the **data‑exchange contract** between the configuration authoring step and any consumer that needs to process constraints—be it a static analyser, a runtime guard, or a reporting UI. By grounding the interchange format in a single, versioned markdown specification, the design avoids ad‑hoc parsing logic and encourages a **single source of truth** for constraint schemas.
 
-1. **Configuration Layer** – the markdown (or the underlying data format it describes) lives under `integrations/mcp-constraint-monitor/docs`.  
-2. **Loading Layer** – a loader (not directly observed) reads the configuration at runtime, translating the declarative entries into in‑memory rule objects.  
-3. **Validation Layer** – the **ConstraintValidation** component consumes those rule objects and applies them to incoming data streams or persisted entities.
+Interaction flow (derived from the docs):
 
-No explicit design patterns such as *Strategy* or *Factory* are mentioned, but the **configuration‑driven** approach implicitly encourages a **Strategy‑like** substitution of rule sets: swapping one configuration for another changes the validation behavior without code changes.
+1. **Authoring** – developers write constraint definitions following the schema in `constraint-configuration.md`.  
+2. **Serialization** – the definitions are serialized into the Claude Code Hook JSON/YAML structure defined in `CLAUDE-CODE-HOOK-FORMAT.md`.  
+3. **Detection** – the semantic detector reads the serialized payload (as outlined in `semantic-constraint-detection.md`) and applies the rules to the target codebase.  
+
+No explicit code‑level design patterns (e.g., Strategy, Visitor) are mentioned, but the documentation reflects a **pipeline** style architecture where each stage (configuration → serialization → detection) is loosely coupled through the shared data format.
 
 ---
 
 ## Implementation Details  
 
-The only concrete artifact is the markdown file, so the implementation details we can state are **implicit**:
+Because the source material is documentation‑centric, the concrete implementation artefacts are inferred rather than listed. The key technical mechanics are:
 
-* **File Location** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is the canonical source for the configuration schema.  
-* **Schema Definition** – while the markdown’s exact contents are not reproduced here, it likely outlines a set of keys (e.g., `maxRetries`, `allowedRegions`, `thresholds`) and their expected data types.  This schema would be parsed by a loader component that validates the configuration itself before it is handed to the validator.  
-* **Loading Mechanism** – given the rule‑based nature of **ConstraintValidation**, the system probably uses a **configuration parser** (e.g., YAML, JSON, or a custom DSL) that maps each declared constraint to a concrete validator object.  Each validator would implement a common interface (e.g., `IConstraintValidator`) and be registered in a **constraint registry** that the validation engine queries at run time.  
-* **Runtime Interaction** – when a business operation triggers validation, the **ConstraintValidation** engine iterates over the registry, invoking each validator with the current payload.  The outcome (pass/fail, severity, messages) is aggregated and returned to the caller.
+* **Constraint schema** – `constraint-configuration.md` defines a hierarchical set of keys (e.g., `name`, `severity`, `condition`, `message`). The schema is deliberately **human‑readable** to encourage easy authoring and version control.  
+* **Claude Code Hook payload** – `CLAUDE-CODE-HOOK-FORMAT.md` specifies the exact JSON fields that must be produced (`hookId`, `payload.type = "constraint"`, `payload.data`). This format is the **contract** that any parser in the detection pipeline must respect.  
+* **Semantic detection algorithm** – `semantic-constraint-detection.md` outlines the steps the detector follows: parsing the hook payload, materialising each constraint into an internal rule object, traversing the abstract syntax tree (AST) of the target code, and evaluating the `condition` expressions against the AST nodes. The document emphasizes **meaningful handling**, meaning that constraints are not merely syntactic matches but are evaluated in the context of the code’s semantics (e.g., type information, scope resolution).
 
-Because no code symbols were discovered, we cannot name specific classes or functions, but the design clearly hinges on a **configuration‑to‑object translation pipeline** that feeds the rule engine.
+Although no concrete class names appear, a typical implementation would include:
+
+* `ConstraintParser` – reads the Claude Code Hook JSON and builds in‑memory constraint objects.  
+* `SemanticEngine` – provides the AST traversal and semantic analysis utilities referenced in the detection guide.  
+* `ConstraintEvaluator` – applies each constraint’s `condition` against the AST nodes and records violations.
+
+All of these components would live under the **AntiPatternIdentification** namespace, reinforcing the parent‑child relationship.
 
 ---
 
 ## Integration Points  
 
-* **Parent Component – ConstraintValidation** – *ConstraintConfiguration* supplies the rule definitions that **ConstraintValidation** consumes.  The validation component is therefore tightly coupled to the configuration format; any change in the configuration schema will require a corresponding update in the loader/parser within **ConstraintValidation**.  
-* **Sibling Entities** – any other configuration artifacts that live under `integrations/mcp-constraint-monitor/docs` (e.g., `monitoring-configuration.md`) likely share the same loading infrastructure, promoting reuse of a common **configuration service**.  
-* **External Systems** – because the configuration is stored as a markdown document, it can be version‑controlled alongside source code, enabling CI pipelines to validate configuration syntax before deployment.  In production, a **configuration management** service could expose the file (or its parsed representation) via an API, allowing dynamic updates without service restarts.  
-* **Dependency Flow** – the only visible dependency is the **documentation** itself, which acts as the source of truth for developers and operators.  At runtime, the loader depends on a **parser library** (e.g., SnakeYAML for YAML, Jackson for JSON) and on the **ConstraintValidation** engine’s validator interface.
+The documentation makes it clear that **ConstraintConfiguration** does not operate in isolation. Its primary integration touch‑points are:
+
+1. **Claude Code Hook infrastructure** – any service that emits or consumes Claude hooks must implement the format from `CLAUDE-CODE-HOOK-FORMAT.md`. This includes CI pipelines that generate constraint files, as well as downstream analytics that ingest them.  
+2. **Semantic detection engine** – the detection logic described in `semantic-constraint-detection.md` is the consumer of the configuration. It expects the hook payload to be available either as a file on disk or via a message bus, depending on deployment.  
+3. **AntiPatternIdentification suite** – as a child of this suite, `ConstraintConfiguration` shares common utilities (logging, error handling, configuration loading) with sibling artefacts such as **AntiPatternRules** or **PatternMatchers** (if they exist). The shared utilities ensure consistent error reporting and traceability across the anti‑pattern detection workflow.
+
+No explicit external libraries or services are mentioned, so the integration surface is limited to the internal data‑format contract and the semantic analysis pipeline.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Edit the Markdown Carefully** – Since the file defines the constraint vocabulary, any typo or structural error can break the loader.  Validate the file against the documented schema before committing.  
-2. **Version Control** – Treat `constraint-configuration.md` as code: review changes through pull requests, tag releases, and roll back if a new configuration introduces validation regressions.  
-3. **Keep Constraints Granular** – Define each business rule as a separate entry.  This aligns with the rule‑based engine’s expectation of distinct validator objects and makes troubleshooting easier.  
-4. **Test Configurations** – Add integration tests that load a sample configuration and assert that the corresponding validators behave as expected.  This guards against silent failures when the configuration format evolves.  
-5. **Avoid Over‑Complexity** – While the system supports “customizable constraint configurations,” excessive nesting or overly complex expressions can degrade validation performance.  Prefer simple, declarative constraints that map cleanly to validator implementations.
+* **Author constraints declaratively** – always start with the template in `constraint-configuration.md`. Stick to the prescribed keys and data types; deviating will cause the Claude hook parser to reject the payload.  
+* **Validate the Claude payload** – before feeding a constraint file to the detection engine, run the JSON/YAML through the schema validator described in `CLAUDE-CODE-HOOK-FORMAT.md`. This catches structural errors early.  
+* **Keep constraints semantic‑aware** – when writing `condition` expressions (as per `semantic-constraint-detection.md`), use the provided semantic primitives (e.g., `typeOf(node)`, `isAsyncFunction(node)`). Purely syntactic checks defeat the purpose of the semantic detector.  
+* **Version control the markdown files** – because the configuration is a first‑class artefact, store `constraint-configuration.md` and its generated hook files alongside source code. This ensures traceability of why a particular constraint exists.  
+* **Coordinate with AntiPatternIdentification** – any change to the constraint schema should be reviewed together with other anti‑pattern artefacts to avoid conflicting definitions or duplicate detection rules.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
 
-1. **Configuration‑Driven Architecture** – constraints are externalized from code.  
-2. **Rules‑Based Validation** – the parent component applies a set of declarative rules.  
-3. **Separation of Concerns** – policy (configuration) is decoupled from mechanism (validation engine).  
+* **Configuration‑driven (declarative) architecture** – constraints are expressed outside of code and consumed at runtime.  
+* **Pipeline style processing** – a clear sequence of author → serialize → detect.
 
-### Design Decisions and Trade‑offs  
+### Design decisions and trade‑offs  
 
-* **Flexibility vs. Runtime Overhead** – externalizing constraints enables rapid policy changes without code changes, but each validation cycle must interpret the configuration, adding a modest processing cost.  
-* **Documentation as Source of Truth** – storing the schema in markdown makes it human‑readable, yet requires a reliable parser and validation step to prevent drift between docs and actual runtime expectations.  
+* **Human‑readable markdown for schema** – promotes ease of authoring but requires a generation step to produce the Claude hook payload.  
+* **Single data‑exchange format (Claude Code Hook)** – centralises communication but couples all consumers to that format; any change to the format propagates system‑wide.  
 
-### System Structure Insights  
+### System structure insights  
 
-* **Hierarchical Layering** – docs → loader → registry → validator → outcome.  
-* **Parent‑Child Relationship** – *ConstraintConfiguration* is a child of **ConstraintValidation**, feeding it the data it needs to operate.  
+* **Parent‑child hierarchy** – `ConstraintConfiguration` lives under `AntiPatternIdentification`, sharing utilities and error‑handling conventions.  
+* **Loose coupling via data format** – the detection engine does not need to know the source of the constraints, only that they conform to the Claude hook schema.
 
-### Scalability Considerations  
+### Scalability considerations  
 
-* Adding new constraints is simply a matter of extending the markdown file, which scales linearly.  
-* Very large configurations could increase memory footprint and validation latency; consider sharding constraints by domain or loading them lazily if performance becomes a bottleneck.  
+* Because constraints are loaded as a single payload, the detection engine can scale horizontally by distributing the payload to multiple workers.  
+* The declarative nature allows new constraints to be added without code changes, supporting organic growth of the rule set.
 
-### Maintainability Assessment  
+### Maintainability assessment  
 
-* High maintainability thanks to the clear separation between configuration and code.  
-* The single source of truth (markdown) reduces duplication, but the lack of generated schema or strong typing means that human error is a risk; automated schema validation mitigates this.  
+* Documentation‑first approach (three markdown files) makes the contract explicit and easy to audit.  
+* The reliance on a single format reduces duplication, but any schema drift must be caught by strict validation.  
+* Keeping the configuration separate from detection logic simplifies testing: unit tests can feed mock Claude payloads directly into the detector.  
 
 ---  
 
-*All analysis is strictly grounded in the observed `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` documentation and the stated relationship to the **ConstraintValidation** component.*
+*All statements above are grounded in the three observed markdown files and the explicit parent relationship to **AntiPatternIdentification**. No external patterns or code elements have been introduced beyond what the source observations provide.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintValidation](./ConstraintValidation.md) -- ConstraintValidation uses a rules-based approach to validate constraints, ensuring system integrity.
+- [AntiPatternIdentification](./AntiPatternIdentification.md) -- AntiPatternIdentification is recognized as a sub-component but lacks direct references in the provided source files.
 
 
 ---

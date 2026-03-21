@@ -1,22 +1,32 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Entity Validation" {
+package "EntityValidator" {
   component "EntityValidator" as ev <<core>>
-  component "Rules" as r <<api>>
-  component "Cache" as c <<storage>>
-  component "Ontology Integration" as oi <<api>>
-  component "Validation Report" as vr <<storage>>
+  component "Entity Cache" as ec <<storage>>
+  component "Entity Versioning" as evs <<agent>>
+  component "Entity Logger" as el <<agent>>
+  component "Entity Updater" as eu <<agent>>
+  component "Entity Staleness Detector" as esd <<agent>>
 }
 
-package "Semantic Analysis" {
-  component "Semantic Analysis Agent" as saa <<agent>>
+package "API" {
+  component "Entity API" as ea <<api>>
 }
 
-ev --> r : uses
-ev --> c : uses
-ev --> oi : uses
-ev --> vr : produces
-saa --> ev : uses
+package "Dependencies" {
+  component "MCP Server" as mcp <<external>>
+  component "Graph Database" as gd <<storage>>
+}
+
+ev --> ec : uses
+ev --> evs : uses
+ev --> el : uses
+ev --> eu : uses
+ev --> esd : uses
+ev --> ea : provides
+ea --> ev : uses
+ev --> mcp : integrates
+ev --> gd : stores
 
 @enduml

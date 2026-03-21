@@ -1,0 +1,21 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Service Management" {
+  component "ServiceOrchestrator" as so <<core>>
+  component "ServiceStarter" as ss <<api>>
+  component "LLMManager" as llm <<core>>
+}
+
+so --> ss : uses
+so --> llm : manages
+ss --> so : provides
+llm --> so : notifies
+
+package "Libraries" {
+  component "lib/service-starter.js" as ls <<api>>
+}
+
+so --> ls : uses
+
+@enduml

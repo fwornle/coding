@@ -2,26 +2,23 @@
 !include /coding/docs/puml/_standard-style.puml
 
 package "CodingPatterns" {
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  component "WaveAgent" as wa <<agent>>
-  component "ConstraintMonitor" as cm <<core>>
-  component "ProviderRegistry" as pr <<core>>
-  component "CodeGraphRAG" as cgr <<core>>
-  component "ContentValidationAgent" as cva <<agent>>
+  component "GraphDatabase" as graph <<storage>>
+  component "GraphPersistenceModule" as gpm <<core>>
+  component "EntityValidator" as ev <<agent>>
+  component "BatchProcessingPipeline" as bpp <<core>>
+  component "BrowserAccess" as ba <<external>>
+  component "LlmServiceManager" as lsm <<api>>
+  component "WaveAgentController" as wac <<agent>>
+  component "CopiWrapper" as cw <<cli>>
 }
 
-package "External Dependencies" {
-  database "GraphDatabase" as gd
-}
-
-gda --> gd : uses
-wa --> gda : uses
-cm --> gda : uses
-pr --> gda : uses
-cgr --> gda : uses
-cva --> gda : uses
-wa --> cm : processes
-wa --> cgr : processes
-cva --> cm : processes
+graph --> gpm : uses
+gpm --> graph : stores
+ev --> graph : validates
+bpp --> ev : processes
+ba --> bpp : integrates
+lsm --> wac : manages
+wac --> lsm : uses
+cw --> ba : extends
 
 @enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: BestPracticeRepository
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[BestPracticeRepository] as best_practice_repository #LightBlue
+[CodeAnalysisPatterns] as code_analysis_patterns #F0F0F0
+[DesignPatternLibrary] as design_pattern_library #F0F0F0
+[AntiPatternIdentification] as anti_pattern_identification #F0F0F0
+[GraphCodeRAG] as graph_code_rag #F0F0F0
+
+coding_patterns --> best_practice_repository
+code_analysis_patterns -[hidden]- best_practice_repository
+design_pattern_library -[hidden]- best_practice_repository
+anti_pattern_identification -[hidden]- best_practice_repository
+graph_code_rag -[hidden]- best_practice_repository
+
+@enduml

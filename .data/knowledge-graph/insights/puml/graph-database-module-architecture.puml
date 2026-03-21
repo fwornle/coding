@@ -1,0 +1,17 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Graph Database Module" {
+  component "GraphDatabaseModule" as gdm <<core>>
+  component "GraphDatabaseAdapter" as gda <<api>>
+  database "Graphology + LevelDB" as gld
+  component "migrateGraphDatabase script" as mgd <<cli>>
+}
+
+gdm --> gda : uses
+gda --> gld : interacts with
+gdm --> mgd : updates with
+gda --> gld : provides storage
+gda --> gld : offers query
+
+@enduml

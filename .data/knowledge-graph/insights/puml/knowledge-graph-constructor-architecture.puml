@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Knowledge Graph Constructor" {
+  component "KnowledgeGraphConstructor" as kgc <<core>>
+  component "Memgraph" as memgraph <<storage>>
+  component "Tree-sitter Parser" as ts <<agent>>
+  component "Knowledge Graph Cache" as kgcache <<storage>>
+  component "Knowledge Graph API" as kgapi <<api>>
+  component "Knowledge Graph Versioning" as kgversion <<agent>>
+  component "Knowledge Graph Logger" as kglogger <<agent>>
+  component "Knowledge Graph Updater" as kgupdater <<agent>>
+}
+
+kgc --> memgraph : uses
+kgc --> ts : uses
+kgc --> kgcache : uses
+kgc --> kgapi : provides
+kgc --> kgversion : uses
+kgc --> kglogger : uses
+kgc --> kgupdater : uses
+kgapi --> memgraph : queries
+kgversion --> memgraph : tracks
+kglogger --> memgraph : logs
+kgupdater --> memgraph : updates
+
+@enduml

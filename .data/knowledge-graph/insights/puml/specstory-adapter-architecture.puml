@@ -1,24 +1,22 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Specstory Adapter" {
+package "SpecstoryAdapter" {
   component "SpecstoryAdapter" as sa <<core>>
-  component "Logger" as logger <<external>>
-  component "Specstory Extension API" as api <<api>>
+  component "Logging Module" as lm <<api>>
+  component "Cache" as cache <<storage>>
+  component "EnvironmentConfigurator" as ec <<api>>
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "WorkStealer" as ws <<agent>>
+  component "Trajectory" as t <<external>>
 }
 
-sa --> logger : uses
-sa --> api : communicates
-logger ..> sa : logs
-
-package "Connection Mechanisms" {
-  component "HTTP Connection" as http <<external>>
-  component "IPC Connection" as ipc <<external>>
-  component "File Watch Connection" as fw <<external>>
-}
-
-sa --> http : uses
-sa --> ipc : uses
-sa --> fw : uses
+sa --> lm : uses
+lm --> cache : stores
+cache --> gdm : retrieves
+sa --> ec : configures
+ec --> cache : caches
+ws --> sa : synchronizes
+sa --> t : notifies
 
 @enduml

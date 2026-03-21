@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "API Service" {
+  component "APIService" as api <<api>>
+  component "ServiceStarter" as ss <<core>>
+  component "Constraint Monitoring API Server" as cm <<external>>
+}
+
+package "LLM Management" {
+  component "LLMManager" as llm <<core>>
+}
+
+api --> ss : uses
+api --> cm : interacts
+api --> llm : collaborates
+ss --> cm : uses
+
+@enduml

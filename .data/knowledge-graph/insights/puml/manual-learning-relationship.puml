@@ -6,20 +6,24 @@ title Hierarchy Context: ManualLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [ManualLearning] as manual_learning #LightBlue
 [OnlineLearning] as online_learning #F0F0F0
-[GraphDatabaseManager] as graph_database_manager #F0F0F0
-[WaveAgentController] as wave_agent_controller #F0F0F0
-[UkbTraceReportGenerator] as ukb_trace_report_generator #F0F0F0
-[LlmServiceManager] as llm_service_manager #F0F0F0
-[VkbApiClientManager] as vkb_api_client_manager #F0F0F0
-[ManualKnowledgePipeline] as manual_knowledge_pipeline #E8F5E8
+[GraphDatabaseModule] as graph_database_module #F0F0F0
+[OntologyClassificationModule] as ontology_classification_module #F0F0F0
+[InsightGenerationModule] as insight_generation_module #F0F0F0
+[AgentFrameworkModule] as agent_framework_module #F0F0F0
+[UtilitiesModule] as utilities_module #F0F0F0
+[BrowserAccess] as browser_access #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[GraphDatabaseUpdater] as graph_database_updater #E8F5E8
 
 knowledge_management --> manual_learning
 online_learning -[hidden]- manual_learning
-graph_database_manager -[hidden]- manual_learning
-wave_agent_controller -[hidden]- manual_learning
-ukb_trace_report_generator -[hidden]- manual_learning
-llm_service_manager -[hidden]- manual_learning
-vkb_api_client_manager -[hidden]- manual_learning
-manual_learning --> manual_knowledge_pipeline
+graph_database_module -[hidden]- manual_learning
+ontology_classification_module -[hidden]- manual_learning
+insight_generation_module -[hidden]- manual_learning
+agent_framework_module -[hidden]- manual_learning
+utilities_module -[hidden]- manual_learning
+browser_access -[hidden]- manual_learning
+code_graph_rag -[hidden]- manual_learning
+manual_learning --> graph_database_updater
 
 @enduml

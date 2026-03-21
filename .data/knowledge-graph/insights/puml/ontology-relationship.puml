@@ -7,13 +7,23 @@ title Hierarchy Context: Ontology
 [Ontology] as ontology #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Insights] as insights #F0F0F0
+[OntologyManager] as ontology_manager #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
 [EntityValidator] as entity_validator #F0F0F0
-[CodeGraph] as code_graph #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+[HierarchicalOntologyStructure] as hierarchical_ontology_structure #E8F5E8
 
 semantic_analysis --> ontology
 pipeline -[hidden]- ontology
 insights -[hidden]- ontology
+ontology_manager -[hidden]- ontology
+code_analyzer -[hidden]- ontology
+insight_generator -[hidden]- ontology
+knowledge_graph_constructor -[hidden]- ontology
 entity_validator -[hidden]- ontology
-code_graph -[hidden]- ontology
+code_graph_rag -[hidden]- ontology
+ontology --> hierarchical_ontology_structure
 
 @enduml

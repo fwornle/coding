@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyClassifier
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[OntologyClassifier] as ontology_classifier #LightBlue
+[TranscriptProcessor] as transcript_processor #F0F0F0
+[Logger] as logger #F0F0F0
+[ConfigurationValidator] as configuration_validator #F0F0F0
+[Copi] as copi #F0F0F0
+[OntologyLoader] as ontology_loader #E8F5E8
+
+live_logging_system --> ontology_classifier
+transcript_processor -[hidden]- ontology_classifier
+logger -[hidden]- ontology_classifier
+configuration_validator -[hidden]- ontology_classifier
+copi -[hidden]- ontology_classifier
+ontology_classifier --> ontology_loader
+
+@enduml

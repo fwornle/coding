@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "WorkStealer Components" {
+  component "WorkStealer" as ws <<core>>
+  component "Task Queue" as tq <<storage>>
+  component "WaveController" as wc <<api>>
+  component "GraphDatabaseManager" as gdm <<storage>>
+  component "LazyLoader" as ll <<api>>
+  component "EnvironmentConfigurator" as ec <<core>>
+  component "Trajectory" as tr <<api>>
+}
+
+ws --> tq : uses
+ws --> wc : uses
+ws --> gdm : uses
+ws --> ll : uses
+ws --> ec : uses
+ws --> tr : notifies
+
+tq --> gdm : stores
+wc --> ws : executes
+ll --> ws : executes
+ec --> ws : configures
+tr --> ws : receives
+
+@enduml

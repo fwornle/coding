@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyManager
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[OntologyManager] as ontology_manager #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[CodeAnalyzer] as code_analyzer #F0F0F0
+[InsightGenerator] as insight_generator #F0F0F0
+[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
+[EntityValidator] as entity_validator #F0F0F0
+[CodeGraphRAG] as code_graph_rag #F0F0F0
+
+semantic_analysis --> ontology_manager
+pipeline -[hidden]- ontology_manager
+ontology -[hidden]- ontology_manager
+insights -[hidden]- ontology_manager
+code_analyzer -[hidden]- ontology_manager
+insight_generator -[hidden]- ontology_manager
+knowledge_graph_constructor -[hidden]- ontology_manager
+entity_validator -[hidden]- ontology_manager
+code_graph_rag -[hidden]- ontology_manager
+
+@enduml

@@ -2,29 +2,30 @@
 !include /coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-  component "KnowledgeManagement" as km <<core>>
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  component "LLMService" as lls <<api>>
-  component "VkbApiClient" as vka <<external>>
-  component "Wave Agent" as wa <<agent>>
+  component "Knowledge Graph" as kg <<storage>>
+  component "GraphDatabaseAdapter" as gda <<core>>
+  component "CheckpointManager" as cm <<core>>
+  component "CodeGraphAgent" as cga <<agent>>
+  component "PersistenceAgent" as pa <<agent>>
 }
 
-km --> gda : persists data
-km --> lls : uses
-lls --> wa : initializes
-wa --> km : executes
-km --> vka : interacts
-gda --> km : provides data
-
-package "Persistence" {
-  database "GraphDatabase" as gd
-  gda --> gd : stores
+package "Ontology System" {
+  component "OntologySystem" as os <<core>>
+  database "LevelDB" as ldb
 }
 
-package "Integrations" {
-  component "UKB Trace Report" as utr <<cli>>
-  km --> utr : generates
-  utr --> km : reports
+package "External Services" {
+  cloud "VKB API" as vkb <<external>>
 }
+
+kg --> gda : uses
+gda --> ldb : stores
+cga --> gda : uses
+pa --> gda : uses
+cm --> gda : tracks
+os --> kg : classifies
+vkb --> gda : interacts
+cga --> cm : updates
+pa --> cm : updates
 
 @enduml

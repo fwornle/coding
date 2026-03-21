@@ -1,0 +1,24 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Configuration Validation" {
+  component "ConfigurationValidator" as cv <<core>>
+  component "LSLConfigValidator" as lcv <<api>>
+  component "Logger" as log <<external>>
+}
+
+cv --> lcv : uses
+cv --> log : logs
+lcv --> cv : validates
+
+package "Configuration" {
+  component "ConfigurationSettings" as cs <<storage>>
+  cv --> cs : checks
+}
+
+package "System" {
+  component "SystemConfig" as sc <<storage>>
+  cv --> sc : optimizes
+}
+
+@enduml

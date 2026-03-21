@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ViolationCaptureModule
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ViolationCaptureModule] as violation_capture_module #LightBlue
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[ContentValidator] as content_validator #F0F0F0
+[HookManager] as hook_manager #F0F0F0
+[WorkflowManager] as workflow_manager #F0F0F0
+[ConstraintConfigurationManager] as constraint_configuration_manager #F0F0F0
+[ConstraintViolationStorage] as constraint_violation_storage #E8F5E8
+
+constraint_system --> violation_capture_module
+graph_database_manager -[hidden]- violation_capture_module
+content_validator -[hidden]- violation_capture_module
+hook_manager -[hidden]- violation_capture_module
+workflow_manager -[hidden]- violation_capture_module
+constraint_configuration_manager -[hidden]- violation_capture_module
+violation_capture_module --> constraint_violation_storage
+
+@enduml

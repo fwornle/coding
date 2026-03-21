@@ -2,25 +2,27 @@
 !include /coding/docs/puml/_standard-style.puml
 
 package "Semantic Analysis" {
-  component "SemanticAnalysisAgent" as sa <<agent>>
+  component "SemanticAnalysis" as sa <<core>>
   component "OntologyClassificationAgent" as oca <<agent>>
+  component "SemanticAnalysisAgent" as sia <<agent>>
   component "CodeGraphAgent" as cga <<agent>>
   component "ContentValidationAgent" as cva <<agent>>
-  component "BaseAgent" as ba <<core>>
 }
 
 package "Storage" {
   component "GraphDatabaseAdapter" as gda <<storage>>
-  database "Graph Database" as gd
+  database "GraphDatabase" as gd
+  database "LevelDB" as ldb
 }
 
-sa --> ba : extends
-oca --> ba : extends
-cga --> ba : extends
-cva --> ba : extends
-
-sa --> gda : uses
-cga --> gda : uses
-gda --> gd : connects to
+sa --> oca : uses
+sa --> sia : uses
+sa --> cga : uses
+sa --> cva : uses
+oca --> gd : uses
+sia --> gd : uses
+cga --> gd : uses
+cga --> ldb : uses
+cva --> gd : uses
 
 @enduml

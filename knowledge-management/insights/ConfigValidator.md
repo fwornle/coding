@@ -2,67 +2,85 @@
 
 **Type:** Detail
 
-The lack of specific source files means we cannot provide a detailed implementation, but the concept of a ConfigValidator is a reasonable inference from the parent context.
+The ConfigurationValidator sub-component is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 
 ## What It Is  
 
-`ConfigValidator` is the logical validation component that lives inside the **LSLConfigManager** hierarchy. The only concrete grounding we have is the statement from the parent‑component analysis that *“LSLConfigManager contains ConfigValidator”* and that the manager *“uses a validation mechanism to ensure configuration data is correct and consistent.”* Because no source files or symbol listings were discovered, we cannot point to a concrete file path such as `src/lsl/ConfigValidator.ts`; instead we treat the name **ConfigValidator** as the canonical identifier for the validation logic that the manager relies on. In practice, this entity is expected to receive raw configuration data (likely a JSON or YAML representation) and apply a set of rules that guarantee the data conforms to the schema required by the rest of the system.
-
-## Architecture and Design  
-
-The observations suggest a **layered architecture** in which the **LSLConfigManager** acts as a façade or service layer that delegates the responsibility of data correctness to a dedicated validator. This reflects the **Separation of Concerns** design principle: configuration loading, storage, and consumption are kept distinct from the validation logic. The only explicit interaction described is that the manager *“uses a validation mechanism,”* indicating a **dependency relationship** where `LSLConfigManager → ConfigValidator`. No explicit design patterns (e.g., Strategy, Builder) are mentioned, so we refrain from labeling the validator with a specific pattern. The design therefore appears to be a straightforward composition: the manager composes a validator object (or static utility) and invokes it before exposing configuration values to downstream consumers.
-
-## Implementation Details  
-
-Because the source snapshot reports **“0 code symbols found”** and provides no file‑level details, we cannot enumerate classes, methods, or interfaces. The only concrete element is the class‑like name **ConfigValidator**. From the parent context we can infer the following plausible implementation outline, without asserting it as fact:
-
-1. **Entry Point** – a public method such as `validate(config: any): ValidationResult` that receives the raw configuration object.
-2. **Rule Set** – an internal collection of validation rules (e.g., required fields, type checks, value ranges) that are applied sequentially or in parallel.
-3. **Error Reporting** – a structure (perhaps `ValidationResult` or an exception) that aggregates any violations and returns them to the caller.
-4. **Integration Hook** – the `LSLConfigManager` likely calls `ConfigValidator.validate` immediately after parsing the configuration file and before caching the result.
-
-Since no concrete code is available, the above is a reasoned extrapolation based solely on the observation that a *validation mechanism* exists within the manager.
-
-## Integration Points  
-
-The sole integration point identified is the **LSLConfigManager → ConfigValidator** relationship. The manager is the consumer of the validator; it supplies the raw configuration data and expects a pass/fail outcome. No other sibling or child components are mentioned, so we cannot describe additional dependencies such as external schema libraries, logging facilities, or error‑handling middleware. The validator’s output presumably influences whether the manager proceeds to store the configuration in its internal state, propagates it to other subsystems, or aborts with an error. Because the observations do not list any interfaces, we assume the contract is a simple method call with a return type that indicates success or enumerates validation errors.
-
-## Usage Guidelines  
-
-* **Invoke Early** – Call `ConfigValidator` immediately after loading configuration data and before any component accesses the configuration. This ensures that downstream code never works with malformed data.  
-* **Treat Validation Results as Authoritative** – If the validator reports errors, the `LSLConfigManager` should reject the configuration load and surface the errors to the user or calling service.  
-* **Do Not Bypass** – Avoid direct manipulation of the manager’s internal configuration store without going through the validator, as this would violate the intended separation of concerns.  
-* **Extensibility** – Should new configuration fields be added, extend the validator’s rule set rather than sprinkling ad‑hoc checks throughout the manager or other consumers.  
-
-Because no concrete API surface is documented, developers should consult the **LSLConfigManager** documentation (or its source, when available) to discover the exact method signatures and expected error handling conventions.
+The **ConfigValidator** sub‑component lives inside the **`scripts`** directory of the repository.  Its concrete implementation is provided by the **`LSLConfigValidator`** script, which is invoked to *validate* and *optimize* configuration data used by the broader **ConfigurationValidator** component.  Although the project documentation does not spell out a concrete `ConfigValidator` class, the surrounding context (the parent **ConfigurationValidator** and the naming convention of the script) makes it clear that **ConfigValidator** is the logical unit responsible for the actual validation logic.  In the component hierarchy, **ConfigValidator** is a child of **ConfigurationValidator**, and it is the only known child at this time.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Layered architecture** – a manager layer delegating validation to a dedicated component.  
-* **Separation of Concerns** – validation logic isolated from configuration loading and consumption.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Explicit validation component** – improves reliability and centralises rule changes, at the cost of an additional indirection layer.  
-* **Implicit contract** – without a formal interface definition, the manager and validator must stay in sync manually, which can increase maintenance overhead.
+The architecture revealed by the observations is a **script‑centric validation layer**.  The parent component **ConfigurationValidator** delegates the heavy‑lifting to a dedicated script (`scripts/LSLConfigValidator`).  This delegation follows a **Facade‑like** approach: the higher‑level component presents a simple interface (e.g., “run validation”) while the underlying script encapsulates the detailed validation rules and optimisation steps.  
 
-### 3. System structure insights  
-* `LSLConfigManager` is the parent component; `ConfigValidator` is its child.  
-* No sibling components are described, suggesting the manager may be the sole owner of configuration concerns in this subsystem.
+Because the validator is implemented as a **stand‑alone script**, it can be executed independently of the main application runtime, which suggests a **batch‑oriented** design.  The script likely reads configuration files, applies a series of checks, and writes back an optimized version.  The lack of explicit class definitions in the current observations points to a **procedural** style rather than an object‑oriented one, at least for this leaf component.  
 
-### 4. Scalability considerations  
-* As configuration schemas grow, the validator can be expanded with more rules without impacting the manager’s core logic, supporting horizontal growth of validation complexity.  
-* If validation becomes computationally heavy (e.g., deep schema checks), the manager may need to off‑load validation to a background task or cache results to avoid repeated work.
+Interaction is straightforward: **ConfigurationValidator** calls into `LSLConfigValidator`, passing it the raw configuration payload (or a file path).  The script returns a validation result—typically a success/failure flag, error messages, and possibly a transformed configuration.  No other components are mentioned as direct peers, so **ConfigValidator** does not appear to share functionality with siblings; its responsibility is singular and well‑scoped.
 
-### 5. Maintainability assessment  
-* The clear separation between manager and validator aids maintainability: changes to validation rules are localized.  
-* However, the lack of explicit interfaces or documented contracts could lead to drift between the manager’s expectations and the validator’s behavior, so establishing a stable API (even if only documented) would be advisable for long‑term health.
+---
+
+## Implementation Details  
+
+The only concrete artifact we have is the **`LSLConfigValidator`** script located under the **`scripts`** folder.  While the source code itself is not listed, the naming convention (`LSL`) hints that the script may be written in **Lua Script Language** (or a similarly named domain‑specific language).  Its responsibilities can be inferred as follows:
+
+1. **Input ingestion** – reading raw configuration data (likely JSON, YAML, or a proprietary format).  
+2. **Validation rules** – a series of checks that ensure required keys exist, values fall within acceptable ranges, and cross‑field constraints are satisfied.  
+3. **Optimization pass** – after validation, the script may rewrite the configuration to eliminate redundancies, apply defaults, or reorder sections for performance.  
+4. **Result emission** – returning a structured report (e.g., a status code, list of warnings/errors, and the optimized configuration file).
+
+Because no class or function signatures are provided, we cannot enumerate method names, but the script is expected to expose a **single entry point** (e.g., a `validate()` function) that the parent **ConfigurationValidator** invokes.  The script’s procedural nature means that state is likely passed through function arguments rather than stored in object fields.
+
+---
+
+## Integration Points  
+
+**ConfigValidator** integrates with the system at two primary junctures:
+
+1. **Upstream – ConfigurationValidator**: The parent component orchestrates when validation should occur (e.g., at startup, after a configuration edit, or as part of a CI pipeline).  It supplies the raw configuration to `LSLConfigValidator` and consumes the validation report to decide whether to proceed, abort, or request user intervention.  
+
+2. **Downstream – Configuration Consumers**: After a successful validation/optimization cycle, the resulting configuration is handed to the rest of the application (e.g., runtime services, deployment scripts).  Although not explicitly listed, any component that reads the configuration will implicitly depend on the correctness guarantees provided by **ConfigValidator**.
+
+No external libraries, services, or APIs are mentioned, so the integration surface appears limited to file I/O and simple data structures.  The script’s location in the **`scripts`** folder also suggests it may be invoked via command‑line or as part of a build step, providing a clean, language‑agnostic interface.
+
+---
+
+## Usage Guidelines  
+
+* **Invoke through ConfigurationValidator** – Developers should not call `LSLConfigValidator` directly; instead, use the higher‑level **ConfigurationValidator** API to ensure proper pre‑ and post‑processing.  
+* **Provide well‑formed input** – The validator expects the configuration to adhere to the expected schema; malformed files will cause the script to abort with errors.  
+* **Treat the output as canonical** – After a successful run, the optimized configuration file should be the source of truth for downstream components.  
+* **Version the script** – Because the validation logic resides in a script, any change to `LSLConfigValidator` can affect many downstream services; bump the script’s version or maintain a changelog.  
+* **Run in isolated environments** – Since the script may perform file writes, execute it in a controlled directory (e.g., a temporary workspace) to avoid unintended side effects on production configuration files.
+
+---
+
+### Architectural patterns identified  
+* **Facade / Delegation** – ConfigurationValidator delegates validation to a dedicated script.  
+* **Procedural batch processing** – Validation is performed as a stand‑alone script rather than an always‑on service.
+
+### Design decisions and trade‑offs  
+* **Script‑centric design** keeps the validator lightweight and easy to run in CI, but it sacrifices the richer type safety and extensibility of an object‑oriented class.  
+* **No explicit class** means fewer compilation dependencies, yet debugging and testability can be harder without a clear API surface.
+
+### System structure insights  
+* The system is organized around a **parent‑child hierarchy** where the parent component orchestrates validation and the child (`LSLConfigValidator`) performs the concrete work.  
+* All validation logic is co‑located in the **`scripts`** folder, isolating it from core application code.
+
+### Scalability considerations  
+* Because validation runs as a script, scaling to large configuration sets will depend on the script’s performance and the host’s I/O capacity. Parallel execution could be added at the **ConfigurationValidator** level if needed.  
+* The lack of a service‑oriented interface means the validator cannot be horizontally scaled across nodes without external orchestration.
+
+### Maintainability assessment  
+* **Positive:** The validation logic is isolated in a single script, making it easy to locate and modify.  
+* **Negative:** Absence of a formal class or test harness may lead to hidden bugs; adding unit tests around the script’s entry point is recommended.  
+* Keeping the script versioned and documenting its expected input/output formats will improve long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LSLConfigManager](./LSLConfigManager.md) -- The LSLConfigManager uses a validation mechanism to ensure configuration data is correct and consistent.
+- [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 
 
 ---

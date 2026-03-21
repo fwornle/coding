@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AntiPatternIdentification
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AntiPatternIdentification] as anti_pattern_identification #LightBlue
+[CodeAnalysisPatterns] as code_analysis_patterns #F0F0F0
+[DesignPatternLibrary] as design_pattern_library #F0F0F0
+[BestPracticeRepository] as best_practice_repository #F0F0F0
+[GraphCodeRAG] as graph_code_rag #F0F0F0
+[ConstraintConfiguration] as constraint_configuration #E8F5E8
+
+coding_patterns --> anti_pattern_identification
+code_analysis_patterns -[hidden]- anti_pattern_identification
+design_pattern_library -[hidden]- anti_pattern_identification
+best_practice_repository -[hidden]- anti_pattern_identification
+graph_code_rag -[hidden]- anti_pattern_identification
+anti_pattern_identification --> constraint_configuration
+
+@enduml

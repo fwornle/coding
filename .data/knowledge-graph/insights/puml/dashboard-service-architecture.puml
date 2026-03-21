@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Dashboard" {
+  component "DashboardService" as ds <<core>>
+  component "Constraint Monitoring Dashboard" as cmd <<external>>
+  component "ServiceStarter" as ss <<api>>
+}
+
+package "Managers" {
+  component "LLMManager" as llm <<core>>
+}
+
+ds --> cmd : provides
+ds --> ss : uses
+ds --> llm : manages
+llm --> cmd : updates
+
+@enduml

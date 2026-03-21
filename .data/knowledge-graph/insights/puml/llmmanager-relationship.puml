@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMManager
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[LLMManager] as llmmanager #LightBlue
+[ServiceOrchestrator] as service_orchestrator #F0F0F0
+[GraphDatabaseManager] as graph_database_manager #F0F0F0
+[WaveAgentExecutor] as wave_agent_executor #F0F0F0
+[APIService] as apiservice #F0F0F0
+[DashboardService] as dashboard_service #F0F0F0
+
+dockerized_services --> llmmanager
+service_orchestrator -[hidden]- llmmanager
+graph_database_manager -[hidden]- llmmanager
+wave_agent_executor -[hidden]- llmmanager
+apiservice -[hidden]- llmmanager
+dashboard_service -[hidden]- llmmanager
+
+@enduml
