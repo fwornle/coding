@@ -18,6 +18,9 @@ coding --claude
 coding --copilot
 coding --agent opencode
 
+# Clean start (kills all orphaned processes, frees ports)
+coding --force
+
 # Query local LLM from command line (Docker Model Runner)
 llm "Explain this error message"
 cat file.js | llm "Review this code"

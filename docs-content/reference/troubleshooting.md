@@ -96,7 +96,10 @@ PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
 ### Container Won't Start
 
 ```bash
-# Check logs
+# First try: clean start (kills orphaned processes hogging ports)
+coding --force
+
+# Check logs if --force doesn't help
 docker compose -f docker/docker-compose.yml logs coding-services
 
 # Force rebuild
@@ -107,10 +110,15 @@ docker compose -f docker/docker-compose.yml up -d
 ### Port Conflicts
 
 ```bash
-# Find process using port
-lsof -i :3848
+# Recommended: force-clean all coding processes and restart
+coding --force
 
-# Kill conflicting process
+# This kills supervisors, health monitors, all processes on coding ports,
+# stops Docker containers, then proceeds with a clean startup.
+# Combine with agent flags: coding --force --claude
+
+# Manual investigation if --force doesn't resolve it
+lsof -i :3848
 kill $(lsof -ti :3848)
 
 # Or change ports in .env.ports

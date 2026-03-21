@@ -19,11 +19,37 @@ coding --project ~/my-project
 coding --claude    # Claude Code (default)
 coding --copilot   # GitHub CoPilot
 
+# Clean start (kills all coding processes, frees all ports, then launches)
+coding --force
+
+# Combine with other flags
+coding --force --claude
+coding --force --project ~/my-project
+
 # Docker mode
 touch .docker-mode && coding --claude
 
 # Help
 coding --help
+```
+
+### `--force` Flag
+
+Performs a full cleanup before startup — use when ports are stuck or orphaned processes prevent launch:
+
+1. Stops all Docker coding containers (`docker compose down`)
+2. Kills process supervisors and health monitors (prevents respawning)
+3. Kills all processes on coding ports (3030-3033, 3847-3850, 8080, 9090, 12435)
+4. Kills remaining coding-repo node processes
+5. Verifies all ports are free
+6. Proceeds with normal startup
+
+```bash
+# When "address already in use" errors block startup
+coding --force
+
+# Equivalent to a clean reboot of all coding services
+coding --force --claude
 ```
 
 ### vkb
@@ -191,6 +217,9 @@ DEBUG_LSL=1 node scripts/generate-proper-lsl-from-transcripts.js --mode=foreign 
 ### Process Management
 
 ```bash
+# Clean start - kill ALL coding processes and restart fresh
+coding --force
+
 # Find running monitors
 ps aux | grep enhanced-transcript-monitor
 

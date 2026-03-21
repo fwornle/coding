@@ -128,7 +128,10 @@ docker compose -f docker/docker-compose.yml down -v
 ### Container Won't Start
 
 ```bash
-# Check logs
+# Recommended: clean start (kills orphaned processes, frees ports, restarts fresh)
+coding --force
+
+# If that doesn't help, check logs
 docker compose -f docker/docker-compose.yml logs coding-services
 
 # Force rebuild
@@ -139,9 +142,11 @@ docker compose -f docker/docker-compose.yml up -d
 ### Port Conflicts
 
 ```bash
-# Find process using port
-lsof -i :3848
+# Recommended: force-clean all coding processes and restart
+coding --force
 
+# Manual investigation if --force doesn't resolve it
+lsof -i :3848
 # Kill conflicting process or change ports in .env.ports
 ```
 
