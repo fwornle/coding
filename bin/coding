@@ -17,6 +17,7 @@ VERBOSE=false
 DRY_RUN=false
 CONFIG_FILE=""
 PROJECT_DIR=""
+FORCE_CLEAN=false
 
 # Helper functions
 log() {
@@ -28,6 +29,86 @@ log() {
 error() {
   echo "Error: $1" >&2
   exit 1
+}
+
+# Force-clean all coding-related processes and ports for a clean start
+force_clean() {
+  echo "[Force] Killing all coding-related processes for a clean start..."
+
+  # Coding-specific ports (from .env.ports)
+  local CODING_PORTS="3030 3031 3032 3033 3847 3848 3849 3850 8080 9090 12435"
+
+  # 1. Stop Docker containers first (graceful)
+  local docker_dir
+  docker_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docker"
+  if [ -f "$docker_dir/docker-compose.yml" ] && command -v docker &>/dev/null; then
+    echo "[Force] Stopping Docker coding containers..."
+    docker compose -f "$docker_dir/docker-compose.yml" down 2>/dev/null || true
+  fi
+
+  # 2. Kill the global process supervisor and health monitors (they respawn children)
+  local supervisor_pids
+  supervisor_pids=$(pgrep -f 'global-process-supervisor\.js' 2>/dev/null || true)
+  if [ -n "$supervisor_pids" ]; then
+    echo "[Force] Killing global process supervisor(s): $supervisor_pids"
+    echo "$supervisor_pids" | xargs kill -9 2>/dev/null || true
+  fi
+
+  local monitor_pids
+  monitor_pids=$(pgrep -f 'statusline-health-monitor\.js' 2>/dev/null || true)
+  if [ -n "$monitor_pids" ]; then
+    echo "[Force] Killing health monitor(s): $monitor_pids"
+    echo "$monitor_pids" | xargs kill -9 2>/dev/null || true
+  fi
+
+  local lsl_pids
+  lsl_pids=$(pgrep -f 'global-lsl-coordinator\.js\|live-logging-coordinator\.js' 2>/dev/null || true)
+  if [ -n "$lsl_pids" ]; then
+    echo "[Force] Killing LSL coordinator(s): $lsl_pids"
+    echo "$lsl_pids" | xargs kill -9 2>/dev/null || true
+  fi
+
+  # 3. Kill anything listening on coding ports
+  local killed_any=false
+  for port in $CODING_PORTS; do
+    local pids
+    pids=$(lsof -ti ":$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+      echo "[Force] Killing process(es) on port $port: $pids"
+      echo "$pids" | xargs kill -9 2>/dev/null || true
+      killed_any=true
+    fi
+  done
+
+  # 4. Kill any remaining coding-repo node processes (but NOT VS Code, NOT this script)
+  local coding_repo
+  coding_repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local remaining
+  remaining=$(pgrep -f "$coding_repo/(scripts|integrations|src|lib)/.*\.(js|ts)" 2>/dev/null || true)
+  if [ -n "$remaining" ]; then
+    echo "[Force] Killing remaining coding node processes: $remaining"
+    echo "$remaining" | xargs kill -9 2>/dev/null || true
+  fi
+
+  # 5. Brief wait for ports to release
+  sleep 1
+
+  # 6. Verify ports are free
+  local blocked_ports=""
+  for port in $CODING_PORTS; do
+    if lsof -ti ":$port" &>/dev/null; then
+      blocked_ports="$blocked_ports $port"
+    fi
+  done
+
+  if [ -n "$blocked_ports" ]; then
+    echo "[Force] ⚠️  Ports still in use after cleanup:$blocked_ports"
+    echo "[Force] You may need to manually check: lsof -i :<port>"
+  else
+    echo "[Force] ✅ All coding ports are free"
+  fi
+
+  echo "[Force] Clean slate ready. Continuing with startup..."
 }
 
 show_help() {
@@ -42,6 +123,7 @@ OPTIONS:
   --claude           Force Claude Code (same as --agent claude)
   --copilot, --copi  Force CoPilot (same as --agent copilot)
   --opencode         Force OpenCode (same as --agent opencode)
+  --force            Kill ALL coding-related processes for a clean start
   --copilot-stop     Stop all CoPilot fallback services
   --config FILE      Use specific config file
   --project DIR      Set target project directory (default: current dir)
@@ -91,6 +173,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --copilot|--copi)
       FORCE_AGENT="copilot"
+      shift
+      ;;
+    --force)
+      FORCE_CLEAN=true
       shift
       ;;
     --copilot-stop)
@@ -148,6 +234,11 @@ done
 
 # Script directory already defined above
 
+# Force-clean if requested (before anything else)
+if [ "$FORCE_CLEAN" = true ]; then
+  force_clean
+fi
+
 # Detect Node.js
 if ! command -v node &> /dev/null; then
   error "Node.js is required but not found in PATH"
@@ -203,8 +294,9 @@ else
   fi
 fi
 
-# Export dry-run flag for launch scripts
+# Export dry-run and force flags for launch scripts
 export CODING_DRY_RUN="$DRY_RUN"
+export CODING_FORCE_CLEAN="$FORCE_CLEAN"
 
 # Set environment variables for agent adapter system
 export CODING_AGENT="$AGENT"
