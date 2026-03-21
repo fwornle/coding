@@ -19,11 +19,17 @@ VKB (Visualize Knowledge Base) is a cross-platform knowledge visualization serve
 
 ### Visualization Screenshots
 
-![Knowledge Graph Viewer](../images/viewer.png)
+![Knowledge Graph Viewer — 281 entities with hierarchical Project/Component/SubComponent/Detail layout, filtered by team and learning source](../images/viewer.png)
 
-![Node Details Panel](../images/viewer-details.png)
+*Graph overview with entity type filters, team/view selectors, learning source toggle (Batch/Online/Combined), and chronological history panel.*
 
-![Insight Document Viewer](../images/viewer-details-insight.png)
+![Node Details Panel — GraphStore entity showing observations, confidence score, and incoming relations](../images/viewer-details.png)
+
+*Clicking a node reveals its details: entity type, source, team, confidence, observations, and relation links. The "View Insight Document" button opens the full insight.*
+
+![Insight Document Viewer — ReduxStateManagementPattern with rendered markdown, architecture diagram, and code examples](../images/viewer-details-insight.png)
+
+*Insight documents render full markdown with diagrams, code blocks, and structured guidance — displayed in a modal overlay alongside the node details panel.*
 
 ---
 
