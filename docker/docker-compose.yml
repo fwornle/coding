@@ -72,12 +72,16 @@ services:
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
       - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
+      # Semantic analysis dist (live-mounted to avoid Docker rebuild for TS changes)
+      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/dist:/coding/integrations/mcp-server-semantic-analysis/dist:ro
       # PlantUML standard styles (needed for diagram generation)
       - ${CODING_REPO:-.}/docs/puml:/coding/docs/puml:ro
       # Dashboard build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
+      # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
+      - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
     networks:
       - coding-network
     # Allow container to reach host services (DMR/llama.cpp)
