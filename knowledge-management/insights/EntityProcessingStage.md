@@ -71,7 +71,6 @@ Downstream, the stage’s output will be consumed by whatever stage follows it i
 
 All statements above are grounded in the provided observations; no additional patterns or file paths have been invented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ All statements above are grounded in the provided observations; no additional pa
 ### Siblings
 - [DagExecutionModel](./DagExecutionModel.md) -- The batch-analysis.yaml file defines the steps and their dependencies, which are used to construct the DAG
 - [PipelineMonitoringSystem](./PipelineMonitoringSystem.md) -- The PipelineMonitoringSystem is likely to be implemented using a logging framework or monitoring tool, such as a metrics dashboard or alerting system
-
 
 ---
 

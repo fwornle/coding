@@ -69,12 +69,10 @@ Because the agent sits between the **code‑analysis pipeline** and the **knowle
 * High maintainability: the agent’s encapsulation limits the impact of changes to graph internals.  
 * Potential maintenance burden lies in **keeping the ingestion logic in sync** with evolving code‑analysis tool output formats. A versioned adapter layer inside `src/agents/code-graph-agent.ts` would mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct and query the code knowledge graph.
-
 
 ---
 

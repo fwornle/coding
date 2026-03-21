@@ -97,12 +97,10 @@ Because the source snapshot reports **0 code symbols found**, we cannot enumerat
 
 Overall, the **HierarchicalClassificationModel** serves as a well‑encapsulated, tree‑driven classification engine that underpins the Ontology‑driven semantic analysis pipeline. Its design choices favor clarity and safety, while scalability hinges on managing taxonomy depth and size.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Ontology](./Ontology.md) -- The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
-
 
 ---
 

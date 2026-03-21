@@ -90,7 +90,6 @@ Because the `Classifier` instance is reused, the component can handle high‑thr
 ### Maintainability Assessment  
 The clear separation of concerns and the use of a single, well‑named class (`Classifier`) make the component easy to understand, test, and extend.  As long as developers adhere to the “one responsibility per module” guideline, the codebase should remain maintainable even as new classification strategies are introduced.  The lack of hidden cross‑module dependencies, as evidenced by the observations, further supports a low‑maintenance trajectory.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ The clear separation of concerns and the use of a single, well‑named class (`C
 ### Siblings
 - [SessionWindowing](./SessionWindowing.md) -- SessionWindowing uses the 'window_session' function in 'session_windowing.py' to handle session windowing tasks
 - [FileRouting](./FileRouting.md) -- FileRouting uses the 'route_file' function in 'file_routing.py' to handle file routing tasks
-
 
 ---
 

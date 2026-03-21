@@ -107,12 +107,10 @@ Because `RetryLogic` is stateless and uses asynchronous delays, it scales horizo
 
 The clear division—`ServiceStarter` (orchestration), `RetryLogic` (retry engine), `exponentialBackoff` (timing)—makes the codebase **highly maintainable**.  Updates to the back‑off algorithm or retry policy require changes in a single location (`backoff.ts` or `retry-logic.ts`) without touching each service’s start‑up code.  The only maintenance risk is ensuring that all optional services provide idempotent start functions, a requirement that must be documented and enforced across the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses the startServiceWithRetry function (lib/service-starter.js:104) to implement the retry-with-backoff pattern, preventing endless loops and providing a more robust solution when optional services fail.
-
 
 ---
 

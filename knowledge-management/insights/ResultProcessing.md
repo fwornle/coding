@@ -62,7 +62,6 @@ Because processing runs in the same process as the scheduler, scaling horizontal
 ### Maintainability Assessment  
 The current design benefits from clear responsibility boundaries and a single point of orchestration (`BatchSchedulerController`).  However, the lack of explicit interfaces between WorkflowExecution and ResultProcessing can make refactoring risky.  Introducing well‑defined data transfer objects (DTOs) and extracting the processing logic into its own module would improve testability and future extensibility without disrupting the existing pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -71,7 +70,6 @@ The current design benefits from clear responsibility boundaries and a single po
 ### Siblings
 - [BatchSchedulerController](./BatchSchedulerController.md) -- The BatchSchedulerController class is defined in the BatchScheduler.java file, which suggests a tight coupling between the scheduler and the batch analysis pipeline
 - [WorkflowExecution](./WorkflowExecution.md) -- The execution of workflows is a critical aspect of the BatchScheduler sub-component, as it directly impacts the processing of batch analysis results
-
 
 ---
 

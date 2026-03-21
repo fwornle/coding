@@ -125,7 +125,6 @@ The reset module exposes a function that clears any in‑memory caches or mutabl
 
 5. **Maintainability assessment** – The clear file boundaries (service, config, logger, validator, randomizer, reset) promote high maintainability. The reliance on a single interface (`LLMService`) ensures that changes propagate uniformly. The only maintenance risk is drift between the mock configuration and the real LLM schema, which is mitigated by the validator and by keeping the config close to the service code.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -135,7 +134,6 @@ The reset module exposes a function that clears any in‑memory caches or mutabl
 - [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.
 - [DMRProviderModule](./DMRProviderModule.md) -- The DMRProviderModule uses a Docker API client to interact with the Model Runner, as seen in lib/llm/dmr-provider-module.ts.
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
-
 
 ---
 

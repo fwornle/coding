@@ -71,12 +71,10 @@ The overall implementation follows a **composition** pattern: the **EntityClassi
 
 All statements above are derived directly from the supplied observations; no additional patterns or implementation details have been invented.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [EntityClassifier](./EntityClassifier.md) -- EntityClassifier uses the classifyEntity method in entity-classifier.ts to classify entities in the graph
-
 
 ---
 

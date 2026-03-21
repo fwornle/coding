@@ -72,7 +72,6 @@ Because the guide relies on **industry‑standard libraries**, developers are en
 * The absence of hard‑coded code symbols means the guide is low‑maintenance; updates consist of revising examples to reflect library API changes.  
 * Consistent templated structure and cross‑references to *TestingGuidelines* and *SecurityStandards* promote easy navigation and reduce the risk of divergent practices across teams.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ Because the guide relies on **industry‑standard libraries**, developers are en
 ### Siblings
 - [TestingGuidelines](./TestingGuidelines.md) -- The TestingGuidelines are outlined in the BestPractices.md document, which provides a comprehensive guide for developers to follow.
 - [SecurityStandards](./SecurityStandards.md) -- The SecurityStandards are based on industry-recognized security frameworks and guidelines, such as OWASP and NIST, which provide a comprehensive approach to security.
-
 
 ---
 

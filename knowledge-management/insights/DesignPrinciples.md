@@ -83,7 +83,6 @@ DesignPrinciples does not expose a public API, but its principles are woven into
 * **Potential risk** – Over‑reliance on shell/Python scripts for lifecycle management requires thorough testing and documentation; any drift between the setup and teardown scripts could lead to resource leaks.  
 * **Mitigation** – Regularly audit `config/teams/*.json` schemas and enforce linting of the automation scripts to keep the system consistent as it grows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ DesignPrinciples does not expose a public API, but its principles are woven into
 - [AntiPatterns](./AntiPatterns.md) -- The AntiPatterns sub-component uses the SoftwarePatterns sub-component to identify and avoid common pitfalls in software design.
 - [IntegrationModules](./IntegrationModules.md) -- The integrations/browser-access/ module provides a modular structure for browser-based coding environments, demonstrating the integration pattern of environment abstraction.
 - [TeamConfiguration](./TeamConfiguration.md) -- The config/teams/*.json files store team-specific settings and coding conventions, allowing for flexible project configuration.
-
 
 ---
 

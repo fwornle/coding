@@ -96,7 +96,6 @@ All integration points rely on a **shared, immutable configuration object** that
 * Low coupling: reasoning and classification code depend only on the configuration contract, not on file paths or parsing logic.
 * Future changes (new ontology libraries, additional parameters) can be accommodated by evolving `ontology-config.js` and the loader without rippling changes throughout the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ All integration points rely on a **shared, immutable configuration object** that
 ### Siblings
 - [OntologyReasoningEngine](./OntologyReasoningEngine.md) -- The ontology-config.js file defines the ontology library configuration, which is used by the OntologyReasoningEngine to interact with the ontology
 - [ClassificationInterface](./ClassificationInterface.md) -- The ClassificationInterface is likely implemented as a separate module, allowing for flexibility and extensibility in entity classification
-
 
 ---
 

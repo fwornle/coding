@@ -89,7 +89,6 @@ The **ProviderMetadataCache** sits at the heart of the provider‑management sub
 * **Encapsulation** – By exposing only the registry’s API, the cache’s internal mechanics are hidden, reducing the surface area for accidental misuse.
 * **Potential technical debt** – The current design assumes a single‑process environment; if the system evolves to a micro‑service architecture, the cache may need refactoring to a shared store, which could be a non‑trivial migration.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The **ProviderMetadataCache** sits at the heart of the provider‑management sub
 ### Siblings
 - [CircuitBreakerPattern](./CircuitBreakerPattern.md) -- The CircuitBreakerPattern would be implemented in the lib/llm/llm-service.ts file, where the ProviderRegistry is defined, to detect and prevent cascading failures
 - [MockProviderImplementation](./MockProviderImplementation.md) -- The MockProviderImplementation would be defined in a separate file, such as lib/llm/mock-provider.ts, to keep the test code separate from the production code
-
 
 ---
 

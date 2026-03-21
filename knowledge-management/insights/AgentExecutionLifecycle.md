@@ -12,14 +12,11 @@ The AgentExecutionLifecycle implements a termination mechanism to stop agent exe
 
 - The AgentExecutionLifecycle implements a termination mechanism to stop agent execution when errors occur or execution timeouts are reached, ensuring that system resources are released and errors are properly handled.
 
-
 ## Related Entities
 
 ### Used By
 
 - AgentManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The AgentExecutionLifecycle implements a termination mechanism to stop agent exe
 ### Siblings
 - [AgentFactoryPattern](./AgentFactoryPattern.md) -- The AgentFactory class (AgentFactory.cs) defines the CreateAgent method, which takes an AgentConfig object as a parameter to create a new agent instance.
 - [AgentConfigurationManagement](./AgentConfigurationManagement.md) -- The AgentConfig class (AgentConfig.cs) provides a Validate method to check the configuration settings for an agent, ensuring that required properties are set and values are within valid ranges.
-
 
 ---
 

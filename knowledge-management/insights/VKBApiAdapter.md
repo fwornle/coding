@@ -74,7 +74,6 @@ Finally, when testing, mock the **VKBApiAdapter** rather than the external VKB s
 * Lack of concrete code symbols in the current documentation suggests a need for explicit interface definitions and documentation to aid maintainers.  
 * Centralized error handling and configuration promote consistency, but developers must ensure the adapter remains well‑tested, as many components depend on it.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Finally, when testing, mock the **VKBApiAdapter** rather than the external VKB s
 ### Siblings
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier class utilizes the VKB API to classify entities into an ontology, as inferred from the parent context of KnowledgeManagement and the Component KnowledgeManagement
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator would logically be part of the OntologyClassifier class, given the classification and validation are closely related processes within the OntologyClassification sub-component
-
 
 ---
 

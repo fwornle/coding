@@ -55,12 +55,10 @@ By adhering to these guidelines, teams can maintain the efficiency and scalabili
 ### 5. Maintainability assessment  
 * The lack of concrete enforcement mechanisms means maintainability hinges on consistent application of the principle, code‑review rigor, and possible static‑analysis support.  When applied correctly, it yields high maintainability through reduced coupling and clearer module responsibilities.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [BestPractices](./BestPractices.md) -- The use of design principles, such as separation of concerns, enables efficient and scalable code.
-
 
 ---
 

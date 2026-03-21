@@ -14,7 +14,7 @@ The design of CodeGraphConstruction revolves around a **graph‑centric architec
 
 Within the same hierarchy, sibling components such as **GraphManagement** also interact with the GraphDatabaseAdapter, reinforcing a shared data‑layer contract across the system.  The **LLMInitialization** sibling adopts lazy loading for language‑model agents, while **ConstraintValidation** and **ContentValidation** use rules‑based validation; these patterns illustrate a broader design philosophy of *specialised, lightweight services* that each address a single concern.  CodeGraphConstruction fits this philosophy by being the sole producer of the graph structure, leaving downstream consumers (e.g., CodeGraphRagSystem) to perform retrieval, query, or reasoning tasks.
 
-![CodeGraphConstruction — Architecture](../../.data/knowledge-graph/insights/images/code-graph-construction-architecture.png)
+![CodeGraphConstruction — Architecture](images/code-graph-construction-architecture.png)
 
 ## Implementation Details  
 
@@ -30,7 +30,7 @@ Because the parent component already supplies the persistence layer, CodeGraphCo
 
 The primary integration surface for CodeGraphConstruction is the **GraphDatabaseAdapter** located at `storage/graph-database-adapter.ts`.  By adhering to the adapter’s contract, CodeGraphConstruction seamlessly participates in the data‑flow established by the parent **CodingPatterns** component.  This relationship is illustrated in the following diagram, which shows how the sub‑component sits between the source‑code parsing layer and the persistence layer, while also exposing the graph to sibling services:
 
-![CodeGraphConstruction — Relationship](../../.data/knowledge-graph/insights/images/code-graph-construction-relationship.png)
+![CodeGraphConstruction — Relationship](images/code-graph-construction-relationship.png)
 
 Beyond storage, CodeGraphConstruction directly feeds the **CodeGraphRagSystem**.  The child component leverages the constructed graph to perform semantic searches and generate context‑aware responses, meaning that any change in the graph schema or node semantics will ripple to the RAG system.  The sibling components—**GraphManagement**, **ConstraintValidation**, **ContentValidation**, **BrowserAccess**, and **LLMInitialization**—do not interact with CodeGraphConstruction directly, but they share the same underlying graph database, ensuring a unified view of the codebase across the entire *CodingPatterns* suite.
 
@@ -66,7 +66,6 @@ Beyond storage, CodeGraphConstruction directly feeds the **CodeGraphRagSystem**.
 - The clear separation between construction, storage (adapter), and consumption (RAG system) enhances maintainability; each concern can evolve independently.  
 - Absence of concrete code symbols in the current view suggests that documentation and interface contracts are crucial to prevent drift between the construction logic and its consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ Beyond storage, CodeGraphConstruction directly feeds the **CodeGraphRagSystem**.
 - [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

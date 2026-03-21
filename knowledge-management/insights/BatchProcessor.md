@@ -62,7 +62,6 @@ During execution, `BatchProcessor` iterates over the dataset locations, loads da
 * **High** – the modular design isolates changes to individual stages, and the single YAML file provides a clear, version‑controlled contract.  
 * **Potential risk** – without strict schema validation of `batch-analysis.yaml`, mis‑configurations could break the pipeline; adding validation tooling would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -71,7 +70,6 @@ During execution, `BatchProcessor` iterates over the dataset locations, loads da
 ### Siblings
 - [DataPipeline](./DataPipeline.md) -- The DataPipeline module is a key component of the OnlineLearning sub-component, as suggested by the parent analysis, and is responsible for data processing and transformation
 - [KnowledgeExtractor](./KnowledgeExtractor.md) -- The KnowledgeExtractor algorithm or processing pattern is designed to work in conjunction with the DataPipeline module, as implied by the parent component analysis
-
 
 ---
 

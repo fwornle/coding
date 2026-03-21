@@ -84,7 +84,6 @@ No external services or libraries are explicitly referenced, so integration appe
 - Reliance on `SchemaManager` for schema knowledge centralises schema evolution, reducing the risk of divergent validation rules.  
 - However, the tight coupling between the handler and its siblings means that major changes to schema management or query resolution may require coordinated updates across all three components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ No external services or libraries are explicitly referenced, so integration appe
 ### Siblings
 - [SchemaManager](./SchemaManager.md) -- The SchemaManager class is responsible for registering and updating GraphQL schema definitions, as indicated by its usage in the GraphQLAPI sub-component.
 - [QueryResolver](./QueryResolver.md) -- The QueryResolver likely utilizes a modular design, with separate resolvers for different query types, to ensure maintainability and scalability.
-
 
 ---
 

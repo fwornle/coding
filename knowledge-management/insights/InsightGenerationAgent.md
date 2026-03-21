@@ -120,12 +120,10 @@ The current design is **highly maintainable**:
 
 Potential maintenance risks stem from the catalog itself—if pattern definitions become overly complex or undocumented, the system’s behavior can become opaque.  Enforcing strict schema validation and documentation for each pattern mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Insights](./Insights.md) -- The insight generation system uses a pattern catalog to extract insights, as implemented in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts.
-
 
 ---
 

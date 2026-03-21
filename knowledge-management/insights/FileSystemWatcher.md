@@ -58,12 +58,10 @@ No sibling components are explicitly mentioned, but any other subsystem that req
 
 *All analysis is strictly grounded in the provided observations; no additional file paths, class names, or implementation details have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [FileWatchManager](./FileWatchManager.md) -- FileWatchManager uses a library like chokidar to watch file system events, providing a standardized way of handling file system notifications.
-
 
 ---
 

@@ -89,7 +89,6 @@ External dependencies include the **Apache Beam** and **Apache NiFi** client lib
 * **Moderate risk** – The factory must stay in sync with both the configurator and retry policy; divergent changes could cause mismatched configurations.
 * **Testability** – The factory’s deterministic `create_agent` method can be unit‑tested with mock configurators and simulated framework failures, supporting a robust CI pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ External dependencies include the **Apache Beam** and **Apache NiFi** client lib
 ### Siblings
 - [IngestionFrameworkConfigurator](./IngestionFrameworkConfigurator.md) -- The IngestionFrameworkConfigurator would likely be implemented in a class or module that handles data source connections, such as a DataSourceConnector class, which would define the interface for connecting to different data sources.
 - [DataIngestionRetryPolicy](./DataIngestionRetryPolicy.md) -- The DataIngestionRetryPolicy would likely be implemented using a retry library or framework, such as the Retry library in Python, which provides a simple and flexible way to implement retry logic.
-
 
 ---
 

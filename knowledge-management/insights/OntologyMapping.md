@@ -62,12 +62,10 @@ Interaction is hierarchical: the parent **OntologyClassificationAgent** contains
 * **Potential fragility** – Reliance on the automatic sync means that any change to the adapter’s contract must be reflected across all nodes that depend on it; thorough integration testing is required.  
 * **Extensibility** – New agents can reuse `OntologyMapping` without duplication, and alternative storage adapters could be introduced with minimal impact on the classification logic.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle persistence with automatic JSON export sync.
-
 
 ---
 

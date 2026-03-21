@@ -127,7 +127,6 @@ The subsystem scores **high** on maintainability:
 
 Potential maintenance risks stem from the centralised mutable state in `ConfigurationManager`; careful versioning and thorough validation are essential to avoid subtle configuration drift. Overall, the design is well‑structured, aligns with the patterns used by sibling components, and provides a solid foundation for future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ Potential maintenance risks stem from the centralised mutable state in `Configur
 - [Ontology](./Ontology.md) -- The OntologyDefinition class in ontology-definition.ts defines the upper and lower ontology structures.
 - [Insights](./Insights.md) -- The InsightGenerator class in insight-generator.ts generates insights based on the processed observations.
 - [LLMIntegration](./LLMIntegration.md) -- The LLMClient class in llm-client.ts provides a provider-agnostic interface for interacting with language models.
-
 
 ---
 

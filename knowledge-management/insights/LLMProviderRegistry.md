@@ -119,7 +119,6 @@ The component is **well‑encapsulated**: each concern (registration, validation
 
 Potential maintenance challenges include the reliance on a flat JSON file for persistence, which may require additional tooling for concurrency control and backup. However, the clear separation of responsibilities and consistent logging mitigate these risks, resulting in a component that is both **readable** and **extensible**.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -132,7 +131,6 @@ Potential maintenance challenges include the reliance on a flat JSON file for pe
 - [LLMLogger](./LLMLogger.md) -- The LLMLogger class uses a logging library (logger-lib.js) to log LLM-related events and errors.
 - [LLMConfigManager](./LLMConfigManager.md) -- The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.
 - [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
-
 
 ---
 

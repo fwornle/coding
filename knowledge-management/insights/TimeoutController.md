@@ -88,7 +88,6 @@ Because timeout thresholds are per‑service and stored in a simple config objec
 
 The clear delineation between timeout, retry, and health‑monitoring responsibilities yields high maintainability.  Each concern lives in its own function, making unit testing and future refactoring straightforward.  The only maintenance risk is the implicit coupling of retry back‑off parameters with the timeout value; documentation and automated checks should enforce consistency to avoid inadvertent timeout breaches.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ The clear delineation between timeout, retry, and health‑monitoring responsibi
 ### Siblings
 - [RetryMechanism](./RetryMechanism.md) -- The startServiceWithRetry function in lib/service-starter.js implements the retry logic, utilizing a combination of exponential backoff and timeout protection to handle service startup failures.
 - [ServiceHealthMonitor](./ServiceHealthMonitor.md) -- The ServiceHealthMonitor is responsible for tracking service health metrics, such as response times and error rates, as implemented in the monitorServiceHealth function in lib/service-starter.js.
-
 
 ---
 

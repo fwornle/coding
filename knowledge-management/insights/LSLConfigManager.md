@@ -73,14 +73,7 @@ From a dependency perspective, LSLConfigManager imports configuration‑file par
 
 ### Relationship
 
-![LSLConfigManager Relationship](images/lslconfig-manager-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/lslconfig-manager-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -95,7 +88,6 @@ From a dependency perspective, LSLConfigManager imports configuration‑file par
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism uses async buffering to handle high-volume logging scenarios.
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses a unified format to represent transcripts from different agents.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities.
-
 
 ---
 

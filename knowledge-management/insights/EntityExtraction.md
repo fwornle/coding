@@ -89,7 +89,6 @@ The system is organized around a **core orchestrator (CodeGraphConstructor)** th
 ### 5. Maintainability assessment  
 The clear separation of concerns and the use of explicit TypeScript interfaces make the codebase **highly maintainable**.  Adding new entity types or tweaking the ML model requires localized changes in `EntityExtraction.ts` and a corresponding schema update in `GraphDB.ts`.  However, the reliance on ML/NLP introduces a hidden complexity: model version drift can affect extraction quality, so a disciplined model‑management process is essential for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The clear separation of concerns and the use of explicit TypeScript interfaces m
 ### Siblings
 - [RelationshipExtraction](./RelationshipExtraction.md) -- RelationshipExtraction (RelationshipExtraction.ts) analyzes the source code to identify relationships between entities, such as method calls, variable references, and inheritance relationships.
 - [GraphDatabaseIntegration](./GraphDatabaseIntegration.md) -- GraphDatabaseIntegration (GraphDatabaseIntegration.ts) provides a standardized interface for interacting with the graph database, allowing the code graph to be stored and queried efficiently.
-
 
 ---
 

@@ -93,7 +93,6 @@ The only explicit code path we can name is `ManualLearningController.java → En
 * Because the validation rules are externalized, domain experts can adjust ontology constraints without code changes, reducing the need for frequent releases.  
 * The lack of concrete symbols in the current snapshot suggests that documentation and naming conventions are critical; developers should maintain up‑to‑date Javadoc/comments linking the controller, service, and validation components to avoid orphaned code paths.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ The only explicit code path we can name is `ManualLearningController.java → En
 ### Siblings
 - [EntityAuthoring](./EntityAuthoring.md) -- The ManualLearningController.java file utilizes the EntityAuthoringService class to handle requests related to entity creation and editing, as seen in the ManualLearningController.java file.
 - [CustomEntityAuthoringService](./CustomEntityAuthoringService.md) -- The CustomEntityAuthoringService class is likely defined in a separate file or module, such as EntityAuthoringService.java, and is instantiated within the ManualLearningController.java file.
-
 
 ---
 

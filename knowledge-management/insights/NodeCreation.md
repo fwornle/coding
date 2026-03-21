@@ -69,12 +69,10 @@ No other explicit dependencies are mentioned in the observations, so we limit th
 - **Testability** is strong because the adapter can be mocked, and the encapsulated logic can be unit‑tested in isolation.  
 - The main risk to maintainability is the potential for the method to accumulate too many responsibilities (validation, logging, metrics, retries); careful refactoring into private helper functions within the same file can mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter relies on the createNode method in storage/graph-database-adapter.ts to create new nodes in the graph database.
-
 
 ---
 

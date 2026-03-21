@@ -91,7 +91,6 @@ Because the observations do not list concrete class or method names, the above d
 * The use of a standardized interface and a dedicated parsing façade reduces coupling to external APIs, making future upgrades or provider migrations low‑risk.  
 * Centralised error handling within the handler aids observability and reduces duplicated try‑catch blocks across the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Because the observations do not list concrete class or method names, the above d
 ### Siblings
 - [RequestValidator](./RequestValidator.md) -- The RequestValidator likely resides in the CompletionRequestPipeline.java file, where it checks for required fields and data types in the incoming request
 - [CompletionRequestPipeline](./CompletionRequestPipeline.md) -- The CompletionRequestPipeline is likely defined in the CompletionRequestPipeline.java file, where it coordinates the execution of various stages, including validation, routing, and response handling
-
 
 ---
 

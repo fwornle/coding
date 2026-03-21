@@ -12,14 +12,11 @@ The AgentConfigurationManagement follows the singleton pattern to ensure that on
 
 - The AgentManager sub-component uses a configuration file (agent.config) to store agent configuration settings, which are loaded and applied to agent instances during creation.
 
-
 ## Related Entities
 
 ### Used By
 
 - AgentManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The AgentConfigurationManagement follows the singleton pattern to ensure that on
 ### Siblings
 - [AgentFactoryPattern](./AgentFactoryPattern.md) -- The AgentFactory class (AgentFactory.cs) defines the CreateAgent method, which takes an AgentConfig object as a parameter to create a new agent instance.
 - [AgentExecutionLifecycle](./AgentExecutionLifecycle.md) -- The AgentExecutionLifecycle uses a threading model (Thread.cs) to execute agents concurrently, allowing multiple agents to run simultaneously and improving overall system throughput.
-
 
 ---
 

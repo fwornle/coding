@@ -95,7 +95,6 @@ DataImporter sits at the intersection of several system boundaries:
 ### Maintainability Assessment  
 The architecture promotes high maintainability through clear separation of concerns and a shared adapter that isolates storage details.  Adding new import sources (e.g., issue‑tracker data) would involve extending `data-importer.ts` without touching the adapter or persistence layers.  However, the reliance on a single adapter means that any change to routing or export logic must be carefully tested across all dependent components.  Overall, the design balances extensibility with a manageable coupling footprint.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The architecture promotes high maintainability through clear separation of conce
 - [CodeKnowledgeGraphBuilder](./CodeKnowledgeGraphBuilder.md) -- CodeKnowledgeGraphBuilder uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [QueryEngine](./QueryEngine.md) -- QueryEngine uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-
 
 ---
 

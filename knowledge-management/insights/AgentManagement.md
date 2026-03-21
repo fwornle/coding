@@ -91,7 +91,6 @@ AgentManagement is the orchestration layer for the agent ecosystem within **Sema
 
 The modular configuration files and the unified `execute` contract make the codebase highly maintainable.  Adding, removing, or updating an agent does not require changes to the core manager logic, only to the agent’s own file and its dependency declarations.  The clear separation between concurrency (`WaveController`), scheduling (`BatchScheduler`), and business logic (individual agents) further isolates concerns, simplifying debugging and future refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The modular configuration files and the unified `execute` contract make the code
 - [Pipeline](./Pipeline.md) -- The Pipeline's batch processing is orchestrated by the coordinator agent, which utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps.
 - [Ontology](./Ontology.md) -- The OntologyClassificationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to define its behavior and dependencies.
 - [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
-
 
 ---
 

@@ -80,7 +80,6 @@ The KnowledgeManagement hierarchy is deliberately modular: each functional sub�
 ### Maintainability assessment  
 The component’s reliance on well‑defined abstractions (factory, adapter, manager) yields high maintainability: changes to the LLM provider or storage engine are localized. However, the implicit coupling to the Wave‑agent base class means that any modification to `ensureLLMInitialized()` must be validated across all siblings. Clear documentation of the expected input schema for loss events and the upsert contract in `EntityPersistenceManager` will further reduce accidental regressions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ The component’s reliance on well‑defined abstractions (factory, adapter, man
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database
 - [KnowledgeGraphQueryEngine](./KnowledgeGraphQueryEngine.md) -- KnowledgeGraphQueryEngine utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to query and retrieve knowledge entities from the graph database
-
 
 ---
 

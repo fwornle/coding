@@ -98,7 +98,6 @@ The only explicit dependency revealed is the import of `Logger.js`. All other in
 * The absence of a single global logger reduces hidden dependencies, making unit testing of **ConversationLogger** straightforward (the creator can be mocked).  
 * However, because the observations do not expose concrete type signatures or error‑handling pathways, documentation of the expected configuration schema is essential to keep the component maintainable over time.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ The only explicit dependency revealed is the import of `Logger.js`. All other in
 ### Siblings
 - [LogFormatter](./LogFormatter.md) -- The Logger.js module, used by ConversationLogger, likely contains a class or function that implements log formatting, such as a template engine or string formatting utility.
 - [LogStorage](./LogStorage.md) -- The LogStorage component may leverage a file system or a dedicated log storage solution, such as a logging database or a message queue, to store and manage logs.
-
 
 ---
 

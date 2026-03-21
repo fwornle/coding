@@ -80,7 +80,6 @@ No external libraries or services are referenced in the observations, so the pro
 * The requirement that mock objects match the production interface provides a strong contract, reducing the risk of drift between test and production code.  
 * The only maintenance overhead is keeping the mock implementations up‑to‑date when the `Mode` interface evolves, a manageable task given the limited scope of the provider.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ No external libraries or services are referenced in the observations, so the pro
 ### Siblings
 - [ModeRegistry](./ModeRegistry.md) -- The ModeRegistry is implemented in the lib/llm/llm-service.ts file, which suggests a modular design for mode management.
 - [ModeSwitcher](./ModeSwitcher.md) -- The ModeSwitcher likely relies on the ModeRegistry to retrieve available modes, as suggested by the parent component analysis.
-
 
 ---
 

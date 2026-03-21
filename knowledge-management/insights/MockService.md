@@ -141,7 +141,6 @@ The design scores highly on maintainability:
 
 Overall, MockService exemplifies a well‑engineered testing aid that integrates seamlessly into the existing LLM abstraction, leveraging the same architectural patterns that power production LLM providers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -150,7 +149,6 @@ Overall, MockService exemplifies a well‑engineered testing aid that integrates
 ### Siblings
 - [DMRService](./DMRService.md) -- DMRService uses the Docker Model Runner to provide local LLM inference capabilities.
 - [LLMService](./LLMService.md) -- LLMService uses the lib/llm/llm-service.ts file to provide a high-level facade for all LLM operations.
-
 
 ---
 

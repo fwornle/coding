@@ -106,7 +106,6 @@ Overall, the implementation follows **single‑responsibility** principles: the 
 * **Extensibility** – Adding new storage backends or cache strategies requires only implementing the existing interface, minimizing ripple effects.  
 * **Risk Areas** – The manager’s tight coupling to the cache may require careful refactoring if a different caching solution is needed; otherwise, the layered design keeps future changes localized.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ Overall, the implementation follows **single‑responsibility** principles: the 
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager is mentioned in the Hierarchy Context as a sub-component of DockerizedServices, indicating its role in managing graph data.
 - [GraphStorageModule](./GraphStorageModule.md) -- The integrations directory suggests a modular approach to data storage and management, with each graph having its own dedicated storage module.
-
 
 ---
 

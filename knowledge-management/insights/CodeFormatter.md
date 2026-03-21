@@ -90,7 +90,6 @@ No other dependencies are mentioned, so we assume the formatter is self‑contai
 * As long as sibling modules expose stable interfaces, new conventions can be introduced without modifying `CodeFormatter` itself, reducing churn.  
 * The reliance on a configuration file means that documentation of the configuration schema is essential; otherwise, misconfigurations could lead to silent rule omissions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ No other dependencies are mentioned, so we assume the formatter is self‑contai
 ### Siblings
 - [NamingConventions](./NamingConventions.md) -- The CodeFormatter class in code-formatter.py checks for naming conventions, such as camelCase or PascalCase, and corrects them if necessary.
 - [IndentationRules](./IndentationRules.md) -- The CodeFormatter class in code-formatter.py checks for indentation, ensuring that the code uses a consistent number of spaces for indentation.
-
 
 ---
 

@@ -84,12 +84,10 @@ Because ModeRouting is a child of `LLMService`, any change to the service’s co
 * The lack of visible code symbols means documentation must be kept in sync with the actual implementation to avoid drift.  
 * Centralized configuration simplifies updates but requires disciplined validation to prevent misrouting.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMService](./LLMService.md) -- LLMService class (lib/llm/llm-service.ts) acts as a single entry point for all LLM operations
-
 
 ---
 

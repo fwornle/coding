@@ -12,14 +12,11 @@ The LLMServiceFactory likely uses a registry or a mapping to keep track of the a
 
 - The LLMServiceFactory may also provide a way to configure the created LLM services, such as setting up logging or establishing connections to external services, as implemented in the ServiceInitializer component.
 
-
 ## Related Entities
 
 ### Used By
 
 - LLMServiceManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The LLMServiceFactory likely uses a registry or a mapping to keep track of the a
 ### Siblings
 - [ServiceInitializer](./ServiceInitializer.md) -- The LLMServiceFactory.py file likely contains the implementation of the ServiceInitializer, utilizing a factory pattern to create instances of LLM services with the correct configuration.
 - [ServiceHealthChecker](./ServiceHealthChecker.md) -- The ServiceHealthChecker likely uses a scheduling mechanism, such as a cron job or a timer, to periodically execute health checks on the LLM services, as seen in similar health checking patterns in other parts of the DockerizedServices component.
-
 
 ---
 

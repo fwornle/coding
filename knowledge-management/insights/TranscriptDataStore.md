@@ -66,12 +66,10 @@ The only documented integration surface is the **CONTRIBUTING.md** file, which m
 
 *All statements above are directly grounded in the single concrete reference (`integrations/code-graph-rag/CONTRIBUTING.md`) and the hierarchical relationship that places **TranscriptDataStore** inside **TranscriptManager**. No additional patterns or code details have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptManager](./TranscriptManager.md) -- The TranscriptManager likely uses a data storage solution, such as a database or a file system, to store transcript data, as seen in the integrations/code-graph-rag/CONTRIBUTING.md file.
-
 
 ---
 

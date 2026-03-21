@@ -111,7 +111,6 @@ No additional dependencies (databases, external services) are mentioned, so the 
 * The clear separation of concerns yields high maintainability: changes to request handling (validation, logging) stay within `InsightsHandler`, while algorithmic changes remain in `InsightsCore`.  
 * The limited surface area (a single public method) reduces the risk of regressions.  However, the lack of explicit interfaces in the observations means that documentation should be kept up‑to‑date to avoid accidental coupling between handler and core.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -119,7 +118,6 @@ No additional dependencies (databases, external services) are mentioned, so the 
 
 ### Siblings
 - [InsightsCore](./InsightsCore.md) -- InsightsCore handles the core logic for Insights
-
 
 ---
 

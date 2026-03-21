@@ -73,12 +73,10 @@ Because the server runs as a single process listening on two ports, horizontal s
 ### Maintainability assessment  
 The clear separation between configuration, networking, and core RAG logic aids maintainability. However, the tight coupling between `CodeGraphRAGService` and `RAGServer` means that changes to server startup or shutdown semantics may ripple to the parent. Documenting the required environment variables and providing health‑check endpoints will mitigate operational friction as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphRAGService](./CodeGraphRAGService.md) -- The CodeGraphRAGService uses the CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT environment variables to configure the ports for the Code Graph RAG service.
-
 
 ---
 

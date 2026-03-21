@@ -64,12 +64,10 @@ Because the only explicit dependency is the relative import of `../logging/Logge
 - The clear boundary between buffering (module) and logging (implementation) makes the codebase easy to reason about and test in isolation.  
 - Minimal external dependencies reduce the surface area for bugs, but the reliance on a single `createLogger` import means that any breaking change to that factory propagates to all consumers; versioning and thorough integration tests are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
-
 
 ---
 

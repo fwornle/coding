@@ -100,7 +100,6 @@ The hook subsystem is encapsulated within `HookOrchestrator.ts`, with three cohe
 
 The architecture’s **clear separation of concerns** (execution, routing, persistence) makes the codebase approachable: developers can modify subscription logic without touching execution ordering, and vice‑versa.  The **pub‑sub contract** serves as a stable API surface, reducing the risk of breaking changes when adding new hooks.  However, the reliance on a single orchestrator means that any substantial refactor of HookPipeline will ripple through the entire hook system, so thorough testing and incremental rollout strategies are advisable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The architecture’s **clear separation of concerns** (execution, routing, persi
 ### Siblings
 - [SubscriptionManager](./SubscriptionManager.md) -- SubscriptionManager (HookOrchestrator.ts) maintains a registry of hook subscriptions, allowing for efficient lookup and notification of subscribed hooks.
 - [HookStore](./HookStore.md) -- HookStore (HookOrchestrator.ts) utilizes a data storage mechanism to persist hook metadata, ensuring that hook information is retained across system restarts.
-
 
 ---
 

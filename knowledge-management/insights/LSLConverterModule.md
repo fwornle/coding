@@ -65,7 +65,6 @@ Because conversion is performed in a pure‑function style (no shared mutable st
 ### Maintainability assessment  
 The clear separation between the façade (LSLConverterModule) and the conversion engine (`LSLConverter`) promotes high maintainability.  Updates to conversion rules are confined to a single class, while the module’s public API remains stable.  The modular design also eases unit testing: the façade can be mocked, and each format handler can be exercised in isolation.  As long as the registration contract is respected, extending the system with new transcript formats incurs minimal risk to existing functionality.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ The clear separation between the façade (LSLConverterModule) and the conversion
 - [LoggingModule](./LoggingModule.md) -- The LoggingModule may utilize a logging framework to handle log messages and exceptions.
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- The GraphDatabaseModule may utilize a graph database framework to handle data storage and retrieval.
 - [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptAdapter class in lib/agent-api/transcript-api.js provides a unified abstraction for reading and converting transcripts from different agent formats into the LSL format.
-
 
 ---
 

@@ -88,7 +88,6 @@ The system is organized as a hierarchy: **KnowledgeManagement** (parent) → **O
 
 Maintainability is strong where the adapter pattern is used: changes to the graph DB API are localized to `graph-database-adapter.ts`. The façade approach of OntologyClassificationSystem also isolates callers from internal changes. However, the heavy reliance on a single agent file means that any modification to `classifyEntity` must be carefully coordinated with all sibling components, increasing the coordination overhead. Adding comprehensive unit tests around `classifyEntity` and the adapter will mitigate regression risk and preserve the system’s maintainability as it evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Maintainability is strong where the adapter pattern is used: changes to the grap
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store entities in the graph database.
 - [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
 - [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
-
 
 ---
 

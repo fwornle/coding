@@ -67,7 +67,6 @@ No other dependencies are mentioned, so the integration surface is limited to th
 ### Maintainability assessment  
 * The modular split between budgeting logic and estimation strategy promotes maintainability: changes to estimation rules do not ripple into budgeting calculations.  However, the lack of concrete code symbols in the current repository suggests that documentation and test coverage will be crucial to avoid “magic” behavior.  Providing explicit TypeScript interfaces for both the algorithm and the strategy will further improve maintainability and developer onboarding.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -75,7 +74,6 @@ No other dependencies are mentioned, so the integration surface is limited to th
 
 ### Siblings
 - [CostEstimationStrategy](./CostEstimationStrategy.md) -- The CostEstimationStrategy would likely be implemented as a separate module or class, allowing for easy modification or replacement of the estimation logic
-
 
 ---
 

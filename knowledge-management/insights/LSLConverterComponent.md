@@ -116,7 +116,6 @@ The component’s lifecycle typically follows: **initialisation → configuratio
 
 The component’s **modular design** and **clear separation of concerns** make it relatively easy to maintain. Adding new agent formats requires changes only in `ConversionFramework.java` and `FormatValidator.java`. Configuration is externalised, reducing code churn for tuning. However, the **tight coupling** between the feedback loop and the conversion framework introduces a potential maintenance hotspot: changes to feedback metrics may ripple through the conversion logic. Overall, the use of well‑known patterns (LRU cache, thread pool, properties file) and explicit class boundaries contributes positively to long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -134,7 +133,6 @@ The component’s **modular design** and **clear separation of concerns** make i
 - [SemanticAnalysisComponent](./SemanticAnalysisComponent.md) -- SemanticAnalysisComponent uses a semantic analysis framework in SemanticAnalysisFramework.java to perform semantic analysis of observations
 - [AgentIntegrationComponent](./AgentIntegrationComponent.md) -- AgentIntegrationComponent uses an agent integration framework in AgentIntegrationFramework.java to integrate with various agents
 - [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
-
 
 ---
 

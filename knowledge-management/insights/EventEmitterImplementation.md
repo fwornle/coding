@@ -66,7 +66,6 @@ Following these conventions ensures that the **EventEmitterImplementation** rema
 4. **Scalability considerations** – The emitter’s lightweight map‑based storage scales with the number of event types and listeners; because it is decoupled, new modules can be added without altering existing code. Potential bottlenecks arise only if a single event has an extremely large listener list, which can be mitigated by sharding or hierarchical emitters if needed.  
 5. **Maintainability assessment** – High maintainability: the emitter is isolated, has a minimal public API, and follows a well‑known pattern. Documentation of event names and payloads is the primary maintenance burden; the clear separation from business logic reduces ripple effects when changes occur.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ Following these conventions ensures that the **EventEmitterImplementation** rema
 
 ### Siblings
 - [AsyncEventHandling](./AsyncEventHandling.md) -- The EventDrivenProgramming.js file employs async/await syntax to handle events and perform subsequent actions, such as registering event listeners and emitting events.
-
 
 ---
 

@@ -97,12 +97,10 @@ Both integrations depend on the loader’s **stable API** (most likely a `load()
 * Keeping configuration schemas documented in the READMEs ensures that contributors can add new ontology fragments without touching code.  
 * However, the lack of explicit code symbols in the current repository limits visibility; adding unit tests around the loader’s public API would improve confidence and future maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyManager](./OntologyManager.md) -- The OntologyClassificationAgent follows a specific constructor and initialization pattern to ensure proper setup of the ontology system and classification capabilities.
-
 
 ---
 

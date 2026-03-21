@@ -68,12 +68,10 @@ No other direct dependencies are mentioned, but the hierarchical description imp
 - **Moderate risk** due to the tight coupling to LevelDB; any storage‑engine change must be reflected in the adapter and possibly in GraphNodeCreator.  
 - The lack of visible source files limits static analysis, but the clear hierarchy (ConstraintSystem → GraphDatabaseAdapter → GraphNodeCreator) provides a straightforward mental model for developers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
-
 
 ---
 

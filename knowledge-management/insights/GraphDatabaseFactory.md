@@ -69,12 +69,10 @@ Because the factory abstracts away the creation details, developers should also 
 ### Maintainability Assessment  
 * The clear separation of concerns—abstract interface, concrete drivers, and factory—makes the codebase maintainable. Adding or replacing a driver requires changes only in the concrete subclass and the factory’s mapping, leaving the OntologyClassificationAgent untouched. The main maintenance burden lies in keeping the abstract interface comprehensive enough to cover the needs of all current and future drivers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses an abstract base class to define the interface for graph database implementations.
-
 
 ---
 

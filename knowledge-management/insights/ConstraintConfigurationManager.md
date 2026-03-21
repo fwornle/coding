@@ -26,13 +26,13 @@ The design of the **ConstraintConfigurationManager** follows a classic *configur
 
 The manager’s interaction with other parts of the system is illustrated in the architecture diagram below, which shows its position inside **ConstraintSystem** and its relationship to sibling components such as **ViolationCaptureModule** (which consumes enforced constraints) and **HookManager** (which also uses a similar configuration‑file‑or‑DB loading approach).  
 
-![ConstraintConfigurationManager — Architecture](../../.data/knowledge-graph/insights/images/constraint-configuration-manager-architecture.png)
+![ConstraintConfigurationManager — Architecture](images/constraint-configuration-manager-architecture.png)
 
 From an architectural standpoint, the manager does **not** embed any persistence logic directly; instead it relies on external sources (file or DB) and on the documentation file for schema guidance. This keeps the component lightweight and focused on *in‑memory* management, while the persistence concerns are handled elsewhere in the system (e.g., the **GraphDatabaseAdapter** used by the parent **ConstraintSystem**).
 
 The relationship diagram further clarifies how the manager registers constraints and serves them to enforcement points, while also exposing its configuration‑store API to consumers.  
 
-![ConstraintConfigurationManager — Relationship](../../.data/knowledge-graph/insights/images/constraint-configuration-manager-relationship.png)
+![ConstraintConfigurationManager — Relationship](images/constraint-configuration-manager-relationship.png)
 
 ---
 
@@ -105,7 +105,6 @@ The manager sits at the heart of the **ConstraintSystem**, providing a shared so
 
 The clear separation between loading, registration, and lifecycle logic makes the component easy to test and evolve. Documentation coupling enforces a single source of truth, reducing drift between code and spec. However, reliance on a markdown‑based schema validator adds a maintenance surface: changes to the markdown must be carefully reviewed to avoid breaking the validation pipeline. Overall, the design promotes maintainability through modular responsibilities and explicit contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ The clear separation between loading, registration, and lifecycle logic makes th
 - [HookManager](./HookManager.md) -- HookManager loads hook events from a configuration file or database.
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
-
 
 ---
 

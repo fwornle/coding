@@ -96,12 +96,10 @@ No other explicit dependencies are mentioned, so the integration surface is limi
 
 Overall, the **DynamicImportMechanism** provides a pragmatic balance between flexibility and performance for the graph‑database component, while keeping the architectural footprint simple and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses a dynamic import mechanism in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to load the VkbApiClient module, allowing for flexibility in the component's dependencies.
-
 
 ---
 

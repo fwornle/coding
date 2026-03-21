@@ -94,7 +94,6 @@ No other modules are explicitly mentioned, so the repository’s outward surface
 * The lack of concrete child components keeps the repository’s API surface small, simplifying unit testing and mocking.  
 * However, the dual possibility of JDBC or Hibernate introduces **implementation ambiguity**; a consistent choice across the codebase should be documented to avoid divergent coding styles and duplicated mapping logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ No other modules are explicitly mentioned, so the repository’s outward surface
 ### Siblings
 - [MetadataManagementFramework](./MetadataManagementFramework.md) -- MetadataManagementFramework is implemented in MetadataManagementFramework.java, which defines the metadata management lifecycle
 - [CacheManager](./CacheManager.md) -- CacheManager is likely implemented as a separate module or class, responsible for caching and expiring metadata
-
 
 ---
 

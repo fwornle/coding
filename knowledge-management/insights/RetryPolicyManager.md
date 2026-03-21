@@ -87,7 +87,6 @@ Because the manager maintains per‑component mappings and attempt counters, its
 ### Maintainability Assessment  
 The manager’s design is **highly maintainable**: configuration‑driven policies mean that most changes are declarative, the factory isolates creation logic, and centralized logging provides a single source of truth for retry behavior.  The main maintenance risk lies in ensuring the configuration schema stays synchronized with the factory’s expectations and that custom policy implementations faithfully adhere to the required interface.  Regular unit tests for each built‑in policy and integration tests that exercise the manager through its public API will keep regression risk low.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ The manager’s design is **highly maintainable**: configuration‑driven polici
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class and its connectViaHTTP method in lib/integrations/specstory-adapter.js to attempt connections to the Specstory extension on multiple ports.
 - [LoggerModule](./LoggerModule.md) -- LoggerModule uses the createLogger function from logging/Logger.js to establish a logger instance for the Trajectory component.
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule may utilize the GraphDatabaseAdapter to interact with a graph database for storing and retrieving data.
-
 
 ---
 

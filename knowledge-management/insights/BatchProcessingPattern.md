@@ -76,7 +76,6 @@ Developers extending or maintaining the BatchProcessingPattern should respect th
 - The lack of generic batch libraries means future changes to the algorithm must be made within the custom pipeline, which could increase maintenance effort.  
 - Centralised configuration and error handling in the controller provide a single locus for updates, simplifying long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ Developers extending or maintaining the BatchProcessingPattern should respect th
 ### Siblings
 - [BatchAnalysisPipeline](./BatchAnalysisPipeline.md) -- The OnlineLearningController.java file utilizes the BatchAnalysisPipeline class to integrate with the batch analysis pipeline, demonstrating the sub-component's reliance on this custom class.
 - [CustomIntegrationPoint](./CustomIntegrationPoint.md) -- The OnlineLearning sub-component's use of a custom BatchAnalysisPipeline class implies a custom integration point, which is likely defined in the OnlineLearningController.java file or related classes.
-
 
 ---
 

@@ -87,12 +87,10 @@ Because the migration runs as a single process over the entire LevelDB store, sc
 
 The modular placement of the migration logic in `scripts/migrate-graph-db-entity-types.js` greatly aids maintainability: developers can locate, read, and modify migration steps without navigating through the core learning code. However, the absence of a formal migration framework means that version history, rollback, and testing must be managed manually, which can increase maintenance overhead as the number of schema changes grows. Adding clear documentation and automated tests around the script will mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.
-
 
 ---
 

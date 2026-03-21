@@ -81,7 +81,6 @@ No direct code symbols were extracted from the source, but the file paths and cl
 
 These insights are drawn directly from the provided observations and file‑level references, ensuring a grounded and actionable understanding of the WatchMechanism sub‑component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ These insights are drawn directly from the provided observations and file‑leve
 - [LoggingService](./LoggingService.md) -- LoggingService implements async logging, as seen in the logging mechanism (integrations/mcp-server-semantic-analysis/src/logging.ts), to prevent event loop blocking.
 - [LSLFormatter](./LSLFormatter.md) -- LSLFormatter uses the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format.
 - [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the TranscriptAPI class (lib/agent-api/transcript-api.js) as an abstract base class for implementing agent-specific transcript adapters.
-
 
 ---
 

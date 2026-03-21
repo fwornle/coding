@@ -99,7 +99,6 @@ The only explicit dependency is on the **public APIs** of `InsightGenerator` and
 
 `ReportGenerator` is deliberately lightweight, containing only orchestration logic and a single filtering step.  This makes the component **easy to understand and modify**.  Because it relies on well‑defined contracts from `InsightRules` and `PatternMiner`, changes in those modules are unlikely to ripple into the generator as long as the public schemas remain stable.  The template‑driven design further isolates UI changes from code changes, enhancing maintainability.  The main risk area is the **tight synchronous coupling**, which could increase maintenance overhead if upstream modules evolve to asynchronous patterns; however, the current design keeps the codebase concise and approachable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ The only explicit dependency is on the **public APIs** of `InsightGenerator` and
 ### Siblings
 - [InsightRules](./InsightRules.md) -- InsightRules (InsightGenerator.ts) utilizes a modular design, allowing for easy addition or removal of rules through the use of a RuleRegistry class
 - [PatternMiner](./PatternMiner.md) -- PatternMiner (PatternMiner.ts) employs a graph-based data structure to represent entity relationships, facilitating efficient pattern discovery through the use of graph traversal algorithms
-
 
 ---
 

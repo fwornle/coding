@@ -55,7 +55,6 @@ Developers adding new heuristics should implement the same interface expected by
 * However, the reliance on ordering introduces a hidden coupling that requires documentation and disciplined code reviews to avoid regression when heuristics are added or reordered.  
 * The absence of complex dependencies (the classifier does not directly touch the graph DB or cache) simplifies testing and refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -64,7 +63,6 @@ Developers adding new heuristics should implement the same interface expected by
 ### Siblings
 - [GraphDBAdapter](./GraphDBAdapter.md) -- GraphDBAdapter (GraphDBAdapter.java:15) uses a graph database to store ontology metadata, allowing for efficient querying and retrieval of complex relationships between entities.
 - [CacheManager](./CacheManager.md) -- CacheManager (CacheManager.java:20) implements a caching layer to store frequently accessed ontology metadata, reducing the need for database queries and improving system performance.
-
 
 ---
 

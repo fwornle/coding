@@ -69,12 +69,10 @@ The logging subsystem follows a clear hierarchy: a top‑level manager orchestra
 
 The design is straightforward: a single, well‑scoped component (`LogBuffer`) with a narrow public API. This simplicity aids maintainability, as changes to buffering (e.g., switching from a list to a ring buffer) are confined to the component itself. However, the lack of explicit code visibility in the observations means that maintainers must rely on documentation and tests to understand edge cases such as concurrency handling and error propagation. Providing clear contracts between `LoggingManager` and `LogBuffer`, along with unit tests for flushing behavior, would further improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingManager](./LoggingManager.md) -- LoggingManager likely employs a buffering mechanism to handle log entries, ensuring that they are properly stored and flushed when necessary.
-
 
 ---
 

@@ -111,14 +111,7 @@ Because the module isolates its concerns, code changes are localized. Documentat
 
 ### Relationship
 
-![HookManagementModule Relationship](images/hook-management-module-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/hook-management-module-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -133,7 +126,6 @@ Because the module isolates its concerns, code changes are localized. Documentat
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
 - [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
-
 
 ---
 

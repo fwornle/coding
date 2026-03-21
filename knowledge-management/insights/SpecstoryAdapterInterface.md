@@ -79,12 +79,10 @@ The interaction flow is straightforward: the client calls methods defined on the
    * The only maintenance overhead is ensuring the interface stays up‑to‑date with any new capabilities required by the client or offered by the Specstory extension.  
    * Testability is enhanced because mock implementations of the interface can replace the real adapter in unit tests, reducing brittle integration tests.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryApiClient](./SpecstoryApiClient.md) -- SpecstoryApiClient utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to provide a unified interface for interacting with the Specstory extension.
-
 
 ---
 

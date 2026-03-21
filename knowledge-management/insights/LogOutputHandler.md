@@ -64,7 +64,6 @@ Because logging is performed asynchronously and can target multiple destinations
 ### Maintainability assessment  
 The modular split between configuration (SpecstoryAdapter), formatting (LogFormatter), output (LogOutputHandler), and error handling (ErrorHandlingMechanism) yields high maintainability.  Each concern can be evolved independently, and new destinations can be added without touching the core handler logic.  The main maintenance risk lies in the asynchronous buffering layer –‑ developers must monitor queue growth and ensure graceful shutdown paths to avoid log loss.  Overall, the design promotes clear responsibility boundaries and testable units, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ The modular split between configuration (SpecstoryAdapter), formatting (LogForma
 ### Siblings
 - [LogFormatter](./LogFormatter.md) -- The SpecstoryAdapter class, utilized by ConversationLogger, likely interacts with LogFormatter to format log entries, as seen in the parent component analysis.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism may employ a retry policy, similar to LLMRetryPolicy, to handle transient errors and prevent logging failures.
-
 
 ---
 

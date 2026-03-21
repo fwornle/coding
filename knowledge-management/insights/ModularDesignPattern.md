@@ -61,12 +61,10 @@ Because each analysis module is independent, the pattern scales horizontally: ne
 ### 5. Maintainability assessment  
 The strict separation of concerns and reliance on a common interface make the codebase **highly maintainable**.  Bugs are isolated to individual modules, and refactoring one module does not ripple through the system.  The main maintenance burden lies in managing the registration and lifecycle of modules within `CodeAnalyzer`, but this is a bounded and well‑defined responsibility.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeAnalyzer](./CodeAnalyzer.md) -- CodeAnalyzer.analyzeCode() uses a modular design, with each component having its own specific responsibilities and behaviors, enabling clear separation of concerns
-
 
 ---
 

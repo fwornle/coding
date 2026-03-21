@@ -14,7 +14,6 @@ The DockerContainerManager's listContainers method in DockerContainerManager.py 
 
 - The DockerContainerManager's listContainers method in DockerContainerManager.py returns a list of running containers, allowing other components to discover and interact with them
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ The DockerContainerManager's listContainers method in DockerContainerManager.py 
 ### Used By
 
 - DockerizedServices (contains)
-
-
 
 ## Hierarchy Context
 
@@ -45,7 +42,6 @@ The DockerContainerManager's listContainers method in DockerContainerManager.py 
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a factory pattern in LLMServiceFactory.py to create instances of LLM services, allowing for easy extension and customization of service implementations
 - [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses a database in process_state.db to store process state information, allowing for persistent storage and retrieval of process data
 - [ServiceDiscovery](./ServiceDiscovery.md) -- ServiceDiscovery uses a registry in service_registry.py to store service instances, allowing for efficient lookup and discovery of services
-
 
 ---
 

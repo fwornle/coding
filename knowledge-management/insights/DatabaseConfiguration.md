@@ -100,7 +100,6 @@ All interactions are contract‑based: the adapter expects a configuration objec
 
 Overall, `DatabaseConfiguration` embodies a disciplined, configuration‑driven approach that underpins reliable, tunable interaction with the graph database across the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ Overall, `DatabaseConfiguration` embodies a disciplined, configuration‑driven 
 - [GraphDatabaseConfiguration](./GraphDatabaseConfiguration.md) -- The parent component analysis suggests the existence of a DatabaseConfiguration, which is likely defined in the GraphDatabaseAdapter module.
 - [GraphDatabaseConfiguration](./GraphDatabaseConfiguration.md) -- The GraphDatabaseAdapter sub-component is used by the LLMServiceManager to store and retrieve data in a consistent manner, as described in the Hierarchy Context.
 - [DatabaseConnectionManager](./DatabaseConnectionManager.md) -- The parent analysis suggests the existence of a DatabaseConnectionManager, which is a common pattern in database-driven applications.
-
 
 ---
 

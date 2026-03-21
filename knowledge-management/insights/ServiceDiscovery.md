@@ -14,7 +14,6 @@ The ServiceDiscovery's listServices method in ServiceDiscovery.py returns a list
 
 - The ServiceDiscovery's listServices method in ServiceDiscovery.py returns a list of available services, allowing other components to discover and interact with them
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ The ServiceDiscovery's listServices method in ServiceDiscovery.py returns a list
 ### Used By
 
 - DockerizedServices (contains)
-
-
 
 ## Hierarchy Context
 
@@ -45,7 +42,6 @@ The ServiceDiscovery's listServices method in ServiceDiscovery.py returns a list
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a factory pattern in LLMServiceFactory.py to create instances of LLM services, allowing for easy extension and customization of service implementations
 - [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses a database in process_state.db to store process state information, allowing for persistent storage and retrieval of process data
 - [DockerContainerManager](./DockerContainerManager.md) -- DockerContainerManager uses the Docker API in docker.py to create and manage containers, allowing for programmatic control over container lifecycle
-
 
 ---
 

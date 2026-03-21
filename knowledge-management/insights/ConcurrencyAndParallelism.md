@@ -136,7 +136,6 @@ Both executors rely on `ConcurrentQueue` for task storage, which means any chang
 
 Overall, `ConcurrencyAndParallelism` delivers a well‑structured, configurable, and extensible foundation for concurrent task execution, tightly integrated with the broader `CodingPatterns` ecosystem while remaining focused on its core responsibilities.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -152,7 +151,6 @@ Overall, `ConcurrencyAndParallelism` delivers a well‑structured, configurable,
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties
 - [CodingStandards](./CodingStandards.md) -- CodingStandards.java provides a set of guidelines for coding, such as naming conventions and code formatting, as seen in the coding-standards-example.java file
 - [ProjectStructure](./ProjectStructure.md) -- ProjectStructure.java provides a set of guidelines for project structure, such as package organization and directory layout, as seen in the project-structure-example.java file
-
 
 ---
 

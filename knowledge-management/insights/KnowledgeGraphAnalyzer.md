@@ -130,7 +130,6 @@ The codebase exhibits **high maintainability**:
 
 Potential maintenance risks include the need to keep the ontology definitions in sync with the validator and ensuring that any future changes to the manager’s API are reflected across all sibling components. Overall, the design choices favor extensibility and low coupling, supporting long‑term evolution of the KnowledgeGraphAnalyzer sub‑component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -144,7 +143,6 @@ Potential maintenance risks include the need to keep the ontology definitions in
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [CheckpointTracker](./CheckpointTracker.md) -- CheckpointTracker uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
-
 
 ---
 

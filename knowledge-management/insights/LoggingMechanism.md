@@ -13,7 +13,7 @@ The **LoggingMechanism** sub‑component lives inside the *LiveLoggingSystem* an
 
 These markdown files are not source code, but they act as the authoritative specification for the **LogOutputter** child component that actually writes logs to the configured destinations.  The mechanism is also shaped by runtime configuration supplied through environment variables (e.g., `BROWSER_ACCESS_PORT`, `CODE_GRAPH_RAG_PORT`, `MEMGRAPH_BATCH_SIZE`, `CONTAINS_PACKAGE`).  Together they give the LoggingMechanism a flexible, environment‑driven surface while keeping the core logic agnostic of any particular agent.
 
-![LoggingMechanism — Architecture](../../.data/knowledge-graph/insights/images/logging-mechanism-architecture.png)
+![LoggingMechanism — Architecture](images/logging-mechanism-architecture.png)
 
 ---
 
@@ -27,7 +27,7 @@ LoggingMechanism follows a **modular, composition‑based architecture**.  It is
 
 Interaction flow: when a Copilot CLI hook fires (per `integrations/copi/docs/hooks.md`), the **LogOutputter** captures the payload, applies any `CONTAINS_PACKAGE` filter, and pushes it onto the async buffer.  The buffer then routes the entry either to the **Browser Access** API (`BROWSER_ACCESS_PORT`/`BROWSER_ACCESS_SSE_URL`) or to the **Graph‑Code RAG** service (`CODE_GRAPH_RAG_PORT`/`CODE_GRAPH_RAG_SSE_PORT`).  Because the parent **LiveLoggingSystem** owns the lifecycle of LoggingMechanism, it can enable or disable the entire pipeline with a single configuration toggle.
 
-![LoggingMechanism — Relationship](../../.data/knowledge-graph/insights/images/logging-mechanism-relationship.png)
+![LoggingMechanism — Relationship](images/logging-mechanism-relationship.png)
 
 ---
 
@@ -90,7 +90,6 @@ At startup, LoggingMechanism reads all relevant environment variables once and c
 
 These insights should give developers and architects a grounded view of how **LoggingMechanism** operates within the LiveLoggingSystem, how it interacts with its siblings, and what considerations to keep in mind when extending or tuning it.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ These insights should give developers and architects a grounded view of how **Lo
 - [TranscriptProcessing](./TranscriptProcessing.md) -- TranscriptAdapter in lib/agent-api/transcript-api.js provides a standardized interface for handling different agent formats.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- The KnowledgeGraphManager sub-component may utilize the integrations/code-graph-rag/README.md Graph-Code system for graph-based knowledge storage and querying.
 - [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
-
 
 ---
 

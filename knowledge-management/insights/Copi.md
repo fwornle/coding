@@ -32,7 +32,7 @@ Interaction flow (illustrated by the architecture diagram below) proceeds as fol
 4. All stdout/stderr streams are captured and forwarded to the Logger.  
 5. The raw result is passed to Copi’s internal validator before being returned to the caller.
 
-![Copi — Architecture](../../.data/knowledge-graph/insights/images/copi-architecture.png)
+![Copi — Architecture](images/copi-architecture.png)
 
 The **high‑volume handling** note in the observations suggests that Copi processes streams asynchronously and likely employs non‑blocking I/O (e.g., Node.js child_process with event listeners) to avoid back‑pressure when many CLI calls are issued concurrently.  No explicit concurrency framework is mentioned, but the design choice to keep the wrapper lightweight and delegate heavy lifting to the OS process model is a pragmatic trade‑off that favors simplicity and testability.
 
@@ -63,7 +63,7 @@ Copi sits at a nexus of three sibling services:
 
 The **relationship diagram** below visualizes these connections:
 
-![Copi — Relationship](../../.data/knowledge-graph/insights/images/copi-relationship.png)
+![Copi — Relationship](images/copi-relationship.png)
 
 Beyond these direct links, Copi indirectly supports the **TranscriptProcessor** because validated Copilot suggestions may become part of a transcript that the processor later consumes.  Likewise, any ontology classification performed by the **OntologyClassifier** could depend on the semantic content of Copilot outputs, making Copi’s validation step critical for downstream accuracy.
 
@@ -91,7 +91,6 @@ Following these conventions ensures that Copi remains a reliable, observable, an
 | **Scalability considerations** | High‑volume handling is achieved through asynchronous process spawning and likely a concurrency guard (semaphore/queue). Configuration can cap concurrent calls, protecting the host from resource exhaustion. |
 | **Maintainability assessment** | The clear separation of concerns (wrapper, logging, configuration) and reliance on shared interfaces make the component easy to test and evolve. Documentation (`INSTALL.md`, `USAGE.md`) and the explicit wrapper class further aid onboarding. The primary risk is tight coupling to the Copilot CLI binary; any CLI API change will require updates to `CopiWrapper` and its validation logic. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ Following these conventions ensures that Copi remains a reliable, observable, an
 - [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
-
 
 ---
 

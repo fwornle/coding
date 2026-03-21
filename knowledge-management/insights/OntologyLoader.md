@@ -74,12 +74,10 @@ Because the loader is a child of `OntologyClassifier`, its public API is expecte
 ### Maintainability Assessment  
 * The clear modular boundary makes the loader easy to maintain: changes to parsing logic stay localized. However, the absence of concrete code artifacts in the repository makes automated analysis and refactoring harder; developers must rely on documentation and runtime contracts to understand the loader’s behavior. Maintaining strict adherence to the loader interface will preserve the ease of integration promised by the modular design.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
-
 
 ---
 

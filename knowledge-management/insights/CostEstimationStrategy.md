@@ -74,7 +74,6 @@ No other code symbols were discovered, so the integration surface is limited to 
 ### Maintainability Assessment  
 - The explicit modular boundary makes the **CostEstimationStrategy** easy to locate, understand, and replace.  As long as the public API remains stable, downstream components (BudgetTracker, BudgetingAlgorithm) require no changes when the estimation logic evolves.  The primary maintenance burden lies in keeping pricing configuration accurate and ensuring that any new operation types are added to the estimator’s input validation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ No other code symbols were discovered, so the integration surface is limited to 
 
 ### Siblings
 - [BudgetingAlgorithm](./BudgetingAlgorithm.md) -- The budgeting-algorithm.ts file is expected to contain the implementation of the BudgetingAlgorithm, which would define the core logic for budget tracking and management
-
 
 ---
 

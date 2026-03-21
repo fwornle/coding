@@ -123,14 +123,7 @@ The modular layout, explicit adapters, and externalized configurations make the 
 
 ### Relationship
 
-![ContentValidationModule Relationship](images/content-validation-module-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/content-validation-module-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -144,7 +137,6 @@ The modular layout, explicit adapters, and externalized configurations make the 
 - [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
 - [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-
 
 ---
 

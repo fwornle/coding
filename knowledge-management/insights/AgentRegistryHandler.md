@@ -95,7 +95,6 @@ These integration points are all explicit in the observations, so the narrative 
 * The clear separation between registry, lifecycle, and API gateway makes each piece independently testable and replaceable.  
 * The only coupling is the contract of the events or polling API; as long as those interfaces remain stable, the registry can evolve (e.g., adding caching, richer query capabilities) without impacting siblings.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ These integration points are all explicit in the observations, so the narrative 
 ### Siblings
 - [AgentLifecycleManager](./AgentLifecycleManager.md) -- The AgentLifecycleManager would likely be implemented in a class within the AgentManagement sub-component, potentially as a method of the AgentManager class, to handle agent lifecycle operations.
 - [VkbApiAgentGateway](./VkbApiAgentGateway.md) -- The VkbApiAgentGateway would encapsulate the VKB API's agent-related functionality, providing a simplified interface for the AgentLifecycleManager and AgentRegistryHandler to perform operations.
-
 
 ---
 

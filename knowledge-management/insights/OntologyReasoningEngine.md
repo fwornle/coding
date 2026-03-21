@@ -78,7 +78,6 @@ External dependencies implied by the observations include an **ontology library*
 4. **Scalability considerations** – the engine’s hybrid nature means scalability hinges on both the ontology store (query performance) and the LLM service (rate limits, latency). Decoupling via the interface could allow horizontal scaling of classification requests behind a load balancer.  
 5. **Maintainability assessment** – high maintainability thanks to isolated configuration and well‑defined interfaces; however, changes to the underlying ontology schema or LLM prompt design may require coordinated updates across the engine and classification module.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ External dependencies implied by the observations include an **ontology library*
 ### Siblings
 - [ClassificationInterface](./ClassificationInterface.md) -- The ClassificationInterface is likely implemented as a separate module, allowing for flexibility and extensibility in entity classification
 - [OntologyConfigLoader](./OntologyConfigLoader.md) -- The ontology-config.js file is loaded by the OntologyConfigLoader, which provides the configuration to the OntologyReasoningEngine and other components
-
 
 ---
 

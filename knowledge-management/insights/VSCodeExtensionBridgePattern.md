@@ -52,21 +52,17 @@ The maintainability of the VSCodeExtensionBridgePattern is assessed as follows:
 
 ![VSCodeExtensionBridgePattern Architecture](images/vscode-extension-bridge-pattern-architecture.png)
 
-
 ### Sequence
 
 ![VSCodeExtensionBridgePattern Sequence](images/vscode-extension-bridge-pattern-sequence.png)
-
 
 ### Class
 
 ![VSCodeExtensionBridgePattern Class](images/vscode-extension-bridge-pattern-class.png)
 
-
 ### Use cases
 
 ![VSCodeExtensionBridgePattern Use cases](images/vscode-extension-bridge-pattern-use-cases.png)
-
 
 ---
 

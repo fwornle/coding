@@ -77,7 +77,6 @@ The system is organized as a hierarchy: *EntityPersistence* (parent) → *Grapho
 
 The clear separation of concerns and the adapter’s role as a thin wrapper around a well‑defined third‑party library make the component relatively easy to maintain. Adding new graph operations or swapping the underlying library requires changes only within the adapter. However, the presence of custom algorithms and caching logic introduces additional code paths that must be documented and tested, especially when the graphology library evolves. Overall, the design balances extensibility with maintainability, provided that the caching strategy and custom algorithm implementations are kept well‑encapsulated and well‑tested.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The clear separation of concerns and the adapter’s role as a thin wrapper arou
 ### Siblings
 - [EntityStorage](./EntityStorage.md) -- GraphDatabaseConnector class in the EntityPersistence sub-component uses the Graphology library to interact with the graph database, indicating a clear separation of concerns for entity storage.
 - [GraphDatabaseConnection](./GraphDatabaseConnection.md) -- The GraphDatabaseConnector class in the EntityPersistence sub-component likely contains the GraphDatabaseConnection logic, as it is responsible for interacting with the graph database.
-
 
 ---
 

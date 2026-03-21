@@ -80,12 +80,10 @@ Because the JSON export is tightly coupled to the persistence actions, any compo
 * The clear separation between domain logic (**ViolationCapture**), persistence (**GraphDatabasePersistence**), and export (JSON sync) supports modular maintenance.  
 * Tight coupling of the export to every write operation introduces a maintenance surface: any change to the graph schema must be mirrored in the JSON serializer.  Automated tests that validate JSON consistency after persistence operations are essential to keep the two representations in sync.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationCapture](./ViolationCapture.md) -- ViolationCapture utilizes the GraphDatabase to handle graph database persistence and querying, with automatic JSON export sync.
-
 
 ---
 

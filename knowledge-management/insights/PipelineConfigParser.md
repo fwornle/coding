@@ -73,7 +73,6 @@ Other downstream components, like `StepExecutor`, never interact directly with t
 * Because the parser has no business logic beyond deserialization, unit tests can focus on schema validation and error handling, keeping the component highly maintainable.
 * The reliance on explicit `depends_on` edges keeps the dependency model transparent, aiding future developers in reasoning about pipeline behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ Other downstream components, like `StepExecutor`, never interact directly with t
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The pipeline-config.yaml file defines the steps and their dependencies, which are then resolved by the DAGDependencyResolver
 - [StepExecutor](./StepExecutor.md) -- The StepExecutor uses the EntityProcessor to process entities and generate observations
-
 
 ---
 

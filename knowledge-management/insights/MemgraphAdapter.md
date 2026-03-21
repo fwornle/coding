@@ -101,7 +101,6 @@ All integration occurs through well‑defined method signatures; there is no ind
 ### Maintainability assessment  
 The clear separation of concerns (adapter, manager, utils, logger) makes the codebase approachable and testable. Configuration externalisation reduces hard‑coded values, and the use of descriptive method names (`persistCodeEntity`, `queryCodeEntity`) aids discoverability. The main maintenance risk lies in the utility mapper becoming a monolith as entity models evolve; disciplined refactoring and unit tests will mitigate this. Overall, the design promotes straightforward extension and reliable operation within the broader **SemanticAnalysis** ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ The clear separation of concerns (adapter, manager, utils, logger) makes the cod
 - [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
 - [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
-
 
 ---
 

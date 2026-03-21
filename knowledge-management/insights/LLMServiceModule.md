@@ -89,7 +89,6 @@ Because each LLM runs in its own container, horizontal scaling is as simple as a
 ### Maintainability Assessment  
 The separation of concerns (orchestration, routing, façade, resilience) yields high maintainability: changes to one aspect (e.g., swapping a model image) rarely affect others. The declarative Docker Compose file serves as a single source of truth for service topology, simplifying onboarding for new developers. The only maintenance burden lies in keeping the circuit‑breaker thresholds and cache eviction policies aligned with evolving model performance characteristics. Overall, the design promotes easy extensibility, clear ownership, and predictable operational behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The separation of concerns (orchestration, routing, façade, resilience) yields 
 ### Siblings
 - [ServiceStarterModule](./ServiceStarterModule.md) -- The ServiceStarterModule uses a retry mechanism to ensure that services are properly started, as seen in the implementation of the ServiceStarter class.
 - [DockerComposeManager](./DockerComposeManager.md) -- The docker-compose.yml file defines the services and their dependencies, making it easy to manage the lifecycle of services.
-
 
 ---
 

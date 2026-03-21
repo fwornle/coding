@@ -83,7 +83,6 @@ Internally, the **FileRouter** child component serves as the concrete implementa
 * Keeping routing policy inside FileRouter isolates changes, supporting maintainability.  
 * Absence of extensive public symbols reduces the risk of accidental misuse, but also means that any future extension (e.g., supporting multiple destinations) will require careful API evolution to avoid breaking existing callers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Internally, the **FileRouter** child component serves as the concrete implementa
 ### Siblings
 - [SessionWindowing](./SessionWindowing.md) -- SessionWindowing uses the 'window_session' function in 'session_windowing.py' to handle session windowing tasks
 - [ClassificationLayers](./ClassificationLayers.md) -- ClassificationLayers uses the 'Classifier' class in 'classification_layers.py' to handle log classification tasks
-
 
 ---
 

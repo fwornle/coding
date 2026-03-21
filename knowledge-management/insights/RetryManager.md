@@ -88,7 +88,6 @@ RetryManager sits at the utility layer of **SemanticAnalysis**, acting as a cros
 
 The utility‑centric design keeps the retry logic in a single, easily discoverable file (`retry-manager.ts`), simplifying updates to the back‑off algorithm or notification handling.  However, the lack of explicit type definitions (no symbols were discovered) suggests that documentation and unit tests are crucial to prevent regression, especially as the manager interacts with many agents and the Pipeline.  Keeping the configuration externalised and providing clear dashboard visualisations further aids maintainability by surfacing operational issues early.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The utility‑centric design keeps the retry logic in a single, easily discovera
 - [Insights](./Insights.md) -- The InsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts, responsible for generating insights from processed data
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/semantic-insight-generator.ts, responsible for generating semantic insights
 - [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, responsible for generating code graphs
-
 
 ---
 

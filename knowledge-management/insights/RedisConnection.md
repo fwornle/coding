@@ -98,7 +98,6 @@ Because the design uses a single client instance created in `cache-config.js`, s
 
 The current approach scores high on maintainability: connection details are defined once, and any change propagates automatically. The clear separation between read/write (`CacheInterface`) and eviction (`CacheInvalidation`) aids readability and testing. The only maintainability risk is the implicit coupling to a single Redis endpoint; future requirements for multi‑tenant or sharded caches would necessitate a redesign of the `RedisConnection` abstraction. Overall, the module is easy to understand, modify, and extend within the constraints of the observed architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ The current approach scores high on maintainability: connection details are defi
 ### Siblings
 - [CacheInterface](./CacheInterface.md) -- The CacheInterface (cache-config.js:10) imports the Redis library, establishing a connection to the Redis cache store
 - [CacheInvalidation](./CacheInvalidation.md) -- CacheInvalidation (cache-config.js:30) utilizes the Redis library to implement cache invalidation, removing outdated cache entries
-
 
 ---
 

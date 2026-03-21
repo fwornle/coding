@@ -82,12 +82,10 @@ Because the resolver builds the full graph in memory and performs a single topol
 
 Encapsulating all DAG logic in `DAGDependencyResolver` yields high maintainability: changes to dependency handling are localized, and the YAML‑driven approach makes the pipeline’s structure self‑documenting. The lack of hidden runtime dependency manipulation reduces technical debt. However, maintainability hinges on disciplined updates to `batch-analysis.yaml`; stale or incorrect declarations directly break the execution plan, so robust validation (cycle detection) and thorough code reviews of the YAML file are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The batch processing pipeline follows a DAG-based execution model, with each step declaring explicit depends_on edges in batch-analysis.yaml.
-
 
 ---
 

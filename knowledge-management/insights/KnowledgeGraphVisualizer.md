@@ -14,7 +14,6 @@ KnowledgeGraphVisualizerService in service.py provides a query interface for vis
 
 - KnowledgeGraphVisualizerExporter in exporter.py provides functionality to export visualization results to external formats
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ KnowledgeGraphVisualizerService in service.py provides a query interface for vis
 ### Used By
 
 - KnowledgeManagement (contains)
-
-
 
 ## Hierarchy Context
 
@@ -50,7 +47,6 @@ KnowledgeGraphVisualizerService in service.py provides a query interface for vis
 - [GraphQueryEngine](./GraphQueryEngine.md) -- GraphQueryEngineDAO in dao.py uses a repository pattern to encapsulate database access for graph queries
 - [PersistenceManager](./PersistenceManager.md) -- PersistenceManagerDAO in dao.py uses a repository pattern to encapsulate database access for persistence operations
 - [DataImporter](./DataImporter.md) -- DataImporterDAO in dao.py uses a repository pattern to encapsulate database access for import operations
-
 
 ---
 

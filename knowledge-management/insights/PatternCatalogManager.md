@@ -102,7 +102,6 @@ Overall, the manager provides a **service‑oriented interface** that other modu
 
 These insights are derived directly from the observations provided and reflect the current design of `PatternCatalogManager` within the Insights ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ These insights are derived directly from the observations provided and reflect t
 ### Siblings
 - [InsightAnalysis](./InsightAnalysis.md) -- The InsightAnalysis module utilizes data visualization libraries to generate interactive and dynamic visualizations of the insights, such as charts and graphs.
 - [ReportCustomization](./ReportCustomization.md) -- The ReportCustomization module utilizes a template engine to generate reports based on user-defined templates, allowing for flexible and dynamic report generation.
-
 
 ---
 

@@ -116,7 +116,6 @@ Potential maintenance challenges include:
 
 Overall, the design choices reflected in the observations create a flexible, extensible router that integrates cleanly with its parent abstraction and sibling services while remaining approachable for future enhancements.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -126,7 +125,6 @@ Overall, the design choices reflected in the observations create a flexible, ext
 - [CachingMechanism](./CachingMechanism.md) -- CachingMechanism uses a cache store to store the results of expensive computations, reducing the need for redundant calculations
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker uses the LLMService class in lib/llm/llm-service.ts to track and manage budgets
 - [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier uses the LLMService class in lib/llm/llm-service.ts to classify the sensitivity of each request
-
 
 ---
 

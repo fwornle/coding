@@ -137,7 +137,6 @@ Potential risks include *drift* if developers ignore the markdown guidelines.  M
 
 Overall, the design promotes a consistent developer experience, eases onboarding, and supports the broader **CodingPatterns** ecosystem by providing a clear, enforceable set of conventions that sibling components (DesignPatterns, BestPractices, GraphDatabase, ConstraintMonitoring) already reference.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -148,7 +147,6 @@ Overall, the design promotes a consistent developer experience, eases onboarding
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
 - [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
-
 
 ---
 

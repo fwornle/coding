@@ -49,12 +49,10 @@ Because the manager is the authoritative source of event dispatch, the integrati
 4. **Scalability considerations** – The hook manager must handle potentially many registered handlers and high‑frequency constraint‑violation events.  Performance can be maintained by keeping handlers non‑blocking and by allowing the manager to dispatch asynchronously.  
 5. **Maintainability assessment** – High maintainability: the integration is a thin wrapper around a well‑defined API, making it easy to test and evolve.  The central manager provides a single place to adjust event‑dispatch semantics, reducing duplicated logic across the code base.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
-
 
 ---
 

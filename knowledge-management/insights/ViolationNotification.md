@@ -69,7 +69,6 @@ Because the component is a child of **ViolationCaptureService**, it inherits any
 ### Maintainability assessment  
 The clear separation of concerns—capture, filter, notification, storage—makes the codebase modular and easier to maintain. Adding or modifying a notification channel only requires changes within the channel handler and its registration, leaving the capture logic untouched. However, the reliance on implicit configuration (parent service supplying channel lists) mandates thorough documentation of the configuration schema to avoid mismatches between what the capture service expects and what the notification handlers provide.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ The clear separation of concerns—capture, filter, notification, storage—make
 ### Siblings
 - [ViolationFilter](./ViolationFilter.md) -- The captureViolation() function in violation-capture.js likely utilizes a filtering mechanism to exclude duplicate violations, potentially leveraging a data structure like a Set or Map to track unique violations
 - [ViolationStorage](./ViolationStorage.md) -- ViolationStorage would likely utilize a database or file storage system to persist captured violations, with potential considerations for data serialization, indexing, and querying
-
 
 ---
 

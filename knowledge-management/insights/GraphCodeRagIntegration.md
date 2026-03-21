@@ -92,12 +92,10 @@ The system is organized around a **parent‑child relationship**: **CodeAnalysis
 
 The integration’s **low surface area** (just two port constants and a documented contract) makes it easy to maintain: changes are confined to the external service and its README.  However, the lack of visible source symbols means that any bug in the contract must be caught through integration testing rather than static analysis.  Keeping the README up‑to‑date and providing automated contract tests will be crucial for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeAnalysisPatterns](./CodeAnalysisPatterns.md) -- CodeAnalysisPatterns utilizes the Graph-Code RAG system described in integrations/code-graph-rag/README.md for graph-based code analysis.
-
 
 ---
 

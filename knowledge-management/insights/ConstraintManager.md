@@ -8,7 +8,7 @@ The ConstraintManager could be related to the ContentValidationAgent in integrat
 
 The **ConstraintManager** is the core sub‑component of the **ConstraintSystem** that orchestrates the definition, storage, and evaluation of constraints applied to entity content. Although the exact source file is not listed, the observations point to a likely implementation file named `constraint-manager.ts`. Its primary responsibilities are to persist constraint definitions using the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) and to validate incoming data against those definitions, a role that mirrors the behavior of the **ContentValidationAgent** found in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`. By residing under the **ConstraintSystem**, the manager inherits the system‑wide persistence strategy (Graphology + LevelDB) and collaborates closely with sibling components such as **ViolationLogger** (which records any rule breaches) and **HookOrchestrator** (which may trigger additional processing when constraints change).
 
-![ConstraintManager — Architecture](../../.data/knowledge-graph/insights/images/constraint-manager-architecture.png)
+![ConstraintManager — Architecture](images/constraint-manager-architecture.png)
 
 ---
 
@@ -20,7 +20,7 @@ Interaction between components is straightforward: the manager calls the adapter
 
 A **separation‑of‑concerns** pattern is evident. Persistence logic lives exclusively in `storage/graph-database-adapter.ts`, while validation logic resides in the manager (and is reused by agents). Violation handling is delegated to the sibling **ViolationLogger**, keeping the manager focused on “decision” rather than “reporting”. This modular split reduces coupling and makes each piece independently testable.
 
-![ConstraintManager — Relationship](../../.data/knowledge-graph/insights/images/constraint-manager-relationship.png)
+![ConstraintManager — Relationship](images/constraint-manager-relationship.png)
 
 ---
 
@@ -89,7 +89,6 @@ A **separation‑of‑concerns** pattern is evident. Persistence logic lives exc
 * The explicit hook mechanism allows extensions without modifying core logic, supporting easier evolution.  
 * However, the lack of a concrete file for **ConstraintManager** suggests documentation gaps; adding a dedicated source file and unit‑test suite would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ A **separation‑of‑concerns** pattern is evident. Persistence logic lives exc
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator might be related to the Copi project in integrations/copi, which has documentation on hook functions and usage.
 - [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger might be related to the ConstraintManager, as it handles constraint violations.
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- The GraphPersistenceModule might be related to the GraphDatabaseAdapter, as it utilizes Graphology and LevelDB for persistence.
-
 
 ---
 

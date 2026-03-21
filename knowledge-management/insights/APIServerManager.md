@@ -74,12 +74,10 @@ Finally, configuration changes that affect the server (port, TLS certs, etc.) sh
 * The façade isolates server‑specific code, making it straightforward to replace the underlying HTTP framework or to add new monitors without touching APIService core logic.  
 * However, the tight coupling means that any breaking change in the server’s API (e.g., a new authentication mechanism) propagates up to APIService, requiring coordinated updates.  Keeping the manager’s interface small and stable mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
-
 
 ---
 

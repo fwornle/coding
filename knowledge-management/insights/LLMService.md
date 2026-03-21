@@ -20,7 +20,7 @@ The interaction flow is straightforward: when a consumer invokes the service’s
 
 The architecture diagram below illustrates the high‑level placement of `LLMService` within the broader **LLMAbstraction** component and its relationship to the `CacheManager`.  
 
-![LLMService — Architecture](../../.data/knowledge-graph/insights/images/llmservice-architecture.png)
+![LLMService — Architecture](images/llmservice-architecture.png)
 
 ### Architectural Patterns Identified  
 
@@ -52,7 +52,7 @@ The **CacheManager** child is instantiated inside `LLMService` (or injected via 
 
 The relationship diagram below visualises these connections, showing the parent‑child hierarchy and the flow of calls from external callers through `LLMService` to the cache and then to the provider.  
 
-![LLMService — Relationship](../../.data/knowledge-graph/insights/images/llmservice-relationship.png)
+![LLMService — Relationship](images/llmservice-relationship.png)
 
 ---
 
@@ -84,7 +84,6 @@ Because the caching logic is encapsulated in a dedicated `CacheManager` and the 
 
 Overall, `LLMService` presents a clean, well‑encapsulated component that fulfills its purpose of reducing redundant LLM calls while keeping the implementation deliberately simple and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ Overall, `LLMService` presents a clean, well‑encapsulated component that fulfi
 
 ### Children
 - [CacheManager](./CacheManager.md) -- The parent analysis suggests the existence of a CacheManager, which is a common pattern in similar services to improve efficiency.
-
 
 ---
 

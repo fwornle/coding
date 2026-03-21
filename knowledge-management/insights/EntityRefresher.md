@@ -97,7 +97,6 @@ EntityRefresher sits in a **vertical slice** under ConstraintSystem, bridging va
 
 The component exhibits **high modularity**: refresh logic, validation consumption, database interaction, caching, and logging are each encapsulated behind well‑defined interfaces.  This makes unit testing straightforward (mock the adapter, cache, and logger).  However, maintaining **cache coherence** and the **dual‑mode execution paths** requires careful regression testing when changing validation rules or adding new graph back‑ends.  Overall, the clear separation of concerns and reliance on shared services (adapter, logging, cache) promote maintainability, provided that interface contracts remain stable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ The component exhibits **high modularity**: refresh logic, validation consumptio
 - [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAdapter's query method to fetch entity content for validation, as seen in the ContentValidationAgent's constructor.
 - [ViolationTracker](./ViolationTracker.md) -- ViolationTracker uses the GraphDatabaseAdapter's query method to fetch violation data for tracking and analysis.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses a factory pattern to create instances of different graph database implementations, such as Neo4j or Amazon Neptune.
-
 
 ---
 

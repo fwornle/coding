@@ -81,7 +81,6 @@ Because the graph model is node‑centric, relationships are first‑class citiz
 
 These observations provide a grounded view of how **SecurityStandards** is architected, implemented, and integrated within the broader *CodingPatterns* ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ These observations provide a grounded view of how **SecurityStandards** is archi
 - [AntiPatterns](./AntiPatterns.md) -- GraphDatabaseAdapter.createEntity() method stores anti-patterns as entities in the graph database, with relationships defined using the createRelationship method
 - [TestingPractices](./TestingPractices.md) -- PersistenceAgent.mapEntityToSharedMemory() method enforces testing practices by validating entity metadata against a set of predefined rules
 - [CodeAnalysis](./CodeAnalysis.md) -- The CodeAnalysis sub-component uses the GraphDatabaseAdapter class to store and retrieve code analysis results, allowing for efficient querying and retrieval
-
 
 ---
 

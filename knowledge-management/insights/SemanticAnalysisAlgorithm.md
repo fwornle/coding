@@ -76,7 +76,6 @@ Even without source code, we can deduce that the implementation respects **depen
 
 Overall, the **SemanticAnalysisAlgorithm** is a well‑encapsulated, pipeline‑oriented component whose design emphasizes clear sequencing, stateless processing, and straightforward integration with the surrounding ingestion and orchestration infrastructure.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ Overall, the **SemanticAnalysisAlgorithm** is a well‑encapsulated, pipeline‑
 ### Siblings
 - [PipelineOrchestrator](./PipelineOrchestrator.md) -- PipelineOrchestrator.orchestratePipeline() defines the main pipeline execution logic, which is responsible for calling each pipeline step in sequence, as seen in the parent component context.
 - [DataIngestionFramework](./DataIngestionFramework.md) -- The DataIngestionFramework is responsible for providing input data to the PipelineOrchestrator, which then executes the pipeline steps, highlighting the framework's importance in the pipeline's execution.
-
 
 ---
 

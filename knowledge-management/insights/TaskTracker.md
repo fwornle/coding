@@ -101,7 +101,6 @@ The **retry mechanism** is also embedded in `SpecstoryAdapter`.  When a connecti
 
 These insights should give developers a clear mental model of how **TaskTracker** fits into the broader Trajectory ecosystem, what patterns it relies on, and how to extend or maintain it without violating the established design contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ These insights should give developers a clear mental model of how **TaskTracker*
 - [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359) to handle potential connection failures.
 - [PhasePlanner](./PhasePlanner.md) -- PhasePlanner could utilize the SpecstoryAdapter class to connect to the Specstory extension and retrieve relevant phase planning data.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter implements the connectViaHTTP method to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359).
-
 
 ---
 

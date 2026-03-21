@@ -75,7 +75,6 @@ No additional child components are described, but the gateway could internally c
 * Keeping all VKB‑API knowledge in one place simplifies updates when the external API evolves.  
 * However, the lack of concrete implementation details (e.g., no visible classes or functions) means that future maintainers must refer to the gateway’s documentation and tests to understand its exact behaviour.  Adding thorough unit and integration tests around the façade will be critical to preserve maintainability over time.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ No additional child components are described, but the gateway could internally c
 ### Siblings
 - [AgentLifecycleManager](./AgentLifecycleManager.md) -- The AgentLifecycleManager would likely be implemented in a class within the AgentManagement sub-component, potentially as a method of the AgentManager class, to handle agent lifecycle operations.
 - [AgentRegistryHandler](./AgentRegistryHandler.md) -- The AgentRegistryHandler would require a data structure, such as a dictionary or a database, to store the registry of available agents, with each agent having a unique identifier.
-
 
 ---
 

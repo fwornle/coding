@@ -73,12 +73,10 @@ Because the integration is described as “used to classify observations,” it 
 - **Ease of testing**: injectable agents enable unit tests with mock implementations, reducing reliance on the live ontology service.  
 - **Potential risk**: if the integration grows to include complex error‑handling or transformation logic, it could become a maintenance hotspot; keeping it intentionally lightweight mitigates that risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ObservationClassifier](./ObservationClassifier.md) -- The ObservationClassifier, located in the integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts file, uses the OntologyClassificationAgent to classify observations.
-
 
 ---
 

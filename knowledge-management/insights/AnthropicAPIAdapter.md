@@ -76,7 +76,6 @@ No additional source files were discovered in the observation set, so the concre
 * Provider‑specific logic (model resolution, error mapping) is isolated inside each adapter, limiting the blast radius of changes.  
 * The clear separation between registration (`ProviderRegistry`) and usage (`LLMAbstraction`) encourages clean module boundaries and reduces coupling, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ No additional source files were discovered in the observation set, so the concre
 - [DMRProviderIntegration](./DMRProviderIntegration.md) -- DMRProviderIntegration uses the DMRProvider class (lib/llm/providers/dmr-provider.ts) to integrate with Docker Model Runner (DMR) for local LLM inference.
 - [LLMService](./LLMService.md) -- LLMService provides a unified interface for LLM operations, including completion, initialization, and mode resolution.
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage a registry of available LLM providers.
-
 
 ---
 

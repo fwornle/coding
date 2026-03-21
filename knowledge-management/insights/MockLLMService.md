@@ -75,7 +75,6 @@ Because providers are resolved by name from a simple in‑memory map, the regist
 ### Maintainability Assessment  
 The clear separation between the registry, the service interface, and concrete implementations (including the mock) yields high maintainability.  The mock implementation is lightweight, with no external dependencies, making it easy to update alongside the interface.  The only maintenance risk is divergence between the mock and real providers, mitigated by the shared `LLMService` contract and the fact that the mock is exercised in the same test suites as the real adapters.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The clear separation between the registry, the service interface, and concrete i
 - [AnthropicAPIAdapter](./AnthropicAPIAdapter.md) -- AnthropicAPIAdapter uses the Anthropic API to handle model resolution, completion requests, and error handling.
 - [LLMService](./LLMService.md) -- LLMService provides a unified interface for LLM operations, including completion, initialization, and mode resolution.
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage a registry of available LLM providers.
-
 
 ---
 

@@ -82,7 +82,6 @@ Because the loader aggregates providers, scaling horizontally (multiple containe
 
 The provider‑based, DI‑driven design yields **high maintainability**.  Adding a new configuration source merely requires implementing a new provider and registering it with the injector—no changes to the loader’s core logic.  Centralizing configuration access simplifies debugging, as all configuration reads funnel through `getConfiguration`.  The explicit `loadConfiguration`/`saveConfiguration` contract makes the component’s responsibilities clear, supporting easier testing and future refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ The provider‑based, DI‑driven design yields **high maintainability**.  Addin
 - [LLMManager](./LLMManager.md) -- LLMManager uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
 - [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses the Process State Manager to register, unregister, and track the state of services.
 - [DependencyInjector](./DependencyInjector.md) -- DependencyInjector uses a provider-based approach for managing the dependencies of the system.
-
 
 ---
 

@@ -58,12 +58,10 @@ Because the storage is delegated to a graph database, scalability largely depend
 ### 5. Maintainability assessment  
 Encapsulating all persistence code in a single adapter file simplifies maintenance: changes to query syntax, connection pooling, or schema migrations are localized. However, the lack of visible source for **HookManagementSystem** means developers must rely on documentation or indirect clues to understand the full flow, which could increase onboarding effort. Overall, the clear boundary between management and storage promotes maintainable code, provided the adapter remains well‑documented and its interface stable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [HookManagementSystem](./HookManagementSystem.md) -- HookManagementSystem uses the createHookConfiguration method in graphdb-adapter.ts to store hook configurations in the graph database.
-
 
 ---
 

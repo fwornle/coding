@@ -20,7 +20,7 @@ Complementing the adapter is a **Factory** pattern embodied by `TranscriptAdapte
 
 Interaction flows are orchestrated through the **LiveLoggingSystem**.  When a new transcript arrives—whether from a Copilot CLI run (referenced in `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md`) or a Claude Code execution (see `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)—the LiveLoggingSystem forwards the payload to **TranscriptProcessing**.  The factory selects the appropriate adapter, which then normalises the data and hands it back to the logging pipeline.  
 
-![TranscriptProcessing — Architecture](../../.data/knowledge-graph/insights/images/transcript-processing-architecture.png)
+![TranscriptProcessing — Architecture](images/transcript-processing-architecture.png)
 
 ---
 
@@ -36,7 +36,7 @@ Environment variables **`ANTHROPIC_API_KEY`** and **`BROWSERBASE_API_KEY`** are 
 
 Finally, the **KnowledgeGraphManager** sibling may consume the normalised transcripts to enrich the graph‑based knowledge store described in `integrations/code-graph-rag/README.md`.  This downstream flow is visualised in the relationship diagram.  
 
-![TranscriptProcessing — Relationship](../../.data/knowledge-graph/insights/images/transcript-processing-relationship.png)
+![TranscriptProcessing — Relationship](images/transcript-processing-relationship.png)
 
 ---
 
@@ -76,7 +76,6 @@ The component also depends on external APIs guarded by `ANTHROPIC_API_KEY` and `
 4. **Scalability considerations** – Adding new transcript formats scales linearly: only a new adapter subclass and factory entry are required.  Stateless adapters and environment‑driven API keys support horizontal scaling of the processing service.  
 5. **Maintainability assessment** – The clear separation of concerns (factory vs. adapters) and reliance on documented format specifications make the subsystem easy to maintain.  As long as adapters remain thin wrappers around format parsing, the codebase stays approachable; however, any heavy business logic should be kept out of adapters to avoid bloating them.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ The component also depends on external APIs guarded by `ANTHROPIC_API_KEY` and `
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component may utilize the integrations/copi/USAGE.md and integrations/copi/docs/hooks.md to handle logging for Copilot CLI.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- The KnowledgeGraphManager sub-component may utilize the integrations/code-graph-rag/README.md Graph-Code system for graph-based knowledge storage and querying.
 - [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
-
 
 ---
 

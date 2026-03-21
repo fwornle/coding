@@ -63,7 +63,6 @@ LoggingInfrastructure is a leaf sub‑component of **LiveLoggingSystem**, direct
 ### Maintainability assessment  
 The component’s responsibilities are narrowly defined (queue → buffer → flush), which aids readability and unit testing. Configuration‑driven sinks isolate storage concerns, making it straightforward to add new destinations. However, the lack of explicit type definitions or interface contracts in the observed code base may increase the risk of integration errors when extending the system; documenting the expected shape of log entries and the sink interface would improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -74,7 +73,6 @@ The component’s responsibilities are narrowly defined (queue → buffer → fl
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification likely utilizes a knowledge graph or ontology database for classification.
 - [LSLConfigurationValidator](./LSLConfigurationValidator.md) -- LSLConfigurationValidator likely checks configuration files for syntax errors and invalid settings.
 - [RedactionAndFiltering](./RedactionAndFiltering.md) -- RedactionAndFiltering likely utilizes regular expressions or natural language processing for identifying sensitive information.
-
 
 ---
 

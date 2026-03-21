@@ -142,7 +142,6 @@ The modular placement of BackoffStrategy yields **high maintainability**:
 
 Overall, the design choices reflected in the observations promote a clean separation of concerns, configurable resilience behaviour, and a scalable retry mechanism that aligns well with the surrounding *CircuitBreaker* ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -153,7 +152,6 @@ Overall, the design choices reflected in the observations promote a clean separa
 - [FailureDetector](./FailureDetector.md) -- The FailureDetector (circuit-breaker-state-machine.py:200) counts consecutive failures, and once a threshold is reached, it triggers the circuit breaker to switch to the open state, leveraging the BackoffStrategy for retry logic.
 - [CircuitBreakerState](./CircuitBreakerState.md) -- The CircuitBreakerState would likely be implemented in the CircuitBreaker.js file, utilizing a finite state machine to manage the different states.
 - [FailureDetector](./FailureDetector.md) -- The FailureDetector would need to integrate with the ProviderHealthMonitor to gather information about the health of the providers and detect failures.
-
 
 ---
 

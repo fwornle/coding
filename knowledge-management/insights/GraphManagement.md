@@ -8,7 +8,7 @@ The design decision to use the GraphDatabaseAdapter class enables seamless data 
 
 **GraphManagement** is a sub‑component that concentrates on the core graph‑related business logic while delegating all persistence concerns to **GraphDatabaseAdapter**. The adapter lives in the file `storage/graph-database-adapter.ts` (as referenced from its parent, **CodingPatterns**), and it is the sole gateway for storing, retrieving, and synchronising graph data as JSON. By keeping the data‑access layer isolated, GraphManagement can remain lightweight and focused on its primary responsibilities, such as graph traversal, mutation, and validation, without being burdened by low‑level storage details.
 
-![GraphManagement — Architecture](../../.data/knowledge-graph/insights/images/graph-management-architecture.png)
+![GraphManagement — Architecture](images/graph-management-architecture.png)
 
 ## Architecture and Design  
 
@@ -16,7 +16,7 @@ The architecture follows a classic **Adapter / Facade** approach. GraphManagemen
 
 The parent component **CodingPatterns** also consumes the same adapter (`storage/graph-database-adapter.ts`), indicating a shared persistence contract across sibling sub‑components. This reuse promotes consistency in how graph data is persisted throughout the system. The sibling components—**LLMInitialization**, **ConstraintValidation**, **CodeGraphConstruction**, **ContentValidation**, **BrowserAccess**, and **CodeGraphRag**—each implement distinct responsibilities (lazy LLM loading, rule‑based validation, graph construction, etc.) but they all sit at the same hierarchical level, allowing GraphManagement to interoperate with them via the common data model exposed by the adapter.
 
-![GraphManagement — Relationship](../../.data/knowledge-graph/insights/images/graph-management-relationship.png)
+![GraphManagement — Relationship](images/graph-management-relationship.png)
 
 ## Implementation Details  
 
@@ -63,7 +63,6 @@ GraphManagement itself does not expose any storage‑related methods; instead, i
 * Shared usage across parent and siblings mandates careful versioning of the adapter’s interface, but the clear contract mitigates accidental breakage.  
 * Adding new persistence strategies is straightforward: implement a new adapter conforming to the same interface, leaving GraphManagement untouched.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ GraphManagement itself does not expose any storage‑related methods; instead, i
 - [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

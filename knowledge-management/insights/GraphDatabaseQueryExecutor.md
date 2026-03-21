@@ -93,7 +93,6 @@ On the schema side, **`GraphDatabaseSchemaManager`** (exposing `GraphDatabaseSch
 * The reliance on callbacks may require developers to be vigilant about error handling, which can be a source of bugs if mixed with newer async patterns.
 * Centralising all graph‑related classes in a single file simplifies navigation but could become unwieldy as features grow; extracting each component into its own module would improve modularity without altering the observed design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ On the schema side, **`GraphDatabaseSchemaManager`** (exposing `GraphDatabaseSch
 ### Siblings
 - [GraphDatabaseConnector](./GraphDatabaseConnector.md) -- GraphDatabaseConnection (graph-database-adapter.js) defines the connection settings, including the database URL and credentials, which are loaded from environment variables.
 - [GraphDatabaseSchemaManager](./GraphDatabaseSchemaManager.md) -- GraphDatabaseSchema (graph-database-adapter.js) defines the schema as a JSON object, which is used to create and update the schema in the graph database.
-
 
 ---
 

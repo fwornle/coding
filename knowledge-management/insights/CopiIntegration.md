@@ -96,12 +96,10 @@ Within the broader system, **ManualLearning** is the parent component that consu
 
 Overall, CopiIntegration provides a focused, well‑documented augmentation layer for the Copilot CLI that supports the ManualLearning workflow through logging and terminal UI feedback, while keeping the implementation deliberately lightweight and easy to understand.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning uses integrations/copi/README.md to handle logging and tmux integration for manual learning processes
-
 
 ---
 

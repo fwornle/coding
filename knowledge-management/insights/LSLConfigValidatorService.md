@@ -129,7 +129,6 @@ The integration point with **LoggingService** is likely realised through a **ser
 
 *All statements above are directly grounded in the supplied observations and hierarchy context; no external assumptions have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -143,7 +142,6 @@ The integration point with **LoggingService** is likely realised through a **ser
 - [LoggingService](./LoggingService.md) -- LoggingService uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve log data, enabling efficient querying and analysis.
 - [AgentAdapter](./AgentAdapter.md) -- AgentAdapter uses a plugin-based architecture to support multiple agent formats and protocols.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses a connection pooling mechanism to improve performance and reduce database load.
-
 
 ---
 

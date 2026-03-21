@@ -90,12 +90,10 @@ The **SpecstoryLoggerAdapter** is defined in `lib/integrations/specstory-adapter
 
 *All statements above are derived directly from the provided observations; no external patterns or implementations have been assumed.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
-
 
 ---
 

@@ -69,7 +69,6 @@ The **AgentRegistry** sits at the heart of the agent integration sub‑system:
 
 These insights are derived directly from the supplied observations and the documented relationships among *AgentRegistry*, its parent *AgentIntegrationComponent*, and its sibling components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ These insights are derived directly from the supplied observations and the docum
 ### Siblings
 - [AgentIntegrationFramework](./AgentIntegrationFramework.md) -- AgentIntegrationFramework utilizes the AgentRegistry to manage the registration of agents, allowing for dynamic agent discovery and integration.
 - [CacheManager](./CacheManager.md) -- The CacheManager implements a least-recently-used (LRU) eviction policy to ensure that the most frequently accessed agent data is retained in the cache.
-
 
 ---
 

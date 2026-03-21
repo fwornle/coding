@@ -93,7 +93,6 @@ No external libraries beyond the graph database driver (e.g., Neo4j Java Driver)
    * The lack of scattered DDL throughout the codebase reduces technical debt.  
    * The main maintenance burden rests on keeping `ConstraintSchemaManager` up‑to‑date and ensuring `DatabaseSchemaManager` remains compatible with any underlying storage‑engine upgrades.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ No external libraries beyond the graph database driver (e.g., Neo4j Java Driver)
 - [DatabaseQueryExecution](./DatabaseQueryExecution.md) -- The DatabaseQueryExecution module would likely utilize a graph database driver, such as the Neo4j Java Driver, to execute queries on the database, as seen in the Neo4j documentation.
 - [ConstraintSchemaManager](./ConstraintSchemaManager.md) -- The ConstraintSchemaManager module would be responsible for defining the schema for the graph database, including the creation of nodes, relationships, and indexes, as described in the graph database's schema management documentation.
 - [QueryOptimizer](./QueryOptimizer.md) -- The QueryOptimizer module would utilize the graph database's query optimization capabilities, such as the Neo4j Query Optimizer, to analyze and optimize query execution plans, as described in the Neo4j documentation.
-
 
 ---
 

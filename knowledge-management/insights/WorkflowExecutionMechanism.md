@@ -82,7 +82,6 @@ Although the source code does not expose concrete symbols, the functional respon
 * Lack of explicit code symbols means developers must rely on interface contracts; thorough documentation of the step descriptor format and error‑handling callbacks is essential.  
 * Adding new workflow step types primarily impacts **AgentInteraction**, minimizing changes to the execution core, which is a positive maintainability trait.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Although the source code does not expose concrete symbols, the functional respon
 ### Siblings
 - [WorkflowDefinitionParser](./WorkflowDefinitionParser.md) -- WorkflowDefinitionParser uses the workflow-definition-parser.js file to parse workflow definitions, as indicated by the parent context of the WorkflowManager sub-component.
 - [AgentInteraction](./AgentInteraction.md) -- The AgentInteraction component is likely to involve API calls or message passing to interact with external agents, with the workflow-definition-parser.js file potentially providing the necessary interface definitions.
-
 
 ---
 

@@ -115,12 +115,10 @@ The modular placement of the agent class suggests that additional agents (e.g., 
 
 Overall, **OntologyClassificationAgentUtilizer** embodies a well‑structured, modular approach to semantic classification within the *AgentAdapter* ecosystem, balancing extensibility with the semantic richness afforded by ontology‑driven analysis.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [AgentAdapter](./AgentAdapter.md) -- AgentAdapter utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for ontology-based classification of observations and entities.
-
 
 ---
 

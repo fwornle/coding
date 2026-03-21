@@ -91,7 +91,6 @@ This chain shows a clear separation of concerns: the component focuses on *what*
 
 Overall, the LoggingAPI’s design reflects a deliberate emphasis on **loose coupling**, **centralised access**, and **single‑source integration** with the Specstory service, providing a solid foundation for both current functionality and future extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Overall, the LoggingAPI’s design reflects a deliberate emphasis on **loose cou
 
 ### Siblings
 - [LogEntryManager](./LogEntryManager.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used by the LogEntryManager to log conversation entries to Specstory, indicating a tight integration with the Specstory service.
-
 
 ---
 

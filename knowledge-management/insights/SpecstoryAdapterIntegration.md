@@ -43,12 +43,10 @@ Developers extending or maintaining the ConnectionManager should treat the `Spec
 
 These observations collectively illustrate a deliberately modular integration point that balances simplicity with extensibility, anchored by the concrete file `lib/integrations/specstory-adapter.js` and its `SpecstoryAdapter` class.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager utilizes the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to encapsulate connection logic and logging functionality.
-
 
 ---
 

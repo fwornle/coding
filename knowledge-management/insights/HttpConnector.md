@@ -72,12 +72,10 @@ Adhering to these conventions ensures that the system remains consistent with it
 - **Positive**: Minimal connector surface area, clear responsibility separation, and a single code location for HTTP handling simplify debugging and updates.  
 - **Negative**: Future protocol diversification will demand architectural refactoring (introducing new connector classes and a selector mechanism). The current design’s rigidity could increase the cost of such extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler uses the connectViaHTTP method in specstory-adapter.js to facilitate HTTP-based connections to external services.
-
 
 ---
 

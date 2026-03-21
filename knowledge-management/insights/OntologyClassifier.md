@@ -22,11 +22,11 @@ Interaction flows are straightforward:
 
 This flow is illustrated in the architecture diagram below, which shows the internal modules of OntologyClassifier and their connections to sibling services.  
 
-![OntologyClassifier — Architecture](../../.data/knowledge-graph/insights/images/ontology-classifier-architecture.png)
+![OntologyClassifier — Architecture](images/ontology-classifier-architecture.png)
 
 The relationship diagram further clarifies how OntologyClassifier sits within the broader LiveLoggingSystem hierarchy, linking to its parent, siblings, and child component.  
 
-![OntologyClassifier — Relationship](../../.data/knowledge-graph/insights/images/ontology-classifier-relationship.png)
+![OntologyClassifier — Relationship](images/ontology-classifier-relationship.png)
 
 ### Architectural Patterns Identified
 - **Modular / Plug‑in architecture** – separate, interchangeable ontology loaders.  
@@ -101,7 +101,6 @@ OntologyClassifier sits at the intersection of **configuration**, **ontology dat
 
 The emphasis on **modular design**, **standardized interfaces**, and **centralized logging** enhances maintainability.  Adding new ontologies or tweaking classification rules does not require changes to the core classifier, limiting the blast radius of updates.  However, the reliance on external validation scripts and the absence of visible unit tests (not mentioned in observations) could become maintenance bottlenecks if validation rules evolve rapidly.  Overall, the component’s clear contract and separation from sibling services position it for easy long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ The emphasis on **modular design**, **standardized interfaces**, and **centraliz
 - [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
-
 
 ---
 

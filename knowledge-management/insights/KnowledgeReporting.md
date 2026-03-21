@@ -10,19 +10,15 @@ The reporting process could involve additional data sources or dependencies, suc
 
 - A KnowledgeReporter class or function might be responsible for generating the knowledge reports, possibly using a templating engine or a reporting library, as seen in report-generator.ts
 
-
 ## How It Works
 
 - The reporting process could involve additional data sources or dependencies, such as databases or external APIs, which would need to be integrated and handled appropriately, potentially in a file like data-access.ts
-
 
 ## Related Entities
 
 ### Used By
 
 - Insights (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ The reporting process could involve additional data sources or dependencies, suc
 ### Siblings
 - [PatternExtraction](./PatternExtraction.md) -- PatternCatalog class is expected to define the patterns used for extraction, potentially in a separate module or file, such as pattern-catalog.ts
 - [InsightGeneration](./InsightGeneration.md) -- The InsightGenerator class is anticipated to contain a method like generateInsights, which takes the extracted patterns and knowledge entities as input, possibly in insight-generator.ts
-
 
 ---
 

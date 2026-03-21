@@ -132,7 +132,6 @@ External dependencies are limited to **LLM provider SDKs** (e.g., `openai`, `ant
 
 Overall, `LargeLanguageModelManager` embodies a disciplined, modular approach to LLM integration that aligns tightly with its parent `SemanticInsightGenerator` and sibling processors, offering a robust foundation for insight generation at scale.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -141,7 +140,6 @@ Overall, `LargeLanguageModelManager` embodies a disciplined, modular approach to
 ### Siblings
 - [CodeAnalysisResultProcessor](./CodeAnalysisResultProcessor.md) -- CodeAnalysisResultProcessor utilizes the output of the SemanticAnalysis component to generate a structured representation of the code analysis results.
 - [InsightGenerationService](./InsightGenerationService.md) -- InsightGenerationService likely orchestrates the workflow of processing code analysis results, invoking large language models, and post-processing the model outputs to generate actionable insights.
-
 
 ---
 

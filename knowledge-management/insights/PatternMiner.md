@@ -102,7 +102,6 @@ Because the sibling **ReportGenerator** relies on a **template‑based approach*
 
 *This insight document is grounded exclusively in the provided observations and references the exact file paths, line numbers, and component names as they appear in the source.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ Because the sibling **ReportGenerator** relies on a **template‑based approach*
 ### Siblings
 - [InsightRules](./InsightRules.md) -- InsightRules (InsightGenerator.ts) utilizes a modular design, allowing for easy addition or removal of rules through the use of a RuleRegistry class
 - [ReportGenerator](./ReportGenerator.md) -- ReportGenerator (ReportGenerator.ts) utilizes a template-based approach to create reports, allowing for easy customization of the report structure and content through the use of template variables
-
 
 ---
 

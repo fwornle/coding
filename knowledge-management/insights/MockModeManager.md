@@ -98,7 +98,6 @@ MockModeManager is a **leaf sub‑component** that plugs into the larger LLMAbst
 
 The component’s responsibilities are **well‑encapsulated**: generation, caching, validation, and notification are each isolated behind clear methods. This separation simplifies unit testing of MockModeManager itself and reduces coupling with siblings. Because the manager follows the same dependency‑injection patterns as the rest of LLMAbstraction, adding new mock providers or swapping generators requires minimal code changes. The primary maintenance burden lies in keeping custom generators aligned with any schema changes to real LLM responses; the built‑in validation mitigates this risk by surfacing mismatches early. Overall, MockModeManager is a maintainable, test‑focused piece that enhances the robustness of the LLM abstraction layer.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ The component’s responsibilities are **well‑encapsulated**: generation, cach
 - [CircuitBreakerManager](./CircuitBreakerManager.md) -- The CircuitBreakerManager utilizes a failure detection mechanism to identify failing services, preventing cascading failures.
 - [BudgetTracker](./BudgetTracker.md) -- The BudgetTracker utilizes a budget tracking mechanism to monitor and report on budget usage, facilitating cost management and optimization.
 - [SensitivityClassifier](./SensitivityClassifier.md) -- The SensitivityClassifier utilizes a sensitivity classification mechanism to categorize and report on sensitive data, facilitating data protection and compliance.
-
 
 ---
 

@@ -72,7 +72,6 @@ When incorporating **ServiceHealthMonitor** into a new service, developers shoul
 * High maintainability for small codebases due to the compact, self‑contained implementation.  
 * Future growth may pressure the single‑file design, prompting a need to separate concerns into distinct modules while preserving the same interfaces.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ When incorporating **ServiceHealthMonitor** into a new service, developers shoul
 ### Siblings
 - [RetryMechanism](./RetryMechanism.md) -- The startServiceWithRetry function in lib/service-starter.js implements the retry logic, utilizing a combination of exponential backoff and timeout protection to handle service startup failures.
 - [TimeoutController](./TimeoutController.md) -- The TimeoutController is integrated with the startServiceWithRetry function in lib/service-starter.js, allowing for the setup of timeout thresholds for service startup.
-
 
 ---
 

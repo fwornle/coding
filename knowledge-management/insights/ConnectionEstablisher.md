@@ -85,12 +85,10 @@ Because no concrete symbols are listed, the above points are inferred from the f
 ### Maintainability assessment  
 * The clear division between façade, establisher, and adapter promotes maintainability.  As long as the adapter remains the sole place with protocol‑specific code, changes to Specstory’s API affect only a single file.  However, the lack of concrete source files for `ConnectionEstablisher` means that documentation and tests become critical to prevent drift between intent and implementation.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler likely uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch.
-
 
 ---
 

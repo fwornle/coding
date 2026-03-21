@@ -95,7 +95,6 @@ These integration points are all **explicitly referenced** in the observations, 
 * Documentation should emphasise the required call order (LLM → manager → validators) to avoid misuse.  
 * Potential maintenance burden lies in keeping the **CodingConventionManager** and **CodeQualityEvaluator** rules in sync with evolving project standards; automated tests for these siblings will mitigate drift.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ These integration points are all **explicitly referenced** in the observations, 
 - [CodingConventionManager](./CodingConventionManager.md) -- CodingConventionManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LLMService class in lib/llm/llm-service.ts to perform provider-agnostic model calls, demonstrating its ability to abstract away underlying database complexities.
 - [LLMService](./LLMService.md) -- LLMService uses the GraphDatabaseAdapter to interact with the graph database, enabling features such as data retrieval, storage, and querying.
-
 
 ---
 

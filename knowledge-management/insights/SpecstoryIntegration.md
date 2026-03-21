@@ -116,14 +116,7 @@ The **SpecstoryIntegration** sub‑component groups the adapter with a **Specsto
 
 ### Relationship
 
-![SpecstoryIntegration Relationship](images/specstory-integration-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/specstory-integration-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -139,7 +132,6 @@ The **SpecstoryIntegration** sub‑component groups the adapter with a **Specsto
 - [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager sub-component is likely responsible for optimizing task execution, ensuring efficient data processing.
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism sub-component is likely responsible for optimizing logging, ensuring efficient data exchange and retrieval.
 - [BrowserAccessManager](./BrowserAccessManager.md) -- The BrowserAccessManager sub-component is likely responsible for optimizing browser access, ensuring efficient data exchange and retrieval.
-
 
 ---
 

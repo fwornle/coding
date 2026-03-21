@@ -119,7 +119,6 @@ Collectively, these patterns give **StalenessDetector** a clear separation betwe
 
 Overall, **StalenessDetector** embodies a deliberately composable, performanceâ€‘oriented design that aligns with the broader architectural goals of the **ConstraintSystem** while remaining extensible through configuration and clear module boundaries.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ Overall, **StalenessDetector** embodies a deliberately composable, performanceâ€
 - [EntityContentAnalyzer](./EntityContentAnalyzer.md) -- EntityContentAnalyzer uses a regex-based pattern matching algorithm, as seen in EntityContentAnalyzer.ts, to extract file paths and commands from entity content
 - [GitHistoryProcessor](./GitHistoryProcessor.md) -- GitHistoryProcessor uses a git-based history processing algorithm, as seen in GitHistoryProcessor.ts, to detect changes and updates in entity content
 - [LSLSessionProcessor](./LSLSessionProcessor.md) -- LSLSessionProcessor uses a session-based processing algorithm, as seen in LSLSessionProcessor.ts, to detect changes and updates in entity content
-
 
 ---
 

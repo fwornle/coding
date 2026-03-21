@@ -78,12 +78,10 @@ The **ContentValidationAgentIntegration** sits between the **ContentValidationAg
 * **Negative** – The tight compile‑time dependency means any change to the adapter’s API forces coordinated changes in the agent, increasing the risk of regression.  
 * Overall, the current design is maintainable as long as the adapter’s interface remains stable and configuration is managed consistently.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-
 
 ---
 

@@ -86,12 +86,10 @@ Because the wrapper is stateless and invoked per file or per run, it scales line
 
 The documentation‑first approach (INSTALL, README, status‑line reference) makes the integration easy to understand and modify.  Absence of compiled code reduces the maintenance burden, but it also means that any bug fixes must be made in the script layer, which may lack type safety.  Clear separation of concerns (CLI call, logging, UI) aids future extensions—e.g., swapping Tmux for another status‑line tool without touching the core wrapper logic.  Overall, the component is highly maintainable as long as the documentation stays in sync with the script implementation.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodingConventionEnforcer](./CodingConventionEnforcer.md) -- The integrations/copi/INSTALL.md file suggests that the CodingConventionEnforcer may utilize GitHub Copilot for code analysis and formatting.
-
 
 ---
 

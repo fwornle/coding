@@ -114,12 +114,10 @@ No external services, message queues, or plugin frameworks are mentioned, so Hoo
 
 Overall, HookLoader embodies a disciplined, documentation‑first approach to extensibility, with a clean managerial boundary that supports both configurability and future growth.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [HookManager](./HookManager.md) -- HookManager loads hook events from a configuration file or database.
-
 
 ---
 

@@ -96,7 +96,6 @@ The system is organized as a **knowledge‑centric hierarchy**: KnowledgeManagem
 
 The adapter‑centric design yields high **maintainability**: changes to storage technology or export format are confined to `storage/graph-database-adapter.ts`.  The clear separation between query logic (QueryEngine) and persistence (adapter) reduces cognitive load for developers working on either side.  However, the heavy reliance on a single adapter means that rigorous testing of the adapter is critical; any regression propagates to all knowledge‑management features.  Documentation should explicitly describe the initialization contract and export synchronization to avoid misuse.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ The adapter‑centric design yields high **maintainability**: changes to storage
 - [CodeKnowledgeGraphBuilder](./CodeKnowledgeGraphBuilder.md) -- CodeKnowledgeGraphBuilder uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 - [DataImporter](./DataImporter.md) -- DataImporter uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
-
 
 ---
 

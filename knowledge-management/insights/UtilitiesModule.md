@@ -18,7 +18,7 @@ The design of **UtilitiesModule** follows a **cohesive utility‑service pattern
 
 These interactions are orchestrated through well‑defined interfaces rather than tight coupling, allowing each sibling to evolve independently.  The architecture can be visualised in the diagram below, which shows the internal layers of **UtilitiesModule** and its external connectors.
 
-![UtilitiesModule — Architecture](../../.data/knowledge-graph/insights/images/utilities-module-architecture.png)
+![UtilitiesModule — Architecture](images/utilities-module-architecture.png)
 
 ## Implementation Details  
 
@@ -48,7 +48,7 @@ Collectively, these pieces form a pipeline: raw utility work → checkpointed st
 
 * **Child – CheckpointSystem**: All long‑running utility processes invoke checkpoint APIs before mutating shared state, guaranteeing that failures can be recovered gracefully.
 
-![UtilitiesModule — Relationship](../../.data/knowledge-graph/insights/images/utilities-module-relationship.png)
+![UtilitiesModule — Relationship](images/utilities-module-relationship.png)
 
 ## Usage Guidelines  
 
@@ -90,7 +90,6 @@ The module is positioned as a middle layer between raw data processing (checkpoi
 
 UtilitiesModule benefits from high modularity: each concern (checkpointing, tracing, persistence) is isolated behind interfaces.  The reliance on shared adapters and migration scripts centralises change management, reducing duplication.  The primary maintenance risk lies in keeping the hook contracts in `integrations/copi/docs/hooks.md` synchronized with agent expectations; disciplined documentation and versioning are essential to mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ UtilitiesModule benefits from high modularity: each concern (checkpointing, trac
 - [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

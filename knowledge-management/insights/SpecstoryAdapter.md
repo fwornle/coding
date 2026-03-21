@@ -10,7 +10,7 @@ The SpecstoryAdapter provides a synchronization mechanism for logging operations
 
 The adapter does not merely forward messages; it also maintains a **caching layer** for recent logging payloads, a **synchronization mechanism** that guarantees thread‑safe updates, and a **callback interface** that notifies Trajectory when a log entry has been successfully persisted.  All of these capabilities are reflected in the observations that link SpecstoryAdapter to the caching strategy of `EnvironmentConfigurator`, the storage‑module contract of `GraphDatabaseManager`, and the work‑stealing concurrency pattern of `WorkStealer`.
 
-![SpecstoryAdapter — Architecture](../../.data/knowledge-graph/insights/images/specstory-adapter-architecture.png)
+![SpecstoryAdapter — Architecture](images/specstory-adapter-architecture.png)
 
 ---
 
@@ -24,7 +24,7 @@ Caching is another first‑class concern.  Drawing on the configurable cache des
 
 Finally, the adapter employs a **callback‑based notification** channel, similar to the one used by `EnvironmentConfigurator`.  After a successful log write, the adapter invokes a registered callback on the **Trajectory** component, allowing the parent to react (e.g., update UI state or trigger downstream analytics) without polling.  
 
-![SpecstoryAdapter — Relationship](../../.data/knowledge-graph/insights/images/specstory-adapter-relationship.png)
+![SpecstoryAdapter — Relationship](images/specstory-adapter-relationship.png)
 
 ---
 
@@ -128,7 +128,6 @@ These integration points mean that changes in one sibling (e.g., a new work‑st
 - **Configurable** – Cache policies and callback registration are externalized, allowing operations teams to tune performance without code changes.  
 - **Potential Risk** – The concurrency and cache layers introduce subtle bugs if developers bypass the provided APIs, so strict linting and code reviews are recommended.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -142,7 +141,6 @@ These integration points mean that changes in one sibling (e.g., a new work‑st
 - [WorkStealer](./WorkStealer.md) -- WorkStealer uses a shared atomic index counter to enable work-stealing, allowing idle workers to pull tasks immediately, as seen in the WaveController's runWithConcurrency method.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a modular approach to data storage and management, with each graph having its own dedicated storage module, as seen in the integrations directory.
 - [EnvironmentConfigurator](./EnvironmentConfigurator.md) -- EnvironmentConfigurator uses a modular approach to environment configuration and connectivity, with each environment variable having its own dedicated configuration module, as seen in the integrations directory.
-
 
 ---
 

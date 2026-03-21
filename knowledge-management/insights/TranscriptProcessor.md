@@ -12,7 +12,7 @@ The processor is built for high‑throughput scenarios: it operates on **batches
 
 Together, these pieces make the TranscriptProcessor a configurable, extensible, and observable gateway for transcript data within the broader LiveLoggingSystem architecture.  
 
-![TranscriptProcessor — Architecture](../../.data/knowledge-graph/insights/images/transcript-processor-architecture.png)
+![TranscriptProcessor — Architecture](images/transcript-processor-architecture.png)
 
 ---
 
@@ -28,7 +28,7 @@ Configuration validation is performed by the **ConfigurationValidator** sibling,
 
 These patterns collectively promote **separation of concerns**, **extensibility**, and **operational robustness** without introducing heavyweight architectural styles such as micro‑services or event‑driven messaging, which are not mentioned in the source observations.  
 
-![TranscriptProcessor — Relationship](../../.data/knowledge-graph/insights/images/transcript-processor-relationship.png)
+![TranscriptProcessor — Relationship](images/transcript-processor-relationship.png)
 
 ---
 
@@ -121,7 +121,6 @@ No external services or databases are explicitly referenced, so integration is c
   * Centralised validation and logging reduce duplicated error‑handling logic.  
   * The reliance on abstract base classes means that any change to the adapter contract must be coordinated across all concrete adapters, requiring disciplined versioning.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -135,7 +134,6 @@ No external services or databases are explicitly referenced, so integration is c
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
-
 
 ---
 

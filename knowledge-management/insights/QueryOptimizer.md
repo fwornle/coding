@@ -104,7 +104,6 @@ All dependencies are resolved at compile time via standard Java imports; no exte
 
 Overall, the **QueryOptimizer** reflects a pragmatic, performance‑first design that builds on Neo4j’s strengths while adding application‑specific caching to meet the demands of the surrounding GraphDatabaseManager ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ Overall, the **QueryOptimizer** reflects a pragmatic, performance‑first design
 - [DatabaseSchemaManager](./DatabaseSchemaManager.md) -- The ConstraintSchemaManager, suggested in the parent analysis, likely plays a crucial role in managing the database schema, defining the structure and relationships between constraint data entities.
 - [DatabaseQueryExecution](./DatabaseQueryExecution.md) -- The DatabaseQueryExecution module would likely utilize a graph database driver, such as the Neo4j Java Driver, to execute queries on the database, as seen in the Neo4j documentation.
 - [ConstraintSchemaManager](./ConstraintSchemaManager.md) -- The ConstraintSchemaManager module would be responsible for defining the schema for the graph database, including the creation of nodes, relationships, and indexes, as described in the graph database's schema management documentation.
-
 
 ---
 

@@ -14,7 +14,7 @@ The design follows a **layered persistence architecture** where the EntityPersis
 
 Interaction patterns are evident in the way sibling components share the same storage backbone.  **ManualLearning** and **OnlineLearning** both persist their extracted knowledge through the same adapter, ensuring a uniform data model across learning pipelines.  The **OntologyManagementSystem** also stores its classification and inference data via the adapter, reinforcing a single source of truth for all graph‑based artifacts.  The EntityPersistenceModule therefore acts as a hub that coordinates persistence for code‑analysis results (via CodeGraphAgent), ontology updates, and learning outcomes.
 
-![EntityPersistenceModule — Architecture](../../.data/knowledge-graph/insights/images/entity-persistence-module-architecture.png)
+![EntityPersistenceModule — Architecture](images/entity-persistence-module-architecture.png)
 
 ## Implementation Details  
 
@@ -35,7 +35,7 @@ The EntityPersistenceModule is tightly coupled with several peers:
 
 Hooks and constraint files (`hooks.md` and `constraint-configuration.md`) serve as extension points, allowing the module’s persistence workflow to be augmented without modifying core logic.  The parent **KnowledgeManagement** component orchestrates these interactions, positioning the EntityPersistenceModule as the central persistence gateway for all knowledge‑graph‑related activities.
 
-![EntityPersistenceModule — Relationship](../../.data/knowledge-graph/insights/images/entity-persistence-module-relationship.png)
+![EntityPersistenceModule — Relationship](images/entity-persistence-module-relationship.png)
 
 ## Usage Guidelines  
 
@@ -68,7 +68,6 @@ Hooks and constraint files (`hooks.md` and `constraint-configuration.md`) serve 
 * Centralized hook and constraint configuration files provide extensibility without code changes, enhancing maintainability.  
 * However, the tight inter‑dependency on a single storage technology means that any major upgrade to the persistence layer will ripple through all sibling components, requiring coordinated updates.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Hooks and constraint files (`hooks.md` and `constraint-configuration.md`) serve 
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor likely utilizes the GraphDatabaseAdapter to store and query the constructed code graph.
 - [OntologyManagementSystem](./OntologyManagementSystem.md) -- OntologyManagementSystem likely utilizes the GraphDatabaseAdapter to store and query the ontology.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter likely utilizes Graphology and LevelDB to store and query the knowledge graph.
-
 
 ---
 

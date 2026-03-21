@@ -85,7 +85,6 @@ The system is organized around a central **ConstraintSystem** that houses three 
 
 The modular design and clear contract between SessionAnalyzer and its parent/sibling components promote maintainability.  Because the analyzer’s responsibilities are narrowly defined (detect and describe changes), unit testing is straightforward.  However, the reliance on external components (ChangeStore, PipelineManager) means that any change to the descriptor format must be coordinated across all three, introducing a potential coupling risk that should be managed through versioned interfaces or schema validation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ The modular design and clear contract between SessionAnalyzer and its parent/sib
 ### Siblings
 - [ChangeStore](./ChangeStore.md) -- Although direct source code is unavailable, the ChangeStore's purpose can be inferred from the parent component's context, indicating a need for storing and retrieving change metadata within the ConstraintSystem.
 - [PipelineManager](./PipelineManager.md) -- The PipelineManager's role in managing the pipeline-based execution model is critical, as it enables the LSLSessionProcessor to process entity content changes in a structured and scalable way, aligning with the ConstraintSystem's design principles.
-
 
 ---
 

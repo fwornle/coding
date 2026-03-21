@@ -77,7 +77,6 @@ Thus, the generator sits at the convergence of parsed workflow data and extracte
 
 All statements above are directly grounded in the provided observations and avoid speculative additions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ All statements above are directly grounded in the provided observations and avoi
 ### Siblings
 - [WorkflowParsing](./WorkflowParsing.md) -- The parent component analysis suggests that WorkflowParsing is a key aspect of the WorkflowTraceReporter, implying that it plays a vital role in the overall workflow tracing process.
 - [ConceptExtraction](./ConceptExtraction.md) -- The inclusion of ConceptExtraction as a suggested detail node suggests that it is an important aspect of the WorkflowTraceReporter, and its implementation has a significant impact on the overall tracing process.
-
 
 ---
 

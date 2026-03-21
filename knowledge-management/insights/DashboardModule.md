@@ -87,7 +87,6 @@ Interaction with siblings is explicit: the dashboard reads violation data from *
 * Centralised logging through **LoggingModule** simplifies troubleshooting across the entire **ConstraintSystem**.  
 * However, the direct dependency on **ViolationTrackingModule** means that any API changes there will necessitate coordinated updates in the dashboard’s aggregation code, which is a maintenance hotspot.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Interaction with siblings is explicit: the dashboard reads violation data from *
 - [GraphPersistenceModule](./GraphPersistenceModule.md) -- GraphPersistenceModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve graph data.
 - [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a logging framework to handle log messages and exceptions, providing a standardized logging approach.
 - [ConstraintEngineModule](./ConstraintEngineModule.md) -- ConstraintEngineModule utilizes a rule-based approach to evaluate and enforce constraints, supporting customizable constraint definitions and validation logic.
-
 
 ---
 

@@ -16,7 +16,7 @@ The **CodeGraph** sub‑component lives under the `integrations/code-graph-rag/s
 
 Together these pieces produce a **graph‑based representation of the codebase** that can be consumed by the SemanticAnalysis pipeline and other agents (e.g., the `CodeGraphAgent`).  
 
-![CodeGraph — Architecture](../../.data/knowledge-graph/insights/images/code-graph-architecture.png)
+![CodeGraph — Architecture](images/code-graph-architecture.png)
 
 ---
 
@@ -32,7 +32,7 @@ Finally, the integration with the ontology (via `ontology-integration.ts`) resem
 
 All of these patterns coexist without a monolithic service boundary; the sub‑component is a collection of focused TypeScript modules that expose clear interfaces to sibling components such as **Pipeline**, **Ontology**, **Insights**, and **EntityValidator**.  
 
-![CodeGraph — Relationship](../../.data/knowledge-graph/insights/images/code-graph-relationship.png)
+![CodeGraph — Relationship](images/code-graph-relationship.png)
 
 ---
 
@@ -115,7 +115,6 @@ All interactions are mediated through well‑typed TypeScript interfaces, keepin
 * The registration‑based extensibility may require documentation for new contributors, but it avoids invasive changes to core classes.  
 * The reliance on external parsers (not detailed) could become a maintenance hotspot if language support expands; encapsulating parser selection behind an interface would mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ All interactions are mediated through well‑typed TypeScript interfaces, keepin
 - [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is responsible for classifying entities based on the ontology.
 - [Insights](./Insights.md) -- The insight generation is performed by the InsightGenerator class in integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts.
 - [EntityValidator](./EntityValidator.md) -- The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/entity-validator.ts.
-
 
 ---
 

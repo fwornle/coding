@@ -68,7 +68,6 @@ Cross‑cutting concerns are addressed with well‑known libraries: **Log4j** su
 
 All statements are grounded in the supplied observations; no additional patterns or implementations have been inferred beyond what was explicitly mentioned.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ All statements are grounded in the supplied observations; no additional patterns
 - [HookManager](./HookManager.md) -- The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) provides a hook management system that allows for custom hook registration and execution, enabling developers to extend the system's functionality.
 - [WorkflowLayoutManager](./WorkflowLayoutManager.md) -- The WorkflowLayoutManager uses a graph library to compute workflow layouts, which provides a robust and scalable way to compute and visualize graph data.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator uses a rules engine to evaluate validation rules against entity data, which provides a robust and scalable way to validate entity data.
-
 
 ---
 

@@ -77,7 +77,6 @@ The indexing subsystem is a child of **GraphDatabaseManagement**, sharing the `G
 ### Maintainability assessment  
 The use of the **Repository pattern** isolates indexing logic behind a well‑defined interface, simplifying future changes to the underlying index implementation. However, the dual responsibility of handling both indexing and caching within a single adapter can increase code complexity. Clear separation of concerns—e.g., extracting the caching logic into a dedicated helper class—would improve readability and testability. Overall, the design is maintainable as long as the indexing strategy remains configurable and the cache invalidation rules are rigorously documented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The use of the **Repository pattern** isolates indexing logic behind a well‑de
 ### Siblings
 - [GraphDatabasePersistence](./GraphDatabasePersistence.md) -- The Repository pattern used in the GraphDatabaseAdapter class (graph-database-adapter.py) abstracts the graph database interactions, providing a layer of abstraction for data persistence.
 - [GraphQueryOptimization](./GraphQueryOptimization.md) -- The GraphDatabaseAdapter class may employ caching mechanisms, such as an in-memory cache, to store frequently accessed graph data, reducing the need for repeated queries and improving performance.
-
 
 ---
 

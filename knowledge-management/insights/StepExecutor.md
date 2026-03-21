@@ -113,7 +113,6 @@ Error handling is probably delegated to the individual services, with the execut
 
 The clear separation of concerns—processing, transformation, deduplication—makes the **StepExecutor** highly maintainable.  Adding a new capability (e.g., validation) can be achieved by introducing another service without altering existing logic.  However, the heavy reliance on configuration files means that changes to the transformation DSL or deduplication rules must be propagated through the **PipelineConfigParser** and possibly the **DAGDependencyResolver**, requiring coordinated updates and comprehensive integration tests.  Overall, the architecture promotes readability and modular testing, but disciplined governance of the YAML schema and service contracts is essential to avoid hidden coupling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ The clear separation of concerns—processing, transformation, deduplication—m
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The pipeline-config.yaml file defines the steps and their dependencies, which are then resolved by the DAGDependencyResolver
 - [PipelineConfigParser](./PipelineConfigParser.md) -- The pipeline-config.yaml file is parsed by the PipelineConfigParser, which extracts the steps and their dependencies
-
 
 ---
 

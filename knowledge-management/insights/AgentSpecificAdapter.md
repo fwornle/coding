@@ -88,12 +88,10 @@ Because each agent has its own adapter, the system can scale horizontally by add
 
 The clear boundary between generic and agent‑specific code aids maintainability: changes to one agent’s processing do not ripple to others. However, the reliance on a shared adapter interface means that any change to the contract must be coordinated across all adapters, requiring careful versioning and thorough regression testing.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

@@ -119,14 +119,7 @@ The documentation‑first approach (rich markdown files) makes the enforcer’s 
 
 ### Relationship
 
-![CodingConventionEnforcer Relationship](images/coding-convention-enforcer-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/coding-convention-enforcer-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -139,7 +132,6 @@ The documentation‑first approach (rich markdown files) makes the enforcer’s 
 ### Siblings
 - [BestPracticeRepository](./BestPracticeRepository.md) -- The integrations/browser-access/README.md file suggests that the BestPracticeRepository may be used in conjunction with the Browser Access MCP Server.
 - [ConstraintMonitor](./ConstraintMonitor.md) -- The integrations/mcp-constraint-monitor/README.md file suggests that the ConstraintMonitor is responsible for monitoring and enforcing constraints.
-
 
 ---
 

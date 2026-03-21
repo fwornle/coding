@@ -69,7 +69,6 @@ When extending or invoking **CommitAnalyzer**, developers should observe the fol
 * High maintainability: clear boundaries, single‑responsibility classes, and reliance on shared contracts mean updates to entity definitions propagate automatically.
 * The main risk is the implicit coupling to ConstraintSystem; any breaking change there requires coordinated updates across the analyzer and its helpers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ When extending or invoking **CommitAnalyzer**, developers should observe the fol
 ### Siblings
 - [ChangeStore](./ChangeStore.md) -- ChangeStore could be implemented as a separate module or class within the GitHistoryProcessor, with its own set of functions for storing, retrieving, and managing change metadata.
 - [PipelineManager](./PipelineManager.md) -- PipelineManager would be responsible for coordinating the various stages of the processing pipeline, potentially using a workflow or a state machine to manage the execution flow.
-
 
 ---
 

@@ -76,7 +76,6 @@ Beyond these direct neighbours, the **WorkflowTraceReporter** itself is the publ
 4. **Scalability considerations** – Because extraction is isolated, it can be parallelized (e.g., processing independent sub‑workflows concurrently) or replaced with a more performant algorithm without affecting the rest of the system. The pipeline can also be scaled horizontally by deploying multiple reporter instances, each reusing the same extraction component.  
 5. **Maintainability assessment** – High maintainability: the clear separation makes the codebase easier to understand, test, and evolve. Adding new concept rules or swapping extraction strategies requires changes only within the `ConceptExtraction` module. The primary maintenance risk is the need to keep the parsing‑extraction contract synchronized.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ Beyond these direct neighbours, the **WorkflowTraceReporter** itself is the publ
 ### Siblings
 - [WorkflowTraceGenerator](./WorkflowTraceGenerator.md) -- WorkflowTraceGenerator is referenced in the WorkflowTraceReporter.java file, indicating its integral role in generating trace reports.
 - [WorkflowParsing](./WorkflowParsing.md) -- The parent component analysis suggests that WorkflowParsing is a key aspect of the WorkflowTraceReporter, implying that it plays a vital role in the overall workflow tracing process.
-
 
 ---
 

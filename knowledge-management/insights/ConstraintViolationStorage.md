@@ -99,12 +99,10 @@ No other sibling components are mentioned, but any future module that needs hist
 
 Overall, **ConstraintViolationStorage** appears to be a deliberately isolated persistence component that enables multiple monitoring and UI integrations to share a consistent view of constraint violations while allowing the underlying storage technology to evolve independently.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
-
 
 ---
 

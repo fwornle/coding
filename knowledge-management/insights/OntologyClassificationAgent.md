@@ -104,12 +104,10 @@ The clear separation of concerns and the convention‑driven registration make t
 
 *All statements above are directly grounded in the observations provided; no unverified patterns or speculative code details have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
-
 
 ---
 

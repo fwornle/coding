@@ -73,12 +73,10 @@ Following these conventions ensures that the retry logic remains effective and t
 * **Low cognitive load** – developers interact primarily with `ConnectionHandler`, which abstracts away the retry complexity.  
 * **Potential risk** – without explicit unit tests for the manager, subtle bugs in delay calculation could surface only under rare network conditions; therefore, dedicated tests for the retry algorithm are recommended.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConnectionHandler](./ConnectionHandler.md) -- The ConnectionHandler uses a retry-with-backoff pattern in the connectViaHTTP method of the SpecstoryAdapter class to establish a stable connection.
-
 
 ---
 

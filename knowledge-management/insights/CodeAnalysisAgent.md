@@ -117,14 +117,7 @@ All these interactions are **interface‑driven**; the agent does not embed the 
 
 ### Relationship
 
-![CodeAnalysisAgent Relationship](images/code-analysis-agent-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/code-analysis-agent-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -141,7 +134,6 @@ All these interactions are **interface‑driven**; the agent does not embed the 
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses ontology systems to classify entities and provide confidence scores for classifications.
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses various modes to validate content and provide validation reports.
 - [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator generates detailed trace reports of UKB workflow runs, capturing data flow, concept extraction, and ontology classification.
-
 
 ---
 

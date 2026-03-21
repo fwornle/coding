@@ -128,7 +128,6 @@ Through these explicit contracts, OntologyClassification remains decoupled from 
 
 Overall, OntologyClassification exhibits a well‑structured, contract‑centric design that balances flexibility (multiple ontologies, optional RAG enrichment) with operational efficiency (lazy loading, stateless pipelines).  With disciplined documentation updates and automated contract validation, the component should remain both scalable and maintainable as the KnowledgeManagement ecosystem grows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -145,7 +144,6 @@ Overall, OntologyClassification exhibits a well‑structured, contract‑centric
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-
 
 ---
 

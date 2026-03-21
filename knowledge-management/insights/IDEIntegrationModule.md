@@ -91,7 +91,6 @@ Error handling follows a consistent pattern: any exception thrown by the validat
 * Shared logging and a common façade reduce duplication, easing future refactors.  
 * However, the need to keep three adapters in sync with any changes to the validation contract adds overhead; comprehensive integration tests are essential to maintain reliability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Error handling follows a consistent pattern: any exception thrown by the validat
 ### Siblings
 - [ValidationRulesEngine](./ValidationRulesEngine.md) -- ValidationRulesEngine would utilize a rules engine like Drools, which is a popular open-source business rules management system, to define and execute validation rules.
 - [ValidationReporter](./ValidationReporter.md) -- ValidationReporter would use a logging framework like Log4j or SLF4J to log validation errors and warnings, allowing for flexible configuration of log levels, formats, and output targets.
-
 
 ---
 

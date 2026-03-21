@@ -137,7 +137,6 @@ All interactions are mediated through well‑defined interfaces (agents and adap
 
 *End of insight document.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -149,7 +148,6 @@ All interactions are mediated through well‑defined interfaces (agents and adap
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
 - [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts to persist entities.
 - [UKBTraceReportModule](./UKBTraceReportModule.md) -- UKBTraceReportModule uses the UKBTraceReportAgent to generate detailed reports of UKB workflow runs.
-
 
 ---
 

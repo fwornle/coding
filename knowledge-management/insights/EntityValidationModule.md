@@ -106,7 +106,6 @@ All three agents inherit common behavior from the system‑wide `BaseAgent` (as 
 * The reliance on a single shared queue simplifies wiring but requires disciplined versioning of message schemas to avoid breaking downstream agents.  
 * Overall, the module’s design aligns with the broader system’s emphasis on modularity and consistency, making it maintainable provided that queue health and cache coherence are actively monitored.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ All three agents inherit common behavior from the system‑wide `BaseAgent` (as 
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The semantic insight generator agent in integrations/mcp-server-semantic-analysis/src/semantic-insight-generator/semantic-insight-generator-agent.ts utilizes a machine learning model to identify patterns in the code and entity relationships
 - [LLMIntegrationModule](./LLMIntegrationModule.md) -- The LLM integration agent in integrations/mcp-server-semantic-analysis/src/llm-integration-module/llm-integration-agent.ts initializes the LLM service and handles interactions
 - [BaseAgent](./BaseAgent.md) -- The BaseAgent class in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts provides a base class for all agents
-
 
 ---
 

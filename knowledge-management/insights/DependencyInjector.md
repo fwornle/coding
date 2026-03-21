@@ -75,7 +75,6 @@ Following these conventions ensures that the **DependencyInjector** continues to
 4. **Scalability considerations** – adding new LLM modes or swapping implementations requires only changes inside the injector, allowing the system to scale horizontally (more modes) without touching the service logic.  
 5. **Maintainability assessment** – centralizing resolution logic improves maintainability; however, developers must guard the Python‑TypeScript interface and avoid mutating injected objects to keep the codebase clean and predictable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Following these conventions ensures that the **DependencyInjector** continues to
 
 ### Siblings
 - [LLMService](./LLMService.md) -- LLMService uses dependency injection to set functions that resolve the current LLM mode, allowing for flexibility and testability.
-
 
 ---
 

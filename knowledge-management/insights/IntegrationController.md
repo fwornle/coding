@@ -116,7 +116,6 @@ Because the controller is a **SubComponent**, it does not expose a public API be
 
 Overall, **IntegrationController** embodies a well‑structured orchestration layer that cleanly separates concerns, leverages a state‑machine for deterministic flow, and integrates tightly with the Specstory extension via a dedicated adapter.  Its design supports configurability and robust error recovery, while the modular sibling components aid maintainability and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -125,7 +124,6 @@ Overall, **IntegrationController** embodies a well‑structured orchestration la
 ### Siblings
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to provide methods such as connectViaHTTP (lib/integrations/specstory-adapter.js:134) for establishing HTTP connections.
 - [LogManager](./LogManager.md) -- LogManager uses a logging mechanism to format and log conversation entries via the Specstory extension.
-
 
 ---
 

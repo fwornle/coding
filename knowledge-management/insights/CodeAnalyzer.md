@@ -34,7 +34,7 @@ These design choices produce a **layered interaction model**:
 4. The **validator** (`code-validator.ts`) runs its rule set on the AST.  
 5. Results, together with **version** metadata (`code-versioning.ts`), are returned and optionally logged (`code-logger.ts`).  
 
-![CodeAnalyzer — Architecture](../../.data/knowledge-graph/insights/images/code-analyzer-architecture.png)
+![CodeAnalyzer — Architecture](images/code-analyzer-architecture.png)
 
 ## Implementation Details  
 
@@ -67,7 +67,7 @@ All agents import a singleton logger from `code-logger.ts`. The logger provides 
 * **OntologyManager & KnowledgeGraphConstructor (siblings)** – These components may consume the versioned code insights to annotate ontology nodes or to populate the knowledge graph with code‑level relationships.  
 * **External Consumers** – Any service that requires up‑to‑date code metadata can invoke the public methods of `code-analyzer.ts`. Because the API is version‑aware, external callers can request insights for a specific version, enabling reproducible builds.
 
-![CodeAnalyzer — Relationship](../../.data/knowledge-graph/insights/images/code-analyzer-relationship.png)
+![CodeAnalyzer — Relationship](images/code-analyzer-relationship.png)
 
 ## Usage Guidelines  
 
@@ -107,7 +107,6 @@ All agents import a singleton logger from `code-logger.ts`. The logger provides 
 
 Overall, the **CodeAnalyzer** demonstrates a disciplined, agent‑centric design that balances extensibility with performance, fitting cleanly into the broader SemanticAnalysis ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -125,7 +124,6 @@ Overall, the **CodeAnalyzer** demonstrates a disciplined, agent‑centric design
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

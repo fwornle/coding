@@ -119,14 +119,7 @@ The modular folder layout and rich, integration‑specific documentation make th
 
 ### Relationship
 
-![Integrations Relationship](images/integrations-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/integrations-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -140,7 +133,6 @@ The modular folder layout and rich, integration‑specific documentation make th
 - [DesignPatterns](./DesignPatterns.md) -- The HookConfigLoader class in lib/agent-api/hooks/hook-config.js loads and merges hook configurations, allowing for a flexible and scalable hook system
 - [CodingConventions](./CodingConventions.md) -- The integrations/copi/USAGE.md file provides usage guidelines, which are relevant to the CodingConventions sub-component
 - [DevelopmentPractices](./DevelopmentPractices.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, which are utilized in the DevelopmentPractices sub-component
-
 
 ---
 

@@ -88,12 +88,10 @@ The integration is therefore **pull‑based**: downstream components pull the MC
 4. **Scalability considerations** – Because the MCP server is an external service, scaling it independently (e.g., via container orchestration) does not affect the consuming components, provided the endpoint remains consistent.  
 5. **Maintainability assessment** – High maintainability when documentation is accurate; low risk of code churn because changes are confined to configuration files rather than source code. However, any drift between docs and actual server deployment can introduce hidden bugs, so regular validation is essential.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-
 
 ---
 

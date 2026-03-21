@@ -65,7 +65,6 @@ No external APIs, network calls, or persistence layers are mentioned for Convers
 * **Clear ownership** – any change to the conversation log format is localized to this sub‑component, reducing ripple effects.  
 * **Coupling** – the component is tightly coupled to the shared logging format; any overhaul of the logging infrastructure will require coordinated updates across ConversationFormatter and all sibling logger users.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -77,7 +76,6 @@ No external APIs, network calls, or persistence layers are mentioned for Convers
 - [RetryPolicyManager](./RetryPolicyManager.md) -- RetryPolicyManager implements a retry mechanism with limited retries, demonstrating a fault-tolerant approach to handling failures and retries.
 - [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
 - [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
-
 
 ---
 

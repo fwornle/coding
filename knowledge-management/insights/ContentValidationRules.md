@@ -104,12 +104,10 @@ The data flow is therefore bidirectional: configuration files feed the rule engi
 * High maintainability thanks to declarative constraints and clear separation of concerns.  
 * Documentation‑driven approach reduces the need for deep code knowledge when updating rules, but the quality of the markdown files becomes critical; strict linting and schema validation of the configuration files are recommended to avoid human error.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
-
 
 ---
 

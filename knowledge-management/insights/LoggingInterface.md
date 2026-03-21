@@ -93,7 +93,6 @@ Following these conventions keeps the logging subsystem maintainable, testable, 
 * The single source of truth for log format (`logging-config.js`) reduces duplication.  
 * Potential technical debt resides in the file‑based storage approach; as log volume grows, refactoring to a more scalable backend may become necessary, but the existing abstraction eases that transition.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Following these conventions keeps the logging subsystem maintainable, testable, 
 ### Siblings
 - [LogFormatter](./LogFormatter.md) -- The logging-config.js file defines the logging format and structure, which is utilized by the LogFormatter to generate consistent log outputs.
 - [LogStorage](./LogStorage.md) -- The LogStorage may be implemented using a file-based storage approach, where log files are written to a designated directory or folder.
-
 
 ---
 

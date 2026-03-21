@@ -10,7 +10,7 @@ ContentValidator checks entity content against predefined validation rules to en
 
 The validator does **not** operate in isolation; it **relies on the GraphDatabaseManager** to fetch the current state of an entity from the underlying graph store before applying its rule set. The validation logic itself is supplied by a **validation framework** (the concrete framework name is not disclosed) that encapsulates the rule definitions and the execution engine. By centralising this logic, `ContentValidator` becomes the gate‑keeper for any content that flows through the `ConstraintSystem`.
 
-![ContentValidator — Architecture](../../.data/knowledge-graph/insights/images/content-validator-architecture.png)
+![ContentValidator — Architecture](images/content-validator-architecture.png)
 
 ---
 
@@ -22,7 +22,7 @@ Interaction with sibling components is minimal but well‑defined. `ContentValid
 
 The **relationship diagram** below illustrates these connections, showing how `ContentValidator` sits between the graph layer and the reporting mechanisms.
 
-![ContentValidator — Relationship](../../.data/knowledge-graph/insights/images/content-validator-relationship.png)
+![ContentValidator — Relationship](images/content-validator-relationship.png)
 
 ---
 
@@ -92,7 +92,6 @@ Because validation is performed synchronously after data retrieval, the componen
 
 The clear separation of responsibilities—data access, rule execution, and report generation—makes `ContentValidator` **highly maintainable**. Adding new validation rules only requires updating the configuration source, while the core validator code remains untouched. However, the lack of dynamic rule loading means any change to the rule set necessitates a redeployment or configuration reload, which should be managed carefully.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The clear separation of responsibilities—data access, rule execution, and repo
 - [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
 - [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
-
 
 ---
 

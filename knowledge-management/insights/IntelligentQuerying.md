@@ -113,7 +113,6 @@ Overall, the design is **scale‑out friendly** as long as the in‑memory graph
 
 The clear separation of responsibilities (query, graph handling, persistence, ontology) makes the codebase **moderately maintainable**.  Shared components like `PersistenceAgent` simplify updates to the storage layer, but any change to its contract ripples through all dependent siblings.  The reliance on external libraries (Graphology, VKB API) means that version upgrades must be coordinated across the entire **KnowledgeManagement** suite.  Documentation should explicitly capture the orchestration flow (query → VKB → Graphology → Ontology → Persistence) to aid future developers in tracing data movement.  With disciplined adherence to the usage guidelines above, the component should remain robust and adaptable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -130,7 +129,6 @@ The clear separation of responsibilities (query, graph handling, persistence, on
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the PersistenceAgent class in the persistence_agent.py file to handle ontology classification and entity typing.
 - [CodeKnowledgeGraphConstruction](./CodeKnowledgeGraphConstruction.md) -- CodeKnowledgeGraphConstruction uses the CodeGraphAgent class in the code_graph_agent.py file to construct the code knowledge graph.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseStorage module to handle storage and retrieval of knowledge graph data.
-
 
 ---
 

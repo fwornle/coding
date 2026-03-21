@@ -16,7 +16,7 @@ The **ServiceStarter** class provides a **robust startup pattern** that includes
 
 LLMManager is positioned to collaborate with the **ServiceOrchestrator** sibling (Observation 5). While ServiceOrchestrator orchestrates the lifecycle of various services, LLMManager contributes the LLM‑specific lifecycle hooks (startup via ServiceStarter, shutdown via orchestrator callbacks). This division of concerns reflects a **separation‑of‑concerns** design: LLMManager focuses on domain‑specific logic, while ServiceOrchestrator handles generic service orchestration.
 
-![LLMManager — Architecture](../../.data/knowledge-graph/insights/images/llmmanager-architecture.png)
+![LLMManager — Architecture](images/llmmanager-architecture.png)
 
 ## Implementation Details  
 
@@ -39,7 +39,7 @@ Beyond these, LLMManager is a consumer of the **ServiceOrchestrator** sibling, w
 
 Other siblings—**GraphDatabaseManager**, **WaveAgentExecutor**, **APIService**, and **DashboardService**—do not directly couple with LLMManager but share the same DI container and service‑starter infrastructure. This common foundation ensures consistent error handling and startup semantics across the entire DockerizedServices suite.
 
-![LLMManager — Relationship](../../.data/knowledge-graph/insights/images/llmmanager-relationship.png)
+![LLMManager — Relationship](images/llmmanager-relationship.png)
 
 ## Usage Guidelines  
 
@@ -71,7 +71,6 @@ LLMManager sits as a domain‑specific leaf under **DockerizedServices**, sharin
 ### Maintainability assessment  
 The strict separation of concerns (LLM logic vs. startup logic) and the use of DI make the codebase easy to unit‑test and evolve. Adding new LLM providers or modes requires only extending **LLMService** and updating DI bindings, without touching LLMManager itself. The reliance on shared infrastructure (ServiceStarter, ServiceOrchestrator) further centralizes error handling, reducing duplicated boilerplate across siblings.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ The strict separation of concerns (LLM logic vs. startup logic) and the use of D
 - [WaveAgentExecutor](./WaveAgentExecutor.md) -- WaveAgentExecutor likely uses a specific constructor and execution pattern to execute wave-based agents.
 - [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
 - [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
-
 
 ---
 

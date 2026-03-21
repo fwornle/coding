@@ -14,11 +14,11 @@ The design of **ConstraintMonitor** follows a **command‑style validation patte
 
 The overall architecture can be visualized in the diagram below, which shows **ConstraintMonitor** nested inside **ConstraintSystem**, alongside its sibling **ContentValidationAgent** and its child **ConstraintValidationPattern**.  
 
-![ConstraintMonitor — Architecture](../../.data/knowledge-graph/insights/images/constraint-monitor-architecture.png)
+![ConstraintMonitor — Architecture](images/constraint-monitor-architecture.png)
 
 The relationship diagram that follows highlights the data flow: the `execute` call originates from higher‑level orchestrators, passes through **ConstraintMonitor**, which invokes **ConstraintValidationPattern**, and finally reports compliance back to the **ConstraintSystem**.  
 
-![ConstraintMonitor — Relationship](../../.data/knowledge-graph/insights/images/constraint-monitor-relationship.png)
+![ConstraintMonitor — Relationship](images/constraint-monitor-relationship.png)
 
 Key architectural decisions evident from the observations include:
 
@@ -89,18 +89,16 @@ No additional external libraries or services are mentioned in the observations, 
 * The clean split between orchestration (monitor) and rule logic (pattern) makes the codebase easy to reason about and test.  
 * Consistent use of the `execute` contract across siblings reduces cognitive load for developers extending the validation framework.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the ContentValidationAgent, which is implemented in the content-validation-agent.ts file, to validate entity content against configured rules. This agent is responsible for ensuring that the code actions and file operations performed during a Claude Code session comply with the predefined constraints. The ContentValidationAgent follows a specific pattern, where it executes a validation function with the input and context as parameters, similar to the execute(input, context) pattern used in the ConstraintMonitor sub-component. This pattern allows for a standardized way of validating constraints across different components of the system. The content-validation-agent.ts file is located in the integrations/mcp-server-semantic-analysis/src/agents directory.
 
 ### Children
-- [ConstraintValidationPattern](./ConstraintValidationPattern.md) -- The ConstraintMonitor's execute pattern is mentioned in the context of the ConstraintSystem component, indicating a shared validation approach.
+- ConstraintValidationPattern -- The ConstraintMonitor's execute pattern is mentioned in the context of the ConstraintSystem component, indicating a shared validation approach.
 
 ### Siblings
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent follows a specific pattern, executing a validation function with input and context as parameters, similar to the execute(input, context) pattern used in the ConstraintMonitor sub-component.
-
 
 ---
 

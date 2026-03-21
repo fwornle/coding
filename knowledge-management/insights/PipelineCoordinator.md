@@ -89,7 +89,6 @@ Overall, the PipelineCoordinator serves as the glue that binds task‑level orch
 * However, the lack of visible code symbols means that documentation and test coverage become critical; any change to the coordinator’s contract must be reflected across all callers (primarily **Trajectory**).  
 * The reliance on sibling services for persistence and concurrency means that changes in those modules may impact the coordinator’s behavior, underscoring the importance of stable interfaces between them.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Overall, the PipelineCoordinator serves as the glue that binds task‑level orch
 - [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
 - [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
 - [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapterFactory uses the SpecstoryAdapter class to create SpecstoryAdapter instances.
-
 
 ---
 

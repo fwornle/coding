@@ -99,7 +99,6 @@ The implementation deliberately avoids embedding LLM logic inside the analysis s
    - Adding new LLM‑driven analyses requires only implementing a consumer service that calls the existing manager, avoiding duplication.  
    - Future changes to storage technology or LLM provider are localized to the adapter or manager, minimizing ripple effects.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ The implementation deliberately avoids embedding LLM logic inside the analysis s
 - [CodingConventions](./CodingConventions.md) -- CodingConventions are applied through the GraphDatabaseInteractions sub-component, which handles interactions with the graph database.
 - [BestPractices](./BestPractices.md) -- BestPractices are applied through the LLMServiceManagement sub-component, which manages LLM services, including initialization, execution, and monitoring.
 - [GraphDatabaseInteractions](./GraphDatabaseInteractions.md) -- GraphDatabaseInteractions utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts for efficient data storage and retrieval.
-
 
 ---
 

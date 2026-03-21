@@ -71,7 +71,6 @@ Interaction with sibling components is implicit: `GraphDatabaseRouter` and `VkbA
 - Lack of automated eviction or TTL means fewer hidden behaviors, reducing debugging complexity.  
 - However, the reliance on callers for cache invalidation introduces a potential source of bugs; adding a thin wrapper or helper that couples mutation operations with invalidation could further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ Interaction with sibling components is implicit: `GraphDatabaseRouter` and `VkbA
 ### Siblings
 - [GraphDatabaseRouter](./GraphDatabaseRouter.md) -- The GraphDatabaseRouter class (GraphDatabaseInteraction.ts) utilizes the VKB API to manage graph database interactions, as seen in the constructor where it initializes the API connection
 - [VkbApiIntegration](./VkbApiIntegration.md) -- The VkbApiIntegration module (GraphDatabaseInteraction.ts) imports the VKB API library and initializes the API connection, as seen in the constructor where it sets the API endpoint and authentication credentials
-
 
 ---
 

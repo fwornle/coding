@@ -18,7 +18,7 @@ The manager’s primary responsibilities include:
 
 These responsibilities position `VkbApiClientManager` as the “gateway” through which external callers reach the knowledge graph while abstracting away the complexities of storage, LLM integration, and routing.
 
-![VkbApiClientManager — Architecture](../../.data/knowledge-graph/insights/images/vkb-api-client-manager-architecture.png)
+![VkbApiClientManager — Architecture](images/vkb-api-client-manager-architecture.png)
 
 ---
 
@@ -36,7 +36,7 @@ The design of `VkbApiClientManager` follows a **layered orchestration** pattern.
 
 The overall architecture is **modular**: each sibling component (ManualLearning, OnlineLearning, etc.) shares the same underlying persistence and LLM services, promoting reuse and consistency. The relationship diagram below visualises these connections.
 
-![VkbApiClientManager — Relationship](../../.data/knowledge-graph/insights/images/vkb-api-client-manager-relationship.png)
+![VkbApiClientManager — Relationship](images/vkb-api-client-manager-relationship.png)
 
 ### Architectural Patterns Identified
 * Layered orchestration (routing → persistence → LLM enrichment)  
@@ -111,7 +111,6 @@ These integration points reflect a **service‑oriented** design where each subs
 
 Overall, `VkbApiClientManager` embodies a well‑structured, service‑oriented approach that balances performance (through caching and intelligent routing) with maintainability (via adapters and shared services).
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ Overall, `VkbApiClientManager` embodies a well‑structured, service‑oriented 
 - [WaveAgentController](./WaveAgentController.md) -- WaveAgentController likely interacts with the LlmServiceManager for LLM operations and initialization.
 - [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
 - [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
-
 
 ---
 

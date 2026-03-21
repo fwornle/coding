@@ -122,7 +122,6 @@ All interactions are **synchronous method calls** within the same Node.js proces
 
 **In summary**, the WorkflowOrchestrator sub‑component provides a disciplined, workflow‑driven engine for coordinating semantic‑analysis agents. Its reliance on a shared `BaseAgent` class, a dedicated `AgentExecutionManager`, and a unified `GraphDatabaseAdapter` yields a clean, maintainable architecture while leaving clear pathways for future scalability enhancements.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ All interactions are **synchronous method calls** within the same Node.js proces
 - [Ontology](./Ontology.md) -- The Ontology sub-component uses a hierarchical approach to manage the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
 - [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.
-
 
 ---
 

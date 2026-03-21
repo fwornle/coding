@@ -95,12 +95,10 @@ Because the configurator is a child of *ConstraintMonitoringService*, it does no
 
 Overall, the **ConstraintConfigurator** exemplifies a pragmatic, configuration‑first approach that balances flexibility with operational simplicity, fitting cleanly within the *ConstraintMonitoringService*’s architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
-
 
 ---
 

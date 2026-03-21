@@ -93,7 +93,6 @@ Overall, the implementation revolves around a **single source of truth (JSON)**,
 
 By adhering to the guidelines above and respecting the observed structure, developers can extend the system confidently while preserving a coherent and adaptable logging strategy across the entire codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ By adhering to the guidelines above and respecting the observed structure, devel
 
 ### Siblings
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstructor class utilizes Tree-sitter AST parsing to construct the knowledge graph.
-
 
 ---
 

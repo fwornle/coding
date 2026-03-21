@@ -88,12 +88,10 @@ Because the client abstracts the raw messaging details, other parts of the syste
 * **High** – Clear separation and composition make the codebase easy to reason about.  
 * **Potential Risk** – Lack of visible source code for the client means that any bugs must be diagnosed through integration tests or runtime inspection.  Maintaining comprehensive mock implementations for tests will be essential to keep the adapter reliable as the extension evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
-
 
 ---
 

@@ -85,7 +85,6 @@ Because the observation set does not expose concrete symbols, the implementation
 * The layered performance optimizations are well‑encapsulated (cache wrapper, DataLoader, pagination helper), keeping each concern isolated and testable.  
 * The main maintenance risk lies in cache invalidation after mutations; disciplined coordination with **MutationHandler** mitigates this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ Because the observation set does not expose concrete symbols, the implementation
 ### Siblings
 - [SchemaManager](./SchemaManager.md) -- The SchemaManager class is responsible for registering and updating GraphQL schema definitions, as indicated by its usage in the GraphQLAPI sub-component.
 - [MutationHandler](./MutationHandler.md) -- The MutationHandler likely employs a transactional approach to mutation processing, ensuring data consistency and integrity.
-
 
 ---
 

@@ -142,7 +142,6 @@ The API file defines routes (e.g., `GET /health`, `POST /health/settings`) that 
    * The mixed language files (TS & JS) could complicate refactoring; consolidating to a single language would improve consistency.  
    * Comprehensive logging and a dedicated notification path aid debugging and operational visibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -158,7 +157,6 @@ The API file defines routes (e.g., `GET /health`, `POST /health/settings`) that 
 - [LLMLogger](./LLMLogger.md) -- The LLMLogger class uses a logging library (logger-lib.js) to log LLM-related events and errors.
 - [LLMProviderRegistry](./LLMProviderRegistry.md) -- The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.
 - [LLMConfigManager](./LLMConfigManager.md) -- The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.
-
 
 ---
 

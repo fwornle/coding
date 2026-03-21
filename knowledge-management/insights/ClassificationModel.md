@@ -85,7 +85,6 @@ No other modules are referenced, so the model’s external surface is limited to
 * The tight, well‑defined dependency graph is easy to understand and navigate, aiding maintainability.  
 * However, the **tight coupling** means that any change to the logging API propagates to both the model and the writer, increasing the maintenance surface.  Encapsulating the logger behind an interface and injecting it would improve testability and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ No other modules are referenced, so the model’s external surface is limited to
 ### Siblings
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism is used by the ClassificationModel to write classification results to a file, indicating a dependency between the two components
 - [ClassificationResultWriter](./ClassificationResultWriter.md) -- The ClassificationResultWriter relies on the LoggingMechanism to write the classification results to a file, demonstrating a clear dependency between the two components
-
 
 ---
 

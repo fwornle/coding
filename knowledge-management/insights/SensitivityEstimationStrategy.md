@@ -64,7 +64,6 @@ Because the strategy is encapsulated behind an interface, other system modules c
 * **Risk areas** – changes to the feature extraction pipeline (`classification-algorithm.ts`) must be coordinated with strategy updates; otherwise mismatches can cause silent degradation.  
 * **Testability** – each strategy implementation can be unit‑tested in isolation using mocked feature sets, and the `SensitivityClassifier` can be integration‑tested with a stub strategy to verify orchestration logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ Because the strategy is encapsulated behind an interface, other system modules c
 
 ### Siblings
 - [ClassificationAlgorithm](./ClassificationAlgorithm.md) -- The classification algorithm is implemented in the classification-algorithm.ts file, which suggests a modular design for the classification logic.
-
 
 ---
 

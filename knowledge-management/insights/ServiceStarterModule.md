@@ -87,12 +87,10 @@ No other sibling modules are mentioned, so the primary integration surface is th
 * **Clear separation** – The façade‑starter split isolates resilience concerns from business logic, simplifying future refactors or replacements of the underlying LLM engine.  
 * **Potential risk** – Since the actual code is not visible, any hidden coupling (e.g., direct references to specific LLM classes) could reduce modularity; developers should audit the module for such dependencies when extending functionality.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMService](./LLMService.md) -- The LLMService class (lib/llm/llm-service.ts) utilizes a facade-based approach to provide a high-level interface for LLM operations.
-
 
 ---
 

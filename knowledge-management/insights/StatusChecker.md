@@ -91,12 +91,10 @@ No other modules, databases, or external APIs are referenced, reinforcing the vi
 
 All statements above are directly grounded in the three provided observations and the explicit file path **`lib/service-starter.js`**. No additional patterns or components have been invented.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceMonitor](./ServiceMonitor.md) -- The ServiceMonitor sub-component uses the isPortListening function in lib/service-starter.js to continuously check the services' status.
-
 
 ---
 

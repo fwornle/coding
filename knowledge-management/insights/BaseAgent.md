@@ -73,7 +73,6 @@ Finally, the state machine is exposed (via methods or events) so that external o
 ### 5. Maintainability assessment  
 The heavy reliance on well‑known design patterns (template, state machine, decorator) makes the codebase **easy to reason about** for developers familiar with these concepts. The **open‑closed extension point** reduces the risk of regressions when adding new behaviour. However, maintainability hinges on disciplined use of extensions and decorators—over‑extension can lead to a “spaghetti” of wrappers. The clear separation between agent logic and persistence (via `GraphDatabaseAdapter`) further aids maintainability by localizing data‑access changes. Overall, the design strikes a solid balance between flexibility and structural clarity.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The heavy reliance on well‑known design patterns (template, state machine, dec
 - [DesignPatterns](./DesignPatterns.md) -- DesignPatterns leverages the createEntity() method in storage/graph-database-adapter.ts to store and manage design pattern entities.
 - [CodingConventions](./CodingConventions.md) -- CodingConventions uses the createEntity() method in storage/graph-database-adapter.ts to store and manage coding convention entities.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the createEntity() method to store and manage entities in the graph database, as seen in storage/graph-database-adapter.ts.
-
 
 ---
 

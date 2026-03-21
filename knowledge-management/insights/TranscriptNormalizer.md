@@ -84,12 +84,10 @@ Because normalization occurs synchronously within the same process, scaling hori
 
 The clear separation of concerns makes the codebase maintainable: changes to transcript formats are isolated to **TranscriptNormalizer**, reducing the risk of regressions in downstream logic. The lack of visible source code means that documentation and unit tests become critical for maintainability; developers should ensure that the normalizer’s contract is well‑specified and that any new format handling is covered by tests. The simple composition model also eases refactoring—swapping the normalizer for a new implementation would require only changes in **`transcript-processor.ts`**.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the TranscriptNormalizer class in transcript-processor.ts to normalize transcript formats
-
 
 ---
 

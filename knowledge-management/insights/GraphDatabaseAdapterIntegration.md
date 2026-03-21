@@ -106,12 +106,10 @@ No other sibling components are mentioned, but because `ContentValidator` is par
 * **Lack of explicit source files** in the observations limits immediate visibility, but the defined file path (`graph-database-adapter.js`) provides a concrete location for future refactoring.  
 * **Potential technical debt** – If additional validation rules start embedding graph logic directly, the clean boundary could erode, so enforcing the façade contract is essential for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
-
 
 ---
 

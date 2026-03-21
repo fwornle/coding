@@ -46,8 +46,6 @@ While the source observations do not list concrete classes or functions, the des
 
 The following schematic diagram (conceptual) illustrates the flow:
 
-![RetryMechanism Interaction Diagram](retry_mechanism_diagram.png)
-
 ---
 
 ## Integration Points  
@@ -97,12 +95,10 @@ No external libraries are mentioned, but typical implementations may rely on Nod
 
 * Because the mechanism is encapsulated and its responsibilities are narrowly defined, it is **easy to maintain**. The main maintenance burden lies in keeping the configuration (delays, max attempts) aligned with operational realities. The lack of separate source files means any future refactor to extract the mechanism into its own module should be straightforward, given the clear logical boundaries already described.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses exponential backoff for retrying service startup, as mentioned in lib/service-starter.js
-
 
 ---
 

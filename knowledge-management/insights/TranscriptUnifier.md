@@ -70,12 +70,10 @@ Finally, because the concrete implementation details are not publicly documented
 4. **Scalability considerations** – the current synchronous, in‑process design scales with the processor’s host resources; adding many source parsers may increase the unifier’s CPU load, suggesting a need for modular parser registration or eventual asynchronous handling if volume grows.  
 5. **Maintainability assessment** – isolation of unification logic improves maintainability by limiting the impact of source‑format changes; however, the lack of visible code artifacts makes it harder to assess test coverage and documentation quality, so explicit contracts and unit tests are essential for long‑term health.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses a unified format to represent transcripts from different agents.
-
 
 ---
 

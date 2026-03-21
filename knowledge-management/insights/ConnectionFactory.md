@@ -50,12 +50,10 @@ No explicit dependency files or import statements are visible, so the integratio
 4. **Scalability considerations** – Adding new connection types scales linearly: a new concrete factory is introduced and registered without affecting existing code.  The factory can be further refined (e.g., using a plugin architecture) if the number of connection types grows large.  
 5. **Maintainability assessment** – Because the factory abstracts all concrete connection details, the codebase remains maintainable; changes to a specific protocol are confined to its concrete factory and connection implementation.  The main maintenance burden lies in keeping the factory registry up‑to‑date and ensuring that the abstract **Connection** interface remains stable across extensions.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses a factory pattern to create instances of different connection methods, allowing for loose coupling between the adapter and the connection methods.
-
 
 ---
 

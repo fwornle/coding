@@ -60,7 +60,6 @@ Finally, monitor the configured limits: a very high `maxAttempts` combined with 
 4. **Scalability considerations** – the strategy’s parameters can be tuned to handle larger clusters or more fragile services without code changes, supporting horizontal scaling of the startup process.  
 5. **Maintainability assessment** – a single‑file implementation (`retry‑strategy.ts`) with external configuration makes the component easy to update, test, and replace, contributing positively to long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -69,7 +68,6 @@ Finally, monitor the configured limits: a very high `maxAttempts` combined with 
 ### Siblings
 - [ServiceInitializer](./ServiceInitializer.md) -- ServiceInitializer may use a dependency graph or a similar data structure to model the relationships between services and determine the correct startup order
 - [StartupSequenceManager](./StartupSequenceManager.md) -- StartupSequenceManager may use a state machine or a similar mechanism to track the startup progress of services and handle any errors that may occur
-
 
 ---
 

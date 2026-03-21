@@ -89,12 +89,10 @@ Developers should treat **CopiWrapper** as the *only* sanctioned way to invoke t
 
 *All observations and conclusions above are directly grounded in the provided markdown files and the explicit mention of the `CopiWrapper` class.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
-
 
 ---
 

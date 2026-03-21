@@ -26,11 +26,11 @@ The **hooks** described in `integrations/copi/docs/hooks.md` are explicitly ment
 
 Together these pieces form the system’s high‑level shape, illustrated in the architecture diagram below:
 
-![GraphCodeRAG — Architecture](../../.data/knowledge-graph/insights/images/graph-code-rag-architecture.png)
+![GraphCodeRAG — Architecture](images/graph-code-rag-architecture.png)
 
 The diagram highlights the three stages (graph extraction, indexing, RAG) and shows the **relationship** between GraphCodeRAG, its parent **CodingPatterns**, and its child **CodeGraphRAGSystem**.  
 
-![GraphCodeRAG — Relationship](../../.data/knowledge-graph/insights/images/graph-code-rag-relationship.png)
+![GraphCodeRAG — Relationship](images/graph-code-rag-relationship.png)
 
 ---
 
@@ -99,7 +99,6 @@ By following these guidelines, developers can safely contribute new language par
 
 These observations are directly grounded in the provided files and hierarchy context, offering a precise, evidence‑based view of **GraphCodeRAG** and its role within the broader **CodingPatterns** ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ These observations are directly grounded in the provided files and hierarchy con
 - [DesignPatternLibrary](./DesignPatternLibrary.md) -- DesignPatternLibrary is mentioned as a known sub-component but lacks specific references in the provided source files.
 - [BestPracticeRepository](./BestPracticeRepository.md) -- BestPracticeRepository is acknowledged as a sub-component but lacks concrete references in the source files.
 - [AntiPatternIdentification](./AntiPatternIdentification.md) -- AntiPatternIdentification is recognized as a sub-component but lacks direct references in the provided source files.
-
 
 ---
 

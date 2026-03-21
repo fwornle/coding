@@ -75,7 +75,6 @@ The mention of a “scheduling or batching mechanism” indicates that the valid
 * **Shared entry function** – Centralizing validation through `validateEntityContent()` reduces duplication but requires careful versioning if the function signature evolves.  
 * **Cache abstraction** – If the caching mechanism is abstracted behind an interface, swapping implementations (e.g., in‑memory to distributed cache) can be done with minimal impact on the validator logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ The mention of a “scheduling or batching mechanism” indicates that the valid
 ### Siblings
 - [ValidationRulesEngine](./ValidationRulesEngine.md) -- The validateEntityContent() function in the validation-rules.yaml file is used to check entity content against predefined rules, as indicated by the parent context of the ConstraintSystem component.
 - [CachingMechanism](./CachingMechanism.md) -- The CachingMechanism would need to store validated entity content in a cache or data storage system, allowing for efficient retrieval and reuse of validated content.
-
 
 ---
 

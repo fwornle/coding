@@ -81,7 +81,6 @@ The only explicit dependency chain revealed by the observations is: **ErrorManag
 * Shared adapters and formatter logic reduce code duplication, simplifying updates to the Specstory contract.
 * The lack of concrete file paths in the observations suggests documentation gaps; adding explicit module locations (e.g., `lib/trajectory/error-manager.js`) would further improve traceability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ The only explicit dependency chain revealed by the observations is: **ErrorManag
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
 - [DataFormatter](./DataFormatter.md) -- DataFormatter uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to format data according to Specstory's requirements
 - [TrajectoryInitializer](./TrajectoryInitializer.md) -- TrajectoryInitializer uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to initialize the Trajectory component
-
 
 ---
 

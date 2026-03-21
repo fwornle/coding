@@ -64,7 +64,6 @@ Because validation occurs once per request and relies on lightweight checks plus
 ### Maintainability assessment  
 The clear stage boundaries and externalized validation rules make the validator easy to update without touching core Java code. However, maintainers must keep the schema in sync with the Java model; automated schema‑generation tests would be advisable to guard against drift.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ The clear stage boundaries and externalized validation rules make the validator 
 ### Siblings
 - [ResponseHandler](./ResponseHandler.md) -- The ResponseHandler probably interacts with the LLM providers through a standardized interface or API, which is defined in a separate module or package
 - [CompletionRequestPipeline](./CompletionRequestPipeline.md) -- The CompletionRequestPipeline is likely defined in the CompletionRequestPipeline.java file, where it coordinates the execution of various stages, including validation, routing, and response handling
-
 
 ---
 

@@ -91,7 +91,6 @@ Because the service is launched inside Docker, its runtime environment is isolat
 - However, the shared nature of the script creates a **tight coupling** between services; any bug or regression in the script can affect all siblings, so thorough testing of the starter script is essential.  
 - Clear configuration parameters and extensive logging mitigate the risk, making the component reasonably maintainable as long as changes are coordinated across the DockerizedServices family.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Because the service is launched inside Docker, its runtime environment is isolat
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService employs the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses the retry-with-backoff pattern in service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter employs the retry-with-backoff pattern to prevent endless loops and provide graceful degradation when optional services fail.
-
 
 ---
 

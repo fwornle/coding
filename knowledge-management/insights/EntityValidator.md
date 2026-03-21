@@ -38,7 +38,7 @@ The **staleness detector** (`entity-staleness-detector.ts`) introduces a machine
 
 These design choices are visualised in the architecture diagram below, which highlights the validator’s internal agents and their interaction with sibling agents in the SemanticAnalysis DAG.
 
-![EntityValidator — Architecture](../../.data/knowledge-graph/insights/images/entity-validator-architecture.png)
+![EntityValidator — Architecture](images/entity-validator-architecture.png)
 
 ---
 
@@ -76,7 +76,7 @@ EntityValidator sits at the intersection of several functional areas:
 
 The relationship diagram below illustrates these connections, showing both upstream dependencies (e.g., CodeAnalyzer) and downstream consumers (e.g., InsightGenerator).
 
-![EntityValidator — Relationship](../../.data/knowledge-graph/insights/images/entity-validator-relationship.png)
+![EntityValidator — Relationship](images/entity-validator-relationship.png)
 
 ---
 
@@ -125,7 +125,6 @@ EntityValidator is a central hub within the **SemanticAnalysis** DAG, bridging c
 
 The agent‑based layout, explicit file boundaries, and dependency injection make the codebase approachable for new contributors.  Clear separation between validation rules and the validator core enables rule evolution without touching core logic.  The primary maintenance burden lies in synchronising cache state across instances and managing the lifecycle of the ML staleness model, both of which are well‑documented entry points in the existing source files.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -143,7 +142,6 @@ The agent‑based layout, explicit file boundaries, and dependency injection mak
 - [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
-
 
 ---
 

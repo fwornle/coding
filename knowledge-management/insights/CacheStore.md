@@ -88,7 +88,6 @@ Because no concrete class names or functions are listed, we can only describe th
 
 All statements above are derived directly from the supplied observations and the explicit relationships among **CacheStore**, **ValidationAgent**, **RuleEngine**, and **ValidationPipeline**. No external patterns or speculative details have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ All statements above are derived directly from the supplied observations and the
 ### Siblings
 - [RuleEngine](./RuleEngine.md) -- The ValidationAgent sub-component uses a rules-engine pattern with ValidationRules, as defined in the parent context of ConstraintSystem.
 - [ValidationPipeline](./ValidationPipeline.md) -- The ValidationPipeline is likely to be responsible for orchestrating the execution of multiple validation rules, ensuring that each rule is evaluated in the correct order and that the overall validation process is efficient and effective.
-
 
 ---
 

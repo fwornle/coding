@@ -71,7 +71,6 @@ Following these conventions keeps the provider ecosystem coherent, preserves the
 ### Maintainability Assessment
 The clear separation between **registry**, **manager**, and **abstraction** yields high maintainability.  Changes to provider implementations or to the storage strategy are isolated to `ProviderRegistry` or the concrete provider classes, leaving the manager’s contract untouched.  The explicit, purpose‑driven API (`registerProvider`, `getProvider`) reduces cognitive load for developers and encourages consistent usage across sibling managers.  Overall, the design promotes easy onboarding, straightforward testing (the manager can be mocked), and future growth of the provider ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ The clear separation between **registry**, **manager**, and **abstraction** yiel
 ### Siblings
 - [DMRManager](./DMRManager.md) -- DMRManager uses the DMRProvider class (lib/llm/providers/dmr-provider.ts) to register as a provider, enabling local LLM inference
 - [CircuitBreakerManager](./CircuitBreakerManager.md) -- CircuitBreakerManager uses a circuit breaker pattern to detect and prevent cascading failures
-
 
 ---
 

@@ -63,7 +63,6 @@ The only explicit file path mentioned is `lib/integrations/specstory-adapter.js`
 ### 5. Maintainability assessment  
 * The clear boundary created by the adapter makes the codebase easier to maintain: changes to transport mechanisms stay inside `SpecstoryAdapter` or new strategy modules, while the public contract of `SpecstoryConnectorAdapter` remains stable. The modular layout, combined with centralized error handling, reduces the risk of duplicated logic and simplifies debugging.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ The only explicit file path mentioned is `lib/integrations/specstory-adapter.js`
 ### Siblings
 - [ConnectionManager](./ConnectionManager.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is utilized by the ConnectionManager to handle different connection methods, such as HTTP and IPC.
 - [ErrorHandler](./ErrorHandler.md) -- The ErrorHandler is tightly coupled with the ConnectionManager to catch and handle connection-related errors, providing a robust error-handling mechanism.
-
 
 ---
 

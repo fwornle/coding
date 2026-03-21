@@ -81,12 +81,10 @@ No explicit dependency files are listed, but the router is expected to depend on
 * **Risk** – The absence of explicit code symbols in the current view makes automated analysis difficult; any change to the service API must be mirrored in the router, demanding disciplined code reviews.  
 * **Mitigation** – Maintaining the README as the authoritative contract and enforcing a “router‑only‑dispatch” rule will keep the component maintainable as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
-
 
 ---
 

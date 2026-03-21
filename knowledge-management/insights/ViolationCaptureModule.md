@@ -22,7 +22,7 @@ Interaction with the rest of the system is anchored through two primary pathways
 
 These interactions are illustrated in the architecture diagram below, which shows the module’s position within the broader ConstraintSystem and its ties to the dashboard and storage layers.  
 
-![ViolationCaptureModule — Architecture](../../.data/knowledge-graph/insights/images/violation-capture-module-architecture.png)
+![ViolationCaptureModule — Architecture](images/violation-capture-module-architecture.png)
 
 The module shares its “configuration‑driven” philosophy with sibling components such as **ConstraintConfigurationManager**, **WorkflowManager**, and **HookManager**, all of which also load definitions from external files or databases.  This uniform approach simplifies onboarding for developers: the same pattern of “load‑config‑instantiate‑run” applies across the constraint enforcement suite.
 
@@ -60,7 +60,7 @@ ViolationCaptureModule is a hub of several integration pathways:
 
 The relationship diagram below visualizes these connections, highlighting the flow from external tools through the capture module to storage and finally to the dashboard.  
 
-![ViolationCaptureModule — Relationship](../../.data/knowledge-graph/insights/images/violation-capture-module-relationship.png)
+![ViolationCaptureModule — Relationship](images/violation-capture-module-relationship.png)
 
 ---
 
@@ -90,7 +90,6 @@ The relationship diagram below visualizes these connections, highlighting the fl
 
 By adhering to the guidelines above and respecting the documented integration points, developers can extend ViolationCaptureModule confidently while preserving the integrity of the overall constraint enforcement ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ By adhering to the guidelines above and respecting the documented integration po
 - [HookManager](./HookManager.md) -- HookManager loads hook events from a configuration file or database.
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
 - [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
-
 
 ---
 

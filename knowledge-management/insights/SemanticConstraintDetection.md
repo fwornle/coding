@@ -105,12 +105,10 @@ Because the source repository contains **zero code symbols** for this component,
 * **Potential fragility** in the hook contract: any deviation in payload shape forces a code change in the parser. Clear versioned documentation (as provided) mitigates this risk.  
 * Lack of visible code symbols makes onboarding harder; adding inline code comments or linking the documentation to concrete classes would improve traceability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService sub-component uses the LLM services to analyze the input data.
-
 
 ---
 

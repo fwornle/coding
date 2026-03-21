@@ -104,14 +104,7 @@ All of these interactions are internal to the same runtime (no cross‑process m
 
 ### Relationship
 
-![TraceReportGenerator Relationship](images/trace-report-generator-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/trace-report-generator-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -125,7 +118,6 @@ All of these interactions are internal to the same runtime (no cross‑process m
 - [CodeAnalysisAgent](./CodeAnalysisAgent.md) -- CodeAnalysisAgent uses AST-based techniques to analyze code structures and extract concepts.
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses ontology systems to classify entities and provide confidence scores for classifications.
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses various modes to validate content and provide validation reports.
-
 
 ---
 

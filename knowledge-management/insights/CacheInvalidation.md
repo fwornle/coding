@@ -77,7 +77,6 @@ No other external dependencies are mentioned, so the integration surface is limi
 * **Potential fragility** as the module grows: lack of separation of concerns may make unit testing harder and increase the risk of accidental side‑effects when modifying one part of the file.  
 * Documentation and strict adherence to the usage guidelines mitigate these risks, ensuring that developers interact with the cache subsystem through the intended `CacheManager` pathway.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ No other external dependencies are mentioned, so the integration surface is limi
 ### Siblings
 - [CacheInterface](./CacheInterface.md) -- The CacheInterface (cache-config.js:10) imports the Redis library, establishing a connection to the Redis cache store
 - [RedisConnection](./RedisConnection.md) -- The cache-config.js file (Line 5) imports the Redis library and establishes a connection to the Redis cache store using the RedisConnection configuration
-
 
 ---
 

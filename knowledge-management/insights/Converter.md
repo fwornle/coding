@@ -111,7 +111,6 @@ The LiveLoggingSystem is composed of three parallel sub‑components (Transcript
 
 The use of clear interfaces (`IConverter`, `ILogger`) and a configuration‑driven strategy makes the `Converter` highly maintainable: new conversion algorithms can be added as separate classes, and existing ones can be modified without affecting callers. The explicit caching and validation layers are isolated concerns, simplifying unit testing. However, maintainers must keep the conversion configuration file synchronized with the actual strategy implementations and monitor cache size to prevent memory leaks. Overall, the design balances extensibility with performance, yielding a component that is both easy to evolve and robust in production.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ The use of clear interfaces (`IConverter`, `ILogger`) and a configuration‑driv
 ### Siblings
 - [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the LSL format to standardize log entries, as defined in the LSL specification document.
 - [Logger](./Logger.md) -- The Logger class implements the ILogger interface, which declares methods for logging and log entry retrieval.
-
 
 ---
 

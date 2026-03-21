@@ -10,11 +10,9 @@ ApiRefactoringPattern is implemented across: src/knowledge-management, lib/ukb-u
 
 - shared-memory.json has been REMOVED from the codebase
 
-
 ## Additional Details
 
 - Core components: VkbApiClient
-
 
 ---
 

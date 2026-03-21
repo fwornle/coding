@@ -74,7 +74,6 @@ Because the parser builds the entire graph in memory, the approach scales well f
 ### Maintainability Assessment  
 The module’s limited scope, reliance on a well‑known library (`yamljs`), and explicit validation logic make it highly maintainable.  Adding new validation rules (e.g., step‑level schema checks) can be done within the existing parsing pass without impacting downstream components.  Clear exception types and the immutable graph contract further reduce the risk of accidental side‑effects, supporting long‑term evolution of the pipeline configuration format.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ The module’s limited scope, reliance on a well‑known library (`yamljs`), and
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges, as seen in the parent context
 - [PipelineStepExecutor](./PipelineStepExecutor.md) -- The PipelineStepExecutor would need to use the dependencies resolved by the DAGDependencyResolver to determine the order in which to execute the steps, potentially using a scheduling algorithm like the critical path method
-
 
 ---
 

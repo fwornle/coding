@@ -117,7 +117,6 @@ No other external modules are mentioned, so the initializer’s outward‑facing
 
 Overall, **TrajectoryInitializer** exemplifies a well‑structured, asynchronous, and modular approach to bootstrapping a complex component while keeping external dependencies and error handling cleanly abstracted.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ Overall, **TrajectoryInitializer** exemplifies a well‑structured, asynchronous
 - [ErrorManager](./ErrorManager.md) -- ErrorManager uses the ConnectionManager sub-component to oversee the connection methods used to log errors
 - [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to establish a connection to the Specstory extension
 - [DataFormatter](./DataFormatter.md) -- DataFormatter uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to format data according to Specstory's requirements
-
 
 ---
 

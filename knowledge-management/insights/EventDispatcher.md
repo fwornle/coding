@@ -90,7 +90,6 @@ Following these conventions helps maintain the clean modularity that the origina
 
 These observations collectively paint a picture of **EventDispatcher** as a deliberately modular, extensible, and well‑encapsulated piece of the overall constraint‑and‑hook ecosystem.  Its design choices favor clean separation, easy integration, and the ability to grow from simple in‑process event emission to a more robust queued architecture as the system’s load increases.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ These observations collectively paint a picture of **EventDispatcher** as a deli
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the hook manager in lib/agent-api/hooks/hook-manager.js to handle content validation events, allowing for customizable event handling and adaptability to different scenarios.
 - [HookManager](./HookManager.md) -- HookManager is implemented in lib/agent-api/hooks/hook-manager.js, providing a centralized location for hook event handling and management.
 - [ConstraintEngine](./ConstraintEngine.md) -- ConstraintEngine is likely implemented in a separate module or service, such as a constraint evaluation service or utility class, to maintain a clean and modular architecture, as suggested by the presence of constraint-related files in the lib/agent-api directory.
-
 
 ---
 

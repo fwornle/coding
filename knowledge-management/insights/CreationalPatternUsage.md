@@ -78,7 +78,6 @@ The Singleton pattern scales well for read‑heavy workloads because the ontolog
 
 Maintainability is high for the current scope: the pattern is simple, the implementation resides in a single, well‑named file, and the intent is clearly documented through the surrounding components (`SingletonPatternImplementation`, `DesignPatternArchitecture`).  The primary risk lies in the global nature of the Singleton, which can make unit testing harder and hide hidden dependencies.  Mitigation strategies include providing a test‑only reset method or allowing dependency injection of a mock loader through a controlled accessor.  Overall, the design is straightforward, easy to reason about, and aligns with the educational goals of the **DesignPatterns** sub‑component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ Maintainability is high for the current scope: the pattern is simple, the implem
 ### Siblings
 - [SingletonPatternImplementation](./SingletonPatternImplementation.md) -- The OntologyLoader class in ontology-loader.py utilizes the Singleton pattern to ensure only one instance is created, as seen in the class definition.
 - [DesignPatternArchitecture](./DesignPatternArchitecture.md) -- The DesignPatterns sub-component is designed to demonstrate the application of various design patterns, including creational, structural, and behavioral patterns, as seen in the component's implementation.
-
 
 ---
 

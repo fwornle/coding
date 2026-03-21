@@ -12,14 +12,11 @@ The use of a standardized data model like MilestoneDataModel enables easy integr
 
 - The use of a standardized data model like MilestoneDataModel enables easy integration with other components and sub-components, such as the Trajectory component
 
-
 ## Related Entities
 
 ### Used By
 
 - ProjectMilestoneManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The use of a standardized data model like MilestoneDataModel enables easy integr
 ### Siblings
 - [MilestoneValidationHandler](./MilestoneValidationHandler.md) -- MilestoneValidationHandler is likely implemented as a separate module or class, given its distinct behavior and importance in the ProjectMilestoneManager sub-component
 - [MilestoneLifecycleManager](./MilestoneLifecycleManager.md) -- MilestoneLifecycleManager would need to interact with the MilestoneDataModel to create, update, and delete milestones, as well as with other components and sub-components to ensure consistency
-
 
 ---
 

@@ -86,7 +86,6 @@ From a dependency perspective, the script relies on three external libraries: an
 * **Moderate** – reliance on external NLP/ML libraries means version upgrades must be coordinated across the **NaturalLanguageProcessingModule** and **MachineLearningIntegrationPoint**.  
 * **Good** – shared logging and clear separation of concerns make debugging straightforward, and the explicit configuration API encourages reproducible setups.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ From a dependency perspective, the script relies on three external libraries: an
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the Logger.js module to create a logger instance, as seen in the logger creation process in the Specstory extension
 - [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the HTTP API to establish connections with the Specstory extension, enabling real-time updates and logging
 - [Logger](./Logger.md) -- Logger uses the Logger.js module to create logger instances, providing a standardized logging interface throughout the Trajectory component
-
 
 ---
 

@@ -71,7 +71,6 @@ All interactions are synchronous method calls, reflecting a tightly integrated, 
 
 Overall, `AuthenticationManager` embodies a straightforward, well‑encapsulated security component that aligns with the system’s broader emphasis on modular, responsibility‑driven design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ Overall, `AuthenticationManager` embodies a straightforward, well‑encapsulated
 ### Siblings
 - [AuthorizationManager](./AuthorizationManager.md) -- The AuthorizationManager would need to define access control lists or roles, possibly in a configuration file or database, to dictate the permissions of different user groups, showcasing a decision to externalize authorization rules for easier management.
 - [EncryptionManager](./EncryptionManager.md) -- The EncryptionManager likely utilizes industry-standard encryption algorithms, such as AES for symmetric encryption and RSA for asymmetric encryption, to ensure the security of data, reflecting a decision to adhere to established cryptographic standards.
-
 
 ---
 

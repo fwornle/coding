@@ -73,12 +73,10 @@ The repository’s public interface is expected to be consumed via TypeScript in
 * The repository’s clear CRUD surface area and encapsulated relationship logic make it straightforward to extend (e.g., adding new node types) without rippling changes throughout the codebase.  
 * However, the lack of concrete implementation details in the current code base suggests that documentation and test coverage will be essential to keep the repository reliable as the domain model evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to persist transcript data in a graph database, enabling efficient querying and retrieval.
-
 
 ---
 

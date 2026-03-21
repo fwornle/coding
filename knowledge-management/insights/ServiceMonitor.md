@@ -62,7 +62,6 @@ Because ServiceMonitor lives within **DockerizedServices**, its lifecycle is bou
 * Clear separation of concerns (StatusChecker vs. ServiceMonitor) aids future extensions.  
 * Tight coupling to a specific file (`lib/service-starter.js`) means changes to that file must be reviewed system‑wide, but the benefit is reduced code duplication and uniform behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ Because ServiceMonitor lives within **DockerizedServices**, its lifecycle is bou
 
 ### Siblings
 - [ServiceStarter](./ServiceStarter.md) -- The startServiceWithRetry function in lib/service-starter.js uses a retry-with-backoff pattern to handle service startup failures, preventing rapid sequential failures.
-
 
 ---
 

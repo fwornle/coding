@@ -96,7 +96,6 @@ ConstraintAgent sits as a leaf node under **ConstraintSystem**, collaborating wi
 
 The **declarative data model** and **clear component boundaries** (REST façade, validator, graph manager) make the codebase easy to understand and evolve. Adding new constraint fields only requires updating `constraint-model.json` and, if needed, the validation rules in `validation-rules.json`. However, the reliance on external schema files means that documentation must stay in sync, and any mismatch can surface only at runtime. Overall, the architecture promotes high maintainability provided that schema versioning and automated integration tests are in place.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The **declarative data model** and **clear component boundaries** (REST façade,
 - [HookManager](./HookManager.md) -- HookManager uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling hook events
 - [ContentValidationManager](./ContentValidationManager.md) -- ContentValidationManager uses a reference-based approach with a custom reference model defined in references.json, providing a flexible framework for reference validation
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling constraint-related events
-
 
 ---
 

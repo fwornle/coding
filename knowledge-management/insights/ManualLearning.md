@@ -13,7 +13,7 @@ ManualLearning is a **sub‑component** of the larger **KnowledgeManagement** sy
 
 Together these pieces enable a workflow where human curators manually enrich and correct entities, while the surrounding infrastructure guarantees that the curated data is persisted, version‑tracked, and kept in sync with downstream JSON exports. ManualLearning therefore represents the “human‑in‑the‑loop” segment of KnowledgeManagement, sitting alongside sibling components such as **OnlineLearning**, **OntologyClassificationModule**, and **UtilitiesModule**.
 
-![ManualLearning — Architecture](../../.data/knowledge-graph/insights/images/manual-learning-architecture.png)
+![ManualLearning — Architecture](images/manual-learning-architecture.png)
 
 ## Architecture and Design  
 
@@ -48,7 +48,7 @@ Checkpoints are simple JSON blobs stored in a dedicated LevelDB namespace (e.g.,
 ### Ontology Classification Integration  
 When a curator adds a new entity, the ManualLearning flow invokes the **OntologyClassificationModule** to infer the most appropriate type based on supplied properties. The module, in turn, consults the **OntologySystem** (shared across the KnowledgeManagement domain) to ensure the classification aligns with the global taxonomy. This bidirectional validation prevents drift between manually curated data and the automated classification logic used by other components such as OnlineLearning.
 
-![ManualLearning — Relationship](../../.data/knowledge-graph/insights/images/manual-learning-relationship.png)
+![ManualLearning — Relationship](images/manual-learning-relationship.png)
 
 ## Integration Points  
 
@@ -97,7 +97,6 @@ ManualLearning sits at the intersection of **human curation** and **automated kn
 
 The architecture’s **single‑point adapter** simplifies maintenance: changes to the persistence layer (e.g., swapping LevelDB for RocksDB) require updates only in `graph-database-adapter.ts`. The **script‑based migration** isolates schema evolution logic, making it straightforward to audit and test migrations independently. However, the tight coupling between ManualLearning and OntologyClassificationModule means that ontology version changes must be coordinated across both modules, necessitating clear release governance. Overall, the component exhibits high **modularity** (clear boundaries between adapter, migration, checkpoint, and classification) and **testability** (each piece can be unit‑tested in isolation), supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ The architecture’s **single‑point adapter** simplifies maintenance: changes 
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

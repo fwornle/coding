@@ -12,14 +12,11 @@ The LogMessageFormatter is a critical component of the LoggingAndErrorTrackingMo
 
 - The LogMessageFormatter is a critical component of the LoggingAndErrorTrackingModule, as it enables the system to produce standardized and consistent log output, which is essential for monitoring, debugging, and troubleshooting the LiveLoggingSystem.
 
-
 ## Related Entities
 
 ### Used By
 
 - LoggingAndErrorTrackingModule (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The LogMessageFormatter is a critical component of the LoggingAndErrorTrackingMo
 ### Siblings
 - [Logger](./Logger.md) -- The Logger class uses a logging framework, defined in logging_framework.py, to handle log messages, including severity levels and log targets, which allows for flexible and customizable logging.
 - [ErrorTracker](./ErrorTracker.md) -- The ErrorTracker is likely integrated with the Logger class to handle error logging, and may use the logging framework defined in logging_framework.py to log error messages with appropriate severity levels.
-
 
 ---
 

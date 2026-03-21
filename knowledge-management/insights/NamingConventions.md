@@ -81,7 +81,6 @@ The system is organised around a **parent‑child component model** where `Codin
 
 The **single‑source‑of‑truth** approach, combined with an explicit example file, yields high maintainability: any rule change is localized to `CodingStandards.java` and immediately reflected in CI tests.  The clear hierarchy (parent `CodingStandards`, siblings) reduces cognitive load for new contributors.  The main risk is **configuration drift** if flags are altered inconsistently across modules; disciplined use of a shared `StandardsConfig` mitigates this.  Overall, the design promotes straightforward evolution of naming policies while keeping the code‑quality ecosystem coherent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The **single‑source‑of‑truth** approach, combined with an explicit example
 ### Siblings
 - [CodeFormatting](./CodeFormatting.md) -- The CodingStandards.java file may contain methods or properties that enforce code formatting, such as checking for consistent indentation or line lengths.
 - [CommentingGuidelines](./CommentingGuidelines.md) -- The CodingStandards.java file likely contains methods or properties that enforce commenting guidelines, such as checking for comment syntax or content.
-
 
 ---
 

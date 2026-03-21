@@ -69,7 +69,6 @@ Even though the source code is not directly visible, the observations let us inf
 4. **Scalability considerations** – Adding rules is cheap (just a new entry), and caching via CacheStore can mitigate the cost of re‑evaluating expensive rules. However, a very long pipeline could become a throughput limiter; parallelization is not inherent to the linear model.  
 5. **Maintainability assessment** – High maintainability thanks to clear separation of concerns: rules are isolated, the pipeline is generic, and the agent orchestrates. The main maintenance burden is ensuring rule order remains correct and that cached results stay consistent with rule logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ Even though the source code is not directly visible, the observations let us inf
 ### Siblings
 - [RuleEngine](./RuleEngine.md) -- The ValidationAgent sub-component uses a rules-engine pattern with ValidationRules, as defined in the parent context of ConstraintSystem.
 - [CacheStore](./CacheStore.md) -- The CacheStore is likely to be implemented using a caching mechanism, such as a hash table or a caching library, to store and retrieve validation results quickly and efficiently.
-
 
 ---
 

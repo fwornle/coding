@@ -76,14 +76,7 @@ No other internal modules are referenced in the observations, so the adapter’s
 
 ### Relationship
 
-![AdapterPattern Relationship](images/adapter-pattern-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/adapter-pattern-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -97,7 +90,6 @@ No other internal modules are referenced in the observations, so the adapter’s
 - [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager may use a work-stealing concurrency model, allowing idle workers to pull tasks immediately, similar to the WaveController.runWithConcurrency() method.
 - [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer may use a lazy loading approach to initialize LLMs, delaying initialization until the model is actually needed, reducing memory usage and improving system responsiveness.
 - [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
-
 
 ---
 

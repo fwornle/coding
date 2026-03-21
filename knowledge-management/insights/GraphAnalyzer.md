@@ -71,12 +71,10 @@ There are no sibling components mentioned, but the overall system may include ot
 4. **Scalability considerations** – The Docker‑Compose service can be horizontally scaled (multiple container instances) and potentially moved to a more robust orchestrator; GraphAnalyzer’s stateless nature makes it easy to run in parallel across multiple callers.  
 5. **Maintainability assessment** – Clear separation of concerns aids maintainability; however, the lack of visible source code for GraphAnalyzer limits deep static analysis.  Maintaining alignment between client expectations and service API contracts will be the primary maintenance burden.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphAnalyzer](./CodeGraphAnalyzer.md) -- CodeGraphAnalyzer uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
-
 
 ---
 

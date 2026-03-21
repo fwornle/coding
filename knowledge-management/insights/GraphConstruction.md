@@ -12,14 +12,11 @@ Given the lack of source files, it's likely that GraphConstruction is implemente
 
 - Given the lack of source files, it's likely that GraphConstruction is implemented in a separate module or package, possibly with its own set of dependencies and configuration options.
 
-
 ## Related Entities
 
 ### Used By
 
 - KnowledgeGraph (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ Given the lack of source files, it's likely that GraphConstruction is implemente
 ### Siblings
 - [GraphQuerying](./GraphQuerying.md) -- GraphQuerying probably relies on the GraphDB library's query API to execute queries on the graph, using query languages such as SPARQL.
 - [GraphManagement](./GraphManagement.md) -- GraphManagement likely interacts with the GraphDB library to perform CRUD (create, read, update, delete) operations on graph entities and relationships.
-
 
 ---
 

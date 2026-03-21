@@ -14,7 +14,7 @@ The **CodingPatterns** component lives under the `integrations/` folder of the r
 
 Together these files reveal a component whose responsibility is to turn raw source code into a structured knowledge graph (the **GraphCodeRAG** child) and to surface that knowledge through pattern libraries, best‑practice repositories, and anti‑pattern detectors.  It sits under the top‑level **Coding** parent, sharing the same “integration‑driven” philosophy as its siblings (LiveLoggingSystem, LLMAbstraction, DockerizedServices, etc.) while exposing its own children: **CodeAnalysisPatterns**, **DesignPatternLibrary**, **BestPracticeRepository**, **AntiPatternIdentification**, and **GraphCodeRAG**.
 
-![CodingPatterns — Architecture](../../.data/knowledge-graph/insights/images/coding-patterns-architecture.png)
+![CodingPatterns — Architecture](images/coding-patterns-architecture.png)
 
 ---
 
@@ -35,7 +35,7 @@ Configuration is externalised through environment variables (`BROWSER_ACCESS_POR
 ### Interaction with Language Model Services  
 The **WaveAgentController** (referenced indirectly in the observations) communicates with the **LlmServiceManager**, indicating that some pattern‑generation or recommendation steps are delegated to LLMs.  This aligns CodingPatterns with the broader **LLMAbstraction** sibling, which supplies a provider‑agnostic LLM façade.  By re‑using the same service manager, CodingPatterns can swap between Anthropic, DMR, or other providers without changing its own code.
 
-![CodingPatterns — Relationship](../../.data/knowledge-graph/insights/images/coding-patterns-relationship.png)
+![CodingPatterns — Relationship](images/coding-patterns-relationship.png)
 
 ---
 
@@ -137,7 +137,6 @@ These integration seams keep CodingPatterns loosely coupled yet tightly coordina
 
 **In summary**, the **CodingPatterns** component is a graph‑centric, batch‑oriented engine that leverages a modular integration architecture, environment‑driven configurability, and extensible hooks to deliver scalable code‑pattern analysis across the entire **Coding** knowledge hierarchy. Its design choices promote reusability with sibling components while providing clear pathways for future scaling and extension.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -158,7 +157,6 @@ These integration seams keep CodingPatterns loosely coupled yet tightly coordina
 - [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
 - [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
-
 
 ---
 

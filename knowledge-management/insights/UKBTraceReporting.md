@@ -125,7 +125,6 @@ These integration points are all documented via markdown files; no code‑level 
 
 Overall, UKBTraceReporting is a well‑structured, documentation‑centric reporting sub‑component that leverages shared schemas, configuration‑driven pipelines, and graph‑based semantic analysis to generate constraint‑aware trace reports within the KnowledgeManagement ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -142,7 +141,6 @@ Overall, UKBTraceReporting is a well‑structured, documentation‑centric repor
 - [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-
 
 ---
 

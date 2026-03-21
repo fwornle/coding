@@ -77,12 +77,10 @@ This simple request‑response wiring suggests a **thin‑client** architecture:
 * **Risk of hidden coupling** – Because the adapter relies on specific ports, any change in Specstory’s deployment configuration must be reflected in the adapter’s port list, requiring diligent documentation.  
 * **Testability** – Mocking SpecstoryAdapter’s `connectViaHTTP` enables unit tests for IntegrationAdapter without needing a live Specstory service, supporting a robust test suite.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager may utilize the connectViaHTTP method in SpecstoryAdapter to establish a connection to the Specstory extension on multiple ports (7357, 7358, 7359) to handle potential connection failures.
-
 
 ---
 

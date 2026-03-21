@@ -70,7 +70,6 @@ Following these steps preserves the intended producer‑consumer contract and en
 * The clear separation into three nodes makes the codebase approachable; each node can be updated or replaced independently as long as the data‑flow contract is honored.  
 * However, the lack of explicit interfaces in the observations suggests that the contract may be implicit, which could lead to brittle integrations if the captured data‑flow schema evolves. Introducing explicit type definitions or serialization contracts would improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ Following these steps preserves the intended producer‑consumer contract and en
 ### Siblings
 - [WorkflowRunning](./WorkflowRunning.md) -- The WorkflowRunner class in workflow_runner.py defines the run_workflow method, which orchestrates the workflow execution and data flow capture.
 - [DataFlowCapture](./DataFlowCapture.md) -- The DataFlowCapture node utilizes the WorkflowRunner class to capture data flow information during workflow execution, as evident from the workflow_runner.py's capture_data_flow function.
-
 
 ---
 

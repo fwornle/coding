@@ -12,14 +12,11 @@ The ServiceHealthChecker likely uses a scheduling mechanism, such as a cron job 
 
 - The ServiceHealthChecker probably logs any issues or errors it encounters during the health checks, allowing for easy monitoring and debugging of the LLM services, and potentially triggering alerts or notifications when problems are detected.
 
-
 ## Related Entities
 
 ### Used By
 
 - LLMServiceManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The ServiceHealthChecker likely uses a scheduling mechanism, such as a cron job 
 ### Siblings
 - [ServiceInitializer](./ServiceInitializer.md) -- The LLMServiceFactory.py file likely contains the implementation of the ServiceInitializer, utilizing a factory pattern to create instances of LLM services with the correct configuration.
 - [LLMServiceFactory](./LLMServiceFactory.md) -- The LLMServiceFactory.py file contains the implementation of the LLMServiceFactory, utilizing a factory pattern to create instances of LLM services with the correct configuration.
-
 
 ---
 

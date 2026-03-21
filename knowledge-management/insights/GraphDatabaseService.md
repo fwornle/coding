@@ -108,7 +108,6 @@ The only external dependency visible is the **native graph‑DB client** accesse
 - The single point of change for any DB driver upgrade or schema migration is the adapter, limiting the impact scope.  
 - However, the lack of explicit method signatures in the observed code means developers must rely on documentation or IDE tooling to discover the exact API; adding well‑documented interfaces would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -121,7 +120,6 @@ The only external dependency visible is the **native graph‑DB client** accesse
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store entities in the graph database.
 - [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
 - [OntologyClassificationSystem](./OntologyClassificationSystem.md) -- OntologyClassificationSystem uses the CodeGraphAgent's classifyEntity function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to classify entities.
-
 
 ---
 

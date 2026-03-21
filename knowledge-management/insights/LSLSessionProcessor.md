@@ -114,7 +114,6 @@ Finally, the work‑stealing scheduler is exposed via a simple interface (`runWi
 
 The component is **well‑modularised**: each concern (session analysis, change storage, pipeline orchestration) lives in its own child class, making unit testing straightforward. The declarative pipeline definition reduces code churn when adding new processing steps. However, the reliance on several external systems (graph DB, Redis, work‑stealing scheduler) introduces **operational complexity**; developers must be familiar with their configuration and failure modes. The explicit `depends_on` edges in YAML provide clear documentation of step ordering, but they also require diligent validation to avoid cyclic dependencies. Overall, the design balances **extensibility** (through YAML and modular children) with **performance** (caching, concurrency), yielding a maintainable subsystem provided that the supporting infrastructure is well‑managed.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -131,7 +130,6 @@ The component is **well‑modularised**: each concern (session analysis, change 
 - [StalenessDetector](./StalenessDetector.md) -- StalenessDetector uses a git-based staleness detection algorithm, as seen in StalenessDetector.ts, to identify outdated entity content
 - [EntityContentAnalyzer](./EntityContentAnalyzer.md) -- EntityContentAnalyzer uses a regex-based pattern matching algorithm, as seen in EntityContentAnalyzer.ts, to extract file paths and commands from entity content
 - [GitHistoryProcessor](./GitHistoryProcessor.md) -- GitHistoryProcessor uses a git-based history processing algorithm, as seen in GitHistoryProcessor.ts, to detect changes and updates in entity content
-
 
 ---
 

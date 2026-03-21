@@ -60,7 +60,6 @@ Finally, when writing unit tests, consider providing a way to reset or mock the 
 - However, the global nature can obscure dependencies, so documentation and strict accessor usage are required to keep the codebase understandable.  
 - Thread‑safety considerations add a modest complexity layer, but the explicit lock around instance creation is a well‑understood pattern that does not significantly hinder future modifications.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -69,7 +68,6 @@ Finally, when writing unit tests, consider providing a way to reset or mock the 
 ### Siblings
 - [CreationalPatternUsage](./CreationalPatternUsage.md) -- The DesignPatterns sub-component utilizes creational patterns, including the Singleton pattern, to manage object instantiation and ensure efficient resource allocation.
 - [DesignPatternArchitecture](./DesignPatternArchitecture.md) -- The DesignPatterns sub-component is designed to demonstrate the application of various design patterns, including creational, structural, and behavioral patterns, as seen in the component's implementation.
-
 
 ---
 

@@ -98,7 +98,6 @@ The system is organised as a narrow vertical stack: a low‑level configuration 
 
 The modular layout makes the codebase highly maintainable: changes to connection parameters are isolated to `graph‑database‑config.js`; adjustments to pooling behavior stay within **ConnectionPool**; and any evolution of query execution (e.g., adding logging or metrics) can be done inside `QueryInterface` without touching business logic.  TypeScript typings further reduce runtime errors.  The main maintenance risk is the proliferation of raw Cypher strings; adopting a query‑builder library or centralising query definitions could mitigate that, but such a change would need to be introduced deliberately rather than assumed.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ The modular layout makes the codebase highly maintainable: changes to connection
 ### Siblings
 - [ConnectionPool](./ConnectionPool.md) -- The ConnectionPool module is likely implemented using a library like Neo4j's official JavaScript driver, which provides a connection pooling mechanism.
 - [GraphDatabaseConfigurator](./GraphDatabaseConfigurator.md) -- The GraphDatabaseConfigurator module is likely defined in a separate file, such as graph-database-configurator.ts, which imports the graph-database-config.js file and configures the connection settings.
-
 
 ---
 

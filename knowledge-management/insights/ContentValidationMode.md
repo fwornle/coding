@@ -99,12 +99,10 @@ External components that need to influence validation behaviour should do so by 
 * **Documentation Dependency** – The lack of visible source‑code symbols places extra importance on keeping the markdown files accurate and up‑to‑date; any drift between docs and code could lead to misconfiguration.
 * **Extensibility Path** – Adding or deprecating modes follows a predictable pattern (update config schema, add/remove strategy), supporting long‑term evolution without large refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses various modes to validate content and provide validation reports.
-
 
 ---
 

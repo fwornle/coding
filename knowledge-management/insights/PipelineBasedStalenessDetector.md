@@ -100,7 +100,6 @@ The system is organized hierarchically: **StalenessDetector** (parent) → **Pip
 
 The clear modular boundaries make the codebase approachable: changes to the git detection algorithm are confined to **GitStalenessDetector**, while metadata schema evolution stays within **StalenessMetadataHandler**.  The pipeline manager centralizes orchestration logic, so updates to job sequencing affect only one location.  However, the lack of concrete symbols in the current observations suggests that documentation and naming conventions are crucial; without explicit file paths or class definitions, developers must rely on the documented contracts and the parent **StalenessDetector** façade to navigate the code.  Adding unit tests for each pipeline stage and integration tests for the full pipeline will further safeguard maintainability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The clear modular boundaries make the codebase approachable: changes to the git 
 ### Siblings
 - [GitStalenessDetector](./GitStalenessDetector.md) -- The StalenessDetector sub-component utilizes a git-based approach, as hinted by its parent component's context, to detect staleness in entity content
 - [StalenessMetadataHandler](./StalenessMetadataHandler.md) -- The StalenessStore suggested by the parent analysis may be responsible for handling staleness metadata, storing and retrieving information about entity staleness
-
 
 ---
 

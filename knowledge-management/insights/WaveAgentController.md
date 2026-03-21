@@ -10,7 +10,7 @@ WaveAgentController probably relies on specific modules or files for managing Wa
 
 The controller sits directly above **WaveAgentInitialization**, its child component, and works side‑by‑side with sibling services such as **LlmServiceManager**, **GraphDatabaseManager**, **VkbApiClientManager**, **UkbTraceReportGenerator**, **ManualLearning**, and **OnlineLearning**. Its primary purpose is to coordinate these services so that a Wave agent can request LLM‑driven reasoning, persist intermediate results in the graph database, and emit trace reports for downstream analysis.
 
-![WaveAgentController — Architecture](../../.data/knowledge-graph/insights/images/wave-agent-controller-architecture.png)
+![WaveAgentController — Architecture](images/wave-agent-controller-architecture.png)
 
 ---
 
@@ -22,7 +22,7 @@ Because WaveAgentController resides within the **KnowledgeManagement** component
 
 The relationship diagram below clarifies the interaction web: WaveAgentController sits at the hub, pulling in LLM services, persisting state, invoking VKB APIs, and finally delegating trace generation.
 
-![WaveAgentController — Relationship](../../.data/knowledge-graph/insights/images/wave-agent-controller-relationship.png)
+![WaveAgentController — Relationship](images/wave-agent-controller-relationship.png)
 
 ---
 
@@ -112,7 +112,6 @@ These integration points are all **explicitly mentioned** in the observations, a
 
 *Prepared from the supplied observations, preserving all referenced file paths, class names, and component relationships.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -128,7 +127,6 @@ These integration points are all **explicitly mentioned** in the observations, a
 - [UkbTraceReportGenerator](./UkbTraceReportGenerator.md) -- UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.
 - [LlmServiceManager](./LlmServiceManager.md) -- LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.
 - [VkbApiClientManager](./VkbApiClientManager.md) -- VkbApiClientManager likely interacts with the GraphDatabaseManager for storing and retrieving data related to VKB API interactions.
-
 
 ---
 

@@ -111,7 +111,6 @@ These integration points are all **data‑centric**: TeamConfiguration provides 
 
 **In summary**, *TeamConfiguration* is the configuration backbone of the **CodingPatterns** component. By exposing team‑specific settings through `config/teams/*.json` and delegating enforcement and consumption to sibling sub‑components, the architecture achieves a clean separation of concerns, easy extensibility, and a strong alignment with the project’s design principles. The pattern‑driven, modular approach ensures that the system can scale to many teams while remaining maintainable and consistent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ These integration points are all **data‑centric**: TeamConfiguration provides 
 - [SoftwarePatterns](./SoftwarePatterns.md) -- The integrations/browser-access/ module provides a reusable solution for browser-based coding environments, demonstrating the software pattern of environment abstraction.
 - [AntiPatterns](./AntiPatterns.md) -- The AntiPatterns sub-component uses the SoftwarePatterns sub-component to identify and avoid common pitfalls in software design.
 - [IntegrationModules](./IntegrationModules.md) -- The integrations/browser-access/ module provides a modular structure for browser-based coding environments, demonstrating the integration pattern of environment abstraction.
-
 
 ---
 

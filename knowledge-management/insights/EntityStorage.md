@@ -90,12 +90,10 @@ The integration model is **vertical** (parent → storage) rather than **horizon
 
 *All statements above are derived directly from the provided observations (the `createEntity()` method in `storage/graph-database-adapter.ts`, its use by `CodingConventions`, and the implication of a graph‑database backend). No additional patterns or components have been introduced beyond what the observations support.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodingConventions](./CodingConventions.md) -- CodingConventions uses the createEntity() method in storage/graph-database-adapter.ts to store and manage coding convention entities.
-
 
 ---
 

@@ -95,7 +95,6 @@ HealthChecker sits at the intersection of **service lifecycle management** (Serv
 
 HealthChecker’s **function‑centric** design, clear separation of concerns (probe, timeout, retry, metrics), and reliance on shared utilities (RetryMechanism) make the codebase easy to understand and extend. The lack of hidden state reduces bug surface area. However, because no class abstractions exist, adding per‑service state (e.g., health history) would require introducing a new data structure, which could increase complexity. Overall, the component is **highly maintainable** as long as new protocols or validation logic are added through the existing dispatcher and optional validation callbacks rather than by modifying core probe code.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ HealthChecker’s **function‑centric** design, clear separation of concerns (p
 - [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator uses Docker containerization to manage services, ensuring isolation and scalability.
 - [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
 - [ServiceRegistry](./ServiceRegistry.md) -- The ServiceRegistry uses a service registry data structure to store service information, including service name, status, and configuration.
-
 
 ---
 

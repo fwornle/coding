@@ -79,7 +79,6 @@ WaveController sits at the heart of KnowledgeManagement’s execution pipeline, 
 ### Maintainability Assessment
 The design’s minimalism (single counter, straightforward worker loop) makes the code easy to understand and modify.  However, the lack of explicit abstractions (e.g., a dedicated task queue interface) could make future extensions—such as priority re‑balancing or distributed execution—more invasive.  Keeping task metadata schema stable in the Graphology + LevelDB store will be essential to avoid breaking the scheduler’s assumptions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ The design’s minimalism (single counter, straightforward worker loop) makes th
 - [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator probably utilizes a report generation mechanism to create detailed trace reports for UKB workflow runs.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology+LevelDB database for storing and querying knowledge graphs, as seen in the storeEntity method.
 - [IntelligentRouter](./IntelligentRouter.md) -- IntelligentRouter utilizes the VKB API and direct database access to optimize interactions with the knowledge graph, as seen in the intelligent routing mechanism.
-
 
 ---
 

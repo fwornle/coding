@@ -115,7 +115,6 @@ No child components are mentioned, so the updater appears to be a leaf node in t
 
 Overall, `EntityRelationshipUpdater` exemplifies a clean, transaction‑oriented design that fits neatly into the broader graph‑database architecture, leveraging its parent and sibling components for connection management and query execution while safeguarding data integrity through rigorous validation and atomic commits.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ Overall, `EntityRelationshipUpdater` exemplifies a clean, transaction‑oriented
 ### Siblings
 - [GraphDatabaseConnector](./GraphDatabaseConnector.md) -- The GraphDatabaseAdapter sub-component likely utilizes a DatabaseConnectionProtocol to establish a connection to the graph database, as suggested by the parent component analysis.
 - [DatabaseQueryProcessor](./DatabaseQueryProcessor.md) -- The DatabaseQueryEngine suggested by the parent analysis likely interacts with the DatabaseQueryProcessor to execute queries against the graph database.
-
 
 ---
 

@@ -10,11 +10,9 @@ AgentArchitecturePattern is implemented across: src/knowledge-management, lib/uk
 
 - shared-memory.json has been REMOVED from the codebase
 
-
 ## Additional Details
 
 - Core components: PersistenceAgent
-
 
 ---
 

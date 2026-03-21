@@ -85,7 +85,6 @@ Following these practices ensures that all codebases under the **CodingPatterns*
 | **Scalability considerations** | Because the rules are applied programmatically, the component scales to large codebases; validation runs in O(N) where N is the number of source files. Adding new naming conventions or package layers requires only extending the relevant child module without touching the façade. |
 | **Maintainability assessment** | High maintainability: guidelines are encapsulated, examples are read‑only, and configuration is externalised. The clear separation of concerns and the use of simple, deterministic validation logic make future refactoring straightforward. Potential risk lies in divergent configuration files; enforcing a single source of truth via CI validation mitigates this. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Following these practices ensures that all codebases under the **CodingPatterns*
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties
 - [ConcurrencyAndParallelism](./ConcurrencyAndParallelism.md) -- WorkStealingExecutor.java implements a work-stealing algorithm for concurrent task execution, as seen in the work-stealing-example.java file
 - [CodingStandards](./CodingStandards.md) -- CodingStandards.java provides a set of guidelines for coding, such as naming conventions and code formatting, as seen in the coding-standards-example.java file
-
 
 ---
 

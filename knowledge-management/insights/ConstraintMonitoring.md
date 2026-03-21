@@ -121,7 +121,6 @@ Developers who need to enforce constraints should follow these best‑practice s
 
 By grounding the analysis in the observed documentation files and the explicit relationship to its parent, siblings, and child, this insight document captures the essential architectural and design characteristics of **ConstraintMonitoring** without introducing unsupported speculation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -135,7 +134,6 @@ By grounding the analysis in the observed documentation files and the explicit r
 - [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
-
 
 ---
 

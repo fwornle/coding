@@ -58,7 +58,6 @@ Because the resolver is stateless and relies on read‑only traversal of the ont
 ### 5. Maintainability assessment  
 The clear separation between loading, classification, resolution, and validation makes the component easy to maintain. Updates to the ontology affect only the loader and classifier; the resolver’s interface remains stable. However, the heavy reliance on the `useUpperOntology` method means that any change to that API will ripple through all dependent components, so versioning and thorough integration testing are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -67,7 +66,6 @@ The clear separation between loading, classification, resolution, and validation
 ### Siblings
 - [OntologyLoader](./OntologyLoader.md) -- The OntologyLoader is designed to handle ontology definitions from various sources, providing flexibility in how the ontology is constructed and updated, which is reflected in the use of the OntologyClassifier's useUpperOntology method.
 - [ValidationRulesEngine](./ValidationRulesEngine.md) -- The ValidationRulesEngine is tightly integrated with the OntologyClassifier and EntityTypeResolver, allowing for the validation of entities against their resolved types and the ontology structure as a whole.
-
 
 ---
 

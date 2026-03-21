@@ -62,12 +62,10 @@ Since the checkpoint system is a child of UtilitiesModule, any sibling utilities
 4. **Scalability considerations** – As workload size grows, checkpoint payload size and write frequency become bottlenecks; scaling may require moving from local file storage to a distributed store or batching checkpoint writes.  
 5. **Maintainability assessment** – The clear separation of concerns (UtilitiesModule ≠ CheckpointSystem) promotes maintainability; however, the lack of visible implementation details means future maintainers must rely on well‑documented API contracts and consistent versioning to avoid regression.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
-
 
 ---
 

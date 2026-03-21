@@ -99,7 +99,6 @@ Finally, the parent component **LLMAbstraction** is described as employing a **m
 
 The use of well‑known patterns (strategy, factory, decorator) makes the codebase **highly maintainable**: new modes or cross‑cutting concerns can be added with minimal impact on existing logic.  Centralizing configuration and provider metadata reduces duplication and the risk of drift.  However, the reliance on several sibling components means that any change to the contract of `ConnectionManager` or `ProviderRegistry` must be carefully versioned, as it could ripple through the mode manager and downstream `LLMService`.  Overall, the design balances extensibility with clear responsibility boundaries, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The use of well‑known patterns (strategy, factory, decorator) makes the codeba
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class probably uses a registry pattern to manage the different LLM providers, as seen in the lib/llm/llm-service.ts file, which handles LLM operations.
 - [CacheManager](./CacheManager.md) -- The CacheManager class likely uses a cache-aside pattern to manage the caching of LLM responses, as seen in the lib/llm/llm-service.ts file, which handles LLM operations.
 - [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager class likely uses a retry-with-backoff pattern to establish connections to LLM providers, as seen in the connectViaHTTP method.
-
 
 ---
 

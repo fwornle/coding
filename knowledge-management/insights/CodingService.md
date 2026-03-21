@@ -78,7 +78,6 @@ No source code symbols (classes, functions) were discovered in the provided snap
 
 5. **Maintainability assessment** – High maintainability stems from clear separation of concerns: build logic, runtime configuration, and deployment are isolated in dedicated files.  Uniform directory layout across siblings reduces cognitive load.  The main maintenance risk is divergence between the Dockerfile, `config.yml`, and `docker‑compose.yml`; disciplined updates and CI checks mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ No source code symbols (classes, functions) were discovered in the provided snap
 - [LLMManager](./LLMManager.md) -- The LLMManager utilizes a modular architecture, with each language model having its own directory and configuration files, such as the 'language-model-service' directory containing a 'docker-compose.yml' file.
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator utilizes a separate directory for each coding service, such as the 'coding-service' directory, containing a 'Dockerfile' that defines the build process for the service.
 - [LanguageModelService](./LanguageModelService.md) -- The LanguageModelService utilizes a separate directory, such as the 'language-model-service' directory, containing a 'docker-compose.yml' file that defines the dependencies and configuration for the service.
-
 
 ---
 

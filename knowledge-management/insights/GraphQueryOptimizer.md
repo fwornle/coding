@@ -120,7 +120,6 @@ The design is **composition‑heavy**: the adapter composes a connection pool, a
 
 *All statements above are grounded in the provided observations and hierarchy context; no external assumptions have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -129,7 +128,6 @@ The design is **composition‑heavy**: the adapter composes a connection pool, a
 ### Siblings
 - [GraphDatabaseConnectionPool](./GraphDatabaseConnectionPool.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties, allowing for flexible configuration of connection settings
 - [GraphDatabaseOperationsManager](./GraphDatabaseOperationsManager.md) -- GraphDatabaseOperationsManager in GraphDatabaseAdapter.java provides a unified interface for basic graph database operations, such as node creation and edge traversal
-
 
 ---
 

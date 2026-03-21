@@ -90,12 +90,10 @@ The implementation therefore follows a **composition** relationship: the EntityP
    * Risk arises when the PersistenceAgent’s interface evolves; any change propagates to the EntityPersistenceModule and all its callers, requiring coordinated updates.  
    * Adding a thin adapter layer could mitigate this risk, but would add indirection. The present design favours simplicity, which is easy to understand and test.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts for entity persistence and relationship management.
-
 
 ---
 

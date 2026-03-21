@@ -64,7 +64,6 @@ When adding new operating modes, developers must extend `ModeConfiguration` to r
 - **Extensibility**: New strategies or modes can be added with minimal impact on existing code, thanks to the interface‑based delegation.  
 - **Risk**: Because the strategy directly couples to both `ProviderRegistry` and `ModeConfiguration`, any breaking change in those components requires coordinated updates, but the single responsibility of the strategy keeps the impact localized.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ When adding new operating modes, developers must extend `ModeConfiguration` to r
 ### Siblings
 - [ModeConfiguration](./ModeConfiguration.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.
-
 
 ---
 

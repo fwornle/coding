@@ -82,7 +82,6 @@ Sibling component **TypeScriptCompiler** shares the same dependency‑management
    * High maintainability thanks to clear separation of concerns, centralized JSON files, and a single access point (`getConfig()`).  
    * Potential maintenance burden arises if the number of JSON files grows unchecked; establishing naming conventions and documentation for each file will mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ Sibling component **TypeScriptCompiler** shares the same dependency‑management
 
 ### Siblings
 - [TypeScriptCompiler](./TypeScriptCompiler.md) -- The presence of a .tsconfig.json file indicates a strong emphasis on type safety and code maintainability.
-
 
 ---
 

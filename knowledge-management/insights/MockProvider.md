@@ -57,7 +57,6 @@ Developers should treat **MockProvider** as the sole source of simulated data wh
 - Reliance on simple, well‑named functions or a single class in `mock-provider.py` keeps the codebase approachable.  
 - Maintaining template files alongside code ensures that updates to mock behavior are traceable and versioned, supporting long‑term upkeep.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -65,7 +64,6 @@ Developers should treat **MockProvider** as the sole source of simulated data wh
 
 ### Siblings
 - [MockResponseStore](./MockResponseStore.md) -- MockResponseStore would require a data storage mechanism, such as a dictionary or a database, to store and retrieve mock responses, which could be implemented using a file like mock-response-store.py.
-
 
 ---
 

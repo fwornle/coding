@@ -111,14 +111,7 @@ Overall, the **ViolationPersistenceService** exemplifies a focused, well‑docum
 
 ### Relationship
 
-![ViolationPersistenceService Relationship](images/violation-persistence-service-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/violation-persistence-service-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -132,7 +125,6 @@ Overall, the **ViolationPersistenceService** exemplifies a focused, well‑docum
 - [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 - [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-
 
 ---
 

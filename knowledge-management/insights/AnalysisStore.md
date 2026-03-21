@@ -67,7 +67,6 @@ Given the parent‑child relationship, the `EntityContentAnalyzer` will instanti
 * The clear contract between `EntityContentAnalyzer` and `AnalysisStore` reduces coupling, and the use of dependency injection eases unit testing.  
 * Potential risk: if the abstracted data model becomes too generic to support multiple back‑ends, future feature additions may require refactoring the store’s interface.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ Given the parent‑child relationship, the `EntityContentAnalyzer` will instanti
 ### Siblings
 - [PatternMatcher](./PatternMatcher.md) -- The PatternMatcher algorithm is implemented using a regex-based approach, as seen in the EntityContentAnalyzer.ts file, to extract specific patterns from entity content
 - [RegexPatternBuilder](./RegexPatternBuilder.md) -- The RegexPatternBuilder is likely implemented as a separate class or function, allowing for easy extension and modification of pattern matching rules
-
 
 ---
 

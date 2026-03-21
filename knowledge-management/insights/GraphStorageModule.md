@@ -72,7 +72,6 @@ The modular approach means that each graph’s storage module can be instantiate
 * The modular directory layout (`integrations/`) simplifies onboarding of new storage implementations and keeps the codebase organized.  
 * However, the lack of a single unified storage interface definition in the observations means developers must rely on documentation or code navigation to understand the exact contract, which could be a minor maintenance friction.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ The modular approach means that each graph’s storage module can be instantiate
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager is mentioned in the Hierarchy Context as a sub-component of DockerizedServices, indicating its role in managing graph data.
 - [DataAccessLayer](./DataAccessLayer.md) -- The GraphDatabaseManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph database operations, indicating a need for a data access layer.
-
 
 ---
 

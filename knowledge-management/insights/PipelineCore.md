@@ -67,7 +67,6 @@ Beyond these immediate connections, **PipelineCore** participates in the broader
 
 *All statements above are directly grounded in the supplied observations; no additional assumptions have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -75,7 +74,6 @@ Beyond these immediate connections, **PipelineCore** participates in the broader
 
 ### Siblings
 - [PipelineHandler](./PipelineHandler.md) -- PipelineHandler handles the handler logic for Pipeline
-
 
 ---
 

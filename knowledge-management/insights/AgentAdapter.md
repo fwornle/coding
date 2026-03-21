@@ -87,7 +87,6 @@ Concurrency considerations are also evident.  The AgentAdapter’s interface is 
 * Centralized error handling and logging simplify debugging, while the ConfigurationValidator ensures that misconfigurations are caught early.  
 * The main maintenance burden will be keeping the plug‑in registry in sync with supported agent formats and ensuring that any protocol changes in external agents are reflected in their respective adapter modules.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Concurrency considerations are also evident.  The AgentAdapter’s interface is 
 - [OntologyManager](./OntologyManager.md) -- OntologyManager could utilize specific configuration settings from the ConfigurationValidator for optimizing its classification and validation processes.
 - [LoggingManager](./LoggingManager.md) -- LoggingManager's logging settings and log level management could be configurable, allowing for adjustments based on the system's current needs or environment.
 - [ConfigurationValidator](./ConfigurationValidator.md) -- ConfigurationValidator likely checks configuration settings against predefined rules or schemas to ensure validity.
-
 
 ---
 

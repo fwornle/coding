@@ -102,7 +102,6 @@ OntologySystem sits as a knowledge‑base sub‑component under **LiveLoggingSys
 ### 5. Maintainability Assessment  
 The component’s high cohesion and low coupling make it **highly maintainable**. Adding a new format or tweaking validation rules involves changes in isolated files without ripple effects. The central logger and error handler provide a uniform diagnostic surface, easing troubleshooting. The only maintenance risk lies in the repository implementation; if it hides complex persistence logic, developers must keep its contract well‑documented to prevent accidental misuse. Overall, OntologySystem’s design promotes clear ownership, testability, and future extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -112,7 +111,6 @@ The component’s high cohesion and low coupling make it **highly maintainable**
 - [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the TranscriptNormalizer class in transcript-processor.ts to normalize transcript formats
 - [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine uses the OntologyClassificationAgent to classify observations against the ontology system
 - [SessionManager](./SessionManager.md) -- SessionManager uses the SessionWindowing class in session-windowing.ts to handle session windowing
-
 
 ---
 

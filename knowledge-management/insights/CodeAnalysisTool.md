@@ -70,7 +70,6 @@ No explicit libraries or external services are mentioned, so we assume the tool 
 
 *All statements above are derived directly from the provided observations and the hierarchical context of the *CodingConventions* component.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ No explicit libraries or external services are mentioned, so we assume the tool 
 ### Siblings
 - [CodeFormatter](./CodeFormatter.md) -- The CodeFormatter utilizes the Eclipse Code Formatter to format the code, as specified in the CodingConventions sub-component.
 - [CommitMessageGuideline](./CommitMessageGuideline.md) -- The CommitMessageGuideline suggests using a specific format for commit messages, such as including a brief summary and a detailed description of the changes.
-
 
 ---
 

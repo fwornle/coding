@@ -105,12 +105,10 @@ These integration points are all **loose‑coupled**: the batch pipeline abstrac
 
 *All statements above are directly derived from the supplied observations; no additional file paths, class names, or undocumented patterns have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-
 
 ---
 

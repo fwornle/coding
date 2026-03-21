@@ -86,7 +86,6 @@ Key integration touch‑points include:
 * Centralized configuration via `providers.json` and the factory reduces duplication, but places a premium on configuration validation tooling.  
 * The use of well‑known patterns (pipeline, work‑stealing) makes the codebase approachable for developers familiar with concurrent processing, aiding long‑term maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Key integration touch‑points include:
 ### Siblings
 - [ModeResolver](./ModeResolver.md) -- ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a factory pattern in ProviderFactory.java to create instances of different provider classes based on their configurations in providers.json
-
 
 ---
 

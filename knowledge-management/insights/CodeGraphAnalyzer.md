@@ -99,7 +99,6 @@ Because the heavy computation resides in the `mcp‑server-semantic-analysis` co
 
 The clear separation of concerns, explicit Docker Compose definitions, and environment‑driven configuration make the component highly maintainable. Updates to the semantic analysis logic are isolated to one container, reducing regression risk for the API and UI layers. The only maintenance challenge is ensuring that shared environment variables remain synchronized across siblings; a centralised configuration (e.g., a `.env` file checked into version control) would mitigate drift. Overall, the design promotes straightforward onboarding for new developers and painless upgrades of individual services.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -111,7 +110,6 @@ The clear separation of concerns, explicit Docker Compose definitions, and envir
 ### Siblings
 - [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze constraints
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to perform semantic analysis
-
 
 ---
 

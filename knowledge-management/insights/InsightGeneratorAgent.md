@@ -97,12 +97,10 @@ The only concrete implementation artifact is the `InsightGenerator` class define
 
 *All statements above are drawn directly from the supplied observations; no additional patterns or implementation details have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Insights](./Insights.md) -- The Insights sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
-
 
 ---
 

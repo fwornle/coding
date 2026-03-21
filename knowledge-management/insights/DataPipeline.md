@@ -77,7 +77,6 @@ The only explicit dependency is the **`batch‑analysis.yaml`** file, which acts
 
 All statements above are derived directly from the supplied observations; no ungrounded assumptions have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ All statements above are derived directly from the supplied observations; no ung
 ### Siblings
 - [BatchProcessor](./BatchProcessor.md) -- The batch-analysis.yaml file defines the batch processing approach, including the dataset locations and knowledge extraction parameters, as seen in the batch-analysis.yaml file
 - [KnowledgeExtractor](./KnowledgeExtractor.md) -- The KnowledgeExtractor algorithm or processing pattern is designed to work in conjunction with the DataPipeline module, as implied by the parent component analysis
-
 
 ---
 

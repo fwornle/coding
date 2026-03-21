@@ -92,7 +92,6 @@ All integration occurs through **Python imports** and **method calls**; there ar
 
 By grounding the analysis in the concrete observations—file paths, class and function names, and the explicit parent‑sibling relationships—this document provides a clear, evidence‑based view of the **WorkflowRunning** entity, its design rationale, and how it fits into the broader trace‑generation pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ By grounding the analysis in the concrete observations—file paths, class and f
 ### Siblings
 - [TraceReportGeneration](./TraceReportGeneration.md) -- The TraceReportGeneration node utilizes the captured data flow information to generate reports, which are then used to analyze the workflow execution.
 - [DataFlowCapture](./DataFlowCapture.md) -- The DataFlowCapture node utilizes the WorkflowRunner class to capture data flow information during workflow execution, as evident from the workflow_runner.py's capture_data_flow function.
-
 
 ---
 

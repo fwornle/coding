@@ -71,7 +71,6 @@ These integration points are all **implicit** in the observations; no explicit i
 * Because validation logic lives in discrete, self‑contained rule files, developers can modify or add rules without touching the RuleEngine or ValidationAgent code.  
 * The clear separation of concerns (rules, engine, pipeline, cache) promotes easier testing and isolated refactoring, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ These integration points are all **implicit** in the observations; no explicit i
 ### Siblings
 - [ValidationPipeline](./ValidationPipeline.md) -- The ValidationPipeline is likely to be responsible for orchestrating the execution of multiple validation rules, ensuring that each rule is evaluated in the correct order and that the overall validation process is efficient and effective.
 - [CacheStore](./CacheStore.md) -- The CacheStore is likely to be implemented using a caching mechanism, such as a hash table or a caching library, to store and retrieve validation results quickly and efficiently.
-
 
 ---
 

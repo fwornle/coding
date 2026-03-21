@@ -103,7 +103,6 @@ All of these steps are orchestrated without the caller needing to know which pro
 
 These insights are derived directly from the supplied observations and hierarchy context, without extrapolating beyond the documented behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -113,7 +112,6 @@ These insights are derived directly from the supplied observations and hierarchy
 - [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class, specifically the getLLMProvider method, to interact with the LLM provider in lib/llm/llm-service.ts
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService uses API Service Wrapper to interact with external APIs and monitor constraint violations
 - [CodeGraphConstructionService](./CodeGraphConstructionService.md) -- CodeGraphConstructionService uses GraphDatabaseAdapter to store and query graph data, facilitating efficient code graph construction
-
 
 ---
 

@@ -61,12 +61,10 @@ If custom error handling is required (for example, mapping specific provider err
 * **High maintainability**: the implementation is localized, uses familiar language constructs, and does not depend on external frameworks.  
 * Future changes (e.g., new provider integrations) only need to follow the existing try‑catch pattern, minimizing the risk of inconsistent error handling across the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMErrorHandling](./LLMErrorHandling.md) -- The LLMErrorHandling class (lib/llm/llm-error-handling.ts) utilizes a try-catch approach to catch and handle errors that occur during LLM provider interactions.
-
 
 ---
 

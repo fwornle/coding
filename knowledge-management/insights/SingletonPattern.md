@@ -54,12 +54,10 @@ No other explicit child or sibling entities are mentioned, but the **DesignPatte
 4. **Scalability considerations** – Because only one adapter instance exists, connection pooling must be handled inside the adapter to support concurrent requests.  The Singleton does not inherently limit horizontal scaling; the underlying driver’s pool configuration determines throughput.  
 5. **Maintainability assessment** – Encapsulating all driver interactions in a single class simplifies maintenance—changes to the driver or connection settings are localized.  However, the global nature of the Singleton can become a hidden dependency; rigorous documentation and strict accessor usage are essential to avoid accidental misuse.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DesignPatterns](./DesignPatterns.md) -- GraphDatabaseAdapter class (storage/graph-database-adapter.ts) utilizes the Singleton pattern to ensure only one instance of the graph database adapter is created throughout the application
-
 
 ---
 

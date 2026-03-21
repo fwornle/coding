@@ -101,12 +101,10 @@ No other sibling components are mentioned, but any future module that needs grap
 
 Overall, the **GraphDatabaseAdapterUtilizer** embodies a disciplined, adapter‑driven design that supports scalable checkpoint management while keeping the system modular and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CheckpointManagementModule](./CheckpointManagementModule.md) -- CheckpointManagementModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage checkpoint-related entities and relationships.
-
 
 ---
 

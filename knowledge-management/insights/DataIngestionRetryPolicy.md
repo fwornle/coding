@@ -86,7 +86,6 @@ Together, these siblings form a thin orchestration layer around the ingestion en
 * Configuration‑driven design isolates policy changes from code changes, making it easy for ops teams to tune behavior without redeploying.  
 * The lack of concrete code symbols suggests the policy may be defined in a thin wrapper or configuration file, which simplifies the codebase but requires clear documentation to avoid “magic” behavior.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ Together, these siblings form a thin orchestration layer around the ingestion en
 ### Siblings
 - [IngestionFrameworkConfigurator](./IngestionFrameworkConfigurator.md) -- The IngestionFrameworkConfigurator would likely be implemented in a class or module that handles data source connections, such as a DataSourceConnector class, which would define the interface for connecting to different data sources.
 - [IngestionAgentFactory](./IngestionAgentFactory.md) -- The IngestionAgentFactory would likely be implemented as a factory class or module, which would create and configure ingestion agents based on the specific requirements of the application.
-
 
 ---
 

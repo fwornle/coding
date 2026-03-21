@@ -78,7 +78,6 @@ Together, these mechanisms give `GraphDatabaseConnection` the ability to **batch
 * Centralizing constraints in a markdown document reduces code duplication but requires disciplined documentation practices.
 * The lack of direct code symbols in the current snapshot suggests that the connection layer may be thin wrapper code; as long as the wrapper remains thin, maintenance overhead stays low.  However, any future expansion (e.g., retry logic, circuit breaking) should be encapsulated within the connection to avoid scattering such concerns across adapters and query mechanisms.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ Together, these mechanisms give `GraphDatabaseConnection` the ability to **batch
 
 ### Siblings
 - [GraphDatabaseQueryMechanism](./GraphDatabaseQueryMechanism.md) -- The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the context of the SemanticAnalysis component.
-
 
 ---
 

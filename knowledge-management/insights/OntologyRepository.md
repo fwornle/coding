@@ -106,7 +106,6 @@ When an agent (e.g., the `OntologyClassificationAgent` inside **SemanticAnalysis
 
 Overall, **OntologyRepository** exhibits a clean, modular design that aligns with the broader DAG‑driven execution model of **SemanticAnalysis**, while providing a robust, extensible foundation for ontology‑centric operations across the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ Overall, **OntologyRepository** exhibits a clean, modular design that aligns wit
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMServiceFactory class in llm-service-manager/factory.ts to create LLM services
 - [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph uses the GraphDatabase class in knowledge-graph/database.ts to store the knowledge entities and their relationships
-
 
 ---
 

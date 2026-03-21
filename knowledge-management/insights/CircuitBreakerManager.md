@@ -69,7 +69,6 @@ Finally, operators should monitor the circuit‑breaker metrics—open/closed st
 
 Overall, **CircuitBreakerManager** introduces a robust, configurable safety net for the LLM abstraction layer while preserving clean separation of concerns and enabling straightforward scaling and maintenance.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ Overall, **CircuitBreakerManager** introduces a robust, configurable safety net 
 ### Siblings
 - [DMRManager](./DMRManager.md) -- DMRManager uses the DMRProvider class (lib/llm/providers/dmr-provider.ts) to register as a provider, enabling local LLM inference
 - [ProviderRegistryManager](./ProviderRegistryManager.md) -- ProviderRegistryManager uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage available LLM providers
-
 
 ---
 

@@ -110,7 +110,6 @@ These sub‑components share the same storage backend (the GraphDatabaseAdapter)
 * **Potential technical debt** – The automatic JSON export tied to every write could become a hidden performance issue; monitoring and possibly refactoring this behavior will be important as the system grows.  
 * Documentation should emphasize the “go‑through‑the‑agent” rule to prevent accidental bypass of the coordination logic.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ These sub‑components share the same storage backend (the GraphDatabaseAdapter)
 - [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving code knowledge graph data.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter relies on the LevelDB database (storage/leveldb.ts) for storing and retrieving graph data.
 - [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
-
 
 ---
 

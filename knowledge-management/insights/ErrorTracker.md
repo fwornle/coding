@@ -12,14 +12,11 @@ The ErrorTracker is an important component of the LoggingAndErrorTrackingModule,
 
 - The ErrorTracker is likely integrated with the Logger class to handle error logging, and may use the logging framework defined in logging_framework.py to log error messages with appropriate severity levels.
 
-
 ## Related Entities
 
 ### Used By
 
 - LoggingAndErrorTrackingModule (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The ErrorTracker is an important component of the LoggingAndErrorTrackingModule,
 ### Siblings
 - [Logger](./Logger.md) -- The Logger class uses a logging framework, defined in logging_framework.py, to handle log messages, including severity levels and log targets, which allows for flexible and customizable logging.
 - [LogMessageFormatter](./LogMessageFormatter.md) -- The LogMessageFormatter would be responsible for formatting log messages according to the logging specification defined in logging_framework.py, which would include severity levels, log targets, and other relevant information.
-
 
 ---
 

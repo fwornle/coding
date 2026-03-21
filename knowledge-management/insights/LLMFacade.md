@@ -73,7 +73,6 @@ The parent **DockerizedServices** component also provides containerisation and l
 
 Overall, LLMFacade exemplifies a well‑structured, modular façade that cleanly abstracts language‑model operations while providing built‑in resilience and extensibility.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ Overall, LLMFacade exemplifies a well‑structured, modular façade that cleanly
 ### Siblings
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the lib/service-starter.js file to start services with retry logic and exponential backoff
 - [LLMService](./LLMService.md) -- LLMService utilizes the lib/llm/llm-service.ts file to handle mode routing, caching, and circuit breaking for language model operations
-
 
 ---
 

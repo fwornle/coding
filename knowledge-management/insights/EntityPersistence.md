@@ -108,7 +108,6 @@ Following these conventions will keep the persistence layer performant, consiste
 
 All statements above are directly derived from the provided observations and the referenced file paths. No speculative patterns have been introduced beyond what the documentation explicitly suggests.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -122,7 +121,6 @@ All statements above are directly derived from the provided observations and the
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-
 
 ---
 

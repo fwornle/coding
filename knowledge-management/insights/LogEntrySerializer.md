@@ -87,7 +87,6 @@ When a client calls `Logger.Log(...)`, the Logger creates a log entry object and
 * The clear parent‑child relationship and sibling modularity make it straightforward to replace or extend **LogWriter** or **LogReader** without touching the serializer, enhancing maintainability.  
 * However, the need to keep compression and encryption settings synchronized across components introduces configuration complexity that should be managed through centralized configuration or dependency injection.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ When a client calls `Logger.Log(...)`, the Logger creates a log entry object and
 ### Siblings
 - [LogWriter](./LogWriter.md) -- The Logger class implements the ILogger interface, which declares methods for logging and log entry retrieval, indicating a clear separation of concerns between logging and storage.
 - [LogReader](./LogReader.md) -- The LogReader would need to implement query logic to retrieve specific log entries based on filters, such as timestamp, log level, or error message, to support efficient log analysis.
-
 
 ---
 

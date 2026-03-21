@@ -80,7 +80,6 @@ Because the observations do not list concrete files, the exact module path (e.g.
 - **High maintainability** thanks to the isolation of Graphology behind GraphManager; updates to the graph library affect only the manager’s implementation.  
 - **Potential technical debt** if persistence logic is tightly coupled to Graphology’s data structures; careful abstraction boundaries mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Because the observations do not list concrete files, the exact module path (e.g.
 
 ### Siblings
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is mentioned in the parent context as utilizing Graphology and LevelDB, indicating a specific implementation choice.
-
 
 ---
 

@@ -76,12 +76,10 @@ No other modules are mentioned, so the integration scope is limited to the regis
 * **Clear separation of concerns** – Registry handles orchestration; factory handles creation; providers handle LLM interaction.  
 * **Potential risk** – If the factory’s mapping logic is not well‑documented, developers may add duplicate keys or forget to update the mapping when a provider is renamed. Regular code‑review of the factory file (`lib/llm/provider-registry-module.ts`) mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.
-
 
 ---
 

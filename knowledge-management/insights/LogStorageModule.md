@@ -118,7 +118,6 @@ All of these classes are instantiated by the parent **LiveLoggingSystem**, which
 
 The heavy reliance on declarative JSON files makes the module **highly maintainable** from a configuration standpoint—changes to compression, thresholds, or schemas do not require recompilation.  The clear separation of responsibilities (storage, optimisation, monitoring, backup) reduces the cognitive load for developers working on a single concern.  However, the dual‑store approach introduces **synchronisation overhead** and potential duplication of logic, which can increase maintenance effort if both stores must reflect the same logical log record.  Adding new query languages or optimisation rules is straightforward but demands disciplined documentation of the JSON schemas to prevent configuration drift.  Overall, the design balances flexibility with manageable complexity, especially when aligned with the consistent configuration strategy used across sibling modules.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ The heavy reliance on declarative JSON files makes the module **highly maintaina
 - [ConfigurationValidationModule](./ConfigurationValidationModule.md) -- ConfigurationValidationModule's ConfigurationLoader class loads and parses the system configuration from JSON files, with support for multiple configuration formats, as specified in the configuration-formats.json file
 - [ConcurrencyManagementModule](./ConcurrencyManagementModule.md) -- ConcurrencyManagementModule's ThreadManager class manages a pool of threads for parallelizing log processing and storage, with thread pool configuration defined in the thread-pool-configuration.json file
 - [AgentIntegrationModule](./AgentIntegrationModule.md) -- AgentIntegrationModule's AgentFactory class creates and configures agent instances, with agent configuration defined in the agent-configuration.json file
-
 
 ---
 

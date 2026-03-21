@@ -71,14 +71,7 @@ The component’s narrow focus, clear file location, and reliance on standard No
 
 ### Relationship
 
-![HookConfigLoader Relationship](images/hook-config-loader-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/hook-config-loader-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -88,7 +81,6 @@ The component’s narrow focus, clear file location, and reliance on standard No
 ### Siblings
 - [ContentValidationAgent](./ContentValidationAgent.md) -- The ContentValidationAgent utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file to perform validation tasks.
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation.
-
 
 ---
 

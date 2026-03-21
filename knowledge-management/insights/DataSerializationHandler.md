@@ -103,7 +103,6 @@ Because the handler defers schema resolution to `SchemaManager`, avoid hard‑co
 ### Maintainability Assessment  
 The clear separation of responsibilities and the use of well‑known patterns make the component **highly maintainable**.  Adding a new format or evolving a schema requires changes only in the dedicated module, leaving the rest of the system untouched.  The main maintenance risk lies in keeping the `SchemaManager` definitions synchronized with actual data models and ensuring that indexing flags remain compatible with evolving database drivers.  Overall, the design promotes straightforward unit testing, easy mocking, and low coupling, which together support long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -112,7 +111,6 @@ The clear separation of responsibilities and the use of well‑known patterns ma
 ### Siblings
 - [DatabaseConnectionManager](./DatabaseConnectionManager.md) -- The DatabaseConnectionManager would likely interact with a database driver, such as MySQL or PostgreSQL, to establish connections (e.g., mysql-connector-nodejs)
 - [QueryExecutionOptimizer](./QueryExecutionOptimizer.md) -- QueryExecutionOptimizer could utilize database query analysis tools or libraries like pg-query-store or query-parser to understand query patterns and optimize them (e.g., query-optimizer.ts:63)
-
 
 ---
 

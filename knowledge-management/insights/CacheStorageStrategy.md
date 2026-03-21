@@ -98,7 +98,6 @@ The clear separation of concerns—caching logic, storage strategy, store manage
 
 Because the interface is the sole contract, existing code (parent and siblings) remains untouched. However, maintainers must ensure that **unit tests cover both storage variants** and that configuration files are kept in sync with deployment environments to avoid mismatched expectations.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -107,7 +106,6 @@ Because the interface is the sole contract, existing code (parent and siblings) 
 ### Siblings
 - [CacheStoreManager](./CacheStoreManager.md) -- CacheStoreManager utilizes a cache store (cache-store.py) to store cached data, allowing for efficient data retrieval and storage
 - [CacheInvalidationPolicy](./CacheInvalidationPolicy.md) -- CacheInvalidationPolicy is likely to be implemented in a separate module or class, with a clear interface for integrating with the CacheStoreManager
-
 
 ---
 

@@ -14,7 +14,6 @@ LLMServiceFacade uses a service-oriented approach to provide a unified interface
 
 - LLMServiceClient uses a configurable set of LLM service clients in LLMServiceClient.java
 
-
 ## Related Entities
 
 ### Dependencies
@@ -28,8 +27,6 @@ LLMServiceFacade uses a service-oriented approach to provide a unified interface
 ### Used By
 
 - SemanticAnalysis (contains)
-
-
 
 ## Hierarchy Context
 
@@ -49,7 +46,6 @@ LLMServiceFacade uses a service-oriented approach to provide a unified interface
 - [EntityValidationModule](./EntityValidationModule.md) -- EntityValidator uses a rule-based approach to validate entity content using ValidationRules and EntityValidator classes
 - [AgentManager](./AgentManager.md) -- AgentManager uses a factory-based approach to create and configure agents using AgentFactory and AgentConfig classes
 - [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph uses a graph-based approach to represent knowledge entities using GraphDB and RDF libraries
-
 
 ---
 

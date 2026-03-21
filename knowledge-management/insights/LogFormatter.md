@@ -70,12 +70,10 @@ The `Logger` itself likely depends on lower‑level transport libraries (Node’
 ### Maintainability assessment  
 * The clear boundary between log creation (`Logger`) and log presentation (`LogFormatter`) makes the subsystem easy to maintain.  Updating log formats or adding new fields requires changes only in `LogFormatter` and the unified logging interface, leaving all consumer code untouched.  The lack of multiple formatter implementations keeps the codebase small and reduces the surface area for bugs.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
-
 
 ---
 

@@ -91,7 +91,6 @@ No evidence points to a distributed or event‑driven architecture; the interact
 
 Overall, the architecture surrounding `CustomEntityAuthoringService` reflects a disciplined, modular approach that balances flexibility for the manual‑learning domain with the maintainability benefits of a well‑defined service layer.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Overall, the architecture surrounding `CustomEntityAuthoringService` reflects a 
 ### Siblings
 - [EntityAuthoring](./EntityAuthoring.md) -- The ManualLearningController.java file utilizes the EntityAuthoringService class to handle requests related to entity creation and editing, as seen in the ManualLearningController.java file.
 - [ManualEntityValidation](./ManualEntityValidation.md) -- The ManualEntityValidation process is likely integrated with the EntityAuthoringService class, as it would be necessary to validate entities after they are created or edited.
-
 
 ---
 

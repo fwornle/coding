@@ -10,7 +10,7 @@ The **GraphPersistenceModule** is a sub‑component that lives inside the **Cons
 
 The module is not a stand‑alone persistence engine; rather, it acts as a bridge between the higher‑level **ConstraintSystem** logic and the lower‑level **GraphDatabaseAdapter** found in `storage/graph-database-adapter.ts`.  The adapter itself already knows how to translate constraint objects into graph operations, and the GraphPersistenceModule supplies the concrete storage backend for those operations.  This relationship is illustrated in the architecture diagram below.  
 
-![GraphPersistenceModule — Architecture](../../.data/knowledge-graph/insights/images/graph-persistence-module-architecture.png)
+![GraphPersistenceModule — Architecture](images/graph-persistence-module-architecture.png)
 
 ## Architecture and Design  
 
@@ -20,7 +20,7 @@ Interaction flows as follows: the **ConstraintSystem** (parent) issues graph‑m
 
 The module’s placement alongside sibling components **ConstraintManager**, **HookOrchestrator**, and **ViolationLogger** reflects a cohesive vertical slice: each sibling focuses on a distinct aspect of constraint handling (management, hook orchestration, violation logging), while the GraphPersistenceModule supplies the shared data‑persistence foundation they all rely on.  The relationship diagram makes these connections explicit.  
 
-![GraphPersistenceModule — Relationship](../../.data/knowledge-graph/insights/images/graph-persistence-module-relationship.png)
+![GraphPersistenceModule — Relationship](images/graph-persistence-module-relationship.png)
 
 ## Implementation Details  
 
@@ -111,7 +111,6 @@ The adapter also likely implements a **JSON export sync** routine, mirroring the
 ### Maintainability Assessment  
 * The clear separation of concerns (adapter, in‑memory model, persistence) promotes testability and easy replacement of the storage backend.  However, the lack of explicit type definitions in the observed code (e.g., missing interfaces) could increase the cognitive load for new contributors; adding TypeScript interfaces for the adapter contract would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ The adapter also likely implements a **JSON export sync** routine, mirroring the
 - [ConstraintManager](./ConstraintManager.md) -- The ConstraintManager likely interacts with the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage constraints.
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator might be related to the Copi project in integrations/copi, which has documentation on hook functions and usage.
 - [ViolationLogger](./ViolationLogger.md) -- The ViolationLogger might be related to the ConstraintManager, as it handles constraint violations.
-
 
 ---
 

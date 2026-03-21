@@ -70,7 +70,6 @@ Because the executor’s API is limited to task submission and result handling, 
 
 The executor’s design is **modular** and **self‑contained**, exposing a small, well‑defined API. Because the core algorithm is encapsulated in a single class (`WorkStealingExecutor.java`), changes to the stealing logic or queue implementation are localized, aiding maintainability. The clear separation from other concurrency models (e.g., DAG‑based execution) reduces coupling, allowing each sibling to evolve independently. Documentation via the example file (`work-stealing-example.java`) provides a concrete usage pattern, further supporting maintainability for future developers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -79,7 +78,6 @@ The executor’s design is **modular** and **self‑contained**, exposing a smal
 ### Siblings
 - [ParallelTaskManagement](./ParallelTaskManagement.md) -- The WorkStealingExecutor (WorkStealingExecutor.java:20) provides methods for submitting tasks and retrieving results, allowing developers to manage parallel tasks with ease
 - [DagBasedExecutionModel](./DagBasedExecutionModel.md) -- The GraphBasedExecution (GraphBasedExecution.java:15) class implements the DAG-based execution model, allowing developers to define complex task dependencies and execute them efficiently
-
 
 ---
 

@@ -100,7 +100,6 @@ Following these guidelines helps maintain a clear data flow, reduces coupling, a
 * The main maintenance burden lies in tracking changes to the semantic analysis output format; encapsulating parsing logic mitigates ripple effects.  
 * Absence of concrete file paths in the observations suggests developers should verify the module location within the `SemanticInsightGenerator` package to avoid integration errors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ Following these guidelines helps maintain a clear data flow, reduces coupling, a
 ### Siblings
 - [LargeLanguageModelManager](./LargeLanguageModelManager.md) -- LargeLanguageModelManager is expected to handle the initialization, configuration, and invocation of large language models, possibly through APIs or libraries.
 - [InsightGenerationService](./InsightGenerationService.md) -- InsightGenerationService likely orchestrates the workflow of processing code analysis results, invoking large language models, and post-processing the model outputs to generate actionable insights.
-
 
 ---
 

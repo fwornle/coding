@@ -97,7 +97,6 @@ Because the integration is a thin wrapper around HTTP calls, scalability hinges 
 
 The design promotes high maintainability: all VKB‑related changes are confined to *VkbApiIntegration*, and consuming components remain untouched. The clear separation also aids unit testing—mocks of the integration can replace the real client in `TraceReporter`, `ReportGenerator`, and `LoggingMechanism` tests. The main maintenance risk is the shared usage across unrelated domains; careful versioning and thorough integration tests will mitigate regression when the VKB API evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ The design promotes high maintainability: all VKB‑related changes are confined
 ### Siblings
 - [ReportGenerator](./ReportGenerator.md) -- The TraceReporter class likely contains the implementation of ReportGenerator, which uses the VKB API to fetch workflow run data.
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism may be closely tied to the ReportGenerator, as logging workflow run events is a necessary step in the report generation process.
-
 
 ---
 

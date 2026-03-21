@@ -88,7 +88,6 @@ Because logging is performed synchronously to a local file or console, high‑th
 **5. Maintainability assessment**  
 The separation of concerns (strategy, level, formatter, transport, configuration) makes the codebase easy to reason about and modify.  Adding a new log level or output format involves editing a single file.  The reliance on external JSON for configuration centralises operational settings, reducing the risk of divergent hard‑coded values.  Overall, the design promotes high maintainability, provided that any future extensions respect the existing modular boundaries.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The separation of concerns (strategy, level, formatter, transport, configuration
 - [LLMProviderRegistry](./LLMProviderRegistry.md) -- The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.
 - [LLMConfigManager](./LLMConfigManager.md) -- The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.
 - [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
-
 
 ---
 

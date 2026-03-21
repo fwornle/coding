@@ -14,11 +14,11 @@ AgentFrameworkModule follows a **modular component architecture** in which each 
 
 The architecture diagram (shown below) illustrates this layered arrangement: the AgentFrameworkModule sits at the centre of the KnowledgeManagement hierarchy, with direct lines to the GraphDatabaseModule, InsightGenerationModule, and UtilitiesModule.  
 
-![AgentFrameworkModule — Architecture](../../.data/knowledge-graph/insights/images/agent-framework-module-architecture.png)
+![AgentFrameworkModule — Architecture](images/agent-framework-module-architecture.png)
 
 The relationship diagram further clarifies the parent‑child and sibling links, highlighting that **AgentDevelopmentGuide** (the hooks file) is a child of the framework, while **KnowledgeManagement** is its parent.  
 
-![AgentFrameworkModule — Relationship](../../.data/knowledge-graph/insights/images/agent-framework-module-relationship.png)
+![AgentFrameworkModule — Relationship](images/agent-framework-module-relationship.png)
 
 Because the module does not embed its own persistence layer, it benefits from the **GraphDatabaseAdapter** implementation that lives in the parent component (see the parent description). This delegation reduces duplication and aligns the agent storage format with the rest of the system’s Graphology + LevelDB knowledge graph.
 
@@ -80,7 +80,6 @@ Because all agent state funnels through the shared GraphDatabaseAdapter, the sca
 
 The strict separation of responsibilities—hooks in a markdown guide, persistence in GraphDatabaseModule, utilities in UtilitiesModule—makes the codebase highly maintainable. Updating the hook contract only requires changes to the guide and corresponding validation logic; storage changes are isolated to the GraphDatabaseAdapter. However, the reliance on external modules means that breaking changes in a sibling (e.g., a new API in InsightGenerationModule) could ripple into the framework, so versioned interfaces and thorough integration tests are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ The strict separation of responsibilities—hooks in a markdown guide, persisten
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

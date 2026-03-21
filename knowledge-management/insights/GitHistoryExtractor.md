@@ -82,12 +82,10 @@ Because the observations do not enumerate specific classes or functions, the imp
 * Potential risk: the extractor’s output schema is a shared contract; rigorous versioning and automated tests are required to keep OnlineLearning and any future consumers stable.  
 * The lack of concrete code symbols in the observations suggests that documentation should be enriched with interface definitions and example usage to aid future developers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline to extract knowledge from git history, which is then stored in the graph database using the GraphDatabaseAdapter (storage/graph-database-adapter.ts).
-
 
 ---
 

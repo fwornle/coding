@@ -227,7 +227,6 @@ The heavy reliance on well‑known **Gang of Four** patterns yields a **highly m
 
 Overall, the design balances flexibility with disciplined structure, positioning NaturalLanguageProcessing as a robust, evolvable foundation for higher‑level NLP services within the larger system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -245,7 +244,6 @@ Overall, the design balances flexibility with disciplined structure, positioning
 - [MachineLearningIntegration](./MachineLearningIntegration.md) -- The MachineLearningModel class in machine-learning-model.py uses the Factory pattern to create instances of different machine learning models.
 - [OntologyManagement](./OntologyManagement.md) -- The OntologyLoader class in ontology-loader.py uses the Singleton pattern to ensure only one instance is created.
 - [EntityManagement](./EntityManagement.md) -- The EntityAuthoringService class in entity-authoring-service.py employs the Factory pattern to handle manual entity creation and editing.
-
 
 ---
 

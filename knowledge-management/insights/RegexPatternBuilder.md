@@ -108,7 +108,6 @@ The only explicit dependency chain is: `EntityContentAnalyzer → RegexPatternBu
 * The lack of discovered symbols means the current codebase likely has a small public API, which further reduces the surface area for bugs.  
 * Documentation should explicitly enumerate the configurable options to prevent misuse, but otherwise the design promotes high maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ The only explicit dependency chain is: `EntityContentAnalyzer → RegexPatternBu
 ### Siblings
 - [PatternMatcher](./PatternMatcher.md) -- The PatternMatcher algorithm is implemented using a regex-based approach, as seen in the EntityContentAnalyzer.ts file, to extract specific patterns from entity content
 - [AnalysisStore](./AnalysisStore.md) -- The AnalysisStore likely uses a data storage mechanism, such as a database or a file system, to store and retrieve analysis metadata
-
 
 ---
 

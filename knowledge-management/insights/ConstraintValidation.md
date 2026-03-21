@@ -27,7 +27,7 @@ Interaction flow (high‑level):
 
 This design promotes **separation of concerns**: configuration lives in its own documentation and (presumably) data store, while the validation engine focuses solely on rule execution.  
 
-![ConstraintValidation — Architecture](../../.data/knowledge-graph/insights/images/constraint-validation-architecture.png)
+![ConstraintValidation — Architecture](images/constraint-validation-architecture.png)
 
 ---
 
@@ -62,7 +62,7 @@ ConstraintValidation is tightly coupled with several other parts of the architec
 
 The **relationship diagram** below visualises these connections, highlighting the flow of rule data from ConstraintConfiguration into the engine and the downstream impact on sibling modules.  
 
-![ConstraintValidation — Relationship](../../.data/knowledge-graph/insights/images/constraint-validation-relationship.png)
+![ConstraintValidation — Relationship](images/constraint-validation-relationship.png)
 
 ---
 
@@ -101,7 +101,6 @@ The **relationship diagram** below visualises these connections, highlighting th
 
 By adhering to the guidelines above and respecting the documented relationships, developers can confidently extend and maintain the **ConstraintValidation** sub‑component as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ By adhering to the guidelines above and respecting the documented relationships,
 - [ContentValidation](./ContentValidation.md) -- ContentValidation uses a rules-based approach to validate content, ensuring system integrity.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses a browser-based approach to provide access to web-based interfaces.
 - [CodeGraphRag](./CodeGraphRag.md) -- CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.
-
 
 ---
 

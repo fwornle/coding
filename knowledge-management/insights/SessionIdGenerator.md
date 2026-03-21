@@ -89,7 +89,6 @@ No other modules are explicitly mentioned as consumers, but the utility nature o
 * **High maintainability** – A single, well‑encapsulated function is easy to locate, understand, and replace if a different ID strategy is needed.  
 * **Low coupling** – Because no configuration or external services are required, changes to SessionIdGenerator rarely ripple through the rest of the codebase.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ No other modules are explicitly mentioned as consumers, but the utility nature o
 
 ### Siblings
 - [SessionStore](./SessionStore.md) -- The SessionStore would likely employ a data storage solution such as a database or a cache layer (e.g., Redis) to store session information, considering the need for both persistence and rapid access.
-
 
 ---
 

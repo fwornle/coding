@@ -110,15 +110,13 @@ The system is layered: *Application → LoggerConfiguration (factory) → Loggin
 
 Because LogWriter does not directly depend on Graphology or LevelDB, changes to the persistence technology are confined to `storage/graph-database-adapter.ts`. The Adapter pattern therefore yields high maintainability. The clear compositional layout also makes it straightforward to add or replace sibling detail nodes (e.g., a new CloudWatch writer) without touching LogWriter’s core logic.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph data using Graphology and LevelDB.
 
 ### Siblings
-- [LoggerConfiguration](./LoggerConfiguration.md) -- The createLogger function from ../logging/Logger.js enables modular and flexible logging capabilities, suggesting a configurable logging system.
-
+- LoggerConfiguration -- The createLogger function from ../logging/Logger.js enables modular and flexible logging capabilities, suggesting a configurable logging system.
 
 ---
 

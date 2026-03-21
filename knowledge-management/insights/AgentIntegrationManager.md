@@ -76,7 +76,6 @@ The manager’s external configuration file (`agents.xml`) is the primary integr
 * The clear separation of concerns—plugin loading, configuration management, lifecycle control, and adapter provision—supports maintainability.  However, reliance on OSGi requires developers to be familiar with its lifecycle semantics.
 * Centralizing agent metadata in `agents.xml` aids traceability but mandates strict schema governance and automated validation to avoid runtime registration failures.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ The manager’s external configuration file (`agents.xml`) is the primary integr
 - [LoggingService](./LoggingService.md) -- LoggingService logs system activities, including errors, warnings, and informational messages, to facilitate debugging and system monitoring.
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses an ontology system to classify observations and categorize logged data.
 - [LSLConverter](./LSLConverter.md) -- LSLConverter uses the LSL format to convert between agent-native transcript formats.
-
 
 ---
 

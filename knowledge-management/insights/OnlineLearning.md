@@ -8,7 +8,7 @@ OnlineLearning relies on the batch analysis pipeline to process data from git hi
 
 OnlineLearning is a **sub‑component** of the larger **KnowledgeManagement** system. Its implementation lives primarily in the **`integrations/code-graph-rag/`** directory, where the Code Graph RAG (Retrieval‑Augmented Generation) system is defined. The component orchestrates a **batch analysis pipeline** that ingests three distinct data streams—Git history, LSL (Learning Session Log) sessions, and static code analysis results. Extracted entities are persisted through the **`GraphDatabaseAdapter`** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) and later fed to the **`InsightGenerationModule`**, which produces actionable learning insights. Throughout the processing flow, the **UKB trace report** from the **UtilitiesModule** is used to log and audit each stage, ensuring traceability of the knowledge‑extraction lifecycle.  
 
-![OnlineLearning — Architecture](../../.data/knowledge-graph/insights/images/online-learning-architecture.png)
+![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
 ---
 
@@ -28,7 +28,7 @@ The design of OnlineLearning is deliberately **modular** and **pipeline‑centri
 
 The component’s **relationship diagram** (shown below) visualizes these interactions, highlighting how OnlineLearning sits between the data ingestion side (Git, LSL, code analysis) and downstream consumers (InsightGenerationModule, GraphDatabaseAdapter).  
 
-![OnlineLearning — Relationship](../../.data/knowledge-graph/insights/images/online-learning-relationship.png)
+![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
 ---
 
@@ -127,7 +127,6 @@ These connections illustrate a **layered integration**: raw data → batch pipel
 * **Documentation** – README files in `integrations/code-graph-rag/` and clear script locations (`scripts/migrate-graph-db-entity-types.js`) aid onboarding.  
 * **Potential Debt** – Reliance on a single‑node LevelDB store may become a maintenance bottleneck as data volume grows; proactive migration planning is advisable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -145,7 +144,6 @@ These connections illustrate a **layered integration**: raw data → batch pipel
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

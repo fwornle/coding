@@ -107,7 +107,6 @@ This hierarchy promotes clear data flow and makes it easy to replace or extend a
 
 The clear division between extraction and graph construction aids maintainability: changes to Git parsing logic stay within GitHistoryAnalyzer, while changes to the graph schema stay within KnowledgeGraphBuilder. However, the lack of a formally defined knowledge contract could become a source of friction; introducing an interface or data‑class (e.g., `KnowledgeItem`) would make future extensions safer. The builder’s relatively small public API (`buildGraph`, `addNodes`) is easy to document and test, but the internal graph‑representation should be encapsulated to avoid leaking implementation details to callers. Overall, the design is maintainable as long as the data exchange contract remains stable and the builder is kept modular enough to accommodate alternative storage back‑ends.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ The clear division between extraction and graph construction aids maintainabilit
 ### Siblings
 - [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- GitHistoryAnalyzer uses the git_history_analyzer.py module to extract knowledge from git history, specifically the GitHistoryAnalyzer class
 - [CodeKnowledgeExtractor](./CodeKnowledgeExtractor.md) -- The CodeKnowledgeExtractor uses code analysis to extract knowledge, specifically using methods such as getCodeKnowledge and extractCodeInsights
-
 
 ---
 

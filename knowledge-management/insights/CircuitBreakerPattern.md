@@ -75,12 +75,10 @@ Following these guidelines ensures that developers leverage the **CircuitBreaker
 4. **Scalability considerations** – Because the circuit‑breaker state is kept in‑process, it scales with the number of façade instances. In a horizontally scaled deployment, each instance maintains its own circuit state; if a shared state is required, an external store (e.g., Redis) would be needed—this is a trade‑off not evident from the current observations.  
 5. **Maintainability assessment** – With the circuit‑breaker encapsulated inside **LLMFacade**, the resilience logic is isolated and easy to maintain. However, the lack of visible source symbols means developers must rely on documentation and configuration to understand behavior, underscoring the importance of clear comments and thorough testing.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMFacade](./LLMFacade.md) -- The LLMFacade uses the CircuitBreaker pattern to handle faults and prevent cascading failures
-
 
 ---
 

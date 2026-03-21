@@ -88,7 +88,6 @@ dockerized-services/
 
 These insights are directly grounded in the observed classes and relationships; no unverified patterns have been introduced.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ These insights are directly grounded in the observed classes and relationships; 
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a routing mechanism in its LLMRouter class to direct incoming requests to the appropriate LLM service
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses a RetryStrategy class to implement a retry-with-backoff pattern, preventing endless loops and ensuring reliable service startup
 - [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses a ProcessRegistry module to store and retrieve process instances, enabling dynamic process discovery and registration
-
 
 ---
 

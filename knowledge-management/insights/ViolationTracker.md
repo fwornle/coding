@@ -120,7 +120,6 @@ Overall, ViolationTracker acts as a mediator between validation logic, persisten
 
 The component’s **clear separation** between API, caching, and persistence makes it relatively easy to reason about and modify. The reliance on well‑defined adapters and a simple data model further reduces coupling. However, the existence of two tracking modes and the need to keep Redis in sync with the graph store add **state‑management complexity**. Documentation of cache key conventions and batch‑flush schedules is crucial to avoid subtle bugs. Overall, with disciplined testing (unit + integration) and consistent use of the provided API, ViolationTracker should remain maintainable as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -130,7 +129,6 @@ The component’s **clear separation** between API, caching, and persistence mak
 - [ContentValidator](./ContentValidator.md) -- ContentValidator uses the GraphDatabaseAdapter's query method to fetch entity content for validation, as seen in the ContentValidationAgent's constructor.
 - [EntityRefresher](./EntityRefresher.md) -- EntityRefresher uses the GraphDatabaseAdapter's update method to refresh entity data in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses a factory pattern to create instances of different graph database implementations, such as Neo4j or Amazon Neptune.
-
 
 ---
 

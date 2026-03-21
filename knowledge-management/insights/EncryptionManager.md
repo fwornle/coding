@@ -83,7 +83,6 @@ The manager’s output (ciphertexts, signed tokens) is consumed by downstream co
    - Configuration‑driven algorithm and key selection promotes easy updates for compliance or performance tuning  
    - Dependence on a KMS introduces a single point of failure; robust retry and fallback mechanisms are needed to maintain high availability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ The manager’s output (ciphertexts, signed tokens) is consumed by downstream co
 ### Siblings
 - [AuthenticationManager](./AuthenticationManager.md) -- The SecurityManager sub-component utilizes the AuthenticationManager to authenticate users, as seen in the SecurityManager.useAuthentication() method, which implies a design decision to centralize authentication logic.
 - [AuthorizationManager](./AuthorizationManager.md) -- The AuthorizationManager would need to define access control lists or roles, possibly in a configuration file or database, to dictate the permissions of different user groups, showcasing a decision to externalize authorization rules for easier management.
-
 
 ---
 

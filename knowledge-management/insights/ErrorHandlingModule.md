@@ -69,7 +69,6 @@ The module’s public interface is likely a set of functions such as `report(err
 * High maintainability: clear separation, external configuration, and a small, well‑defined public API make the module easy to understand and evolve.
 * The reliance on a single configuration file requires disciplined versioning and validation, but overall the design encourages low‑risk updates and straightforward testing of individual strategies.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ The module’s public interface is likely a set of functions such as `report(err
 ### Siblings
 - [LoggingModule](./LoggingModule.md) -- The createLogger function from ../logging/Logger.js is used to implement logging functionality.
 - [SpecstoryIntegration](./SpecstoryIntegration.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js provides a connection to the Specstory extension via HTTP, IPC, or file watch.
-
 
 ---
 

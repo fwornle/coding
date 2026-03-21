@@ -128,7 +128,6 @@ Following these conventions keeps the classification pipeline reliable, reproduc
 
 *All statements are directly grounded in the provided observations and file references; no speculative patterns beyond those mentioned have been introduced.*
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ Following these conventions keeps the classification pipeline reliable, reproduc
 - [TranscriptConverter](./TranscriptConverter.md) -- The TranscriptConverter uses the TranscriptAPI in lib/agent-api/transcript-api.js to access and convert transcript data
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager uses Graphology and LevelDB to manage the database
 - [LoggingMechanism](./LoggingMechanism.md) -- The LoggingMechanism uses async log buffering to improve performance
-
 
 ---
 

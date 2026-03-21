@@ -95,7 +95,6 @@ All of these interactions are mediated through well‑defined JavaScript module 
 
 Overall, the ServiceManager provides a disciplined, reusable mechanism for guaranteeing that every Docker‑managed service is started reliably, verified healthy, and registered for discovery, while leveraging shared sibling components to keep the implementation clean and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ Overall, the ServiceManager provides a disciplined, reusable mechanism for guara
 - [HealthChecker](./HealthChecker.md) -- The HealthChecker uses the isServiceHealthy function to check the health of services by making requests to their health endpoints.
 - [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
 - [ServiceRegistry](./ServiceRegistry.md) -- The ServiceRegistry uses a service registry data structure to store service information, including service name, status, and configuration.
-
 
 ---
 

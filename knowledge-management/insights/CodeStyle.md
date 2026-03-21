@@ -52,12 +52,10 @@ No runtime dependencies are implied because CodeStyle is a static guideline, not
 4. **Scalability considerations** – Because CodeStyle is a static convention, it scales trivially: the same rule applies regardless of project size, but enforcement tooling must be configured across all repositories to maintain uniformity.  
 5. **Maintainability assessment** – High maintainability: a single, well‑documented naming rule reduces cognitive load, eases code reviews, and improves long‑term readability.  The main risk is drift if tooling is not uniformly applied.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodingConventions](./CodingConventions.md) -- The use of consistent naming conventions, such as PascalCase, facilitates readability and understandability of the codebase.
-
 
 ---
 

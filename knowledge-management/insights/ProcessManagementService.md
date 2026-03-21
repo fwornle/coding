@@ -146,7 +146,6 @@ Potential maintainability risks include:
 
 Overall, the architecture balances robustness with simplicity, providing a solid foundation for future extensions while keeping the operational surface area small.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -156,7 +155,6 @@ Overall, the architecture balances robustness with simplicity, providing a solid
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager leverages the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking for LLM-related tasks.
 - [APIService](./APIService.md) -- APIService uses the scripts/api-service.js file to start the API service, providing a clear entry point for API-related functionality.
 - [DashboardService](./DashboardService.md) -- DashboardService uses the scripts/dashboard-service.js file to start the dashboard service, providing a clear entry point for dashboard-related functionality.
-
 
 ---
 

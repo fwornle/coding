@@ -125,7 +125,6 @@ ViolationDetector sits as a leaf under `ConstraintSystem`, sharing storage and h
 
 The component exhibits strong modular boundaries: persistence, caching, rule storage, and notification are each encapsulated in dedicated files. This separation aligns with the **Single Responsibility Principle**, making the codebase easier to navigate and test. Reuse of patterns across siblings (e.g., repository and hook mechanisms) promotes a shared mental model for developers. The primary maintenance risk lies in the coupling between cache invalidation and rule updates; ensuring that all cache‑clear hooks are correctly wired is essential to avoid stale detection results. Overall, the design is maintainable, extensible, and well‑aligned with the surrounding constraint‑system architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -140,7 +139,6 @@ The component exhibits strong modular boundaries: persistence, caching, rule sto
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LevelDB database in leveldb-database.ts to store graph data.
 - [ConstraintMetadataManager](./ConstraintMetadataManager.md) -- ConstraintMetadataManager uses a metadata repository in metadata-repository.ts to store constraint configuration and registration data.
 - [AgentManager](./AgentManager.md) -- AgentManager uses an agent repository in agent-repository.ts to store agent configuration and registration data.
-
 
 ---
 

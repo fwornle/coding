@@ -94,7 +94,6 @@ Although the source contains no explicit symbols, the observations give a clear 
 
 Overall, **ProcessStateManager** provides a well‑encapsulated, configuration‑driven coordination layer that fits cleanly within the DockerizedServices ecosystem while sharing design conventions with its sibling managers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ Overall, **ProcessStateManager** provides a well‑encapsulated, configuration�
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMService class in lib/llm/llm-service.ts to manage LLM services across different modes and providers.
 - [DockerOrchestrator](./DockerOrchestrator.md) -- DockerOrchestrator uses Docker Compose configurations to manage container deployments.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter to interact with the graph database.
-
 
 ---
 

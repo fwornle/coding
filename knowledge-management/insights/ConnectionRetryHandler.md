@@ -81,7 +81,6 @@ The system is organized around a central **ConnectionManager** that orchestrates
 ### 5. Maintainability assessment  
 The clear separation between retry, logging, and adapter logic makes the codebase approachable for new developers.  Because the handler’s algorithm mirrors the already‑familiar `LLMRetryPolicy`, existing knowledge can be reused, reducing the learning curve.  The primary maintenance risk lies in the shared file (`specstory-adapter.js`) growing large; future refactoring could extract the handler into its own module if the integration expands, but the current composition keeps related concerns tightly coupled and easy to trace.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The clear separation between retry, logging, and adapter logic makes the codebas
 ### Siblings
 - [ConnectionLogger](./ConnectionLogger.md) -- The ConnectionLogger would likely be integrated with the SpecstoryAdapter class in the lib/integrations/specstory-adapter.js file to log connection events
 - [SpecstoryAdapterIntegration](./SpecstoryAdapterIntegration.md) -- The SpecstoryAdapterIntegration would be defined in the lib/integrations/specstory-adapter.js file, where the SpecstoryAdapter class is imported and configured
-
 
 ---
 

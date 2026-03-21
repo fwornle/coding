@@ -83,12 +83,10 @@ The system is layered: the **configuration layer** (`batch-analysis.yaml`) feeds
 
 The declarative nature of the DAG model makes the pipeline easy to read and modify: a developer can understand execution order simply by inspecting `depends_on` lists.  Validation of acyclicity at parse time provides early feedback, reducing runtime bugs.  However, the lack of explicit naming for classes or functions in the observations means that maintainers must rely on the YAML schema and the coordinator’s internal implementation details, which should be well‑documented in code comments and developer guides to avoid confusion.  Overall, the design promotes maintainability through clear separation of concerns and deterministic scheduling.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-
 
 ---
 

@@ -80,7 +80,6 @@ Even though no concrete symbols were listed, the observations give us a clear pi
 - Centralizing invalidation logic inside the controller reduces duplication across callers, improving maintainability.
 - However, because the controller’s internals are not exposed in the current observations, developers must rely on the *LLMServiceManager* API; any changes to invalidation semantics will need coordinated updates to the manager’s contract, which could be a maintenance hotspot if not well‑documented.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ Even though no concrete symbols were listed, the observations give us a clear pi
 ### Siblings
 - [ModeManager](./ModeManager.md) -- The ModeManager utilizes the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking.
 - [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker uses a circuit breaker pattern to detect when a service is not responding and prevent further requests from being sent to it, as seen in the lib/llm/llm-service.ts file.
-
 
 ---
 

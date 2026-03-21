@@ -10,7 +10,7 @@ The **ProviderRegistration** sub‑component lives inside the **CodingPatterns**
 
 ProviderRegistration’s responsibility is to expose a **method for registering new providers**. This method is invoked by higher‑level consumers such as the **CodeGraphConstructor** (see `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`). By funneling every new provider through a single registry, the system gains a consistent, searchable catalogue of providers that can be queried or iterated over by other components.
 
-> ![ProviderRegistration — Architecture](../../.data/knowledge-graph/insights/images/provider-registration-architecture.png)
+> ![ProviderRegistration — Architecture](images/provider-registration-architecture.png)
 
 ---
 
@@ -27,7 +27,7 @@ Interaction flow:
 3. `ProviderRegistry` uses `GraphDatabaseAdapter` to persist the provider as a graph node, linking it to relevant entities (e.g., capabilities, constraints).  
 4. The newly stored provider becomes immediately visible to any component that queries the graph, enabling downstream analysis such as constraint detection or RAG retrieval.
 
-> ![ProviderRegistration — Relationship](../../.data/knowledge-graph/insights/images/provider-registration-relationship.png)
+> ![ProviderRegistration — Relationship](images/provider-registration-relationship.png)
 
 The sub‑component shares this graph‑centric approach with its siblings **GraphDatabaseManagement**, **CodeGraphAnalysis**, and **CodeGraphRAG**, all of which also rely on the same `GraphDatabaseAdapter`. This common dependency creates a **tight coupling** around the graph layer, which simplifies data consistency but also means that changes to the adapter ripple through the entire family of components.
 
@@ -96,7 +96,6 @@ Overall, the implementation follows a **separation‑of‑concerns** discipline:
 
 By grounding the analysis in the observed classes, file paths, and documented usage, this insight document clarifies how **ProviderRegistration** fits into the broader **CodingPatterns** ecosystem, the design rationales that shaped it, and the practical guidelines developers should follow when extending or interacting with it.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ By grounding the analysis in the observed classes, file paths, and documented us
 - [ConstraintDetection](./ConstraintDetection.md) -- The ConstraintDetection sub-component uses the execute(input, context) pattern for detecting and monitoring constraints.
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.
-
 
 ---
 

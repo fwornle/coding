@@ -91,7 +91,6 @@ Although no concrete code symbols for MilestoneManager are listed, the observati
 * **Clear contract boundaries** – The CRUD API of MilestoneManager and the adapter’s methods act as stable interfaces, reducing ripple effects of changes.  
 * **Potential risk** – Absence of explicit tests or concrete implementations in the observation set means that future developers must rely on documentation and the defined patterns; adding unit tests around the adapter and retry policy would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ Although no concrete code symbols for MilestoneManager are listed, the observati
 ### Siblings
 - [MilestoneTracker](./MilestoneTracker.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to connect to the Specstory extension, enabling the MilestoneTracker to manage project milestones.
 - [SpecstoryIntegration](./SpecstoryIntegration.md) -- The SpecstoryIntegration uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension, allowing it to manage project milestones.
-
 
 ---
 

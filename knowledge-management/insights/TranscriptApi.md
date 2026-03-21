@@ -71,7 +71,6 @@ When integrating with the **LslConverter**, callers must fetch the transcript vi
 4. **Scalability considerations** – because each module is independent, they can be horizontally scaled or replaced without affecting the others; the API layer can be load‑balanced separately from logging or conversion services.  
 5. **Maintainability assessment** – high maintainability due to clear file boundaries, focused responsibilities, and the ability to test modules in isolation; the explicit separation reduces the risk of regression when updating one slice of the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ When integrating with the **LslConverter**, callers must fetch the transcript vi
 ### Siblings
 - [LoggingModule](./LoggingModule.md) -- LoggingModule uses a modular design, allowing for easier maintenance and updates without affecting the entire system.
 - [LslConverter](./LslConverter.md) -- LslConverter uses a specific conversion algorithm to transform transcripts into LSL format.
-
 
 ---
 

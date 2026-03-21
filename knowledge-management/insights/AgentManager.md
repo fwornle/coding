@@ -82,7 +82,6 @@ These integration points are all file‑level imports, preserving a clear depend
 
 These insights are drawn directly from the provided observations and reflect the current state of the **AgentManager** sub‑component within the **ConstraintSystem**.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -94,7 +93,6 @@ These insights are drawn directly from the provided observations and reflect the
 - [ViolationCapture](./ViolationCapture.md) -- ViolationCapture utilizes the GraphDatabase to handle graph database persistence and querying, with automatic JSON export sync.
 - [Logger](./Logger.md) -- Logger utilizes the centralLog function as a simple logger wrapper to provide a logging mechanism for the system.
 - [GraphDatabase](./GraphDatabase.md) -- GraphDatabase utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to handle graph database persistence and querying.
-
 
 ---
 

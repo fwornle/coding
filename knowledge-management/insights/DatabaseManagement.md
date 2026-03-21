@@ -92,14 +92,7 @@ These insights are derived directly from the supplied observations and reflect t
 
 ### Relationship
 
-![DatabaseManagement Relationship](images/database-management-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/database-management-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -115,7 +108,6 @@ These insights are derived directly from the supplied observations and reflect t
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
-
 
 ---
 

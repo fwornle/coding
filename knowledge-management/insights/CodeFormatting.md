@@ -89,7 +89,6 @@ Because `CodeFormatting` shares the same configuration mechanism as its siblings
 4. **Scalability considerations** – the stateless, pure‑function approach scales horizontally (multiple IDE instances or CI agents can run checks concurrently) and adds negligible runtime overhead; extending the rule set is straightforward due to the method‑per‑rule layout.  
 5. **Maintainability assessment** – high maintainability thanks to isolated rule methods, shared configuration, and the example file that serves as living documentation; however, any change to constants requires coordinated updates to the example and any dependent tooling.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Because `CodeFormatting` shares the same configuration mechanism as its siblings
 ### Siblings
 - [NamingConventions](./NamingConventions.md) -- The CodingStandards.java file likely contains methods or properties that enforce naming conventions, such as checking for camelCase or PascalCase naming schemes.
 - [CommentingGuidelines](./CommentingGuidelines.md) -- The CodingStandards.java file likely contains methods or properties that enforce commenting guidelines, such as checking for comment syntax or content.
-
 
 ---
 

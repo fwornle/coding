@@ -79,7 +79,6 @@ DockerOrchestrator is the operational core of the DockerizedServices hierarchy. 
 ### Maintainability Assessment
 Because the design leans on well‑understood patterns (state machine, orchestrator), the codebase should be relatively modular: each concern (Docker interaction, state handling, monitoring, load‑balancing) can evolve independently.  The lack of concrete symbols in the current observation set limits a deeper assessment, but the explicit separation of responsibilities and the reuse of shared services (logging, graph‑database adapter) suggest a maintainable architecture, provided that state persistence and leader election are implemented cleanly.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ Because the design leans on well‑understood patterns (state machine, orchestra
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService incorporates health verification mechanisms to ensure the service is functioning correctly.
 - [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code graph analysis results.
 - [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager is responsible for managing LLM services, including lazy initialization and health verification.
-
 
 ---
 

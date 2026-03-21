@@ -127,7 +127,6 @@ The design is **highly maintainable** for several reasons:
 
 Potential maintenance challenges include ensuring that the `LLMService` interface evolves without breaking existing providers and managing the lifecycle of many Docker images when per‑agent overrides proliferate. Proper versioning of the interface and automated integration tests against each provider will mitigate these risks.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -138,7 +137,6 @@ Potential maintenance challenges include ensuring that the `LLMService` interfac
 - [AnthropicAPIAdapter](./AnthropicAPIAdapter.md) -- AnthropicAPIAdapter uses the Anthropic API to handle model resolution, completion requests, and error handling.
 - [LLMService](./LLMService.md) -- LLMService provides a unified interface for LLM operations, including completion, initialization, and mode resolution.
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses the ProviderRegistry class (lib/llm/provider-registry.js) to manage a registry of available LLM providers.
-
 
 ---
 

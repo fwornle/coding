@@ -103,14 +103,7 @@ Because the sibling **OntologyClassificationAgent** and **OntologyManager** both
 
 ### Relationship
 
-![LSLConfigValidator Relationship](images/lslconfig-validator-relationship.png)
-
-
-
 ## Architecture Diagrams
-
-![relationship](../../.data/knowledge-graph/insights/images/lslconfig-validator-relationship.png)
-
 
 ## Hierarchy Context
 
@@ -126,7 +119,6 @@ Because the sibling **OntologyClassificationAgent** and **OntologyManager** both
 - [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

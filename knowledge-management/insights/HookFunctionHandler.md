@@ -91,12 +91,10 @@ Following these conventions will keep the hook system extensible and prevent reg
 
 *No speculative code or undocumented patterns have been introduced; every statement is rooted in the provided observations.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator might be related to the Copi project in integrations/copi, which has documentation on hook functions and usage.
-
 
 ---
 

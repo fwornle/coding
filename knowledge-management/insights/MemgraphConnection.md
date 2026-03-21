@@ -111,12 +111,10 @@ Because no code symbols were discovered, the exact class names (e.g., `MemgraphC
 
 *This insight document is built exclusively from the provided observations, preserving all file paths, class names, and configuration constants exactly as they appear.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
-
 
 ---
 

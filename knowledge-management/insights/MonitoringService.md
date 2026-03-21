@@ -143,7 +143,6 @@ Potential maintainability challenges include:
 
 Overall, the design choices favour **extensibility** and **testability**, positioning MonitoringService as a maintainable building block within the DockerizedServices suite.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -159,7 +158,6 @@ Overall, the design choices favour **extensibility** and **testability**, positi
 - [APIService](./APIService.md) -- APIService uses the express.js framework to handle HTTP requests and responses
 - [DashboardService](./DashboardService.md) -- DashboardService uses the react.js framework to handle user interface rendering and events
 - [LoggingService](./LoggingService.md) -- LoggingService uses the winston.js library to handle logging of system events and errors
-
 
 ---
 

@@ -93,7 +93,6 @@ ProviderRegistryComponent sits as a leaf under DockerizedServices, acting as a s
 ### Maintainability Assessment
 The reliance on a clear provider interface and configuration‑driven discovery makes the component highly maintainable: adding a new provider is a matter of implementing the interface and updating YAML. The observer‑style notification decouples side‑effects, allowing new consumers to be added without touching the registry core. Potential maintenance burdens arise from the need to keep the registry’s cache and event system in sync during dynamic registration, but these are manageable with disciplined lifecycle hooks as demonstrated in sibling components (e.g., ServiceStarterComponent’s retry logic). Overall, the design promotes clean separation of concerns and aligns with the modular, DI‑centric philosophy of the broader DockerizedServices architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The reliance on a clear provider interface and configuration‑driven discovery 
 - [ServiceStarterComponent](./ServiceStarterComponent.md) -- The ServiceStarterComponent likely uses a retry mechanism to handle startup failures, as seen in the ServiceStarter class.
 - [GraphDatabaseComponent](./GraphDatabaseComponent.md) -- The GraphDatabaseComponent likely uses a graph database library, such as Neo4j, to store and retrieve knowledge entities.
 - [BrowserAccessComponent](./BrowserAccessComponent.md) -- The BrowserAccessComponent likely uses a web framework, such as Express.js, to handle HTTP requests and provide a web interface.
-
 
 ---
 

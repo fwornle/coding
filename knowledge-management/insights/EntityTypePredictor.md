@@ -101,7 +101,6 @@ The **only explicit file referenced** is `ontology-definitions.json`, which belo
 
 These insights are derived directly from the observations provided and avoid any speculation beyond what the source material describes.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ These insights are derived directly from the observations provided and avoid any
 ### Siblings
 - [OntologyClassifier](./OntologyClassifier.md) -- The ontology-definitions.json file contains the upper and lower ontology definitions used by the OntologyClassifier, which are loaded and utilized for entity classification.
 - [ValidationRules](./ValidationRules.md) -- The ValidationRules are defined to ensure that entity metadata fields conform to a specific format and structure, as implied by the parent context of the SemanticAnalysis component.
-
 
 ---
 

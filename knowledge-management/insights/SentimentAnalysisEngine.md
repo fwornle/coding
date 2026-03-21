@@ -61,7 +61,6 @@ Finally, respect the modular boundaries: do not embed entity‑extraction logic 
 - High maintainability thanks to clear separation of stages, explicit file location (`natural-language-processor.py`), and a well‑defined interface.
 - Future updates (model upgrades, bug fixes) are localized to the engine class, limiting regression risk across the pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -70,7 +69,6 @@ Finally, respect the modular boundaries: do not embed entity‑extraction logic 
 ### Siblings
 - [EntityExtractionModule](./EntityExtractionModule.md) -- The NaturalLanguageProcessor class in natural-language-processor.py uses the Pipeline pattern to process natural language text, which includes entity extraction as one of its key steps
 - [LanguageModelingComponent](./LanguageModelingComponent.md) -- The NaturalLanguageProcessor class's Pipeline pattern-based architecture suggests that language modeling is a critical step in the text processing workflow, facilitating tasks such as entity extraction and sentiment analysis
-
 
 ---
 

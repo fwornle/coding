@@ -151,7 +151,6 @@ Potential maintainability risks stem from the **implicit coupling** to `GraphDat
 
 **In summary**, `VkbApiClientWrapper` is the façade that unifies all KnowledgeManagement agents’ interactions with the VKB service, leveraging the existing `GraphDatabaseAdapter` for durable storage. Its design follows established façade/adapter patterns, promotes clean separation of concerns, and positions the system for straightforward scaling and maintainability, provided that its dependencies are kept well‑documented and version‑controlled.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -164,7 +163,6 @@ Potential maintainability risks stem from the **implicit coupling** to `GraphDat
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) for constructing knowledge graphs.
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier utilizes LLM-based reasoning for classifying entities.
 - [PersistenceModule](./PersistenceModule.md) -- PersistenceModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) for handling entity persistence.
-
 
 ---
 

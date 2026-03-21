@@ -70,12 +70,10 @@ Developers extending the system should **avoid embedding parsing code inside new
 4. **Scalability considerations** – Independent parsing module enables parallel processing and easy replacement of the parser without affecting graph logic.  
 5. **Maintainability assessment** – Clear boundaries and single‑responsibility classes make the codebase easy to maintain; changes to parsing stay localized to `code-graph/parser.ts` and the utility wrapper.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the ASTParser class in code-graph/parser.ts to parse the abstract syntax tree of the code
-
 
 ---
 

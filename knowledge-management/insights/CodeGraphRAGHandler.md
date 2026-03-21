@@ -124,12 +124,10 @@ Additionally, because the handler is Dockerized, it integrates with the broader 
 
 Overall, the **CodeGraphRAGHandler** embodies a clean, container‑based service boundary that enables a graph‑driven RAG workflow while exposing both synchronous and streaming interfaces for flexible client integration.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG system is described in integrations/code-graph-rag/README.md.
-
 
 ---
 

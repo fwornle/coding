@@ -112,7 +112,6 @@ Because the singleton lives inside `logging/Logger.js`, any component that direc
 * However, the heavy reliance on a global singleton means that **unintended side effects** (e.g., a component changing the log level globally) can impact unrelated parts of the system, requiring disciplined usage guidelines.  
 * Overall, the design balances **reusability** and **simplicity**, yielding a maintainable logging foundation for the `Trajectory` component and its siblings.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -124,7 +123,6 @@ Because the singleton lives inside `logging/Logger.js`, any component that direc
 - [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
 - [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
 - [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
-
 
 ---
 

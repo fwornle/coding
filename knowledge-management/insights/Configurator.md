@@ -70,7 +70,6 @@ Because configuration reads are typically cheap, the Configurator can be instant
 ### 5. Maintainability assessment  
 The modular, validated, and logged design strongly supports maintainability: new settings can be added without touching consumer code, validation guarantees stability, and logs provide traceability.  The primary maintenance burden lies in keeping the validator and persistence abstraction up‑to‑date as the configuration schema evolves, but this is a bounded and well‑encapsulated effort.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ The modular, validated, and logged design strongly supports maintainability: new
 - [RetryMechanism](./RetryMechanism.md) -- RetryMechanism is implemented in the connectViaHTTP function (lib/integrations/specstory-adapter.js) to handle connection failures
 - [SpecstoryApiClient](./SpecstoryApiClient.md) -- SpecstoryApiClient is responsible for providing an API client for interacting with the Specstory extension
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter is responsible for adapting the Specstory extension to the Trajectory component's architecture
-
 
 ---
 

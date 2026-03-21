@@ -100,12 +100,10 @@ The system is organized around a **core learning engine (OnlineLearning)** that 
 
 Because the pipeline’s logic is encapsulated behind configuration and documented in the *code‑graph‑RAG* README, it is relatively easy to understand and modify.  However, the lack of explicit code symbols in the current view means that developers must rely on documentation and the surrounding integration files to locate the concrete implementation.  Maintaining a clear, version‑controlled README and keeping the configuration in sync with code changes are essential to preserve maintainability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
-
 
 ---
 

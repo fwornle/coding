@@ -77,12 +77,10 @@ No other sibling components are described, so the integration narrative remains 
 * High maintainability: adding a new service only requires creating a new start‑up script following the same conventions.  
 * Clear separation reduces the risk of cross‑service regressions; however, the manager must stay in sync with any new health‑check contracts introduced by new services.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager utilizes a modular architecture, as seen in the separate scripts for starting each service, such as api-service.js and dashboard-service.js, allowing for better resource management and fault tolerance.
-
 
 ---
 

@@ -145,7 +145,6 @@ All of these pieces are wired together at application start‑up by the `LLMServ
 
 Overall, the LocalLLM component demonstrates a disciplined, modular architecture that aligns with the broader **LLMAbstraction** design philosophy, offering clear extension points, predictable resource management, and a solid foundation for scaling on‑device LLM inference.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -158,7 +157,6 @@ Overall, the LocalLLM component demonstrates a disciplined, modular architecture
 - [MockLLM](./MockLLM.md) -- MockLLM uses a mock implementation of the Provider interface in lib/llm/providers/mock-llm-provider.ts to generate mock LLM responses
 - [LLMService](./LLMService.md) -- LLMService uses the ProviderRegistry in lib/llm/provider-registry.js to manage a chain of LLM providers
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a registry data structure to store a list of available LLM providers
-
 
 ---
 

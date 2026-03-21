@@ -96,7 +96,6 @@ The system is organized as a three‑tier hierarchy: *AgentIntegrationComponent*
 
 The clear modular separation and use of well‑known patterns (registry, LRU cache) make the codebase easy to understand and modify.  Adding a new agent is a matter of supplying a new `AgentConfig` and registering it—no changes to the framework itself are required.  The only maintenance burden lies in ensuring cache consistency when configurations evolve, but this is mitigated by the explicit cache‑clear APIs.  Overall, the design promotes high maintainability and low risk of regression when extending the integration surface.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The clear modular separation and use of well‑known patterns (registry, LRU cac
 ### Siblings
 - [AgentRegistry](./AgentRegistry.md) -- The AgentRegistry maintains a mapping of agent identifiers to their corresponding configurations, allowing for efficient agent lookup and configuration retrieval.
 - [CacheManager](./CacheManager.md) -- The CacheManager implements a least-recently-used (LRU) eviction policy to ensure that the most frequently accessed agent data is retained in the cache.
-
 
 ---
 

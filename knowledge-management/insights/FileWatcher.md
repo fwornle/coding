@@ -82,7 +82,6 @@ The system is a small, tightly‑coupled in‑process module where **FileWatcher
 
 Because the implementation is built directly on Node’s native **fs** API and follows a clear observer model, the codebase remains easy to understand and modify.  The separation of concerns—watching (FileWatcher), error handling (ErrorHandlingMechanism), and processing (FileProcessor)—supports independent evolution of each piece.  However, the lack of explicit abstraction layers (e.g., an interface for the watcher) could make future replacement of the **fs.watch()** mechanism (for cross‑platform consistency) more invasive.  Adding a thin wrapper interface around the watcher would improve testability and future adaptability without disrupting the current design.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Because the implementation is built directly on Node’s native **fs** API and f
 ### Siblings
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism would likely involve using try-catch blocks to catch errors thrown by the Node.js fs module, such as errors when trying to read or write to a file.
 - [FileProcessor](./FileProcessor.md) -- The FileProcessor class would likely utilize the Node.js fs module's write() function to write log data to the log files, as seen in the fs module documentation.
-
 
 ---
 

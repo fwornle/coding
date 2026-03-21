@@ -82,12 +82,10 @@ No other integration points (such as messaging queues or external APIs) are evid
 
 Overall, the **EntityEditor** serves as a concise, well‑scoped component that translates user‑driven entity creation into persistent graph entries via a single, well‑defined adapter method.  Its design favors simplicity and directness, which benefits current development velocity while leaving clear pathways for future decoupling and scaling improvements.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning likely utilizes the storeEntity method in GraphDatabaseAdapter (storage/graph-database-adapter.ts) to persist manually created entities.
-
 
 ---
 

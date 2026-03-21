@@ -93,7 +93,6 @@ Because the component centralises security and reliability, any new external age
 
 Overall, `AgentInteraction` functions as a well‑encapsulated gateway that enforces security, reliability, and transport abstraction for the workflow execution engine.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Overall, `AgentInteraction` functions as a well‑encapsulated gateway that enfo
 ### Siblings
 - [WorkflowDefinitionParser](./WorkflowDefinitionParser.md) -- WorkflowDefinitionParser uses the workflow-definition-parser.js file to parse workflow definitions, as indicated by the parent context of the WorkflowManager sub-component.
 - [WorkflowExecutionMechanism](./WorkflowExecutionMechanism.md) -- The WorkflowExecutionMechanism is likely to involve interactions with external agents or services to execute the workflows, as hinted by the AgentInteraction suggested detail node.
-
 
 ---
 

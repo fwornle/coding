@@ -80,7 +80,6 @@ Because the module is used by both **ManualLearning** and **OnlineLearning**, it
 * Adding new data sources (e.g., a new analytics engine) requires only a new agent implementation and a small extension to the UKBTraceReportAgent, leaving existing code untouched.  
 * The absence of tightly coupled imports reduces the risk of ripple effects when updating sibling modules.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -92,7 +91,6 @@ Because the module is used by both **ManualLearning** and **OnlineLearning**, it
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
 - [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts to persist entities.
 - [CodeGraphAnalysisModule](./CodeGraphAnalysisModule.md) -- CodeGraphAnalysisModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to perform code graph analysis.
-
 
 ---
 

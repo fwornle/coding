@@ -14,7 +14,6 @@ ConfigurationPattern is implemented across: src/knowledge-management, lib/ukb-un
 
 - Pattern extracted from codebase analysis and stored as reusable knowledge entity
 
-
 ---
 
 *Generated from 8 observations*

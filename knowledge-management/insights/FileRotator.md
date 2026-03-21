@@ -76,7 +76,6 @@ Finally, the **LoggingComponent** itself likely provides the configuration sourc
    * Centralised configuration reduces duplication but requires careful versioning to keep logger and rotator in sync.  
    * Because the rotator interacts only through a thin façade, changes to its internal mechanics have minimal impact on the AsyncLogger and BufferManager, supporting low‑risk maintenance cycles.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ Finally, the **LoggingComponent** itself likely provides the configuration sourc
 ### Siblings
 - [AsyncLogger](./AsyncLogger.md) -- The Logger class in Logger.java utilizes an async buffering mechanism to handle log messages, reducing the impact on the main application thread.
 - [BufferManager](./BufferManager.md) -- The BufferManager is likely to be implemented as a separate module or class, allowing for easy customization and modification of the buffering mechanism.
-
 
 ---
 

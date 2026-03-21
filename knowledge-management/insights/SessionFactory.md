@@ -70,12 +70,10 @@ No child entities (i.e., specific session classes) are identified in the observa
 - **High Maintainability** – The clear separation between SessionManager and SessionFactory simplifies reasoning about where changes should be made when session creation requirements evolve.
 - **Potential Risk** – The lack of visible source code (no symbols found) means that developers must rely on documentation and tests to understand the factory’s behaviour.  Maintaining comprehensive unit tests for the factory’s public methods is essential to guard against regressions when the underlying implementation changes.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SessionManager](./SessionManager.md) -- SessionManager creates new sessions, using the SessionFactory class (lib/agent-api/session-api.js) to create new session objects.
-
 
 ---
 

@@ -86,7 +86,6 @@ Finally, the parent **ConstraintSystem** orchestrates the overall workflow.  It 
 * Extensibility points are explicit (plug‑in NLP, model versioning), reducing the need for invasive changes when upgrading capabilities.
 * However, the reliance on incremental state management introduces subtle bugs if change‑set handling is not rigorously tested; comprehensive unit and integration tests are essential to maintain reliability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ Finally, the parent **ConstraintSystem** orchestrates the overall workflow.  It 
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
 - [ViolationCapture](./ViolationCapture.md) -- ViolationCapture works closely with the ContentValidator sub-component to capture validation failures and persist them for further analysis.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter implements a standardized data model for representing entities, relationships, and constraints in the graph database.
-
 
 ---
 

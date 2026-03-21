@@ -16,7 +16,7 @@ KnowledgeManagement
 
 All processing is orchestrated through the **AgentFrameworkModule**, which runs the insight‑generation tasks as agents. The module also leans on the **GraphDatabaseModule** for persisting and querying the entity graph that underpins the insight logic, and it calls the **OntologyClassificationModule** to ensure entities are correctly typed before insights are derived. Progress is tracked via the checkpoint system that originates in **UtilitiesModule**, guaranteeing that long‑running insight jobs can be resumed safely.
 
-![InsightGenerationModule — Architecture](../../.data/knowledge-graph/insights/images/insight-generation-module-architecture.png)
+![InsightGenerationModule — Architecture](images/insight-generation-module-architecture.png)
 
 ---
 
@@ -51,7 +51,7 @@ The actual insight generation is performed by agents provided by **AgentFramewor
 ### Checkpoint Management  
 Progress tracking is handled by the checkpoint system from **UtilitiesModule**. This system records intermediate states, enabling the module to resume from the last successful checkpoint if a failure occurs. The checkpoint data is likely stored alongside other utility artifacts, though exact file locations are not enumerated.
 
-![InsightGenerationModule — Relationship](../../.data/knowledge-graph/insights/images/insight-generation-module-relationship.png)
+![InsightGenerationModule — Relationship](images/insight-generation-module-relationship.png)
 
 ---
 
@@ -108,7 +108,6 @@ Scalability hinges on the underlying GraphDatabaseModule and the agent framework
 ### Maintainability assessment  
 The clear module boundaries and use of adapters make the codebase relatively maintainable. Changes to the graph storage layer are isolated to the adapter, while ontology updates stay within OntologyClassificationModule. However, the tight coupling through direct module calls means that any change to a sibling’s API will ripple through InsightGenerationModule, so versioned interfaces and thorough integration tests are essential for long‑term stability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -126,7 +125,6 @@ The clear module boundaries and use of adapters make the codebase relatively mai
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

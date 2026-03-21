@@ -98,12 +98,10 @@ No concrete import statements or configuration files were identified, so the exa
 * Assuming the façade pattern is respected, future changes to the persistence layer (e.g., swapping Neo4j for another graph store) could be confined to `GraphDatabaseManager`, preserving the pipeline’s external contract.  
 * Clear documentation of the integration adapters (code‑graph‑rag, copi) will be essential to keep the pipeline maintainable as external schemas evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.
-
 
 ---
 

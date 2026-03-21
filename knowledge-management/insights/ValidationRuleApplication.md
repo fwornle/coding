@@ -10,19 +10,15 @@ Given the EntityValidationModule's purpose, ValidationRuleApplication would be a
 
 - Given the EntityValidationModule's purpose, ValidationRuleApplication would be a key component, responsible for the actual enforcement of validation rules, ensuring that entities conform to the expected standards.
 
-
 ## How It Works
 
 - The application of validation rules is likely to be iterative, checking each entity attribute against the defined rules, and reporting any discrepancies or errors found during the validation process.
-
 
 ## Related Entities
 
 ### Used By
 
 - EntityValidationModule (contains)
-
-
 
 ## Hierarchy Context
 
@@ -32,7 +28,6 @@ Given the EntityValidationModule's purpose, ValidationRuleApplication would be a
 ### Siblings
 - [EntityValidation](./EntityValidation.md) -- EntityValidation utilizes the EntityValidator class to apply validation rules, as suggested by the parent component analysis, to ensure entity content validity.
 - [StalenessDetection](./StalenessDetection.md) -- StalenessDetection would require a mechanism to track entity update timestamps or version numbers, comparing them against a threshold or a timeline to determine if the data is stale, as is typical in data validation processes.
-
 
 ---
 

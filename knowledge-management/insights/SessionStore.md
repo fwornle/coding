@@ -55,7 +55,6 @@ Because the store may be backed by a volatile cache (Redis), developers should b
 * Clear separation between ID generation, storage, and management improves testability; each component can be unit‑tested in isolation.  
 * However, the lack of concrete implementation files in the current repository means developers must refer to external documentation or code generation templates to understand the exact API signatures.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -63,7 +62,6 @@ Because the store may be backed by a volatile cache (Redis), developers should b
 
 ### Siblings
 - [SessionIdGenerator](./SessionIdGenerator.md) -- The SessionIdGenerator likely utilizes a UUID (Universally Unique Identifier) generation algorithm to ensure uniqueness, similar to those found in libraries such as uuid-js in Node.js projects.
-
 
 ---
 

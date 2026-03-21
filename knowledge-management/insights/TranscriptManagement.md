@@ -80,7 +80,6 @@ Interaction-wise, TranscriptManagement sits directly under **LiveLoggingSystem**
 - The abstract base enforces a contract, making it easy to audit that new adapters conform to expectations.  
 - Potential maintenance burden arises from the need to keep the canonical transcript schema synchronized across all siblings; a versioned schema or schema‑validation layer would further improve robustness.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -91,7 +90,6 @@ Interaction-wise, TranscriptManagement sits directly under **LiveLoggingSystem**
 - [OntologyClassification](./OntologyClassification.md) -- OntologyClassification likely utilizes a knowledge graph or ontology database for classification.
 - [LSLConfigurationValidator](./LSLConfigurationValidator.md) -- LSLConfigurationValidator likely checks configuration files for syntax errors and invalid settings.
 - [RedactionAndFiltering](./RedactionAndFiltering.md) -- RedactionAndFiltering likely utilizes regular expressions or natural language processing for identifying sensitive information.
-
 
 ---
 

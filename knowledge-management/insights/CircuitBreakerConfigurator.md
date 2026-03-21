@@ -102,12 +102,10 @@ No sibling entities are mentioned in the observations, so the document cannot el
 
 *All statements above are grounded in the provided observations; no additional patterns or file locations have been invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CircuitBreakerManager](./CircuitBreakerManager.md) -- CircuitBreakerManager uses a circuit breaker pattern to detect and prevent cascading failures
-
 
 ---
 

@@ -92,12 +92,10 @@ The system is organized around a **core logging subsystem** (`Logger`) that dele
 
 The layered design and clear repository‑adapter separation make the logging subsystem **highly maintainable**.  Changes to the persistence technology (e.g., switching from Neo4j to another graph engine) are confined to the GraphDatabaseAdapter, leaving Logger and LogRepository untouched.  The explicit naming (`LogRepository`) and its role as the sole gatekeeper for log entities reduce the risk of “spaghetti” data access code.  However, the lack of concrete implementation details in the current code base means that developers must rely on the documented contract; thorough unit and integration tests are crucial to preserve maintainability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Logger](./Logger.md) -- Logger utilizes the GraphDatabaseAdapter for log persistence and retrieval, as seen in the logging/logger.ts file.
-
 
 ---
 

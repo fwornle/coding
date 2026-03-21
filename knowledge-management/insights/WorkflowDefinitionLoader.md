@@ -111,12 +111,10 @@ No explicit APIs are listed, but we can safely assume that the loader exposes at
 
 *End of insight document.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
-
 
 ---
 

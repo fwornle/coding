@@ -73,12 +73,10 @@ Developers working with the NaturalLanguageProcessor should observe the followin
 4. **Scalability considerations** – because the processor is likely stateless, it can be horizontally scaled (multiple instances behind a load balancer) to handle higher text‑throughput. The main scalability limiter will be the underlying NLP library’s computational cost, which should be profiled if the system grows.  
 5. **Maintainability assessment** – the clear separation of concerns and the abstraction of NLP details make the component easy to maintain. Documentation links (`README.md`, `semantic-constraint-detection.md`) provide a single source of truth for its purpose, reducing the risk of divergent implementations. The lack of exposed code symbols means that future developers will need to locate the actual implementation (presumably in a dedicated package) but the existing documentation gives a reliable entry point.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticAnalyzer](./SemanticAnalyzer.md) -- SemanticAnalyzer leverages natural language processing (NLP) techniques to parse and understand entity content.
-
 
 ---
 

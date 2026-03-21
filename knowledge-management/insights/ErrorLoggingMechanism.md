@@ -94,7 +94,6 @@ No additional code symbols were discovered, so the concrete class names (e.g., `
 ### Maintainability assessment  
 * The clear separation between configuration, interface, and consumer makes the logging subsystem easy to test (mock `Logger`), extend (add new log levels or destinations), and refactor (swap out *log4js*).  The only maintenance burden is keeping the `Logger` adapter in sync with any breaking changes in the underlying *log4js* API.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ No additional code symbols were discovered, so the concrete class names (e.g., `
 ### Siblings
 - [ErrorHandler](./ErrorHandler.md) -- The ErrorHandler class would likely be implemented in a separate module, such as error-handler.ts, to keep the code organized and reusable.
 - [RetryManager](./RetryManager.md) -- The RetryManager would likely use a retry policy, such as the RetryPolicy interface in retry-policy.ts, to define the retry strategy and configure the number of attempts and wait time.
-
 
 ---
 

@@ -62,12 +62,10 @@ Consistent naming conventions are important: the provider name used in the regis
 
 *No diagram images were provided in the source observations; therefore none are embedded.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class (lib/llm/provider-registry.js) uses a provider-agnostic approach to manage LLM providers.
-
 
 ---
 

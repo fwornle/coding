@@ -95,7 +95,6 @@ Because retries are performed locally within each host, scaling the number of co
 
 The composition‑based approach isolates error‑handling logic, making it straightforward to update the retry algorithm or logging format in a single place.  However, the lack of explicit interfaces in the observed code means that future contributors must rely on documentation (such as this insight) to understand the required callback contract.  Adding a formal interface (e.g., `IErrorFeedback`) would further improve maintainability without altering existing behaviour.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ The composition‑based approach isolates error‑handling logic, making it stra
 ### Siblings
 - [SpecstoryConnectionManager](./SpecstoryConnectionManager.md) -- The SpecstoryConnectionManager utilizes the ConnectionMethodFactory to create and manage different connection methods, as suggested by the parent component analysis.
 - [ConnectionMethodFactory](./ConnectionMethodFactory.md) -- The ConnectionMethodFactory is likely to be implemented as a separate module or class, allowing for easy maintenance and extension of connection methods.
-
 
 ---
 

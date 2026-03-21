@@ -112,7 +112,6 @@ Following these conventions keeps the system stable, preserves the flexibility h
 * Centralized error handling ensures consistent behaviour and reduces scattered try/catch blocks.  
 * The main risk is the lack of explicit persistence for workflow state; relying on Specstory for durability ties the manager’s reliability to that external service. Adding an optional local persistence layer could further improve resilience without breaking existing contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -128,7 +127,6 @@ Following these conventions keeps the system stable, preserves the flexibility h
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversation entries to Specstory.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- ErrorHandlingMechanism implements error handling mechanisms to handle connection errors and exceptions, ensuring the system remains stable and functional.
 - [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage project milestones.
-
 
 ---
 

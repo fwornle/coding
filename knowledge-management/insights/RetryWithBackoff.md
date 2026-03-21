@@ -74,12 +74,10 @@ Following these conventions keeps the start‑up sequence resilient, observable,
 * Lack of visible symbols in the current observations suggests the implementation may be simple, which aids readability, but also means documentation should be kept up‑to‑date to avoid “magic numbers” hidden in the code.  
 * Providing a clear configuration interface (environment variables) further enhances maintainability by allowing runtime adjustments without code changes.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter implements a retry-with-backoff pattern in lib/service-starter.js to prevent endless loops and provide graceful degradation when optional services fail.
-
 
 ---
 

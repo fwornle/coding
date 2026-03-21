@@ -12,14 +12,11 @@ The FileCache is expected to interact with the FileRouter and FileRoutingSpecifi
 
 - The FileCache is expected to interact with the FileRouter and FileRoutingSpecification to ensure that cached file information is consistent with the current file routing configuration.
 
-
 ## Related Entities
 
 ### Used By
 
 - FileRoutingModule (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The FileCache is expected to interact with the FileRouter and FileRoutingSpecifi
 ### Siblings
 - [FileRouter](./FileRouter.md) -- The FileRouter uses a file routing specification, defined in file_routing_specification.py, to validate the file routing configuration, including file settings and destination options.
 - [FileRoutingSpecification](./FileRoutingSpecification.md) -- The FileRoutingSpecification is defined in file_routing_specification.py and is used by the FileRouter to validate the file routing configuration.
-
 
 ---
 

@@ -62,7 +62,6 @@ Other components of **SemanticAnalysis** may also interact with **InsightsCore**
 - The clear separation between core and handler improves maintainability: developers can evolve algorithms in InsightsCore without risking regressions in API contracts.  
 - Absence of concrete file paths in the observations suggests documentation gaps; improving source navigation (e.g., adding module‑level READMEs) would further enhance maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -70,7 +69,6 @@ Other components of **SemanticAnalysis** may also interact with **InsightsCore**
 
 ### Siblings
 - [InsightsHandler](./InsightsHandler.md) -- InsightsHandler handles the handler logic for Insights
-
 
 ---
 

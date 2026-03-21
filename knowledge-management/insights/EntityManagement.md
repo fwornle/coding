@@ -118,7 +118,6 @@ Collectively, these pieces form a **pipeline**: classification → code‑graph 
 * The reliance on a **single adapter** means that bug fixes or performance improvements have a **high impact radius**, which is beneficial for consistency but raises the risk of regression.  
 * Automatic JSON export is a **convenient but hidden side‑effect**; developers need to be aware of it to avoid surprising performance hits, suggesting that documentation and naming (e.g., `exportSyncEnabled`) are essential for long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -132,7 +131,6 @@ Collectively, these pieces form a **pipeline**: classification → code‑graph 
 - [PersistenceService](./PersistenceService.md) -- PersistenceService relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter relies on the LevelDB database (storage/leveldb.ts) for storing and retrieving graph data.
 - [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent relies on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving persistence data.
-
 
 ---
 

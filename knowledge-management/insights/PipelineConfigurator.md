@@ -74,7 +74,6 @@ Because the pipeline is modeled as a DAG, steps without dependencies can be run 
 * **Modular components** (`PipelineConfigurator`, `DAGDependencyResolver`, `ConcurrentExecutor`) allow independent evolution; for instance, a new executor strategy can be introduced without touching the configurator.  
 * Potential risk: if the JSON schema evolves, the configurator must be updated accordingly; however, because the schema is simple (id + depends_on), versioning impact is minimal.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -83,7 +82,6 @@ Because the pipeline is modeled as a DAG, steps without dependencies can be run 
 ### Siblings
 - [DAGDependencyResolver](./DAGDependencyResolver.md) -- The pipeline-configuration.json file defines the steps and their dependencies, which are then used by the DAGDependencyResolver to determine the execution order
 - [ConcurrentExecutor](./ConcurrentExecutor.md) -- The ConcurrentExecutor class uses a thread pool to execute pipeline steps concurrently, with each thread executing a separate step
-
 
 ---
 

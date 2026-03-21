@@ -114,12 +114,10 @@ No additional sibling components are described, so the integration landscape is 
 
 These insights are derived strictly from the provided observations and avoid any speculation beyond the documented files and component relationships.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
-
 
 ---
 

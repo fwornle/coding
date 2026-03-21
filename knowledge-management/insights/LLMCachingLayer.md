@@ -104,7 +104,6 @@ The clear modular split makes the LLMCachingLayer highly maintainable: each file
 
 Overall, the LLMCachingLayer exhibits a well‑structured, extensible design that aligns with the broader architectural goals of the LLMAbstraction component.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ Overall, the LLMCachingLayer exhibits a well‑structured, extensible design tha
 - [LLMProviderRegistry](./LLMProviderRegistry.md) -- The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.
 - [LLMConfigManager](./LLMConfigManager.md) -- The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.
 - [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
-
 
 ---
 

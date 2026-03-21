@@ -77,12 +77,10 @@ The integration point is therefore a **tight, compile‑time dependency**: the g
 * **Encapsulation of third‑party NLP dependencies** inside `NLPProcessor` shields the rest of the system from library‑specific changes.  
 * The current **tight coupling** is a maintenance hotspot; introducing an interface layer would improve testability and future extensibility, but as it stands the design is still maintainable due to its simplicity and limited surface area.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text
-
 
 ---
 

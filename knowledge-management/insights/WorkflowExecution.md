@@ -79,7 +79,6 @@ The system is organized hierarchically: **WorkflowManagement** is the parent com
 
 The façade approach makes the codebase easier to maintain: changes to VKB authentication, endpoint URLs, or request formats are isolated to `WorkflowManager`.  However, because the manager appears to own both API interaction and state management, future extensions (e.g., adding retry policies, circuit breakers, or richer telemetry) could increase its complexity.  Introducing auxiliary collaborators—such as a dedicated **VKBClient** class or a **WorkflowStateTracker**—would improve separation of concerns and keep the manager lean.  Overall, with the current limited scope, maintainability is high, but care should be taken to avoid letting the manager become a “god object” as new requirements emerge.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ The façade approach makes the codebase easier to maintain: changes to VKB authe
 
 ### Siblings
 - [WorkflowScheduling](./WorkflowScheduling.md) -- The scheduling of workflows may involve integrating with a scheduling service or component, potentially leveraging libraries or frameworks designed for job scheduling, although the specific implementation details are not available without source code.
-
 
 ---
 

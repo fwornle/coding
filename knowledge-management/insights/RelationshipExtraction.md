@@ -128,7 +128,6 @@ All three live at the same hierarchical level under the **`CodeGraphConstructor`
 
 Overall, the architecture is **well‑structured for extensibility and performance**, with the main risks lying in memory usage for massive code bases and the need for disciplined coordination of the shared entity model.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -137,7 +136,6 @@ Overall, the architecture is **well‑structured for extensibility and performan
 ### Siblings
 - [EntityExtraction](./EntityExtraction.md) -- CodeGraphConstructor (CodeGraphConstructor.ts) utilizes EntityExtraction to identify and extract entities from source code, which are then stored in the graph database for querying.
 - [GraphDatabaseIntegration](./GraphDatabaseIntegration.md) -- GraphDatabaseIntegration (GraphDatabaseIntegration.ts) provides a standardized interface for interacting with the graph database, allowing the code graph to be stored and queried efficiently.
-
 
 ---
 

@@ -89,12 +89,10 @@ No external libraries or services are explicitly referenced, so the loader’s d
 ### Maintainability assessment  
 * By centralising constraint definitions in a single, well‑documented markdown file, the system is highly maintainable: updates are straightforward and traceable. The clear separation between configuration (loader) and enforcement (monitor, graph analyser) further eases future extensions or refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintMonitor](./ConstraintMonitor.md) -- The constraint monitoring system uses a dashboard to display constraint violations, as seen in integrations/mcp-constraint-monitor/dashboard/README.md.
-
 
 ---
 

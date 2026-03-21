@@ -90,7 +90,6 @@ No direct integration with **BrowserAccess** is indicated; the sibling focuses o
 * **Medium maintainability** for the overall persistence layer: any change to `createNode` impacts all consumers, so careful versioning and documentation are required.  
 * The **modular layout** (separating BrowserAccess, GraphDatabaseAdapter, and ManualEntityHandler) aids discoverability and limits the blast radius of changes, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ No direct integration with **BrowserAccess** is indicated; the sibling focuses o
 ### Siblings
 - [BrowserAccess](./BrowserAccess.md) -- The integrations/browser-access/ module relies on config/teams/*.json files to store team-specific settings and coding conventions.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter relies on the createNode method in storage/graph-database-adapter.ts to create new nodes in the graph database.
-
 
 ---
 

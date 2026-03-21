@@ -12,14 +12,11 @@ MilestoneLifecycleManager would need to interact with the MilestoneDataModel to 
 
 - The use of a MilestoneLifecycleManager suggests a focus on managing the dynamic aspects of project milestones, rather than just their static data model
 
-
 ## Related Entities
 
 ### Used By
 
 - ProjectMilestoneManager (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ MilestoneLifecycleManager would need to interact with the MilestoneDataModel to 
 ### Siblings
 - [MilestoneDataModel](./MilestoneDataModel.md) -- MilestoneDataModel is defined in the Milestone.js file, which is referenced by the ProjectMilestoneManager sub-component
 - [MilestoneValidationHandler](./MilestoneValidationHandler.md) -- MilestoneValidationHandler is likely implemented as a separate module or class, given its distinct behavior and importance in the ProjectMilestoneManager sub-component
-
 
 ---
 

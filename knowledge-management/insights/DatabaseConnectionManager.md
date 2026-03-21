@@ -79,7 +79,6 @@ The system is organised around a **storage** package (`storage/graph-database-ad
 ### 5. Maintainability Assessment  
 The clear division between **configuration**, **connection management**, and **data‑access logic** promotes maintainability: changes to connection handling affect only the manager and adapter, while business‑logic modules remain untouched.  However, the lack of explicit source symbols for the manager introduces a knowledge gap; documentation must be kept up‑to‑date to ensure developers understand the implicit contract between the adapter and its manager.  Adding unit tests around the adapter’s public API (mocking the manager) would further safeguard future refactors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -89,7 +88,6 @@ The clear division between **configuration**, **connection management**, and **d
 - [GraphDatabaseConfiguration](./GraphDatabaseConfiguration.md) -- The parent component analysis suggests the existence of a DatabaseConfiguration, which is likely defined in the GraphDatabaseAdapter module.
 - [GraphDatabaseConfiguration](./GraphDatabaseConfiguration.md) -- The GraphDatabaseAdapter sub-component is used by the LLMServiceManager to store and retrieve data in a consistent manner, as described in the Hierarchy Context.
 - [DatabaseConfiguration](./DatabaseConfiguration.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields, implying a need for database configuration to connect to the correct database instance.
-
 
 ---
 

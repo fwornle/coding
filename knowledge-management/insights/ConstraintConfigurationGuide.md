@@ -80,12 +80,10 @@ No external libraries, services, or APIs are mentioned in the observations, so w
 4. **Scalability considerations** – Because configuration is externalized and documented, scaling the system to more constraints simply involves extending the guide and the corresponding schema; the runtime can ingest larger rule sets without code changes, assuming the parser is designed for generic schema handling.  
 5. **Maintainability assessment** – High maintainability is achieved through the explicit documentation path; however, maintainability hinges on disciplined updates to both the guide and the configuration files. Automated validation tools (e.g., schema validators) would further strengthen this aspect.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation.
-
 
 ---
 

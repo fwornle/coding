@@ -72,7 +72,6 @@ No classes, functions, or symbols are reported, which suggests that the TypeScri
 
 The TypeScriptCompiler sub‑component therefore embodies a lean, configuration‑centric approach that aligns tightly with the parent *CodingPatterns* ethos of type safety and maintainable code.  By keeping the implementation declarative and relying on standard Node/TypeScript tooling, the project enjoys strong reproducibility, easy onboarding, and a clear path for future evolution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ The TypeScriptCompiler sub‑component therefore embodies a lean, configuration�
 
 ### Siblings
 - [ConfigManager](./ConfigManager.md) -- The config/ directory contains files like graph-database-config.json and logging-config.json, demonstrating a centralized configuration approach.
-
 
 ---
 

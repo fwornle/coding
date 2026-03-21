@@ -10,7 +10,7 @@ AntiPatternIdentification is defined as a **sub‑component** of the broader **C
 
 Because the component itself is not materialised in source code, the concrete entry points are indirect: the **EntityValidator** class in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` validates entities (including anti‑patterns) as part of the batch processing pipeline, while the **ConstraintConfiguration** guide (`constraint-configuration.md`) supplies the rules that steer what constitutes an anti‑pattern. The sibling components – **CodeAnalysisPatterns**, **DesignPatternLibrary**, **BestPracticeRepository**, and **GraphCodeRAG** – share the same reliance on the graph‑based analysis, suggesting a common infrastructure that AntiPatternIdentification taps into.  
 
-![AntiPatternIdentification — Architecture](../../.data/knowledge-graph/insights/images/anti-pattern-identification-architecture.png)
+![AntiPatternIdentification — Architecture](images/anti-pattern-identification-architecture.png)
 
 ---
 
@@ -20,7 +20,7 @@ The architectural stance of AntiPatternIdentification is **composition over inhe
 
 From an architectural pattern perspective, the system exhibits a **Pipeline pattern** (batch processing of code artefacts) combined with a **Validator pattern** (entity validation against constraints). The **Graph‑Code RAG** system functions as a **shared service** that multiple sibling components consume, providing a **service‑oriented** flavour without explicitly naming a micro‑service. The relationship diagram below illustrates how AntiPatternIdentification sits between the parent graph engine and its child constraint configuration, while also aligning with sibling components that reuse the same graph service.  
 
-![AntiPatternIdentification — Relationship](../../.data/knowledge-graph/insights/images/anti-pattern-identification-relationship.png)
+![AntiPatternIdentification — Relationship](images/anti-pattern-identification-relationship.png)
 
 Design decisions evident from the observations include:
 
@@ -103,7 +103,6 @@ No explicit import statements or API contracts are visible in the observations, 
 * The lack of a dedicated source file for AntiPatternIdentification means the responsibility is distributed across validator logic and configuration, which can lead to scattered knowledge if documentation is not kept up‑to‑date.  
 * Shared dependencies on the Graph‑Code RAG system mean that changes to the graph API must be coordinated across all siblings, requiring disciplined versioning and testing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -117,7 +116,6 @@ No explicit import statements or API contracts are visible in the observations, 
 - [DesignPatternLibrary](./DesignPatternLibrary.md) -- DesignPatternLibrary is mentioned as a known sub-component but lacks specific references in the provided source files.
 - [BestPracticeRepository](./BestPracticeRepository.md) -- BestPracticeRepository is acknowledged as a sub-component but lacks concrete references in the source files.
 - [GraphCodeRAG](./GraphCodeRAG.md) -- GraphCodeRAG is described in integrations/code-graph-rag/README.md as a Graph-Code RAG system for any codebases.
-
 
 ---
 

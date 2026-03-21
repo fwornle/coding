@@ -23,7 +23,7 @@ The module also incorporates **observability** via the UKB trace report supplied
 
 This arrangement yields a **layered architecture** where each responsibility is encapsulated behind a well‑defined interface, minimizing coupling and making it straightforward to swap or extend any layer independently.
 
-![OntologyClassificationModule — Architecture](../../.data/knowledge-graph/insights/images/ontology-classification-module-architecture.png)
+![OntologyClassificationModule — Architecture](images/ontology-classification-module-architecture.png)
 
 ### Architectural Patterns Identified  
 
@@ -49,7 +49,7 @@ Although the source repository does not expose concrete class or function names 
 
 These interactions form a tightly coordinated workflow that maximizes reuse of existing infrastructure while keeping the classification logic focused and testable.
 
-![OntologyClassificationModule — Relationship](../../.data/knowledge-graph/insights/images/ontology-classification-module-relationship.png)
+![OntologyClassificationModule — Relationship](images/ontology-classification-module-relationship.png)
 
 ---
 
@@ -95,7 +95,6 @@ Developers integrating new entity sources should ensure that those sources produ
 
 By adhering to the guidelines above and respecting the documented integration contracts, developers can extend or replace parts of the OntologyClassificationModule with minimal impact on the surrounding KnowledgeManagement ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ By adhering to the guidelines above and respecting the documented integration co
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

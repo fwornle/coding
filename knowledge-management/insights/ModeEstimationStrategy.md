@@ -67,7 +67,6 @@ Because the strategy may involve network latency, callers (typically `ModeResolv
 - External configuration of factor weights keeps tuning separate from code, reducing the need for frequent releases.  
 - Potential downside: the probabilistic/ML component may require periodic retraining or parameter tuning, introducing a maintenance cadence that must be managed.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ Because the strategy may involve network latency, callers (typically `ModeResolv
 ### Siblings
 - [ModeRegistryManager](./ModeRegistryManager.md) -- The mode-registry.ts file is expected to contain the ModeRegistry class, which defines the mode management interface and strategy registration mechanisms.
 - [ModeSwitchingMechanism](./ModeSwitchingMechanism.md) -- The ModeSwitchingMechanism is anticipated to be tightly coupled with the ModeRegistryManager, as it relies on the registry to determine the active mode and retrieve the associated strategy.
-
 
 ---
 

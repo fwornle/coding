@@ -76,7 +76,6 @@ The **EntityExtractionModule** integrates with three primary system elements:
 * Clear separation of concerns (entity extraction vs. sentiment analysis) simplifies unit testing and future refactoring.  
 * The reliance on external NLP libraries introduces a maintenance surface (model updates, deprecations), but encapsulating them behind the module’s façade mitigates impact on the rest of the system.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -85,7 +84,6 @@ The **EntityExtractionModule** integrates with three primary system elements:
 ### Siblings
 - [SentimentAnalysisEngine](./SentimentAnalysisEngine.md) -- The NaturalLanguageProcessor class's use of the Pipeline pattern suggests that sentiment analysis is a discrete step in the text processing workflow, allowing for focused development and optimization of this component
 - [LanguageModelingComponent](./LanguageModelingComponent.md) -- The NaturalLanguageProcessor class's Pipeline pattern-based architecture suggests that language modeling is a critical step in the text processing workflow, facilitating tasks such as entity extraction and sentiment analysis
-
 
 ---
 

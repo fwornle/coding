@@ -114,7 +114,6 @@ DockerContainerizer enjoys **high maintainability** because:
 
 The primary maintenance risk is the **lack of explicit source code** (0 symbols found).  As long as the compose files remain the single source of truth and any custom scripting around Docker API calls is kept minimal and well‑documented, the component should remain easy to evolve.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -123,7 +122,6 @@ The primary maintenance risk is the **lack of explicit source code** (0 symbols 
 ### Siblings
 - [DependencyInjectionModule](./DependencyInjectionModule.md) -- LLMService module utilizes dependency injection in lib/llm/llm-service.ts, enabling flexible configuration and testing
 - [ServiceStarter](./ServiceStarter.md) -- Service starter scripts (scripts/api-service.js, scripts/dashboard-service.js) implement retry logic with backoff to ensure robust service initialization
-
 
 ---
 

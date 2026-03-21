@@ -12,14 +12,11 @@ The Strategy pattern is used to define a family of algorithms, encapsulate each 
 
 - The behavioral patterns are used to provide a flexible and maintainable way to manage complex object interactions, as implied by the parent context hierarchy.
 
-
 ## Related Entities
 
 ### Used By
 
 - DesignPatterns (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The Strategy pattern is used to define a family of algorithms, encapsulate each 
 ### Siblings
 - [CreationalPatternManager](./CreationalPatternManager.md) -- The FactoryMethodPattern uses a config.json file to determine which factory to instantiate, allowing for easy switching between different implementations, as seen in the parent context hierarchy.
 - [StructuralPatternComposite](./StructuralPatternComposite.md) -- The Adapter pattern is used to allow objects with different interfaces to work together, which can be seen in the way the DesignPatterns sub-component is designed to be adaptable to different use cases.
-
 
 ---
 

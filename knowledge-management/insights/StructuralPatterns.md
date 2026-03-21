@@ -54,7 +54,6 @@ Because adapters and decorators both rely on interface contracts, any change to 
 4. **Scalability considerations** – The lightweight nature of adapters and decorators supports horizontal scaling; however, excessive decorator stacking may introduce latency, so performance testing is advisable as the number of layers grows.  
 5. **Maintainability assessment** – High maintainability due to clear separation of concerns; adapters isolate external changes, decorators allow incremental feature addition.  The main risk is proliferating many small adapters/decorators, which can be mitigated by a shared registry or factory to manage instances centrally.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -63,7 +62,6 @@ Because adapters and decorators both rely on interface contracts, any change to 
 ### Siblings
 - [CreationalPatterns](./CreationalPatterns.md) -- SingletonPattern.java uses a double-checked locking mechanism to ensure thread safety in getInstance() method, demonstrating a creational pattern for object creation
 - [BehavioralPatterns](./BehavioralPatterns.md) -- The Observer pattern in BehavioralPatterns enables objects to notify other objects about changes to their state, thus allowing for loose coupling and promoting a more modular design
-
 
 ---
 

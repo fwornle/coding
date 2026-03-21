@@ -109,7 +109,6 @@ These connections indicate that the DashboardServiceWrapper is both a consumer (
 
 The design leans heavily on shared patterns (retry, logging, auth) that are already codified in `lib/service-starter.js` and sibling wrappers, which reduces duplication and eases maintenance. The clear separation of concerns—each wrapper handling its own domain—means changes to dashboard internals rarely affect the LLM or API layers. However, the reliance on implicit interactions (e.g., “may interact with LLMServiceManager”) suggests that documentation and explicit interface contracts are crucial to avoid hidden coupling as the codebase evolves. Regularly updating the façade methods to reflect the underlying micro‑service APIs, and keeping the ServiceStarter configuration in sync, will be key to long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -120,7 +119,6 @@ The design leans heavily on shared patterns (retry, logging, auth) that are alre
 - [APIServiceWrapper](./APIServiceWrapper.md) -- APIServiceWrapper likely utilizes the retry-with-backoff pattern in the Service Starter (lib/service-starter.js) to handle API service failures.
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry utilizes the LLM Mock Service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to provide mock LLM responses for testing frontend logic without actual API calls.
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the retry-with-backoff pattern to handle service failures.
-
 
 ---
 

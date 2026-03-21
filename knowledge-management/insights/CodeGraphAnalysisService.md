@@ -101,7 +101,6 @@ No concrete functions or classes beyond the adapter are listed, so the above det
 
 The use of an explicit adapter (`storage/graph-database-adapter.ts`) and a dedicated interaction layer (`GraphDatabaseInteraction`) isolates database concerns, making future migrations straightforward. Shared patterns (lazy LLM init, health checks) across siblings foster consistency and reduce duplicated effort. The main maintenance risk lies in the undocumented state‑machine and algorithmic components; without concrete source files, developers must rely on clear interface contracts and thorough integration tests to avoid regressions when extending analysis capabilities. Overall, the architectural choices favor modularity and ease of evolution, provided that the hidden algorithmic code is kept well‑documented and unit‑tested.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -115,7 +114,6 @@ The use of an explicit adapter (`storage/graph-database-adapter.ts`) and a dedic
 - [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService incorporates health verification mechanisms to ensure the service is functioning correctly.
 - [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager is responsible for managing LLM services, including lazy initialization and health verification.
 - [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator is responsible for deploying and managing Docker containers for coding services.
-
 
 ---
 

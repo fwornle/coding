@@ -92,7 +92,6 @@ The system follows a **hierarchical composition**: `CodingPatterns` (parent) →
 
 The clear separation between domain logic (PatternStorage, CodingConvention, DesignPatternAnalyzer) and infrastructure (GraphDatabaseAdapter) enhances maintainability. Configuration files centralise environment‑specific settings, making updates straightforward. However, the concentration of multiple responsibilities (service, manager, possibly adapters) within a single file (`llm-service.ts`) could become a maintenance bottleneck as the component evolves. Introducing dedicated modules for the manager and for adapter interfaces would improve readability and testability. Overall, the architecture promotes easy substitution of the underlying graph store, but careful versioning of the JSON configurations and thorough integration testing are essential to preserve stability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -106,7 +105,6 @@ The clear separation between domain logic (PatternStorage, CodingConvention, Des
 - [DesignPatternAnalyzer](./DesignPatternAnalyzer.md) -- DesignPatternAnalyzer interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve design pattern analysis results.
 - [CodeQualityEvaluator](./CodeQualityEvaluator.md) -- CodeQualityEvaluator interacts with the GraphDatabaseAdapter in the lib/llm/llm-service.ts file to store and retrieve code quality evaluation results.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter interacts with the graph database using the graph-database-config.json file in the config directory.
-
 
 ---
 

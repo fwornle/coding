@@ -101,7 +101,6 @@ The design leans heavily on **shared infrastructure** (wave controller, lazy LLM
 
 Overall, ObservationDerivation exhibits a **well‑structured, pipeline‑centric architecture** that reuses proven concurrency and lazy‑initialization patterns from its parent, integrates cleanly with sibling services, and isolates specialized logic (graph‑RAG, semantic constraints) behind dedicated sub‑components.  With modest enhancements to interface definition and optional service extraction for heavy RAG workloads, the component should remain scalable and maintainable as the system grows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -118,7 +117,6 @@ Overall, ObservationDerivation exhibits a **well‑structured, pipeline‑centri
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
-
 
 ---
 

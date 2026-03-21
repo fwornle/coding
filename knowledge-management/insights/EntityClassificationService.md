@@ -70,7 +70,6 @@ The periodic model‑update mechanism is not tied to the classification call pat
 
 These insights are derived directly from the provided observations and file references, without introducing unsupported assumptions.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ These insights are derived directly from the provided observations and file refe
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct and query the code knowledge graph.
 - [KnowledgeGraphManagement](./KnowledgeGraphManagement.md) -- KnowledgeGraphManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to provide efficient persistence and querying of knowledge graphs.
 - [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and update entities in the knowledge graph.
-
 
 ---
 

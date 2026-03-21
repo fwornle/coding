@@ -104,7 +104,6 @@ Following these conventions guarantees that LoggingManager remains consistent wi
    * The absence of hard‑coded paths and the use of environment‑driven configuration reduce the risk of drift between code and deployment.  
    * Potential risk: if the documentation files diverge from the actual implementation, the loader may mis‑interpret settings; regular sync checks between docs and code are recommended.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -118,7 +117,6 @@ Following these conventions guarantees that LoggingManager remains consistent wi
 - [ConnectionHandler](./ConnectionHandler.md) -- ConnectionHandler likely uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension via HTTP, IPC, or file watch.
 - [DataAdapter](./DataAdapter.md) -- DataAdapter likely utilizes the integrations/copi/README.md file to understand the data transformation requirements for the Copi integration.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter uses the lib/integrations/specstory-adapter.js file to connect to the Specstory extension.
-
 
 ---
 

@@ -107,12 +107,10 @@ The **CodeKnowledgeGraphConstructor** would import this module and invoke `new A
 * **Potential fragility** – the shared `ASTResult` contract is a single point of failure; any unsynchronized change can break the downstream graph builder.  
 * **Documentation need** – because the module’s public API is the only integration surface, thorough TypeScript typings and versioned changelogs are essential to keep dependent components stable.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor uses the batch analysis pipeline to construct the code knowledge graph
-
 
 ---
 

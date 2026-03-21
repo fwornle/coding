@@ -88,12 +88,10 @@ The logging subsystem is organised as a tree: **Trajectory** → **ConversationL
 
 The current design is **highly maintainable** due to its clear separation of concerns and minimal public surface area. The single‑method adapter is easy to unit‑test, and the compositional relationship means changes to the logging backend are confined to **SpecstoryAdapterLogger**. However, the lack of explicit interfaces or abstract base classes (as far as the observations show) could make future refactoring more manual; introducing a shared logger interface would improve consistency across multiple adapters. Overall, the structure supports straightforward updates, debugging, and extension.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ConversationLogger](./ConversationLogger.md) -- The logConversation method in SpecstoryAdapter (lib/integrations/specstory-adapter.js:134) implements logging functionality for conversation entries.
-
 
 ---
 

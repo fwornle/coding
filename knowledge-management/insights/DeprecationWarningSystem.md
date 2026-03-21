@@ -94,7 +94,6 @@ Because the system scales with PHPStan, adding more code or additional deprecati
 
 The maintainability is high: the only artifact developers need to manage is a well‑documented `phpstan.neon` file. As long as the configuration stays in sync with the codebase and the team treats warnings seriously, the DeprecationWarningSystem contributes positively to long‑term sustainability and technical‑debt reduction, exactly as described in the source observations.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The maintainability is high: the only artifact developers need to manage is a we
 ### Siblings
 - [StaticCodeAnalysis](./StaticCodeAnalysis.md) -- The phpstan.neon file defines the configuration for PHPStan, specifying the paths to scan and the rules to apply, which helps in maintaining code quality and adhering to coding standards.
 - [CodeQualityConfiguration](./CodeQualityConfiguration.md) -- The phpstan.neon file serves as a central configuration point for PHPStan, allowing developers to easily manage and adjust the analysis settings without delving into complex code changes.
-
 
 ---
 

@@ -77,12 +77,10 @@ The `ViolationCaptureManager` holds an instance of the integration component (e.
 
 By grounding every statement in the observed `violation‑model.json` definition and the explicit relationship between `ViolationCaptureManager` and `TimeSeriesDatabaseIntegration`, this insight document captures the essential architectural and design characteristics of the time‑series database integration without extrapolating beyond the provided evidence.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ViolationCaptureManager](./ViolationCaptureManager.md) -- ViolationCaptureManager uses a time-series database to store violation data, with a custom data model defined in violation-model.json
-
 
 ---
 

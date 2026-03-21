@@ -86,7 +86,6 @@ LockManager sits directly under ConcurrencyManager and is a peer to ThreadPoolMa
 
 The separation of concerns (local vs. distributed strategies, façade API) promotes clean, testable code.  Adding a new distributed protocol would involve implementing a new **LockProvider** without touching callers.  However, the lack of concrete symbols in the current snapshot suggests that documentation and clear interface definitions are crucial to avoid misuse, especially around lock lifetimes and error handling.  Keeping the lock‑key naming convention consistent across TaskScheduler and application code will also reduce the risk of deadlocks and improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -95,7 +94,6 @@ The separation of concerns (local vs. distributed strategies, façade API) promo
 ### Siblings
 - [ThreadPoolManager](./ThreadPoolManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks, which implies the existence of a ThreadPoolManager to oversee thread creation and termination.
 - [TaskScheduler](./TaskScheduler.md) -- A TaskScheduler would be necessary to manage the queue of tasks to be executed by the thread pool, ensuring that high-priority tasks are executed promptly and that dependencies between tasks are respected.
-
 
 ---
 

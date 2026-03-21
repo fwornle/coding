@@ -8,7 +8,7 @@ The CodeGraphRAG provides a mechanism for updating the code graph, allowing for 
 
 CodeGraphRAG is the **code‑graph‑based Retrieval‑Augmented Generation (RAG) sub‑component** that lives under the `integrations/code-graph-rag/` directory. Its core definition and purpose are documented in `integrations/code-graph-rag/README.md`, where the **Graph‑Code** system is described as a graph‑based RAG engine capable of ingesting any codebase. The component brings together a **graph database**, a **rule‑engine for insight extraction**, a **caching layer**, a **versioning subsystem**, and a **public API** that other sub‑components (e.g., the `CodeAnalyzer` or `InsightGenerator` siblings) can call to retrieve structured code‑graph information. The implementation details for these capabilities are further elaborated in `integrations/code-graph-rag/CONTRIBUTING.md` (rules) and `integrations/code-graph-rag/docs/claude-code-setup.md` (caching, versioning, and update mechanics.
 
-> ![CodeGraphRAG — Architecture](../../.data/knowledge-graph/insights/images/code-graph-rag-architecture.png)
+> ![CodeGraphRAG — Architecture](images/code-graph-rag-architecture.png)
 
 In the broader **SemanticAnalysis** hierarchy, CodeGraphRAG supplies the graph‑structured knowledge that the `CodeGraphAgent` (one of the agents described in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) consumes to generate semantic insights. It therefore acts as the data‑layer backbone for the whole semantic pipeline, while sibling components such as **Pipeline**, **Ontology**, and **Insights** focus on orchestration, ontology management, and downstream insight generation respectively.
 
@@ -22,7 +22,7 @@ The **caching mechanism** (see `integrations/code-graph-rag/docs/claude-code-set
 
 Logging is injected at the graph‑operation boundaries (also documented in the README), giving visibility into mutations and queries. This aligns with a **cross‑cutting concern** implementation where logging is applied via middleware rather than scattered throughout business logic.  
 
-> ![CodeGraphRAG — Relationship](../../.data/knowledge-graph/insights/images/code-graph-rag-relationship.png)
+> ![CodeGraphRAG — Relationship](images/code-graph-rag-relationship.png)
 
 The component’s design is deliberately **modular**: child entities such as `CodeGraphRAGGuide` (the README) and `GraphDatabaseIntegration` encapsulate documentation and DB‑specific glue code, while the rest of the system interacts only through the stable API. This mirrors the **Facade pattern**, shielding sibling components (e.g., `CodeAnalyzer`, `InsightGenerator`) from implementation churn.
 
@@ -84,7 +84,6 @@ All integration points rely on **HTTP/JSON** (or possibly gRPC) as the transport
 
 These insights should help developers understand **how CodeGraphRAG is built**, **why certain design choices were made**, and **how to work with it safely and efficiently** within the larger **SemanticAnalysis** ecosystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ These insights should help developers understand **how CodeGraphRAG is built**, 
 - [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 - [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
-
 
 ---
 

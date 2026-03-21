@@ -72,12 +72,10 @@ When extending the system to support a new transcript format (e.g., a different 
 4. **Scalability considerations** – Adding new transcript adapters is straightforward: implement a new concrete factory without touching the logging core, supporting horizontal growth as more agent platforms are integrated.  
 5. **Maintainability assessment** – The hierarchical factory design promotes single‑responsibility and isolates format‑specific code, making future updates or bug fixes localized to the concrete factory and its adapter. The clear file‑level organization (`lib/agent-api`) further aids discoverability and reduces coupling.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class may be implemented in the lib/agent-api/transcript-api.js file.
-
 
 ---
 

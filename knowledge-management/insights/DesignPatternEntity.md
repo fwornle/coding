@@ -102,12 +102,10 @@ No concrete file symbols or paths were provided, so the description remains abst
 
 Overall, `DesignPatternEntity` exemplifies a clean, graph‑oriented domain model that leverages an adapter‑based persistence strategy to keep the system modular, testable, and ready for evolution.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [DesignPatterns](./DesignPatterns.md) -- GraphDatabaseAdapter.createEntity() method utilizes the graph database to store design patterns as entities, with relationships defined using the createRelationship method
-
 
 ---
 

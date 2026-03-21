@@ -102,7 +102,6 @@ The integration does not appear to expose a public SDK or library; instead, it o
 * **High Maintainability** – The clear separation of concerns (ingest → batch → network) and the reliance on environment‑driven configuration make the component easy to modify and redeploy.  
 * **Potential Risk Areas** – Lack of explicit class or function definitions in the current observations means future developers must consult the README and runtime configuration to understand the exact API surface; adding a small SDK or interface definition would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -110,7 +109,6 @@ The integration does not appear to expose a public SDK or library; instead, it o
 
 ### Siblings
 - [CodeGraphRAGGuide](./CodeGraphRAGGuide.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code: A Graph-Based RAG System for Any Codebases, indicating the purpose of the CodeGraphRAG sub-component.
-
 
 ---
 

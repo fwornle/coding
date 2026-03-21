@@ -12,14 +12,11 @@ ServiceDiscoveryMechanism (DockerizedServices context) ensures that services are
 
 - ServiceDiscoveryMechanism (DockerizedServices context) ensures that services are properly registered and endpoints are resolved, providing a solid foundation for the ServiceDiscovery sub-component
 
-
 ## Related Entities
 
 ### Used By
 
 - ServiceDiscovery (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ ServiceDiscoveryMechanism (DockerizedServices context) ensures that services are
 ### Siblings
 - [ServiceRegistry](./ServiceRegistry.md) -- ServiceRegistry (service_registry.py) utilizes a dictionary to store service instances, enabling fast lookup and retrieval of service endpoints
 - [ServiceEndpointResolver](./ServiceEndpointResolver.md) -- ServiceEndpointResolver (service_registry.py) uses the registry to resolve service endpoints, providing a reliable way to retrieve the most current endpoint information
-
 
 ---
 

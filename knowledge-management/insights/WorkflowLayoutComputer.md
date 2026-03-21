@@ -103,7 +103,6 @@ All agents must implement the `WorkflowAgent` contract, which likely defines met
 
 The **WorkflowLayoutComputer** therefore provides a robust, extensible foundation for deriving deterministic layouts from complex, dynamic workflow definitions while staying neatly integrated within the broader **ConstraintSystem** architecture.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ The **WorkflowLayoutComputer** therefore provides a robust, extensible foundatio
 - [StatisticsCalculator](./StatisticsCalculator.md) -- StatisticsCalculator uses a data aggregation approach in statistics-calculator.ts to compute statistics from violation history
 - [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses a rules-based approach in content-validation-agent.ts to validate entity content against predefined constraints
 - [ViolationCaptureService](./ViolationCaptureService.md) -- ViolationCaptureService uses a event-driven approach in violation-capture-service.ts to capture and process constraint violations
-
 
 ---
 

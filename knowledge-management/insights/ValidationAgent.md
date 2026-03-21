@@ -102,7 +102,6 @@ External dependencies are limited to the Redis client (for caching) and the grap
 
 The use of explicit, file‑based rule definitions and a declarative pipeline makes the system **highly maintainable**: developers can add or modify validation logic without touching the core engine.  Centralizing metadata population in `mapEntityToRuleSet()` reduces duplication, though any change to that method requires thorough regression testing.  The clear separation between persistence (graph‑DB), caching (Redis), and orchestration (HookOrchestrator) means that each concern can be upgraded or swapped independently, aiding long‑term evolution.  However, the reliance on multiple external services (graph DB, Redis, HookOrchestrator) introduces operational complexity; proper observability and health‑checking are required to keep the subsystem reliable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -119,7 +118,6 @@ The use of explicit, file‑based rule definitions and a declarative pipeline ma
 - [EntityContentAnalyzer](./EntityContentAnalyzer.md) -- EntityContentAnalyzer uses a regex-based pattern matching algorithm, as seen in EntityContentAnalyzer.ts, to extract file paths and commands from entity content
 - [GitHistoryProcessor](./GitHistoryProcessor.md) -- GitHistoryProcessor uses a git-based history processing algorithm, as seen in GitHistoryProcessor.ts, to detect changes and updates in entity content
 - [LSLSessionProcessor](./LSLSessionProcessor.md) -- LSLSessionProcessor uses a session-based processing algorithm, as seen in LSLSessionProcessor.ts, to detect changes and updates in entity content
-
 
 ---
 

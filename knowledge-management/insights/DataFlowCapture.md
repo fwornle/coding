@@ -79,7 +79,6 @@ The downstream **TraceReportGeneration** node consumes this payload to produce h
 - **Risk** – Tight coupling to the `WorkflowRunner` API means that changes to runner internals require coordinated updates across DataFlowCapture and TraceReportGeneration.  
 - **Mitigation** – Maintaining a stable interface contract for `capture_data_flow` (e.g., versioned schemas) and comprehensive integration tests between the three sibling components will preserve maintainability as the codebase evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ The downstream **TraceReportGeneration** node consumes this payload to produce h
 ### Siblings
 - [WorkflowRunning](./WorkflowRunning.md) -- The WorkflowRunner class in workflow_runner.py defines the run_workflow method, which orchestrates the workflow execution and data flow capture.
 - [TraceReportGeneration](./TraceReportGeneration.md) -- The TraceReportGeneration node utilizes the captured data flow information to generate reports, which are then used to analyze the workflow execution.
-
 
 ---
 

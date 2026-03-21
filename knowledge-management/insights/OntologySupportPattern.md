@@ -12,7 +12,6 @@ OntologySupportPattern is implemented across: src/knowledge-management, lib/ukb-
 
 - Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
-
 ---
 
 *Generated from 3 observations*

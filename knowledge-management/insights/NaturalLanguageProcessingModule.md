@@ -77,7 +77,6 @@ Because every component writes to the same LevelDB‑backed graph, horizontal sc
 ### Maintainability assessment  
 The clear separation of concerns—generation, validation, persistence, classification—makes the module highly maintainable. Adding new validation rules or swapping the text generator can be done in isolation. However, the tight coupling through a single JSON schema means that any schema change requires coordinated updates across at least two modules (`NaturalLanguageProcessingModule` and `OntologyClassificationModule`). The shared `GraphDatabaseAdapter` is a maintenance hotspot: changes to storage strategy must be vetted against all siblings. Overall, the architecture favours readability and modularity, with the primary maintenance burden centred on the persistence adapter and the JSON contract.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -90,7 +89,6 @@ The clear separation of concerns—generation, validation, persistence, classifi
 - [CodeAnalysisModule](./CodeAnalysisModule.md) -- CodeAnalysisModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve code analysis results in the graph database.
 - [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve ontology classification results in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology library (graphology.ts) to interact with the graph database.
-
 
 ---
 

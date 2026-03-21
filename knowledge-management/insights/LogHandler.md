@@ -72,12 +72,10 @@ Because Winston can multiplex to many transports, LogHandler can scale horizonta
 ### Maintainability Assessment  
 The façade approach yields high maintainability: updates to Winston or the addition of new transports are confined to LogHandler.  The lack of direct Winston usage elsewhere reduces the surface area for bugs.  However, the current documentation does not expose concrete file paths or class signatures, so developers must rely on the parent LoggingService’s documentation to locate LogHandler’s source.  Adding clear module exports and inline comments within LogHandler would further improve discoverability and onboarding speed.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LoggingService](./LoggingService.md) -- LoggingService uses the winston.js library to handle logging of system events and errors
-
 
 ---
 

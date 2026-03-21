@@ -84,7 +84,6 @@ These integration points are all mediated through well‑defined method calls (e
 * Absence of tightly coupled logic (e.g., no direct writes from `CacheHitHandler`) reduces the risk of side‑effects.  
 * The reliance on simple TTL and recency heuristics keeps the implementation straightforward, lowering the learning curve for new developers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ These integration points are all mediated through well‑defined method calls (e
 ### Siblings
 - [CacheInvalidationHandler](./CacheInvalidationHandler.md) -- CacheInvalidationHandler would likely utilize the ClassificationCache class in classification_cache.py to store and retrieve classification results, implementing a mechanism to track cache validity
 - [LLMCallCoordinator](./LLMCallCoordinator.md) -- LLMCallCoordinator would need to interact with the ClassificationCache class to determine when cache entries are invalid and require an LLM call, potentially using a callback mechanism to trigger the call
-
 
 ---
 

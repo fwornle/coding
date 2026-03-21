@@ -89,7 +89,6 @@ No other runtime dependencies are required; the provider is self‑contained apa
 
 By adhering to these guidelines and understanding the underlying design, developers can confidently employ **MockLLM** to validate LLM‑dependent components while preserving the modular, provider‑centric architecture of the broader LLM subsystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -99,7 +98,6 @@ By adhering to these guidelines and understanding the underlying design, develop
 - [LocalLLM](./LocalLLM.md) -- LocalLLM uses the DockerModelRunner class in lib/llm/docker-model-runner.ts to run local LLM models
 - [LLMService](./LLMService.md) -- LLMService uses the ProviderRegistry in lib/llm/provider-registry.js to manage a chain of LLM providers
 - [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a registry data structure to store a list of available LLM providers
-
 
 ---
 

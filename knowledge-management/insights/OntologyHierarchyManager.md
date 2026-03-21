@@ -75,7 +75,6 @@ No additional files or symbols were identified, so the concrete import statement
 * The lack of explicit file paths or symbols in the observations suggests the codebase is still abstracted; adding comprehensive unit tests for the manager’s traversal and mutation methods will further safeguard future changes.  
 * Documentation should emphasize the contract between `UpperOntologyLoader` and `OntologyHierarchyManager` to prevent accidental misuse of the hierarchy data structure.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ No additional files or symbols were identified, so the concrete import statement
 ### Siblings
 - [UpperOntologyLoader](./UpperOntologyLoader.md) -- UpperOntologyDefinition.loadDefinitions() reads upper ontology definitions from a CSV file and creates a hierarchical structure, as defined in the parent context of the SemanticAnalysis component
 - [EntityTypeResolver](./EntityTypeResolver.md) -- The EntityTypeResolverService, mentioned in the suggested detail nodes, is likely a key part of the EntityTypeResolver's functionality, providing a service-based interface for resolving entity types
-
 
 ---
 

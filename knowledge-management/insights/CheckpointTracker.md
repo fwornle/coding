@@ -95,7 +95,6 @@ Because all checkpoint writes funnel through a single `GraphDatabaseManager`, th
 
 The layered approach and clear naming (e.g., `trackCheckpoint`, `checkpointValidator`) make the codebase **highly maintainable**.  Adding new checkpoint fields or validation rules is localized to the validator and the data‑model definitions.  However, the tight coupling to the shared manager means that refactoring the storage layer requires coordinated updates across all siblings, which can increase the impact of changes.  Overall, the design favors **readability** and **testability** (each function can be unit‑tested in isolation) while keeping the risk of widespread breakage low, provided the manager’s contract remains stable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -109,7 +108,6 @@ The layered approach and clear naming (e.g., `trackCheckpoint`, `checkpointValid
 - [KnowledgeGraphAnalyzer](./KnowledgeGraphAnalyzer.md) -- KnowledgeGraphAnalyzer uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [OntologyClassifier](./OntologyClassifier.md) -- OntologyClassifier uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
-
 
 ---
 

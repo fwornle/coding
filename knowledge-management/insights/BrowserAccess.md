@@ -18,7 +18,7 @@ which describes the steps required to spin up the access layer, configure authen
 
 The overall architecture follows a **modular, layered design** in which BrowserAccess acts as a thin orchestration layer atop a set of well‑defined sibling modules.  The **architecture diagram** below visualises this composition:
 
-![BrowserAccess — Architecture](../../.data/knowledge-graph/insights/images/browser-access-architecture.png)
+![BrowserAccess — Architecture](images/browser-access-architecture.png)
 
 At the top level, BrowserAccess resides under the **KnowledgeManagement** parent component, inheriting the same data‑consistency guarantees provided by the GraphDatabaseAdapter (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  The component does not embed its own database logic; instead it **delegates persistence** to the **GraphDatabaseModule**, which itself is a thin wrapper around the GraphDatabaseAdapter.  This separation of concerns keeps BrowserAccess focused on session handling and UI exposure while reusing the robust graph‑storage infrastructure already present in the system.
 
@@ -26,7 +26,7 @@ Interaction with the **InsightGenerationModule** follows a **producer‑consumer
 
 The **relationship diagram** clarifies these connections:
 
-![BrowserAccess — Relationship](../../.data/knowledge-graph/insights/images/browser-access-relationship.png)
+![BrowserAccess — Relationship](images/browser-access-relationship.png)
 
 ## Implementation Details  
 
@@ -86,7 +86,6 @@ Because all three modules are siblings under the **KnowledgeManagement** umbrell
 
 Overall, BrowserAccess exemplifies a well‑structured, modular addition to the KnowledgeManagement ecosystem, reusing existing graph and utility infrastructure while providing a focused entry point for browser‑based interactions with the MCP server.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ Overall, BrowserAccess exemplifies a well‑structured, modular addition to the 
 - [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

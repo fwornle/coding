@@ -79,12 +79,10 @@ Given the observations, developers working on LLMService should observe the foll
 
 *Note: The analysis above strictly follows the supplied observations; no additional file paths, class names, or implementation specifics were invented.*
 
-
 ## Hierarchy Context
 
 ### Parent
 - [LLMService](./LLMService.md) -- LLMService uses a cache object to store and retrieve responses, reducing the need for redundant requests.
-
 
 ---
 

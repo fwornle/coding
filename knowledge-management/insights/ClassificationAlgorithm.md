@@ -57,7 +57,6 @@ When extending the system, prefer adding new estimation strategies (e.g., a new 
 - The lack of exposed internal symbols (0 code symbols found) suggests a simple public API, which reduces surface area for bugs.  
 - Ongoing maintenance will focus on updating the algorithm’s internal logic or model, which can be done in isolation and verified with unit tests.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -65,7 +64,6 @@ When extending the system, prefer adding new estimation strategies (e.g., a new 
 
 ### Siblings
 - [SensitivityEstimationStrategy](./SensitivityEstimationStrategy.md) -- The SensitivityEstimationStrategy may employ various techniques, such as natural language processing or machine learning, to analyze input prompts and estimate their sensitivity, as seen in the classification-algorithm.ts file.
-
 
 ---
 

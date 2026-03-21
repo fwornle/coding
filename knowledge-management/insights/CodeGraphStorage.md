@@ -67,12 +67,10 @@ No other design patterns (e.g., event‑driven, micro‑services) are mentioned,
 - **Low coupling**: Callers depend only on the module’s interface, reducing ripple effects when the adapter or DB changes.  
 - **Potential risk**: If the adapter’s contract is not well‑documented, adding new graph operations may lead to duplicated logic across the module and storage layers. Maintaining a clear interface definition for the adapter mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage code-related entities and relationships.
-
 
 ---
 

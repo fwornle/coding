@@ -71,7 +71,6 @@ The system is organized as a three‑tier hierarchy: the **TierBasedRouter** (pa
 ### 5. Maintainability assessment  
 The clear separation of concerns—static rule handling, provider registration, and routing decision—makes the codebase easy to understand and modify. Adding new routing criteria involves updating `routing‑table.json` and, if needed, extending the **RoutingAlgorithm** without touching the manager. However, the immutability of the rule set means any change mandates a restart, which could be a maintenance friction point in environments that demand hot‑reloading of routing policies. Overall, the design favors maintainability through modularity, with the main trade‑off being reduced runtime configurability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ The clear separation of concerns—static rule handling, provider registration, 
 ### Siblings
 - [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry uses a data structure to store provider information, which is populated during the registration process
 - [RoutingAlgorithm](./RoutingAlgorithm.md) -- The RoutingAlgorithm uses a decision-making process to select the best provider, which is based on the routing rules and provider information
-
 
 ---
 

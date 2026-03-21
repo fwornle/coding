@@ -84,7 +84,6 @@ Because the component is purely transformational, it does not maintain persisten
 4. **Scalability considerations** – Because the extractor is stateless, multiple repository fragments can be processed concurrently, scaling horizontally across CPU cores or distributed workers. The main scalability bottleneck will be the size of the AST and the cost of traversing it; incremental parsing or streaming extraction could mitigate this.  
 5. **Maintainability assessment** – The clear modular boundaries and single‑responsibility focus make the component easy to maintain. Adding support for new languages or entity types requires only new extractor implementations without touching the orchestration logic. However, the lack of concrete code in the current snapshot means that documentation and interface contracts become critical to avoid integration drift.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ Because the component is purely transformational, it does not maintain persisten
 ### Siblings
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeKnowledgeGraphConstructor sub-component uses a custom CodeGraphConstructor class to construct knowledge graphs, as inferred from the parent context of KnowledgeManagement
 - [CodeParsing](./CodeParsing.md) -- CodeParsing is a suggested node from the parent component analysis, highlighting its significance in the code knowledge graph construction process
-
 
 ---
 

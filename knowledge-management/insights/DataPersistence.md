@@ -104,7 +104,6 @@ Because the observations do not enumerate concrete class names inside DataPersis
 
 Overall, the **DataPersistence** sub‑component presents a well‑structured, pattern‑driven approach to durable, secure, and performant data storage, leveraging the existing Singleton‑based graph adapter while offering extensible layers for caching, integrity, and security.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -116,7 +115,6 @@ Overall, the **DataPersistence** sub‑component presents a well‑structured, p
 - [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement sub-component utilizes a graph database to store and manage knowledge graphs and ontologies
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- The GraphDatabaseManagement sub-component utilizes the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) to manage graph database connections and operations
 - [EventDrivenArchitecture](./EventDrivenArchitecture.md) -- The EventDrivenArchitecture sub-component utilizes a message broker, such as Apache Kafka, to manage event production and consumption
-
 
 ---
 

@@ -90,7 +90,6 @@ Because initialization is performed once and then reused, the component scales w
 ### Maintainability assessment  
 The clear separation of concerns (config loading, DI, lazy init, error handling) makes the initializer **highly maintainable**. Changes to configuration format, dependency implementations, or error‑handling policies can be made in isolated modules without touching the adapter’s business logic. The single public API (`initialize`) reduces the surface area that developers must understand. The only maintenance risk is ensuring that the thread‑safety guard remains correct as JavaScript runtimes evolve (e.g., moving from callbacks to async/await), but the current pattern is well‑established and straightforward to test.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The clear separation of concerns (config loading, DI, lazy init, error handling)
 - [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector utilizes the SpecstoryAdapter class in specstory-adapter.js to encapsulate connection logic
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes a logging framework to format and log conversation entries
 - [ConnectionRetryManager](./ConnectionRetryManager.md) -- ConnectionRetryManager utilizes a retry policy to determine the number of retries for failed connections
-
 
 ---
 

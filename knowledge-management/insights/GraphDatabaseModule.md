@@ -20,11 +20,11 @@ The design of the GraphDatabaseModule follows a classic **Adapter pattern**. The
 
 The overall architecture can be visualised in the diagram below, which shows the module at the centre of the KnowledgeManagement subtree, its child adapter, and the supporting migration script:
 
-![GraphDatabaseModule — Architecture](../../.data/knowledge-graph/insights/images/graph-database-module-architecture.png)
+![GraphDatabaseModule — Architecture](images/graph-database-module-architecture.png)
 
 The **relationship diagram** highlights how GraphDatabaseModule fits among its siblings (ManualLearning, OnlineLearning, OntologyClassificationModule, etc.) and shares the migration script with ManualLearning, reinforcing a **shared‑utility** approach rather than duplicated code:
 
-![GraphDatabaseModule — Relationship](../../.data/knowledge-graph/insights/images/graph-database-module-relationship.png)
+![GraphDatabaseModule — Relationship](images/graph-database-module-relationship.png)
 
 Key architectural choices evident from the observations include:
 
@@ -109,7 +109,6 @@ The GraphDatabaseModule sits at the heart of KnowledgeManagement, acting as the 
 
 The clear separation of concerns and the single migration script simplify maintenance: developers modify entity definitions in one place and run the script to propagate changes. However, the tight coupling of automatic export logic to every write operation means that bugs in the sync path can affect all callers. Regular testing of the migration script and monitoring of the export process are essential to keep the subsystem reliable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -127,7 +126,6 @@ The clear separation of concerns and the single migration script simplify mainte
 - [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
-
 
 ---
 

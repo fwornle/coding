@@ -110,7 +110,6 @@ Because the observations do not mention external services (e.g., remote validati
 
 **Bottom line:** *EntityValidationMechanism* is the gatekeeper that enforces data quality for every entity created or edited within the **EntityManagement** subsystem.  It operates as a synchronous validation step invoked by the factory‑based `EntityAuthoringService`, leverages both built‑in type checks and a pluggable set of custom rules, and integrates tightly with the change‑merge strategy used during edits.  Understanding its placement and interaction patterns is essential for any developer extending entity creation, editing, or validation workflows.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -119,7 +118,6 @@ Because the observations do not mention external services (e.g., remote validati
 ### Siblings
 - [EntityFactoryPattern](./EntityFactoryPattern.md) -- The EntityAuthoringService class in entity-authoring-service.py employs the Factory pattern to handle manual entity creation and editing, as seen in the class definition.
 - [EntityChangeMergeStrategy](./EntityChangeMergeStrategy.md) -- The EntityEditing technique likely involves a change merge strategy, which determines how changes are combined and applied to the entity data.
-
 
 ---
 

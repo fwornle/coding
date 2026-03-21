@@ -10,7 +10,7 @@ The CodeGraphConstructor relies on the GraphDatabaseAdapter for constructing and
 
 The adapter exposes a concise API for **creating**, **reading**, and **updating** graph entities. These operations are directly consumed by the **`CodeGraphConstructor`** (found in `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`) to build and analyse code graphs that represent the structure and relationships of source code. The tight coupling between the adapter and the constructor enables a streamlined pipeline from raw code to a persisted graph model, which is then leveraged by sibling sub‑components such as **CodeGraphAnalysis** and **CodeGraphRAG**.
 
-![GraphDatabaseManagement — Architecture](../../.data/knowledge-graph/insights/images/graph-database-management-architecture.png)
+![GraphDatabaseManagement — Architecture](images/graph-database-management-architecture.png)
 
 ---
 
@@ -28,7 +28,7 @@ Because the adapter is **tightly coupled** with the constructor (Observation 3
 
 The relationship diagram below visualises these connections, showing the parent **CodingPatterns** component, sibling sub‑components that also rely on the persisted graph, and the child **GraphDatabaseAdapter** itself.
 
-![GraphDatabaseManagement — Relationship](../../.data/knowledge-graph/insights/images/graph-database-management-relationship.png)
+![GraphDatabaseManagement — Relationship](images/graph-database-management-relationship.png)
 
 ---
 
@@ -113,7 +113,6 @@ No additional helper classes or factories are mentioned in the observations, so 
 
 Overall, **GraphDatabaseManagement** delivers a pragmatic, performance‑focused solution for code‑graph persistence, with clear opportunities for future decoupling and scaling enhancements as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -128,7 +127,6 @@ Overall, **GraphDatabaseManagement** delivers a pragmatic, performance‑focused
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [ProviderRegistration](./ProviderRegistration.md) -- The ProviderRegistration sub-component uses the ProviderRegistry class for registering new providers.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.
-
 
 ---
 

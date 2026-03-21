@@ -69,7 +69,6 @@ Because the gateway uses a single logger instance, scaling the number of log‑e
 ### Maintainability assessment
 The façade approach isolates the rest of the codebase from logger implementation details, making future upgrades to `logging/Logger.js` low‑risk.  The modular layout, with clearly defined responsibilities for each sibling, promotes straightforward unit testing and encourages isolated changes.  The main maintenance burden lies in keeping the **standardized format** documentation up‑to‑date, as any divergence can cause downstream log processing failures.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ The façade approach isolates the rest of the codebase from logger implementatio
 - [RetryPolicyManager](./RetryPolicyManager.md) -- RetryPolicyManager implements a retry mechanism with limited retries, demonstrating a fault-tolerant approach to handling failures and retries.
 - [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
 - [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
-
 
 ---
 

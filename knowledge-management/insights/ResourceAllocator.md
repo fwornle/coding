@@ -88,7 +88,6 @@ The **ResourceAllocator** sits at the heart of the process‑execution pipeline:
 ### 5. Maintainability assessment  
 Because the allocator’s responsibilities are well‑defined and confined to a single module, the codebase remains approachable.  The reliance on explicit interfaces (`ProcessRegistry`, `StateManager`) aids testability.  However, the lack of a formal abstraction layer for quota policies could make future extensions (e.g., dynamic quota adjustments) more invasive.  Documenting the event contracts between `StateManager` and the allocator, and keeping the pool implementation isolated, will preserve maintainability as the system evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ Because the allocator’s responsibilities are well‑defined and confined to a 
 ### Siblings
 - [ProcessRegistry](./ProcessRegistry.md) -- The ProcessRegistry module is likely to be implemented as a singleton, providing a global point of access for process instances, similar to the pattern used in the DockerizedServices component.
 - [StateManager](./StateManager.md) -- The StateManager would likely implement a finite state machine using an enumeration of states (e.g., Initialized, Running, Paused, Terminated) and define transitions between these states based on specific events or actions.
-
 
 ---
 

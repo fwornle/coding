@@ -121,7 +121,6 @@ The overall interaction flow can be visualized as:
 * **Potential risk** – The reliance on a single metadata catalog means that any bug in GraphDatabaseStorage’s validation logic could affect all components. Comprehensive unit tests around schema registration are essential.  
 * **Documentation surface** – Since the observations list no concrete symbols, developers should maintain clear API docs for the adapter interface and the storage façade to prevent accidental misuse by sibling components.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ The overall interaction flow can be visualized as:
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve entities.
 - [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraph utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct the AST-based code knowledge graph.
 - [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve workflow run data.
-
 
 ---
 

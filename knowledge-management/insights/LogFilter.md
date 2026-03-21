@@ -84,7 +84,6 @@ Because filtering occurs in‑process before any I/O, the component scales with 
 
 The use of standard framework interfaces and a declarative rule configuration makes the LogFilter highly maintainable. Changes to filtering logic are confined to the rule definitions rather than code changes, and the filter’s isolation from writer/rotator logic reduces the risk of side effects. The main maintenance risk is configuration drift—ensuring that rule files stay in sync with operational requirements requires proper governance and automated validation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ The use of standard framework interfaces and a declarative rule configuration ma
 ### Siblings
 - [LogWriter](./LogWriter.md) -- The LogWriter likely utilizes a logging framework, such as Log4j or Logback, to handle log output, as seen in similar logging mechanisms in other components.
 - [LogRotator](./LogRotator.md) -- The LogRotator may use a scheduling mechanism, such as a cron job or a timer, to periodically rotate logs, ensuring that logs are regularly cycled and preventing excessive log growth.
-
 
 ---
 

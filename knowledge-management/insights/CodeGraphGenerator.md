@@ -66,12 +66,10 @@ If a project wishes to replace the default generator (for example, to support a 
 - Clear file boundaries (`src/code-graph-generator.ts`) and a dedicated class improve readability and make the component easy to locate and modify.  
 - The lack of exposed symbols in the static analysis suggests a simple public API, which reduces surface area for bugs but also means that any future extensions must be carefully versioned to avoid breaking existing consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [CodeGraph](./CodeGraph.md) -- The code graph generation is performed by the CodeGraphGenerator class in integrations/code-graph-rag/src/code-graph-generator.ts.
-
 
 ---
 

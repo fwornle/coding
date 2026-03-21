@@ -88,7 +88,6 @@ The sibling component **`GraphDBAdapter`** (in `GraphDBAdapter.java`) provides p
 
 These observations are grounded entirely in the provided source notes and reflect the current architectural intent of the **`LSLTranscriptAdapter`** within the transcript‑processing subsystem.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ These observations are grounded entirely in the provided source notes and reflec
 ### Siblings
 - [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- TranscriptAdapterFactory in TranscriptAdapterFactory.java defines a factory method createAdapter() that returns an instance of a specific transcript adapter based on the agent type
 - [GraphDBAdapter](./GraphDBAdapter.md) -- GraphDBAdapter in GraphDBAdapter.java defines methods for storing and retrieving transcript metadata, such as storeTranscript() and getTranscript(), which interact with the graph database
-
 
 ---
 

@@ -70,7 +70,6 @@ Because the underlying persistence is **LevelDB backed by Graphology**, the comp
 ### Maintainability assessment  
 The **layered architecture** and **adapter abstraction** give ProjectTemplates a high maintainability rating. Changes to storage (e.g., swapping LevelDB for RocksDB) are isolated within `graph-database-adapter.ts`. The explicit contract in `TemplateConfig.ts` reduces accidental API drift, and the renderer’s reliance on that contract ensures that any modification is caught at compile time. Shared usage across sibling components reinforces consistency but also means that breaking changes to the adapter must be coordinated across the entire *CodingPatterns* subtree. Overall, the design promotes easy testing, clear responsibilities, and straightforward evolution.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -78,7 +77,6 @@ The **layered architecture** and **adapter abstraction** give ProjectTemplates a
 
 ### Siblings
 - [AntiPatterns](./AntiPatterns.md) -- AntiPatterns utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving anti-pattern data.
-
 
 ---
 

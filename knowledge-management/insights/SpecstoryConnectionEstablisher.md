@@ -109,7 +109,6 @@ Following these conventions ensures that the connection remains stable, observab
 * Centralised error handling and configuration reduce duplicated code across siblings.  
 * The only maintainability risk is the tight coupling between the Establisher and the manager; any change in the manager’s public contract may necessitate updates in the Establisher. However, this is mitigated by their co‑location within the same module.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -118,7 +117,6 @@ Following these conventions ensures that the connection remains stable, observab
 ### Siblings
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism is likely to be implemented using try-catch blocks and error logging, as commonly seen in connection establishment processes.
 - [ConfigurationSettingsManager](./ConfigurationSettingsManager.md) -- The ConfigurationSettingsManager is likely to be implemented using a configuration file or a database, allowing for easy modification of connection settings and preferences.
-
 
 ---
 

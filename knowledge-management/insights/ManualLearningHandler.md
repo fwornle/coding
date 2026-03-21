@@ -85,7 +85,6 @@ No external libraries, services, or third‑party APIs are mentioned, so the int
 * The architecture promotes maintainability: changes to orchestration (validation, logging, error handling) are confined to the handler, while algorithmic updates stay within the core.  
 * The lack of concrete code symbols in the observations limits a deeper assessment, but the naming and hierarchy indicate an intention toward clean modular boundaries, which generally eases future refactoring and onboarding.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -93,7 +92,6 @@ No external libraries, services, or third‑party APIs are mentioned, so the int
 
 ### Siblings
 - [ManualLearningCore](./ManualLearningCore.md) -- ManualLearningCore handles the core logic for ManualLearning
-
 
 ---
 

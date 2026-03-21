@@ -122,7 +122,6 @@ KnowledgeGraphQueryEngine sits at the intersection of **LLM‑driven inference**
 
 The component benefits from **clear separation of concerns**: LLM handling, query orchestration, and persistence are each isolated behind well‑named methods and shared abstractions. The reliance on a single adapter reduces code duplication, making bug fixes and enhancements localized. However, the tight coupling to the shared GraphDatabaseAdapter means that any breaking change to the underlying storage API will ripple through all siblings, demanding careful versioning and thorough integration testing. Overall, the design is **moderately maintainable**—easy to extend query logic, but changes to storage or LLM configuration require coordinated updates across the whole KnowledgeManagement family.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -133,7 +132,6 @@ The component benefits from **clear separation of concerns**: LLM handling, quer
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis
 - [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve entities in the graph database
 - [DataLossTracker](./DataLossTracker.md) -- DataLossTracker utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve data loss information
-
 
 ---
 

@@ -95,7 +95,6 @@ All interactions are mediated through well‑defined interfaces (registration AP
 
 Overall, the **ProcessRegistry** is designed as a centralized, singleton‑based catalogue that leverages callbacks/event notifications and a pluggable persistence layer to keep the rest of the system (state management and resource allocation) in lock‑step with the lifecycle of process instances.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -104,7 +103,6 @@ Overall, the **ProcessRegistry** is designed as a centralized, singleton‑based
 ### Siblings
 - [StateManager](./StateManager.md) -- The StateManager would likely implement a finite state machine using an enumeration of states (e.g., Initialized, Running, Paused, Terminated) and define transitions between these states based on specific events or actions.
 - [ResourceAllocator](./ResourceAllocator.md) -- The ResourceAllocator would need to interact with the ProcessRegistry and StateManager to ensure that resource allocation and deallocation are properly synchronized with process instance creation and state transitions.
-
 
 ---
 

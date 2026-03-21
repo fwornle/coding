@@ -73,7 +73,6 @@ No external libraries or services are mentioned, so the parser appears to be a s
 - Potential risk: regex patterns can become hard to read and maintain as the definition language grows; adding a formal grammar (e.g., using a parser generator) would improve readability but increase complexity.  
 - Documentation should capture the exact regex patterns and the expected output schema to aid future contributors.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -82,7 +81,6 @@ No external libraries or services are mentioned, so the parser appears to be a s
 ### Siblings
 - [WorkflowExecutionMechanism](./WorkflowExecutionMechanism.md) -- The WorkflowExecutionMechanism is likely to involve interactions with external agents or services to execute the workflows, as hinted by the AgentInteraction suggested detail node.
 - [AgentInteraction](./AgentInteraction.md) -- The AgentInteraction component is likely to involve API calls or message passing to interact with external agents, with the workflow-definition-parser.js file potentially providing the necessary interface definitions.
-
 
 ---
 

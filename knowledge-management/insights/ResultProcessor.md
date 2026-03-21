@@ -12,14 +12,11 @@ The ResultProcessor's functionality is vital for the DMRController's overall wor
 
 - The ResultProcessor's functionality is vital for the DMRController's overall workflow, as it enables the effective utilization of the model inference results and provides a foundation for further processing and analysis.
 
-
 ## Related Entities
 
 ### Used By
 
 - DMRController (contains)
-
-
 
 ## Hierarchy Context
 
@@ -29,7 +26,6 @@ The ResultProcessor's functionality is vital for the DMRController's overall wor
 ### Siblings
 - [ModelLoader](./ModelLoader.md) -- The ModelLoader utilizes the docker-controller.py script to interact with the Docker environment, specifically leveraging the Docker Python SDK to load models.
 - [InferenceRunner](./InferenceRunner.md) -- The InferenceRunner is expected to be implemented in conjunction with the ModelLoader, as it relies on the loaded models to execute inference tasks.
-
 
 ---
 

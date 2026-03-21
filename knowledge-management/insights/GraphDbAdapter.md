@@ -96,7 +96,6 @@ The adapter’s `query` method (GraphDBAdapter.java:30) directly leverages the g
 - **Potential technical debt** – The reliance on native query language ties the code to a specific graph database; future migration would require refactoring query construction logic.  
 - Overall, the clear separation of concerns and the use of well‑understood patterns (Adapter, Composition, Cache‑Aside) make the component maintainable, provided that query logic remains documented and any database‑specific nuances are encapsulated within the adapter.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ The adapter’s `query` method (GraphDBAdapter.java:30) directly leverages the g
 ### Siblings
 - [HeuristicClassifier](./HeuristicClassifier.md) -- HeuristicClassifier (HeuristicClassifier.java:10) utilizes a combination of machine learning and rule-based approaches to determine the classification of observations.
 - [CacheManager](./CacheManager.md) -- CacheManager (CacheManager.java:20) implements a caching layer to store frequently accessed ontology metadata, reducing the need for database queries and improving system performance.
-
 
 ---
 

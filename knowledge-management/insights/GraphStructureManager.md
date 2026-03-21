@@ -92,7 +92,6 @@ The only explicit dependency revealed is on **Graphology**, which provides the i
 * Configuration‑driven batch size makes performance tuning a non‑code change, enhancing operational maintainability.  
 * However, the reliance on a single in‑memory representation may become a maintenance hotspot if future requirements demand streaming or partial loading; extending the manager to support such patterns would require careful refactoring.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ The only explicit dependency revealed is on **Graphology**, which provides the i
 
 ### Siblings
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The parent analysis suggests the GraphDatabaseAdapter is utilized by the GraphDatabaseManager for interacting with the graph database.
-
 
 ---
 

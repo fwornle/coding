@@ -67,7 +67,6 @@ Finally, because the manager is the sole holder of configuration data, its threa
 * The singleton approach yields high maintainability for small‑to‑medium codebases: a single location to adjust settings, easy traceability, and minimal boilerplate.  
 * As the system grows, the monolithic configuration manager could become a maintenance hotspot; separating concerns (e.g., splitting connection‑specific settings from logging settings) or introducing a configuration provider interface would improve modularity without breaking existing contracts.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -76,7 +75,6 @@ Finally, because the manager is the sole holder of configuration data, its threa
 ### Siblings
 - [SpecstoryConnectionEstablisher](./SpecstoryConnectionEstablisher.md) -- The SpecstoryAdapter class is utilized to create a connection to the Specstory extension, as seen in the parent component's context.
 - [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism is likely to be implemented using try-catch blocks and error logging, as commonly seen in connection establishment processes.
-
 
 ---
 

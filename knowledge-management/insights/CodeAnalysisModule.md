@@ -81,7 +81,6 @@ All of these steps are orchestrated synchronously inside `parseCodeRepository`, 
 - **Risk** lies in the tightly coupled JSON contract; any schema change propagates through several modules, demanding coordinated updates and comprehensive tests.  
 - Documentation of the adapter interface and the JSON schema is essential to keep sibling components aligned and to prevent divergent storage expectations.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ All of these steps are orchestrated synchronously inside `parseCodeRepository`, 
 - [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve ontology classification results in the graph database.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- NaturalLanguageProcessingModule utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve natural language processing results in the graph database.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology library (graphology.ts) to interact with the graph database.
-
 
 ---
 

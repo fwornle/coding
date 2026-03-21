@@ -122,7 +122,6 @@ ViolationCapture is a leaf sub‑component under **ConstraintSystem**, sharing t
 
 By adhering to the guidelines above, developers can extend ViolationCapture safely, keep performance predictable, and maintain the overall health of the ConstraintSystem’s violation‑management pipeline.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -132,7 +131,6 @@ By adhering to the guidelines above, developers can extend ViolationCapture safe
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
 - [SemanticAnalyzer](./SemanticAnalyzer.md) -- SemanticAnalyzer leverages natural language processing (NLP) techniques to parse and understand entity content.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter implements a standardized data model for representing entities, relationships, and constraints in the graph database.
-
 
 ---
 

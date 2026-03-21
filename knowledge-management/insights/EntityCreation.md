@@ -88,12 +88,10 @@ Given the lack of direct source symbols, we can infer that **EntityCreation** do
 * **Risk of drift** – Because the domain model is inferred rather than explicitly typed in the observations, developers must keep the adapter’s input contracts aligned with any evolution of entity schemas.  
 * **Documentation reliance** – Since no concrete symbols are present, up‑to‑date documentation (like this insight) is essential to prevent misuse of the adapter or accidental bypass of **EntityCreation**.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities in the knowledge graph.
-
 
 ---
 

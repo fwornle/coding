@@ -75,12 +75,10 @@ If additional agents or services were added later, they would follow the same pa
 4. **Scalability considerations** – The cache enables horizontal scaling of classification workloads within a single process by avoiding repeated I/O.  However, without eviction or sharding, scaling to a very large number of distinct ontologies may be limited by available RAM.  
 5. **Maintainability assessment** – Encapsulation of the cache behind OntologyManager improves maintainability: changes to caching strategy (e.g., adding eviction, swapping to a distributed store) can be made inside the manager without touching agents.  The simplicity of the observed design (single map, lazy load) also aids readability and testing, though future growth may require more sophisticated cache management.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-
 
 ---
 

@@ -64,7 +64,6 @@ The integration is file‑based (markdown) rather than in‑process API calls, a
 ### 5. Maintainability assessment  
 The use of declarative markdown and small, single‑purpose phases makes the system **highly maintainable**: developers can add, remove, or reorder phases without touching code.  The clear separation between the planner (execution) and the sibling modules (domain‑specific processing) reduces coupling.  The main maintenance risk lies in the reliance on file‑based communication; any change to the markdown schema must be propagated consistently across all consumers.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -73,7 +72,6 @@ The use of declarative markdown and small, single‑purpose phases makes the sys
 ### Siblings
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule is likely to be implemented using a library or framework, such as NLTK or spaCy, given the complexity of natural language processing tasks.
 - [MachineLearningIntegrationPoint](./MachineLearningIntegrationPoint.md) -- The MachineLearningIntegrationPoint is likely to be implemented using a library or framework, such as scikit-learn or TensorFlow, given the complexity of machine learning tasks.
-
 
 ---
 

@@ -55,12 +55,10 @@ No additional classes, functions, or files are mentioned, so the analysis is lim
 * High maintainability: the DAG is expressed in a single, human‑readable YAML file, making it easy to audit and modify.
 * Risks arise if developers forget to update `depends_on` when adding or refactoring steps, potentially introducing hidden ordering bugs. Automated validation of the DAG (e.g., cycle detection) would mitigate this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-
 
 ---
 

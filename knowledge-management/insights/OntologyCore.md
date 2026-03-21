@@ -77,12 +77,10 @@ Given the limited visibility into the actual API, the following best‑practice 
 * The clear hierarchical separation (SemanticAnalysis → Ontology → OntologyCore) aids maintainability: developers can modify the core without touching higher‑level analysis code, provided the public contract of the Ontology façade remains stable.  
 * The lack of visible source files limits immediate assessment of code quality, test coverage, and documentation; adding comprehensive unit tests around the **OntologyCore** API would be a prudent step to improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Ontology](./Ontology.md) -- Ontology is a sub-component of SemanticAnalysis
-
 
 ---
 

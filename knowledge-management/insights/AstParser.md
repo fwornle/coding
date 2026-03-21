@@ -76,7 +76,6 @@ No other explicit interfaces are described, so the integration surface is limite
 ### Maintainability assessment  
 * The clear separation of concerns (agent, constructor, parser, builder) aids maintainability; changes to language support are confined to the **AstParser** configuration.  However, the lack of a dedicated file for **AstParser** in the observed tree could make locating the wrapper harder for new developers, suggesting a future refactor to give the parser its own module with explicit documentation.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -84,7 +83,6 @@ No other explicit interfaces are described, so the integration surface is limite
 
 ### Siblings
 - [GraphBuilder](./GraphBuilder.md) -- The CodeGraphConstructor class constructs the knowledge graph from the parsed AST, which is facilitated by the GraphBuilder.
-
 
 ---
 

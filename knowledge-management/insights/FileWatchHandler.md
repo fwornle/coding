@@ -133,7 +133,6 @@ The handler abstracts the underlying filesystem through a thin wrapper that dete
 
 Overall, **FileWatchHandler** exhibits a pragmatic, well‑encapsulated architecture that balances reliability (polling) with performance (event‑driven watch) while keeping the implementation simple enough for easy maintenance and future extension.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -149,7 +148,6 @@ Overall, **FileWatchHandler** exhibits a pragmatic, well‑encapsulated architec
 - [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes the SpecstoryAdapter class to log conversations, providing methods for formatting log entries and handling errors.
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- SpecstoryAdapter utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
 - [TrajectoryController](./TrajectoryController.md) -- TrajectoryController utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
-
 
 ---
 

@@ -8,7 +8,7 @@ The ProviderRegistry enables the component to be highly flexible and scalable, a
 
 The **ProviderRegistry** lives in the file `lib/llm/provider-registry.js`. It is the central registry that holds the concrete LLM provider implementations used by the **LLMAbstraction** component. By design it is *provider‑agnostic*: the registry does not contain any provider‑specific logic, only the mappings between a **ProviderConfig** (e.g., an API key) and a concrete provider class such as `AnthropicProvider` (`lib/llm/providers/anthropic-provider.ts`) or `DMRProvider` (`lib/llm/providers/dmr-provider.ts`). Because the registry is a child of **LLMAbstraction**, any consumer of the abstraction interacts with the registry indirectly—asking the abstraction for a provider instance rather than instantiating a provider itself. This decoupling lets the system add, replace, or remove providers without touching the rest of the codebase.
 
-![ProviderRegistry — Architecture](../../.data/knowledge-graph/insights/images/provider-registry-architecture.png)
+![ProviderRegistry — Architecture](images/provider-registry-architecture.png)
 
 ---
 
@@ -20,7 +20,7 @@ Each concrete provider (e.g., `AnthropicProvider`, `DMRProvider`) extends the sh
 
 The design is deliberately **decoupled**: the registry does not import any business‑logic modules other than the provider classes themselves, and providers do not reference the registry. This one‑way dependency keeps the system modular and simplifies testing—providers can be instantiated in isolation, and the registry can be swapped with a mock during unit tests.
 
-![ProviderRegistry — Relationship](../../.data/knowledge-graph/insights/images/provider-registry-relationship.png)
+![ProviderRegistry — Relationship](images/provider-registry-relationship.png)
 
 ---
 
@@ -97,7 +97,6 @@ The registry’s implementation is lightweight: it does not perform heavy logic 
 * Decoupling via interfaces limits ripple effects when a provider changes internally.  
 * The only maintenance risk is ensuring that **ProviderConfig** stays in sync with provider requirements; automated validation of config keys can mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -108,7 +107,6 @@ The registry’s implementation is lightweight: it does not perform heavy logic 
 
 ### Siblings
 - [LLMProvider](./LLMProvider.md) -- The AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) extends the LLMProvider class.
-
 
 ---
 

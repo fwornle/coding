@@ -68,12 +68,10 @@ No other sibling components are mentioned, but any future component that needs g
 - **Testability** – Dependency injection allows isolated unit tests for both manager and adapter.  
 - **Future extensibility** – Adding new graph operations will require expanding the adapter’s interface, which is straightforward given the existing pattern, but developers must ensure backward compatibility with the manager.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [IntelligentRoutingManager](./IntelligentRoutingManager.md) -- IntelligentRoutingManager uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the graph database.
-
 
 ---
 

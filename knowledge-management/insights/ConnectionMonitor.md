@@ -75,7 +75,6 @@ No direct child components are mentioned for ConnectionMonitor; its outward‑fa
 - The lack of direct coupling to retry logic or logging implementations means changes in those areas have minimal impact on ConnectionMonitor.  
 - Documentation should emphasize the event contract between ConnectionMonitor and SpecstoryAdapter to avoid mismatches when either side evolves.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ No direct child components are mentioned for ConnectionMonitor; its outward‑fa
 - [RetryPolicyManager](./RetryPolicyManager.md) -- RetryPolicyManager implements a retry mechanism with limited retries, demonstrating a fault-tolerant approach to handling failures and retries.
 - [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
 - [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
-
 
 ---
 

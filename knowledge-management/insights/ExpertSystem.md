@@ -82,7 +82,6 @@ Interaction with other components is straightforward: the ExpertSystem receives 
 
 Overall, **ExpertSystem** embodies a well‑encapsulated, extensible reasoning layer that aligns with the broader architectural themes of the *KnowledgeManagement* ecosystem while providing concrete performance safeguards through caching and indexing.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -98,7 +97,6 @@ Overall, **ExpertSystem** embodies a well‑encapsulated, extensible reasoning l
 - [Logger](./Logger.md) -- Logger uses a logging library, such as Log4j, to interact with the logging system, as defined in the logging-config.js file
 - [KnowledgeGraph](./KnowledgeGraph.md) -- KnowledgeGraph.java uses a graph database to store knowledge entities and their relationships, allowing for flexible querying and reasoning.
 - [InformationRetrieval](./InformationRetrieval.md) -- InformationRetrieval.java implements a query engine that supports SPARQL and SQL queries, allowing developers to retrieve information from the knowledge graph using standard query languages.
-
 
 ---
 

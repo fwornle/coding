@@ -51,12 +51,10 @@ The lack of source symbols prevents us from naming exact classes or functions, b
 4. **Scalability considerations** – batch size tuning enables the system to scale horizontally (more parallel batch jobs) and vertically (larger batches on powerful nodes). The facade design also makes it feasible to replace the underlying graph engine if scaling demands change.  
 5. **Maintainability assessment** – encapsulating all graph interactions in a single library improves maintainability; changes to connection handling or batch logic affect only one place. However, the lack of visible source symbols means that documentation and clear configuration contracts are critical to avoid misuse.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseComponent](./GraphDatabaseComponent.md) -- The GraphDatabaseComponent likely uses a graph database library, such as Neo4j, to store and retrieve knowledge entities.
-
 
 ---
 

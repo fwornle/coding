@@ -79,7 +79,6 @@ Error handling should be centralized: let each stage throw domain‑specific exc
 * Centralized error handling and consistent interfaces reduce duplication.
 * The modest risk lies in the tight coupling between the handler and pipeline; any change to the pipeline’s contract requires coordinated updates to the handler.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -88,7 +87,6 @@ Error handling should be centralized: let each stage throw domain‑specific exc
 ### Siblings
 - [RequestValidator](./RequestValidator.md) -- The RequestValidator likely resides in the CompletionRequestPipeline.java file, where it checks for required fields and data types in the incoming request
 - [ResponseHandler](./ResponseHandler.md) -- The ResponseHandler probably interacts with the LLM providers through a standardized interface or API, which is defined in a separate module or package
-
 
 ---
 

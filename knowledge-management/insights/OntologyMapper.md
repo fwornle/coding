@@ -94,12 +94,10 @@ Even though the source files for `OntologyMapper` are not provided, the observat
 
 5. **Maintainability assessment** – The clear division between domain logic (agent), transformation (mapper), and infrastructure (adapter) yields high maintainability. Adding new ontology concepts only requires updates in the mapper, while changing the graph engine only touches `GraphDatabaseAdapter`. The primary risk is the lack of concrete unit tests for the mapper; injecting a mock adapter can mitigate this.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent utilizes the GraphDatabaseAdapter to persist classified observations in a graph database, enabling efficient querying and analysis of the data in storage/graph-database-adapter.ts
-
 
 ---
 

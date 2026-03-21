@@ -49,7 +49,6 @@ Because state transitions are lightweight and driven by simple counters and time
 ### Maintainability assessment  
 The clear separation between state management, failure detection, and back‑off logic makes the codebase maintainable.  Adding new states (e.g., a *forced‑open* mode) or swapping the back‑off algorithm requires changes only in the respective module.  The reliance on a single source file (`CircuitBreaker.js`) for the FSM keeps the implementation discoverable, while sibling modules can evolve independently, supporting long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -60,7 +59,6 @@ The clear separation between state management, failure detection, and back‑off
 - [BackoffStrategy](./BackoffStrategy.md) -- The BackoffStrategy (circuit-breaker-state-machine.py:300) implements an exponential backoff algorithm, increasing the delay between retries to prevent cascading failures and allow the service time to recover.
 - [FailureDetector](./FailureDetector.md) -- The FailureDetector would need to integrate with the ProviderHealthMonitor to gather information about the health of the providers and detect failures.
 - [BackoffStrategy](./BackoffStrategy.md) -- The BackoffStrategy would be implemented as a separate module, allowing for easy modification or replacement of the backoff algorithm.
-
 
 ---
 

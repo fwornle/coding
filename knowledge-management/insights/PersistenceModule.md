@@ -88,7 +88,6 @@ The *intelligent routing* exposes two external interfaces: an **API endpoint** (
 ### Maintainability Assessment  
 The adapter‑centric design yields high **maintainability**: changes to storage technology or routing logic are confined to `storage/graph-database-adapter.ts`.  This isolation reduces the surface area for bugs across the many sibling modules.  However, the tight coupling means that any breaking change in the adapter’s contract forces coordinated updates across all dependent modules, demanding disciplined versioning and comprehensive integration testing.  Overall, the architecture balances ease of evolution with the need for careful coordination.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -101,7 +100,6 @@ The adapter‑centric design yields high **maintainability**: changes to storage
 - [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage code-related entities and relationships.
 - [CheckpointManagementModule](./CheckpointManagementModule.md) -- CheckpointManagementModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage checkpoint-related entities and relationships.
 - [ObservationDerivationModule](./ObservationDerivationModule.md) -- ObservationDerivationModule utilizes the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage observation-related entities and relationships.
-
 
 ---
 

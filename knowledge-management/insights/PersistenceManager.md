@@ -89,7 +89,6 @@ The manager also supplies a **query mechanism** that is described as “flexible
 * **Clear responsibility boundaries** – Agents focus on business logic; PersistenceManager handles data integrity, making the codebase easier to reason about.  
 * **Potential risk** – The lack of visible public interfaces in the current snapshot means documentation and type definitions are critical; without them, developers may misuse the manager.  Adding comprehensive API docs and unit tests would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ The manager also supplies a **query mechanism** that is described as “flexible
 - [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- The CodeGraphAgent constructs a knowledge graph of code entities using Tree-sitter AST parsing, as seen in the SemanticAnalysis component description
 - [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator generates insights based on the processed observations and code graph analysis, as seen in the SemanticAnalysis component description
 - [WorkflowManager](./WorkflowManager.md) -- The WorkflowManager coordinates the workflow of agents, ensuring the correct execution of tasks, as seen in the SemanticAnalysis component description
-
 
 ---
 

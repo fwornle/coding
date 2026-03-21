@@ -93,7 +93,6 @@ Because `CacheInvalidationHandler` is encapsulated within `ClassificationCacheMa
 * Because the handler does not embed business logic beyond TTL checks, unit testing is straightforward—mock timestamps and verify validity outcomes.  
 * The only maintenance risk is **configuration drift**: if TTL values are changed in one part of the system but not reflected in the handler’s defaults, inconsistencies may arise.  Centralizing TTL configuration in `ClassificationCacheManager` mitigates this risk.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -102,7 +101,6 @@ Because `CacheInvalidationHandler` is encapsulated within `ClassificationCacheMa
 ### Siblings
 - [LLMCallCoordinator](./LLMCallCoordinator.md) -- LLMCallCoordinator would need to interact with the ClassificationCache class to determine when cache entries are invalid and require an LLM call, potentially using a callback mechanism to trigger the call
 - [CacheHitHandler](./CacheHitHandler.md) -- CacheHitHandler would work closely with the ClassificationCache class to retrieve cached results, using a cache key to identify and fetch the relevant entry
-
 
 ---
 

@@ -79,7 +79,6 @@ Because request handling is tightly bound to a single client instance, scaling t
 * **Positive aspects** – Clear separation of request and response concerns; a single, well‑defined integration file makes contract changes straightforward.  
 * **Risks** – Tight coupling limits reusability and can increase the impact radius of changes. The absence of an explicit interface between `ApiRequestHandler` and the extension API means that any change in the extension’s method signatures forces updates across the client, handler, and possibly the response handler. Maintaining thorough unit and integration tests around `specstory-adapter.js` is essential to keep the module stable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -87,7 +86,6 @@ Because request handling is tightly bound to a single client instance, scaling t
 
 ### Siblings
 - [ApiResponseHandler](./ApiResponseHandler.md) -- Given the SpecstoryApiClient's role in interacting with the Specstory extension, the ApiResponseHandler likely plays a crucial role in parsing or processing the responses, which could involve deserialization or error handling.
-
 
 ---
 

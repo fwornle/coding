@@ -58,12 +58,10 @@ Within the codebase, ServiceInitializer is invoked by the **ServiceStarterManage
 4. **Scalability considerations** – Because Docker Compose is primarily intended for single‑host deployments, scaling beyond one host would require replacing the initializer with a more distributed orchestrator (e.g., Kubernetes). Within a single host, adding more services only grows the YAML size and health‑check load, which the initializer can handle as long as the host resources suffice.  
 5. **Maintainability assessment** – Encapsulating Docker‑Compose interactions in ServiceInitializer promotes maintainability: changes to startup logic are localized, and the declarative YAML keeps service configuration separate from code. However, the tight coupling to Docker Compose means any breaking changes in Docker’s CLI or health‑check behavior will require coordinated updates to the initializer.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceStarterManager](./ServiceStarterManager.md) -- ServiceStarterManager uses the docker-compose.yaml file to define the services and their dependencies, ensuring proper startup and health verification.
-
 
 ---
 

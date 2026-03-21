@@ -72,7 +72,6 @@ No explicit library or API dependencies beyond standard POSIX shell utilities an
 | **Scalability considerations** | Scalability is bounded by Tmux itself – the status line can display only a modest amount of data, and the script runs synchronously with each Copi invocation. For large‑scale trace volumes, the visual component remains a lightweight monitor, not a data sink. |
 | **Maintainability assessment** | High maintainability for small teams because the integration is simple and well‑documented. However, the lack of concrete code symbols means that any refactor must be carefully reflected in the README files to avoid drift. Consistent documentation updates are essential for long‑term health. |
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -80,7 +79,6 @@ No explicit library or API dependencies beyond standard POSIX shell utilities an
 
 ### Siblings
 - [LoggingHandler](./LoggingHandler.md) -- The integrations/copi/README.md file mentions that Copi provides logging functionality, indicating the presence of a logging handler in the UKBTraceReporting sub-component.
-
 
 ---
 

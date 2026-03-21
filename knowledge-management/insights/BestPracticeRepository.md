@@ -20,7 +20,7 @@ The architectural picture of **BestPracticeRepository** can be understood only b
 
 In this context, **BestPracticeRepository** is positioned as a *data source* that feeds curated best‑practice nodes into the same graph.  The repository does not introduce its own runtime behaviour; instead, it supplies static knowledge that the graph‑processing pipeline can query.  This design keeps the repository lightweight and decoupled from the processing engine, allowing the graph layer to evolve independently.  
 
-![BestPracticeRepository — Architecture](../../.data/knowledge-graph/insights/images/best-practice-repository-architecture.png)  
+![BestPracticeRepository — Architecture](images/best-practice-repository-architecture.png)  
 
 The architecture therefore follows a **separation‑of‑concerns** pattern: the repository holds immutable guidance artefacts, while the graph engine (used by **CodeAnalysisPatterns**, **GraphCodeRAG**, and other siblings) handles traversal, inference, and recommendation generation.  No explicit design patterns such as factories or adapters are visible in the source because the repository is not represented by code; the pattern that does emerge is the *knowledge‑base* pattern, where a read‑only data store is queried by multiple consumers.
 
@@ -55,7 +55,7 @@ Because the observations report **0 code symbols** and no explicit file paths fo
 
 4. **Sibling Consumption** – Components such as **DesignPatternLibrary** and **AntiPatternIdentification** may reference the same underlying markdown artefacts to enrich their own knowledge graphs.  This shared consumption reinforces consistency across the **CodingPatterns** family.
 
-![BestPracticeRepository — Relationship](../../.data/knowledge-graph/insights/images/best-practice-repository-relationship.png)  
+![BestPracticeRepository — Relationship](images/best-practice-repository-relationship.png)  
 
 Through these pathways, the repository remains a *passive* yet essential source of guidance, allowing multiple consumers to stay synchronized with the latest best‑practice definitions without requiring duplicated logic.
 
@@ -85,7 +85,6 @@ Given the lack of concrete implementation code, the practical guidance for devel
 4. **Scalability considerations** – Because the repository is file‑based, scaling is mainly a matter of filesystem performance and parser throughput; the graph engine can horizontally scale the ingestion pipeline to handle large numbers of markdown files.  
 5. **Maintainability assessment** – High maintainability: the repository consists of plain markdown, versioned alongside code, with contribution guidelines that enforce consistency.  The main risk is drift between the markdown schema and the graph‑ingestion parser, mitigated by shared contribution templates and periodic audits.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -96,7 +95,6 @@ Given the lack of concrete implementation code, the practical guidance for devel
 - [DesignPatternLibrary](./DesignPatternLibrary.md) -- DesignPatternLibrary is mentioned as a known sub-component but lacks specific references in the provided source files.
 - [AntiPatternIdentification](./AntiPatternIdentification.md) -- AntiPatternIdentification is recognized as a sub-component but lacks direct references in the provided source files.
 - [GraphCodeRAG](./GraphCodeRAG.md) -- GraphCodeRAG is described in integrations/code-graph-rag/README.md as a Graph-Code RAG system for any codebases.
-
 
 ---
 

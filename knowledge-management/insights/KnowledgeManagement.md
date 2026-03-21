@@ -14,7 +14,7 @@ The **KnowledgeManagement** component lives under the *integrations/mcp‑server
 
 Supporting scripts such as `scripts/migrate-graph-db-entity-types.js` keep the live LevelDB/Graphology database in sync when entity‑type definitions evolve. Together these pieces give KnowledgeManagement the ability to ingest code‑level artifacts (via the **CodeGraphRAG** child), classify them with the **OntologySystem**, and surface insights through the **UKBTraceReport** utility.  
 
-![KnowledgeManagement — Architecture](../../.data/knowledge-graph/insights/images/knowledge-management-architecture.png)
+![KnowledgeManagement — Architecture](images/knowledge-management-architecture.png)
 
 ---
 
@@ -28,7 +28,7 @@ A **checkpoint system** (Observation 4) provides deterministic progress tracki
 
 Finally, the component is **script‑driven for schema evolution**. The `migrateGraphDatabase` script (Observation 1) runs as a one‑off migration step, updating entity‑type definitions directly in the LevelDB store. This explicit migration path reinforces data integrity while keeping the runtime code free of version‑checking logic.  
 
-![KnowledgeManagement — Relationship](../../.data/knowledge-graph/insights/images/knowledge-management-relationship.png)
+![KnowledgeManagement — Relationship](images/knowledge-management-relationship.png)
 
 ---
 
@@ -109,7 +109,6 @@ Following these conventions will maintain the lock‑free guarantees, keep the k
 4. **Scalability considerations** – The lock‑free approach scales horizontally when multiple processes read via the VKB API; however, direct LevelDB writes are single‑process bound, so production deployments should keep the VKB server alive. Checkpoint JSON files should be sharded or rotated for very large graphs. Migration scripts must be idempotent to support rolling upgrades.  
 5. **Maintainability assessment** – The clear constructor contracts, isolated adapter, and explicit migration script give the codebase high maintainability. The reliance on dynamic `require` is a minor source of complexity but is well‑documented. Adding new agents or ontologies is straightforward, provided developers follow the established patterns and update the checkpoint/ migration processes accordingly.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -134,7 +133,6 @@ Following these conventions will maintain the lock‑free guarantees, keep the k
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
 - [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
-
 
 ---
 

@@ -96,7 +96,6 @@ External dependencies are limited to the chosen HTTP library (Axios or Fetch) an
 - Centralising error handling reduces duplication, but any change to the error contract must be propagated to all consumers (primarily `SpecstoryConnector`).  
 - Absence of concrete file paths in the current documentation suggests a need for explicit module placement and naming conventions to aid discoverability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -105,7 +104,6 @@ External dependencies are limited to the chosen HTTP library (Axios or Fetch) an
 ### Siblings
 - [ConnectionManager](./ConnectionManager.md) -- The ConnectionManager would likely be implemented in a separate module, such as connection-manager.ts, to handle connection establishment and termination
 - [AuthenticationHandler](./AuthenticationHandler.md) -- The AuthenticationHandler would implement authentication protocols, such as OAuth or JWT, to verify the identity of the connecting entity
-
 
 ---
 

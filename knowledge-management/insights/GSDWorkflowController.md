@@ -63,7 +63,6 @@ Because the controller delegates external calls to the **SpecstoryAdapter**, sca
 ### Maintainability assessment  
 The explicit separation of orchestration, integration, and tracking yields a high maintainability rating.  Changes to the Specstory API only require updates inside `lib/integrations/specstory-adapter.js`; workflow logic changes stay confined to the controller; and visibility enhancements affect only **WorkflowTracker**.  The main risk lies in the controller becoming a “god object” if future features are added without respecting the existing boundaries, so disciplined code reviews and modular testing are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -72,7 +71,6 @@ The explicit separation of orchestration, integration, and tracking yields a hig
 ### Siblings
 - [SpecstoryAdapter](./SpecstoryAdapter.md) -- The SpecstoryAdapter class is defined in lib/integrations/specstory-adapter.js, which suggests a modular design for integrating with external services.
 - [WorkflowTracker](./WorkflowTracker.md) -- The WorkflowTracker's role in the GSDWorkflowManager suggests an emphasis on operational visibility and control, which is crucial for managing complex workflows.
-
 
 ---
 

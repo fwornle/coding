@@ -73,12 +73,10 @@ Developers who need to extend or maintain the pattern‑based insight generation
 * Clear boundaries and a single responsibility (pattern matching) make the codebase easy to understand and test.  
 * Reliance on a stable input contract from **SemanticAnalysis** is a potential fragility; versioned interfaces or adapters can improve resilience.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-
 
 ---
 

@@ -121,7 +121,6 @@ These integration points collectively illustrate a **layered** interaction model
 
 Overall, the ViolationProcessor appears to be a well‑encapsulated, fault‑aware component that fits cleanly into the **ConstraintSystem** hierarchy, leveraging established patterns used by its sibling components while providing a dedicated pathway for handling, persisting, and exposing constraint violations.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -134,7 +133,6 @@ Overall, the ViolationProcessor appears to be a well‑encapsulated, fault‑awa
 - [ContentValidator](./ContentValidator.md) -- ContentValidator uses the constructor(config) + initialize() + execute(input) pattern in content-validation-agent.ts, allowing for lazy initialization and execution
 - [HookManager](./HookManager.md) -- HookManager utilizes a event-driven architecture, with hook events and handlers registered and managed through a centralized interface
 - [ConstraintEngine](./ConstraintEngine.md) -- ConstraintEngine likely interacts with the ContentValidator sub-component to receive and process constraint evaluations
-
 
 ---
 

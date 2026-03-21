@@ -94,7 +94,6 @@ External integration is limited to the public repository interface; no direct fi
 * Clear separation between **persistence**, **indexing**, and **optimisation** reduces coupling and eases unit testing.
 * The need for explicit cache invalidation after writes adds a maintenance burden; automated hooks between **GraphDatabasePersistence** and the adapter are advisable to keep this reliable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -103,7 +102,6 @@ External integration is limited to the public repository interface; no direct fi
 ### Siblings
 - [GraphDatabasePersistence](./GraphDatabasePersistence.md) -- The Repository pattern used in the GraphDatabaseAdapter class (graph-database-adapter.py) abstracts the graph database interactions, providing a layer of abstraction for data persistence.
 - [GraphDatabaseIndexing](./GraphDatabaseIndexing.md) -- The GraphDatabaseAdapter class may utilize indexing mechanisms, such as B-tree indexing or hash indexing, to accelerate graph queries and reduce the time complexity of data retrieval.
-
 
 ---
 

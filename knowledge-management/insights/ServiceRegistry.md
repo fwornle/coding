@@ -75,7 +75,6 @@ The ServiceRegistry is a central node in a loosely coupled graph of sibling comp
 ### Maintainability assessment  
 The clear separation between lifecycle (ServiceManager), health verification (HealthChecker), and discovery (ServiceRegistry) promotes maintainability; changes to one area are unlikely to ripple across others.  However, the reliance on multiple adapters and cache synchronization introduces additional moving parts that require disciplined testing and documentation to keep the system coherent.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -86,7 +85,6 @@ The clear separation between lifecycle (ServiceManager), health verification (He
 - [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator uses Docker containerization to manage services, ensuring isolation and scalability.
 - [HealthChecker](./HealthChecker.md) -- The HealthChecker uses the isServiceHealthy function to check the health of services by making requests to their health endpoints.
 - [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
-
 
 ---
 

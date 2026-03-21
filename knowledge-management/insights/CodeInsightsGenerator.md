@@ -81,7 +81,6 @@ While the source snapshot does not expose concrete symbols, the observations giv
 - **Configuration‑driven** – Adding or removing insight rules is a matter of updating YAML files rather than altering core logic, reducing the risk of regressions.  
 - **Potential risk** – The absence of concrete type definitions in the current snapshot means that developers must rely on interface contracts; any drift between the generator’s expectations and the graph schema could introduce subtle bugs, so strong integration tests are essential.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -100,7 +99,6 @@ While the source snapshot does not expose concrete symbols, the observations giv
 - [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph is likely to be implemented as a separate module or component, with its own data structures and querying mechanisms, to store and manage the code metadata.
 - [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor likely utilizes the parent component's suggested node, KnowledgeGraph, to store and query code metadata for semantic analysis, as indicated by the parent analysis.
 - [NaturalLanguageProcessingModule](./NaturalLanguageProcessingModule.md) -- The NaturalLanguageProcessingModule likely incorporates machine learning algorithms, as suggested by the parent analysis, to improve the accuracy and effectiveness of code analysis and insight generation.
-
 
 ---
 

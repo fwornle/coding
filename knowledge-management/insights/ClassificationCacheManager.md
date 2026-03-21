@@ -116,7 +116,6 @@ ClassificationCacheManager sits at the heart of the *KnowledgeManagement* compon
 
 The clear modular boundaries (cache, invalidation, LLM client, hit/miss services) promote high maintainability. Each module can be unit‑tested in isolation, and the façade (`ClassificationCacheManagerModule`) offers a single point of change for API evolution. The explicit naming of handlers and services reduces cognitive load for new developers. Potential maintenance risk lies in the coordination logic that decides hit vs. miss; ensuring that the cache key generation remains consistent across all handlers is critical. Overall, the architecture balances readability with extensibility, making future enhancements (e.g., adding async LLM calls or a distributed cache) achievable with limited ripple effects.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -136,7 +135,6 @@ The clear modular boundaries (cache, invalidation, LLM client, hit/miss services
 - [DataLossTracker](./DataLossTracker.md) -- DataLossTracker uses the DataFlowMonitor class in data_flow_monitor.py to monitor data flow and track data loss.
 - [OntologyManager](./OntologyManager.md) -- OntologyManager uses the OntologyUpdater class in ontology_updater.py to update the ontology.
 - [WorkflowManager](./WorkflowManager.md) -- WorkflowManager uses the WorkflowRunner class in workflow_runner.py to run workflows.
-
 
 ---
 

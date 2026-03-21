@@ -107,12 +107,10 @@ Other integration points that can be deduced:
 * The clear separation of concerns makes the codebase easier to maintain: changes to start‑up policies affect only `lib/service-starter.js`.  
 * However, the lack of visible unit tests or explicit interfaces in the observations suggests a potential risk: without contract documentation, downstream developers may misuse the API. Adding TypeScript typings or JSDoc comments would further improve maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the ServiceStarter class in lib/service-starter.js to provide robust service startup with retry, timeout, and graceful degradation.
-
 
 ---
 

@@ -66,12 +66,10 @@ The synchronizer does **not** appear to expose a public API beyond the `syncData
 * **Risk** – the lack of a public contract (e.g., interface or abstract class) means that any change to the method signature of `syncData` forces updates in the adapter, increasing the coupling surface.  
 * **Documentation gap** – with no visible source symbols, developers must rely on observations or external docs; adding explicit type definitions and inline documentation would improve long‑term maintainability.
 
-
 ## Hierarchy Context
 
 ### Parent
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the Graphology+LevelDB database for storing and querying knowledge graphs, as seen in the storeEntity method.
-
 
 ---
 

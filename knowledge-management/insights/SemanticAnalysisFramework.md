@@ -61,7 +61,6 @@ Cache hits should be checked before calling the framework; the parent component 
 * Dependence on external libraries (Stanbol/OpenNLP) means version upgrades must be coordinated across the component.  
 * Because the framework is the sole entry point (`SemanticAnalysisFramework.java`), any change has wide impact; thorough integration tests with KnowledgeGraph and CacheManager are essential to preserve system stability.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -70,7 +69,6 @@ Cache hits should be checked before calling the framework; the parent component 
 ### Siblings
 - [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph may be implemented using a graph database, such as Neo4j or Amazon Neptune, to efficiently store and query complex relationships between entities.
 - [CacheManager](./CacheManager.md) -- The CacheManager may utilize a caching library, such as Redis or Ehcache, to store and retrieve analysis results, leveraging its built-in features for cache expiration, invalidation, and size management.
-
 
 ---
 

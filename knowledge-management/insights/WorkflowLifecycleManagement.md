@@ -72,7 +72,6 @@ No additional child entities are mentioned, so the manager’s public surface is
 - However, the proliferation of small state classes can increase the code footprint; clear documentation of each state’s responsibilities mitigates this risk.  
 - Centralizing persistence behind an interface isolates storage‑specific changes, aiding future migrations (e.g., from a relational DB to a NoSQL store).
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -81,7 +80,6 @@ No additional child entities are mentioned, so the manager’s public surface is
 ### Siblings
 - [WorkflowRunner](./WorkflowRunner.md) -- The WorkflowRunner class is defined in the workflow_runner.py file, which suggests that it is a key component of the WorkflowManager sub-component.
 - [WorkflowExecution](./WorkflowExecution.md) -- The WorkflowExecution aspect of the WorkflowManager sub-component may involve the use of specific algorithms or patterns, such as dependency resolution or task scheduling, to manage workflow execution.
-
 
 ---
 

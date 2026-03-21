@@ -14,7 +14,7 @@ ServiceOrchestrator follows a **modular orchestration** pattern: it isolates the
 
 The parent component **DockerizedServices** employs dependency injection (as described in the LLMService implementation) to wire together its sub‑components. Although the observations do not explicitly call out DI for ServiceOrchestrator, its placement under DockerizedServices strongly suggests that it is instantiated and supplied with its dependencies (e.g., a reference to ServiceStarter) via the same injection mechanism. This promotes loose coupling between ServiceOrchestrator and sibling managers such as **LLMManager**, **GraphDatabaseManager**, **WaveAgentExecutor**, **APIService**, and **DashboardService**, allowing each to request service startup without needing to know the exact startup sequence or error‑handling strategy.
 
-![ServiceOrchestrator — Architecture](../../.data/knowledge-graph/insights/images/service-orchestrator-architecture.png)
+![ServiceOrchestrator — Architecture](images/service-orchestrator-architecture.png)
 
 ## Implementation Details  
 
@@ -30,7 +30,7 @@ ServiceOrchestrator itself likely exposes a small public API such as `startServi
 
 Because ServiceOrchestrator sits within DockerizedServices, its lifecycle is tied to the container orchestration layer. When DockerizedServices boots, it can invoke ServiceOrchestrator to bring up all required services in a deterministic order, respecting dependencies among them.
 
-![ServiceOrchestrator — Relationship](../../.data/knowledge-graph/insights/images/service-orchestrator-relationship.png)
+![ServiceOrchestrator — Relationship](images/service-orchestrator-relationship.png)
 
 ## Integration Points  
 
@@ -82,7 +82,6 @@ Because ServiceStarter handles retries and timeouts per service, scaling the num
 
 The clear separation between ServiceOrchestrator and ServiceStarter improves maintainability: changes to retry policies, timeout thresholds, or degradation strategies can be made in `lib/service-starter.js` without touching orchestration logic. The use of dependency injection further isolates components, making unit testing straightforward—mocks of ServiceStarter can be injected into ServiceOrchestrator tests. The primary maintenance risk lies in the implicit contracts (e.g., what constitutes “graceful degradation”) which must be documented and kept in sync across all consumers (LLMManager, APIService, etc.). Regular integration tests that spin up the full DockerizedServices stack will help catch regressions in orchestrated startup sequences.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ The clear separation between ServiceOrchestrator and ServiceStarter improves mai
 - [WaveAgentExecutor](./WaveAgentExecutor.md) -- WaveAgentExecutor likely uses a specific constructor and execution pattern to execute wave-based agents.
 - [APIService](./APIService.md) -- APIService likely interacts with the constraint monitoring API server to provide easy startup and management.
 - [DashboardService](./DashboardService.md) -- DashboardService likely interacts with the constraint monitoring dashboard to provide easy startup and management.
-
 
 ---
 

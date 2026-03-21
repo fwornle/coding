@@ -89,7 +89,6 @@ No external services (e.g., log aggregation platforms) are mentioned, so the int
 
 Overall, `LogRotationHandler` embodies a pragmatic, configuration‑driven approach to log file management within the **LoggingManager** ecosystem, providing reliable rotation while keeping the architecture simple and maintainable.
 
-
 ## Hierarchy Context
 
 ### Parent
@@ -97,7 +96,6 @@ Overall, `LogRotationHandler` embodies a pragmatic, configuration‑driven appro
 
 ### Siblings
 - [LogConfigurationLoader](./LogConfigurationLoader.md) -- The integrations/copi/README.md file provides information on logging requirements for the Copi integration, which LogConfigurationLoader likely utilizes.
-
 
 ---
 
