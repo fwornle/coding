@@ -34,10 +34,9 @@
         "endpoint": "http://localhost:6333/readyz",
         "timeout_ms": 2000,
         "description": "Check Qdrant vector database availability - CRITICAL for semantic search",
-        "auto_heal": false,
+        "auto_heal": true,
         "auto_heal_action": "start_qdrant",
-        "recommendation": "Start Qdrant: docker-compose up -d qdrant",
-        "requires_docker": true
+        "recommendation": "Start Qdrant: docker-compose up -d qdrant"
       },
       "graph_integrity": {
         "enabled": true,

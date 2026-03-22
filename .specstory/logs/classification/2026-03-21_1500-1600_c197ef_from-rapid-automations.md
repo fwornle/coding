@@ -4,27 +4,27 @@
 **Project**: rapid-automations<br>
 **Target**: CODING<br>
 **Generated**: 2026-03-21T15:00:00.000Z<br>
-**Decisions in Window**: 8
+**Decisions in Window**: 18
 
 ---
 
 ## Statistics
 
-- **Total Prompt Sets**: 8
-- **Classified as CODING**: 8 (100%)
+- **Total Prompt Sets**: 18
+- **Classified as CODING**: 18 (100%)
 - **Classified as LOCAL**: 0 (0%)
 - **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 0
-- **[Layer 1 (Path) Decisions](#layer-1-path)**: 2
-- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 6
+- **[Layer 1 (Path) Decisions](#layer-1-path)**: 3
+- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 15
 - **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 0
 - **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 0
-- **Average Processing Time**: 48ms
+- **Average Processing Time**: 33ms
 
 ---
 
 ## Layer 1: Path
 
-**Decisions**: 2
+**Decisions**: 3
 
 ### Prompt Set: [ps_1774102704174](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774102704174)
 
@@ -62,9 +62,27 @@
 
 ---
 
+### Prompt Set: [ps_1774104499848](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)
+
+**Time Range**: 2026-03-21T14:48:19.848Z → 2026-03-21T15:35:54.436Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.95)
+
+#### Layer-by-Layer Trace
+
+✅ **Layer 1 (path)**
+- Decision: coding
+- Confidence: 0.98
+- Reasoning: Coding operations detected (1): .data
+- Processing Time: 1ms
+
+---
+
 ## Layer 2: Keyword
 
-**Decisions**: 6
+**Decisions**: 15
 
 ### Prompt Set: [ps_1774102486316](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774102486316)
 
@@ -207,6 +225,222 @@
 - Confidence: 0.535
 - Reasoning: Keyword analysis: 1 matches, score: 3/1
 - Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774103057602](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774103057602)
+
+**Time Range**: 2026-03-21T14:24:17.602Z → 2026-03-21T15:27:12.229Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774103057602)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/Q284340/Agentic/_work/rapid-automations/hooks/sitemap_locales.py, /Users/Q284340/Agentic/_work/rapid-automations/mkdocs.yml
+- Processing Time: 56ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104499848](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)
+
+**Time Range**: 2026-03-21T14:48:19.848Z → 2026-03-21T15:27:12.286Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.5175)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority (100.0%) of file operations target local project: .data, /dev/null, dev/null, integrations/operational-knowledge-management, /operational-knowledge-management, data/, persistence/export, data/okb/levelDB, graphology/leveldb
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.5175
+- Reasoning: Keyword analysis: 1 matches, score: 2/1
+- Processing Time: 1ms
+
+---
+
+### Prompt Set: [ps_1774104596100](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)
+
+**Time Range**: 2026-03-21T14:49:56.100Z → 2026-03-21T15:27:12.487Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority (100.0%) of file operations target local project: /okb/, /dev/null, /okb/exports/, /okb/leveldb/, data/okb/, dev/null, data/okb/exports/, data/okb/leveldb/, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/Dockerfile, data/okb/exports
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104636666](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)
+
+**Time Range**: 2026-03-21T14:50:36.666Z → 2026-03-21T15:27:13.003Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/index.ts, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/raas.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/kpifw.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/general.json, /Users/Q284340/Agentic/_work/rapid-automations/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/deployment.md
+- Processing Time: 33ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104499848](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)
+
+**Time Range**: 2026-03-21T14:48:19.848Z → 2026-03-21T15:32:12.297Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104499848)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.5175)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority (100.0%) of file operations target local project: .data, /dev/null, dev/null, integrations/operational-knowledge-management, /operational-knowledge-management, data/, persistence/export, data/okb/levelDB, graphology/leveldb
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.5175
+- Reasoning: Keyword analysis: 1 matches, score: 2/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104596100](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)
+
+**Time Range**: 2026-03-21T14:49:56.100Z → 2026-03-21T15:32:12.470Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority (100.0%) of file operations target local project: /okb/, /dev/null, /okb/exports/, /okb/leveldb/, data/okb/, dev/null, data/okb/exports/, data/okb/leveldb/, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/Dockerfile, data/okb/exports
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104636666](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)
+
+**Time Range**: 2026-03-21T14:50:36.666Z → 2026-03-21T15:32:12.563Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/index.ts, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/raas.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/kpifw.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/general.json, /Users/Q284340/Agentic/_work/rapid-automations/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/deployment.md
+- Processing Time: 55ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 1ms
+
+---
+
+### Prompt Set: [ps_1774104596100](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)
+
+**Time Range**: 2026-03-21T14:49:56.100Z → 2026-03-21T15:35:54.478Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104596100)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority (100.0%) of file operations target local project: /okb/, /dev/null, /okb/exports/, /okb/leveldb/, data/okb/, dev/null, data/okb/exports/, data/okb/leveldb/, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/Dockerfile, data/okb/exports
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 0ms
+
+---
+
+### Prompt Set: [ps_1774104636666](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)
+
+**Time Range**: 2026-03-21T14:50:36.666Z → 2026-03-21T15:35:54.565Z<br>
+**LSL File**: [2026-03-21_1500-1600_c197ef_from-rapid-automations.md](../../../history/2026-03-21_1500-1600_c197ef_from-rapid-automations.md#ps_1774104636666)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.535)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/index.ts, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/raas.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/kpifw.json, /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/.data/okb/exports/general.json, /Users/Q284340/Agentic/_work/rapid-automations/.gitignore, /Users/Q284340/Agentic/_work/rapid-automations/docs/integrations/okb/deployment.md
+- Processing Time: 58ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.535
+- Reasoning: Keyword analysis: 1 matches, score: 3/1
+- Processing Time: 1ms
 
 ---
 

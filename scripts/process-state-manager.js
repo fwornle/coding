@@ -679,27 +679,14 @@ class ProcessStateManager {
       health.levelDB.locked = false;
     }
 
-    // Check Qdrant availability
-    // Qdrant runs as a Docker container — port 6333 is forwarded through the Docker VM.
-    // Fetching this port when Docker Desktop's VM is unstable can trigger/worsen crash
-    // loops (com.docker.virtualization: use of closed network connection). Only check
-    // if we're inside the container (/.dockerenv) or if Docker's VM socket is responsive.
+    // Check Qdrant availability (use QDRANT_URL env var for Docker networking)
     try {
-      const fsCheck = await import('fs');
-      const isInsideDocker = fsCheck.existsSync('/.dockerenv');
-
-      if (isInsideDocker) {
-        // Inside container — safe to check directly
-        const qdrantBase = process.env.QDRANT_URL || 'http://localhost:6333';
-        const response = await fetch(`${qdrantBase}/readyz`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(2000)
-        });
-        health.qdrant.available = response.ok;
-      } else {
-        // On host — Qdrant is Docker-managed, skip check to avoid destabilizing VM
-        health.qdrant.available = null; // null = unknown/not checked
-      }
+      const qdrantBase = process.env.QDRANT_URL || 'http://localhost:6333';
+      const response = await fetch(`${qdrantBase}/readyz`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      });
+      health.qdrant.available = response.ok;
     } catch {
       health.qdrant.available = false;
     }
