@@ -1659,11 +1659,16 @@ class StatusLineHealthMonitor {
    * - running coding-services container
    */
   isDockerMode() {
-    // Only trust /.dockerenv — it exists exclusively inside Docker containers.
-    // Env vars and .docker-mode marker files persist across host sessions and cause
-    // false positives. Do NOT call `docker ps` to validate — it crashes Docker Desktop
-    // when the engine is stopped (accessing a closed network connection).
-    return fs.existsSync('/.dockerenv');
+    // Check environment variable
+    if (process.env.CODING_DOCKER_MODE === 'true') {
+      return true;
+    }
+    // Check marker file
+    const markerFile = path.join(this.codingRepoPath, '.docker-mode');
+    if (fs.existsSync(markerFile)) {
+      return true;
+    }
+    return false;
   }
 
   /**

@@ -34,10 +34,18 @@ const execAsync = promisify(exec);
  * 3. /.dockerenv (when running inside container)
  */
 function isDockerMode() {
-  // Only trust /.dockerenv — it exists exclusively inside Docker containers.
-  // Env vars and .docker-mode marker files persist across host sessions and cause
-  // false positives. Do NOT call `docker ps` to validate — it crashes Docker Desktop
-  // when the engine is stopped (accessing a closed network connection).
+  // Environment variable takes precedence (set by launch scripts)
+  if (process.env.CODING_DOCKER_MODE === 'true') {
+    return true;
+  }
+
+  // Check for .docker-mode marker file
+  const codingRoot = process.env.CODING_REPO || scriptRoot;
+  if (existsSync(join(codingRoot, '.docker-mode'))) {
+    return true;
+  }
+
+  // Running inside container
   return existsSync('/.dockerenv');
 }
 
@@ -541,13 +549,40 @@ export class HealthRemediationActions {
     try {
       this.log('Starting Qdrant vector database...');
 
-      // Qdrant runs as a Docker container — any Docker CLI call (docker ps, docker info,
-      // docker-compose) or Docker socket contact can crash Docker Desktop when its VM is
-      // unstable ("com.docker.virtualization: use of closed network connection"). Never
-      // attempt to start/restart Qdrant from the health monitor — it must be managed
-      // externally via docker-compose.
-      this.log('Qdrant is Docker-managed — skipping auto-heal to avoid destabilizing Docker VM');
-      return { success: false, message: 'Qdrant is Docker-managed — use docker-compose to start it' };
+      if (this.isDocker) {
+        this.log('Docker mode: Qdrant runs as a separate container - cannot restart from here');
+        return { success: false, message: 'Docker mode: Qdrant is managed by docker-compose externally' };
+      }
+
+      // Check if docker-compose file exists
+      const composeFile = `${this.codingRoot}/docker-compose.yml`;
+
+      // Start Qdrant via docker-compose
+      await execAsync(`docker-compose -f ${composeFile} up -d qdrant`, {
+        timeout: 30000
+      });
+
+      // Wait for Qdrant to be ready
+      await this.sleep(5000);
+
+      // Verify it's running
+      for (let i = 0; i < 5; i++) {
+        try {
+          const response = await fetch('http://localhost:6333/health', {
+            method: 'GET',
+            signal: AbortSignal.timeout(2000)
+          });
+
+          if (response.ok) {
+            return { success: true, message: 'Qdrant started successfully' };
+          }
+        } catch (error) {
+          // Retry
+          await this.sleep(2000);
+        }
+      }
+
+      return { success: false, message: 'Qdrant started but health check failed' };
 
     } catch (error) {
       return { success: false, message: error.message };
@@ -903,14 +938,6 @@ export class HealthRemediationActions {
     const programName = DOCKER_SERVICE_MAP[actionName];
     if (!programName) {
       return { success: false, message: `No Docker service mapping for: ${actionName}` };
-    }
-
-    // Guard: supervisorctl only works inside Docker containers where supervisord runs.
-    // On the host, calling supervisorctl hits the Docker daemon socket and can crash
-    // Docker Desktop when its VM is unstable (closed network connection).
-    if (!existsSync('/.dockerenv')) {
-      this.log(`Skipping supervisorctl restart — not running inside a Docker container`);
-      return { success: false, message: 'supervisorctl unavailable — not inside Docker container' };
     }
 
     try {
