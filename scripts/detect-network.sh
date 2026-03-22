@@ -4,12 +4,29 @@
 # Sourced by agent-common-setup.sh
 #
 # Provides:
-#   detect_corporate_network()   - Sets INSIDE_CN=true/false
-#   test_proxy_connectivity()    - Sets PROXY_WORKING=true/false
-#   configure_proxy_if_needed()  - Auto-configures proxy if proxydetox available
+#   detect_corporate_network()       - Sets INSIDE_CN=true/false
+#   test_proxy_connectivity()        - Sets PROXY_WORKING=true/false
+#   configure_proxy_if_needed()      - Auto-configures proxy if proxydetox available
+#   detect_network_and_configure_proxy() - Combined detection (convenience)
+#   validate_agent_connectivity()    - Validate that the chosen agent can reach its API
+#
+# Exported state (after detect_network_and_configure_proxy):
+#   INSIDE_CN       - true if on corporate VPN
+#   PROXY_WORKING   - true if external APIs are reachable
+#   PROXY_REQUIRED  - true if proxy is needed for external access (= inside CN)
 #
 # Environment overrides:
 #   CODING_FORCE_CN=true/false   - Skip CN detection, force result (for testing)
+#
+# === CONNECTIVITY MATRIX ===
+#
+# | Scenario       | Proxy needed | Anthropic API | GH Copilot API | GH Enterprise |
+# |----------------|-------------|---------------|----------------|---------------|
+# | Inside VPN     | YES         | via proxy     | via proxy      | direct        |
+# | Outside VPN    | NO          | direct        | direct         | unreachable   |
+#
+# All external APIs (Anthropic, GitHub, OpenAI) require the proxy when inside CN.
+# Direct connections time out (000) inside CN. Outside CN, direct works fine.
 
 # Avoid re-sourcing
 if [ -n "$_DETECT_NETWORK_LOADED" ]; then
@@ -20,6 +37,7 @@ _DETECT_NETWORK_LOADED=true
 # Defaults
 INSIDE_CN=false
 PROXY_WORKING=true
+PROXY_REQUIRED=false
 
 # ============================================
 # Corporate Network Detection
@@ -28,36 +46,41 @@ detect_corporate_network() {
   # Allow forcing for testing
   if [ "$CODING_FORCE_CN" = "true" ]; then
     INSIDE_CN=true
+    PROXY_REQUIRED=true
     log "CN detection forced: INSIDE_CN=true (via CODING_FORCE_CN)"
-    export INSIDE_CN
+    export INSIDE_CN PROXY_REQUIRED
     return 0
   elif [ "$CODING_FORCE_CN" = "false" ]; then
     INSIDE_CN=false
+    PROXY_REQUIRED=false
     log "CN detection forced: INSIDE_CN=false (via CODING_FORCE_CN)"
-    export INSIDE_CN
+    export INSIDE_CN PROXY_REQUIRED
     return 0
   fi
 
   log "Detecting network location (CN vs Public)..."
 
-  # Test BMW GitHub accessibility via SSH
-  local bmw_response
-  bmw_response=$(timeout 5 ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -T git@cc-github.bmwgroup.net 2>&1 || true)
-  if echo "$bmw_response" | grep -q -iE "(successfully authenticated|Welcome to GitLab|You've successfully authenticated)"; then
+  # Fast check: try HTTPS to corporate GitHub (2s timeout)
+  if timeout 3 curl -s --connect-timeout 2 https://cc-github.bmwgroup.net >/dev/null 2>&1; then
     INSIDE_CN=true
-    log "Inside Corporate Network - SSH access to cc-github.bmwgroup.net works"
+    PROXY_REQUIRED=true
+    log "🏢 Inside Corporate Network (cc-github.bmwgroup.net reachable)"
   else
-    # Fallback: try HTTPS
-    if timeout 5 curl -s --connect-timeout 5 https://cc-github.bmwgroup.net >/dev/null 2>&1; then
+    # Fallback: SSH test (slower but more reliable through some firewalls)
+    local bmw_response
+    bmw_response=$(timeout 5 ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=no -T git@cc-github.bmwgroup.net 2>&1 || true)
+    if echo "$bmw_response" | grep -q -iE "(successfully authenticated|Welcome to GitLab|You've successfully authenticated)"; then
       INSIDE_CN=true
-      log "Inside Corporate Network - cc-github.bmwgroup.net accessible via HTTPS"
+      PROXY_REQUIRED=true
+      log "🏢 Inside Corporate Network (SSH to cc-github.bmwgroup.net)"
     else
       INSIDE_CN=false
-      log "Outside Corporate Network - cc-github.bmwgroup.net not accessible"
+      PROXY_REQUIRED=false
+      log "🌐 Outside Corporate Network"
     fi
   fi
 
-  export INSIDE_CN
+  export INSIDE_CN PROXY_REQUIRED
 }
 
 # ============================================
@@ -65,18 +88,28 @@ detect_corporate_network() {
 # ============================================
 test_proxy_connectivity() {
   if [ "$INSIDE_CN" = "false" ]; then
-    PROXY_WORKING=true  # Outside CN, assume direct access works
+    # Outside CN: verify direct internet works
+    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' https://api.github.com >/dev/null 2>&1; then
+      PROXY_WORKING=true
+      log "✅ Direct internet access working"
+    else
+      PROXY_WORKING=false
+      log "⚠️  No internet access (neither proxy nor direct)"
+    fi
     export PROXY_WORKING
     return 0
   fi
 
+  # Inside CN: proxy is required for external access
   log "Testing proxy connectivity for external access..."
-  if timeout 5 curl -s --connect-timeout 5 https://google.de >/dev/null 2>&1; then
+
+  # Test with current proxy settings (may already be in environment)
+  if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
     PROXY_WORKING=true
-    log "Proxy is working - external access available"
+    log "✅ External access working (via proxy)"
   else
     PROXY_WORKING=false
-    log "WARNING: Proxy not working or external access blocked"
+    log "⚠️  External access not working — proxy may need configuration"
   fi
 
   export PROXY_WORKING
@@ -85,27 +118,35 @@ test_proxy_connectivity() {
 # ============================================
 # Auto-Configure Proxy
 # ============================================
-# If inside CN and proxy not working, check for proxydetox and configure
+# If inside CN and proxy not working, detect proxydetox and configure
 configure_proxy_if_needed() {
-  # Skip if not inside CN
+  # Outside CN: clear proxy vars if set (they would route through a non-existent proxy)
   if [ "$INSIDE_CN" = "false" ]; then
+    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ]; then
+      log "Outside CN — clearing proxy env vars (HTTP_PROXY was: ${HTTP_PROXY:-$http_proxy})"
+      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+      # Keep NO_PROXY as-is (harmless)
+    fi
     return 0
   fi
 
-  # Skip if proxy is already working
+  # Inside CN: proxy is required
+  # If already working, just log the config
   if [ "$PROXY_WORKING" = "true" ]; then
+    log "Proxy active: ${HTTP_PROXY:-${http_proxy:-'(inherited)'}}"
     return 0
   fi
 
-  # Skip if HTTP_PROXY is already set
+  # Proxy not working — try to auto-detect proxydetox
   if [ -n "$HTTP_PROXY" ] || [ -n "$http_proxy" ]; then
-    log "HTTP_PROXY already set: ${HTTP_PROXY:-$http_proxy}"
-    return 0
+    log "⚠️  Proxy is configured (${HTTP_PROXY:-$http_proxy}) but not working"
+    log "   Check if proxydetox is running: lsof -i :3128"
+    return 1
   fi
 
-  # Check if proxydetox is listening on 127.0.0.1:3128
-  if curl -s --connect-timeout 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:3128 2>/dev/null | grep -q -E "^(000|407|403|200)"; then
-    log "Proxydetox detected on 127.0.0.1:3128 - auto-configuring proxy..."
+  # No proxy set at all — check for proxydetox on standard port
+  if curl -s --connect-timeout 2 -o /dev/null -x http://127.0.0.1:3128/ http://example.com 2>/dev/null; then
+    log "Proxydetox detected on 127.0.0.1:3128 — auto-configuring..."
     export HTTP_PROXY="http://127.0.0.1:3128"
     export HTTPS_PROXY="http://127.0.0.1:3128"
     export http_proxy="http://127.0.0.1:3128"
@@ -113,20 +154,75 @@ configure_proxy_if_needed() {
     export NO_PROXY="localhost,127.0.0.1,.bmwgroup.net"
     export no_proxy="localhost,127.0.0.1,.bmwgroup.net"
 
-    # Re-test with proxy configured
-    if timeout 5 curl -s --connect-timeout 5 https://google.de >/dev/null 2>&1; then
+    # Re-test
+    if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
       PROXY_WORKING=true
       export PROXY_WORKING
-      log "Proxy auto-configured and working"
+      log "✅ Proxy auto-configured and working"
     else
-      log "WARNING: Proxy auto-configured but external access still failing"
+      log "⚠️  Proxy auto-configured but external access still failing"
     fi
   else
-    log "WARNING: Inside CN but no proxy available"
-    log "  HTTP_PROXY is not set and proxydetox not detected on 127.0.0.1:3128"
-    log "  Docker pulls, npm installs, and external API calls may fail"
-    log "  Start proxydetox or set HTTP_PROXY/HTTPS_PROXY manually"
+    log "❌ Inside CN but no proxy available"
+    log "   Start proxydetox or set HTTP_PROXY/HTTPS_PROXY manually"
+    log "   Without proxy, all external API calls will fail"
   fi
+}
+
+# ============================================
+# Agent Connectivity Validation
+# ============================================
+# Call AFTER detect_network_and_configure_proxy and AFTER agent config is loaded.
+# Validates that the chosen agent can actually reach its API endpoint.
+validate_agent_connectivity() {
+  local agent_name="$1"
+
+  if [ "$PROXY_WORKING" = "false" ]; then
+    log "⚠️  WARNING: No external API access — $agent_name will likely fail"
+    log "   Network: $([ "$INSIDE_CN" = "true" ] && echo "Inside CN (proxy required)" || echo "Outside CN")"
+    return 1
+  fi
+
+  case "$agent_name" in
+    claude)
+      # Claude Code uses OAuth (Max subscription) or ANTHROPIC_API_KEY
+      # Both need to reach api.anthropic.com
+      if ! timeout 5 curl -s --connect-timeout 3 -o /dev/null https://api.anthropic.com 2>/dev/null; then
+        log "⚠️  Cannot reach api.anthropic.com — Claude Code may not work"
+        return 1
+      fi
+      log "✅ Anthropic API reachable"
+      ;;
+    opencode)
+      # OpenCode uses GitHub Copilot (inside CN) or Anthropic (outside CN)
+      if [ "$INSIDE_CN" = "true" ]; then
+        if ! timeout 5 curl -s --connect-timeout 3 -o /dev/null https://api.github.com 2>/dev/null; then
+          log "⚠️  Cannot reach api.github.com — OpenCode (Copilot) may not work"
+          return 1
+        fi
+        log "✅ GitHub API reachable (for Copilot provider)"
+      else
+        if ! timeout 5 curl -s --connect-timeout 3 -o /dev/null https://api.anthropic.com 2>/dev/null; then
+          log "⚠️  Cannot reach api.anthropic.com — OpenCode (Anthropic) may not work"
+          return 1
+        fi
+        log "✅ Anthropic API reachable"
+      fi
+      ;;
+    copilot)
+      # GitHub Copilot CLI needs api.github.com
+      if ! timeout 5 curl -s --connect-timeout 3 -o /dev/null https://api.github.com 2>/dev/null; then
+        log "⚠️  Cannot reach api.github.com — Copilot CLI may not work"
+        return 1
+      fi
+      log "✅ GitHub API reachable (for Copilot CLI)"
+      ;;
+    *)
+      # Unknown agent — skip validation
+      ;;
+  esac
+
+  return 0
 }
 
 # ============================================
@@ -134,6 +230,6 @@ configure_proxy_if_needed() {
 # ============================================
 detect_network_and_configure_proxy() {
   detect_corporate_network
-  test_proxy_connectivity
   configure_proxy_if_needed
+  test_proxy_connectivity
 }

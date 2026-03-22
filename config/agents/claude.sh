@@ -18,7 +18,7 @@ agent_check_requirements() {
   fi
 }
 
-# Pre-launch: generate Docker MCP config, log mode info
+# Pre-launch: validate connectivity, log mode info
 agent_pre_launch() {
   # MCP config is now selected by claude-mcp-launcher.sh based on CODING_DOCKER_MODE
   if [ "$DOCKER_MODE" = true ]; then
@@ -26,4 +26,7 @@ agent_pre_launch() {
   else
     _agent_log "Native mode: MCP servers will run as local processes"
   fi
+
+  # Claude Code uses OAuth (Max subscription) — works through proxy and direct
+  validate_agent_connectivity "$AGENT_NAME"
 }

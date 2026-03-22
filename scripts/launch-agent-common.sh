@@ -294,12 +294,21 @@ launch_agent() {
   # 5. Load env files (before dry-run so env is available)
   _load_env_files
 
-  # 6. Dry-run exit
+  # 6. Network detection (needed early for dry-run output and agent config)
+  _agent_log "Detecting network environment..."
+  detect_network_and_configure_proxy
+
+  # 7. Dry-run exit
   if [ "$CODING_DRY_RUN" = "true" ]; then
     _agent_log "DRY-RUN: All startup logic completed successfully"
     _agent_log "DRY-RUN: Would launch in tmux: $AGENT_COMMAND"
     _agent_log "DRY-RUN: Agent=$AGENT_NAME, Docker=$DOCKER_MODE, Platform=$PLATFORM"
     _agent_log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
+    _agent_log "DRY-RUN: Network: CN=$INSIDE_CN, Proxy=$PROXY_WORKING, Required=$PROXY_REQUIRED"
+    # Run agent pre-launch to show model selection
+    if type agent_pre_launch &>/dev/null; then
+      agent_pre_launch
+    fi
     exit 0
   fi
 
@@ -329,7 +338,7 @@ launch_agent() {
     agent_check_requirements
   fi
 
-  # 14. Agent-specific pre-launch hook
+  # 15. Agent-specific pre-launch hook (can use INSIDE_CN, PROXY_WORKING)
   if type agent_pre_launch &>/dev/null; then
     agent_pre_launch
   fi
