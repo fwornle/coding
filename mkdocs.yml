@@ -98,6 +98,7 @@ nav:
   - Guides:
     - Overview: guides/index.md
     - Agent Integration: guides/agent-integration.md
+    - Network Configuration: guides/network-configuration.md
     - Status Line: guides/status-line.md
     - Health Dashboard: guides/health-dashboard.md
     - LLM Providers: guides/llm-providers.md

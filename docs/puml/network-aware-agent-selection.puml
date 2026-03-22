@@ -1,0 +1,59 @@
+@startuml network-aware-agent-selection
+!include _standard-style.puml
+
+title Network-Aware Agent Selection & Connectivity Matrix
+
+rectangle "Network Environment" as env #F0F8FF {
+  rectangle "Inside VPN / Corporate Network" as vpn #E8F5E8 {
+    component [Proxydetox\n127.0.0.1:3128] <<infra>> as proxy
+    note bottom of proxy
+      Required for ALL
+      external API calls
+    end note
+  }
+
+  rectangle "Outside VPN / Public Network" as pub #FFF9E6 {
+    component [Direct Internet\nAccess] <<infra>> as direct
+    note bottom of direct
+      No proxy needed
+      Proxy vars cleared
+    end note
+  }
+}
+
+rectangle "Agent Selection" as sel #FFF0F5 {
+  component [coding --claude\n\nAuth: OAuth (Max sub)\nAPI: api.anthropic.com] <<agent>> as claude
+  component [coding --opencode\n\nAuto-selects provider\nbased on network] <<agent>> as opencode
+  component [coding --copilot\n\nAuth: VS Code token\nAPI: api.github.com] <<agent>> as copilot
+}
+
+cloud "External APIs" as apis {
+  component [Anthropic API\napi.anthropic.com] <<api>> as anthropic
+  component [GitHub API\napi.github.com] <<api>> as github
+  component [GitHub Copilot\napi.githubcopilot.com] <<api>> as ghcopilot
+}
+
+' VPN connections (via proxy)
+proxy SYNC_LINE anthropic : via proxy
+proxy SYNC_LINE github : via proxy
+proxy SYNC_LINE ghcopilot : via proxy
+
+' Public connections (direct)
+direct DATA_LINE anthropic : direct
+direct DATA_LINE github : direct
+direct DATA_LINE ghcopilot : direct
+
+' Agent to API mappings
+claude -[#4A90E2,thickness=2]-> anthropic : always
+opencode -[#43A047,thickness=2]-> ghcopilot : VPN (Copilot)
+opencode -[#FF9800,thickness=2,dashed]-> anthropic : Public (Anthropic)
+copilot -[#9C27B0,thickness=2]-> github : always
+
+legend right
+  |= Scenario |= Claude |= OpenCode |= Copilot |
+  | VPN + Proxy | via proxy | GH Copilot\nvia proxy | via proxy |
+  | VPN no Proxy | blocked | blocked | blocked |
+  | Outside VPN | direct | Anthropic\ndirect | direct |
+end legend
+
+@enduml

@@ -47,13 +47,38 @@ The system follows a layered architecture:
 When a new agent is launched:
 
 1. `bin/coding` validates config exists in `config/agents/<name>.sh`
-2. Agent detection checks CLI availability via `AGENT_REQUIRES_COMMANDS`
-3. Shared orchestrator (`launch-agent-common.sh`) sources the config
-4. Docker mode detection (3-tier: marker file, container check, env var)
+2. Shared orchestrator (`launch-agent-common.sh`) sources the config
+3. Docker mode detection (3-tier: marker file, container check, env var)
+4. **Network detection** — VPN/CN status, proxy auto-configuration
 5. Services start (Docker compose or native, based on mode)
 6. Agent-specific hooks run (`agent_check_requirements`, `agent_pre_launch`)
-7. Agent launches wrapped in tmux session with unified status bar
-8. Optional: pipe-pane I/O capture with `capture-monitor.js`
+7. Agent validates API connectivity (`validate_agent_connectivity`)
+8. Agent launches wrapped in tmux session with unified status bar
+
+### Startup Sequence
+
+![Launcher Startup Sequence](../images/launcher-startup-sequence.png)
+
+### Network-Aware Agent Selection
+
+![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
+
+The launcher detects the network environment and automatically configures each agent:
+
+| Scenario | Proxy | Claude Code | OpenCode | Copilot CLI |
+|---|---|---|---|---|
+| **Inside VPN** | Required (proxydetox) | Anthropic via proxy | GH Copilot Enterprise via proxy | GH API via proxy |
+| **Outside VPN** | Cleared | Anthropic direct | Anthropic direct | GH API direct |
+| **Inside VPN, no proxy** | Missing | Blocked | Blocked | Blocked |
+
+**Key behaviors:**
+
+- **`detect-network.sh`** runs early in the startup pipeline (before agent hooks)
+- Inside CN: auto-detects proxydetox on `127.0.0.1:3128`, sets `HTTP_PROXY`/`HTTPS_PROXY`
+- Outside CN: **clears** proxy env vars that would route through a non-existent proxy
+- **OpenCode** auto-switches model: `github-copilot-enterprise/claude-opus-4.6` (VPN) → `claude-opus-4-6` (public)
+- All agents call `validate_agent_connectivity()` to verify API reachability before launch
+- `CODING_FORCE_CN=true/false` overrides detection for testing
 
 ### Launcher Docker Mode Flow
 

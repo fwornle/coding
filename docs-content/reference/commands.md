@@ -6,25 +6,24 @@ CLI commands and shell usage reference.
 
 ### coding
 
-Launch Claude Code with all integrations.
+Launch a coding agent with all integrations (Docker services, LSL, health monitoring, constraints).
 
 ```bash
-# Default launch
-coding --claude
+# Launch specific agents
+coding --claude      # Claude Code (Anthropic OAuth / Max subscription)
+coding --opencode    # OpenCode (auto-selects provider based on network)
+coding --copilot     # GitHub Copilot CLI
+coding --copi        # Alias for --copilot
 
-# Specify project
+# Specify project directory
 coding --project ~/my-project
-
-# Force specific agent
-coding --claude    # Claude Code (default)
-coding --copilot   # GitHub CoPilot
 
 # Clean start (kills all coding processes, frees all ports, then launches)
 coding --force
-
-# Combine with other flags
 coding --force --claude
-coding --force --project ~/my-project
+
+# Dry run (validates config, network, Docker — does not launch)
+coding --opencode --dry-run
 
 # Docker mode
 touch .docker-mode && coding --claude
@@ -32,6 +31,25 @@ touch .docker-mode && coding --claude
 # Help
 coding --help
 ```
+
+### Network-Aware Agent Selection
+
+The launcher automatically detects your network environment and configures each agent accordingly:
+
+![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
+
+| Agent | Inside VPN (proxy) | Outside VPN (direct) | Provider |
+|---|---|---|---|
+| `--claude` | Works via proxy | Works direct | Anthropic (OAuth / Max) |
+| `--opencode` | GitHub Copilot Enterprise | Anthropic direct | Auto-selected |
+| `--copilot` | Works via proxy | Works direct | GitHub Copilot CLI |
+
+**Auto-configuration:**
+
+- **Inside VPN**: proxy auto-detected (proxydetox on 127.0.0.1:3128), all APIs routed through proxy
+- **Outside VPN**: proxy env vars cleared, direct connections used
+- **OpenCode** switches model: `github-copilot-enterprise/claude-opus-4.6` (VPN) → `claude-opus-4-6` (public)
+- Each agent validates its API endpoint is reachable before launch
 
 ### `--force` Flag
 

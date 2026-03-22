@@ -1,0 +1,76 @@
+@startuml launcher-startup-sequence
+!include _standard-style.puml
+
+title Coding Launcher Startup Sequence
+
+actor User as user
+participant "bin/coding" as launcher
+participant "launch-agent-\ncommon.sh" as common
+participant "detect-\nnetwork.sh" as network
+participant "agent config\n(opencode.sh\nclaude.sh\ncopilot.sh)" as agent
+participant "Docker\nServices" as docker
+participant "tmux-session-\nwrapper.sh" as tmux
+
+user -> launcher: coding --opencode
+activate launcher
+
+launcher -> launcher: Parse args\nFORCE_AGENT=opencode
+launcher -> launcher: Validate config exists\nconfig/agents/opencode.sh
+launcher -> common: launch_agent()
+activate common
+
+== Docker Detection ==
+common -> common: _detect_docker_mode()\n.docker-mode / container / env var
+
+== Environment Setup ==
+common -> common: _load_env_files()\n.env, .env.ports
+
+== Network Detection ==
+common -> network: detect_network_and_configure_proxy()
+activate network
+network -> network: detect_corporate_network()\ncurl cc-github.bmwgroup.net
+alt Inside VPN
+  network -> network: INSIDE_CN=true, PROXY_REQUIRED=true
+  network -> network: configure_proxy_if_needed()\nVerify/set HTTP_PROXY
+else Outside VPN
+  network -> network: INSIDE_CN=false
+  network -> network: Clear proxy env vars
+end
+network -> network: test_proxy_connectivity()\nVerify API access
+network --> common: INSIDE_CN, PROXY_WORKING
+deactivate network
+
+== Docker Services ==
+common -> docker: docker compose up -d
+docker --> common: Containers healthy
+
+== Monitoring ==
+common -> common: _verify_monitoring()\nLSL, health monitors
+
+== Agent Configuration ==
+common -> agent: agent_check_requirements()
+agent --> common: ✅ CLI available
+
+common -> agent: agent_pre_launch()
+activate agent
+alt OpenCode + VPN
+  agent -> agent: OPENCODE_CONFIG_CONTENT =\n{model: "github-copilot-enterprise/..."}
+else OpenCode + Public
+  agent -> agent: OPENCODE_CONFIG_CONTENT =\n{model: "claude-opus-4-6"}
+end
+agent -> network: validate_agent_connectivity()
+network --> agent: ✅ API reachable
+agent --> common
+deactivate agent
+
+== Common Init ==
+common -> common: agent_common_init()\nLSL, hooks, gitignore,\nstatus line
+
+== Launch ==
+common -> tmux: tmux_session_wrapper()
+tmux -> tmux: Create tmux session\nAttach status bar
+tmux --> user: Agent running in tmux
+deactivate common
+deactivate launcher
+
+@enduml
