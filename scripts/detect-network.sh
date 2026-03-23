@@ -116,21 +116,59 @@ test_proxy_connectivity() {
 }
 
 # ============================================
+# Bash Profile Proxy Toggle
+# ============================================
+# Ensures ~/.bash_profile proxy lines match the current network state,
+# so child processes (Claude Code, etc.) inherit the correct environment.
+_sync_bash_profile_proxy() {
+  local desired_state="$1"  # "enabled" or "disabled"
+  local profile="$HOME/.bash_profile"
+
+  [ -f "$profile" ] || return 0
+
+  if [ "$desired_state" = "disabled" ]; then
+    # Comment out active http_proxy= line (if not already commented)
+    if grep -qF -- 'http_proxy=' "$profile" && grep -q '^http_proxy=' "$profile" 2>/dev/null; then
+      /usr/bin/sed -i.bak 's/^http_proxy=/#http_proxy=/' "$profile"
+      log "Disabled proxy in ~/.bash_profile"
+    fi
+  elif [ "$desired_state" = "enabled" ]; then
+    # Uncomment http_proxy= line (if currently commented)
+    if grep -q '^#http_proxy=' "$profile" 2>/dev/null; then
+      /usr/bin/sed -i.bak 's/^#http_proxy=/http_proxy=/' "$profile"
+      log "Enabled proxy in ~/.bash_profile"
+    fi
+  fi
+}
+
+# ============================================
 # Auto-Configure Proxy
 # ============================================
-# If inside CN and proxy not working, detect proxydetox and configure
+# If inside CN and proxy not working, detect proxydetox and configure.
+# If outside CN, disable proxy in env AND in ~/.bash_profile so child
+# processes don't inherit stale proxy settings (causes 502 Bad Gateway).
 configure_proxy_if_needed() {
-  # Outside CN: clear proxy vars if set (they would route through a non-existent proxy)
+  # Outside CN: clear proxy vars and disable in profile
   if [ "$INSIDE_CN" = "false" ]; then
-    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ]; then
-      log "Outside CN — clearing proxy env vars (HTTP_PROXY was: ${HTTP_PROXY:-$http_proxy})"
-      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
-      # Keep NO_PROXY as-is (harmless)
+    local had_proxy=false
+    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
+      had_proxy=true
+    fi
+
+    # Always sync profile — even if env vars are clear, profile may still have them active
+    _sync_bash_profile_proxy disabled
+
+    if [ "$had_proxy" = "true" ]; then
+      log "Outside CN — clearing proxy env vars (was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
+      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
     fi
     return 0
   fi
 
   # Inside CN: proxy is required
+  # Ensure profile has proxy enabled
+  _sync_bash_profile_proxy enabled
+
   # If already working, just log the config
   if [ "$PROXY_WORKING" = "true" ]; then
     log "Proxy active: ${HTTP_PROXY:-${http_proxy:-'(inherited)'}}"
@@ -140,6 +178,20 @@ configure_proxy_if_needed() {
   # Proxy not working — try to auto-detect proxydetox
   if [ -n "$HTTP_PROXY" ] || [ -n "$http_proxy" ]; then
     log "⚠️  Proxy is configured (${HTTP_PROXY:-$http_proxy}) but not working"
+    # Try restarting proxydetox
+    if launchctl list cc.colorto.proxydetox >/dev/null 2>&1; then
+      log "Restarting proxydetox..."
+      launchctl stop cc.colorto.proxydetox 2>/dev/null
+      launchctl start cc.colorto.proxydetox 2>/dev/null
+      sleep 1
+      # Re-test after restart
+      if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
+        PROXY_WORKING=true
+        export PROXY_WORKING
+        log "✅ Proxy working after proxydetox restart"
+        return 0
+      fi
+    fi
     log "   Check if proxydetox is running: lsof -i :3128"
     return 1
   fi
