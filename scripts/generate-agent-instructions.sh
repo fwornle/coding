@@ -200,6 +200,13 @@ ensure_skill_references_in_claude_md() {
         mv "$temp" "$claude_md"
     fi
 
+    # Trim trailing blank lines so appending doesn't accumulate empties
+    local temp2
+    temp2=$(mktemp)
+    # Use perl to strip trailing newlines (portable across macOS/Linux)
+    perl -0777 -pe 's/\n+\z/\n/' "$claude_md" > "$temp2"
+    mv "$temp2" "$claude_md"
+
     # Append fresh skill catalog
     {
         echo ""
