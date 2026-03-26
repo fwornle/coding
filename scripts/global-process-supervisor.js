@@ -130,9 +130,14 @@ class GlobalProcessSupervisor {
         const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
         if (match) {
           const projectName = match[1];
-          // Convert project name to full path using dynamic path resolution
-          const projectPath = path.join(agenticDir, projectName);
-          if (fs.existsSync(projectPath)) {
+          // Convert project name to full path — check direct Agentic child first,
+          // then _work/ subdirectory (OpenCode/Copilot sessions live there).
+          const directPath = path.join(agenticDir, projectName);
+          const workPath = path.join(agenticDir, '_work', projectName);
+          const projectPath = fs.existsSync(directPath) ? directPath
+            : fs.existsSync(workPath) ? workPath
+            : null;
+          if (projectPath) {
             projects.push(projectPath);
           }
         }
@@ -380,18 +385,11 @@ class GlobalProcessSupervisor {
 
       monitor.unref();
 
-      // Register with PSM
-      await this.psm.registerService({
-        name: 'enhanced-transcript-monitor',
-        pid: monitor.pid,
-        type: 'per-project',
-        script: 'enhanced-transcript-monitor.js',
-        projectPath,
-        metadata: {
-          spawnedBy: 'global-process-supervisor',
-          restartedAt: new Date().toISOString()
-        }
-      });
+      // NOTE: Do NOT register the child with PSM here.
+      // The child (enhanced-transcript-monitor.js) self-registers on startup (line ~2750).
+      // If the supervisor pre-registers, the child finds the entry via getService(),
+      // sees its own PID as "another instance already running", and exits immediately.
+      // This was the root cause of the transcript monitor crash-loop.
 
       this.recordRestart(serviceName);
       this.log(`Restarted transcript monitor for ${projectPath} (PID: ${monitor.pid})`);
