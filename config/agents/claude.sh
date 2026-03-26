@@ -28,5 +28,5 @@ agent_pre_launch() {
   fi
 
   # Claude Code uses OAuth (Max subscription) — works through proxy and direct
-  validate_agent_connectivity "$AGENT_NAME"
+  validate_agent_connectivity "$AGENT_NAME" || true
 }

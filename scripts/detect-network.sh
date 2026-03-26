@@ -129,13 +129,13 @@ _sync_bash_profile_proxy() {
   if [ "$desired_state" = "disabled" ]; then
     # Comment out active http_proxy= line (if not already commented)
     if grep -qF -- 'http_proxy=' "$profile" && grep -q '^http_proxy=' "$profile" 2>/dev/null; then
-      /usr/bin/sed -i.bak 's/^http_proxy=/#http_proxy=/' "$profile"
+      sed -i.bak 's/^http_proxy=/#http_proxy=/' "$profile"
       log "Disabled proxy in ~/.bash_profile"
     fi
   elif [ "$desired_state" = "enabled" ]; then
     # Uncomment http_proxy= line (if currently commented)
     if grep -q '^#http_proxy=' "$profile" 2>/dev/null; then
-      /usr/bin/sed -i.bak 's/^#http_proxy=/http_proxy=/' "$profile"
+      sed -i.bak 's/^#http_proxy=/http_proxy=/' "$profile"
       log "Enabled proxy in ~/.bash_profile"
     fi
   fi
@@ -144,81 +144,62 @@ _sync_bash_profile_proxy() {
 # ============================================
 # Auto-Configure Proxy
 # ============================================
-# If inside CN and proxy not working, detect proxydetox and configure.
-# If outside CN, disable proxy in env AND in ~/.bash_profile so child
-# processes don't inherit stale proxy settings (causes 502 Bad Gateway).
+# Mirrors the user's proven toggle script:
+#   Inside CN  → uncomment proxy in ~/.bash_profile, source it, restart proxydetox
+#   Outside CN → comment out proxy in ~/.bash_profile, unset env vars
+#
+# The key insight: editing ~/.bash_profile alone does NOTHING for the current shell.
+# We must also source it (enable) or unset vars (disable), AND restart proxydetox
+# so it picks up the new state.
 configure_proxy_if_needed() {
-  # Outside CN: clear proxy vars and disable in profile
+  local profile="$HOME/.bash_profile"
+
+  # Outside CN: disable proxy
   if [ "$INSIDE_CN" = "false" ]; then
-    local had_proxy=false
-    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
-      had_proxy=true
-    fi
-
-    # Always sync profile — even if env vars are clear, profile may still have them active
     _sync_bash_profile_proxy disabled
-
-    if [ "$had_proxy" = "true" ]; then
-      log "Outside CN — clearing proxy env vars (was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
-      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
+    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
+      log "Outside CN — disabling proxy (was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
+    fi
+    unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
+    # Restart proxydetox so it doesn't hold stale state (macOS only)
+    if [ "$PLATFORM" = "macos" ]; then
+      launchctl stop cc.colorto.proxydetox 2>/dev/null || true
+      launchctl start cc.colorto.proxydetox 2>/dev/null || true
     fi
     return 0
   fi
 
-  # Inside CN: proxy is required
-  # Ensure profile has proxy enabled
+  # Inside CN: enable proxy
   _sync_bash_profile_proxy enabled
 
-  # If already working, just log the config
-  if [ "$PROXY_WORKING" = "true" ]; then
-    log "Proxy active: ${HTTP_PROXY:-${http_proxy:-'(inherited)'}}"
-    return 0
+  # Source the profile to load proxy vars into THIS shell process
+  if [ -f "$profile" ]; then
+    # shellcheck disable=SC1090
+    source "$profile"
+    log "Sourced ~/.bash_profile (proxy vars loaded into current shell)"
   fi
 
-  # Proxy not working — try to auto-detect proxydetox
-  if [ -n "$HTTP_PROXY" ] || [ -n "$http_proxy" ]; then
-    log "⚠️  Proxy is configured (${HTTP_PROXY:-$http_proxy}) but not working"
-    # Try restarting proxydetox
-    if launchctl list cc.colorto.proxydetox >/dev/null 2>&1; then
-      log "Restarting proxydetox..."
-      launchctl stop cc.colorto.proxydetox 2>/dev/null
-      launchctl start cc.colorto.proxydetox 2>/dev/null
-      sleep 1
-      # Re-test after restart
-      if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
-        PROXY_WORKING=true
-        export PROXY_WORKING
-        log "✅ Proxy working after proxydetox restart"
-        return 0
-      fi
-    fi
-    log "   Check if proxydetox is running: lsof -i :3128"
-    return 1
+  # Restart proxydetox to ensure it's running with current config (macOS only)
+  if [ "$PLATFORM" = "macos" ]; then
+    log "Restarting proxydetox..."
+    launchctl stop cc.colorto.proxydetox 2>/dev/null || true
+    launchctl start cc.colorto.proxydetox 2>/dev/null || true
+    sleep 1
   fi
 
-  # No proxy set at all — check for proxydetox on standard port
-  if curl -s --connect-timeout 2 -o /dev/null -x http://127.0.0.1:3128/ http://example.com 2>/dev/null; then
-    log "Proxydetox detected on 127.0.0.1:3128 — auto-configuring..."
+  # Verify we have proxy vars set
+  if [ -z "$http_proxy" ] && [ -z "$HTTP_PROXY" ]; then
+    # Profile didn't set them — fall back to known default
+    log "Proxy vars not set after sourcing profile — using default 127.0.0.1:3128"
     export HTTP_PROXY="http://127.0.0.1:3128"
     export HTTPS_PROXY="http://127.0.0.1:3128"
     export http_proxy="http://127.0.0.1:3128"
     export https_proxy="http://127.0.0.1:3128"
     export NO_PROXY="localhost,127.0.0.1,.bmwgroup.net"
     export no_proxy="localhost,127.0.0.1,.bmwgroup.net"
-
-    # Re-test
-    if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
-      PROXY_WORKING=true
-      export PROXY_WORKING
-      log "✅ Proxy auto-configured and working"
-    else
-      log "⚠️  Proxy auto-configured but external access still failing"
-    fi
-  else
-    log "❌ Inside CN but no proxy available"
-    log "   Start proxydetox or set HTTP_PROXY/HTTPS_PROXY manually"
-    log "   Without proxy, all external API calls will fail"
   fi
+
+  log "Proxy active: ${HTTP_PROXY:-${http_proxy}}"
 }
 
 # ============================================

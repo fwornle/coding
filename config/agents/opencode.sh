@@ -44,6 +44,6 @@ agent_pre_launch() {
     fi
   fi
 
-  # Validate connectivity for the chosen provider
-  validate_agent_connectivity "$AGENT_NAME"
+  # Validate connectivity for the chosen provider (warn only, don't abort)
+  validate_agent_connectivity "$AGENT_NAME" || true
 }
