@@ -61,7 +61,7 @@ agent_pre_launch() {
   fi
 
   # Validate GitHub API connectivity
-  validate_agent_connectivity "$AGENT_NAME"
+  validate_agent_connectivity "$AGENT_NAME" || true
 
   _agent_log "📚 CoPilot features available:"
   _agent_log "   • Copilot CLI in tmux session with I/O capture"

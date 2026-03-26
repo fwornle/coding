@@ -116,6 +116,8 @@ ensure_coding_runtime_ignored() {
     ".claude/settings.local.json"
     ".health/"
     ".logs/"
+    "logs/"
+    "*.log"
     ".specstory/trajectory/live-state.json"
     ".specstory/validation-report.json"
     ".specstory/change-log.json"
