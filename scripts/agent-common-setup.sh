@@ -39,10 +39,16 @@ ensure_specstory_logs_tracked() {
       log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/logs/classification/"
       log "🔧 Adding exception '!.specstory/logs/' to .gitignore..."
 
-      # Insert the exception right after the logs/ line
-      sed -i.backup '/^logs\//a\
+      # Insert the exception right after the logs/ line (cross-platform compatible)
+      if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' '/^logs\//a\
 !.specstory/logs/
 ' "$gitignore_file"
+      else
+        sed -i '/^logs\//a\
+!.specstory/logs/
+' "$gitignore_file"
+      fi
 
       if [ $? -eq 0 ]; then
         log "✅ Added .specstory/logs/ exception to .gitignore"
