@@ -315,6 +315,12 @@ class EnhancedTranscriptMonitor {
       transcripts.push({ path: copilotTranscript, mtime: new Date(), source: 'copilot' });
     }
 
+    // OpenCode SQLite
+    const openCodeTranscript = this.findOpenCodeTranscript();
+    if (openCodeTranscript) {
+      transcripts.push({ path: openCodeTranscript, mtime: new Date(), source: 'opencode' });
+    }
+
     return transcripts;
   }
 
@@ -418,12 +424,20 @@ class EnhancedTranscriptMonitor {
 
     for (const [tPath, tracker] of this.trackedTranscripts) {
       try {
-        const stats = fs.statSync(tPath);
-        if (stats.size === tracker.lastFileSize) continue;
+        // Detect new content: file size for file-based transcripts, message count for OpenCode
+        let currentSize;
+        if (this.isOpenCodePath(tPath)) {
+          const sessionId = this.getOpenCodeSessionId(tPath);
+          currentSize = this.getOpenCodeMessageCount(sessionId);
+        } else {
+          const stats = fs.statSync(tPath);
+          currentSize = stats.size;
+        }
+        if (currentSize === tracker.lastFileSize) continue;
 
         // New content detected in this transcript
         anyNewContent = true;
-        tracker.lastFileSize = stats.size;
+        tracker.lastFileSize = currentSize;
 
         // Flush any pending prompt set from the previous transcript before switching.
         // Without this, transcript A's leftover prompt set gets completed by transcript B's
@@ -768,8 +782,23 @@ class EnhancedTranscriptMonitor {
       }
     }
 
+    // Check OpenCode SQLite
+    const openCodeTranscript = this.findOpenCodeTranscript();
+    if (openCodeTranscript) {
+      const sessionId = this.getOpenCodeSessionId(openCodeTranscript);
+      try {
+        const { execSync } = require('child_process');
+        const query = `SELECT time_updated FROM session WHERE id = '${sessionId.replace(/'/g, "''")}';`;
+        const result = execSync(`sqlite3 "${this.openCodeDbPath}" "${query}"`, { encoding: 'utf-8', timeout: 3000 }).trim();
+        const mtime = new Date(parseInt(result, 10));
+        candidates.push({ path: openCodeTranscript, mtime, source: 'opencode' });
+      } catch (e) {
+        this.debug(`Error getting OpenCode session time: ${e.message}`);
+      }
+    }
+
     if (candidates.length === 0) {
-      this.debug('No active transcripts found (copilot or Claude)');
+      this.debug('No active transcripts found (copilot, Claude, or OpenCode)');
       return null;
     }
 
@@ -1234,6 +1263,235 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * OpenCode SQLite database path
+   */
+  get openCodeDbPath() {
+    return path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
+  }
+
+  /**
+   * Check if a transcript path is a virtual OpenCode path
+   */
+  isOpenCodePath(transcriptPath) {
+    return transcriptPath && transcriptPath.startsWith('opencode://');
+  }
+
+  /**
+   * Extract session ID from virtual OpenCode path
+   */
+  getOpenCodeSessionId(transcriptPath) {
+    return transcriptPath ? transcriptPath.replace('opencode://', '') : null;
+  }
+
+  /**
+   * Find current OpenCode transcript by scanning SQLite for sessions matching this project path.
+   * Returns a virtual path like "opencode://<session_id>" since there's no file to watch.
+   */
+  findOpenCodeTranscript() {
+    const dbPath = this.openCodeDbPath;
+    if (!fs.existsSync(dbPath)) {
+      this.debug('OpenCode database not found');
+      return null;
+    }
+
+    try {
+      const { execSync } = require('child_process');
+      const projectPath = this.config.projectPath;
+
+      // Resolve symlinks so we match regardless of which path alias was used
+      const resolvedPath = fs.realpathSync(projectPath);
+      const escapedPath = resolvedPath.replace(/'/g, "''");
+      const escapedOrig = projectPath.replace(/'/g, "''");
+
+      // Find sessions whose directory matches this project path (try both resolved and original), ordered by most recent
+      const query = `SELECT s.id, s.directory, s.time_updated, s.title FROM session s WHERE s.directory = '${escapedPath}' OR s.directory = '${escapedOrig}' ORDER BY s.time_updated DESC LIMIT 1;`;
+      const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
+        encoding: 'utf-8',
+        timeout: 5000
+      }).trim();
+
+      if (!result) {
+        this.debug('No matching OpenCode session found for project');
+        return null;
+      }
+
+      const [sessionId, directory, timeUpdated, title] = result.split('|');
+      const sessionAge = Date.now() - parseInt(timeUpdated, 10);
+
+      // Only consider sessions active within 2x session duration
+      if (sessionAge > this.config.sessionDuration * 2) {
+        this.debug(`OpenCode session too old: ${Math.round(sessionAge / 60000)}min (${title})`);
+        return null;
+      }
+
+      this.debug(`Found OpenCode session: ${sessionId} (${title}, ${Math.round(sessionAge / 1000)}s ago)`);
+      return `opencode://${sessionId}`;
+    } catch (error) {
+      this.debug(`Error finding OpenCode transcript: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Read messages from OpenCode SQLite database for a given session.
+   * Queries the message + part tables and converts to Claude-compatible format
+   * that the existing extractExchanges pipeline can process.
+   */
+  readOpenCodeMessages(sessionId) {
+    const dbPath = this.openCodeDbPath;
+    if (!fs.existsSync(dbPath)) return [];
+
+    try {
+      const { execSync } = require('child_process');
+
+      // Get messages with their parts joined together
+      // Using JSON output mode for reliable parsing
+      const query = `
+        SELECT m.id, m.time_created, m.data as msg_data,
+               GROUP_CONCAT(p.data, '|||PART_SEP|||') as parts_data
+        FROM message m
+        LEFT JOIN part p ON p.message_id = m.id
+        WHERE m.session_id = '${sessionId.replace(/'/g, "''")}'
+        GROUP BY m.id
+        ORDER BY m.time_created ASC;
+      `;
+      const result = execSync(`sqlite3 -separator '|||COL_SEP|||' "${dbPath}" "${query}"`, {
+        encoding: 'utf-8',
+        timeout: 15000,
+        maxBuffer: 50 * 1024 * 1024 // 50MB buffer for large sessions
+      }).trim();
+
+      if (!result) return [];
+
+      const normalized = [];
+      const rows = result.split('\n');
+
+      for (const row of rows) {
+        if (!row.trim()) continue;
+        const cols = row.split('|||COL_SEP|||');
+        if (cols.length < 3) continue;
+
+        const msgId = cols[0];
+        const timeCreated = cols[1];
+        let msgData;
+        try {
+          msgData = JSON.parse(cols[2]);
+        } catch { continue; }
+
+        const partsRaw = cols.length > 3 ? cols[3] : '';
+        const parts = partsRaw
+          ? partsRaw.split('|||PART_SEP|||').map(p => { try { return JSON.parse(p); } catch { return null; } }).filter(Boolean)
+          : [];
+
+        const timestamp = new Date(parseInt(timeCreated, 10)).toISOString();
+
+        if (msgData.role === 'user') {
+          // Find user text from parts
+          const textParts = parts.filter(p => p.type === 'text');
+          const userText = textParts.map(p => p.text || '').join('\n') || '';
+
+          normalized.push({
+            type: 'user',
+            uuid: msgId,
+            timestamp,
+            message: {
+              role: 'user',
+              content: [{ type: 'text', text: userText }]
+            }
+          });
+        } else if (msgData.role === 'assistant') {
+          const content = [];
+
+          for (const part of parts) {
+            if (part.type === 'text' && part.text) {
+              content.push({ type: 'text', text: part.text });
+            } else if (part.type === 'tool' && part.tool && part.state) {
+              // Tool invocation — map to tool_use
+              content.push({
+                type: 'tool_use',
+                id: part.callID || part.tool,
+                name: part.tool,
+                input: part.state?.input || {}
+              });
+
+              // If tool has completed output, add as a separate tool_result message after this one
+              if (part.state?.status === 'completed' && part.state?.output != null) {
+                const resultContent = typeof part.state.output === 'string'
+                  ? part.state.output
+                  : JSON.stringify(part.state.output);
+                // Queue tool result as a follow-up user message
+                normalized.push({
+                  type: 'assistant',
+                  uuid: msgId,
+                  timestamp,
+                  message: { role: 'assistant', content: [...content], stop_reason: 'tool_use' }
+                });
+                content.length = 0; // Reset for next segment
+
+                normalized.push({
+                  type: 'user',
+                  uuid: `${msgId}_tool_${part.callID || part.tool}`,
+                  timestamp,
+                  message: {
+                    role: 'user',
+                    content: [{
+                      type: 'tool_result',
+                      tool_use_id: part.callID || part.tool,
+                      content: resultContent.substring(0, 50000), // Truncate very large outputs
+                      is_error: part.state?.metadata?.exit > 0 || false
+                    }]
+                  }
+                });
+                continue; // Already pushed assistant message
+              }
+            }
+            // Skip step-start, step-finish, reasoning, patch parts — they're metadata
+          }
+
+          if (content.length > 0) {
+            normalized.push({
+              type: 'assistant',
+              uuid: msgId,
+              timestamp,
+              message: {
+                role: 'assistant',
+                content,
+                stop_reason: msgData.finish || 'end_turn'
+              }
+            });
+          }
+        }
+      }
+
+      this.debug(`Read ${normalized.length} normalized messages from OpenCode session ${sessionId}`);
+      return normalized;
+    } catch (error) {
+      this.debug(`Error reading OpenCode messages: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Get the current message count for an OpenCode session (used for change detection)
+   */
+  getOpenCodeMessageCount(sessionId) {
+    const dbPath = this.openCodeDbPath;
+    if (!fs.existsSync(dbPath)) return 0;
+
+    try {
+      const { execSync } = require('child_process');
+      const query = `SELECT COUNT(*) FROM message WHERE session_id = '${sessionId.replace(/'/g, "''")}';`;
+      const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
+        encoding: 'utf-8',
+        timeout: 3000
+      }).trim();
+      return parseInt(result, 10) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
    * Normalize Copilot events.jsonl entries to Claude-compatible message format
    * so the existing extractExchanges pipeline can process them unchanged
    */
@@ -1312,6 +1570,12 @@ class EnhancedTranscriptMonitor {
    * Read and parse transcript messages
    */
   readTranscriptMessages(transcriptPath) {
+    // Handle OpenCode virtual paths — read from SQLite instead of file
+    if (this.isOpenCodePath(transcriptPath)) {
+      const sessionId = this.getOpenCodeSessionId(transcriptPath);
+      return this.readOpenCodeMessages(sessionId);
+    }
+
     if (!fs.existsSync(transcriptPath)) return [];
 
     try {
@@ -2694,6 +2958,22 @@ class EnhancedTranscriptMonitor {
    */
   hasNewContent() {
     if (!this.transcriptPath) return false;
+
+    // OpenCode: poll message count instead of file size
+    if (this.isOpenCodePath(this.transcriptPath)) {
+      try {
+        const sessionId = this.getOpenCodeSessionId(this.transcriptPath);
+        const msgCount = this.getOpenCodeMessageCount(sessionId);
+        const hasNew = msgCount !== this.lastFileSize; // Reuse lastFileSize to store message count
+        this.lastFileSize = msgCount;
+        if (hasNew) {
+          this.lastActivityTime = Date.now();
+        }
+        return hasNew;
+      } catch {
+        return false;
+      }
+    }
 
     try {
       const stats = fs.statSync(this.transcriptPath);
