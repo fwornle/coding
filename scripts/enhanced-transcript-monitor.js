@@ -472,15 +472,20 @@ class EnhancedTranscriptMonitor {
             await this.processExchanges(exchanges);
           }
 
-          // Flush stale prompt set for this transcript (held > 10s with no new exchanges)
+          // Flush stale or long-running prompt set for this transcript
           if (this.currentUserPromptSet.length > 0) {
             const lastTs = this.currentUserPromptSet[this.currentUserPromptSet.length - 1].timestamp;
             const setAge = Date.now() - new Date(lastTs).getTime();
-            if (setAge > 10000) {
+            const firstTs = this.currentUserPromptSet[0].timestamp;
+            const setDuration = Date.now() - new Date(firstTs).getTime();
+            const isStale = setAge > 10000;
+            const isLongRunning = setDuration > 5 * 60 * 1000;
+            if (isStale || isLongRunning) {
               const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
               const target = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              const reason = isLongRunning ? `long-running (${Math.round(setDuration/60000)}min)` : `stale (${Math.round(setAge/1000)}s)`;
               if (target !== null) {
-                this.debug(`⏰ Flushing stale per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges (${Math.round(setAge/1000)}s old)`);
+                this.debug(`⏰ Flushing per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
                 await this.processUserPromptSetCompletion(this.currentUserPromptSet, target, setTranche);
               }
               this.currentUserPromptSet = [];
@@ -3126,13 +3131,17 @@ class EnhancedTranscriptMonitor {
         const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
 
         // Flush if: hour boundary crossed OR set has been held too long (> 10s)
+        // OR set has been accumulating for > 5 minutes (long agent runs)
         const hourCrossed = currentTranche.timeString !== setTranche.timeString || currentTranche.date !== setTranche.date;
         const lastExchangeTs = this.currentUserPromptSet[this.currentUserPromptSet.length - 1].timestamp;
         const setAge = Date.now() - new Date(lastExchangeTs).getTime();
         const isStale = setAge > 10000; // 10 seconds without new exchanges in this set
+        const firstExchangeTs = this.currentUserPromptSet[0].timestamp;
+        const setDuration = Date.now() - new Date(firstExchangeTs).getTime();
+        const isLongRunning = setDuration > 5 * 60 * 1000; // 5 minutes since first exchange
 
-        if (hourCrossed || isStale) {
-          const reason = hourCrossed ? `hour boundary (${setTranche.timeString} → ${currentTranche.timeString})` : `stale (${Math.round(setAge/1000)}s)`;
+        if (hourCrossed || isStale || isLongRunning) {
+          const reason = hourCrossed ? `hour boundary (${setTranche.timeString} → ${currentTranche.timeString})` : isLongRunning ? `long-running (${Math.round(setDuration/60000)}min, ${this.currentUserPromptSet.length} exchanges)` : `stale (${Math.round(setAge/1000)}s)`;
           this.debug(`⏰ Flushing held prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
           const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
           if (targetProject !== null) {
