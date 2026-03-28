@@ -389,6 +389,7 @@ coding --lsl-status
 
 - 25-line config file, zero shared code changes
 - Demonstrates the minimum integration: `AGENT_NAME` + `AGENT_COMMAND` + `agent_check_requirements()`
+- **Native LSL support**: The transcript monitor reads directly from OpenCode's SQLite database (`~/.local/share/opencode/opencode.db`) — no pipe-pane capture needed for session logging
 
 ![OpenCode running in coding](../images/coding-opencode.png)
 

@@ -70,6 +70,8 @@ Map your agent's native events to unified events.
 
 Convert your agent's transcript format to unified LSL format.
 
+The transcript monitor supports three built-in sources: Claude Code (`.jsonl`), Copilot CLI (`events.jsonl`), and OpenCode (SQLite). If your agent uses a different format, implement a normalizer in `enhanced-transcript-monitor.js` that converts messages to the Claude-compatible `{type, uuid, timestamp, message: {role, content}}` format.
+
 ## Step 5: Register the Adapter
 
 Update `lib/agent-api/index.js` to include your adapter in the ADAPTERS registry.

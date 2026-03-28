@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Adaptive Transcript Format Detection System automatically learns and adapts to changes in Claude Code transcript formats, ensuring robust LSL (Live Session Logging) functionality even when transcript structures evolve.
+The Adaptive Transcript Format Detection System automatically learns and adapts to changes in Claude Code transcript formats, ensuring robust LSL (Live Session Logging) functionality across different coding agents (Claude Code, Copilot CLI, OpenCode) and when transcript structures evolve.
 
 ## Problem Solved
 
@@ -94,6 +94,19 @@ const stats = extractor.getStats();
 - **Message Types**: `human_turn_start`, `human_turn_end`, `claude_turn_start`, `claude_turn_end`
 - **Structure**: Separate turn boundaries with content in `*_turn_end` messages
 - **Tool Handling**: Dedicated `tool_use` and `tool_result` message types
+
+### 3. Copilot CLI (events.jsonl)
+- **Message Types**: `user.message`, `assistant.message`, `tool.call`, `tool.result`
+- **Structure**: Event-based JSONL with `type` field discriminator
+- **Normalization**: `normalizeCopilotMessages()` converts to Claude-compatible format
+
+### 4. OpenCode (SQLite)
+- **Storage**: SQLite database at `~/.local/share/opencode/opencode.db`
+- **Tables**: `session` (metadata), `message` (conversation), `part` (content fragments)
+- **Structure**: `message.data` contains `{role, time, model, ...}`, parts contain text/tool data
+- **Change Detection**: Message count polling (no file to watch)
+- **Virtual Paths**: Uses `opencode://<session_id>` virtual URIs for transcript tracking
+- **Normalization**: `readOpenCodeMessages()` converts to Claude-compatible format with tool use/result pairs
 
 ## Usage
 

@@ -6,7 +6,7 @@ Real-time conversation monitoring and intelligent classification that captures e
 
 The LSL system provides **intelligent session capture** with automatic content routing:
 
-- **Real-Time Monitoring** - Captures every Claude conversation as it happens
+- **Real-Time Monitoring** - Captures every coding agent conversation as it happens
 - **Intelligent Classification** - 5-layer system determines content routing (LOCAL vs CODING)
 - **Zero Data Loss** - 4-layer monitoring architecture ensures reliability
 - **Multi-Project Support** - Handles multiple projects simultaneously with foreign session tracking
@@ -47,7 +47,7 @@ The LSL system uses a **4-layer failsafe monitoring architecture** (distinct fro
 ### Core Components
 
 **Enhanced Transcript Monitor** (`scripts/enhanced-transcript-monitor.js`):
-- Monitors Claude transcript files (`.jsonl`) in real-time
+- Monitors transcript sources (Claude `.jsonl`, Copilot `events.jsonl`, OpenCode SQLite) in real-time
 - Detects session boundaries and organizes into time windows
 - Generates health files with process metrics
 - Routes classified content to appropriate destinations
@@ -73,9 +73,9 @@ The LSL system uses a **4-layer failsafe monitoring architecture** (distinct fro
 
 ### Real-Time Monitoring
 
-Every project started via `coding/bin/coding` gets its own Enhanced Transcript Monitor:
+Every project started via `coding` gets its own Enhanced Transcript Monitor:
 
-1. **Exchange Detection**: Monitor detects new exchanges in Claude transcript files
+1. **Exchange Detection**: Monitor detects new exchanges across all transcript sources
 2. **Periodic Refresh**: Every 60s, switches to newest transcript file
 3. **Health Reporting**: Generates `.transcript-monitor-health` with process metrics
 4. **Suspicious Activity**: Identifies stuck processes and processing issues
@@ -191,9 +191,19 @@ ANTHROPIC_API_KEY=<SECRET_REDACTED>
 
 ## What It Monitors
 
-### Transcript Files
+### Transcript Sources
 
-**Claude Conversation Transcripts** (`.jsonl` format):
+The monitor supports three transcript sources, auto-detected per project:
+
+| Source | Format | Change Detection | Agent |
+|--------|--------|-----------------|-------|
+| **Claude Code** | `.jsonl` files in `~/.claude/projects/` | File size polling | Claude Code |
+| **Copilot CLI** | `events.jsonl` in `~/.copilot/session-state/` | File size polling | GitHub Copilot CLI |
+| **OpenCode** | SQLite database (`~/.local/share/opencode/opencode.db`) | Message count polling | OpenCode |
+
+All sources are normalized to a common exchange format before processing, so classification, redaction, and routing work identically regardless of which agent generated the conversation.
+
+**Common behaviors across all sources**:
 - Real-time exchange detection
 - Periodic refresh to newest transcript (60s)
 - Session boundary detection

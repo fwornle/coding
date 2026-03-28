@@ -366,10 +366,11 @@ coding --lsl-status
 - `agent_pre_launch()` — starts HTTP adapter server
 - `agent_cleanup()` — stops HTTP adapter on exit
 
-### OpenCode (`config/agents/opencode.sh`) — Proof of concept
+### OpenCode (`config/agents/opencode.sh`)
 
 - 25-line config file, zero shared code changes
 - Demonstrates the minimum integration: `AGENT_NAME` + `AGENT_COMMAND` + `agent_check_requirements()`
+- **Native LSL support**: The transcript monitor reads directly from OpenCode's SQLite database (`~/.local/share/opencode/opencode.db`) — no pipe-pane capture needed for session logging
 
 ---
 
