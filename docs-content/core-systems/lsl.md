@@ -8,7 +8,7 @@ Real-time conversation monitoring and intelligent classification with zero data 
 
 ## What It Does
 
-- **Real-Time Monitoring** - Captures every Claude conversation as it happens
+- **Real-Time Monitoring** - Captures every coding agent conversation as it happens (Claude Code, Copilot CLI, OpenCode)
 - **Intelligent Classification** - 5-layer system routes content (LOCAL vs CODING)
 - **Zero Data Loss** - 4-layer monitoring architecture ensures reliability
 - **Multi-Project Support** - Handles multiple projects with foreign session tracking
@@ -85,11 +85,23 @@ Performance: <5ms overhead per exchange.
 }
 ```
 
+## Transcript Sources
+
+The monitor supports three transcript sources, auto-detected per project:
+
+| Source | Format | Agent |
+|--------|--------|-------|
+| **Claude Code** | `.jsonl` files in `~/.claude/projects/` | Claude Code |
+| **Copilot CLI** | `events.jsonl` in `~/.copilot/session-state/` | GitHub Copilot CLI |
+| **OpenCode** | SQLite database (`~/.local/share/opencode/opencode.db`) | OpenCode |
+
+All sources are normalized to a common exchange format before processing.
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `scripts/enhanced-transcript-monitor.js` | Core monitoring process |
+| `scripts/enhanced-transcript-monitor.js` | Core monitoring process (all 3 transcript sources) |
 | `src/live-logging/ReliableCodingClassifier.js` | 5-layer classification |
 | `src/live-logging/ConfigurableRedactor.js` | Security redaction |
 | `monitoring/global-monitor-watchdog.js` | System-level watchdog |
