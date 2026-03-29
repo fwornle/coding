@@ -80,11 +80,11 @@ Four phases that integrate mastra.ai's observational memory into the coding infr
   2. Observations persist to a LibSQL database at a configurable path under `.observations/` and survive process restarts
   3. Observer and reflector LLM calls route through the existing coding LLM proxy (Docker to host agent SDK) -- no direct API keys in mastra config
   4. Token budget limits are configurable per observer/reflector agent and prevent runaway LLM costs during tool-heavy sessions
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md -- Port LLM proxy bridge server and provider config from OKM
-- [ ] 20-02-PLAN.md -- Plugin installation lifecycle, storage config, token budgets, smoke test
+- [x] 20-02-PLAN.md -- Plugin installation lifecycle, storage config, token budgets, smoke test
 
 #### Phase 21: Mastracode Agent Integration
 **Goal**: Users can launch mastracode as a fully integrated coding agent with tmux session management and LSL logging
@@ -123,7 +123,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 20. Foundation & OpenCode OM | v4.0 | 0/2 | Planned | - |
+| 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
 | 21. Mastracode Agent Integration | v4.0 | 0/? | Not started | - |
 | 22. Transcript Converters | v4.0 | 0/? | Not started | - |
 | 23. Live Observation Tap & Dashboard | v4.0 | 0/? | Not started | - |
