@@ -219,6 +219,13 @@ constraints:
   - Write
   suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md
     or ALL-CAPS-FILE.md'
+  exceptions:
+  - path: '**/README.md'
+  - path: '**/CHANGELOG.md'
+  - path: '**/.planning/**'
+  - path: '**/skills/**'
+  - path: '**/.claude/**'
+  - path: '**/.agents/**'
 - id: update-main-readme
   group: documentation
   pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
