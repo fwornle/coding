@@ -30,6 +30,7 @@ import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import ClassificationLogger from './classification-logger.js';
 import ProcessStateManager from './process-state-manager.js';
 import { enableAutoRestart } from './auto-restart-watcher.js';
+import { execSync as _execSync } from 'child_process';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -792,9 +793,8 @@ class EnhancedTranscriptMonitor {
     if (openCodeTranscript) {
       const sessionId = this.getOpenCodeSessionId(openCodeTranscript);
       try {
-        const { execSync } = require('child_process');
         const query = `SELECT time_updated FROM session WHERE id = '${sessionId.replace(/'/g, "''")}';`;
-        const result = execSync(`sqlite3 "${this.openCodeDbPath}" "${query}"`, { encoding: 'utf-8', timeout: 3000 }).trim();
+        const result = _execSync(`sqlite3 "${this.openCodeDbPath}" "${query}"`, { encoding: 'utf-8', timeout: 3000 }).trim();
         const mtime = new Date(parseInt(result, 10));
         candidates.push({ path: openCodeTranscript, mtime, source: 'opencode' });
       } catch (e) {
@@ -1300,7 +1300,7 @@ class EnhancedTranscriptMonitor {
     }
 
     try {
-      const { execSync } = require('child_process');
+      const execSync = _execSync;
       const projectPath = this.config.projectPath;
 
       // Resolve symlinks so we match regardless of which path alias was used
@@ -1347,7 +1347,7 @@ class EnhancedTranscriptMonitor {
     if (!fs.existsSync(dbPath)) return [];
 
     try {
-      const { execSync } = require('child_process');
+      const execSync = _execSync;
 
       // Get messages with their parts joined together
       // Using JSON output mode for reliable parsing
@@ -1484,7 +1484,7 @@ class EnhancedTranscriptMonitor {
     if (!fs.existsSync(dbPath)) return 0;
 
     try {
-      const { execSync } = require('child_process');
+      const execSync = _execSync;
       const query = `SELECT COUNT(*) FROM message WHERE session_id = '${sessionId.replace(/'/g, "''")}';`;
       const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
         encoding: 'utf-8',
