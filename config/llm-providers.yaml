@@ -196,6 +196,31 @@ circuit_breaker:
   threshold: 5
   resetTimeoutMs: 60000  # 1 minute
 
+# Observation Memory (mastra plugin) configuration
+# Default models for observer/reflector agents — fast/cheap since observations are background work
+observation_defaults:
+  model: "google/gemini-2.5-flash"        # Default for observation generation
+  fallback_model: "groq/llama-3.3-70b-versatile"  # Fallback if gemini unavailable
+  provider_priority: ["gemini", "groq", "copilot", "claude-code"]  # Cheapest first
+
+# Network-adaptive provider priority overrides
+# Applied by llm-proxy when VPN is detected
+network_overrides:
+  vpn:
+    # Inside VPN: copilot is free via corporate subscription
+    default_provider: "copilot"
+    provider_priority:
+      fast: ["copilot", "groq", "gemini", "anthropic", "openai", "github-models"]
+      standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+      premium: ["copilot", "claude-code", "groq", "anthropic", "openai", "gemini", "github-models"]
+  public:
+    # Outside VPN: claude-code subscription is preferred
+    default_provider: "claude-code"
+    provider_priority:
+      fast: ["groq", "claude-code", "copilot", "anthropic", "openai", "gemini", "github-models"]
+      standard: ["groq", "claude-code", "copilot", "anthropic", "openai", "gemini", "github-models"]
+      premium: ["groq", "claude-code", "copilot", "anthropic", "openai", "gemini", "github-models"]
+
 # Environment variable overrides
 # Set these to force specific tiers:
 #   SEMANTIC_ANALYSIS_TIER=premium  - All tasks use premium
