@@ -1,7 +1,7 @@
 # Requirements: Coding Project v4.0
 
 **Defined:** 2026-03-29
-**Core Value:** Intelligent observational memory replacing verbatim logging — mastra.ai integration across all coding agents
+**Core Value:** Intelligent observational memory replacing verbatim logging -- mastra.ai integration across all coding agents
 
 ## v4.0 Requirements
 
@@ -11,7 +11,7 @@ Requirements for mastra integration milestone. Each maps to roadmap phases.
 
 - [ ] **OCOM-01**: The mastra/opencode plugin is installed via `install.sh` (with corresponding uninstall in `uninstall.sh` and validation in `scripts/test-coding.sh`)
 - [ ] **OCOM-02**: Observation storage uses LibSQL with configurable path and schema setup
-- [ ] **OCOM-03**: Observer/reflector agents use the coding LLM proxy (Docker → host agent SDK) instead of direct API keys
+- [ ] **OCOM-03**: Observer/reflector agents use the coding LLM proxy (Docker to host agent SDK) instead of direct API keys
 - [ ] **OCOM-04**: Token budget limits are configurable per observer/reflector agent to control LLM costs
 
 ### Transcript Converters
@@ -51,33 +51,33 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | Feature | Reason |
 |---------|--------|
 | Cross-agent observation sharing (resource-scoped OM) | Marked experimental in mastra, defer until stable |
-| Replacing verbatim LSL with observations | Additive only — LSL must continue unchanged |
-| KG bridge (observations → Graphology entities) | Future milestone after observations are proven |
+| Replacing verbatim LSL with observations | Additive only -- LSL must continue unchanged |
+| KG bridge (observations to Graphology entities) | Future milestone after observations are proven |
 | Direct API key configuration for mastra LLM | Must use existing coding LLM proxy infrastructure |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OCOM-01 | — | Pending |
-| OCOM-02 | — | Pending |
-| OCOM-03 | — | Pending |
-| OCOM-04 | — | Pending |
-| CONV-01 | — | Pending |
-| CONV-02 | — | Pending |
-| CONV-03 | — | Pending |
-| CONV-04 | — | Pending |
-| MSTR-01 | — | Pending |
-| MSTR-02 | — | Pending |
-| MSTR-03 | — | Pending |
-| LIVE-01 | — | Pending |
-| LIVE-02 | — | Pending |
+| OCOM-01 | Phase 20 | Pending |
+| OCOM-02 | Phase 20 | Pending |
+| OCOM-03 | Phase 20 | Pending |
+| OCOM-04 | Phase 20 | Pending |
+| CONV-01 | Phase 22 | Pending |
+| CONV-02 | Phase 22 | Pending |
+| CONV-03 | Phase 22 | Pending |
+| CONV-04 | Phase 22 | Pending |
+| MSTR-01 | Phase 21 | Pending |
+| MSTR-02 | Phase 21 | Pending |
+| MSTR-03 | Phase 21 | Pending |
+| LIVE-01 | Phase 23 | Pending |
+| LIVE-02 | Phase 23 | Pending |
 
 **Coverage:**
 - v4.0 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 after initial definition*
+*Last updated: 2026-03-29 after roadmap creation*

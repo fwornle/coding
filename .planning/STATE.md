@@ -5,9 +5,9 @@ milestone_name: Mastra Integration & LSL Observational Memory
 status: in-progress
 stopped_at: null
 last_updated: "2026-03-29T12:00:00Z"
-last_activity: "2026-03-29 — Milestone v4.0 started"
+last_activity: "2026-03-29 — Roadmap created for v4.0"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,105 +20,52 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-29)
 
-**Core value:** Intelligent observational memory replacing verbatim logging — mastra.ai integration across all coding agents
-**Current focus:** v4.0 — Defining requirements
+**Core value:** Intelligent observational memory replacing verbatim logging -- mastra.ai integration across all coding agents
+**Current focus:** Phase 20 — Foundation & OpenCode OM
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 20 of 23 (Foundation & OpenCode OM)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-29 — Milestone v4.0 started
+Status: Ready to plan
+Last activity: 2026-03-29 — Roadmap created for v4.0 (4 phases, 13 requirements)
 
-Progress: [█████████░] 92% (11/12 plans)
-
-### Phase 19 Blocker: State Machine Dashboard Integration Incomplete
-
-Plan 19-01 (parallel validation) reached checkpoint but validation revealed the state machine format is structurally incompatible with the dashboard. The migration cleanup cannot proceed until these gaps are closed:
-
-1. **Progress format mismatch** — State machine writes `{progress: {completedSteps: ['wave1','wave2'], currentStepName: '...'}}` but dashboard reads flat `{completedSteps: 0, totalSteps: 14, currentStep: '...'}`
-2. **Wave step tracking** — Wave-controller dispatches `substep-update` but never `step-complete`, so completedSteps stays empty
-3. **Trace modal** — Reads old DAG workflow definitions (14 steps), not wave-analysis (4 waves)
-4. **Single-step controls** — Pause/resume field naming differs between formats
-5. **Graph visualization** — Still coordinator-centric, not wave-clustered
-
-**Resolution:** Need a "dashboard state machine integration" phase before migration cleanup can proceed. This is new scope not covered by phase 19's plans.
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 7min
-- Total execution time: 58min
+- Total plans completed: 0 (v4.0) / 11 cumulative (v3.0)
+- Average duration: 7min (from v3.0)
+- Total execution time: 0min (v4.0)
 
-| Phase | Plan | Duration | Tasks | Files |
-|-------|------|----------|-------|-------|
-| 15    | 01   | 3min     | 2     | 6     |
-| 15    | 02   | 4min     | 2     | 6     |
-| 16    | 01   | 9min     | 2     | 8     |
-| 16    | 02   | 8min     | 3     | 5     |
-| 17    | 01   | 4min     | 2     | 7     |
-| 17    | 02   | 15min    | 2     | 10    |
-| 18    | 01   | 5min     | 2     | 2     |
-| 18    | 02   | 10min    | 2     | 4     |
-| 19.1  | 01   | 3min     | 2     | 2     |
-| 19.1  | 03   | 7min     | 2     | 4     |
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
 
 ## Accumulated Context
 
 ### Decisions
 
-- [v2.1]: Plan 14-03 deferred — workflow state mgmt needs redesign first
-- [v3.0]: Hand-rolled discriminated unions, not XState (workflow has ~6 states, below library threshold)
-- [v3.0]: Zod for runtime validation at system boundaries
-- [v3.0]: File-copy sync for shared types between backend and dashboard (not npm package)
-- [v3.0]: Backend owns state, dashboard is pure consumer — no inference
-- [15-01]: Zod-first schemas as single source of truth, TS types derived via z.infer<>
-- [15-01]: Single RunningStateSchema with subStatus enum (not nested discriminatedUnion)
-- [15-01]: Migration preprocess at boundaries for old format compatibility
-- [15-02]: Added nextStep field to step-complete event for explicit step advancement
-- [15-02]: TransitionMap type for compile-time enforcement alongside runtime validation
-- [16-01]: Cross-process state -- MCP server and workflow-runner have separate singleton instances; progress file is bridge
-- [16-01]: Legacy writeProgress kept @deprecated for backward compat until phase-19
-- [16-01]: Heartbeat intervals removed -- subscriber writes on every transition serve as natural heartbeats
-- [16-02]: substep-update is a self-loop on running state -- progress tracking without state transition
-- [16-02]: updateProgress and writeProgress fully deleted -- state machine subscriber is sole progress writer
-- [16-02]: Cooperative cancel checks at 6 strategic points between major substeps
-- [17-01]: Two SSE event types (state-change, initial-state) with full state snapshot -- no client-side reconstruction
-- [17-01]: SSEBroadcaster uses minimal SSEWritable interface for testability without Express dependency
-- [17-01]: Broadcaster subscribed at module load to capture all transitions from server start
-- [17-02]: Minimal SSE client via http.get() -- no eventsource dependency, ~30 lines with exponential backoff reconnect
-- [17-02]: STATE_SNAPSHOT envelope for typed state forwarding over WebSocket
-- [17-02]: Legacy event types mapped from status transitions for backward compat (removed in Phase 18)
-- [18-01]: Single setWorkflowState action replaces 12 granular event handlers -- no event-by-event reconstruction
-- [18-01]: Backward-compat sync in setWorkflowState writes to legacy execution fields for unmigrated components
-- [18-01]: deriveStepStatuses uses backend step names from stepMappings, reverse-mapped to agent IDs for UI
-- [18-02]: deriveSubstepStatuses called with backend step name from stepToAgent reverse lookup
-- [18-02]: Step/Into buttons use WebSocket sendCommand with isTransitionInFlight -- replaces REST fetch+poll
-- [18-02]: resolvedStatus in sidebar typed as DisplayStatus union using selectNodeStatus selector
-- [19.1-01]: stepName/nextStep/duration fields per StepCompleteEventSchema (plan examples used wrong 'step' field)
-- [19.1-01]: bridgeStateMachineToLegacy returns null for non-state-machine format (passthrough for legacy data)
-- [19.1-01]: Terminal states detected via workflowId presence, not progress array
-- [19.1-03]: z.record(z.string(), z.unknown()) for trace schemas -- avoids coupling to TraceAgentInstance/TraceLLMCall interfaces
-- [19.1-03]: stepsDetail carried from RunningState through CompletedState for terminal state trace access
-- [19.1-03]: Terminal states included in API for 30 minutes via isRecentTerminal filter
+- [v4.0 roadmap]: 4 phases derived from 13 requirements (OCOM/CONV/MSTR/LIVE categories)
+- [v4.0 roadmap]: Phase order: foundation first, live tap last (highest risk)
+- [v4.0 roadmap]: Observer/reflector must use coding LLM proxy, not direct API keys
+- [v4.0 roadmap]: Mastracode LSL via lifecycle hooks, not pipe-pane (pi-tui/tmux conflict)
 
-### Critical Pitfalls
+### Research Flags
 
-- **Sticky debug state**: mockLLM/singleStepMode persist in progress file between runs — must clear before production runs
-- **Docker rebuild**: Pipeline changes require submodule build + Docker rebuild
-- **Progress file migration**: Must support both old and new format during transition (MIG-02)
-
-### Roadmap Evolution
-
-- Phase 19.1 inserted after Phase 19: Dashboard state machine integration (URGENT)
+- `@mastra/opencode` npm availability uncertain -- may need monorepo build (affects Phase 20)
+- `MastraDBMessage` type shape needs confirmation before Phase 22 normalization design
+- Mastracode first-run OAuth in headless tmux is untested (Phase 21)
 
 ### Blockers/Concerns
 
-None.
+- v3.0 Phase 19.1 still in progress (2/4 plans) -- v4.0 is independent work, no blocker
 
 ## Session Continuity
 
-Last session: 2026-03-12T00:10:00Z
-Stopped at: Completed 19.1-03-PLAN.md
-Resume with: Plan 19.1-04 next.
+Last session: 2026-03-29
+Stopped at: Roadmap created for v4.0
+Resume with: `/gsd:plan-phase 20`
