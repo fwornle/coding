@@ -13,7 +13,7 @@
  * Execution: Before every user prompt is processed
  */
 
-import { readFileSync, existsSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -161,26 +161,56 @@ function outputBlockedResponse(healthStatus) {
 /**
  * Independent LSL health check — runs regardless of health verifier status.
  * Checks whether the transcript monitor is actively producing session logs.
+ * If LSL is down, attempts auto-recovery before reporting.
  * Returns a warning string if LSL is down, empty string if healthy.
  */
 function checkLSLHealth() {
     try {
         const healthFile = join(codingRoot, '.health', 'coding-transcript-monitor-health.json');
-        if (!existsSync(healthFile)) {
-            return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded.\n';
+        const isDown = !existsSync(healthFile);
+        let isStopped = false;
+        let isStale = false;
+        let ageSec = 0;
+
+        if (!isDown) {
+            const health = JSON.parse(readFileSync(healthFile, 'utf-8'));
+            const ageMs = Date.now() - (health.timestamp || 0);
+            ageSec = Math.floor(ageMs / 1000);
+            isStopped = health.status === 'stopped';
+            isStale = ageMs > 120_000; // 2 minutes
         }
 
-        const health = JSON.parse(readFileSync(healthFile, 'utf-8'));
-        const ageMs = Date.now() - (health.timestamp || 0);
-        const MAX_STALE_MS = 120_000; // 2 minutes
+        if (isDown || isStopped || isStale) {
+            // Attempt auto-recovery: spawn global-lsl-coordinator in background
+            // Rate-limited by a lockfile to prevent spawning on every prompt
+            const lockFile = join(codingRoot, '.health', '.lsl-recovery-lock');
+            let shouldRecover = true;
+            if (existsSync(lockFile)) {
+                try {
+                    const lockAge = Date.now() - statSync(lockFile).mtimeMs;
+                    shouldRecover = lockAge > 60_000; // At most once per minute
+                } catch { /* proceed with recovery */ }
+            }
 
-        if (health.status === 'stopped') {
-            return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded. Run: node scripts/global-lsl-coordinator.js ensure /Users/Q284340/Agentic/coding\n';
-        }
+            if (shouldRecover) {
+                try {
+                    // Touch lockfile
+                    writeFileSync(lockFile, String(Date.now()));
+                    // Fire-and-forget: spawn coordinator to restart monitor
+                    const coordinator = spawn('node', [
+                        join(codingRoot, 'scripts', 'global-lsl-coordinator.js'),
+                        'ensure',
+                        codingRoot
+                    ], { detached: true, stdio: 'ignore', cwd: codingRoot });
+                    coordinator.unref();
+                } catch { /* recovery is best-effort */ }
 
-        if (ageMs > MAX_STALE_MS) {
-            const ageSec = Math.floor(ageMs / 1000);
-            return `🔴 LSL STALE: Transcript monitor health not updated for ${ageSec}s. LSL may have crashed. Run: node scripts/global-lsl-coordinator.js ensure /Users/Q284340/Agentic/coding\n`;
+                return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded. Auto-recovery attempted.\n';
+            }
+
+            if (isDown) return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded.\n';
+            if (isStopped) return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded.\n';
+            return `🔴 LSL STALE: Transcript monitor health not updated for ${ageSec}s. LSL may have crashed.\n`;
         }
 
         return ''; // Healthy
