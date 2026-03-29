@@ -78,6 +78,9 @@ The supervision architecture includes multiple guards to prevent runaway process
 - **Active Session Gating** - Transcript monitors only spawned for sessions with transcript activity in the last 2 minutes
 - **Multi-Agent Detection** - Detects Claude, Copilot, and OpenCode sessions via process scanning
 - **Agent Age Cap** - Running agent's display age capped at monitor uptime; transcripts with `status: 'not_found'` (e.g., OpenCode) correctly show as inactive instead of falsely green
+- **GPS/Coordinator Deference** - GPS defers transcript monitor management to GlobalLSLCoordinator when active (prevents dual-supervisor race condition)
+- **Prompt Hook Safety Net** - HealthPromptHook spawns coordinator when GPS has exhausted restart budget (rate-limited 1/min)
+- **Idle Timeout Tmux Guard** - Monitor checks for active tmux session before idle-exit (prevents restart budget waste)
 - **Intentional Stop Markers** - Graceful shutdown marks project as stopped, preventing restart loops
 
 ## Component Details
@@ -88,6 +91,7 @@ The supervision architecture includes multiple guards to prevent runaway process
 - Discovers projects from: PSM registry, health files, Claude transcript directories
 - **OS-level fallback**: When PSM says "not registered", checks OS process table via `findRunningProcessesByScript()` — re-registers alive services instead of blind respawn
 - Health file staleness threshold: **120 seconds** (2× write interval, prevents false-positive "dead" detection at boundary)
+- **Defers to GlobalLSLCoordinator**: checks for coordinator daemon via pgrep before restarting transcript monitors (prevents dual-supervisor race)
 - 5-minute cooldown per service prevents restart storms
 - Max 10 restarts per hour per service (safety limit)
 - Respects intentional stop markers (skips projects that were gracefully shut down)

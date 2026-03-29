@@ -1,0 +1,72 @@
+@startuml dual-supervisor-resolution
+!include _standard-style.puml
+
+title Dual-Supervisor Resolution\nGPS ↔ Coordinator Conflict Prevention
+
+top to bottom direction
+
+package "Session Startup" #E8F5E8 {
+  component [launch-claude.sh] as Launch <<cli>>
+  component [GlobalLSLCoordinator\n(monitor daemon)] as GLC <<core>>
+  note right of GLC
+    **Started per session by launch-claude.sh**
+    - 30s health check loop
+    - Spawns monitors for its project
+    - Registers in PSM
+  end note
+}
+
+package "Background Daemon" #E6F3FF {
+  component [GlobalProcessSupervisor\n(GPS)] as GPS <<infra>>
+  note right of GPS
+    **Long-running daemon (days/weeks)**
+    - 30s supervision loop
+    - Discovers ALL projects dynamically
+    - Max 10 restarts/hour per service
+  end note
+}
+
+package "Per-Project Monitors" #FFE8F4 {
+  component [EnhancedTranscriptMonitor\n(coding)] as ETM <<per_project>>
+}
+
+package "Safety Net" #FFF9E6 {
+  component [HealthPromptHook\n(pre-prompt)] as HPH <<core>>
+  note right of HPH
+    **Last-resort recovery**
+    Spawns coordinator if LSL down
+    Rate-limited: 1 attempt/minute
+  end note
+}
+
+' Coordinator manages monitors
+Launch -[#43A047,thickness=2]-> GLC : starts
+GLC -[#43A047,thickness=2]-> ETM : spawns & monitors
+
+' GPS defers to coordinator
+GPS -[#E53935,thickness=2,dashed]-> ETM : **skips** when\ncoordinator active
+GPS -[#757575,thickness=1,dotted]-> GLC : checks via pgrep
+
+' Prompt hook as safety net
+HPH -[#FF9800,thickness=2,dashed]-> GLC : spawns if\nLSL down
+
+legend right
+  |= Priority |= Who Manages Monitors |= When |
+  | 1 (Primary) | GlobalLSLCoordinator | Session active |
+  | 2 (Fallback) | GlobalProcessSupervisor | No coordinator running |
+  | 3 (Safety net) | HealthPromptHook | GPS exhausted + LSL down |
+endlegend
+
+note as N1
+  **Root Cause (Mar 2026):**
+  Both GPS and coordinator spawned monitors simultaneously.
+  The second monitor found the first's PSM entry and exited
+  with "another instance already running", creating a crash-loop
+  that exhausted GPS's 10/hour restart budget.
+
+  **Fix:** GPS checks for coordinator daemon via pgrep before
+  attempting any transcript monitor restart. Prompt hook spawns
+  coordinator as safety net when GPS has given up.
+end note
+
+@enduml

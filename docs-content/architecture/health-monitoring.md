@@ -12,14 +12,31 @@ The health monitoring system uses a **multi-layer resilience architecture** with
 |-------|-----------|---------|-------------------|--------------|
 | Cache | StatusLineFastPath | Every 5s (tmux) | N/A (read-only) | N/A |
 | 1 | CombinedStatusLine | Cache miss | GPS, SHM (fallback only) | GPS heartbeat gate |
-| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, SHM, TranscriptMonitors | OS dup check, re-registration, 120s staleness |
+| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, SHM, TranscriptMonitors | OS dup check, re-registration, GLC deference |
+| 2 | GlobalLSLCoordinator | 30s loop | TranscriptMonitors (primary) | Per-session, launched by coding |
 | 2 | GlobalServiceCoordinator | 15s loop | Constraint services (api, dashboard) | OS dup check, orphan kill, 2m cooldown, 6/hr limit |
 | 3 | HealthVerifier | 60s loop | Databases, Services, Processes | N/A |
+| Hook | HealthPromptHook | Every prompt | LSL (safety net) | 1/min lockfile rate limit |
 
 **Key Guarantee**: If any service dies, it will be restarted within:
 
-- 30 seconds (by GlobalProcessSupervisor)
+- 30 seconds (by GlobalLSLCoordinator if session active, or GlobalProcessSupervisor)
 - Or the next cache miss (by CombinedStatusLine as fallback supervisor, only if GPS is also dead)
+- Or the next user prompt (by HealthPromptHook if GPS restart budget exhausted)
+
+### Supervisor Priority
+
+Transcript monitors are managed by a priority-ordered chain of supervisors:
+
+| Priority | Supervisor | When Active |
+|----------|-----------|-------------|
+| 1 (Primary) | GlobalLSLCoordinator | Session active (launched by `coding`) |
+| 2 (Fallback) | GlobalProcessSupervisor | No coordinator running |
+| 3 (Safety net) | HealthPromptHook | GPS exhausted + LSL down |
+
+GPS checks for the coordinator daemon via `pgrep` before restarting. This prevents the dual-supervisor race condition where both spawn monitors simultaneously, causing the second to exit with "another instance already running".
+
+![Dual Supervisor Resolution](../images/dual-supervisor-resolution.png)
 
 ## Cache Layer: Fast-Path
 
@@ -58,12 +75,25 @@ The health monitoring system uses a **multi-layer resilience architecture** with
 - 30-second supervision loop with dynamic project discovery
 - Discovers projects from: PSM registry, health files, Claude transcript directories
 - **OS-level fallback**: When PSM says "not registered", checks OS process table via `findRunningProcessesByScript()` — re-registers alive services instead of blind respawn
+- **Defers to GlobalLSLCoordinator**: Before restarting a transcript monitor, checks for an active coordinator daemon via `pgrep`. If the coordinator is managing monitors, GPS skips the restart to prevent dual-supervisor conflicts
 - Health file staleness threshold: **120 seconds** (2× write interval, prevents false-positive "dead" detection at boundary)
 - 5-minute cooldown per service prevents restart storms
 - Max 10 restarts per hour per service (safety limit)
 - Respects intentional stop markers
 - Auto-restarts on own code change via AutoRestartWatcher
 - Heartbeat file: `.health/supervisor-heartbeat.json`
+
+### GlobalLSLCoordinator
+
+**Component**: `scripts/global-lsl-coordinator.js`
+
+**Function**: Per-session transcript monitor management (primary supervisor for monitors)
+
+- Started by `launch-claude.sh` when a coding session begins
+- 30-second health check loop per registered project
+- **Primary supervisor** for transcript monitors — GPS defers when coordinator is active
+- Registers monitors with PSM, cleans up dead processes
+- Can run in `ensure` mode (one-shot) or `monitor` mode (daemon)
 
 ### GlobalServiceCoordinator
 
@@ -136,6 +166,8 @@ Sessions use a graduated cooling scheme based on idle time:
 - 2-second check interval for prompt detection
 - Writes health files to centralized `.health/` directory
 - Generates LSL files in `.specstory/history/`
+- **Periodic flush**: Writes accumulated exchanges every 5 minutes during long agent runs (prevents multi-hour buffering)
+- **Idle timeout with tmux guard**: After 30 minutes of no transcript activity, checks for active tmux session via pane cwd. If session exists, stays alive instead of exiting (prevents wasting GPS restart budget overnight)
 - Auto-restarts on code change via AutoRestartWatcher
 - Marks project as intentionally stopped on graceful shutdown
 
@@ -200,6 +232,24 @@ ps aux | grep node | wc -l
 ```
 
 ## Troubleshooting
+
+### LSL shows red / monitor crash-loop
+
+```bash
+# Check GPS restart history (look for "exceeded hourly restart limit")
+grep "coding" .logs/global-process-supervisor.log | tail -20
+
+# Check if dual supervisors are competing
+pgrep -f "global-lsl-coordinator.js monitor"  # Should be 0 or 1
+pgrep -f "global-process-supervisor"            # Should be exactly 1
+
+# Check if monitor exits due to "another instance already running"
+# Start a test monitor with visible output:
+node scripts/enhanced-transcript-monitor.js /path/to/project 2>&1 | head -20
+
+# Force clean restart
+node scripts/global-lsl-coordinator.js ensure /path/to/project
+```
 
 ### Monitor not updating
 

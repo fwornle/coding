@@ -8,7 +8,7 @@ The LSL system provides **intelligent session capture** with automatic content r
 
 - **Real-Time Monitoring** - Captures every coding agent conversation as it happens
 - **Intelligent Classification** - 5-layer system determines content routing (LOCAL vs CODING)
-- **Zero Data Loss** - 4-layer monitoring architecture ensures reliability
+- **Zero Data Loss** - Multi-layer supervision with automatic recovery ensures reliability
 - **Multi-Project Support** - Handles multiple projects simultaneously with foreign session tracking
 - **Security Redaction** - Automatic sanitization of API keys, passwords, and credentials
 
@@ -43,6 +43,24 @@ The LSL system uses a **4-layer failsafe monitoring architecture** (distinct fro
 - Each monitor generates `.transcript-monitor-health` file
 - Real-time process metrics (memory, CPU, uptime)
 - Exchange count and activity tracking
+
+### Supervisor Priority Chain
+
+The transcript monitor is managed by a priority-ordered chain:
+
+| Priority | Supervisor | When Active |
+|----------|-----------|-------------|
+| 1 | GlobalLSLCoordinator | Session active (started by `coding`) |
+| 2 | GlobalProcessSupervisor | No coordinator running |
+| 3 | HealthPromptHook | GPS restart budget exhausted |
+
+GPS defers to the coordinator via `pgrep` check, preventing dual-supervisor race conditions.
+
+### Self-Protection
+
+- **Periodic flush**: Writes exchanges every 5 minutes during long runs (prevents multi-hour buffering)
+- **Idle timeout with tmux guard**: Before idle-exit, checks for active tmux session via pane cwd
+- **Auto-recovery**: Prompt hook spawns coordinator when GPS has given up (rate-limited 1/min)
 
 ### Core Components
 
