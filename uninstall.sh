@@ -199,6 +199,32 @@ if [[ -d "$CODING_REPO/integrations/llm-cli-proxy" ]]; then
     echo "    Source code preserved"
 fi
 
+# Clean up Mastra OpenCode plugin
+echo -e "\n${BLUE}🧠 Removing Mastra OpenCode plugin...${NC}"
+
+# Remove @mastra/opencode from node_modules
+if npm list @mastra/opencode >/dev/null 2>&1; then
+    npm uninstall @mastra/opencode 2>/dev/null || true
+    echo "  Removed @mastra/opencode package"
+else
+    echo "  @mastra/opencode not installed -- skipping"
+fi
+
+# Remove .opencode/mastra.json plugin config
+if [[ -f "$CODING_REPO/.opencode/mastra.json" ]]; then
+    rm -f "$CODING_REPO/.opencode/mastra.json"
+    echo "  Removed .opencode/mastra.json plugin config"
+    # Remove .opencode/ dir if empty
+    rmdir "$CODING_REPO/.opencode" 2>/dev/null || true
+else
+    echo "  .opencode/mastra.json not found -- skipping"
+fi
+
+# Preserve .observations/ directory (user data, same as .data/ preservation pattern)
+if [[ -d "$CODING_REPO/.observations" ]]; then
+    echo -e "  ${GREEN}Preserved .observations/ directory (contains observation data)${NC}"
+fi
+
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
 

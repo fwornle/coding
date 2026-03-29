@@ -2185,6 +2185,11 @@ else
     print_info "VSCode Extension Bridge test skipped (extension not installed)"
 fi
 
+# Test Mastra OpenCode plugin (if installed)
+if node -e "require.resolve('@mastra/opencode')" 2>/dev/null; then
+    test_mastra_opencode
+fi
+
 # =============================================================================
 # PHASE 9: PERFORMANCE & HEALTH CHECKS
 # =============================================================================
@@ -2539,4 +2544,108 @@ test_enhanced_lsl() {
     fi
     
     return $((lsl_tests_total - lsl_tests_passed))
+}
+
+# Test Mastra OpenCode observational memory plugin
+test_mastra_opencode() {
+    print_section "Testing Mastra OpenCode Plugin"
+
+    local mastra_tests_passed=0
+    local mastra_tests_total=5
+
+    # Test 1: Package installed
+    print_test "Mastra OpenCode package installed"
+    if node -e "require.resolve('@mastra/opencode')" 2>/dev/null; then
+        print_pass "@mastra/opencode package is installed"
+        mastra_tests_passed=$((mastra_tests_passed + 1))
+    else
+        print_fail "@mastra/opencode package not found"
+    fi
+
+    # Test 2: Observations directory exists
+    print_test "Observations directory"
+    if [[ -d "$CODING_ROOT/.observations" ]]; then
+        print_pass ".observations/ directory exists"
+        mastra_tests_passed=$((mastra_tests_passed + 1))
+    else
+        print_fail ".observations/ directory missing"
+    fi
+
+    # Test 3: Config files exist
+    print_test "Configuration files"
+    local configs_ok=0
+    if [[ -f "$CODING_ROOT/.observations/config.json" ]]; then
+        configs_ok=$((configs_ok + 1))
+        print_pass ".observations/config.json exists"
+    else
+        print_fail ".observations/config.json missing"
+    fi
+    if [[ -f "$CODING_ROOT/.opencode/mastra.json" ]]; then
+        configs_ok=$((configs_ok + 1))
+        print_pass ".opencode/mastra.json exists"
+    else
+        print_fail ".opencode/mastra.json missing"
+    fi
+    if [[ $configs_ok -eq 2 ]]; then
+        mastra_tests_passed=$((mastra_tests_passed + 1))
+    fi
+
+    # Test 4: Plugin exports MastraPlugin
+    print_test "Plugin exports MastraPlugin"
+    if timeout 10s node -e "
+        import('@mastra/opencode').then(m => {
+            if (m.MastraPlugin || m.default) {
+                process.stdout.write('OK');
+                process.exit(0);
+            } else {
+                process.stderr.write('No MastraPlugin export found');
+                process.exit(1);
+            }
+        }).catch(e => {
+            process.stderr.write(e.message);
+            process.exit(1);
+        });
+    " 2>/dev/null; then
+        print_pass "MastraPlugin export verified"
+        mastra_tests_passed=$((mastra_tests_passed + 1))
+    else
+        print_fail "MastraPlugin export not found or import failed"
+    fi
+
+    # Test 5: LibSQL DB creation (transitive dep from @mastra/opencode)
+    print_test "LibSQL database creation"
+    local test_db="/tmp/mastra-test-$$.db"
+    if timeout 10s node -e "
+        import('@mastra/libsql').then(m => {
+            const store = new m.LibSQLStore({ url: 'file:${test_db}' });
+            store.init().then(() => {
+                process.stdout.write('OK');
+                process.exit(0);
+            }).catch(e => {
+                process.stderr.write(e.message);
+                process.exit(1);
+            });
+        }).catch(e => {
+            process.stderr.write('LibSQLStore not available: ' + e.message);
+            process.exit(1);
+        });
+    " 2>/dev/null; then
+        print_pass "LibSQL database creation works"
+        mastra_tests_passed=$((mastra_tests_passed + 1))
+    else
+        print_fail "LibSQL database creation failed"
+    fi
+    # Clean up test DB
+    rm -f "${test_db}" "${test_db}-shm" "${test_db}-wal" 2>/dev/null || true
+
+    # Summary
+    if [[ $mastra_tests_passed -eq $mastra_tests_total ]]; then
+        print_pass "Mastra OpenCode plugin: All tests passed ($mastra_tests_passed/$mastra_tests_total)"
+    elif [[ $mastra_tests_passed -gt $((mastra_tests_total / 2)) ]]; then
+        print_warning "Mastra OpenCode plugin: Most tests passed ($mastra_tests_passed/$mastra_tests_total)"
+    else
+        print_fail "Mastra OpenCode plugin: Multiple test failures ($mastra_tests_passed/$mastra_tests_total)"
+    fi
+
+    return $((mastra_tests_total - mastra_tests_passed))
 }
