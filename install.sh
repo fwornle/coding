@@ -2872,6 +2872,7 @@ main() {
     setup_mcp_config
     setup_vscode_extension
     install_enhanced_lsl
+    install_mastra_opencode
     install_skills
     create_project_local_settings
     install_constraint_monitor_hooks
@@ -2971,6 +2972,99 @@ install_enhanced_lsl() {
     else
         warning "Enhanced LSL deployment script not found or not executable"
     fi
+}
+
+# Install Mastra OpenCode plugin for observational memory
+install_mastra_opencode() {
+    echo -e "\n${CYAN}🧠 Installing Mastra OpenCode plugin...${NC}"
+
+    cd "$CODING_REPO"
+
+    # Check Node.js >= 22.13.0 (required by @mastra/opencode)
+    if ! command -v node &> /dev/null; then
+        warning "Node.js not found. Mastra OpenCode requires Node.js 22+"
+        INSTALLATION_WARNINGS+=("Mastra OpenCode: Node.js not found")
+        return 1
+    fi
+
+    local node_major
+    node_major=$(node -v | sed 's/^v//' | cut -d. -f1)
+    if [[ "$node_major" -lt 22 ]]; then
+        warning "Node.js $node_major found, but Mastra OpenCode requires Node.js >= 22.13.0"
+        INSTALLATION_WARNINGS+=("Mastra OpenCode: Node.js version too old ($node_major, need 22+)")
+        return 1
+    fi
+    info "Node.js v$(node -v | sed 's/^v//') detected (>= 22 required)"
+
+    # Install @mastra/opencode via npm
+    info "Installing @mastra/opencode..."
+    if npm install @mastra/opencode@latest 2>>"$INSTALL_LOG"; then
+        success "@mastra/opencode installed"
+    else
+        warning "npm install @mastra/opencode failed. If package is unavailable, a monorepo build fallback may be needed."
+        INSTALLATION_WARNINGS+=("Mastra OpenCode: npm install failed -- check npm registry availability")
+        return 1
+    fi
+
+    # Create .observations/ directory for LibSQL storage
+    info "Setting up observation storage directory..."
+    mkdir -p "$CODING_REPO/.observations"
+    success "Created .observations/ directory"
+
+    # Create .observations/config.json with default token budget config
+    if [[ ! -f "$CODING_REPO/.observations/config.json" ]]; then
+        info "Creating default observation config..."
+        cat > "$CODING_REPO/.observations/config.json" << 'OBSCONFIG'
+{
+  "version": 1,
+  "model": "google/gemini-2.5-flash",
+  "observation": {
+    "messageTokens": 20000
+  },
+  "reflection": {
+    "observationTokens": 90000
+  },
+  "budgets": {
+    "opencode": {
+      "dailyTokens": 500000
+    },
+    "mastra": {
+      "dailyTokens": 500000
+    },
+    "claude": {
+      "dailyTokens": 1000000
+    }
+  }
+}
+OBSCONFIG
+        success "Created .observations/config.json with default budgets"
+    else
+        info ".observations/config.json already exists -- skipping"
+    fi
+
+    # Create .opencode/ directory and mastra.json plugin config
+    mkdir -p "$CODING_REPO/.opencode"
+    if [[ ! -f "$CODING_REPO/.opencode/mastra.json" ]]; then
+        info "Creating Mastra plugin config..."
+        cat > "$CODING_REPO/.opencode/mastra.json" << 'MASTRACONFIG'
+{
+  "model": "google/gemini-2.5-flash",
+  "storagePath": ".observations/observations.db",
+  "observation": {
+    "messageTokenThreshold": 500
+  },
+  "reflection": {
+    "observationTokenThreshold": 5000
+  }
+}
+MASTRACONFIG
+        success "Created .opencode/mastra.json with storage path override"
+    else
+        info ".opencode/mastra.json already exists -- skipping"
+    fi
+
+    cd "$CODING_REPO"
+    success "Mastra OpenCode plugin installation complete"
 }
 
 # Install skills to all supported agents (Claude global, Copilot, OpenCode)
