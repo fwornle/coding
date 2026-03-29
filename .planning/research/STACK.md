@@ -1,233 +1,280 @@
-# Stack Research: v3.0 Workflow State Machine
+# Stack Research
 
-**Domain:** Typed state machine for multi-agent workflow orchestration
-**Researched:** 2026-03-10
-**Confidence:** HIGH — based on codebase inspection, npm registry, official docs
+**Domain:** Mastra.ai integration for observational memory, mastracode agent, and LSL-to-observations conversion
+**Researched:** 2026-03-28
+**Confidence:** MEDIUM (packages verified via npm/docs, but standalone observe() API is new and less documented)
 
----
+## Recommended Stack
 
-## What This Milestone Adds
+### Core Technologies
 
-Replace ad-hoc workflow state management (untyped JSON progress file, boolean flags, fallback inference in dashboard) with a typed state machine. This document covers ONLY the net-new stack decisions for v3.0. The existing stack (TypeScript 5.8.3, React 18, Redux Toolkit 2.9, Express 4.21, Graphology, etc.) is unchanged and documented in prior versions of this file below.
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `@mastra/memory` | ^1.6.1 | Observational Memory engine (Observer + Reflector agents) | The core OM library. Provides standalone `observe()` API (since v1.4.0), token threshold management, and observation/reflection lifecycle. 95% on LongMemEval, 5-40x context compression vs raw message history. |
+| `@mastra/core` | ^1.10.0 | Mastra framework core (Agent class, model routing) | Required peer dependency for `@mastra/memory`. Provides model routing to 1800+ models, lifecycle hooks. |
+| `@mastra/libsql` | ^0.16.4 | LibSQL/SQLite storage adapter for observations | Local-first storage (no separate DB server needed). Stores threads, messages, token usage, and observations in SQLite. Already used by mastracode internally. Aligns with existing project preference for local storage (Graphology + LevelDB). |
+| `mastracode` | ^0.9.2 | TUI coding agent (built on pi-tui) | The `coding --mastra` agent. Includes built-in OM, LibSQL persistence, MCP server support, project-scoped threads via git remote or path. Install globally. |
+| `@mastra/opencode` | latest | OpenCode plugin for OM | Hooks into OpenCode lifecycle for auto-observe, context injection, and message filtering. Provides `memory_status` and `memory_observations` diagnostic tools. Merged in PR #12925 (Feb 2026). May need to be built from mastra monorepo source if not yet published to npm standalone. |
 
----
+### Supporting Libraries
 
-## Key Decision: Hand-Rolled Discriminated Union State Machine
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `better-sqlite3` | ^11.x | Direct SQLite access for LSL batch converter | For reading OpenCode's SQLite transcript DB during batch conversion. Transitive dependency of libsql -- may already be available. |
 
-**Recommendation: Do NOT use XState or robot3. Hand-roll a discriminated union state machine.**
+### Development Tools
 
-### Rationale
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `mastracode` (global) | TUI coding agent | `npm install -g mastracode`. Requires Node.js >= 22.13.0. Project uses Node 25.x -- compatible. |
+| `opencode` (Go binary) | Existing OpenCode agent | ALREADY INSTALLED. Plugin configured via `.opencode/mastra.json`. |
 
-| Factor | XState v5 | robot3 | Hand-rolled DU |
-|--------|-----------|--------|----------------|
-| Bundle size | ~17KB min+gz | ~1KB | 0KB (it's your code) |
-| TypeScript DX | Good with `setup()` API, but state-specific context not supported until v6 | Functional API, weaker TS inference | Perfect — discriminated unions ARE TypeScript's type system |
-| Learning curve | Significant — actors, services, guards, invoke patterns | Moderate — functional but different paradigm | Zero — team already knows TS unions |
-| State-specific data | NOT supported (confirmed: XState v6 feature) | Not supported | Native — each state variant carries its own data |
-| Visualization | Stately.ai visualizer | None | None needed — states are explicit in code |
-| Dependencies added | 1 (xstate) + 1 (@xstate/react) for dashboard | 1 (robot3) + 1 (react-robot) | 0 |
-| Fits this codebase | Over-engineered for 6 workflow states | Too small community (2K stars vs 29K) | Matches existing TypeScript-first, zero-dep approach |
+## What Already Exists (DO NOT ADD)
 
-**The decisive factor:** XState v5 cannot associate different context shapes with different states. The workflow needs `idle` (no data), `running` (currentStep, substepIndex), `paused` (pausedAt, resumeToken), `failed` (error, failedStep). Discriminated unions do this natively:
+These are already in the project and must NOT be re-added or replaced:
 
-```typescript
-type WorkflowState =
-  | { status: 'idle' }
-  | { status: 'running'; currentStep: string; substepIndex: number; startedAt: Date }
-  | { status: 'paused'; pausedAt: Date; pausedStep: string; resumeToken: string }
-  | { status: 'completed'; completedAt: Date; summary: WorkflowSummary }
-  | { status: 'failed'; error: string; failedStep: string; failedAt: Date };
-```
+| Existing | Where | Covers |
+|----------|-------|--------|
+| `graphology` ^0.25.4 | mcp-server-semantic-analysis | Knowledge graph storage -- observations feed INTO this, not replaced by it |
+| `level` ^10.0.0 | mcp-server-semantic-analysis | LevelDB persistence for KG entities |
+| `@anthropic-ai/sdk` ^0.57.0 | mcp-server-semantic-analysis | LLM calls -- use for batch observation conversion too |
+| `openai` ^4.52.0 | mcp-server-semantic-analysis | Alternative LLM provider |
+| `zod` ^4.3.6 | mcp-server-semantic-analysis | Runtime validation (already added in v3.0) |
+| `enhanced-transcript-monitor.js` | scripts/ | LSL live logging pipeline -- extend with observation stage, don't replace |
+| `StreamingTranscriptReader` | src/live-logging/ | Reads Claude JSONL, Copilot events, OpenCode SQLite |
+| `AdaptiveExchangeExtractor` | src/live-logging/ | Exchange boundary detection |
+| `SemanticAnalyzer` | src/live-logging/ | 5-layer classification |
+| Agent adapter scripts | config/agents/*.sh | claude.sh, copilot.sh, opencode.sh -- add mastra.sh |
 
-TypeScript's `switch (state.status)` gives exhaustive checking. XState would add complexity without adding value for a workflow with ~6 states and ~10 transitions.
-
-**When XState WOULD be right:** If the workflow had 20+ states, nested parallel regions, or needed the Stately.ai visual editor for non-developer stakeholders. This workflow does not.
-
----
-
-## New Stack Additions
-
-### 1. Shared Type Package — No New Library
-
-**What:** A shared TypeScript types file defining `WorkflowState`, `WorkflowEvent`, and `WorkflowTransition` types, consumed by both the backend (MCP server) and frontend (dashboard).
-
-**Pattern:** Single `.ts` file with type-only exports, copied or symlinked to both packages at build time. NOT a separate npm package — the overhead of publishing/versioning a private package for ~100 lines of types is not justified.
-
-**Location:** `integrations/mcp-server-semantic-analysis/src/types/workflow-state.ts` (source of truth)
-**Consumer:** `integrations/system-health-dashboard/src/types/workflow-state.ts` (copy, kept in sync by build script)
-
-**Why not a shared package:** This project already manages 3 submodules with build+Docker rebuild cycles. Adding a 4th package with its own package.json, tsconfig, and build step would slow iteration. A copied types file with a header comment `// GENERATED — source: mcp-server-semantic-analysis/src/types/workflow-state.ts` is simpler and the team already uses this pattern (the dashboard manually defines types that mirror backend shapes).
-
-**Why not path aliases / tsconfig paths:** The backend runs in Docker (compiled to dist/), the dashboard is a Vite app. Cross-submodule path resolution across these build systems is fragile. A simple copy is robust.
+## Installation
 
 ```bash
-# Sync script (add to dashboard package.json scripts)
-cp ../mcp-server-semantic-analysis/src/types/workflow-state.ts src/types/workflow-state.ts
+# Mastra packages (in mcp-server-semantic-analysis or a new observations submodule)
+npm install @mastra/memory@^1.6.1 @mastra/core@^1.10.0 @mastra/libsql@^0.16.4
+
+# Mastracode -- install globally (TUI coding agent)
+npm install -g mastracode@^0.9.2
+
+# @mastra/opencode plugin -- check npm availability first
+npm view @mastra/opencode version 2>/dev/null && npm install @mastra/opencode@latest
+# If not on npm, build from mastra monorepo (packages/opencode)
 ```
 
----
+## Key API Surface
 
-### 2. SSE Event Typing — No New Library
+### Standalone observe() -- for LSL-to-observations converter
 
-**What:** Typed SSE events using the same discriminated union pattern. No library needed.
-
-**Why not better-sse or ts-sse:** The backend already has a working Express SSE implementation on port 3848. The problem is not SSE transport — it works. The problem is that events are untyped strings with ad-hoc JSON payloads. The fix is TypeScript types on existing code, not a new SSE library.
-
-**Pattern:**
+This is the critical API for the batch converter and live observation pipeline. It allows feeding external messages into the OM engine without using a Mastra Agent wrapper.
 
 ```typescript
-// Shared type (in workflow-state.ts)
-type SSEEvent =
-  | { type: 'workflow:state-change'; payload: WorkflowState }
-  | { type: 'workflow:step-progress'; payload: { step: string; substep: string; progress: number } }
-  | { type: 'workflow:heartbeat'; payload: { timestamp: number } }
-  | { type: 'workflow:error'; payload: { message: string; step?: string } };
+import { ObservationalMemory, ModelByInputTokens } from '@mastra/memory';
+import { LibSQLStore } from '@mastra/libsql';
 
-// Backend: type-safe emit
-function emitSSE(res: Response, event: SSEEvent): void {
-  res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`);
-}
+const storage = new LibSQLStore({ url: 'file:.data/observations.db' });
 
-// Frontend: type-safe parse
-function parseSSE(eventType: string, data: string): SSEEvent | null {
-  // parse + validate against discriminated union
+const om = new ObservationalMemory({
+  storage,
+  model: 'anthropic/claude-sonnet-4-20250514',
+  options: {
+    messageTokens: 30_000,      // trigger observation when messages exceed this
+    observationTokens: 40_000,  // trigger reflection when observations exceed this
+    bufferTokens: 0.2,          // keep 20% buffer ratio
+    blockAfter: 1.2,            // safety multiplier
+  },
+});
+
+// Standalone observe -- feed transcript messages directly
+await om.observe({
+  threadId: 'lsl-session-2026-03-28-0600',
+  resourceId: 'coding-project',
+  messages: convertedMessages,  // MastraDBMessage[] format
+  hooks: {
+    onObservationStart: () => { /* progress indicator */ },
+    onObservationEnd: (obs) => { /* bridge observations to KG */ },
+    onReflectionStart: () => { /* log */ },
+    onReflectionEnd: (ref) => { /* bridge reflections to KG */ },
+  },
+});
+```
+
+### Cost-Optimized Model Routing for Batch Processing
+
+```typescript
+import { ModelByInputTokens } from '@mastra/memory';
+
+const om = new ObservationalMemory({
+  storage,
+  options: {
+    observationalMemory: {
+      observation: {
+        model: new ModelByInputTokens({
+          upTo: {
+            5_000: 'anthropic/claude-haiku-3',        // small exchanges
+            20_000: 'anthropic/claude-sonnet-4-20250514',     // medium sessions
+            100_000: 'google/gemini-2.5-flash',       // large sessions (cost-effective)
+          },
+        }),
+      },
+    },
+  },
+});
+```
+
+### OpenCode Plugin Configuration
+
+```json
+// .opencode/mastra.json
+{
+  "model": "anthropic/claude-sonnet-4-20250514",
+  "scope": "thread"
 }
 ```
 
-**What this replaces:** The current system where the dashboard receives raw SSE events and guesses meaning via fallback inference logic. With typed events, the dashboard becomes a pure consumer — no inference needed.
+The plugin uses lazy credential resolution from OpenCode's provider store -- no hardcoded API keys needed.
 
----
+### Mastracode MCP Configuration
 
-### 3. Zod for Runtime Validation — New Dependency
+```json
+// .mastracode/mcp.json
+{
+  "coding-services": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["integrations/mcp-server-semantic-analysis/dist/index.js"]
+  }
+}
+```
 
-**Package:** `zod` ^3.24
-**Install in:** Both `integrations/mcp-server-semantic-analysis/` and `integrations/system-health-dashboard/`
-
-**Why:** TypeScript types are compile-time only. The workflow-progress.json file is read from disk, SSE events arrive as strings, and the dashboard receives JSON over HTTP. Runtime validation is needed at these boundaries:
-
-1. **Reading workflow-progress.json** — currently untyped `JSON.parse()`, source of stuck boolean flags
-2. **Parsing SSE events in dashboard** — currently untyped, source of fallback inference bugs
-3. **API responses from health endpoint** — currently trust-and-cast
-
-Zod is the right choice because:
-- Zero dependencies
-- TypeScript-first — `z.infer<typeof schema>` derives types from schemas (single source of truth)
-- Already the community standard (30M+ weekly downloads)
-- Works in both Node.js and browser (Vite) environments
-- Small: ~14KB min+gz
-
-**What NOT to use:** io-ts (functional programming style mismatch), yup (less TypeScript integration), ajv (JSON Schema based, more verbose for this use case).
+### New Agent Adapter: config/agents/mastra.sh
 
 ```bash
-# In both submodules
-cd integrations/mcp-server-semantic-analysis && npm install zod@^3.24
-cd integrations/system-health-dashboard && npm install zod@^3.24
+AGENT_NAME="mastra"
+AGENT_DISPLAY_NAME="Mastra Code"
+AGENT_COMMAND="mastracode"
+AGENT_SESSION_PREFIX="mastra"
+AGENT_SESSION_VAR="MASTRA_SESSION_ID"
+AGENT_TRANSCRIPT_FMT="mastra"  # new format -- LibSQL-based
+AGENT_ENABLE_PIPE_CAPTURE=true
+AGENT_REQUIRES_COMMANDS="mastracode"
 ```
 
-**Usage:**
+Key environment variables for mastracode:
+- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` -- for API key auth
+- Or use `/login` in mastracode for OAuth with Claude Max / ChatGPT Plus
 
-```typescript
-import { z } from 'zod';
+## Alternatives Considered
 
-const WorkflowStateSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('idle') }),
-  z.object({ status: z.literal('running'), currentStep: z.string(), substepIndex: z.number() }),
-  z.object({ status: z.literal('paused'), pausedAt: z.string(), pausedStep: z.string() }),
-  z.object({ status: z.literal('completed'), completedAt: z.string() }),
-  z.object({ status: z.literal('failed'), error: z.string(), failedStep: z.string() }),
-]);
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `@mastra/libsql` (SQLite local) | `@mastra/pg` (PostgreSQL) | When sharing observations across multiple machines. Not needed for single-developer setup. |
+| `@mastra/memory` standalone observe() | Full Mastra Agent wrapper | When you want complete agent lifecycle (generate + observe in one call). We don't -- existing agent infrastructure handles generation. |
+| mastracode global install | npx mastracode | For one-off testing. Global install avoids npx startup delay for `coding --mastra`. |
+| LibSQL file storage for observations | Direct Graphology/LevelDB writes | When bypassing Mastra storage entirely. NOT recommended -- let Mastra manage observation lifecycle, bridge to KG via hooks. |
+| Text-based OM | Vector store RAG for memory | OM outperforms RAG on LongMemEval (95% vs lower). Add vector retrieval later as optional enhancement (`retrieval: { vector: true }`). |
 
-type WorkflowState = z.infer<typeof WorkflowStateSchema>;
-
-// Runtime-safe read from disk
-function loadProgress(filePath: string): WorkflowState {
-  const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  return WorkflowStateSchema.parse(raw); // throws ZodError if invalid
-}
-```
-
----
-
-## What NOT to Add
+## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| XState v5 | Over-engineered for ~6 states; no state-specific context until v6; adds 17KB + learning curve | Discriminated union with exhaustive switch |
-| robot3 | Small community (2K GitHub stars), less TypeScript inference than raw unions | Discriminated union |
-| @xstate/react | Unnecessary if not using XState | Redux dispatch of typed state changes |
-| better-sse / ts-sse | SSE transport already works; problem is typing, not transport | Type the existing Express SSE code |
-| Redux Saga / redux-observable | Workflow runs on backend, not in Redux; dashboard just displays state | SSE event listener dispatching to Redux |
-| Socket.io | Bidirectional not needed; SSE is sufficient for server-to-client state push | Existing Express SSE |
-| Separate shared npm package | Overhead of package management for ~100 lines of types | Copy types file with sync script |
-| io-ts | FP style (Either/fold) clashes with imperative codebase style | Zod (imperative throw/catch) |
+| `@mastra/pg` | Adds PostgreSQL dependency to a local-first project. Unnecessary complexity for single-developer use. | `@mastra/libsql` -- zero-config SQLite |
+| `@mastra/mem0` | Separate memory system, not integrated with OM. Would create two competing memory layers. | `@mastra/memory` OM |
+| Vector store as primary memory | OM's text-based compression outperforms RAG on LongMemEval. Vector search is optional enhancement, not primary. | Text-based OM, add `retrieval: { vector: true }` later |
+| Custom memory compression | Mastra's Observer/Reflector is battle-tested (95% LongMemEval). Rolling your own would take months for inferior results. | `@mastra/memory` standalone observe() |
+| Replacing enhanced-transcript-monitor.js | Working system with 5-layer classification, exchange extraction, 3 transcript sources. Proven reliable. | Extend it: add observation output stage that feeds exchanges into `om.observe()` |
+| pi-tui/pi-mono directly | Low-level TUI framework. mastracode wraps it with OM, thread management, MCP support. | `mastracode` package which includes pi-tui |
 
----
+## Stack Patterns by Variant
 
-## Installation Summary
+**For live observation (coding --opencode with mastra plugin):**
+- Install `@mastra/opencode` plugin
+- Configure via `.opencode/mastra.json`
+- Observations happen automatically during OpenCode sessions
+- Existing LSL logging continues in parallel (defense in depth)
 
-```bash
-# Step 1: Backend — add Zod
-cd /Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis
-npm install zod@^3.24
+**For live observation (coding --mastra):**
+- `mastracode` has OM built-in (LibSQL + auto-observe)
+- Create `config/agents/mastra.sh` adapter
+- MCP servers configured via `.mastracode/mcp.json`
+- LSL support via tmux pipe capture (same pattern as other agents)
+- Mastracode stores threads locally in LibSQL -- bridge to KG periodically
 
-# Step 2: Rebuild submodule (CRITICAL)
-npm run build
+**For batch conversion (historical LSL to observations):**
+- Use `@mastra/memory` standalone observe() API
+- Build converter: read LSL markdown files -> parse exchanges -> convert to MastraDBMessage[] -> feed to om.observe()
+- Three converter paths needed: Claude JSONL, Copilot events.jsonl, OpenCode SQLite
+- Bridge observation results into Graphology KG via onObservationEnd hook
+- Use ModelByInputTokens for cost control on large batch runs
 
-# Step 3: Docker rebuild (CRITICAL)
-cd /Users/Q284340/Agentic/coding/docker
-docker-compose build coding-services && docker-compose up -d coding-services
+**For live LSL refactoring (observations alongside verbatim):**
+- Extend enhanced-transcript-monitor.js with observation output stage
+- After exchange extraction + classification, feed to om.observe()
+- Keep verbatim LSL output as fallback/audit trail (never remove)
+- Observations stored in LibSQL; periodically synced to KG
 
-# Step 4: Dashboard — add Zod
-cd /Users/Q284340/Agentic/coding/integrations/system-health-dashboard
-npm install zod@^3.24
-npm run build
+## Architecture Integration Points
+
+```
+                     LIVE PATH                          BATCH PATH
+                     --------                           ----------
+  coding --opencode                                  .specstory/history/*.md
+       |                                                    |
+  @mastra/opencode plugin                     LSL batch converter (new script)
+       |                                                    |
+  auto-observe during session               parse exchanges -> MastraDBMessage[]
+       |                                                    |
+       v                                                    v
+  @mastra/memory observe()  <---------- standalone observe() API
+       |                                                    |
+  Observer agent (compress)                    Observer agent (compress)
+       |                                                    |
+  Reflector agent (condense)                   Reflector agent (condense)
+       |                                                    |
+  LibSQL storage (.data/observations.db)       LibSQL storage
+       |                                                    |
+  onObservationEnd hook  -----> Bridge to Graphology KG <-----
+                                        |
+                                  Existing VKB viewer
+                                  Existing wave-analysis pipeline
 ```
 
-**Total new dependencies: 1 (Zod).** Everything else is TypeScript types on existing code.
+## Version Compatibility
 
----
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `@mastra/memory@^1.6.1` | `@mastra/core@^1.10.0` | Same monorepo, versions move in lockstep. Pin to same minor range. |
+| `@mastra/libsql@^0.16.4` | `@mastra/memory@^1.6.1` | Storage adapter interface stable since 1.0. |
+| `mastracode@^0.9.2` | Node.js >= 22.13.0 | Project uses Node 25.x -- compatible. Pre-1.0 so expect breaking changes between minor versions. |
+| `@mastra/opencode` | OpenCode 0.x (Go binary) | Plugin interface may change. Pin to exact version when available. |
+| `@mastra/memory` | Existing `@anthropic-ai/sdk@^0.57.0` | No conflict -- Mastra uses its own model routing layer. The SDK is only used by our existing pipeline. |
+| `@mastra/libsql` | Existing `level@^10.0.0` | No conflict -- separate storage for observations (LibSQL) vs KG entities (LevelDB). |
 
-## Version Compatibility Matrix
+## Confidence Assessment
 
-| Package | Version | Compatible With | Verified |
-|---------|---------|----------------|----------|
-| zod | ^3.24 | TypeScript ^5.8.3, Node.js 20, Vite 5 | YES — zero deps, pure TS |
-| typescript | ^5.8.3 (installed) | Discriminated unions, exhaustive checks | YES — native since TS 2.0 |
-| @reduxjs/toolkit | ^2.9.0 (installed) | Typed action payloads from WorkflowState | YES — createSlice handles DU types |
-| express | ^4.21.0 (installed) | Typed SSE emit wrapper | YES — Response type accepts write() |
-
----
-
-## Existing Stack (Unchanged from v2.0)
-
-All entries from the v2.0 STACK.md remain valid. Key components for reference:
-
-- **Backend:** TypeScript 5.8.3, Express 4.21, Node.js 20, Graphology 0.25.4, Level 10.0
-- **Frontend (Dashboard):** React 18.3.1, Redux Toolkit 2.9.0, Vite 5.3.1, Radix UI
-- **Frontend (VKB):** React 18.2.0, D3 7.8.5, Redux Toolkit, Tailwind CSS
-- **Infrastructure:** Docker, SSE on port 3848, Health API on port 3033
-- **LLM:** Custom provider chain (Copilot/Claude/Groq/Anthropic/OpenAI/Gemini/DMR)
-
----
+| Area | Confidence | Notes |
+|------|------------|-------|
+| @mastra/memory API + versions | HIGH | npm registry verified, official docs comprehensive |
+| @mastra/libsql as storage | HIGH | npm verified, default storage for mastracode, well-documented |
+| mastracode installation + requirements | HIGH | npm 0.9.2 verified, Node >= 22.13.0 confirmed from code.mastra.ai |
+| Standalone observe() API | MEDIUM | Confirmed in PR #12925 + changelog (v1.4.0), but limited standalone documentation |
+| @mastra/opencode plugin availability | LOW | PR merged but npm publication status unclear. May need monorepo build. |
+| OpenCode plugin config (.opencode/mastra.json) | LOW | Inferred from PR description. Format needs runtime validation. |
+| Mastracode MCP config (.mastracode/mcp.json) | MEDIUM | Documented on code.mastra.ai, stdio + HTTP transport confirmed |
+| MastraDBMessage format for converter | MEDIUM | Referenced in PR but exact type shape needs Context7 or source inspection |
 
 ## Sources
 
-**Codebase inspection (HIGH confidence):**
-- `integrations/mcp-server-semantic-analysis/package.json` — confirmed TS ^5.8.3, Express ^4.21.0, no existing state machine libs
-- `integrations/system-health-dashboard/package.json` — confirmed React ^18.3.1, Redux Toolkit ^2.9.0, Vite ^5.3.1
-- `integrations/mcp-server-semantic-analysis/src/workflow-runner.ts` — confirmed ad-hoc state via cleanupState object, untyped progress file writes
-- `.planning/PROJECT.md` — confirmed v3.0 scope: typed state machine, SSE event typing
-
-**Web research (MEDIUM confidence):**
-- [XState v5 TypeScript improvements](https://github.com/statelyai/xstate/discussions/2323) — confirmed state-specific context NOT supported in v5
-- [XState v5 release blog](https://stately.ai/blog/2023-12-01-xstate-v5) — confirmed ~17KB bundle, setup() API
-- [XState different context per state discussion](https://github.com/statelyai/xstate/discussions/1975) — confirmed "likely v6 feature"
-- [robot3 npm](https://www.npmjs.com/package/robot3) — confirmed 148K weekly downloads, 2K stars
-- [xstate npm](https://www.npmjs.com/package/xstate) — confirmed 2.4M weekly downloads, 29K stars
-- [XState vs Robot comparison](https://blog.logrocket.com/comparing-state-machines-xstate-vs-robot/) — functional vs object API differences
-- [better-sse](https://github.com/MatthewWid/better-sse) — confirmed spec-compliant but unnecessary when SSE transport already works
-- [npm trends: state machine comparison](https://npmtrends.com/machina-vs-robot3-vs-state-machine-vs-stately.js-vs-ts-fsm-vs-typescript-fsm-vs-xstate) — download trend data
+- [Observational Memory Docs](https://mastra.ai/docs/memory/observational-memory) -- API, thresholds, storage backends, code examples (HIGH confidence)
+- [Memory Overview](https://mastra.ai/docs/memory/overview) -- Package requirements, quickstart (HIGH confidence)
+- [OM Research Paper](https://mastra.ai/research/observational-memory) -- 95% LongMemEval benchmark (HIGH confidence)
+- [Announcing Mastra Code](https://mastra.ai/blog/announcing-mastra-code) -- Architecture, pi-tui, LibSQL storage, Node >= 22.13.0 (MEDIUM confidence)
+- [PR #12925: @mastra/opencode plugin + standalone observe()](https://github.com/mastra-ai/mastra/pull/12925) -- Plugin API, hooks, observe() standalone (MEDIUM confidence)
+- [Mastra Code site](https://code.mastra.ai/) -- Installation, configuration capabilities (MEDIUM confidence)
+- [mastracode npm](https://www.npmjs.com/package/mastracode) -- Version 0.9.2 verified (HIGH confidence)
+- [@mastra/memory npm](https://www.npmjs.com/package/@mastra/memory) -- Version 1.6.1 verified (HIGH confidence)
+- [@mastra/core npm](https://www.npmjs.com/package/@mastra/core) -- Version 1.10.0 verified (HIGH confidence)
+- [@mastra/libsql npm](https://www.npmjs.com/package/@mastra/libsql) -- Version 0.16.4 verified (HIGH confidence)
+- [Mastra Changelog 2026-03-23](https://mastra.ai/blog/changelog-2026-03-23) -- Recent updates (MEDIUM confidence)
 
 ---
-*Stack research for: v3.0 Workflow State Machine*
-*Researched: 2026-03-10*
+*Stack research for: Mastra.ai integration with coding infrastructure (v4.0)*
+*Researched: 2026-03-28*
