@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: -- Workflow State Machine
+milestone: v4.0
+milestone_name: Mastra Integration & LSL Observational Memory
 status: in-progress
-stopped_at: Completed 19.1-01-PLAN.md
-last_updated: "2026-03-11T17:16:40Z"
-last_activity: "2026-03-11 — Completed plan 19.1-01 (step-complete dispatches + bridge layer)"
+stopped_at: null
+last_updated: "2026-03-29T12:00:00Z"
+last_activity: "2026-03-29 — Milestone v4.0 started"
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 11
-  percent: 92
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-10)
+See: .planning/PROJECT.md (updated 2026-03-29)
 
-**Core value:** Typed state machine for workflow orchestration -- single source of truth, typed transitions, dashboard as pure consumer
-**Current focus:** v3.0 Phase 19.1 — Dashboard State Machine Integration
+**Core value:** Intelligent observational memory replacing verbatim logging — mastra.ai integration across all coding agents
+**Current focus:** v4.0 — Defining requirements
 
 ## Current Position
 
-Phase: 19.1 (Dashboard State Machine Integration)
-Plan: 19.1-03 complete, 19.1-04 next
-Status: In Progress
-Last activity: 2026-03-12 — Completed plan 19.1-03 (enriched step-complete events with trace data)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-29 — Milestone v4.0 started
 
 Progress: [█████████░] 92% (11/12 plans)
 

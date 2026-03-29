@@ -8,18 +8,15 @@ An agentic coding environment with a multi-agent UKB analysis pipeline, knowledg
 
 The semantic analysis pipeline must operate as a hierarchical wave-based multi-agent system — not a flat DAG — producing self-sufficient knowledge at every level, with rich observations, detailed insight documents, and proper parent-child structure from stem to leaves.
 
-## Current Milestone: v3.0 Workflow State Machine
+## Current Milestone: v4.0 Mastra Integration & LSL Observational Memory
 
-**Goal:** Replace the ad-hoc workflow state management (scattered if/else, untyped JSON progress file, multiple competing state sources, fallback inference in the dashboard) with a proper typed state machine. Single source of truth, typed transitions, dashboard as pure consumer.
+**Goal:** Integrate mastra.ai's observational memory system into the coding infrastructure — replacing verbatim LSL logging with intelligent observations, adding mastra plugin to OpenCode, and integrating mastracode as a new coding agent.
 
-**Key problems driving this:**
-- Workflow progress tracked via untyped JSON file (`workflow-progress.json`) with ad-hoc fields
-- Dashboard has "fallback inference" logic that guesses substep status — often wrong
-- Single-step/substep mode uses boolean flags (`singleStepMode`, `stepIntoSubsteps`, `stepPaused`) that get stuck
-- Multiple state sources compete: SSE events, polling, progress file, Redux store
-- Step/substep coloring is fundamentally broken — green when should be blue, stuck states
-- "Batch" label still shown instead of "Wave Analysis"
-- Every fix introduces new edge cases — the architecture needs replacement, not more band-aids
+**Target features:**
+- Add mastra plugin to OpenCode variant (`coding --opencode`) for live observational memory alongside existing LSL
+- Evaluate and implement LSL refactoring from verbatim transcript logging to mastra-style observations (online/live mode + batch mode for historical LSL conversion)
+- Build transcript-to-observation converters for all 3 agents (Claude JSONL, Copilot events.jsonl, OpenCode SQLite)
+- Install and integrate mastracode (pi-tui based) as `coding --mastra` with tmux statusline, coding services, and LSL support
 
 ## Requirements
 
@@ -37,11 +34,11 @@ The semantic analysis pipeline must operate as a hierarchical wave-based multi-a
 
 ### Active
 
-- [ ] Wave-based pipeline orchestration (replaces flat batch DAG)
-- [ ] Rich multi-observation entities with detailed insight documents
-- [ ] Hierarchical agent spawning (wave 1→2→3)
-- [ ] VKB tree navigation with drill-down and breadcrumbs
-- [ ] Self-sufficient knowledge at each hierarchy level
+- [ ] Mastra plugin integration for OpenCode (live observational memory)
+- [ ] LSL refactoring: verbatim logging → mastra-style observations (live + batch)
+- [ ] Transcript-to-observation converters (Claude, Copilot, OpenCode)
+- [ ] Historical LSL batch converter (git-tracked .specstory files → observations)
+- [ ] Mastracode agent integration (`coding --mastra` with full infrastructure support)
 
 ### Out of Scope
 
@@ -82,4 +79,22 @@ The semantic analysis pipeline must operate as a hierarchical wave-based multi-a
 | Rich observations + insight docs per entity | One-liner observations are insufficient for useful knowledge | — Pending |
 
 ---
-*Last updated: 2026-03-07 after v2.1 milestone start*
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+*Last updated: 2026-03-29 after v4.0 milestone start*
