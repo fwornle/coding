@@ -9,8 +9,8 @@ Requirements for mastra integration milestone. Each maps to roadmap phases.
 
 ### OpenCode OM
 
-- [ ] **OCOM-01**: The mastra/opencode plugin is installed via `install.sh` (with corresponding uninstall in `uninstall.sh` and validation in `scripts/test-coding.sh`)
-- [ ] **OCOM-02**: Observation storage uses LibSQL with configurable path and schema setup
+- [x] **OCOM-01**: The mastra/opencode plugin is installed via `install.sh` (with corresponding uninstall in `uninstall.sh` and validation in `scripts/test-coding.sh`)
+- [x] **OCOM-02**: Observation storage uses LibSQL with configurable path and schema setup
 - [ ] **OCOM-03**: Observer/reflector agents use the coding LLM proxy (Docker to host agent SDK) instead of direct API keys
 - [ ] **OCOM-04**: Token budget limits are configurable per observer/reflector agent to control LLM costs
 
@@ -59,8 +59,8 @@ Deferred to future milestones. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OCOM-01 | Phase 20 | Pending |
-| OCOM-02 | Phase 20 | Pending |
+| OCOM-01 | Phase 20 | Complete |
+| OCOM-02 | Phase 20 | Complete |
 | OCOM-03 | Phase 20 | Pending |
 | OCOM-04 | Phase 20 | Pending |
 | CONV-01 | Phase 22 | Pending |

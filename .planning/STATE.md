@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: -- Mastra Integration & LSL Observational Memory
-status: planning
-stopped_at: Phase 20 context gathered
-last_updated: "2026-03-29T14:20:59.273Z"
-last_activity: 2026-03-29 — Roadmap created for v4.0 (4 phases, 13 requirements)
+status: executing
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-03-29T16:54:01.175Z"
+last_activity: 2026-03-29
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 20 of 23 (Foundation & OpenCode OM)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-29 — Roadmap created for v4.0 (4 phases, 13 requirements)
+Phase: 20 (Foundation & OpenCode OM) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-03-29
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -48,12 +48,15 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Accumulated Context
 
+| Phase 20 P02 | 26min | 2 tasks | 3 files |
+
 ### Decisions
 
 - [v4.0 roadmap]: 4 phases derived from 13 requirements (OCOM/CONV/MSTR/LIVE categories)
 - [v4.0 roadmap]: Phase order: foundation first, live tap last (highest risk)
 - [v4.0 roadmap]: Observer/reflector must use coding LLM proxy, not direct API keys
 - [v4.0 roadmap]: Mastracode LSL via lifecycle hooks, not pipe-pane (pi-tui/tmux conflict)
+- [Phase 20]: Node.js >= 22 hard gate for @mastra/opencode; default model google/gemini-2.5-flash; .observations/ preserved on uninstall
 
 ### Research Flags
 
@@ -67,6 +70,6 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-Last session: 2026-03-29T14:20:59.262Z
-Stopped at: Phase 20 context gathered
+Last session: 2026-03-29T16:54:01.170Z
+Stopped at: Completed 20-02-PLAN.md
 Resume with: `/gsd:plan-phase 20`
