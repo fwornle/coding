@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "defaults": {
+    "model": "google/gemini-2.5-flash",
+    "observation": {
+      "messageTokens": 20000,
+      "bufferTokens": 0.2
+    },
+    "reflection": {
+      "observationTokens": 90000,
+      "bufferTokens": 0.2
+    }
+  },
+  "agents": {
+    "opencode": {
+      "model": "google/gemini-2.5-flash",
+      "maxDailyTokens": 500000
+    },
+    "mastra": {
+      "model": "google/gemini-2.5-flash",
+      "maxDailyTokens": 500000
+    },
+    "claude": {
+      "model": "groq/llama-3.3-70b-versatile",
+      "maxDailyTokens": 1000000
+    }
+  }
+}
