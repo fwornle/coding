@@ -13,10 +13,10 @@ LibSQL observation storage setup, @mastra/opencode plugin installation via insta
 <decisions>
 ## Implementation Decisions
 
-### LLM Proxy Routing
-- **D-01:** Use the OKM proxy pattern from `rapid-automations/integrations/operational-knowledge-management` — Docker container calls back to host agent's SDK (no direct API keys)
-- **D-02:** Network-adaptive SDK routing: inside VPN -> Copilot Enterprise subscription, outside VPN -> Claude subscription (same pattern as `config/agents/opencode.sh` agent_pre_launch)
-- **D-03:** Port the proxy code into this repo (copy from rapid-automations/OKM into `src/` or `integrations/`), not a shared package or submodule
+### LLM Routing
+- **D-01:** Use the EXISTING `lib/llm/` LLMService infrastructure in this repo — it already has all subscription providers (claude-code-provider, copilot-provider), SDK loader, subscription quota tracker, provider registry. Do NOT create a separate proxy.
+- **D-02:** Network-adaptive SDK routing: inside VPN -> Copilot Enterprise subscription, outside VPN -> Claude subscription (same pattern as `config/agents/opencode.sh` agent_pre_launch). Already implemented in `lib/llm/providers/`.
+- **D-03:** Configure mastra's observer/reflector to use `LLMService` (or the Docker `llm-proxy.mjs` bridge from OKM if mastra needs HTTP-based access). The Docker proxy bridge is at `rapid-automations/OKM/docker/llm-proxy.mjs` — port ONLY this bridge if needed, NOT the full LLM lib (already here).
 
 ### Storage Location & Schema
 - **D-04:** Observation DB lives at per-project `.observations/` directory (alongside `.specstory/`)
@@ -57,14 +57,17 @@ LibSQL observation storage setup, @mastra/opencode plugin installation via insta
 - `.planning/research/ARCHITECTURE.md` -- Integration architecture and data flow
 - `.planning/research/FEATURES.md` -- Observer/reflector agent behavior, observe() API
 
-### Existing Infrastructure
+### Existing LLM Infrastructure (MUST USE, NOT DUPLICATE)
+- `lib/llm/` -- Full LLM lib with providers (claude-code, copilot, groq, anthropic, etc.), SDK loader, circuit breaker, caching, subscription quota tracker, provider registry. THIS IS THE LLM LIB.
+- `lib/llm/providers/claude-code-provider.ts` -- Claude Max subscription access
+- `lib/llm/providers/copilot-provider.ts` -- Copilot Enterprise subscription access
+- `src/inference/UnifiedInferenceEngine.js` -- High-level facade that delegates to LLMService from lib/llm/
 - `config/agents/opencode.sh` -- Agent adapter pattern (network-adaptive model selection)
-- `install.sh` -- Installation patterns for new integrations (see install_semantic_analysis, install_code_graph_rag)
+- `install.sh` -- Installation patterns for new integrations
 - `scripts/test-coding.sh` -- Validation patterns for installed components
-- `src/inference/UnifiedInferenceEngine.js` -- Existing LLM routing abstraction (reference, not used directly)
 
-### LLM Proxy (to port)
-- Rapid-automations OKM project at `/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/` -- LLM proxy implementation to copy
+### Docker LLM Proxy (port only if needed)
+- `rapid-automations/OKM/docker/llm-proxy.mjs` -- HTTP bridge for containers to access host agent SDKs. Port this ONLY if mastra needs HTTP-based LLM access from Docker context.
 
 </canonical_refs>
 
