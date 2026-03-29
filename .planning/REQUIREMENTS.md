@@ -1,86 +1,83 @@
-# Requirements: Coding Project v3.0
+# Requirements: Coding Project v4.0
 
-**Defined:** 2026-03-10
-**Core Value:** Workflow state management via typed state machine — single source of truth, typed transitions, dashboard as pure consumer
+**Defined:** 2026-03-29
+**Core Value:** Intelligent observational memory replacing verbatim logging — mastra.ai integration across all coding agents
 
-## v3.0 Requirements
+## v4.0 Requirements
 
-### State Machine Core
+Requirements for mastra integration milestone. Each maps to roadmap phases.
 
-- [x] **SM-01**: Workflow state is a TypeScript discriminated union with state-specific data (idle/running/paused/completed/failed/cancelled)
-- [x] **SM-02**: State transitions are typed — only valid transitions compile
-- [x] **SM-03**: RunConfig (singleStepMode, mockLLM, llmMode, stepIntoSubsteps) is immutable after workflow start, separated from RunProgress
-- [x] **SM-04**: Step/substep status derived from state machine position — not stored as separate mutable fields
-- [x] **SM-05**: Zod schemas validate state at system boundaries
+### OpenCode OM
 
-### Backend Integration
+- [ ] **OCOM-01**: The mastra/opencode plugin is installed via `install.sh` (with corresponding uninstall in `uninstall.sh` and validation in `scripts/test-coding.sh`)
+- [ ] **OCOM-02**: Observation storage uses LibSQL with configurable path and schema setup
+- [ ] **OCOM-03**: Observer/reflector agents use the coding LLM proxy (Docker → host agent SDK) instead of direct API keys
+- [ ] **OCOM-04**: Token budget limits are configurable per observer/reflector agent to control LLM costs
 
-- [x] **BE-01**: Wave-controller dispatches typed events instead of ad-hoc updateProgress() calls
-- [x] **BE-02**: Health API step-advance endpoint operates on the state machine
-- [x] **BE-03**: Progress file written by subscriber — not directly by wave-controller or health API
-- [x] **BE-04**: Workflow cancel operates via state machine transition
+### Transcript Converters
 
-### SSE Events
+- [ ] **CONV-01**: User can convert Claude .jsonl transcript files to mastra observations via CLI command
+- [ ] **CONV-02**: User can convert Copilot events.jsonl transcript files to mastra observations via CLI command
+- [ ] **CONV-03**: User can batch-convert git-tracked .specstory/ LSL files to mastra observations
+- [ ] **CONV-04**: Converters normalize all 3 transcript formats to MastraDBMessage format before observation
 
-- [x] **SSE-01**: Every state transition emits typed SSE event with full WorkflowState snapshot
-- [x] **SSE-02**: SSE events use discriminated union types shared between backend and dashboard
-- [x] **SSE-03**: SSE reconnection sends full current state on connect
+### Mastracode Agent
 
-### Dashboard Consumer
+- [ ] **MSTR-01**: User can start mastracode via `coding --mastra` with proper tmux session setup
+- [ ] **MSTR-02**: Mastracode sessions appear in tmux statusline with LSL indicator and health monitoring
+- [ ] **MSTR-03**: Enhanced-transcript-monitor captures mastracode conversations for LSL logging
 
-- [x] **UI-01**: Dashboard renders from typed SSE events only — zero fallback inference
-- [x] **UI-02**: Substep coloring derived from state machine state (SUBSTEP_COLORS from constants)
-- [x] **UI-03**: Step/Into buttons dispatch typed commands, disabled during transitions
-- [x] **UI-04**: "Batch" label replaced with correct workflow name
-- [x] **UI-05**: Redux store receives typed SSE events directly — no inference
+### Live Observations
 
-### Migration
+- [ ] **LIVE-01**: Enhanced-transcript-monitor produces mastra observations in real-time alongside verbatim LSL (additive, not replacing)
+- [ ] **LIVE-02**: Observations are browsable via REST endpoint on the health dashboard
 
-- [x] **MIG-01**: Parallel path — old updateProgress and new state machine run side-by-side
-- [x] **MIG-02**: Backward-compatible progress file reader
-- [ ] **MIG-03**: All old inference/fallback code removed after validation
+## Future Requirements
 
-## v3.1 Requirements (Deferred)
+Deferred to future milestones. Tracked but not in current roadmap.
 
-- **SM-06**: Crash recovery from persisted state
-- **SM-07**: Workflow history for comparison
-- **UI-06**: State machine inspector panel
-- **BE-05**: Retry with feedback as typed state machine loop
+### Cross-Agent Memory
+
+- **XAGT-01**: Observations from different agents (Claude, Copilot, OpenCode, Mastra) are unified into a shared memory space
+- **XAGT-02**: Resource-scoped OM allows agents to share context about specific files/components
+
+### Knowledge Graph Bridge
+
+- **KGBR-01**: Observations feed into Graphology knowledge graph as entities
+- **KGBR-02**: VKB viewer displays observation-derived entities alongside pipeline entities
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| XState / state machine library | Overkill for ~6 states. Hand-rolled DU is simpler |
-| Shared npm package for types | File-copy sync sufficient for ~100 lines |
-| Distributed state | Single process, unnecessary complexity |
-| Workflow queue | One workflow at a time |
-| Dynamic step insertion | Step sequence is static |
+| Cross-agent observation sharing (resource-scoped OM) | Marked experimental in mastra, defer until stable |
+| Replacing verbatim LSL with observations | Additive only — LSL must continue unchanged |
+| KG bridge (observations → Graphology entities) | Future milestone after observations are proven |
+| Direct API key configuration for mastra LLM | Must use existing coding LLM proxy infrastructure |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SM-01 | Phase 15 | Complete |
-| SM-02 | Phase 15 | Complete |
-| SM-03 | Phase 15 | Complete |
-| SM-04 | Phase 15 | Complete |
-| SM-05 | Phase 15 | Complete |
-| BE-01 | Phase 16 | Complete |
-| BE-02 | Phase 16 | Complete |
-| BE-03 | Phase 16 | Complete |
-| BE-04 | Phase 16 | Complete |
-| SSE-01 | Phase 17 | Complete |
-| SSE-02 | Phase 17 | Complete |
-| SSE-03 | Phase 17 | Complete |
-| UI-01 | Phase 18 | Complete |
-| UI-02 | Phase 18 | Complete |
-| UI-03 | Phase 18 | Complete |
-| UI-04 | Phase 18 | Complete |
-| UI-05 | Phase 18 | Complete |
-| MIG-01 | Phase 19 | Complete |
-| MIG-02 | Phase 19 | Complete |
-| MIG-03 | Phase 19 | Pending |
+| OCOM-01 | — | Pending |
+| OCOM-02 | — | Pending |
+| OCOM-03 | — | Pending |
+| OCOM-04 | — | Pending |
+| CONV-01 | — | Pending |
+| CONV-02 | — | Pending |
+| CONV-03 | — | Pending |
+| CONV-04 | — | Pending |
+| MSTR-01 | — | Pending |
+| MSTR-02 | — | Pending |
+| MSTR-03 | — | Pending |
+| LIVE-01 | — | Pending |
+| LIVE-02 | — | Pending |
+
+**Coverage:**
+- v4.0 requirements: 13 total
+- Mapped to phases: 0
+- Unmapped: 13 ⚠️
 
 ---
-*Requirements defined: 2026-03-10*
+*Requirements defined: 2026-03-29*
+*Last updated: 2026-03-29 after initial definition*
