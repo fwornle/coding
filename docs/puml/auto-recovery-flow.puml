@@ -1,95 +1,83 @@
-@startuml
+@startuml auto-recovery-flow
 !include _standard-style.puml
 
 title Auto-Recovery Flow & Plug'n'Play Behavior
 
 participant "User Session" as User
-participant "Global Watchdog" as GW
-participant "Global LSL Coordinator" as GLC
-participant "StatusLine Monitor" as SLM
-participant "Enhanced Transcript Monitor" as ETM
+participant "Health Prompt Hook" as HPH
+participant "Global Process\nSupervisor (GPS)" as GPS
+participant "Global LSL\nCoordinator" as GLC
+participant "Enhanced Transcript\nMonitor" as ETM
 participant "Health Files" as HF
 
 == Normal Operation ==
-User -> User : Start Claude session via `coding/bin/coding`
+User -> User : Start Claude session via `coding`
 activate GLC
 GLC -> ETM : Ensure transcript monitor for project
 activate ETM
 ETM -> HF : Write health data every 5 seconds
 GLC -> GLC : Perform health check every 30 seconds
-SLM -> HF : Read health data for statusLine
-SLM -> User : Display ✅C:🟢 CA:🟢 ND:🟢
+User -> User : Display [LSL🟢]
 
-== Auto-Recovery Scenario 1: Dead Monitor Detection ==
-GLC -> ETM : Health check (kill -0 PID)
-ETM --> GLC : Process not found
+== Recovery 1: Dead Monitor (Coordinator Active) ==
+ETM --> GLC : Process not found (kill -0 fails)
+deactivate ETM
 GLC -> GLC : Mark monitor as unhealthy
-GLC -> ETM : Start new monitor process  
+GLC -> ETM : Start new monitor process
 activate ETM
 ETM -> HF : Resume health file updates
-GLC -> GLC : Update registry with new PID
-note right : **Plug'n'Play:** User continues working\nwithout interruption
+note right : **GLC is primary supervisor**\nGPS detects GLC via pgrep → skips restart
 
-== Auto-Recovery Scenario 2: Stale Health File ==
-GLC -> HF : Read health file timestamp
-HF --> GLC : File age > 60 seconds
-GLC -> ETM : Kill stale monitor
+== Recovery 2: Dead Monitor (No Coordinator) ==
+note over GLC : Coordinator not running\n(session closed, no daemon)
+deactivate GLC
+GPS -> HF : Read health file timestamp
+HF --> GPS : File age > 120 seconds
+GPS -> ETM : Kill stale monitor
 deactivate ETM
-GLC -> ETM : Start fresh monitor
+GPS -> ETM : Start fresh monitor
 activate ETM
 ETM -> HF : Write current health data
-note right : **Self-Healing:** System detects\nand fixes stale monitoring
+note right : **GPS as fallback supervisor**\nOnly acts when GLC is absent
 
-== Auto-Recovery Scenario 3: Coordinator Failure ==
-GW -> GLC : Health check (kill -0 PID)
-GLC --> GW : Process not found
-GW -> GW : Start new LSL Coordinator
+== Recovery 3: GPS Budget Exhausted ==
+note over GPS : 10 restarts/hour reached\nGPS gives up
+HPH -> HF : Check LSL health (pre-prompt)
+HF --> HPH : Status: stopped / stale
+HPH -> HPH : Check lockfile age (>60s?)
+HPH -> GLC : Spawn coordinator (fire-and-forget)
 activate GLC
-GLC -> GLC : Update coordinator PID in registry
-GLC -> ETM : Verify all project monitors
-GLC -> GLC : Perform immediate health check
-note right : **Layer 4 Protection:** Watchdog\nensures coordinator availability
+GLC -> ETM : Ensure transcript monitor
+activate ETM
+ETM -> HF : Resume health file updates
+note right : **Prompt hook safety net**\nRate-limited to 1 attempt/minute
+
+== Recovery 4: Idle Timeout Guard ==
+note over ETM : No transcript activity for 30 minutes
+ETM -> ETM : Check tmux pane cwd
+ETM -> ETM : Active tmux session found
+ETM -> ETM : Reset activity timer, stay alive
+note right : **Prevents restart budget waste**\nMonitor stays alive while session exists
 
 == Dynamic Session Discovery ==
 User -> User : Start new project session
-SLM -> SLM : Scan ~/.claude/projects/ directory
-SLM -> SLM : Discover new session pattern
-SLM -> GLC : Request monitor for new project  
+GLC -> GLC : Discover new project
 GLC -> ETM : Start monitor for new project
 activate ETM
-SLM -> User : Display updated status with new session
-note right : **Zero-Config Discovery:** New sessions\nautomatically appear in statusLine
-
-== StatusLine Update Flow ==
-loop Every statusLine request
-    SLM -> HF : Read health from all projects
-    SLM -> SLM : Generate smart abbreviations
-    SLM -> SLM : Aggregate individual statuses
-    SLM -> User : Display C:🟢 CA:🟢 ND:🟢
-end
+note right : **Zero-config:** New sessions\nautomatically get monitoring
 
 note over User, HF
-  **Key Recovery Features:**
-  
-  **1. Process Health Monitoring**
-  - 30-second health checks on all monitors
-  - kill -0 PID validation
-  - Automatic process restart on failure
-  
-  **2. Health File Validation**  
-  - 60-second staleness detection
-  - Timestamp verification
-  - Activity monitoring (exchange counts)
-  
-  **3. Dynamic Session Discovery**
-  - Claude transcript directory scanning
-  - Pattern-based project detection
-  - Automatic monitor provisioning
-  
-  **4. Coordinator Self-Recovery**
-  - PID registration on startup
-  - Registry consistency checks
-  - Watchdog process monitoring
+  **Supervisor Priority Order:**
+
+  |= Priority |= Supervisor |= When Active |
+  | 1 | GlobalLSLCoordinator | Session running (launched by coding) |
+  | 2 | GlobalProcessSupervisor | No coordinator → GPS manages monitors |
+  | 3 | HealthPromptHook | GPS exhausted → spawns coordinator |
+
+  **Key Prevention Mechanisms:**
+  - GPS defers to GLC via pgrep check (no dual-supervisor conflict)
+  - Monitor checks tmux cwd before idle-exit (no budget waste)
+  - Prompt hook rate-limited via lockfile (no spawn storm)
 end note
 
 @enduml

@@ -28,14 +28,21 @@ Real-time conversation monitoring and intelligent classification with zero data 
 
 Early exit optimization: Classification stops at first confident decision.
 
-## 4-Layer Monitoring Architecture
+## Supervision & Recovery
 
-| Layer | Component | Function |
-|-------|-----------|----------|
-| 1 | Watchdog | Top-level supervisor, restarts failed processes |
-| 2 | Coordinator | Manages monitors across all projects |
-| 3 | Verifier | Health checks, detects stuck processes |
-| 4 | Self-Monitoring | Per-monitor health files with metrics |
+The transcript monitor is managed by a priority-ordered supervisor chain:
+
+| Priority | Supervisor | Role |
+|----------|-----------|------|
+| 1 | GlobalLSLCoordinator | Primary (per-session, launched by `coding`) |
+| 2 | GlobalProcessSupervisor | Fallback (defers when coordinator active) |
+| 3 | HealthPromptHook | Safety net (spawns coordinator if GPS exhausted) |
+
+**Self-protection features:**
+
+- **Periodic flush**: Writes accumulated exchanges every 5 minutes during long agent runs
+- **Idle timeout with tmux guard**: Stays alive while tmux session exists (prevents restart budget waste)
+- **Auto-recovery**: Prompt hook detects LSL down and spawns coordinator (rate-limited 1/min)
 
 ## Content Routing
 
