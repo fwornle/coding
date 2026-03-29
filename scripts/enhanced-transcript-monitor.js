@@ -3111,16 +3111,34 @@ class EnhancedTranscriptMonitor {
       // This prevents orphaned monitors when Claude sessions are force-quit
       const idleTime = Date.now() - this.lastActivityTime;
       if (idleTime > this.idleTimeout) {
-        const idleMinutes = Math.round(idleTime / 60000);
-        process.stderr.write(`[EnhancedTranscriptMonitor] ${new Date().toISOString()} Idle timeout reached: no transcript activity for ${idleMinutes} minutes. Auto-exiting.\n`);
+        // Before exiting, check if there's still an active tmux session for this project.
+        // If so, stay alive (idling) rather than exit and consume GPS restart budget.
+        // The idle-exit/restart cycle wastes 10 restarts/hour overnight when no session
+        // is active, leaving no budget for genuine crash recovery.
+        let hasActiveTmuxSession = false;
+        try {
+          const { execSync } = await import('child_process');
+          // Check if any tmux pane has cwd pointing to this project
+          const paneOutput = execSync('tmux list-panes -a -F "#{pane_current_path}" 2>/dev/null', { encoding: 'utf-8', timeout: 3000 });
+          hasActiveTmuxSession = paneOutput.split('\n').some(p => p.trim() === this.config.projectPath);
+        } catch { /* tmux not available or no sessions — proceed with exit */ }
 
-        // Graceful shutdown WITHOUT stop marker — PSM should be free to restart
-        // this monitor when a new Claude session starts. Only user-initiated
-        // stops (SIGINT/SIGTERM) should set the stop marker.
-        if (this.intervalId) clearInterval(this.intervalId);
-        if (this.healthIntervalId) clearInterval(this.healthIntervalId);
-        await this.stop({ setStopMarker: false });
-        process.exit(0);
+        if (hasActiveTmuxSession) {
+          // Reset activity time to prevent checking every cycle
+          this.lastActivityTime = Date.now();
+          this.debug('⏰ Idle timeout reached but tmux session still active — staying alive');
+        } else {
+          const idleMinutes = Math.round(idleTime / 60000);
+          process.stderr.write(`[EnhancedTranscriptMonitor] ${new Date().toISOString()} Idle timeout reached: no transcript activity for ${idleMinutes} minutes. Auto-exiting.\n`);
+
+          // Graceful shutdown WITHOUT stop marker — PSM should be free to restart
+          // this monitor when a new Claude session starts. Only user-initiated
+          // stops (SIGINT/SIGTERM) should set the stop marker.
+          if (this.intervalId) clearInterval(this.intervalId);
+          if (this.healthIntervalId) clearInterval(this.healthIntervalId);
+          await this.stop({ setStopMarker: false });
+          process.exit(0);
+        }
       }
 
       // Flush held prompt sets when they're stale or cross hour boundaries.

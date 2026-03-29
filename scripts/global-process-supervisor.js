@@ -339,6 +339,18 @@ class GlobalProcessSupervisor {
       // Fail-open: if check fails, allow restart
     }
 
+    // Skip if a global-lsl-coordinator daemon is actively managing monitors.
+    // Two supervisors fighting over the same monitor causes a spawn/exit race:
+    // both spawn monitors, the second finds the first's PSM entry and exits.
+    try {
+      const { execSync } = await import('child_process');
+      const pgrep = execSync('pgrep -f "global-lsl-coordinator.js monitor" 2>/dev/null', { encoding: 'utf-8', timeout: 3000 }).trim();
+      if (pgrep) {
+        this.log(`${serviceName} restart skipped: global-lsl-coordinator daemon is active (PID: ${pgrep.split('\n')[0]})`, 'DEBUG');
+        return false;
+      }
+    } catch { /* no coordinator running or pgrep failed — proceed with restart */ }
+
     // Check cooldown and rate limits
     if (this.isInCooldown(serviceName)) {
       this.log(`${serviceName} is in cooldown, skipping restart`, 'DEBUG');
