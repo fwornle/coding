@@ -1,19 +1,19 @@
 @startuml llm-cli-proxy-architecture
 !include _standard-style.puml
 
-title LLM CLI Proxy Bridge Architecture\nHost-side HTTP bridge for Docker container CLI access
+title LLM Subscription Provider Architecture\nDirect HTTP + CLI Shell-Out with Proxy Bridge
 
 top to bottom direction
 
 package "Docker Container (coding-services)" {
   component [Semantic Analysis\nMCP Server] as semantic <<core>>
   component [LLM Service\n(Provider Registry)] as llmservice <<core>>
-  component [Claude-Code\nProvider] as claudeprov <<agent>>
-  component [Copilot\nProvider] as copilotprov <<agent>>
+  component [Copilot Provider\n(proxy mode)] as copilotprov <<agent>>
+  component [Claude Code Provider\n(proxy mode)] as claudeprov <<agent>>
   component [Groq Provider] as groqprov <<api>>
   component [Anthropic Provider] as anthropicprov <<api>>
 
-  llmservice -down-> copilotprov : priority 1 (parallelized)
+  llmservice -down-> copilotprov : priority 1
   llmservice -down-> groqprov : priority 2
   llmservice -down-> claudeprov : priority 3
   llmservice -down-> anthropicprov : priority 4
@@ -21,61 +21,82 @@ package "Docker Container (coding-services)" {
 }
 
 rectangle "host.docker.internal" {
-  package "Host Machine (port 12435)" {
-    component [LLM CLI Proxy\nExpress Server] as proxy <<api>>
+  package "Host: LLM Proxy Bridge (port 8089)" {
+    component [llm-proxy.mjs\nExpress Server] as proxy <<api>>
     component [POST /api/complete] as complete <<api>>
     component [GET /health] as health <<api>>
-    component [CLI Spawner\n(child_process)] as spawner <<util>>
 
     proxy -down-> complete
     proxy -down-> health
-    complete -down-> spawner
   }
 
-  package "Host CLI Tools" {
-    component [claude CLI\n(Claude Max)] as claude <<cli>>
-    component [copilot-cli\n(GitHub Copilot)] as copilot <<cli>>
+  package "Host: Direct Copilot HTTP" {
+    component [Direct HTTP POST\nto Copilot API] as copilothttp <<api>>
   }
 
-  spawner -down-> claude : spawn --print
-  spawner -down-> copilot : spawn --prompt
+  package "Host: Claude CLI" {
+    component [claude -p\n--output-format json\n(Max OAuth)] as claudecli <<cli>>
+  }
+
+  complete -down-> copilothttp : copilot requests
+  complete -down-> claudecli : claude-code requests
 }
 
-cloud "Cloud APIs" {
+cloud "External APIs" {
+  component [Copilot API\ncopilot-api.{enterprise}] as copilotapi <<external>>
   component [Anthropic API] as anthropicapi <<external>>
   component [Groq API] as groqapi <<external>>
 }
 
+database "Host Auth Stores" {
+  component [~/.local/share/opencode/auth.json\nCopilot OAuth token] as copilotauth <<storage>>
+  component [macOS Keychain\nClaude Max OAuth] as keychain <<storage>>
+}
+
 ' Cross-boundary connections
-claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
-copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
-groqprov ASYNC_LINE groqapi : HTTPS API
-anthropicprov ASYNC_LINE anthropicapi : HTTPS API
+copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:8089
+claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:8089
+groqprov ASYNC_LINE groqapi : HTTPS (direct)
+anthropicprov ASYNC_LINE anthropicapi : HTTPS (direct)
+
+' Host-side connections
+copilothttp SYNC_LINE copilotapi : HTTPS POST\n/chat/completions
+copilothttp <.. copilotauth : reads OAuth token\n(refresh every 60s)
+claudecli <.. keychain : reads OAuth\n(managed by CLI)
 
 note right of proxy
-  **Stateless HTTP Bridge**
-  - No caching (Docker handles it)
-  - No queuing (CircuitBreaker in Docker)
-  - stdin for large prompts (>200KB)
-  - Error codes map to provider errors
-  - Provider availability cached 60s
+  **Split Routing**
+  - Copilot: Direct HTTP POST (~2s)
+    No SDK, no subprocess, no JSON-RPC
+  - Claude: CLI shell-out (~12s)
+    JSON output, exact token counts
+    ANTHROPIC_API_KEY stripped from env
 end note
 
-note right of claude
-  **Zero per-token cost**
-  Claude Max subscription
-  via host's claude CLI
+note right of copilothttp
+  **Copilot Auth**
+  Bearer token from auth.json
+  Enterprise: copilot-api.{host}
+  Public: api.githubcopilot.com
+end note
+
+note right of claudecli
+  **Claude Auth**
+  Max OAuth from Keychain
+  Cannot use OAuth directly
+  against api.anthropic.com
+  (server-side allowlisting)
 end note
 
 note bottom of llmservice
-  **Provider Priority Chain**
-  1. copilot (proxy) -- free, parallelism-optimized
-  2. groq -- API key, fast fallback
-  3. claude-code (proxy) -- free
-  4. anthropic -- API key
-  5. openai -- API key
-  6. gemini -- API key
-  7. github-models -- API key
+  **Provider Priority**
+  1. copilot (proxy) — free, ~2s
+  2. groq — API key, fast
+  3. claude-code (proxy) — free, ~12s
+  4. anthropic — API key
+  5. openai — API key
+  6. gemini — API key
+  7. github-models — API key
 end note
 
 @enduml

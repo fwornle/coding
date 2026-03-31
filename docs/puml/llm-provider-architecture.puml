@@ -19,8 +19,8 @@ package "lib/llm/ - Unified LLM Layer" {
   }
 
   package "Subscription Providers (Zero Cost)" {
-    component [Copilot\nclaude-haiku-4.5 / claude-sonnet-4.5 / claude-opus-4.6 (CLI)\n**Primary** - scales with parallelism (0.77s @10 concurrent)] <<cli>> as Copilot
-    component [Claude Code\nsonnet / opus (CLI)] <<cli>> as ClaudeCode
+    component [Copilot\nclaude-haiku-4.5 / claude-sonnet-4.6 / claude-opus-4.6\n**Direct HTTP** to copilot-api (~2s)\nAuth: OAuth from ~/.local/share/opencode/auth.json] <<api>> as Copilot
+    component [Claude Code\nhaiku / sonnet / opus\n**CLI shell-out** claude -p --output-format json (~12s)\nAuth: Claude Max OAuth from macOS Keychain] <<cli>> as ClaudeCode
     component [QuotaTracker\nExponential backoff] <<infra>> as QuotaTracker
   }
 
@@ -62,7 +62,7 @@ LLMService -down-> QuotaTracker
 ' Registry to providers via circuit breaker
 Registry -down-> CB
 
-' Subscription providers (copilot first - parallelism optimized)
+' Subscription providers (copilot first - direct HTTP)
 CB -down-> Copilot
 CB -down-> ClaudeCode
 Copilot .right.> QuotaTracker : reports usage
@@ -83,16 +83,20 @@ CB -down-> Ollama
 CB -down-> Mock
 
 note right of Registry
-  **Copilot-First Parallelized Routing**
+  **Copilot-First Routing (Direct HTTP)**
   All Tiers: Copilot -> Groq -> Claude Code -> Anthropic -> OpenAI -> Gemini -> GitHub Models
 
-  **Why Copilot first?** Scales with parallelism:
-  - Sequential: 5s per call
-  - 10 concurrent: 0.77s effective per call
-  - Batch agents use Promise.all (concurrency 5-20)
+  **Copilot**: Direct HTTP POST to copilot-api (~2s)
+  - Auth: OAuth token from OpenCode auth.json
+  - Enterprise: copilot-api.{enterprise-host}
+  - No SDK, no subprocess, no JSON-RPC
+
+  **Claude Code**: CLI shell-out (~12s)
+  - Auth: Max OAuth from macOS Keychain
+  - ANTHROPIC_API_KEY stripped from env
+  - JSON output with exact token counts
 
   **Quota exhausted?** Automatic fallback to next provider
-  **All cloud failed?** Local fallback: DMR -> Ollama
   **Cost**: $0 until subscriptions exhausted
 end note
 
@@ -101,15 +105,7 @@ note bottom of LLMService
   BudgetTrackerInterface
   SensitivityClassifierInterface
   MockServiceInterface
-  SubscriptionQuotaTrackerInterface (new)
-end note
-
-note bottom of QuotaTracker
-  **Quota Management**
-  • Tracks completions/hour
-  • Exponential backoff: 5m -> 15m -> 1h
-  • Persistent storage: .data/llm-subscription-usage.json
-  • Auto-prune data older than 24h
+  SubscriptionQuotaTrackerInterface
 end note
 
 @enduml

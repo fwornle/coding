@@ -1,118 +1,19 @@
 # Subscription-Based LLM Providers Implementation
 
-## Status: Phase 1-4 Complete
+## Status: Direct HTTP / CLI Rewrite Complete
 
-Implementation of subscription-based LLM providers (Claude Code & GitHub Copilot) with automatic quota tracking and API fallback.
-
----
-
-## Completed Phases
-
-### Phase 1: Core Provider Infrastructure
-
-**Files Created:**
-1. `lib/llm/providers/cli-provider-base.ts` - Abstract base for CLI providers
-2. `lib/llm/providers/claude-code-provider.ts` - Claude Code subscription provider
-3. `lib/llm/providers/copilot-provider.ts` - GitHub Copilot subscription provider
-
-**Features:**
-- CLI process spawning with timeout handling
-- Token estimation (rough: 4 chars ≈ 1 token)
-- Quota and auth error detection
-- Graceful error handling
-
-### Phase 2: Quota Tracking System
-
-**Files Created:**
-1. `lib/llm/subscription-quota-tracker.ts` - Quota tracking with exponential backoff
-
-**Files Modified:**
-1. `lib/llm/types.ts` - Added `claude-code` and `copilot` to ProviderName
-2. `lib/llm/types.ts` - Added `SubscriptionQuotaTrackerInterface`
-
-**Features:**
-- Hourly usage tracking with persistence to `.data/llm-subscription-usage.json`
-- Exponential backoff: 5m -> 15m -> 1h
-- Automatic pruning of data older than 24 hours
-- Optimistic quota checking
-
-### Phase 3: Integration with LLM Service
-
-**Files Modified:**
-1. `lib/llm/provider-registry.ts` - Registered new providers (prioritized first)
-2. `lib/llm/llm-service.ts` - Integrated quota tracker
-   - Added `setQuotaTracker()` dependency injection
-   - Pre-flight quota availability checks
-   - Zero-cost recording for subscriptions
-   - Quota exhaustion handling
-
-**Features:**
-- Subscription providers tried first in all tiers
-- Automatic fallback to API providers on quota exhaustion
-- Zero cost recorded for subscription usage
-- Circuit breaker integration
-
-### Phase 4: Configuration Updates
-
-**Files Modified:**
-1. `config/llm-providers.yaml` - Added provider configs
-   - `claude-code`: CLI: `claude`, models: sonnet/opus
-   - `copilot`: CLI: `copilot-cli`, models: claude-haiku-4.5/claude-sonnet-4.5/claude-opus-4.6
-   - Updated priority: copilot first in all tiers (parallelism-optimized)
-2. `lib/llm/types.ts` - Extended `ProviderConfig` with CLI fields
-
-**Provider Priority (All Tiers) — Copilot-First for Parallelism:**
-```yaml
-fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-```
-
-**Why Copilot first?** Benchmarking revealed copilot scales beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all`, copilot as the primary provider unlocks peak throughput.
+Subscription providers rewritten to eliminate SDK overhead. Copilot uses direct HTTP (~2s), Claude Code uses CLI shell-out with JSON output (~12s).
 
 ---
 
-## Testing
-
-**Files Created:**
-1. `lib/llm/__tests__/subscription-providers.test.ts` - Unit tests
-
-**Test Coverage:**
-- Provider initialization
-- Quota usage tracking
-- Quota exhaustion handling
-- Data persistence
-- Old data pruning
-
----
-
-## Remaining Work (Phase 5-7)
-
-### Phase 5: Additional Testing
-- Integration tests for fallback behavior
-- CLI timeout and error handling tests
-- Concurrent request tests
-
-### Phase 6: Documentation
-- Update `docs-content/architecture/llm-architecture.md`
-- Add Getting Started guide section
-- Update PlantUML diagram
-
-### Phase 7: Monitoring & Analytics
-- Subscription usage dashboard component
-- API endpoints for usage stats
-- Cost savings metrics
-
----
-
-## Architecture Summary
+## Architecture
 
 ### Provider Hierarchy
 ```
 BaseProvider (abstract)
-  - CLIProviderBase (abstract) [NEW]
-    - ClaudeCodeProvider [NEW]
-    - CopilotProvider [NEW]
+  - CopilotProvider [Direct HTTP to Copilot API]
+  - ClaudeCodeProvider [CLI shell-out with JSON output]
+  - CLIProviderBase (abstract) [legacy, still used by proxy fallback]
   - OpenAICompatibleProvider
     - GroqProvider
     - OpenAIProvider
@@ -124,142 +25,197 @@ BaseProvider (abstract)
   - MockProvider
 ```
 
-### Request Flow
-```
-1. LLMService.complete()
-2. Check subscription quotas (if enabled)
-3. Resolve provider chain (copilot first — parallelism-optimized)
-4. Try each provider in order:
-   - Copilot -> Groq -> Claude Code -> Anthropic -> OpenAI -> Gemini -> GitHub Models
-5. On quota exhaustion:
-   - Mark provider exhausted (exponential backoff)
-   - Continue to next provider
-6. Record usage:
-   - Subscription: quota tracker + $0 cost
-   - API: standard cost tracking
+### Key Change: No More SDK/CLI Subprocess Overhead
 
-Note: Batch agents parallelize calls via Promise.all (concurrency 5-20).
-Copilot scales from 5s sequential to 0.77s effective @10 concurrent.
-```
-
-### Cost Savings
-- **Subscription providers**: $0 per token
-- **Automatic routing**: Always tries free subscriptions first
-- **Transparent fallback**: Users never see quota exhaustion (auto-fallback to paid APIs)
+| Provider | Old Approach | New Approach | Latency |
+|----------|-------------|-------------|---------|
+| Copilot | `copilot-cli` subprocess via JSON-RPC | Direct HTTP POST to Copilot API | ~2-5s (was ~30s) |
+| Claude Code | `claude --print` with token estimation | `claude -p` with `--output-format json` | ~12s (exact tokens) |
 
 ---
 
-## CLI Requirements
+## Copilot Provider: Direct HTTP
 
-### Claude Code
-- **Installation**: https://claude.ai/downloads
-- **CLI Command**: `claude`
-- **Authentication**: `claude login`
-- **Test**: `claude --version`
+**File:** `lib/llm/providers/copilot-provider.ts`
 
-### GitHub Copilot
-- **Installation**: `npm install -g @githubnext/github-copilot-cli`
-- **CLI Command**: `copilot-cli`
-- **Authentication**: Handled by GitHub CLI
-- **Test**: `copilot-cli --version`
+The copilot provider sends a direct HTTP POST to the GitHub Copilot chat completions endpoint (OpenAI-compatible):
+
+```
+POST https://copilot-api.{enterprise-host}/chat/completions
+Authorization: Bearer <oauth-refresh-token>
+Content-Type: application/json
+User-Agent: opencode/1.0
+Openai-Intent: conversation-edits
+```
+
+### Authentication
+
+- **Source:** OAuth token from `~/.local/share/opencode/auth.json` (written by OpenCode)
+- **Token field:** `refresh` from the `github-copilot-enterprise` or `github-copilot` entry
+- **Enterprise URL:** Auto-detected from `enterpriseUrl` field → `https://copilot-api.{enterpriseUrl}`
+- **Public fallback:** `https://api.githubcopilot.com` (when no enterprise URL)
+- **Token refresh:** Re-reads auth.json at most every 60 seconds
+- **401/403 handling:** Forces immediate re-read of auth.json
+
+### Docker Support
+
+In Docker (`LLM_CLI_PROXY_URL` set), the provider delegates to the host-side proxy bridge which has access to the auth tokens.
+
+### No Longer Uses
+
+- `CLIProviderBase` — extends `BaseProvider` directly
+- `copilot-cli` subprocess — no CLI spawning
+- `@github/copilot-sdk` — no SDK dependency
+
+---
+
+## Claude Code Provider: CLI Shell-Out
+
+**File:** `lib/llm/providers/claude-code-provider.ts`
+
+The claude-code provider shells out to the `claude` CLI in non-interactive mode:
+
+```bash
+claude -p "<prompt>" --output-format json --model sonnet --tools "" --no-session-persistence [--system-prompt "<sp>"]
+```
+
+### Authentication
+
+- **Source:** Claude Max subscription OAuth token from macOS Keychain
+- **Key entry:** `"Claude Code-credentials"` (managed by `claude` CLI)
+- **CRITICAL:** `ANTHROPIC_API_KEY` must be **stripped** from the subprocess environment. If present, the CLI uses API credits instead of the Max OAuth subscription.
+- **Also stripped:** `ANTHROPIC_AUTH_TOKEN`
+- **Auth check:** `claude auth status` returns JSON with `loggedIn` and `authMethod` fields
+
+### Why Not Direct API?
+
+The Claude Max OAuth token **cannot** be used directly against `api.anthropic.com` from non-CLI clients — the API returns 401 (server-side client allowlisting). The `claude` CLI is the only supported client for subscription-based access.
+
+### JSON Output
+
+The `--output-format json` flag returns structured output with exact token counts:
+
+```json
+{
+  "type": "result",
+  "is_error": false,
+  "result": "...",
+  "usage": { "input_tokens": 123, "output_tokens": 456 },
+  "modelUsage": {
+    "claude-sonnet-4-20250514": {
+      "inputTokens": 100,
+      "outputTokens": 450,
+      "cacheReadInputTokens": 23,
+      "costUSD": 0.0
+    }
+  }
+}
+```
+
+### No Longer Uses
+
+- `CLIProviderBase` — extends `BaseProvider` directly
+- `--print --silent` flags — uses `-p --output-format json` instead
+- Token estimation — gets exact counts from JSON output
+- `@anthropic-ai/claude-agent-sdk` — no SDK dependency
+
+---
+
+## Proxy Bridge Architecture
+
+Both providers support Docker containers via the HTTP proxy bridge (`src/llm-proxy/llm-proxy.mjs`):
+
+```
+Docker Container                    Host Machine
+┌──────────────┐                   ┌──────────────────────┐
+│ LLM Service  │ ── HTTP ──────>  │ llm-proxy.mjs        │
+│ ProviderReg  │  /api/complete   │  ├── Copilot: HTTP    │ ── POST ──> copilot-api.{host}
+│              │  /health         │  └── Claude: CLI      │ ── spawn -> claude -p
+└──────────────┘                   └──────────────────────┘
+```
+
+- **Copilot requests** on the proxy: Direct HTTP to Copilot API (same as host-side provider)
+- **Claude requests** on the proxy: Shell out to `claude -p` CLI (host has keychain access)
+- **API providers** (Groq, Anthropic, OpenAI): Direct HTTPS from container, no proxy needed
+
+---
+
+## Network Compatibility
+
+| Scenario | Copilot (Direct HTTP) | Claude (CLI) |
+|----------|----------------------|-------------|
+| Outside VPN, no proxy | ✓ (~2s) | ✓ (~12s) |
+| Inside VPN, corporate proxy | ✓ (~2s) | ✓ (~12s) |
+| Docker container | ✓ (via proxy bridge) | ✓ (via proxy bridge) |
+
+---
+
+## Provider Priority
+
+```yaml
+fast:     ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+premium:  ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+```
+
+**Why Copilot first?** Direct HTTP scales with parallelism (~2s per call, even at high concurrency). Batch agents use `Promise.all` with concurrency 5-20.
 
 ---
 
 ## Configuration
 
-Subscription providers are enabled by default in `config/llm-providers.yaml`:
+Provider configs in `config/llm-providers.yaml`:
 
 ```yaml
 providers:
-  claude-code:
-    cliCommand: "claude"
-    timeout: 60000
+  copilot:
+    timeout: 120000
     models:
-      fast: "sonnet"
+      fast: "claude-haiku-4.5"
+      standard: "claude-sonnet-4.6"
+      premium: "claude-opus-4.6"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
+
+  claude-code:
+    timeout: 120000
+    models:
+      fast: "haiku"
       standard: "sonnet"
       premium: "opus"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
-
-  copilot:
-    cliCommand: "copilot-cli"
-    timeout: 120000
-    models:
-      fast: "claude-haiku-4.5"        # Benchmarked: 0.77s @10 parallel
-      standard: "claude-sonnet-4.5"
-      premium: "claude-opus-4.6"
-    quotaTracking:
-      enabled: true
-      softLimitPerHour: 100
 ```
 
-To disable, remove from `provider_priority` arrays.
+---
+
+## Performance Comparison
+
+| Approach | Per-call latency | Method |
+|----------|-----------------|--------|
+| SDK spawn (original) | 30-120s | `copilot-cli` / `claude-agent-sdk` subprocess |
+| CLI generic (previous) | 5-30s | `CLIProviderBase` with `--print --silent` |
+| Direct HTTP + CLI JSON (current) | 2-15s | HTTP POST / `claude -p --output-format json` |
 
 ---
 
-## Known Issues & Future Enhancements
+## Files
 
-### Current Limitations
-1. Token estimation is rough (4 chars ≈ 1 token)
-   - *Future*: Parse CLI output for exact counts if available
-2. CLI output format assumptions
-   - *Future*: Add response format detection/parsing
+### Provider Files
+1. `lib/llm/providers/copilot-provider.ts` — Direct HTTP to Copilot API
+2. `lib/llm/providers/claude-code-provider.ts` — CLI shell-out with JSON output
+3. `lib/llm/providers/base-provider.ts` — Abstract base (both extend this directly)
+4. `lib/llm/providers/cli-provider-base.ts` — Legacy CLI base (kept for reference, unused by subscription providers)
 
-### Parallelism (Achieved)
-- Copilot CLI scales beautifully with concurrent calls (0.77s effective @10 parallel)
-- Batch agents already use `Promise.all` with concurrency 5-20
-- Copilot is now the primary provider for all tiers to maximize throughput
+### Infrastructure
+5. `lib/llm/subscription-quota-tracker.ts` — Quota tracking with exponential backoff
+6. `src/llm-proxy/llm-proxy.mjs` — HTTP proxy bridge for Docker containers
 
-### Future Enhancements
-1. **Dashboard Integration**: Real-time usage metrics
-2. **Cost Analytics**: Show savings vs API costs
-3. **Quota Forecasting**: Predict when quotas will reset
-4. **Smart Routing**: Learn provider preferences based on task type
-5. **Health Checks**: Periodic CLI availability checks
+### Configuration
+7. `config/llm-providers.yaml` — Provider configs, model tiers, network overrides
 
 ---
 
-## Success Criteria (Achieved)
-
-**Functional**:
-- Claude Code provider routes requests through CLI
-- Copilot provider routes requests through CLI
-- Quota tracking records usage accurately
-- Automatic fallback to API providers works
-- Zero cost recorded for subscriptions
-
-**Integration**:
-- Providers registered in provider registry
-- Config loaded from YAML
-- Priority chains respect subscription-first policy
-- Circuit breaker integration working
-
-**Reliability**:
-- Graceful CLI errors (timeout, auth, quota)
-- Exponential backoff on exhaustion
-- No service interruption on quota exhaustion
-
----
-
-## Files Modified Summary
-
-### New Files (6)
-1. `lib/llm/providers/cli-provider-base.ts`
-2. `lib/llm/providers/claude-code-provider.ts`
-3. `lib/llm/providers/copilot-provider.ts`
-4. `lib/llm/subscription-quota-tracker.ts`
-5. `lib/llm/__tests__/subscription-providers.test.ts`
-6. `docs/subscription-providers-implementation.md` (this file)
-
-### Modified Files (4)
-1. `lib/llm/types.ts` - Added provider names, interfaces, config fields
-2. `lib/llm/provider-registry.ts` - Registered new providers
-3. `lib/llm/llm-service.ts` - Integrated quota tracker
-4. `config/llm-providers.yaml` - Added provider configs and priority
-
----
-
-**Implementation Date**: 2026-02-10
-**Estimated Effort**: 2.5 days (Phase 1-4 complete)
-**Remaining Effort**: 2.5 days (Phase 5-7)
+**Last updated:** 2026-03-31
