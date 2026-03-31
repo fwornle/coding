@@ -6,10 +6,10 @@
 providers:
   # Subscription providers (zero cost)
   claude-code:
-    cliCommand: "claude"
-    timeout: 30000
+    method: "cli"                       # claude -p --output-format json (Max OAuth)
+    timeout: 120000                     # CLI needs longer timeout (~12s typical)
     models:
-      fast: "sonnet"
+      fast: "haiku"
       standard: "sonnet"
       premium: "opus"
     quotaTracking:
@@ -17,11 +17,11 @@ providers:
       softLimitPerHour: 100  # Conservative estimate
 
   copilot:
-    cliCommand: "copilot-cli"
-    timeout: 30000
+    method: "http"                      # Direct HTTP POST to Copilot API (~2s)
+    timeout: 120000
     models:
-      fast: "claude-haiku-4.5"        # Benchmarked: 5s sequential, 0.77s @10 parallel
-      standard: "claude-sonnet-4.5"
+      fast: "claude-haiku-4.5"
+      standard: "claude-sonnet-4.6"    # Updated: 4.6 available via enterprise
       premium: "claude-opus-4.6"
     quotaTracking:
       enabled: true
