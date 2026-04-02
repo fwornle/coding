@@ -28,10 +28,50 @@ agent_check_requirements() {
   _agent_log "✅ mastracode CLI detected at $(command -v mastracode)"
 }
 
+# First-run setup: mastracode needs OAuth auth on first launch.
+# If launched inside tmux without auth, the interactive setup wizard gets mangled.
+# Detect missing auth and run mastracode once in the raw terminal first.
+_mastra_first_run_setup() {
+  local auth_file="$HOME/Library/Application Support/mastracode/auth.json"
+  # Linux fallback
+  [ ! -d "$HOME/Library" ] && auth_file="$HOME/.local/share/mastracode/auth.json"
+
+  if [ -f "$auth_file" ]; then
+    return 0  # already authenticated
+  fi
+
+  _agent_log ""
+  _agent_log "⚠️  First-run setup required — mastracode needs authentication"
+  _agent_log "   This will launch mastracode directly so you can complete the"
+  _agent_log "   interactive setup wizard (auth, model selection, etc.)"
+  _agent_log "   Once setup completes, press Ctrl+C to exit back to the launcher."
+  _agent_log ""
+  printf "[%s] Run first-time setup now? [Y/n] " "$AGENT_DISPLAY_NAME"
+  read -r response
+  if [ -z "$response" ] || [[ "$response" =~ ^[Yy] ]]; then
+    _agent_log "Launching mastracode for first-run setup..."
+    _agent_log "(Complete the setup wizard, then press Ctrl+C to return)"
+    _agent_log ""
+    # Run directly in current terminal — NOT inside tmux
+    mastracode || true
+    _agent_log ""
+    if [ -f "$auth_file" ]; then
+      _agent_log "✅ Authentication complete"
+    else
+      _agent_log "⚠️  Auth file not found after setup — mastracode may prompt again inside tmux"
+    fi
+  else
+    _agent_log "Skipping first-run setup — mastracode will prompt for auth inside tmux"
+  fi
+}
+
 # Configure Mastracode and validate environment
 # Note: agent_pre_launch runs AFTER detect_network_and_configure_proxy,
 # so INSIDE_CN and PROXY_WORKING are already set.
 agent_pre_launch() {
+  # First-run auth check — must happen before tmux launch
+  _mastra_first_run_setup
+
   # D-07: All LLM calls route through coding LLM proxy
   # D-15: Check LLM proxy reachability (warn only, do not block)
   if curl -sf http://localhost:8089/health &>/dev/null; then
