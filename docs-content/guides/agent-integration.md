@@ -32,7 +32,7 @@ The Coding system supports multiple AI coding assistants through a config-driven
 
 The system follows a layered architecture:
 
-1. **Agent Layer** - Your AI coding assistant (Claude, CoPilot, OpenCode, etc.)
+1. **Agent Layer** - Your AI coding assistant (Claude, CoPilot, OpenCode, Mastracode, etc.)
 2. **Tmux Wrapper Layer** - Shared `tmux-session-wrapper.sh` wraps all agents in tmux with unified status bar
 3. **Config Layer** - Agent definitions in `config/agents/<name>.sh`
 4. **Orchestration Layer** - `launch-agent-common.sh` handles all shared startup (Docker, services, monitoring)
@@ -392,6 +392,17 @@ coding --lsl-status
 - **Native LSL support**: The transcript monitor reads directly from OpenCode's SQLite database (`~/.local/share/opencode/opencode.db`) — no pipe-pane capture needed for session logging
 
 ![OpenCode running in coding](../images/coding-opencode.png)
+
+### Mastracode (`config/agents/mastra.sh`)
+
+- `AGENT_COMMAND="mastracode"` — launches standalone mastracode TUI
+- `AGENT_ENABLE_PIPE_CAPTURE=false` — uses lifecycle hook transcripts for LSL
+- `AGENT_INSTALL_COMMAND="npm install -g mastracode"` — auto-installs on first launch
+- `agent_pre_launch()` — handles first-run OAuth setup, network-adaptive model selection, hooks config
+- Transcript capture via `MastraTranscriptReader` reading NDJSON from mastra lifecycle hooks
+- Observational memory via LibSQL at `.observations/observations.db`
+
+![Mastracode running in coding](../images/coding-mastra.png)
 
 ---
 
