@@ -24,6 +24,7 @@ import AdaptiveExchangeExtractor from '../src/live-logging/AdaptiveExchangeExtra
 import { SemanticAnalyzer } from '../src/live-logging/SemanticAnalyzer.js';
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import StreamingTranscriptReader from '../src/live-logging/StreamingTranscriptReader.js';
+import MastraTranscriptReader from '../src/live-logging/MastraTranscriptReader.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
@@ -320,6 +321,24 @@ class EnhancedTranscriptMonitor {
     const openCodeTranscript = this.findOpenCodeTranscript();
     if (openCodeTranscript) {
       transcripts.push({ path: openCodeTranscript, mtime: new Date(), source: 'opencode' });
+    }
+
+    // Mastra NDJSON transcripts
+    const mastraTranscriptDir = this.findMastraTranscriptDir();
+    if (mastraTranscriptDir && fs.existsSync(mastraTranscriptDir)) {
+      try {
+        const mastraFiles = fs.readdirSync(mastraTranscriptDir)
+          .filter(f => f.endsWith('.jsonl') || f.endsWith('.ndjson'))
+          .map(f => {
+            const fp = path.join(mastraTranscriptDir, f);
+            const stats = fs.statSync(fp);
+            return { path: fp, mtime: stats.mtime, source: 'mastra' };
+          })
+          .filter(f => (Date.now() - f.mtime.getTime()) < this.config.sessionDuration * 2);
+        transcripts.push(...mastraFiles);
+      } catch (e) {
+        this.debug(`Error scanning Mastra transcripts: ${e.message}`);
+      }
     }
 
     return transcripts;
@@ -802,8 +821,30 @@ class EnhancedTranscriptMonitor {
       }
     }
 
+    // Check Mastra transcript directory (.observations/transcripts/)
+    const mastraTranscriptDir = this.findMastraTranscriptDir();
+    if (mastraTranscriptDir) {
+      try {
+        const mastraFiles = fs.readdirSync(mastraTranscriptDir)
+          .filter(f => f.endsWith('.jsonl') || f.endsWith('.ndjson'))
+          .map(f => {
+            const fp = path.join(mastraTranscriptDir, f);
+            const stats = fs.statSync(fp);
+            return { path: fp, mtime: stats.mtime, size: stats.size };
+          })
+          .filter(f => (Date.now() - f.mtime.getTime()) < this.config.sessionDuration * 2)
+          .sort((a, b) => b.mtime - a.mtime);
+
+        if (mastraFiles.length > 0) {
+          candidates.push({ path: mastraFiles[0].path, mtime: mastraFiles[0].mtime, source: 'mastra' });
+        }
+      } catch (e) {
+        this.debug(`Error scanning Mastra transcripts: ${e.message}`);
+      }
+    }
+
     if (candidates.length === 0) {
-      this.debug('No active transcripts found (copilot, Claude, or OpenCode)');
+      this.debug('No active transcripts found (copilot, Claude, OpenCode, or Mastra)');
       return null;
     }
 
@@ -813,6 +854,30 @@ class EnhancedTranscriptMonitor {
     this.agentType = winner.source;
     this.debug(`Using ${winner.source} transcript: ${winner.path}`);
     return winner.path;
+  }
+
+  /**
+   * Find the mastra transcript directory.
+   * Mastra lifecycle hooks write NDJSON transcripts to .observations/transcripts/
+   * relative to the project path.
+   */
+  findMastraTranscriptDir() {
+    // Check if this is a mastra session (via env or agent adapter)
+    const isMastraAgent = process.env.CODING_AGENT === 'mastra' ||
+      process.env.AGENT_TRANSCRIPT_FMT === 'mastra' ||
+      process.env.CODING_TRANSCRIPT_FORMAT === 'mastra';
+
+    const transcriptDir = path.join(this.config.projectPath, '.observations', 'transcripts');
+    if (fs.existsSync(transcriptDir)) {
+      return transcriptDir;
+    }
+
+    // Only create if explicitly a mastra session
+    if (isMastraAgent) {
+      return transcriptDir; // Will be created by MastraTranscriptReader.start()
+    }
+
+    return null;
   }
 
   /**
@@ -1605,11 +1670,149 @@ class EnhancedTranscriptMonitor {
         return this.normalizeCopilotMessages(messages);
       }
 
+      // If this is a mastra NDJSON transcript, normalize to Claude-compatible format
+      const isMastraTranscript = this.agentType === 'mastra' ||
+        (messages.length > 0 && (
+          messages[0].type === 'session_start' ||
+          (messages[0].type === 'message' && messages.some(m => m.type === 'onStepFinish' || m.type === 'onToolCall'))
+        ));
+      if (isMastraTranscript) {
+        this.debug('Detected mastra NDJSON transcript — normalizing to Claude format');
+        return this.normalizeMastraMessages(messages);
+      }
+
       return messages;
     } catch (error) {
       this.debug(`Error reading transcript: ${error.message}`);
       return [];
     }
+  }
+
+  /**
+   * Normalize mastra lifecycle hook NDJSON events to Claude-compatible message format.
+   * Maps mastra event types (message, onStepFinish, onToolCall, etc.) to the
+   * user/assistant message format that the ETM exchange extraction pipeline expects.
+   *
+   * Per D-09: native mastra format is read by a dedicated normalizer.
+   * Per D-11: agent identity captured in metadata, not filename.
+   */
+  normalizeMastraMessages(events) {
+    const normalized = [];
+    let messageIndex = 0;
+
+    for (const event of events) {
+      const ts = event.timestamp || new Date().toISOString();
+      const uuid = event.id || event.sessionId || `mastra_${messageIndex++}`;
+
+      switch (event.type) {
+        case 'message': {
+          if (event.role === 'user' && event.content) {
+            normalized.push({
+              type: 'user',
+              uuid,
+              timestamp: ts,
+              message: {
+                role: 'user',
+                content: event.content
+              },
+              mastraAgent: true
+            });
+          } else if (event.role === 'assistant' && event.content) {
+            normalized.push({
+              type: 'assistant',
+              uuid,
+              timestamp: ts,
+              message: {
+                role: 'assistant',
+                content: event.content,
+                stop_reason: 'end_turn'
+              },
+              mastraAgent: true
+            });
+          }
+          break;
+        }
+        case 'onStepFinish': {
+          if (event.output) {
+            const content = typeof event.output === 'string' ? event.output : JSON.stringify(event.output);
+            normalized.push({
+              type: 'assistant',
+              uuid,
+              timestamp: ts,
+              message: {
+                role: 'assistant',
+                content,
+                stop_reason: 'end_turn'
+              },
+              mastraAgent: true
+            });
+          }
+          break;
+        }
+        case 'onToolCall': {
+          normalized.push({
+            type: 'assistant',
+            uuid,
+            timestamp: ts,
+            message: {
+              role: 'assistant',
+              content: [{
+                type: 'tool_use',
+                id: event.toolCallId || uuid,
+                name: event.tool || event.name || 'unknown',
+                input: event.input || {}
+              }]
+            },
+            mastraAgent: true
+          });
+          break;
+        }
+        case 'onToolResult': {
+          const resultContent = typeof event.output === 'string'
+            ? event.output
+            : JSON.stringify(event.output || {});
+          normalized.push({
+            type: 'user',
+            uuid,
+            timestamp: ts,
+            message: {
+              role: 'user',
+              content: [{
+                type: 'tool_result',
+                tool_use_id: event.toolCallId || uuid,
+                content: resultContent,
+                is_error: event.is_error || false
+              }]
+            },
+            mastraAgent: true
+          });
+          break;
+        }
+        // session_start and session_end are metadata-only; skip for exchange extraction
+        case 'session_start':
+        case 'session_end':
+          break;
+        default:
+          // Unknown event with content — treat as assistant message
+          if (event.content) {
+            const content = typeof event.content === 'string' ? event.content : JSON.stringify(event.content);
+            normalized.push({
+              type: 'assistant',
+              uuid,
+              timestamp: ts,
+              message: {
+                role: 'assistant',
+                content,
+                stop_reason: 'end_turn'
+              },
+              mastraAgent: true
+            });
+          }
+          break;
+      }
+    }
+
+    return normalized;
   }
 
   /**
@@ -2228,9 +2431,16 @@ class EnhancedTranscriptMonitor {
         this.logHealthError(`Regenerated historical file: ${path.basename(sessionFile)} (${timeDiffHours.toFixed(1)}h old)`);
       }
 
+      // Per D-11: Agent identity captured in LSL file header/metadata, not filename
+      const agentDisplayName = this.agentType === 'mastra' ? 'Mastracode' :
+        this.agentType === 'copilot' ? 'GitHub Copilot' :
+        this.agentType === 'opencode' ? 'OpenCode' : 'Claude Code';
+      const agentLine = `**Agent:** ${agentDisplayName}\n`;
+
       const sessionHeader = `# WORK SESSION (${tranche.timeString})${isRedirected ? ` - From ${currentProjectName}` : ''}\n\n` +
         `**Generated:** ${sessionTimestamp.toISOString()}\n` +
         `**Work Period:** ${tranche.timeString}\n` +
+        agentLine +
         `**Focus:** ${isRedirected ? `Coding activities from ${currentProjectName}` : 'Live session logging'}\n` +
         `**Duration:** ~60 minutes\n` +
         `${isRedirected ? `**Source Project:** ${this.config.projectPath}\n` : ''}` +

@@ -1,38 +1,102 @@
 /**
  * Unit tests for MastraTranscriptReader
  *
- * Wave 0 stubs -- these tests validate the interface contract for the
+ * Activated by Plan 21-03 -- validates the interface contract for the
  * mastracode transcript reader and hook NDJSON parsing.
- *
- * Activated by Plan 21-03 Task 1
  */
 
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import MastraTranscriptReader from '../../src/live-logging/MastraTranscriptReader.js';
 
-// -- Stub: MastraTranscriptReader import --
-// The actual module is created in Plan 21-03. Until then, these tests
-// are skipped so the file can exist as a verify target.
-
-describe('MastraTranscriptReader', { skip: 'Activated by Plan 21-03 Task 1' }, () => {
+describe('MastraTranscriptReader', () => {
   it('should export a MastraTranscriptReader class', () => {
-    // const { MastraTranscriptReader } = await import('../../src/lsl/readers/mastra-reader.js');
-    // assert.ok(MastraTranscriptReader, 'MastraTranscriptReader should be exported');
-    assert.ok(true);
+    assert.ok(MastraTranscriptReader, 'MastraTranscriptReader should be exported');
+    assert.strictEqual(typeof MastraTranscriptReader, 'function');
   });
 
-  it('should implement the TranscriptReader interface', () => {
-    // const reader = new MastraTranscriptReader();
-    // assert.strictEqual(typeof reader.read, 'function');
-    // assert.strictEqual(typeof reader.getSessionId, 'function');
-    assert.ok(true);
+  it('should be constructable with a transcript path', () => {
+    const reader = new MastraTranscriptReader('/tmp/test-transcripts');
+    assert.ok(reader, 'Reader should be instantiated');
+    assert.strictEqual(reader.transcriptDir, '/tmp/test-transcripts');
+  });
+
+  it('should have start and stop methods', () => {
+    const reader = new MastraTranscriptReader('/tmp/test-transcripts');
+    assert.strictEqual(typeof reader.start, 'function');
+    assert.strictEqual(typeof reader.stop, 'function');
+  });
+
+  it('should have a static extractExchangesFromBatch method', () => {
+    assert.strictEqual(typeof MastraTranscriptReader.extractExchangesFromBatch, 'function');
   });
 });
 
-describe('Hook NDJSON parsing', { skip: 'Activated by Plan 21-03 Task 1' }, () => {
+describe('MastraTranscriptReader.extractExchangesFromBatch', () => {
+  it('should extract a user->assistant exchange', () => {
+    const events = [
+      { type: 'message', role: 'user', content: 'fix the bug', timestamp: '2026-04-02T10:00:00Z' },
+      { type: 'message', role: 'assistant', content: 'I will fix it', timestamp: '2026-04-02T10:00:05Z' }
+    ];
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch(events);
+    assert.strictEqual(exchanges.length, 1);
+    assert.strictEqual(exchanges[0].humanMessage, 'fix the bug');
+    assert.strictEqual(exchanges[0].assistantMessage, 'I will fix it');
+    assert.strictEqual(exchanges[0].metadata.agent, 'mastra');
+  });
+
+  it('should handle onStepFinish as assistant response', () => {
+    const events = [
+      { type: 'message', role: 'user', content: 'run tests', timestamp: '2026-04-02T10:00:00Z' },
+      { type: 'onStepFinish', output: 'All 5 tests passed', timestamp: '2026-04-02T10:00:10Z' }
+    ];
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch(events);
+    assert.strictEqual(exchanges.length, 1);
+    assert.strictEqual(exchanges[0].assistantMessage, 'All 5 tests passed');
+  });
+
+  it('should accumulate tool calls within an exchange', () => {
+    const events = [
+      { type: 'message', role: 'user', content: 'read the file', timestamp: '2026-04-02T10:00:00Z' },
+      { type: 'onToolCall', tool: 'read_file', input: { path: '/tmp/test.js' }, timestamp: '2026-04-02T10:00:02Z' },
+      { type: 'message', role: 'assistant', content: 'Here is the file content', timestamp: '2026-04-02T10:00:05Z' }
+    ];
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch(events);
+    assert.strictEqual(exchanges.length, 1);
+    assert.strictEqual(exchanges[0].toolCalls.length, 1);
+    assert.strictEqual(exchanges[0].toolCalls[0].name, 'read_file');
+  });
+
+  it('should handle multiple exchanges', () => {
+    const events = [
+      { type: 'message', role: 'user', content: 'first question', timestamp: '2026-04-02T10:00:00Z' },
+      { type: 'message', role: 'assistant', content: 'first answer', timestamp: '2026-04-02T10:00:05Z' },
+      { type: 'message', role: 'user', content: 'second question', timestamp: '2026-04-02T10:01:00Z' },
+      { type: 'message', role: 'assistant', content: 'second answer', timestamp: '2026-04-02T10:01:05Z' }
+    ];
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch(events);
+    assert.strictEqual(exchanges.length, 2);
+  });
+
+  it('should skip session_start and session_end events', () => {
+    const events = [
+      { type: 'session_start', sessionId: 'abc-123' },
+      { type: 'message', role: 'user', content: 'hello', timestamp: '2026-04-02T10:00:00Z' },
+      { type: 'message', role: 'assistant', content: 'hi', timestamp: '2026-04-02T10:00:01Z' },
+      { type: 'session_end', sessionId: 'abc-123' }
+    ];
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch(events);
+    assert.strictEqual(exchanges.length, 1);
+  });
+
+  it('should return empty array for empty input', () => {
+    const exchanges = MastraTranscriptReader.extractExchangesFromBatch([]);
+    assert.strictEqual(exchanges.length, 0);
+  });
+});
+
+describe('Hook NDJSON parsing', () => {
   it('should parse a single NDJSON line into a hook event', () => {
-    // Expected input: '{"type":"message","role":"assistant","content":"Hello"}\n'
-    // Expected output: { type: 'message', role: 'assistant', content: 'Hello' }
     const input = '{"type":"message","role":"assistant","content":"Hello"}';
     const parsed = JSON.parse(input);
     assert.strictEqual(parsed.type, 'message');
