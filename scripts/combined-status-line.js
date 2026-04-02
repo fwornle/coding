@@ -37,6 +37,15 @@ class CombinedStatusLine {
     this.apiCache = null;
     this.currentSessionId = null;
     this.config = config;
+
+    // Agent type display configuration: icon prefix and tmux color for each agent type
+    // Used in session display to visually distinguish which agent is active per project
+    this.agentDisplay = {
+      claude:   { prefix: '',  color: '' },           // Default (no prefix for claude — most common)
+      opencode: { prefix: 'oc:', color: '' },          // OpenCode sessions
+      copilot:  { prefix: 'cp:', color: '' },          // Copilot sessions
+      mastra:   { prefix: '#[fg=colour13]M#[fg=default]:', color: 'colour13' }  // Mastra: magenta diamond
+    };
   }
 
   /**
@@ -741,7 +750,7 @@ class CombinedStatusLine {
           }
         } else {
           // No running monitors — but sessions may still be valid if agent processes
-          // (claude, copilot, opencode) are running. Trust the status file data when
+          // (claude, copilot, opencode, mastra) are running. Trust the status file data when
           // it was recently written by the daemon, just slightly outside the freshness window.
           // Only clear if file is VERY stale (> 5 minutes = daemon is truly dead)
           if (age > 300000) {
@@ -1750,10 +1759,13 @@ class CombinedStatusLine {
             const abbrev = this.getProjectAbbreviation(project);
             const isCurrentProject = abbrev === currentAbbrev;
             const displayAbbrev = isCurrentProject ? `#[underscore]${abbrev}#[nounderscore]` : abbrev;
+            // Add agent type prefix for non-Claude agents (mastra, opencode, copilot)
+            const agentType = health.details ? this.extractAgentType(health.details) : null;
+            const agentPrefix = agentType && this.agentDisplay[agentType] ? this.agentDisplay[agentType].prefix : '';
             if ((health.icon === '🟡' || health.icon === '🔴') && health.reason) {
-              return `${displayAbbrev}${health.icon}(${health.reason})`;
+              return `${agentPrefix}${displayAbbrev}${health.icon}(${health.reason})`;
             }
-            return `${displayAbbrev}${health.icon}`;
+            return `${agentPrefix}${displayAbbrev}${health.icon}`;
           })
           .join('');
 
@@ -1885,6 +1897,21 @@ class CombinedStatusLine {
       color: overallColor,
       helpCommand: './bin/status'
     };
+  }
+
+  /**
+   * Extract agent type from health details string
+   * Details format: "opencode (capture 5min)" or "mastra running (no capture)" etc.
+   */
+  extractAgentType(details) {
+    if (!details) return null;
+    const detailsLower = details.toLowerCase();
+    for (const agentType of ['mastra', 'opencode', 'copilot']) {
+      if (detailsLower.startsWith(agentType) || detailsLower.includes(agentType)) {
+        return agentType;
+      }
+    }
+    return null;
   }
 
   /**
