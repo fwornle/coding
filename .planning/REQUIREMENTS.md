@@ -24,7 +24,7 @@ Requirements for mastra integration milestone. Each maps to roadmap phases.
 ### Mastracode Agent
 
 - [x] **MSTR-01**: User can start mastracode via `coding --mastra` with proper tmux session setup
-- [ ] **MSTR-02**: Mastracode sessions appear in tmux statusline with LSL indicator and health monitoring
+- [x] **MSTR-02**: Mastracode sessions appear in tmux statusline with LSL indicator and health monitoring
 - [ ] **MSTR-03**: Enhanced-transcript-monitor captures mastracode conversations for LSL logging
 
 ### Live Observations
@@ -68,7 +68,7 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | CONV-03 | Phase 22 | Pending |
 | CONV-04 | Phase 22 | Pending |
 | MSTR-01 | Phase 21 | Complete |
-| MSTR-02 | Phase 21 | Pending |
+| MSTR-02 | Phase 21 | Complete |
 | MSTR-03 | Phase 21 | Pending |
 | LIVE-01 | Phase 23 | Pending |
 | LIVE-02 | Phase 23 | Pending |
