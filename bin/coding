@@ -123,6 +123,7 @@ OPTIONS:
   --claude           Force Claude Code (same as --agent claude)
   --copilot, --copi  Force CoPilot (same as --agent copilot)
   --opencode         Force OpenCode (same as --agent opencode)
+  --mastra           Force Mastracode (same as --agent mastra)
   --force            Kill ALL coding-related processes for a clean start
   --copilot-stop     Stop all CoPilot fallback services
   --config FILE      Use specific config file
@@ -142,12 +143,14 @@ EXAMPLES:
   coding-agent --copilot          # Force CoPilot
   coding-agent --copilot-stop     # Stop CoPilot services
   coding-agent --claude           # Force Claude Code
+  coding-agent --mastra           # Force Mastracode
   coding-agent --project /path/to/project  # Work in specific project
   coding-agent suggest "add tests" # Pass command to agent
 
 AGENTS:
   claude     Claude Code with MCP servers (memory, browser, logging)
   copilot    GitHub CoPilot with fallback services
+  mastra     Mastracode with observational memory (mastra.ai)
   <name>     Any agent with a config at config/agents/<name>.sh
 
 For more information, see docs/agent-agnostic-implementation-plan.md
@@ -188,6 +191,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --opencode)
       FORCE_AGENT="opencode"
+      shift
+      ;;
+    --mastra)
+      FORCE_AGENT="mastra"
       shift
       ;;
     --config)
