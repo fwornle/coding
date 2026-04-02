@@ -77,7 +77,7 @@ class StatusLineHealthMonitor {
       // Capture files: capture-coding-{agent}-{launchPID}-{timestamp}.txt
       // Find all capture files for opencode/copilot (non-Claude agents)
       const captureFiles = fs.readdirSync(captureDir)
-        .filter(f => /^capture-coding-(opencode|copilot)-\d+-\d+\.txt$/.test(f))
+        .filter(f => /^capture-coding-(opencode|copilot|mastra)-\d+-\d+\.txt$/.test(f))
         .map(f => {
           const fullPath = path.join(captureDir, f);
           const stats = fs.statSync(fullPath);
@@ -88,10 +88,13 @@ class StatusLineHealthMonitor {
       // Match capture files to this project via tmux session pane path
       for (const cap of captureFiles) {
         // Extract launch PID from filename: capture-coding-opencode-{PID}-{ts}.txt
-        const pidMatch = cap.name.match(/capture-coding-(?:opencode|copilot)-(\d+)-\d+\.txt/);
+        const pidMatch = cap.name.match(/capture-coding-(?:opencode|copilot|mastra)-(\d+)-\d+\.txt/);
         if (!pidMatch) continue;
         const launchPid = pidMatch[1];
-        const tmuxSession = `coding-opencode-${launchPid}`;
+        // Determine tmux session prefix from capture filename
+        const agentMatch = cap.name.match(/capture-coding-(opencode|copilot|mastra)-/);
+        const captureAgent = agentMatch ? agentMatch[1] : 'opencode';
+        const tmuxSession = `coding-${captureAgent}-${launchPid}`;
         
         try {
           const panePath = execSync(
@@ -292,7 +295,7 @@ class StatusLineHealthMonitor {
    * This catches sessions even if transcript monitors haven't started yet
    */
   async getRunningAgentSessions() {
-    // Returns Map<projectName, {agentType: 'claude'|'opencode'|'copilot', pid: string}>
+    // Returns Map<projectName, {agentType: 'claude'|'opencode'|'copilot'|'mastra', pid: string}>
     // When multiple agents target the same project, the most recent one wins.
     const agentSessions = new Map();
 
@@ -336,7 +339,7 @@ class StatusLineHealthMonitor {
       // Only bare binary names (e.g. "opencode", "copilot") are actual interactive agents.
       // Note: No fixed uptime threshold — long-running opencode sessions are legitimate.
       // Activity is determined downstream via capture file age (getCaptureFileAge).
-      for (const agentName of ['copilot', 'opencode']) {
+      for (const agentName of ['copilot', 'opencode', 'mastra']) {
         let agentLines = '';
         try {
           agentLines = execSync(`ps -eo pid,etime,comm | awk '$3 == "${agentName}" {print $1, $2}'`, { encoding: 'utf8', timeout: 5000 });
@@ -395,7 +398,7 @@ class StatusLineHealthMonitor {
     // killing transcript monitors that will never find .jsonl transcripts.
     this._nonClaudeProjects = new Set();
     for (const [name, info] of agentSessions) {
-      if (info.agentType === 'opencode' || info.agentType === 'copilot') {
+      if (info.agentType === 'opencode' || info.agentType === 'copilot' || info.agentType === 'mastra') {
         this._nonClaudeProjects.add(name);
       }
     }
@@ -467,7 +470,7 @@ class StatusLineHealthMonitor {
                     const transcriptIsStale = age > STALE_TRANSCRIPT_THRESHOLD;
                     const agentInfo = agentSessions.get(projectName);
                     const agentType = agentInfo ? agentInfo.agentType : null;
-                    const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot';
+                    const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot' || agentType === 'mastra';
                     let iconData;
                     if (hasAgentSession && transcriptIsStale && isNonClaudeAgent) {
                       // Non-Claude agent: transcript is irrelevant, check capture file
@@ -505,7 +508,7 @@ class StatusLineHealthMonitor {
           // Claude .jsonl transcripts, so getProjectSessionHealth() would always return ⚫.
           // Use capture file age (tmux pipe output) as the activity signal instead.
           const agentInfo = agentSessions.get(projectName);
-          if (agentInfo && (agentInfo.agentType === 'opencode' || agentInfo.agentType === 'copilot')) {
+          if (agentInfo && (agentInfo.agentType === 'opencode' || agentInfo.agentType === 'copilot' || agentInfo.agentType === 'mastra')) {
             const captureAge = this.getCaptureFileAge(projectName);
             if (captureAge !== null) {
               const iconData = this.iconFromAge(captureAge);
@@ -568,7 +571,7 @@ class StatusLineHealthMonitor {
                   const STALE_THRESHOLD = 900000; // 15 min
                   const agentInfo = agentSessions.get(projectName);
                   const agentType = agentInfo ? agentInfo.agentType : null;
-                  const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot';
+                  const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot' || agentType === 'mastra';
                   let iData;
                   if (hasAgent && age > STALE_THRESHOLD && isNonClaudeAgent) {
                     const captureAge = this.getCaptureFileAge(projectName);
@@ -727,7 +730,7 @@ class StatusLineHealthMonitor {
                   const STALE_THRESHOLD = 900000; // 15 min
                   const agentInfo3 = agentSessions.get(projectName);
                   const agentType3 = agentInfo3 ? agentInfo3.agentType : null;
-                  const isNonClaude3 = agentType3 === 'opencode' || agentType3 === 'copilot';
+                  const isNonClaude3 = agentType3 === 'opencode' || agentType3 === 'copilot' || agentType3 === 'mastra';
                   let iData3;
                   if (hasAgent3 && age > STALE_THRESHOLD && isNonClaude3) {
                     const captureAge = this.getCaptureFileAge(projectName);
@@ -775,7 +778,7 @@ class StatusLineHealthMonitor {
 
       // Determine icon based on agent type and available activity signals.
       const agentType = agentInfo ? agentInfo.agentType : null;
-      const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot';
+      const isNonClaudeAgent = agentType === 'opencode' || agentType === 'copilot' || agentType === 'mastra';
       let iconData = { status: 'idle', icon: '💤', details: `${agentType || 'agent'} running (no activity signal)` };
 
       if (isNonClaudeAgent) {
@@ -1172,12 +1175,12 @@ class StatusLineHealthMonitor {
 
       // If monitor is running but can't find transcripts, it may be a broken state
       // (e.g. getProjectDirName() mismatch). Restart the monitor to pick up fixes.
-      // EXCEPTION: Non-Claude agent projects (opencode/copilot) never have .jsonl transcripts,
+      // EXCEPTION: Non-Claude agent projects (opencode/copilot/mastra) never have .jsonl transcripts,
       // so 'not_found' is expected — don't restart their monitors.
       if (healthData.transcriptInfo?.status === 'not_found' &&
           healthData.streamingActive &&
           healthData.metrics?.uptimeSeconds > 120) {
-        // Check if this project runs a non-Claude agent (opencode/copilot)
+        // Check if this project runs a non-Claude agent (opencode/copilot/mastra)
         const projectName = projectPath ? path.basename(projectPath) : null;
         const isNonClaudeProject = projectName && this._nonClaudeProjects?.has(projectName);
         if (!isNonClaudeProject) {
