@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: -- Mastra Integration & LSL Observational Memory
 status: verifying
-stopped_at: Completed 21-03-PLAN.md
-last_updated: "2026-04-02T06:21:50.426Z"
+stopped_at: Completed 21-04-PLAN.md
+last_updated: "2026-04-02T16:49:57.892Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 21 (mastracode-agent-integration) — EXECUTING
-Plan: 3 of 3
+Phase: 22
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-02
 
@@ -53,6 +53,7 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 | Phase 21 P01 | 2min | 3 tasks | 5 files |
 | Phase 21 P02 | 5min | 2 tasks | 4 files |
 | Phase 21 P03 | 6min | 2 tasks | 3 files |
+| Phase 21 P04 | 3min | 1 tasks | 1 files |
 
 ### Decisions
 
@@ -67,6 +68,8 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 - [Phase 21]: LLM proxy check for mastra is non-blocking per D-15
 - [Phase 21]: Mastra NDJSON events normalized to Claude-compatible format in ETM (same pattern as copilot)
 - [Phase 21]: Agent identity added to ALL LSL session headers per D-11
+- [Phase 21]: Single rolling transcript file with session boundary events rather than per-session files
+- [Phase 21]: 6 lifecycle hooks (incl. tool use) for complete mastra conversation capture
 
 ### Research Flags
 
@@ -80,6 +83,6 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 
 ## Session Continuity
 
-Last session: 2026-04-02T06:21:50.422Z
-Stopped at: Completed 21-03-PLAN.md
+Last session: 2026-04-02T16:49:57.889Z
+Stopped at: Completed 21-04-PLAN.md
 Resume with: `/gsd:plan-phase 21` or `/gsd:verify-work 20`
