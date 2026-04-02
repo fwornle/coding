@@ -65,7 +65,7 @@ Four phases that integrate mastra.ai's observational memory into the coding infr
 ### Phases
 
 - [ ] **Phase 20: Foundation & OpenCode OM** - LibSQL storage, mastra OpenCode plugin, LLM proxy routing, token budget controls
-- [ ] **Phase 21: Mastracode Agent Integration** - `coding --mastra` launch, tmux statusline, LSL capture via observation hooks
+- [x] **Phase 21: Mastracode Agent Integration** - `coding --mastra` launch, tmux statusline, LSL capture via observation hooks (completed 2026-04-02)
 - [ ] **Phase 22: Transcript Converters** - Claude JSONL, Copilot events, .specstory batch conversion, shared MastraDBMessage normalization
 - [ ] **Phase 23: Live Observation Tap & Dashboard** - Real-time observation generation in enhanced-transcript-monitor, REST browsing endpoint
 
@@ -94,12 +94,12 @@ Plans:
   1. User can run `coding --mastra` and get a working mastracode session inside the standard tmux layout
   2. The tmux statusline shows mastracode session status with LSL indicator and health monitoring (same pattern as claude/copilot/opencode)
   3. Enhanced-transcript-monitor captures mastracode conversations for LSL logging (via mastra lifecycle hooks, not pipe-pane)
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 21-01-PLAN.md -- Agent adapter, launch wrapper, and --mastra flag in main launcher
 - [x] 21-02-PLAN.md -- Statusline, health monitor, process supervisor, and remediation integration
-- [ ] 21-03-PLAN.md -- MastraTranscriptReader and ETM integration for LSL capture
+- [x] 21-03-PLAN.md -- MastraTranscriptReader and ETM integration for LSL capture
 
 #### Phase 22: Transcript Converters
 **Goal**: Users can convert historical transcripts from all three agents into mastra observations via CLI
@@ -129,6 +129,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
-| 21. Mastracode Agent Integration | v4.0 | 2/3 | In Progress|  |
+| 21. Mastracode Agent Integration | v4.0 | 3/3 | Complete   | 2026-04-02 |
 | 22. Transcript Converters | v4.0 | 0/? | Not started | - |
 | 23. Live Observation Tap & Dashboard | v4.0 | 0/? | Not started | - |
