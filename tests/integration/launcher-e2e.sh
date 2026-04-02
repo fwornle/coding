@@ -374,6 +374,39 @@ test_agent_configs_exist() {
   fi
 }
 
+# Test: --mastra flag selects mastra agent and adapter is valid
+test_mastra_flag() {
+  local coding_root
+  coding_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+  # 1. Help text contains --mastra
+  local help_output
+  help_output=$("$CODING_BIN" --help 2>&1) || true
+  assert_output_contains "$help_output" "--mastra" "help should document --mastra" || return 1
+
+  # 2. Agent adapter sets correct AGENT_NAME
+  local agent_name
+  agent_name=$(bash -c 'source "'"$coding_root"'/config/agents/mastra.sh" 2>/dev/null; echo "$AGENT_NAME"')
+  if [ "$agent_name" != "mastra" ]; then
+    echo "Expected AGENT_NAME=mastra, got $agent_name"
+    return 1
+  fi
+
+  # 3. Agent adapter sets correct AGENT_COMMAND
+  local agent_cmd
+  agent_cmd=$(bash -c 'source "'"$coding_root"'/config/agents/mastra.sh" 2>/dev/null; echo "$AGENT_COMMAND"')
+  if [ "$agent_cmd" != "mastracode" ]; then
+    echo "Expected AGENT_COMMAND=mastracode, got $agent_cmd"
+    return 1
+  fi
+
+  # 4. Launch wrapper exists and is executable
+  if [ ! -x "$coding_root/scripts/launch-mastra.sh" ]; then
+    echo "scripts/launch-mastra.sh is not executable"
+    return 1
+  fi
+}
+
 # Test: Generic launcher fallback works for config-only agents
 test_generic_launcher_fallback() {
   local output
@@ -477,6 +510,7 @@ run_test "--help shows help text"              test_help_flag
 run_test "--verbose shows agent selection"     test_verbose_agent_selection
 run_test "Docker auto-start logic exists"       test_docker_autostart_exists
 run_test "Agent config files exist"             test_agent_configs_exist
+run_test "--mastra flag and adapter valid"        test_mastra_flag
 run_test "Generic launcher fallback works"      test_generic_launcher_fallback
 run_test "dry-run produces DRY-RUN markers"    test_dry_run_markers
 run_test "CODING_FORCE_CN=true detected"       test_force_cn_true
