@@ -1,6 +1,6 @@
 # Coding - AI Development Toolkit
 
-A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, and OpenCode. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
+A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, OpenCode, and Mastracode. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
 
 ---
 
@@ -16,7 +16,8 @@ coding
 # Or use specific agent
 coding --claude
 coding --copilot
-coding --agent opencode
+coding --opencode
+coding --mastra
 
 # Clean start (kills all orphaned processes, frees ports)
 coding --force
@@ -56,7 +57,7 @@ The transition system ensures safe mode switching with:
 - Native mode: Runs MCP servers directly as Node.js processes
 - Configuration selection is centralized in `claude-mcp-launcher.sh`
 
-**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, and future agents. The shared orchestrator (`scripts/launch-agent-common.sh`) handles Docker mode detection, service startup, monitoring, and session management — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles Docker mode detection, service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
@@ -66,13 +67,16 @@ The transition system ensures safe mode switching with:
 |-------|---------------|-----------|
 | **Claude Code** (default) | `coding` or `coding --claude` | Native transcript support |
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding --agent opencode` | Pipe-pane I/O capture |
+| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+| **Mastracode** | `coding --mastra` | Lifecycle hook transcripts |
 
-All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, constraint enforcement, and **shared skills** (see [Skills System](docs/skills-system.md)).
+All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, constraint enforcement, and **shared skills** (see [Skills System](docs/skills-system.md)). Missing agent CLIs are auto-installed on first launch (with user confirmation).
 
 ![GitHub Copilot CLI running in coding](docs/images/coding-copilot-cli.png)
 
 ![OpenCode running in coding](docs/images/coding-opencode.png)
+
+![Mastracode running in coding](docs/images/coding-mastra.png)
 
 See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new agents.
 

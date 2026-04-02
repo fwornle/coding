@@ -372,6 +372,17 @@ coding --lsl-status
 - Demonstrates the minimum integration: `AGENT_NAME` + `AGENT_COMMAND` + `agent_check_requirements()`
 - **Native LSL support**: The transcript monitor reads directly from OpenCode's SQLite database (`~/.local/share/opencode/opencode.db`) — no pipe-pane capture needed for session logging
 
+### Mastracode (`config/agents/mastra.sh`)
+
+- `AGENT_COMMAND="mastracode"` — launches standalone mastracode TUI
+- `AGENT_ENABLE_PIPE_CAPTURE=false` — uses lifecycle hook transcripts for LSL
+- `AGENT_INSTALL_COMMAND="npm install -g mastracode"` — auto-installs on first launch
+- `agent_pre_launch()` — handles first-run OAuth setup, network-adaptive model selection, hooks config
+- Transcript capture via `MastraTranscriptReader` reading NDJSON from mastra lifecycle hooks
+- Observational memory via LibSQL at `.observations/observations.db`
+
+![Mastracode running in coding](images/coding-mastra.png)
+
 ---
 
 ## Troubleshooting

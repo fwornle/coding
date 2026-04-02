@@ -30,9 +30,11 @@ touch .docker-mode
 # Launch with any agent (services start automatically)
 coding --claude
 coding --copilot
+coding --opencode
+coding --mastra
 ```
 
-Both `coding --claude` and `coding --copilot` share identical Docker mode logic:
+All agents (`--claude`, `--copilot`, `--opencode`, `--mastra`) share identical Docker mode logic:
 
 1. Detects Docker mode via 3-tier priority (`.docker-mode` marker, running `coding-services` container, `CODING_DOCKER_MODE` env var)
 2. Reuses existing containers if already healthy, or starts new ones via Docker Compose
@@ -92,6 +94,7 @@ See [Architecture > Data Flow](../architecture/data-flow.md) for detailed diagra
 touch .docker-mode
 coding --claude   # Services start automatically
 coding --copilot  # Same Docker support
+coding --mastra   # Auto-installs mastracode if missing
 ```
 
 ### Disable Docker Mode
@@ -101,6 +104,7 @@ rm .docker-mode
 docker compose -f docker/docker-compose.yml down
 coding --claude   # Now runs in native mode
 coding --copilot  # Also runs in native mode
+coding --mastra   # Also runs in native mode
 ```
 
 ## Common Operations
