@@ -38,7 +38,7 @@ The semantic analysis pipeline must operate as a hierarchical wave-based multi-a
 - [ ] LSL refactoring: verbatim logging → mastra-style observations (live + batch)
 - [ ] Transcript-to-observation converters (Claude, Copilot, OpenCode)
 - [ ] Historical LSL batch converter (git-tracked .specstory files → observations)
-- [ ] Mastracode agent integration (`coding --mastra` with full infrastructure support)
+- [x] Mastracode agent integration (`coding --mastra` with full infrastructure support) — Phase 21
 
 ### Out of Scope
 
@@ -97,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-29 after v4.0 milestone start*
+*Last updated: 2026-04-02 after Phase 21 completion*
