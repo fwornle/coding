@@ -56,6 +56,10 @@ class GlobalProcessSupervisor {
       { name: 'statusline-health-monitor', script: 'statusline-health-monitor.js', args: ['--daemon', '--auto-heal'] },
       { name: 'health-verifier', script: 'health-verifier.js', args: ['start'] }
     ];
+
+    // Supported agent types for session detection and supervision
+    // Each agent type uses tmux sessions named: coding-{agentType}-{launchPid}
+    this.supportedAgentTypes = ['claude', 'opencode', 'copilot', 'mastra'];
   }
 
   log(message, level = 'INFO') {
