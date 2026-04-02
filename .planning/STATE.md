@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: -- Mastra Integration & LSL Observational Memory
-status: Both plans executed, all acceptance criteria pass
-stopped_at: Phase 21 context gathered
-last_updated: "2026-03-30T06:04:20.825Z"
-last_activity: 2026-03-29
+status: executing
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-04-02T06:08:58.418Z"
+last_activity: 2026-04-02
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 5
+  completed_plans: 3
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Intelligent observational memory replacing verbatim logging -- mastra.ai integration across all coding agents
-**Current focus:** Phase 20 — Foundation & OpenCode OM
+**Current focus:** Phase 21 — mastracode-agent-integration
 
 ## Current Position
 
-Phase: 20 (Foundation & OpenCode OM) — COMPLETE
-Plan: 2 of 2
-Status: Both plans executed, all acceptance criteria pass
-Last activity: 2026-03-29
+Phase: 21 (mastracode-agent-integration) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-02
 
 Progress: [██████████] 100% (Phase 20)
 Overall:  [██░░░░░░░░] 25% (1/4 phases)
@@ -50,6 +50,7 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 ## Accumulated Context
 
 | Phase 20 P02 | 26min | 2 tasks | 3 files |
+| Phase 21 P01 | 2min | 3 tasks | 5 files |
 
 ### Decisions
 
@@ -58,6 +59,8 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 - [v4.0 roadmap]: Observer/reflector must use coding LLM proxy, not direct API keys
 - [v4.0 roadmap]: Mastracode LSL via lifecycle hooks, not pipe-pane (pi-tui/tmux conflict)
 - [Phase 20]: Node.js >= 22 hard gate for @mastra/opencode; default model google/gemini-2.5-flash; .observations/ preserved on uninstall
+- [Phase 21]: AGENT_ENABLE_PIPE_CAPTURE=false per D-08: lifecycle hooks for transcript capture
+- [Phase 21]: LLM proxy health check on port 8089 (warn-only, D-15)
 
 ### Research Flags
 
@@ -71,6 +74,6 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 
 ## Session Continuity
 
-Last session: 2026-03-30T06:04:20.821Z
-Stopped at: Phase 21 context gathered
+Last session: 2026-04-02T06:08:58.415Z
+Stopped at: Completed 21-01-PLAN.md
 Resume with: `/gsd:plan-phase 21` or `/gsd:verify-work 20`
