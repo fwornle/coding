@@ -194,6 +194,9 @@ export class HealthRemediationActions {
         case 'check_llm_cli_proxy':
           result = await this.checkLLMCLIProxy(issueDetails);
           break;
+        case 'check_mastra_agent':
+          result = await this.checkMastraAgent(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -879,6 +882,67 @@ export class HealthRemediationActions {
         success: false,
         message: `LLM CLI Proxy not responding on port ${proxyPort}. ` +
           'Start on host: cd integrations/llm-cli-proxy && npm start'
+      };
+
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Check mastra agent health and attempt recovery
+   * Detects mastra process via tmux session (coding-mastra-*) or ps.
+   * Per D-15: LLM proxy unreachable at startup warns but does NOT block —
+   * mastra agent is NOT marked unhealthy just because proxy is down.
+   */
+  async checkMastraAgent(details) {
+    try {
+      this.log('Checking mastra agent health...');
+
+      // Check if mastra process is running via tmux sessions
+      let mastraSessions = '';
+      try {
+        const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^coding-mastra-"', { timeout: 5000 });
+        mastraSessions = stdout.trim();
+      } catch (e) {
+        // No mastra tmux sessions — normal if not running
+      }
+
+      // Also check via ps for mastra/mastracode processes
+      let mastraProcesses = '';
+      try {
+        const { stdout } = await execAsync('ps -eo pid,comm | awk \'$2 == "mastra" || $2 == "mastracode" {print $1}\'', { timeout: 5000 });
+        mastraProcesses = stdout.trim();
+      } catch (e) {
+        // No mastra processes — normal if not running
+      }
+
+      const isRunning = !!(mastraSessions || mastraProcesses);
+
+      if (!isRunning) {
+        return {
+          success: true,
+          message: 'Mastra agent is not running (no active sessions or processes)'
+        };
+      }
+
+      // Mastra is running — check LLM proxy connectivity (non-blocking per D-15)
+      const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+      const proxyHost = this.isDocker ? 'host.docker.internal' : 'localhost';
+      const proxyHealthy = await this.checkHttpHealth(`http://${proxyHost}:${proxyPort}/health`, 3000);
+
+      if (!proxyHealthy) {
+        // WARN only — do not mark mastra as unhealthy (D-15: non-blocking)
+        this.log('Mastra agent running but LLM proxy unreachable — warning only (non-blocking per D-15)', 'WARN');
+        return {
+          success: true,
+          message: `Mastra agent running (sessions: ${mastraSessions || 'via ps'}). LLM proxy on port ${proxyPort} unreachable — warning only.`
+        };
+      }
+
+      return {
+        success: true,
+        message: `Mastra agent healthy (sessions: ${mastraSessions || 'via ps'}, LLM proxy OK)`
       };
 
     } catch (error) {
