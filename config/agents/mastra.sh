@@ -25,7 +25,7 @@ agent_check_requirements() {
     _agent_log "Error: mastracode CLI is not installed or not in PATH"
     return 1
   fi
-  _agent_log "mastracode CLI detected ($(mastracode --version 2>/dev/null || echo 'unknown'))"
+  _agent_log "✅ mastracode CLI detected at $(command -v mastracode)"
 }
 
 # Configure Mastracode and validate environment
