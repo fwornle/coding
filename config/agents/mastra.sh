@@ -17,13 +17,13 @@ AGENT_SESSION_VAR="MASTRA_SESSION_ID"
 AGENT_TRANSCRIPT_FMT="mastra"
 AGENT_ENABLE_PIPE_CAPTURE=false
 AGENT_REQUIRES_COMMANDS="mastracode"
+AGENT_INSTALL_COMMAND="npm install -g mastracode"
 
 # Verify mastracode CLI is available
 agent_check_requirements() {
   if ! command -v mastracode &>/dev/null; then
     _agent_log "Error: mastracode CLI is not installed or not in PATH"
-    _agent_log "Install: npm install -g mastracode"
-    exit 1
+    return 1
   fi
   _agent_log "mastracode CLI detected ($(mastracode --version 2>/dev/null || echo 'unknown'))"
 }

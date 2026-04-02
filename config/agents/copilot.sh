@@ -11,6 +11,7 @@ AGENT_TRANSCRIPT_FMT="copilot"
 AGENT_ENABLE_PIPE_CAPTURE=true
 AGENT_PROMPT_REGEX='❯\s+([^\n\r]+)[\n\r]'
 AGENT_REQUIRES_COMMANDS="copilot"
+# No AGENT_INSTALL_COMMAND — copilot install is org-specific
 
 # Track HTTP adapter PID for cleanup
 HTTP_SERVER_PID=""
@@ -22,13 +23,13 @@ agent_check_requirements() {
   if ! command -v copilot &>/dev/null; then
     _agent_log "Error: copilot CLI is not installed or not in PATH"
     _agent_log "Ensure the 'copilot' command is available"
-    exit 1
+    return 1
   fi
 
   if ! command -v tmux &>/dev/null; then
     _agent_log "Error: tmux is not installed (required for session wrapper)"
     _agent_log "Install: brew install tmux"
-    exit 1
+    return 1
   fi
 
   _agent_log "✅ copilot CLI and tmux detected"

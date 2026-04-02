@@ -333,9 +333,36 @@ launch_agent() {
   # 12. Verify monitoring
   _verify_monitoring "$TARGET_PROJECT_DIR"
 
-  # 13. Agent-specific requirements check
+  # 13. Agent-specific requirements check (with auto-install)
   if type agent_check_requirements &>/dev/null; then
-    agent_check_requirements
+    if ! agent_check_requirements; then
+      if [ -n "$AGENT_INSTALL_COMMAND" ]; then
+        _agent_log ""
+        _agent_log "Would you like to install it now?"
+        _agent_log "  Command: $AGENT_INSTALL_COMMAND"
+        _agent_log ""
+        printf "[%s] Install now? [Y/n] " "$AGENT_DISPLAY_NAME"
+        read -r response
+        if [ -z "$response" ] || [[ "$response" =~ ^[Yy] ]]; then
+          _agent_log "📦 Installing: $AGENT_INSTALL_COMMAND"
+          if eval "$AGENT_INSTALL_COMMAND"; then
+            _agent_log "✅ Installed successfully, retrying requirements check..."
+            if ! agent_check_requirements; then
+              _agent_log "❌ Requirements still not met after install"
+              exit 1
+            fi
+          else
+            _agent_log "❌ Install failed. Run manually: $AGENT_INSTALL_COMMAND"
+            exit 1
+          fi
+        else
+          _agent_log "Skipped. Install manually: $AGENT_INSTALL_COMMAND"
+          exit 1
+        fi
+      else
+        exit 1
+      fi
+    fi
   fi
 
   # 15. Agent-specific pre-launch hook (can use INSIDE_CN, PROXY_WORKING)
