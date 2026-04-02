@@ -65,6 +65,78 @@ _mastra_first_run_setup() {
   fi
 }
 
+# Generate hooks.json with shell commands that write NDJSON transcript events.
+# Each hook appends a JSON line to .observations/transcripts/mastra-transcript.jsonl
+# in the format expected by MastraTranscriptReader._normalizeEvent().
+#
+# Hook env vars (set by mastracode at runtime):
+#   $MASTRACODE_SESSION_ID, $MASTRACODE_CWD, $MASTRACODE_MESSAGE,
+#   $MASTRACODE_STOP_MESSAGE, $MASTRACODE_STOP_REASON,
+#   $MASTRACODE_TOOL_NAME, $MASTRACODE_TOOL_INPUT, $MASTRACODE_TOOL_OUTPUT
+#
+# NOTE: Exact env var names sourced from research doc -- may need runtime verification.
+_generate_mastra_hooks_config() {
+  local hooks_file="$1"
+  local transcript_dir
+  transcript_dir="$(cd "${CODING_REPO:-.}" && pwd)/.observations/transcripts"
+  local transcript_file="${transcript_dir}/mastra-transcript.jsonl"
+
+  mkdir -p "$transcript_dir"
+
+  # Build hooks.json with embedded absolute transcript path.
+  # $MASTRACODE_* vars are NOT expanded here -- they resolve at hook runtime.
+  # The transcript_file path IS expanded (absolute path baked in).
+  cat > "$hooks_file" <<HOOKS_EOF
+{
+  "SessionStart": [
+    {
+      "type": "command",
+      "command": "echo '{\"type\":\"session_start\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"cwd\":\"'\$MASTRACODE_CWD'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ],
+  "SessionEnd": [
+    {
+      "type": "command",
+      "command": "echo '{\"type\":\"session_end\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"cwd\":\"'\$MASTRACODE_CWD'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "type": "command",
+      "command": "MSG=\$(echo \"\$MASTRACODE_MESSAGE\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g; s/\\\\t/\\\\\\\\t/g' | tr '\\\\n' ' '); echo '{\"type\":\"message\",\"role\":\"user\",\"content\":\"'\"\$MSG\"'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ],
+  "Stop": [
+    {
+      "type": "command",
+      "command": "MSG=\$(echo \"\$MASTRACODE_STOP_MESSAGE\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g; s/\\\\t/\\\\\\\\t/g' | tr '\\\\n' ' '); echo '{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"'\"\$MSG\"'\",\"reason\":\"'\$MASTRACODE_STOP_REASON'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ],
+  "PreToolUse": [
+    {
+      "type": "command",
+      "command": "echo '{\"type\":\"onToolCall\",\"tool\":\"'\$MASTRACODE_TOOL_NAME'\",\"input\":\"'\$(echo \"\$MASTRACODE_TOOL_INPUT\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g' | tr '\\\\n' ' ')'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ],
+  "PostToolUse": [
+    {
+      "type": "command",
+      "command": "echo '{\"type\":\"onToolResult\",\"tool\":\"'\$MASTRACODE_TOOL_NAME'\",\"output\":\"'\$(echo \"\$MASTRACODE_TOOL_OUTPUT\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g' | tr '\\\\n' ' ')'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
+      "timeout": 5000
+    }
+  ]
+}
+HOOKS_EOF
+
+  _agent_log "Hooks config written to $hooks_file"
+  _agent_log "Transcript output: $transcript_file"
+}
+
 # Configure Mastracode and validate environment
 # Note: agent_pre_launch runs AFTER detect_network_and_configure_proxy,
 # so INSIDE_CN and PROXY_WORKING are already set.
@@ -99,19 +171,13 @@ agent_pre_launch() {
   local hooks_dir="$HOME/.mastracode"
   local hooks_file="$hooks_dir/hooks.json"
   if [ ! -f "$hooks_file" ]; then
-    _agent_log "Creating default hooks config at $hooks_file"
+    _agent_log "Creating hooks config with NDJSON transcript writers at $hooks_file"
     mkdir -p "$hooks_dir"
-    cat > "$hooks_file" << 'HOOKS_EOF'
-{
-  "version": 1,
-  "hooks": {
-    "onSessionStart": [],
-    "onSessionEnd": [],
-    "onMessage": []
-  }
-}
-HOOKS_EOF
+    _generate_mastra_hooks_config "$hooks_file"
   fi
+
+  # Ensure transcript output directory exists for MastraTranscriptReader
+  mkdir -p "${CODING_REPO:-.}/.observations/transcripts"
 
   # D-06: Validate connectivity for the chosen provider (warn only, don't abort)
   validate_agent_connectivity "$AGENT_NAME" || true
