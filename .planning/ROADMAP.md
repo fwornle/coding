@@ -66,7 +66,7 @@ Four phases that integrate mastra.ai's observational memory into the coding infr
 
 - [ ] **Phase 20: Foundation & OpenCode OM** - LibSQL storage, mastra OpenCode plugin, LLM proxy routing, token budget controls
 - [x] **Phase 21: Mastracode Agent Integration** - `coding --mastra` launch, tmux statusline, LSL capture via observation hooks (gap closure in progress) (completed 2026-04-02)
-- [ ] **Phase 22: Transcript Converters** - Claude JSONL, Copilot events, .specstory batch conversion, shared MastraDBMessage normalization
+- [x] **Phase 22: Transcript Converters** - Claude JSONL, Copilot events, .specstory batch conversion, shared MastraDBMessage normalization (completed 2026-04-03)
 - [ ] **Phase 23: Live Observation Tap & Dashboard** - Real-time observation generation in enhanced-transcript-monitor, REST browsing endpoint
 
 ### Phase Details
@@ -111,11 +111,11 @@ Plans:
   2. User can run a CLI command to convert Copilot events.jsonl transcript files into mastra observations stored in LibSQL
   3. User can batch-convert git-tracked .specstory/ LSL files into mastra observations with manifest-based idempotency (no double-processing)
   4. All three converters normalize their input format to MastraDBMessage before calling observe() -- shared normalization layer, not three separate implementations
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 22-01-PLAN.md -- Shared TranscriptNormalizer, ObservationWriter with LLM proxy, CLI skeleton
-- [ ] 22-02-PLAN.md -- Claude JSONL and Copilot events converter handlers
+- [x] 22-02-PLAN.md -- Claude JSONL and Copilot events converter handlers
 - [x] 22-03-PLAN.md -- Specstory batch converter with manifest idempotency
 
 #### Phase 23: Live Observation Tap & Dashboard
@@ -136,5 +136,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
 | 21. Mastracode Agent Integration | v4.0 | 4/4 | Complete   | 2026-04-02 |
-| 22. Transcript Converters | v4.0 | 2/3 | In Progress|  |
+| 22. Transcript Converters | v4.0 | 3/3 | Complete   | 2026-04-03 |
 | 23. Live Observation Tap & Dashboard | v4.0 | 0/? | Not started | - |
