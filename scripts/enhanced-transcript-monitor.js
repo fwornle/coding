@@ -867,14 +867,25 @@ class EnhancedTranscriptMonitor {
       process.env.AGENT_TRANSCRIPT_FMT === 'mastra' ||
       process.env.CODING_TRANSCRIPT_FORMAT === 'mastra';
 
-    const transcriptDir = path.join(this.config.projectPath, '.observations', 'transcripts');
-    if (fs.existsSync(transcriptDir)) {
-      return transcriptDir;
+    // Check project-local transcript dir first
+    const projectTranscriptDir = path.join(this.config.projectPath, '.observations', 'transcripts');
+    if (fs.existsSync(projectTranscriptDir)) {
+      return projectTranscriptDir;
+    }
+
+    // Mastra hooks write to the coding repo's .observations/transcripts/ (not the target project).
+    // Check the coding repo path via CODING_REPO env or common parent discovery.
+    const codingRepo = process.env.CODING_REPO || path.join(os.homedir(), 'Agentic', 'coding');
+    if (codingRepo && codingRepo !== this.config.projectPath) {
+      const codingTranscriptDir = path.join(codingRepo, '.observations', 'transcripts');
+      if (fs.existsSync(codingTranscriptDir)) {
+        return codingTranscriptDir;
+      }
     }
 
     // Only create if explicitly a mastra session
     if (isMastraAgent) {
-      return transcriptDir; // Will be created by MastraTranscriptReader.start()
+      return projectTranscriptDir; // Will be created by MastraTranscriptReader.start()
     }
 
     return null;
