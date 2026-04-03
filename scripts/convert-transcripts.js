@@ -167,6 +167,8 @@ async function handleClaude(filePath) {
 
 /**
  * Process a Copilot events.jsonl file line-by-line.
+ * Reads streaming, filters conversation events via parseCopilot, groups into
+ * conversation exchanges, and writes observations via ObservationWriter.
  */
 async function handleCopilot(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -174,28 +176,77 @@ async function handleCopilot(filePath) {
     process.exit(1);
   }
 
-  process.stderr.write(`[copilot] Processing: ${filePath}\n`);
+  process.stderr.write(`[convert] Copilot: processing ${filePath}\n`);
 
-  const messages = [];
+  const writer = new ObservationWriter();
+  await writer.init();
+
+  let totalLines = 0;
+  let skippedEvents = 0;
+  let totalObs = 0;
+  let errors = 0;
+  let currentExchange = [];
+
   const fileStream = fs.createReadStream(filePath, 'utf-8');
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
   for await (const line of rl) {
+    totalLines++;
     const msg = parseCopilot(line);
-    if (msg) messages.push(msg);
+
+    if (!msg) {
+      // Non-conversation events are silently skipped (expected behavior)
+      if (line.trim()) skippedEvents++;
+      continue;
+    }
+
+    currentExchange.push(msg);
+
+    // Group into conversation exchanges: flush when we see a complete user+assistant pair
+    const hasUser = currentExchange.some(m => m.role === 'user');
+    const hasAssistant = currentExchange.some(m => m.role === 'assistant');
+
+    if (hasUser && hasAssistant && msg.role === 'assistant') {
+      try {
+        const result = await writer.processMessages(currentExchange, {
+          agent: 'copilot',
+          sourceFile: filePath,
+        });
+        totalObs += result.observations;
+        errors += result.errors;
+      } catch (err) {
+        errors++;
+        process.stderr.write(`[convert] Error writing exchange: ${err.message}\n`);
+      }
+      currentExchange = [];
+    }
+
+    // Progress reporting every 100 lines
+    if (totalLines % 100 === 0) {
+      process.stderr.write(`[convert] Processed ${totalLines} lines, ${totalObs} observations...\n`);
+    }
   }
 
-  process.stderr.write(`[copilot] Parsed ${messages.length} messages\n`);
+  // Flush remaining exchange
+  if (currentExchange.length > 0) {
+    try {
+      const result = await writer.processMessages(currentExchange, {
+        agent: 'copilot',
+        sourceFile: filePath,
+      });
+      totalObs += result.observations;
+      errors += result.errors;
+    } catch (err) {
+      errors++;
+      process.stderr.write(`[convert] Error writing final exchange: ${err.message}\n`);
+    }
+  }
 
-  const writer = new ObservationWriter();
-  await writer.init();
-  const result = await writer.processMessages(messages, {
-    agent: 'copilot',
-    sourceFile: filePath,
-  });
   await writer.close();
 
-  return result;
+  process.stderr.write(`[convert] Done: ${totalLines} lines, ${totalObs} observations, ${errors} errors (${skippedEvents} non-conversation events skipped)\n`);
+
+  return { observations: totalObs, errors };
 }
 
 /**
