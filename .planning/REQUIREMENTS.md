@@ -19,7 +19,7 @@ Requirements for mastra integration milestone. Each maps to roadmap phases.
 - [ ] **CONV-01**: User can convert Claude .jsonl transcript files to mastra observations via CLI command
 - [ ] **CONV-02**: User can convert Copilot events.jsonl transcript files to mastra observations via CLI command
 - [ ] **CONV-03**: User can batch-convert git-tracked .specstory/ LSL files to mastra observations
-- [ ] **CONV-04**: Converters normalize all 3 transcript formats to MastraDBMessage format before observation
+- [x] **CONV-04**: Converters normalize all 3 transcript formats to MastraDBMessage format before observation
 
 ### Mastracode Agent
 
@@ -66,7 +66,7 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | CONV-01 | Phase 22 | Pending |
 | CONV-02 | Phase 22 | Pending |
 | CONV-03 | Phase 22 | Pending |
-| CONV-04 | Phase 22 | Pending |
+| CONV-04 | Phase 22 | Complete |
 | MSTR-01 | Phase 21 | Complete |
 | MSTR-02 | Phase 21 | Complete |
 | MSTR-03 | Phase 21 | Complete |
