@@ -185,6 +185,16 @@ export function parseClaude(jsonlLine) {
  * @param {string} eventLine - A single line from the events JSONL file
  * @returns {MastraDBMessage|null} Parsed message or null if not a conversation message
  */
+/**
+ * Set of Copilot event types that contain conversation content.
+ * @type {Set<string>}
+ */
+const COPILOT_CONVERSATION_EVENTS = new Set([
+  'conversation.message',
+  'conversation.turn',
+  'completion.response',
+]);
+
 export function parseCopilot(eventLine) {
   if (!eventLine || !eventLine.trim()) return null;
 
@@ -195,14 +205,45 @@ export function parseCopilot(eventLine) {
     return null;
   }
 
-  // Only process conversation.message events
-  if (parsed.event !== 'conversation.message') return null;
+  const eventType = parsed.event || parsed.type;
+
+  // Only process conversation-related events; skip status events, heartbeats, etc.
+  if (!eventType || !COPILOT_CONVERSATION_EVENTS.has(eventType)) return null;
 
   const data = parsed.data;
-  if (!data || !data.content) return null;
+  if (!data) return null;
 
-  const role = data.role || 'assistant';
-  const content = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+  // Extract content from multiple possible shapes:
+  // 1. data.content (string) -- most common for conversation.message
+  // 2. data.message.content (nested) -- some event formats
+  // 3. data.choices[0].message.content -- completion.response format
+  // 4. data.choices[0].delta.content -- incremental delta events
+  let content = null;
+  let role = null;
+
+  if (typeof data.content === 'string' && data.content.trim()) {
+    content = data.content;
+    role = data.role || 'assistant';
+  } else if (data.message && typeof data.message.content === 'string' && data.message.content.trim()) {
+    content = data.message.content;
+    role = data.message.role || data.role || 'assistant';
+  } else if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
+    const choice = data.choices[0];
+    // Full message (completion.response)
+    if (choice.message && typeof choice.message.content === 'string' && choice.message.content.trim()) {
+      content = choice.message.content;
+      role = choice.message.role || 'assistant';
+    }
+    // Delta (incremental streaming)
+    else if (choice.delta && typeof choice.delta.content === 'string' && choice.delta.content.trim()) {
+      content = choice.delta.content;
+      role = choice.delta.role || 'assistant';
+    }
+  }
+
+  // Skip events with no meaningful content
+  if (!content) return null;
+
   const timestamp = data.timestamp || parsed.timestamp || new Date().toISOString();
 
   return {
@@ -213,6 +254,7 @@ export function parseCopilot(eventLine) {
     metadata: {
       agent: 'copilot',
       format: 'events',
+      eventType,
     },
   };
 }
