@@ -56,13 +56,14 @@ function extractContent(content) {
 
 /**
  * Map Claude transcript type to standard role.
- * @param {string} type - 'human' | 'assistant' | 'system' | 'user'
+ * @param {string} type - 'human' | 'assistant' | 'system' | 'user' | 'tool_use' | 'tool_result'
  * @returns {string} Normalized role
  */
 function mapClaudeRole(type) {
   if (type === 'human' || type === 'user') return 'user';
   if (type === 'assistant') return 'assistant';
   if (type === 'system') return 'system';
+  if (type === 'tool_use' || type === 'tool_result') return 'tool';
   return 'assistant';
 }
 
@@ -87,9 +88,45 @@ export function parseClaude(jsonlLine) {
     return null;
   }
 
+  // Skip system messages (prompt caching metadata, not conversation content)
+  if (parsed.type === 'system' || (parsed.message && parsed.message.role === 'system')) {
+    return null;
+  }
+
+  // Handle tool_use messages: map to role "tool" with tool info as content
+  if (parsed.type === 'tool_use') {
+    const toolName = parsed.tool_name || parsed.name || 'unknown_tool';
+    const toolInput = parsed.input_json || parsed.input || '';
+    const content = `[Tool Use: ${toolName}] ${typeof toolInput === 'string' ? toolInput : JSON.stringify(toolInput)}`;
+    const timestamp = parsed.timestamp || new Date().toISOString();
+    return {
+      id: deterministicId(content, timestamp),
+      role: 'tool',
+      content,
+      createdAt: timestamp,
+      metadata: { agent: 'claude', format: 'jsonl', toolName },
+    };
+  }
+
+  // Handle tool_result messages: map to role "tool" with result as content
+  if (parsed.type === 'tool_result') {
+    const output = parsed.output_json || parsed.output || parsed.content || '';
+    const content = `[Tool Result] ${typeof output === 'string' ? output : JSON.stringify(output)}`;
+    const timestamp = parsed.timestamp || new Date().toISOString();
+    return {
+      id: deterministicId(content, timestamp),
+      role: 'tool',
+      content,
+      createdAt: timestamp,
+      metadata: { agent: 'claude', format: 'jsonl', isError: parsed.is_error || false },
+    };
+  }
+
   // Handle standard format: { type, message: { role, content }, timestamp }
   if (parsed.message && parsed.message.content !== undefined) {
     const type = parsed.type || parsed.message.role || 'assistant';
+    // Skip system messages nested in message object
+    if (type === 'system') return null;
     const role = mapClaudeRole(type);
     const content = extractContent(parsed.message.content);
     if (!content) return null;
