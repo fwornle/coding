@@ -111,12 +111,12 @@ Plans:
   2. User can run a CLI command to convert Copilot events.jsonl transcript files into mastra observations stored in LibSQL
   3. User can batch-convert git-tracked .specstory/ LSL files into mastra observations with manifest-based idempotency (no double-processing)
   4. All three converters normalize their input format to MastraDBMessage before calling observe() -- shared normalization layer, not three separate implementations
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 22-01-PLAN.md -- Shared TranscriptNormalizer, ObservationWriter with LLM proxy, CLI skeleton
 - [ ] 22-02-PLAN.md -- Claude JSONL and Copilot events converter handlers
-- [ ] 22-03-PLAN.md -- Specstory batch converter with manifest idempotency
+- [x] 22-03-PLAN.md -- Specstory batch converter with manifest idempotency
 
 #### Phase 23: Live Observation Tap & Dashboard
 **Goal**: Live coding sessions produce real-time observations alongside verbatim LSL, browsable from the health dashboard
@@ -136,5 +136,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
 | 21. Mastracode Agent Integration | v4.0 | 4/4 | Complete   | 2026-04-02 |
-| 22. Transcript Converters | v4.0 | 1/3 | In Progress|  |
+| 22. Transcript Converters | v4.0 | 2/3 | In Progress|  |
 | 23. Live Observation Tap & Dashboard | v4.0 | 0/? | Not started | - |
