@@ -80,8 +80,10 @@ _mastra_first_run_setup() {
 #   PostToolUse:     { session_id, cwd, hook_event_name, tool_name, tool_input, tool_output }
 _generate_mastra_hooks_config() {
   local hooks_file="$1"
+  # Write transcripts to the TARGET project, not the coding repo
+  local project_dir="${TARGET_PROJECT_DIR:-${CODING_REPO:-.}}"
   local transcript_dir
-  transcript_dir="$(cd "${CODING_REPO:-.}" && pwd)/.observations/transcripts"
+  transcript_dir="$(cd "$project_dir" && pwd)/.observations/transcripts"
   local transcript_file="${transcript_dir}/mastra-transcript.jsonl"
   local hook_script_dir="${CODING_REPO:-.}/scripts/mastra-hooks"
 
@@ -198,7 +200,7 @@ agent_pre_launch() {
   fi
 
   # Ensure transcript output directory exists for MastraTranscriptReader
-  mkdir -p "${CODING_REPO:-.}/.observations/transcripts"
+  mkdir -p "${TARGET_PROJECT_DIR:-${CODING_REPO:-.}}/.observations/transcripts"
 
   # D-06: Validate connectivity for the chosen provider (warn only, don't abort)
   validate_agent_connectivity "$AGENT_NAME" || true
