@@ -26,20 +26,20 @@ Usage:
   node scripts/convert-transcripts.js <subcommand> <target> [options]
 
 Subcommands:
-  claude     Convert Claude JSONL transcript file
-  copilot    Convert Copilot events.jsonl file
-  specstory  Convert .specstory markdown file(s)
+  claude    <file.jsonl>          Convert Claude JSONL transcript
+  copilot   <file.jsonl>          Convert Copilot events file
+  specstory <dir|file> [--force]  Convert .specstory files (batch with idempotency)
 
 Options:
-  --batch    (specstory) Process all .md files in the target directory
-  --force    Overwrite existing observations
-  --help     Show this help message
+  --force   Re-process already-converted files (specstory only)
+  --help    Show this help message
 
 Examples:
   node scripts/convert-transcripts.js claude ~/.claude/projects/logs/transcript.jsonl
   node scripts/convert-transcripts.js copilot ~/.config/github-copilot/events.jsonl
-  node scripts/convert-transcripts.js specstory .specstory/history/ --batch
+  node scripts/convert-transcripts.js specstory .specstory/history/
   node scripts/convert-transcripts.js specstory .specstory/history/2026-03-30_1500-1600_abc.md
+  node scripts/convert-transcripts.js specstory .specstory/history/ --force
 `.trim();
 
 // --- Argument Parsing ---
@@ -199,70 +199,51 @@ async function handleCopilot(filePath) {
 }
 
 /**
- * Process .specstory markdown file(s).
- * If --batch flag is set and target is a directory, process all .md files.
+ * Process .specstory markdown file(s) using SpecstoryBatchConverter.
+ * Directories are processed in batch mode with manifest-based idempotency.
+ * Single .md files are also supported.
  */
 async function handleSpecstory(targetPath) {
   const resolvedPath = path.resolve(targetPath);
-  const isDir = fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory();
 
-  let files = [];
-
-  if (isDir && hasBatch) {
-    // Batch mode: process all .md files in directory
-    files = fs.readdirSync(resolvedPath)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(resolvedPath, f))
-      .sort();
-    process.stderr.write(`[specstory] Batch mode: found ${files.length} .md files in ${resolvedPath}\n`);
-  } else if (isDir && !hasBatch) {
-    process.stderr.write(`Error: ${resolvedPath} is a directory. Use --batch to process all files.\n`);
-    process.exit(1);
-  } else if (fs.existsSync(resolvedPath)) {
-    files = [resolvedPath];
-  } else {
+  if (!fs.existsSync(resolvedPath)) {
     process.stderr.write(`Error: Path not found: ${resolvedPath}\n`);
     process.exit(1);
   }
 
-  const writer = new ObservationWriter();
-  await writer.init();
+  const isDir = fs.statSync(resolvedPath).isDirectory();
 
-  let totalObservations = 0;
-  let totalErrors = 0;
-  let filesProcessed = 0;
+  const converter = new SpecstoryBatchConverter({
+    force: hasForce,
+  });
+  await converter.init();
 
-  for (const file of files) {
+  let result;
+
+  if (isDir) {
+    // Directory mode: batch convert all .md files with manifest idempotency
+    const batchResult = await converter.convertDirectory(resolvedPath);
+    result = {
+      observations: batchResult.totalObservations,
+      errors: batchResult.errors,
+      files: batchResult.converted,
+      skipped: batchResult.skipped,
+      total: batchResult.total,
+    };
+  } else {
+    // Single file mode
     try {
-      const content = fs.readFileSync(file, 'utf-8');
-      const messages = parseSpecstory(content, { sourceFile: path.basename(file) });
-
-      if (messages.length === 0) {
-        process.stderr.write(`[specstory] Skipping ${path.basename(file)}: no messages found\n`);
-        continue;
-      }
-
-      const result = await writer.processMessages(messages, {
-        agent: 'claude',
-        sourceFile: file,
-      });
-
-      totalObservations += result.observations;
-      totalErrors += result.errors;
-      filesProcessed++;
+      const obsCount = await converter.convertFile(resolvedPath);
+      result = { observations: obsCount, errors: 0, files: 1 };
     } catch (err) {
-      totalErrors++;
-      process.stderr.write(`[specstory] Error processing ${path.basename(file)}: ${err.message}\n`);
+      process.stderr.write(`[specstory] Error converting ${path.basename(resolvedPath)}: ${err.message}\n`);
+      result = { observations: 0, errors: 1, files: 0 };
     }
   }
 
-  await writer.close();
+  await converter.close();
 
-  return {
-    observations: totalObservations,
-    errors: totalErrors,
-    files: filesProcessed,
-  };
+  return result;
 }
 
 // --- Main ---
