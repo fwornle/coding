@@ -17,6 +17,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { parseClaude, parseCopilot, parseSpecstory } from '../src/live-logging/TranscriptNormalizer.js';
 import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
+import { SpecstoryBatchConverter } from '../src/live-logging/SpecstoryBatchConverter.js';
 
 const USAGE = `
 convert-transcripts - Convert coding agent transcripts to observations
@@ -74,6 +75,8 @@ const hasForce = flags.includes('--force');
 
 /**
  * Process a Claude JSONL transcript file line-by-line.
+ * Reads streaming, normalizes via parseClaude, groups into conversation exchanges,
+ * and writes observations via ObservationWriter with progress reporting.
  */
 async function handleClaude(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -81,28 +84,85 @@ async function handleClaude(filePath) {
     process.exit(1);
   }
 
-  process.stderr.write(`[claude] Processing: ${filePath}\n`);
+  if (!filePath.endsWith('.jsonl')) {
+    process.stderr.write(`Warning: File does not have .jsonl extension: ${filePath}\n`);
+  }
 
-  const messages = [];
+  process.stderr.write(`[convert] Claude: processing ${filePath}\n`);
+
+  const writer = new ObservationWriter();
+  await writer.init();
+
+  let totalLines = 0;
+  let totalObs = 0;
+  let errors = 0;
+  let currentExchange = [];
+
   const fileStream = fs.createReadStream(filePath, 'utf-8');
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
   for await (const line of rl) {
+    totalLines++;
     const msg = parseClaude(line);
-    if (msg) messages.push(msg);
+
+    if (!msg) {
+      // Count JSON parse failures (non-empty lines that produce no message)
+      if (line.trim()) {
+        let isParseFail = false;
+        try { JSON.parse(line); } catch { isParseFail = true; }
+        if (isParseFail) errors++;
+      }
+      continue;
+    }
+
+    currentExchange.push(msg);
+
+    // Group into conversation exchanges: flush when we see a complete user+assistant pair
+    // or when exchange reaches a reasonable size
+    const hasUser = currentExchange.some(m => m.role === 'user');
+    const hasAssistant = currentExchange.some(m => m.role === 'assistant');
+
+    if (hasUser && hasAssistant && msg.role === 'assistant') {
+      try {
+        const result = await writer.processMessages(currentExchange, {
+          agent: 'claude',
+          sourceFile: filePath,
+        });
+        totalObs += result.observations;
+        errors += result.errors;
+      } catch (err) {
+        errors++;
+        process.stderr.write(`[convert] Error writing exchange: ${err.message}\n`);
+      }
+      currentExchange = [];
+    }
+
+    // Progress reporting every 100 lines
+    if (totalLines % 100 === 0) {
+      process.stderr.write(`[convert] Processed ${totalLines} lines, ${totalObs} observations...\n`);
+    }
   }
 
-  process.stderr.write(`[claude] Parsed ${messages.length} messages\n`);
+  // Flush remaining exchange
+  if (currentExchange.length > 0) {
+    try {
+      const result = await writer.processMessages(currentExchange, {
+        agent: 'claude',
+        sourceFile: filePath,
+      });
+      totalObs += result.observations;
+      errors += result.errors;
+    } catch (err) {
+      errors++;
+      process.stderr.write(`[convert] Error writing final exchange: ${err.message}\n`);
+    }
+  }
 
-  const writer = new ObservationWriter();
-  await writer.init();
-  const result = await writer.processMessages(messages, {
-    agent: 'claude',
-    sourceFile: filePath,
-  });
   await writer.close();
 
-  return result;
+  process.stderr.write(`[convert] Done: ${totalLines} lines, ${totalObs} observations, ${errors} errors\n`);
+
+  return { observations: totalObs, errors };
 }
 
 /**
