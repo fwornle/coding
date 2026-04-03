@@ -69,71 +69,92 @@ _mastra_first_run_setup() {
 # Each hook appends a JSON line to .observations/transcripts/mastra-transcript.jsonl
 # in the format expected by MastraTranscriptReader._normalizeEvent().
 #
-# Hook env vars (set by mastracode at runtime):
-#   $MASTRACODE_SESSION_ID, $MASTRACODE_CWD, $MASTRACODE_MESSAGE,
-#   $MASTRACODE_STOP_MESSAGE, $MASTRACODE_STOP_REASON,
-#   $MASTRACODE_TOOL_NAME, $MASTRACODE_TOOL_INPUT, $MASTRACODE_TOOL_OUTPUT
+# PROTOCOL: mastracode passes hook data as JSON on STDIN (not env vars).
+# The only env var set is MASTRA_HOOK_EVENT.
 #
-# NOTE: Exact env var names sourced from research doc -- may need runtime verification.
+# STDIN payloads by event:
+#   SessionStart/End: { session_id, cwd, hook_event_name }
+#   UserPromptSubmit: { session_id, cwd, hook_event_name, user_message }
+#   Stop:            { session_id, cwd, hook_event_name, assistant_message, stop_reason }
+#   PreToolUse:      { session_id, cwd, hook_event_name, tool_name, tool_input }
+#   PostToolUse:     { session_id, cwd, hook_event_name, tool_name, tool_input, tool_output }
 _generate_mastra_hooks_config() {
   local hooks_file="$1"
   local transcript_dir
   transcript_dir="$(cd "${CODING_REPO:-.}" && pwd)/.observations/transcripts"
   local transcript_file="${transcript_dir}/mastra-transcript.jsonl"
+  local hook_script_dir="${CODING_REPO:-.}/scripts/mastra-hooks"
 
   mkdir -p "$transcript_dir"
+  mkdir -p "$hook_script_dir"
 
-  # Build hooks.json with embedded absolute transcript path.
-  # $MASTRACODE_* vars are NOT expanded here -- they resolve at hook runtime.
-  # The transcript_file path IS expanded (absolute path baked in).
-  cat > "$hooks_file" <<HOOKS_EOF
+  # Create a single reusable hook script that reads JSON from stdin,
+  # transforms it based on MASTRA_HOOK_EVENT, and appends NDJSON to the transcript.
+  cat > "$hook_script_dir/transcript-writer.py" << 'PYSCRIPT'
+#!/usr/bin/env python3
+"""Mastra lifecycle hook → NDJSON transcript writer.
+Reads JSON from stdin (mastracode hook protocol), writes one NDJSON line to transcript file.
+"""
+import sys, json, os, datetime
+
+def main():
+    try:
+        d = json.load(sys.stdin)
+    except Exception:
+        return  # silently skip if stdin is not valid JSON
+
+    event = d.get("hook_event_name", os.environ.get("MASTRA_HOOK_EVENT", ""))
+    ts = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    sid = d.get("session_id", "")
+    cwd = d.get("cwd", "")
+
+    if event == "SessionStart":
+        out = {"type": "session_start", "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    elif event == "SessionEnd":
+        out = {"type": "session_end", "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    elif event == "UserPromptSubmit":
+        out = {"type": "message", "role": "user", "content": d.get("user_message", ""),
+               "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    elif event == "Stop":
+        out = {"type": "message", "role": "assistant", "content": d.get("assistant_message", ""),
+               "reason": d.get("stop_reason", ""), "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    elif event == "PreToolUse":
+        out = {"type": "onToolCall", "tool": d.get("tool_name", ""),
+               "input": d.get("tool_input", ""), "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    elif event == "PostToolUse":
+        out = {"type": "onToolResult", "tool": d.get("tool_name", ""),
+               "output": d.get("tool_output", ""), "sessionId": sid, "cwd": cwd, "timestamp": ts}
+    else:
+        out = {"type": event, "sessionId": sid, "cwd": cwd, "timestamp": ts, "raw": d}
+
+    transcript = os.environ.get("MASTRA_TRANSCRIPT_FILE", "")
+    if transcript:
+        with open(transcript, "a") as f:
+            f.write(json.dumps(out, ensure_ascii=False) + "\n")
+    else:
+        print(json.dumps(out, ensure_ascii=False))
+
+if __name__ == "__main__":
+    main()
+PYSCRIPT
+  chmod +x "$hook_script_dir/transcript-writer.py"
+
+  # Build hooks.json — all events use the same script, differentiated by stdin payload
+  local cmd="MASTRA_TRANSCRIPT_FILE=${transcript_file} python3 ${hook_script_dir}/transcript-writer.py"
+
+  cat > "$hooks_file" << HOOKS_EOF
 {
-  "SessionStart": [
-    {
-      "type": "command",
-      "command": "echo '{\"type\":\"session_start\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"cwd\":\"'\$MASTRACODE_CWD'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ],
-  "SessionEnd": [
-    {
-      "type": "command",
-      "command": "echo '{\"type\":\"session_end\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"cwd\":\"'\$MASTRACODE_CWD'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ],
-  "UserPromptSubmit": [
-    {
-      "type": "command",
-      "command": "MSG=\$(echo \"\$MASTRACODE_MESSAGE\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g; s/\\\\t/\\\\\\\\t/g' | tr '\\\\n' ' '); echo '{\"type\":\"message\",\"role\":\"user\",\"content\":\"'\"\$MSG\"'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ],
-  "Stop": [
-    {
-      "type": "command",
-      "command": "MSG=\$(echo \"\$MASTRACODE_STOP_MESSAGE\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g; s/\\\\t/\\\\\\\\t/g' | tr '\\\\n' ' '); echo '{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"'\"\$MSG\"'\",\"reason\":\"'\$MASTRACODE_STOP_REASON'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ],
-  "PreToolUse": [
-    {
-      "type": "command",
-      "command": "echo '{\"type\":\"onToolCall\",\"tool\":\"'\$MASTRACODE_TOOL_NAME'\",\"input\":\"'\$(echo \"\$MASTRACODE_TOOL_INPUT\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g' | tr '\\\\n' ' ')'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ],
-  "PostToolUse": [
-    {
-      "type": "command",
-      "command": "echo '{\"type\":\"onToolResult\",\"tool\":\"'\$MASTRACODE_TOOL_NAME'\",\"output\":\"'\$(echo \"\$MASTRACODE_TOOL_OUTPUT\" | sed 's/\\\\\\\\/\\\\\\\\\\\\\\\\/g; s/\"/\\\\\\\\\"/g' | tr '\\\\n' ' ')'\",\"sessionId\":\"'\$MASTRACODE_SESSION_ID'\",\"timestamp\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ${transcript_file}",
-      "timeout": 5000
-    }
-  ]
+  "SessionStart": [{"type": "command", "command": "${cmd}", "timeout": 5000}],
+  "SessionEnd": [{"type": "command", "command": "${cmd}", "timeout": 5000}],
+  "UserPromptSubmit": [{"type": "command", "command": "${cmd}", "timeout": 5000}],
+  "Stop": [{"type": "command", "command": "${cmd}", "timeout": 5000}],
+  "PreToolUse": [{"type": "command", "command": "${cmd}", "timeout": 5000}],
+  "PostToolUse": [{"type": "command", "command": "${cmd}", "timeout": 5000}]
 }
 HOOKS_EOF
 
   _agent_log "Hooks config written to $hooks_file"
+  _agent_log "Transcript writer: $hook_script_dir/transcript-writer.py"
   _agent_log "Transcript output: $transcript_file"
 }
 
