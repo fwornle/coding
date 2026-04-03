@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: -- Mastra Integration & LSL Observational Memory
 status: executing
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-04-03T16:01:03.731Z"
+stopped_at: Completed 22-03-PLAN.md
+last_updated: "2026-04-03T16:07:53.753Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 22 (transcript-converters) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-03
 
@@ -55,6 +55,7 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 | Phase 21 P03 | 6min | 2 tasks | 3 files |
 | Phase 21 P04 | 3min | 1 tasks | 1 files |
 | Phase 22 P01 | 7min | 2 tasks | 3 files |
+| Phase 22 P03 | 3min | 2 tasks | 2 files |
 
 ### Decisions
 
@@ -74,6 +75,8 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 - [Phase 22]: Deterministic SHA-256 IDs from content+timestamp for transcript dedup
 - [Phase 22]: better-sqlite3 for ObservationWriter (sync, already in project deps)
 - [Phase 22]: LLM proxy fallback: store raw message stats when proxy unavailable
+- [Phase 22]: Manifest saved after each file for crash-safe incremental progress
+- [Phase 22]: Directories auto-batch for specstory without --batch flag
 
 ### Research Flags
 
@@ -87,6 +90,6 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 
 ## Session Continuity
 
-Last session: 2026-04-03T16:01:03.609Z
-Stopped at: Completed 22-01-PLAN.md
+Last session: 2026-04-03T16:07:53.749Z
+Stopped at: Completed 22-03-PLAN.md
 Resume with: `/gsd:plan-phase 21` or `/gsd:verify-work 20`
