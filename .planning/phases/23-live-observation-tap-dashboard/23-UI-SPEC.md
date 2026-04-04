@@ -52,11 +52,11 @@ Exceptions: none
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Body | 14px | 400 (regular) | 1.5 | Observation content text, filter labels |
-| Label | 12px | 500 (medium) | 1.4 | Timestamps, agent badges, metadata, muted-foreground |
+| Label | 12px | 400 (regular) | 1.4 | Timestamps, agent badges, metadata, muted-foreground |
 | Heading | 20px | 600 (semibold) | 1.2 | Page title "Observations" |
 | Display | 28px | 600 (semibold) | 1.2 | Not used in this phase |
 
-Note: The existing dashboard uses Tailwind's `text-sm` (14px) for body content and `text-xs` (12px) for metadata. Follow the same pattern.
+Note: The existing dashboard uses Tailwind's `text-sm` (14px) for body content and `text-xs` (12px) for metadata. Follow the same pattern. The 12px Label size provides sufficient visual distinction from 14px Body without requiring a weight difference.
 
 ---
 
