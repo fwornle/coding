@@ -49,7 +49,7 @@ export class ObservationWriter {
 
     this.dbPath = options.dbPath || '.observations/observations.db';
     this.proxyUrl = options.proxyUrl || 'http://localhost:8089';
-    this.model = options.model || config.defaults?.model || 'google/gemini-2.5-flash';
+    this.model = options.model || config.defaults?.model || 'claude-code';
     this.batchSize = options.batchSize || 10;
     this.messageTokenLimit = config.defaults?.observation?.messageTokens || 20000;
     this.db = null;
