@@ -100,7 +100,7 @@ export class ObservationWriter {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: this.model,
+          provider: this.model,
           messages: [
             {
               role: 'system',
