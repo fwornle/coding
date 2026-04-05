@@ -8,7 +8,7 @@ Observational Memory captures per-exchange observations during coding sessions. 
 
 ## Architecture
 
-![Observation Pipeline](../../docs/images/observation-pipeline.png)
+![Observation Pipeline](../images/observation-pipeline.png)
 
 ```
 ETM (per project)          ObservationWriter          LLM Proxy (8089)
