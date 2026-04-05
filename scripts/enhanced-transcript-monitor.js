@@ -32,6 +32,7 @@ import ClassificationLogger from './classification-logger.js';
 import ProcessStateManager from './process-state-manager.js';
 import { enableAutoRestart } from './auto-restart-watcher.js';
 import { execSync as _execSync } from 'child_process';
+import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -200,6 +201,10 @@ class EnhancedTranscriptMonitor {
     } else {
       this.debug('Trajectory analyzer not available (missing dependencies)');
     }
+
+    // Observation tap - fire-and-forget per D-04 (Phase 23)
+    this.observationWriter = null;
+    this._initObservationWriter();
 
     // Initialize classification logger for tracking 4-layer classification decisions
     this.classificationLogger = null;
@@ -704,10 +709,68 @@ class EnhancedTranscriptMonitor {
     };
   }
 
+  /**
+   * Initialize the ObservationWriter for live observation tap (Phase 23).
+   * Non-blocking: errors are logged but never prevent ETM from operating.
+   */
+  async _initObservationWriter() {
+    try {
+      this.observationWriter = new ObservationWriter({
+        dbPath: path.join(codingRoot, '.observations', 'observations.db'),
+        proxyUrl: 'http://localhost:8089',
+        batchSize: 2, // Small batches for per-exchange granularity
+      });
+      await this.observationWriter.init();
+      this.debug('[ObservationTap] Writer initialized');
+    } catch (err) {
+      process.stderr.write(`[ObservationTap] Init failed (non-blocking): ${err.message}\n`);
+      this.observationWriter = null;
+    }
+  }
+
+  /**
+   * Fire-and-forget observation for a completed exchange.
+   * Per D-04: never awaited, errors logged to stderr, never blocks LSL.
+   */
+  _fireObservation(exchange) {
+    if (!this.observationWriter) return;
+
+    const messages = [];
+    if (exchange.userMessage) {
+      messages.push({
+        id: `${exchange.uuid}-user`,
+        role: 'user',
+        content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
+        createdAt: new Date(exchange.timestamp).toISOString(),
+        metadata: { agent: this.agentType, format: 'live' }
+      });
+    }
+    if (exchange.assistantMessage) {
+      messages.push({
+        id: `${exchange.uuid}-assistant`,
+        role: 'assistant',
+        content: typeof exchange.assistantMessage === 'string' ? exchange.assistantMessage : JSON.stringify(exchange.assistantMessage),
+        createdAt: new Date(exchange.timestamp).toISOString(),
+        metadata: { agent: this.agentType, format: 'live' }
+      });
+    }
+
+    if (messages.length === 0) return;
+
+    // Fire-and-forget: do NOT await. Per D-04 and D-05.
+    this.observationWriter.processMessages(messages, {
+      agent: this.agentType,
+      sessionId: this.sessionId || null,
+      sourceFile: 'live-etm',
+    }).catch(err => {
+      process.stderr.write(`[ObservationTap] Error: ${err.message}\n`);
+    });
+  }
+
   async initializeReliableCodingClassifier() {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
-      
+
       this.reliableCodingClassifier = new ReliableCodingClassifier({
         projectPath: this.config.projectPath,
         codingRepo: codingPath,
@@ -3045,7 +3108,10 @@ class EnhancedTranscriptMonitor {
           this.debug(`Failed to analyze trajectory: ${error.message}`);
         }
       }
-      
+
+      // Observation tap - fire-and-forget per D-01, D-04
+      this._fireObservation(exchange);
+
       if (exchange.isUserPrompt) {
         userPromptCount++;
         const userMessageText = typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage);
