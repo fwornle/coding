@@ -39,7 +39,7 @@ function buildQueryString(filters: FilterState, page: number): string {
     filters.agents.forEach(a => params.append('agent', a))
   }
   if (filters.from) params.set('from', filters.from)
-  if (filters.to) params.set('to', filters.to)
+  if (filters.to) params.set('to', filters.to.includes('T') ? filters.to : `${filters.to}T23:59:59.999Z`)
   if (filters.project) params.set('project', filters.project)
   if (filters.q) params.set('q', filters.q)
 
