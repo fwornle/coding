@@ -6,6 +6,9 @@
 # Machine-specific MCP config (contains absolute paths)
 claude-code-mcp-docker.json
 
+# Playwright MCP server artifacts (page snapshots, console logs)
+.playwright-mcp/
+
 # Editor directories and files
 .idea
 .vscode
