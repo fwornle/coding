@@ -98,24 +98,27 @@ export class ObservationWriter {
       .join('\n\n');
 
     try {
+      const requestBody = {
+        ...(this.provider ? { provider: this.provider } : {}),
+        messages: [
+          {
+            role: 'system',
+            content: 'Summarize this coding session exchange into a concise observation. ' +
+              'Focus on what the developer was trying to accomplish, key decisions made, ' +
+              'problems encountered, and solutions found. Keep it under 200 words.',
+          },
+          {
+            role: 'user',
+            content: messagesText,
+          },
+        ],
+      };
+      process.stderr.write(`[ObservationWriter] Calling proxy: ${this.proxyUrl}/api/complete (provider: ${this.provider || 'auto'})\n`);
+
       const response = await fetch(`${this.proxyUrl}/api/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(this.provider ? { provider: this.provider } : {}),
-          messages: [
-            {
-              role: 'system',
-              content: 'Summarize this coding session exchange into a concise observation. ' +
-                'Focus on what the developer was trying to accomplish, key decisions made, ' +
-                'problems encountered, and solutions found. Keep it under 200 words.',
-            },
-            {
-              role: 'user',
-              content: messagesText,
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30000),
       });
 
@@ -126,7 +129,9 @@ export class ObservationWriter {
       }
 
       const result = await response.json();
-      return result.content || this._fallbackSummary(messages);
+      const summary = result.content || this._fallbackSummary(messages);
+      process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING from response'} (${summary.length} chars)\n`);
+      return summary;
     } catch (err) {
       process.stderr.write(`[ObservationWriter] Proxy unavailable: ${err.message}. Storing raw summary.\n`);
       return this._fallbackSummary(messages);
