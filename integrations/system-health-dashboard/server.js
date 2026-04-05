@@ -3800,20 +3800,21 @@ class SystemHealthAPIServer {
             if (!existsSync(dbPath)) {
                 return null;
             }
-            this._obsDb = new Database(dbPath, { readonly: true });
-            // Create FTS5 virtual table if not exists (per D-08)
+            // Create FTS5 virtual table with a writable connection first
             try {
-                this._obsDb.exec(`
+                const writeDb = new Database(dbPath);
+                writeDb.exec(`
                     CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
                         summary, content=observations, content_rowid=rowid
                     )
                 `);
-                // Populate FTS index from existing data (rebuild)
-                this._obsDb.exec(`INSERT INTO observations_fts(observations_fts) VALUES('rebuild')`);
+                writeDb.exec(`INSERT INTO observations_fts(observations_fts) VALUES('rebuild')`);
+                writeDb.close();
             } catch (ftsErr) {
-                // FTS creation may fail on readonly DB — non-fatal
                 process.stderr.write(`[ObservationsAPI] FTS init note: ${ftsErr.message}\n`);
             }
+            // Open readonly for queries
+            this._obsDb = new Database(dbPath, { readonly: true });
             return this._obsDb;
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] DB init failed: ${err.message}\n`);
@@ -3841,8 +3842,8 @@ class SystemHealthAPIServer {
             const params = {};
 
             if (agent) {
-                // Support comma-separated agent list
-                const agents = agent.split(',').map(a => a.trim());
+                // Support both array (?agent=a&agent=b) and comma-separated (?agent=a,b)
+                const agents = Array.isArray(agent) ? agent : agent.split(',').map(a => a.trim());
                 where.push(`agent IN (${agents.map((_, i) => `@agent${i}`).join(',')})`);
                 agents.forEach((a, i) => { params[`agent${i}`] = a; });
             }
