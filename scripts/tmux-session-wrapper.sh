@@ -140,5 +140,9 @@ tmux_session_wrapper() {
   # causing "staircase" output (LF without CR) after detach/exit
   stty sane 2>/dev/null || true
   printf '\e[?1004l' 2>/dev/null || true   # Disable focus reporting
-  printf '\ec' 2>/dev/null || true          # Full terminal reset (RIS)
+  printf '\e[?1049l' 2>/dev/null || true   # Exit alternate screen buffer (if stuck)
+  printf '\e[?25h' 2>/dev/null || true     # Ensure cursor is visible
+  # Note: intentionally NOT using '\ec' (RIS / full terminal reset) here.
+  # RIS resets terminal geometry and column tracking, which corrupts VS Code's
+  # integrated terminal and causes garbled/wrapped output on the next launch.
 }
