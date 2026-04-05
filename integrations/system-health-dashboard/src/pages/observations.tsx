@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { RefreshCw, Eye, Filter } from 'lucide-react'
+import { RefreshCw, Eye, Filter, List, LayoutList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ObservationCard } from '@/components/observation-card'
+import type { Observation } from '@/components/observation-card'
 import { ObservationFilters, getDefaultFilters } from '@/components/observation-filters'
 import type { FilterState } from '@/components/observation-filters'
 import { PaginationBar } from '@/components/pagination-bar'
@@ -12,16 +13,6 @@ const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
 const PAGE_SIZE = 50
 const REFRESH_INTERVAL = 30_000
-
-interface Observation {
-  id: string
-  content: string
-  agent: 'claude' | 'copilot' | 'opencode' | 'mastra'
-  project: string
-  sessionId: string
-  timestamp: string
-  source: string
-}
 
 interface ObservationResponse {
   data: Observation[]
@@ -65,7 +56,9 @@ export function ObservationsPage() {
   const [fetching, setFetching] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [compact, setCompact] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const fetchObservations = useCallback(async (f: FilterState, p: number, isAutoRefresh = false) => {
     if (!isAutoRefresh) setLoading(true)
@@ -107,6 +100,26 @@ export function ObservationsPage() {
     }
   }, [filters, page, fetchObservations])
 
+  // Close expanded card on ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && expandedId) {
+        setExpandedId(null)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [expandedId])
+
+  // Close expanded card on click outside any card
+  const handleContentClick = useCallback((e: React.MouseEvent) => {
+    if (!expandedId) return
+    const target = e.target as HTMLElement
+    if (!target.closest('[data-observation-card]')) {
+      setExpandedId(null)
+    }
+  }, [expandedId])
+
   const handleApplyFilters = (newFilters: FilterState) => {
     setPage(1)
     setFilters(newFilters)
@@ -137,6 +150,15 @@ export function ObservationsPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <h1 className="text-xl font-semibold">Observations</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCompact(c => !c)}
+            aria-label="Toggle compact view"
+            title={compact ? 'Normal view' : 'Compact view'}
+          >
+            {compact ? <LayoutList className="h-4 w-4" /> : <List className="h-4 w-4" />}
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleRefresh} aria-label="Refresh observations">
             <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin text-muted-foreground' : ''}`} />
           </Button>
@@ -164,7 +186,7 @@ export function ObservationsPage() {
         </aside>
 
         {/* Content area */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{ marginLeft: '0' }}>
+        <div className="flex-1 flex flex-col overflow-hidden" style={{ marginLeft: '0' }} ref={contentRef} onClick={handleContentClick}>
           {/* Error state */}
           {error && (
             <div className="px-6 pt-4">
@@ -209,14 +231,16 @@ export function ObservationsPage() {
           {!loading && !error && observations.length > 0 && (
             <>
               <ScrollArea className="flex-1">
-                <div className="px-6 py-4 space-y-2">
+                <div className={`px-6 py-4 ${compact ? 'space-y-1' : 'space-y-2'}`}>
                   {observations.map(obs => (
-                    <ObservationCard
-                      key={obs.id}
-                      observation={obs}
-                      isExpanded={expandedId === obs.id}
-                      onToggle={() => handleToggle(obs.id)}
-                    />
+                    <div key={obs.id} data-observation-card>
+                      <ObservationCard
+                        observation={obs}
+                        isExpanded={expandedId === obs.id}
+                        onToggle={() => handleToggle(obs.id)}
+                        compact={compact}
+                      />
+                    </div>
                   ))}
                 </div>
               </ScrollArea>

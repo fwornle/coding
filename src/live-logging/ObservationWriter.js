@@ -55,6 +55,9 @@ export class ObservationWriter {
     this.batchSize = options.batchSize || 10;
     this.messageTokenLimit = config.defaults?.observation?.messageTokens || 20000;
     this.db = null;
+    /** @type {Map<string, number>} Recent content hashes → timestamp for dedup */
+    this._recentHashes = new Map();
+    this._dedupWindowMs = 60_000; // skip duplicates within 60s
   }
 
   /**
@@ -92,6 +95,10 @@ export class ObservationWriter {
    * @param {import('./TranscriptNormalizer.js').MastraDBMessage[]} messages
    * @returns {Promise<string>} Summary text
    */
+  /**
+   * @param {import('./TranscriptNormalizer.js').MastraDBMessage[]} messages
+   * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
+   */
   async summarize(messages) {
     const messagesText = messages
       .map(m => `[${m.role}] ${m.content}`)
@@ -125,16 +132,19 @@ export class ObservationWriter {
       if (!response.ok) {
         const errBody = await response.text();
         process.stderr.write(`[ObservationWriter] Proxy error ${response.status}: ${errBody}\n`);
-        return this._fallbackSummary(messages);
+        return { summary: this._fallbackSummary(messages) };
       }
 
       const result = await response.json();
       const summary = result.content || this._fallbackSummary(messages);
-      process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING from response'} (${summary.length} chars)\n`);
-      return summary;
+      const llm = result.model && result.provider
+        ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
+        : undefined;
+      process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING'} (${summary.length} chars) via ${llm ? `${llm.model}@${llm.provider}` : 'fallback'}\n`);
+      return { summary, llm };
     } catch (err) {
       process.stderr.write(`[ObservationWriter] Proxy unavailable: ${err.message}. Storing raw summary.\n`);
-      return this._fallbackSummary(messages);
+      return { summary: this._fallbackSummary(messages) };
     }
   }
 
@@ -164,8 +174,26 @@ export class ObservationWriter {
       throw new Error('Database not initialized. Call init() first.');
     }
 
+    // Dedup: skip if same user content OR same summary was written recently
+    const userContent = messages.filter(m => m.role === 'user').map(m => m.content).join('|');
+    const contentHash = crypto.createHash('md5').update(userContent).digest('hex');
+    const summaryHash = crypto.createHash('md5').update(summary).digest('hex');
+    const now = Date.now();
+
+    // Prune old entries
+    for (const [h, ts] of this._recentHashes) {
+      if (now - ts > this._dedupWindowMs) this._recentHashes.delete(h);
+    }
+
+    if (this._recentHashes.has(contentHash) || this._recentHashes.has(summaryHash)) {
+      process.stderr.write(`[ObservationWriter] Dedup: skipping duplicate observation\n`);
+      return null;
+    }
+    this._recentHashes.set(contentHash, now);
+    this._recentHashes.set(summaryHash, now);
+
     const id = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const nowISO = new Date().toISOString();
 
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata)
@@ -179,7 +207,7 @@ export class ObservationWriter {
       metadata.agent || null,
       metadata.sessionId || null,
       metadata.sourceFile || null,
-      now,
+      nowISO,
       JSON.stringify(metadata),
     );
 
@@ -209,8 +237,11 @@ export class ObservationWriter {
 
     for (const chunk of chunks) {
       try {
-        const summary = await this.summarize(chunk);
-        await this.writeObservation(summary, chunk, metadata);
+        const { summary, llm } = await this.summarize(chunk);
+        const enrichedMeta = llm
+          ? { ...metadata, llmModel: llm.model, llmProvider: llm.provider, llmTokens: llm.tokens, llmLatencyMs: llm.latencyMs }
+          : metadata;
+        await this.writeObservation(summary, chunk, enrichedMeta);
         observations++;
       } catch (err) {
         errors++;

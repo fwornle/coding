@@ -3870,7 +3870,8 @@ class SystemHealthAPIServer {
                        session_id as sessionId,
                        json_extract(metadata, '$.project') as project,
                        created_at as timestamp,
-                       source_file as source
+                       source_file as source,
+                       metadata
                 FROM observations ${whereClause}
                 ORDER BY created_at DESC
                 LIMIT @limit OFFSET @offset
@@ -3878,7 +3879,20 @@ class SystemHealthAPIServer {
             params.limit = limit;
             params.offset = offset;
 
-            const data = dataQuery.all(params);
+            const rows = dataQuery.all(params);
+            // Parse metadata and merge LLM fields into each row
+            const data = rows.map(row => {
+                let meta = {};
+                try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
+                const { metadata: _raw, ...rest } = row;
+                return {
+                    ...rest,
+                    llmModel: meta.llmModel || null,
+                    llmProvider: meta.llmProvider || null,
+                    llmTokens: meta.llmTokens || null,
+                    llmLatencyMs: meta.llmLatencyMs || null,
+                };
+            });
 
             res.json({ data, total, limit, offset });
         } catch (err) {
@@ -3897,7 +3911,7 @@ class SystemHealthAPIServer {
         }
         try {
             const rows = db.prepare(
-                "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE project IS NOT NULL ORDER BY project"
+                "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL ORDER BY project"
             ).all();
             res.json(rows.map(r => r.project).filter(Boolean));
         } catch (err) {
