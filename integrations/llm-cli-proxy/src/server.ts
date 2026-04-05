@@ -277,12 +277,24 @@ app.get('/health', (_req, res) => {
 // Completion endpoint
 app.post('/api/complete', async (req, res) => {
   const body = req.body as CompletionRequest;
-  const { provider, messages, model, maxTokens = 4096, temperature, tier } = body;
+  const { messages, model, maxTokens = 4096, temperature, tier } = body;
+  let { provider } = body;
 
   // Validate request
-  if (!provider || !messages?.length) {
-    res.status(400).json({ error: 'Missing required fields: provider, messages' });
+  if (!messages?.length) {
+    res.status(400).json({ error: 'Missing required field: messages' });
     return;
+  }
+
+  // Auto-select provider if not specified: pick first available
+  if (!provider) {
+    const available = Object.keys(CLI_CONFIGS).find(p => providerStatuses[p]?.available);
+    if (!available) {
+      res.status(503).json({ error: 'No provider specified and no providers available' });
+      return;
+    }
+    provider = available as CompletionRequest['provider'];
+    log(`[auto-select] No provider specified, using: ${provider}`);
   }
 
   const config = CLI_CONFIGS[provider];
