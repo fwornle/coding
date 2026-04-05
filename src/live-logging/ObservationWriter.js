@@ -49,7 +49,9 @@ export class ObservationWriter {
 
     this.dbPath = options.dbPath || '.observations/observations.db';
     this.proxyUrl = options.proxyUrl || 'http://localhost:8089';
-    this.model = options.model || config.defaults?.model || 'claude-code';
+    // Provider is optional — if omitted, the LLM proxy uses network-adaptive routing
+    // (VPN → copilot subscription, outside → claude-code subscription)
+    this.provider = options.provider || null;
     this.batchSize = options.batchSize || 10;
     this.messageTokenLimit = config.defaults?.observation?.messageTokens || 20000;
     this.db = null;
@@ -100,7 +102,7 @@ export class ObservationWriter {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          provider: this.model,
+          ...(this.provider ? { provider: this.provider } : {}),
           messages: [
             {
               role: 'system',
