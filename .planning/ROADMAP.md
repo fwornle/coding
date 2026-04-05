@@ -141,3 +141,16 @@ Plans:
 | 21. Mastracode Agent Integration | v4.0 | 4/4 | Complete   | 2026-04-02 |
 | 22. Transcript Converters | v4.0 | 3/3 | Complete    | 2026-04-03 |
 | 23. Live Observation Tap & Dashboard | v4.0 | 2/2 | Complete    | 2026-04-05 |
+
+---
+
+## Backlog
+
+### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)
+
+**Goal:** Extract `lib/llm/` to a shared submodule used by coding and rapid-automations/OKB. Add direct HTTP path for Claude Max (OAuth token from keychain → Anthropic API, no CLI spawn) to eliminate 12-15s latency. Copilot provider already does direct HTTP (~2-5s) — same pattern for claude-code.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)

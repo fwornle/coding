@@ -764,6 +764,7 @@ class EnhancedTranscriptMonitor {
       agent: this.agentType,
       sessionId: this.sessionId || null,
       sourceFile: 'live-etm',
+      project: path.basename(this.config.projectPath || ''),
     }).catch(err => {
       process.stderr.write(`[ObservationTap] Error: ${err.message}\n`);
     });
