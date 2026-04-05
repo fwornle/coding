@@ -718,7 +718,8 @@ class EnhancedTranscriptMonitor {
       this.observationWriter = new ObservationWriter({
         dbPath: path.join(codingRoot, '.observations', 'observations.db'),
         proxyUrl: 'http://localhost:8089',
-        model: 'claude-code', // Use coding LLM proxy's default provider
+        // No provider specified — proxy uses network-adaptive routing
+        // (VPN → copilot, outside → claude-code, fallback → groq/openai/anthropic)
         batchSize: 2, // Small batches for per-exchange granularity
       });
       await this.observationWriter.init();
