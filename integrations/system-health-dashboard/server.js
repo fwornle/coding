@@ -3840,7 +3840,8 @@ class SystemHealthAPIServer {
             }
             if (to) {
                 where.push('created_at <= @to');
-                params.to = to;
+                // If date-only (no T), make it end-of-day inclusive
+                params.to = to.includes('T') ? to : `${to}T23:59:59.999Z`;
             }
             if (project) {
                 where.push("json_extract(metadata, '$.project') = @project");
