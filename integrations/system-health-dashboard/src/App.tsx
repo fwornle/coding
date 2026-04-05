@@ -1,27 +1,37 @@
 import { Provider } from 'react-redux'
 import { store } from './store'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SystemHealthDashboard from './components/system-health-dashboard'
+import { ObservationsPage } from './pages/observations'
+import { NavBar } from './components/nav-bar'
 import { useEffect } from 'react'
 import { healthRefreshManager } from './store/middleware/healthRefreshMiddleware'
 import { initializeWorkflowConfig } from './store/slices/workflowConfigSlice'
 
-function App() {
+function AppContent() {
   useEffect(() => {
-    // Start/restart health refresh manager when app mounts
-    // This handles React StrictMode double-mount and HMR
     healthRefreshManager.startAutoRefresh()
-
-    // Initialize workflow config from API (with fallback to constants)
     store.dispatch(initializeWorkflowConfig())
-
-    return () => {
-      healthRefreshManager.stopAutoRefresh()
-    }
+    return () => { healthRefreshManager.stopAutoRefresh() }
   }, [])
 
   return (
+    <>
+      <NavBar />
+      <Routes>
+        <Route path="/" element={<SystemHealthDashboard />} />
+        <Route path="/observations" element={<ObservationsPage />} />
+      </Routes>
+    </>
+  )
+}
+
+function App() {
+  return (
     <Provider store={store}>
-      <SystemHealthDashboard />
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
     </Provider>
   )
 }
