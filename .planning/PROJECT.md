@@ -2,21 +2,15 @@
 
 ## What This Is
 
-An agentic coding environment with a multi-agent UKB analysis pipeline, knowledge graph storage (Graphology + LevelDB), and VKB viewer. The pipeline analyzes codebases to produce knowledge entities with observations and insight documents. v1.0 shipped a working pipeline with correct pattern extraction, entity naming, and LLM-synthesized observations. v2.0 replaces the flat batch DAG with a wave-based multi-agent system that builds hierarchical knowledge top-down: project survey → component deep-dive → detail expansion.
+An agentic coding environment with multi-agent support (Claude, Copilot, OpenCode, Mastracode), live session logging, real-time observational memory, semantic knowledge management, and a health dashboard. v1.0-v2.1 shipped the UKB analysis pipeline. v3.0 added workflow state machine. v4.0 integrated mastra.ai's observational memory alongside LSL, added mastracode as a fourth coding agent, and built transcript converters + a live observation dashboard.
 
 ## Core Value
 
-The semantic analysis pipeline must operate as a hierarchical wave-based multi-agent system — not a flat DAG — producing self-sufficient knowledge at every level, with rich observations, detailed insight documents, and proper parent-child structure from stem to leaves.
+A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable — across all AI coding agents.
 
-## Current Milestone: v4.0 Mastra Integration & LSL Observational Memory
+## Current State
 
-**Goal:** Integrate mastra.ai's observational memory system into the coding infrastructure — replacing verbatim LSL logging with intelligent observations, adding mastra plugin to OpenCode, and integrating mastracode as a new coding agent.
-
-**Target features:**
-- Add mastra plugin to OpenCode variant (`coding --opencode`) for live observational memory alongside existing LSL
-- Evaluate and implement LSL refactoring from verbatim transcript logging to mastra-style observations (online/live mode + batch mode for historical LSL conversion)
-- Build transcript-to-observation converters for all 3 agents (Claude JSONL, Copilot events.jsonl, OpenCode SQLite)
-- Install and integrate mastracode (pi-tui based) as `coding --mastra` with tmux statusline, coding services, and LSL support
+**v4.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files.
 
 ## Requirements
 
@@ -34,11 +28,16 @@ The semantic analysis pipeline must operate as a hierarchical wave-based multi-a
 
 ### Active
 
-- [ ] Mastra plugin integration for OpenCode (live observational memory)
-- [x] LSL refactoring: verbatim logging → mastra-style observations (live + batch) — Phase 23
-- [x] Transcript-to-observation converters (Claude, Copilot, OpenCode) — Phase 22
-- [x] Historical LSL batch converter (git-tracked .specstory files → observations) — Phase 22
-- [x] Mastracode agent integration (`coding --mastra` with full infrastructure support) — Phase 21
+(Next milestone — to be defined via `/gsd:new-milestone`)
+
+### Shipped in v4.0
+
+- ✓ Mastracode agent integration (`coding --mastra`) — Phase 21
+- ✓ Transcript-to-observation converters (Claude, Copilot, Specstory) — Phase 22
+- ✓ Historical LSL batch converter (git-tracked .specstory files → observations) — Phase 22
+- ✓ Live observation tap (ETM fire-and-forget per exchange) — Phase 23
+- ✓ Observations dashboard (REST API + React page with FTS search) — Phase 23
+- ✓ LLM proxy bridge for observer/reflector agents — Phase 20
 
 ### Out of Scope
 
@@ -97,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 after Phase 23 completion — v4.0 milestone complete*
+*Last updated: 2026-04-05 after v4.0 milestone completion*
