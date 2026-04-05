@@ -97,12 +97,21 @@ export class ObservationWriter {
    */
   /**
    * @param {import('./TranscriptNormalizer.js').MastraDBMessage[]} messages
+   * @param {Object} [metadata] - Context metadata (project, agent, etc.)
    * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
    */
-  async summarize(messages) {
+  async summarize(messages, metadata = {}) {
     const messagesText = messages
       .map(m => `[${m.role}] ${m.content}`)
       .join('\n\n');
+
+    // Build project context hint so the LLM doesn't infer the project from file paths
+    // the agent happened to read (e.g. exploring external repos to answer a question).
+    const projectHint = metadata.project
+      ? `\nThe agent is working in project "${metadata.project}". ` +
+        'Any files read outside this project are investigations, NOT the project itself. ' +
+        'Describe observations in terms of the agent\'s project, not external files it explored.'
+      : '';
 
     try {
       const requestBody = {
@@ -110,9 +119,11 @@ export class ObservationWriter {
         messages: [
           {
             role: 'system',
-            content: 'Summarize this coding session exchange into a concise observation. ' +
-              'Focus on what the developer was trying to accomplish, key decisions made, ' +
-              'problems encountered, and solutions found. Keep it under 200 words.',
+            content: 'You are a coding session observer. Given a user↔assistant exchange, write a 1-3 sentence observation. ' +
+              'State WHAT was done (e.g. "Fixed the auth middleware", "Added pagination to the API"), not what was discussed. ' +
+              'Never echo the assistant\'s response. Never use markdown formatting. ' +
+              'If the exchange is trivial (greetings, acknowledgments), respond with just "Trivial exchange, no actionable content."' +
+              projectHint,
           },
           {
             role: 'user',
@@ -174,23 +185,21 @@ export class ObservationWriter {
       throw new Error('Database not initialized. Call init() first.');
     }
 
-    // Dedup: skip if same user content OR same summary was written recently
-    const userContent = messages.filter(m => m.role === 'user').map(m => m.content).join('|');
-    const contentHash = crypto.createHash('md5').update(userContent).digest('hex');
-    const summaryHash = crypto.createHash('md5').update(summary).digest('hex');
-    const now = Date.now();
-
-    // Prune old entries
-    for (const [h, ts] of this._recentHashes) {
-      if (now - ts > this._dedupWindowMs) this._recentHashes.delete(h);
-    }
-
-    if (this._recentHashes.has(contentHash) || this._recentHashes.has(summaryHash)) {
-      process.stderr.write(`[ObservationWriter] Dedup: skipping duplicate observation\n`);
+    // Skip trivial observations
+    if (summary.toLowerCase().includes('trivial exchange')) {
+      process.stderr.write(`[ObservationWriter] Skipping trivial observation\n`);
       return null;
     }
-    this._recentHashes.set(contentHash, now);
-    this._recentHashes.set(summaryHash, now);
+
+    // DB-level dedup: check if same summary already exists for this agent
+    const agent = metadata.agent || null;
+    const existing = this.db.prepare(
+      'SELECT id FROM observations WHERE agent = ? AND summary = ? LIMIT 1'
+    ).get(agent, summary);
+    if (existing) {
+      process.stderr.write(`[ObservationWriter] Dedup: identical summary already in DB\n`);
+      return null;
+    }
 
     const id = crypto.randomUUID();
     const nowISO = new Date().toISOString();
@@ -237,7 +246,7 @@ export class ObservationWriter {
 
     for (const chunk of chunks) {
       try {
-        const { summary, llm } = await this.summarize(chunk);
+        const { summary, llm } = await this.summarize(chunk, metadata);
         const enrichedMeta = llm
           ? { ...metadata, llmModel: llm.model, llmProvider: llm.provider, llmTokens: llm.tokens, llmLatencyMs: llm.latencyMs }
           : metadata;

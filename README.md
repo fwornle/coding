@@ -130,6 +130,7 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 - **🔒 Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
 - **📈 Trajectory Generation** - Automated project analysis and documentation
+- **👁️ Observational Memory** - Per-exchange LLM observations from live sessions, browsable dashboard
 - **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
 
 ### LLM Providers (Zero-Cost Routing)
@@ -214,6 +215,19 @@ Real-time code quality enforcement through PreToolUse hooks
 - **Online (Continuous Learning)**: Real-time session learning with semantic search
 - **Visualization (VKB)**: Web-based graph visualization at `http://localhost:8080`
 - **Ontology Classification**: 4-layer classification pipeline
+
+#### [👁️ Observational Memory](docs-content/core-systems/observational-memory.md)
+Real-time per-exchange observations from live coding sessions:
+- **LLM-powered summaries**: Each exchange summarized into 1-3 sentence observations via claude-code (Max subscription)
+- **Multi-agent capture**: All four agents (Claude, Copilot, OpenCode, Mastracode) generate observations
+- **Dashboard**: Browsable at `http://localhost:3032/observations` with filters, search, compact view
+- **Transcript converters**: Batch-convert historical Claude JSONL, Copilot events, and .specstory files
+- **Deduplication**: DB-level dedup prevents duplicate observations across ETM restarts
+- **Zero-cost summarization**: Routes through subscription providers (Claude Max, Copilot Enterprise)
+
+![Observation Pipeline](docs/images/observation-pipeline.png)
+
+![Mastracode in VS Code](docs/images/coding-mastracode-vscode.png)
 
 ### Integration Components
 
@@ -420,6 +434,7 @@ cd integrations/mcp-constraint-monitor && npm test
 ✅ **Constraint Monitoring** - 18 active constraints with PreToolUse hooks
 ✅ **Knowledge Management** - UKB/VKB with MCP integration
 ✅ **Multi-Agent Analysis** - 11 agents with workflow orchestration
+✅ **Observational Memory** - Per-exchange LLM observations with dashboard
 ✅ **Status Line System** - Real-time indicators via unified tmux status bar
 ✅ **Cross-Platform** - macOS, Linux, Windows support
 
@@ -449,6 +464,7 @@ Copyright © 2025 Frank Wornle
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
 - **LLM Providers & Local Models**: [docs/provider-configuration.md](docs/provider-configuration.md)
 - **Agent Abstraction API**: [docs/architecture/agent-abstraction-api.md](docs/architecture/agent-abstraction-api.md)
+- **Observational Memory**: [docs-content/core-systems/observational-memory.md](docs-content/core-systems/observational-memory.md)
 - **Skills System**: [docs/skills-system.md](docs/skills-system.md)
 - **Adding Agents**: [docs/agent-integration-guide.md](docs/agent-integration-guide.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
