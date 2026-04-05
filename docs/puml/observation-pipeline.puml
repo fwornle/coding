@@ -1,0 +1,62 @@
+@startuml observation-pipeline
+!include _standard-style.puml
+
+title Observational Memory Pipeline
+
+top to bottom direction
+
+rectangle "Coding Agents" <<agent>> {
+  component "Claude Code" as claude
+  component "Copilot CLI" as copilot
+  component "OpenCode" as opencode
+  component "Mastracode" as mastra
+}
+
+rectangle "Enhanced Transcript Monitor\n(per project)" <<core>> as etm {
+  component "_fireObservation()" as fire
+}
+
+rectangle "ObservationWriter" <<core>> as ow {
+  component "summarize()" as summarize
+  component "writeObservation()" as write
+  component "DB-level dedup" as dedup
+}
+
+rectangle "LLM Proxy\n(localhost:8089)" <<api>> as proxy {
+  component "LLMService" as llm
+}
+
+rectangle "LLM Providers" <<external>> as providers {
+  component "claude-code\n(Max subscription)" as cc
+  component "copilot\n(Enterprise)" as cp
+  component "groq\n(API fallback)" as groq
+}
+
+database "SQLite\n.observations/\nobservations.db" <<storage>> as db
+
+rectangle "Health Dashboard\n(localhost:3032)" <<api>> as dash {
+  component "REST API\n(port 3033)" as api
+  component "Observations\nUI" as ui
+}
+
+claude --> etm
+copilot --> etm
+opencode --> etm
+mastra --> etm
+
+fire --> summarize : messages\n(fire-and-forget)
+summarize --> proxy : POST /api/complete
+proxy --> llm
+llm --> cc : priority 1
+llm --> cp : priority 2
+llm --> groq : priority 3
+
+summarize <-- proxy : summary +\nmodel/provider/tokens
+summarize --> dedup
+dedup --> write : if unique
+write --> db
+
+api --> db : readonly
+ui --> api : fetch + poll
+
+@enduml
