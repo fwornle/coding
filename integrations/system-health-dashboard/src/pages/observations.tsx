@@ -137,11 +137,8 @@ export function ObservationsPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <h1 className="text-xl font-semibold">Observations</h1>
         <div className="flex items-center gap-2">
-          <RefreshCw
-            className={`h-4 w-4 text-muted-foreground ${fetching ? 'animate-spin' : ''}`}
-          />
-          <Button variant="ghost" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4" />
+          <Button variant="ghost" size="sm" onClick={handleRefresh} aria-label="Refresh observations">
+            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin text-muted-foreground' : ''}`} />
           </Button>
           {/* Mobile filter toggle */}
           <Button
