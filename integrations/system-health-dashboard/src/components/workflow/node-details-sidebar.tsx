@@ -1390,7 +1390,7 @@ export function UKBNodeDetailsSidebar({
         ) : null}
 
         {/* Step Execution Details - Always show with available data */}
-        <Separator />
+        <div><Separator className="" /></div>
         <div className="space-y-3">
           <h4 className="font-medium text-sm">Execution Details</h4>
           <div className="space-y-2 text-sm">
@@ -1417,7 +1417,7 @@ export function UKBNodeDetailsSidebar({
                 </span>
                 <span>{formatDurationMs(stepInfo.duration)}</span>
               </div>
-            ) : null}
+            ) : undefined}
 
             {/* Tokens - only show if we have it */}
             {stepInfo?.tokensUsed !== undefined && stepInfo.tokensUsed > 0 && (
