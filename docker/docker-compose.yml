@@ -64,6 +64,7 @@ services:
     volumes:
       # Persistent data
       - ${CODING_REPO:-.}/.data:/coding/.data
+      - ${CODING_REPO:-.}/.observations:/coding/.observations
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
       - ${CODING_REPO:-.}/.git:/coding/.git:ro
