@@ -101,17 +101,14 @@ export class ObservationWriter {
    * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
    */
   async summarize(messages, metadata = {}) {
-    const messagesText = messages
-      .map(m => `[${m.role}] ${m.content}`)
-      .join('\n\n');
-
-    // Build project context hint so the LLM doesn't infer the project from file paths
-    // the agent happened to read (e.g. exploring external repos to answer a question).
     const projectHint = metadata.project
-      ? `\nThe agent is working in project "${metadata.project}". ` +
-        'Any files read outside this project are investigations, NOT the project itself. ' +
-        'Describe observations in terms of the agent\'s project, not external files it explored.'
+      ? ` The agent is working in project "${metadata.project}".`
       : '';
+
+    // Wrap the exchange in XML tags so the LLM treats it as data to analyze, not content to relay
+    const exchangeBlock = messages
+      .map(m => `<${m.role}>\n${m.content}\n</${m.role}>`)
+      .join('\n');
 
     try {
       const requestBody = {
@@ -119,15 +116,21 @@ export class ObservationWriter {
         messages: [
           {
             role: 'system',
-            content: 'You are a coding session observer. Given a user↔assistant exchange, write a 1-3 sentence observation. ' +
-              'State WHAT was done (e.g. "Fixed the auth middleware", "Added pagination to the API"), not what was discussed. ' +
-              'Never echo the assistant\'s response. Never use markdown formatting. ' +
-              'If the exchange is trivial (greetings, acknowledgments), respond with just "Trivial exchange, no actionable content."' +
+            content: 'You produce structured observation summaries from coding exchanges. ' +
+              'You MUST respond using ONLY this exact template — nothing else:\n\n' +
+              'Intent: [one sentence — what the developer asked for]\n' +
+              'Approach: [one sentence — key actions taken: files edited, tools used, commands run]\n' +
+              'Outcome: [one sentence — what was achieved or learned]\n' +
+              'Status: [done | in-progress | blocked | needs-followup]\n\n' +
+              'Constraints:\n' +
+              '- Your ENTIRE response must be these 4 lines. Nothing before, nothing after.\n' +
+              '- Never reproduce code, commands, file contents, or the assistant\'s words.\n' +
+              '- If the exchange has no real work, respond with only: "No actionable content."' +
               projectHint,
           },
           {
             role: 'user',
-            content: messagesText,
+            content: '<exchange>\n' + exchangeBlock + '\n</exchange>\n\nProduce the 4-line observation summary.',
           },
         ],
       };
@@ -186,7 +189,7 @@ export class ObservationWriter {
     }
 
     // Skip trivial observations
-    if (summary.toLowerCase().includes('trivial exchange')) {
+    if (summary.toLowerCase().includes('trivial exchange') || summary.toLowerCase().includes('no actionable content')) {
       process.stderr.write(`[ObservationWriter] Skipping trivial observation\n`);
       return null;
     }
