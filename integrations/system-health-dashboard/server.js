@@ -3800,20 +3800,7 @@ class SystemHealthAPIServer {
             if (!existsSync(dbPath)) {
                 return null;
             }
-            // Create FTS5 virtual table with a writable connection first
-            try {
-                const writeDb = new Database(dbPath);
-                writeDb.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
-                        summary, content=observations, content_rowid=rowid
-                    )
-                `);
-                writeDb.exec(`INSERT INTO observations_fts(observations_fts) VALUES('rebuild')`);
-                writeDb.close();
-            } catch (ftsErr) {
-                process.stderr.write(`[ObservationsAPI] FTS init note: ${ftsErr.message}\n`);
-            }
-            // Open readonly for queries
+            // Open readonly for queries — FTS5 table is managed by ObservationWriter
             this._obsDb = new Database(dbPath, { readonly: true });
             return this._obsDb;
         } catch (err) {
@@ -3861,8 +3848,14 @@ class SystemHealthAPIServer {
             }
 
             if (q) {
-                // FTS5 full-text search per D-08
-                where.push('observations.rowid IN (SELECT rowid FROM observations_fts WHERE observations_fts MATCH @q)');
+                // FTS5 full-text search per D-08 — fall back to LIKE if FTS table doesn't exist
+                try {
+                    db.prepare('SELECT 1 FROM observations_fts LIMIT 0').get();
+                    where.push('observations.rowid IN (SELECT rowid FROM observations_fts WHERE observations_fts MATCH @q)');
+                } catch {
+                    where.push('summary LIKE @q');
+                    q = `%${q}%`;
+                }
                 params.q = q;
             }
 
