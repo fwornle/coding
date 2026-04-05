@@ -29,8 +29,8 @@ Requirements for mastra integration milestone. Each maps to roadmap phases.
 
 ### Live Observations
 
-- [ ] **LIVE-01**: Enhanced-transcript-monitor produces mastra observations in real-time alongside verbatim LSL (additive, not replacing)
-- [ ] **LIVE-02**: Observations are browsable via REST endpoint on the health dashboard
+- [x] **LIVE-01**: Enhanced-transcript-monitor produces mastra observations in real-time alongside verbatim LSL (additive, not replacing)
+- [x] **LIVE-02**: Observations are browsable via REST endpoint on the health dashboard
 
 ## Future Requirements
 
@@ -70,8 +70,8 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | MSTR-01 | Phase 21 | Complete |
 | MSTR-02 | Phase 21 | Complete |
 | MSTR-03 | Phase 21 | Complete |
-| LIVE-01 | Phase 23 | Pending |
-| LIVE-02 | Phase 23 | Pending |
+| LIVE-01 | Phase 23 | Complete |
+| LIVE-02 | Phase 23 | Complete |
 
 **Coverage:**
 - v4.0 requirements: 13 total

@@ -125,10 +125,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Enhanced-transcript-monitor produces mastra observations in real-time during `coding --claude` sessions without blocking or degrading verbatim LSL output
   2. Observations are browsable via a REST endpoint on the health dashboard (port 3032) with agent filtering and time range
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 23-01-PLAN.md -- ETM observation tap and REST API endpoint with FTS5 search
+- [x] 23-01-PLAN.md -- ETM observation tap and REST API endpoint with FTS5 search
 - [ ] 23-02-PLAN.md -- Observations dashboard page with filters, cards, pagination
 
 ### Progress
@@ -140,4 +140,4 @@ Plans:
 | 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
 | 21. Mastracode Agent Integration | v4.0 | 4/4 | Complete   | 2026-04-02 |
 | 22. Transcript Converters | v4.0 | 3/3 | Complete    | 2026-04-03 |
-| 23. Live Observation Tap & Dashboard | v4.0 | 0/2 | Not started | - |
+| 23. Live Observation Tap & Dashboard | v4.0 | 1/2 | In Progress|  |
