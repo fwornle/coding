@@ -16,7 +16,10 @@ import cors from 'cors';
 import { spawn, execSync } from 'child_process';
 import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
+import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
+
+const require_cjs = createRequire(import.meta.url);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
@@ -155,6 +158,10 @@ class SystemHealthAPIServer {
         this.app.get('/api/cgr/freshness', this.handleGetCGRFreshness.bind(this));
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
+
+        // Observations API (Phase 23)
+        this.app.get('/api/observations', this.handleGetObservations.bind(this));
+        this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -3777,6 +3784,131 @@ class SystemHealthAPIServer {
         return readdirSync(workflowsDir)
             .filter(f => f.endsWith('.yaml'))
             .map(f => f.replace('.yaml', ''));
+    }
+
+    // ── Observations API (Phase 23) ────────────────────────────────────
+
+    /**
+     * Lazy-initialize a read-only connection to the observations SQLite database.
+     * Creates FTS5 virtual table for full-text search on summaries.
+     */
+    _getObservationsDb() {
+        if (this._obsDb) return this._obsDb;
+        try {
+            const Database = require_cjs('better-sqlite3');
+            const dbPath = join(codingRoot, '.observations', 'observations.db');
+            if (!existsSync(dbPath)) {
+                return null;
+            }
+            this._obsDb = new Database(dbPath, { readonly: true });
+            // Create FTS5 virtual table if not exists (per D-08)
+            try {
+                this._obsDb.exec(`
+                    CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
+                        summary, content=observations, content_rowid=rowid
+                    )
+                `);
+                // Populate FTS index from existing data (rebuild)
+                this._obsDb.exec(`INSERT INTO observations_fts(observations_fts) VALUES('rebuild')`);
+            } catch (ftsErr) {
+                // FTS creation may fail on readonly DB — non-fatal
+                process.stderr.write(`[ObservationsAPI] FTS init note: ${ftsErr.message}\n`);
+            }
+            return this._obsDb;
+        } catch (err) {
+            process.stderr.write(`[ObservationsAPI] DB init failed: ${err.message}\n`);
+            return null;
+        }
+    }
+
+    /**
+     * GET /api/observations — paginated observations with filtering and FTS5 search.
+     * Query params: agent, from, to, project, q (full-text), limit, offset
+     * Response: { data, total, limit, offset }
+     */
+    handleGetObservations(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) {
+            return res.status(503).json({ error: 'Observations database unavailable' });
+        }
+
+        const { agent, from, to, project, q, limit: limitStr, offset: offsetStr } = req.query;
+        const limit = Math.min(parseInt(limitStr) || 50, 200);
+        const offset = parseInt(offsetStr) || 0;
+
+        try {
+            const where = [];
+            const params = {};
+
+            if (agent) {
+                // Support comma-separated agent list
+                const agents = agent.split(',').map(a => a.trim());
+                where.push(`agent IN (${agents.map((_, i) => `@agent${i}`).join(',')})`);
+                agents.forEach((a, i) => { params[`agent${i}`] = a; });
+            }
+            if (from) {
+                where.push('created_at >= @from');
+                params.from = from;
+            }
+            if (to) {
+                where.push('created_at <= @to');
+                params.to = to;
+            }
+            if (project) {
+                where.push("json_extract(metadata, '$.project') = @project");
+                params.project = project;
+            }
+
+            if (q) {
+                // FTS5 full-text search per D-08
+                where.push('observations.rowid IN (SELECT rowid FROM observations_fts WHERE observations_fts MATCH @q)');
+                params.q = q;
+            }
+
+            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+            const countQuery = db.prepare(`SELECT COUNT(*) as total FROM observations ${whereClause}`);
+            const { total } = countQuery.get(params);
+
+            const dataQuery = db.prepare(`
+                SELECT id, summary as content, agent,
+                       session_id as sessionId,
+                       json_extract(metadata, '$.project') as project,
+                       created_at as timestamp,
+                       source_file as source
+                FROM observations ${whereClause}
+                ORDER BY created_at DESC
+                LIMIT @limit OFFSET @offset
+            `);
+            params.limit = limit;
+            params.offset = offset;
+
+            const data = dataQuery.all(params);
+
+            res.json({ data, total, limit, offset });
+        } catch (err) {
+            process.stderr.write(`[ObservationsAPI] Query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query observations' });
+        }
+    }
+
+    /**
+     * GET /api/observations/projects — distinct project names for filter dropdown.
+     */
+    handleGetObservationProjects(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) {
+            return res.status(503).json({ error: 'Observations database unavailable' });
+        }
+        try {
+            const rows = db.prepare(
+                "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE project IS NOT NULL ORDER BY project"
+            ).all();
+            res.json(rows.map(r => r.project).filter(Boolean));
+        } catch (err) {
+            process.stderr.write(`[ObservationsAPI] Projects query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query projects' });
+        }
     }
 }
 
