@@ -199,9 +199,16 @@ export class ObservationWriter {
       throw new Error('Database not initialized. Call init() first.');
     }
 
-    // Skip trivial and raw observations (no value for learning)
+    // Skip trivial, raw, and no-work observations (no value for learning)
     const lower = summary.toLowerCase();
-    if (lower.includes('trivial exchange') || lower.includes('no actionable content') || summary.startsWith('[Raw]')) {
+    if (
+      lower.includes('trivial exchange') ||
+      lower.includes('no actionable content') ||
+      summary.startsWith('[Raw]') ||
+      (lower.includes('no new work was performed') && lower.includes('needs-followup')) ||
+      (lower.includes('no new work was performed') && lower.includes('needs followup')) ||
+      (lower.includes('single-word check-in') && lower.includes('artifacts: none'))
+    ) {
       process.stderr.write(`[ObservationWriter] Skipping low-value observation\n`);
       return null;
     }
