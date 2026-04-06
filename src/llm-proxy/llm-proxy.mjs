@@ -167,10 +167,12 @@ const server = http.createServer(async (req, res) => {
         taskType: body.taskType,
       };
 
-      // If specific provider requested, we can try to force it
-      // by placing it first in priority (LLMService will still fallback)
+      // If specific provider requested, force routing via task_provider_priority.
+      // Always use proxy_<provider> as taskType so the LLMService respects
+      // the caller's explicit provider preference (e.g., OKB requesting copilot).
+      // The original taskType is preserved for tier resolution only.
       if (body.provider) {
-        request.taskType = request.taskType || `proxy_${body.provider}`;
+        request.taskType = `proxy_${body.provider}`;
       }
 
       const result = await llmService.complete(request);

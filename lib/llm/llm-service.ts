@@ -233,9 +233,9 @@ export class LLMService extends EventEmitter {
       }
     }
 
-    // No local providers available — fall through to public as last resort
-    console.warn('[llm] No local providers available, falling back to public');
-    return this.completePublic(request, startTime);
+    // No local providers available — throw instead of calling completePublic
+    // to prevent infinite recursion (completePublic → sensitivity → completeWithLocal → completePublic)
+    throw new Error('No local LLM providers available');
   }
 
   private async completePublic(
@@ -264,7 +264,11 @@ export class LLMService extends EventEmitter {
         });
         if (classification.isSensitive) {
           this.emit('sensitivity-routed', { operationType: request.operationType });
-          return this.completeWithLocal(request, startTime);
+          try {
+            return await this.completeWithLocal(request, startTime);
+          } catch {
+            // No local providers — fall through to public chain
+          }
         }
       } catch {
         // On error, assume not sensitive
@@ -280,7 +284,11 @@ export class LLMService extends EventEmitter {
         });
         if (!canAfford) {
           this.emit('budget-blocked', { operationType: request.operationType });
-          return this.completeWithLocal(request, startTime);
+          try {
+            return await this.completeWithLocal(request, startTime);
+          } catch {
+            // No local providers — fall through to public chain
+          }
         }
       } catch {
         // On error, allow (fail open)

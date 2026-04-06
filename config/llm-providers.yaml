@@ -74,6 +74,9 @@ task_provider_priority:
   ontology_classification: ["claude-code", "copilot", "groq", "anthropic", "openai"]
   observation_generation: ["claude-code", "copilot", "groq", "anthropic", "openai"]
   content_analysis: ["claude-code", "copilot", "groq", "anthropic", "openai"]
+  # Proxy-forwarded requests: honor the caller's explicit provider preference
+  proxy_copilot: ["copilot", "claude-code", "groq", "anthropic", "openai"]
+  proxy_claude-code: ["claude-code", "copilot", "groq", "anthropic", "openai"]
 
 # Task-to-tier mapping
 task_tiers:
