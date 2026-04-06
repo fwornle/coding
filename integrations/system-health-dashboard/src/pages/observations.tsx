@@ -33,6 +33,7 @@ function buildQueryString(filters: FilterState, page: number): string {
   if (filters.to) params.set('to', filters.to.includes('T') ? filters.to : `${filters.to}T23:59:59.999Z`)
   if (filters.project) params.set('project', filters.project)
   if (filters.q) params.set('q', filters.q)
+  if (filters.hideLow) params.set('quality', 'high,normal')
 
   return params.toString()
 }

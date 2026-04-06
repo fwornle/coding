@@ -3848,6 +3848,12 @@ class SystemHealthAPIServer {
                 params.project = project;
             }
 
+            if (req.query.quality) {
+                const qualities = Array.isArray(req.query.quality) ? req.query.quality : req.query.quality.split(',');
+                where.push(`COALESCE(quality, 'normal') IN (${qualities.map((_, i) => `@quality${i}`).join(',')})`);
+                qualities.forEach((q, i) => { params[`quality${i}`] = q; });
+            }
+
             if (q) {
                 // FTS5 full-text search per D-08 — fall back to LIKE if FTS table doesn't exist
                 try {
@@ -3871,7 +3877,8 @@ class SystemHealthAPIServer {
                        json_extract(metadata, '$.project') as project,
                        created_at as timestamp,
                        source_file as source,
-                       metadata
+                       metadata,
+                       COALESCE(quality, 'normal') as quality
                 FROM observations ${whereClause}
                 ORDER BY created_at DESC
                 LIMIT @limit OFFSET @offset

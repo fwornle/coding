@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -22,6 +21,7 @@ export interface FilterState {
   to: string
   project: string
   q: string
+  hideLow: boolean
 }
 
 interface ObservationFiltersProps {
@@ -46,6 +46,7 @@ export function getDefaultFilters(): FilterState {
     to: getDefaultTo(),
     project: '',
     q: '',
+    hideLow: false,
   }
 }
 
@@ -64,6 +65,19 @@ export function ObservationFilters({ filters, onApply }: ObservationFiltersProps
     setLocal(filters)
   }, [filters])
 
+  // Auto-apply on filter change (skip initial mount)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      onApply(local)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [local]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleAgent = (agent: string) => {
     setLocal(prev => ({
       ...prev,
@@ -71,10 +85,6 @@ export function ObservationFilters({ filters, onApply }: ObservationFiltersProps
         ? prev.agents.filter(a => a !== agent)
         : [...prev.agents, agent],
     }))
-  }
-
-  const handleApply = () => {
-    onApply(local)
   }
 
   return (
@@ -149,9 +159,17 @@ export function ObservationFilters({ filters, onApply }: ObservationFiltersProps
 
       <Separator />
 
-      <Button className="w-full" onClick={handleApply}>
-        Apply Filters
-      </Button>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="hide-low"
+          checked={local.hideLow}
+          onCheckedChange={(checked) => setLocal(prev => ({ ...prev, hideLow: !!checked }))}
+        />
+        <label htmlFor="hide-low" className="text-sm cursor-pointer">
+          Hide low-value
+        </label>
+      </div>
+
     </div>
   )
 }

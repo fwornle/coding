@@ -731,33 +731,65 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Fire-and-forget observation for a completed exchange.
-   * Per D-04: never awaited, errors logged to stderr, never blocks LSL.
+   * Fire observation for a COMPLETE prompt set (all exchanges).
+   * Builds a consolidated message list so the LLM sees the full picture:
+   * user intent + all tool calls + all assistant responses + final outcome.
    */
-  _fireObservation(exchange) {
+  _firePromptSetObservation(exchanges) {
     if (!this.observationWriter) return;
+    if (!exchanges || exchanges.length === 0) return;
 
     const messages = [];
-    if (exchange.userMessage) {
-      messages.push({
-        id: `${exchange.uuid}-user`,
-        role: 'user',
-        content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
-        createdAt: new Date(exchange.timestamp).toISOString(),
-        metadata: { agent: this.agentType, format: 'live' }
-      });
-    }
-    if (exchange.assistantMessage) {
-      messages.push({
-        id: `${exchange.uuid}-assistant`,
-        role: 'assistant',
-        content: typeof exchange.assistantMessage === 'string' ? exchange.assistantMessage : JSON.stringify(exchange.assistantMessage),
-        createdAt: new Date(exchange.timestamp).toISOString(),
-        metadata: { agent: this.agentType, format: 'live' }
-      });
+    for (const exchange of exchanges) {
+      // User message (only from first exchange to avoid repeating the prompt)
+      if (exchange.userMessage && messages.length === 0) {
+        messages.push({
+          id: `${exchange.uuid || exchange.id}-user`,
+          role: 'user',
+          content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
+          createdAt: new Date(exchange.timestamp).toISOString(),
+          metadata: { agent: this.agentType, format: 'live' }
+        });
+      }
+
+      // Build assistant content: tool call summary + text response
+      let assistantContent = '';
+      if (exchange.toolCalls && exchange.toolCalls.length > 0) {
+        const toolSummary = exchange.toolCalls.map(tc => {
+          const inp = tc.input || {};
+          if (tc.name === 'Edit' || tc.name === 'Write') {
+            return `${tc.name}: ${inp.file_path || 'unknown file'}`;
+          } else if (tc.name === 'Read') {
+            return `Read: ${inp.file_path || 'unknown file'}`;
+          } else if (tc.name === 'Bash') {
+            const cmd = (inp.command || '').slice(0, 120);
+            return `Bash: ${cmd}`;
+          } else if (tc.name === 'Grep' || tc.name === 'Glob') {
+            return `${tc.name}: ${inp.pattern || ''} in ${inp.path || '.'}`;
+          } else {
+            return tc.name;
+          }
+        }).join('\n');
+        assistantContent += `[Tool calls]\n${toolSummary}\n\n`;
+      }
+      const resp = exchange.assistantMessage || exchange.claudeResponse;
+      if (resp) {
+        const respStr = typeof resp === 'string' ? resp : JSON.stringify(resp);
+        assistantContent += respStr;
+      }
+
+      if (assistantContent) {
+        messages.push({
+          id: `${exchange.uuid || exchange.id}-assistant`,
+          role: 'assistant',
+          content: assistantContent,
+          createdAt: new Date(exchange.timestamp).toISOString(),
+          metadata: { agent: this.agentType, format: 'live' }
+        });
+      }
     }
 
-    if (messages.length === 0) return;
+    if (messages.length < 2) return; // Need at least user + assistant
 
     // Fire-and-forget: do NOT await. Per D-04 and D-05.
     this.observationWriter.processMessages(messages, {
@@ -766,7 +798,7 @@ class EnhancedTranscriptMonitor {
       sourceFile: 'live-etm',
       project: path.basename(this.config.projectPath || ''),
     }).catch(err => {
-      process.stderr.write(`[ObservationTap] Error: ${err.message}\n`);
+      process.stderr.write(`[ObservationTap] PromptSet error: ${err.message}\n`);
     });
   }
 
@@ -2766,6 +2798,10 @@ class EnhancedTranscriptMonitor {
       }
     }
 
+    // Fire observation for the COMPLETED prompt set — the LLM sees ALL exchanges
+    // (user prompt + every tool call + every assistant response) in one shot.
+    this._firePromptSetObservation(meaningfulExchanges);
+
     // CRITICAL: Update lastProcessedUuid ONLY when prompt set is successfully written
     // This ensures incomplete exchanges are re-processed on subsequent cycles until
     // they have full content (assistant response + tool calls)
@@ -3112,8 +3148,9 @@ class EnhancedTranscriptMonitor {
         }
       }
 
-      // Observation tap - fire-and-forget per D-01, D-04
-      this._fireObservation(exchange);
+      // Observations now fire at prompt-set level in processUserPromptSetCompletion,
+      // not per-exchange. This ensures the LLM sees ALL tool calls, edits, and outcomes
+      // before generating the summary — not just the first exchange.
 
       if (exchange.isUserPrompt) {
         userPromptCount++;
@@ -3206,6 +3243,8 @@ class EnhancedTranscriptMonitor {
       // this.lastProcessedUuid = exchange.id;  // DISABLED
       this.exchangeCount++;
     }
+
+    // No per-exchange observation flush needed — observations fire at prompt-set level
 
     // REMOVED: Save moved to processUserPromptSetCompletion
     // this.saveLastProcessedUuid();  // DISABLED
