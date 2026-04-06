@@ -75,6 +75,7 @@ function renderMarkdown(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-muted rounded text-xs font-mono">$1</code>')
     .replace(/^- /gm, '• ')
+    .replace(/^(Intent|Approach|Outcome|Status):/gm, '<strong>$1:</strong>')
 }
 
 function formatLlmTag(obs: Observation): string | null {
@@ -128,7 +129,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
       <Card
-        className={`transition-colors ${
+        className={`transition-colors overflow-hidden ${
           isExpanded
             ? `bg-accent border-l-[3px] ${borderColor}`
             : 'hover:bg-accent/50'
@@ -163,6 +164,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
           <CardContent className="pt-0 pb-4">
             <div
               className="whitespace-pre-wrap text-sm [&_strong]:font-semibold [&_code]:text-xs"
+              style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
               dangerouslySetInnerHTML={{ __html: renderMarkdown(observation.content) }}
             />
             {/* LLM details footer */}
