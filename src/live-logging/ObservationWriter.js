@@ -85,11 +85,9 @@ export class ObservationWriter {
       )
     `);
 
-    // Add content_hash column for input-based dedup (idempotent)
-    try {
-      this.db.exec(`ALTER TABLE observations ADD COLUMN content_hash TEXT`);
-    } catch {
-      // Column already exists — ignore
+    // Add columns for dedup and quality (idempotent)
+    for (const col of ['content_hash TEXT', 'quality TEXT DEFAULT "normal"']) {
+      try { this.db.exec(`ALTER TABLE observations ADD COLUMN ${col}`); } catch { /* exists */ }
     }
     // Index for fast dedup lookups
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)`);
@@ -110,9 +108,7 @@ export class ObservationWriter {
    * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
    */
   async summarize(messages, metadata = {}) {
-    const projectHint = metadata.project
-      ? ` The agent is working in project "${metadata.project}".`
-      : '';
+    const projectName = metadata.project || 'unknown';
 
     // Wrap the exchange in XML tags so the LLM treats it as data to analyze, not content to relay
     const exchangeBlock = messages
@@ -125,21 +121,27 @@ export class ObservationWriter {
         messages: [
           {
             role: 'system',
-            content: 'You produce structured observation summaries from coding exchanges. ' +
-              'You MUST respond using ONLY this exact template — nothing else:\n\n' +
-              'Intent: [one sentence — what the developer asked for]\n' +
-              'Approach: [one sentence — key actions taken: files edited, tools used, commands run]\n' +
-              'Outcome: [one sentence — what was achieved or learned]\n' +
+            content: `You produce structured observation summaries from coding exchanges.\n` +
+              `CRITICAL CONTEXT: The developer is working in the "${projectName}" project. ` +
+              `The exchange below happened in that project. System prompts, CLAUDE.md content, ` +
+              `and file paths from OTHER projects appearing in the exchange are background context ` +
+              `or cross-project investigations — they are NOT what the developer asked about. ` +
+              `Only describe what the developer actually requested in their message.\n\n` +
+              'Respond using ONLY this template — nothing else:\n\n' +
+              'Intent: [what the developer actually asked or requested — base this ONLY on the <user> message content]\n' +
+              'Approach: [key actions taken — 1-3 sentences]\n' +
+              'Artifacts: [list each file modified/created/deleted with verb, e.g. "edited src/foo.ts, created lib/bar.js". Write "none" if no files were touched]\n' +
+              'Outcome: [what was achieved, learned, or decided — 1-3 sentences]\n' +
               'Status: [done | in-progress | blocked | needs-followup]\n\n' +
               'Constraints:\n' +
-              '- Your ENTIRE response must be these 4 lines. Nothing before, nothing after.\n' +
+              '- Your ENTIRE response must be these 5 labeled lines. Nothing before, nothing after.\n' +
               '- Never reproduce code, commands, file contents, or the assistant\'s words.\n' +
-              '- If the exchange has no real work, respond with only: "No actionable content."' +
-              projectHint,
+              '- Intent MUST reflect the user\'s actual question/request, not inferred topics from system context.\n' +
+              '- If the exchange has no real work (greetings, "yes", "proceed"), respond with only: "No actionable content."',
           },
           {
             role: 'user',
-            content: '<exchange>\n' + exchangeBlock + '\n</exchange>\n\nProduce the 4-line observation summary.',
+            content: `<project>${projectName}</project>\n<exchange>\n` + exchangeBlock + '\n</exchange>\n\nProduce the observation summary.',
           },
         ],
       };
@@ -197,9 +199,10 @@ export class ObservationWriter {
       throw new Error('Database not initialized. Call init() first.');
     }
 
-    // Skip trivial observations
-    if (summary.toLowerCase().includes('trivial exchange') || summary.toLowerCase().includes('no actionable content')) {
-      process.stderr.write(`[ObservationWriter] Skipping trivial observation\n`);
+    // Skip trivial and raw observations (no value for learning)
+    const lower = summary.toLowerCase();
+    if (lower.includes('trivial exchange') || lower.includes('no actionable content') || summary.startsWith('[Raw]')) {
+      process.stderr.write(`[ObservationWriter] Skipping low-value observation\n`);
       return null;
     }
 
@@ -220,12 +223,21 @@ export class ObservationWriter {
       return null;
     }
 
+    // Semantic dedup: check if a very similar observation was written recently (same agent, last 5)
+    if (this._isSemanticallyDuplicate(agent, summary)) {
+      process.stderr.write(`[ObservationWriter] Dedup: semantically similar observation already exists\n`);
+      return null;
+    }
+
+    // Classify observation quality
+    const quality = this._classifyQuality(summary);
+
     const id = crypto.randomUUID();
     const nowISO = new Date().toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata, content_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata, content_hash, quality)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -238,9 +250,88 @@ export class ObservationWriter {
       nowISO,
       JSON.stringify(metadata),
       contentHash,
+      quality,
     );
 
     return id;
+  }
+
+  /**
+   * Check if a semantically similar observation already exists for this agent.
+   * Extracts the Intent line and compares word overlap with recent observations.
+   */
+  _isSemanticallyDuplicate(agent, summary) {
+    if (!this.db) return false;
+
+    // Extract Intent line from new summary
+    const newIntent = this._extractIntent(summary);
+    if (!newIntent || newIntent.length < 20) return false;
+
+    // Get recent observations for this agent (last 10)
+    const recent = this.db.prepare(
+      'SELECT summary FROM observations WHERE agent = ? ORDER BY created_at DESC LIMIT 10'
+    ).all(agent);
+
+    const newWords = new Set(newIntent.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    if (newWords.size < 3) return false;
+
+    for (const row of recent) {
+      const existingIntent = this._extractIntent(row.summary);
+      if (!existingIntent) continue;
+
+      const existingWords = new Set(existingIntent.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+      if (existingWords.size < 3) continue;
+
+      // Calculate Jaccard similarity
+      let intersection = 0;
+      for (const w of newWords) {
+        if (existingWords.has(w)) intersection++;
+      }
+      const union = new Set([...newWords, ...existingWords]).size;
+      const similarity = intersection / union;
+
+      if (similarity > 0.7) return true;
+    }
+    return false;
+  }
+
+  /** Extract the Intent line from a structured observation summary */
+  _extractIntent(summary) {
+    const match = summary.match(/^Intent:\s*(.+)$/m);
+    return match ? match[1].trim() : null;
+  }
+
+  /**
+   * Classify observation quality based on summary content.
+   * Returns: "high" (actionable work done), "normal" (question/investigation), "low" (no tools, inconclusive, raw)
+   */
+  _classifyQuality(summary) {
+    const lower = summary.toLowerCase();
+
+    // Raw/failed summaries are always low
+    if (lower.startsWith('[raw]')) return 'low';
+
+    // Low-value indicators
+    const lowPatterns = [
+      'no tools were used', 'no tools were invoked', 'no files were',
+      'no actionable content', 'no resolution', 'no diagnosis',
+      'needs-followup', 'needs followup',
+      'no assistant response', 'no answer or investigation',
+      'the exchange contains only a question',
+      'not examined', 'not investigated',
+    ];
+    if (lowPatterns.some(p => lower.includes(p))) return 'low';
+
+    // High-value indicators — actual work was done
+    const highPatterns = [
+      'edited', 'fixed', 'created', 'updated', 'refactored',
+      'implemented', 'configured', 'installed', 'deployed',
+      'committed', 'merged', 'resolved',
+      'status: done',
+    ];
+    if (highPatterns.some(p => lower.includes(p))) return 'high';
+
+    return 'normal';
   }
 
   /**

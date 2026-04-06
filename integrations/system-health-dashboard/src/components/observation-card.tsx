@@ -27,6 +27,7 @@ export interface Observation {
   llmProvider?: string
   llmTokens?: string | LlmTokens | null
   llmLatencyMs?: number | null
+  quality?: 'high' | 'normal' | 'low'
 }
 
 interface ObservationCardProps {
@@ -75,7 +76,7 @@ function renderMarkdown(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-muted rounded text-xs font-mono">$1</code>')
     .replace(/^- /gm, '• ')
-    .replace(/^(Intent|Approach|Outcome|Status):/gm, '<strong>$1:</strong>')
+    .replace(/^(Intent|Approach|Artifacts|Outcome|Status):/gm, '<strong>$1:</strong>')
 }
 
 function formatLlmTag(obs: Observation): string | null {
@@ -97,12 +98,13 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   const borderColor = AGENT_BORDER_COLORS[observation.agent] || 'border-l-blue-500'
   const llmTag = formatLlmTag(observation)
   const tokens = parseTokens(observation.llmTokens)
+  const isLow = observation.quality === 'low'
 
   if (compact && !isExpanded) {
     // Single-line compact row
     return (
       <div
-        className={`flex items-center gap-2 px-3 py-1 cursor-pointer rounded hover:bg-accent/50 border-l-2 ${borderColor}`}
+        className={`flex items-center gap-2 px-3 py-1 cursor-pointer rounded hover:bg-accent/50 border-l-2 ${borderColor} ${isLow ? 'opacity-40' : ''}`}
         onClick={onToggle}
       >
         <AgentBadge agent={observation.agent} />
@@ -129,7 +131,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
       <Card
-        className={`transition-colors overflow-hidden ${
+        className={`transition-colors overflow-hidden ${isLow ? 'opacity-40' : ''} ${
           isExpanded
             ? `bg-accent border-l-[3px] ${borderColor}`
             : 'hover:bg-accent/50'
