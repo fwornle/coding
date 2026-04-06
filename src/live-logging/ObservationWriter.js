@@ -27,7 +27,7 @@ function loadConfig(configPath) {
   } catch {
     return {
       defaults: {
-        model: 'google/gemini-2.5-flash',
+        model: 'anthropic/claude-haiku-4-5',
         observation: { messageTokens: 20000, bufferTokens: 0.2 },
       },
     };
