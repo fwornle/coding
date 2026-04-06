@@ -347,6 +347,16 @@ class StatusLineHealthMonitor {
           // agent not running is normal
         }
 
+        // Mastra runs as "node /opt/homebrew/bin/mastracode", so comm is "node" not "mastra".
+        // Fall back to args-based detection if comm-based detection found nothing.
+        if (agentName === 'mastra' && (!agentLines || !agentLines.trim())) {
+          try {
+            agentLines = execSync(`ps -eo pid,etime,args | awk '/\\/mastracode( |$)/ && !/awk/ {print $1, $2}'`, { encoding: 'utf8', timeout: 5000 });
+          } catch (psError) {
+            // mastracode not running is normal
+          }
+        }
+
         if (agentLines && agentLines.trim()) {
           for (const line of agentLines.trim().split('\n')) {
             const [pid, etime] = line.trim().split(/\s+/);
