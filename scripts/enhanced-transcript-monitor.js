@@ -458,7 +458,44 @@ class EnhancedTranscriptMonitor {
           const stats = fs.statSync(tPath);
           currentSize = stats.size;
         }
-        if (currentSize === tracker.lastFileSize) continue;
+        if (currentSize === tracker.lastFileSize) {
+          // No new content — but check if this transcript has a stale prompt set to flush.
+          // This is the KEY path: assistant finished responding, waiting for user input.
+          // The prompt set is complete and should be flushed as an observation.
+          if (tracker.currentUserPromptSet && tracker.currentUserPromptSet.length > 0) {
+            const lastTs = tracker.currentUserPromptSet[tracker.currentUserPromptSet.length - 1].timestamp;
+            const setAge = Date.now() - new Date(lastTs).getTime();
+            if (setAge > 10000) {
+              // Swap state to this transcript's context for the flush
+              const savedPath = this.transcriptPath;
+              const savedUuid = this.lastProcessedUuid;
+              const savedAgent = this.agentType;
+              this.transcriptPath = tPath;
+              this.lastProcessedUuid = tracker.lastProcessedUuid;
+              this.agentType = tracker.agentType;
+
+              const setTranche = this.getCurrentTimetranche(tracker.currentUserPromptSet[0].timestamp);
+              const target = await this.determineTargetProject(tracker.currentUserPromptSet[0]);
+              this.debug(`⏰ Flushing stale prompt set (no new content, ${Math.round(setAge/1000)}s old): ${tracker.currentUserPromptSet.length} exchanges from ${path.basename(tPath)}`);
+              if (target !== null) {
+                await this.processUserPromptSetCompletion(tracker.currentUserPromptSet, target, setTranche);
+              } else {
+                this._firePromptSetObservation(tracker.currentUserPromptSet);
+              }
+              tracker.currentUserPromptSet = [];
+              // Update lastProcessedUuid from the flushed set
+              tracker.lastProcessedUuid = this.lastProcessedUuid;
+              this._saveMultiTranscriptState();
+
+              // Restore
+              this.transcriptPath = savedPath;
+              this.lastProcessedUuid = savedUuid;
+              this.agentType = savedAgent;
+              anyNewContent = true; // trigger activity timestamp update
+            }
+          }
+          continue;
+        }
 
         // New content detected in this transcript
         anyNewContent = true;
@@ -472,6 +509,9 @@ class EnhancedTranscriptMonitor {
           const flushTarget = await this.determineTargetProject(this.currentUserPromptSet[0]);
           if (flushTarget !== null) {
             await this.processUserPromptSetCompletion(this.currentUserPromptSet, flushTarget, flushTranche);
+          } else {
+            // Not coding-related — skip LSL but still fire observation
+            this._firePromptSetObservation(this.currentUserPromptSet);
           }
           this.currentUserPromptSet = [];
         }
@@ -512,6 +552,9 @@ class EnhancedTranscriptMonitor {
               if (target !== null) {
                 this.debug(`⏰ Flushing per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
                 await this.processUserPromptSetCompletion(this.currentUserPromptSet, target, setTranche);
+              } else {
+                // Not coding-related — skip LSL but still fire observation
+                this._firePromptSetObservation(this.currentUserPromptSet);
               }
               this.currentUserPromptSet = [];
             }
@@ -2112,28 +2155,25 @@ class EnhancedTranscriptMonitor {
 
     const exchanges = await this.extractExchanges(messages);
 
-    // Filter to unprocessed exchanges
-    // FIX: ALWAYS use message-based filtering to ensure we capture assistant responses
-    // that came after lastProcessedUuid, even if they're part of a previous exchange
+    // Filter to unprocessed exchanges using the FULL exchange list (which correctly
+    // splits on user prompts). An exchange is unprocessed if its lastMessageUuid
+    // comes after lastProcessedUuid in the message stream.
     let unprocessed;
-    let lastProcessedMsgIndex = -1;
 
     if (!this.lastProcessedUuid) {
       unprocessed = exchanges.slice(-10);
     } else {
-      // CRITICAL FIX: Always filter by MESSAGE index, not exchange index
-      // This ensures assistant responses after lastProcessedUuid are captured,
-      // even if they belong to the same exchange as the user prompt
-      lastProcessedMsgIndex = messages.findIndex(msg => msg.uuid === this.lastProcessedUuid);
+      // Find which message lastProcessedUuid corresponds to
+      const lastProcessedMsgIndex = messages.findIndex(msg => msg.uuid === this.lastProcessedUuid);
       if (lastProcessedMsgIndex >= 0) {
-        // Extract exchanges only from messages after this point
-        const remainingMessages = messages.slice(lastProcessedMsgIndex + 1);
-        if (remainingMessages.length > 0) {
-          this.debug(`🔍 Extracting from ${remainingMessages.length} messages after lastProcessedUuid (msg index ${lastProcessedMsgIndex})`);
-          unprocessed = await this.extractExchanges(remainingMessages);
-        } else {
-          unprocessed = [];
-        }
+        // Find exchanges that contain messages AFTER lastProcessedUuid.
+        // An exchange is unprocessed if its lastMessageUuid is after lastProcessedMsgIndex.
+        unprocessed = exchanges.filter(ex => {
+          const exLastUuid = ex.lastMessageUuid || ex.id;
+          const exMsgIndex = messages.findIndex(m => m.uuid === exLastUuid);
+          return exMsgIndex > lastProcessedMsgIndex;
+        });
+        this.debug(`🔍 Found ${unprocessed.length} unprocessed exchanges (${unprocessed.filter(e => e.isUserPrompt).length} user prompts) after msg index ${lastProcessedMsgIndex}`);
       } else {
         // UUID not found in messages, fall back to last 10 exchanges
         this.debug(`⚠️ lastProcessedUuid not found in messages, using last 10 exchanges`);
@@ -2141,70 +2181,6 @@ class EnhancedTranscriptMonitor {
       }
     }
 
-    // FIX: If unprocessed is empty but there are messages after lastProcessedUuid,
-    // create a continuation exchange to capture assistant responses and tool results
-    if (unprocessed.length === 0 && lastProcessedMsgIndex >= 0) {
-      const messagesAfter = messages.slice(lastProcessedMsgIndex + 1);
-      if (messagesAfter.length > 0) {
-        const firstMsgAfter = messagesAfter[0];
-        const isUserPrompt = firstMsgAfter.type === 'user' &&
-          firstMsgAfter.message?.role === 'user' &&
-          !this.isToolResultMessage(firstMsgAfter);
-
-        if (!isUserPrompt) {
-          // Create continuation exchange manually
-          const continuationExchange = {
-            id: firstMsgAfter.uuid || `continuation_${Date.now()}`,
-            timestamp: firstMsgAfter.timestamp || new Date().toISOString(),
-            userMessage: '',
-            claudeResponse: '',
-            toolCalls: [],
-            toolResults: [],
-            isUserPrompt: false,
-            isComplete: true,  // FIX: Continuation exchanges ARE complete - they contain accumulated content
-            stopReason: 'continuation',
-            isContinuation: true,
-            lastMessageUuid: firstMsgAfter.uuid
-          };
-
-          // Accumulate content from all messages after lastProcessedUuid
-          for (const msg of messagesAfter) {
-            if (msg.type === 'assistant' && msg.message?.content) {
-              if (Array.isArray(msg.message.content)) {
-                for (const item of msg.message.content) {
-                  if (item.type === 'text') {
-                    continuationExchange.claudeResponse += item.text + '\n';
-                  } else if (item.type === 'tool_use') {
-                    continuationExchange.toolCalls.push({
-                      name: item.name,
-                      input: item.input,
-                      id: item.id
-                    });
-                  }
-                }
-              }
-              if (msg.uuid) continuationExchange.lastMessageUuid = msg.uuid;
-            } else if (msg.type === 'user' && msg.message?.content && Array.isArray(msg.message.content)) {
-              for (const item of msg.message.content) {
-                if (item.type === 'tool_result') {
-                  continuationExchange.toolResults.push({
-                    tool_use_id: item.tool_use_id,
-                    content: item.content,
-                    is_error: item.is_error || false
-                  });
-                }
-              }
-              if (msg.uuid) continuationExchange.lastMessageUuid = msg.uuid;
-            }
-          }
-
-          this.debug(`📎 Created continuation exchange from ${messagesAfter.length} messages after lastProcessedUuid`);
-          unprocessed = [continuationExchange];
-        }
-      }
-    }
-
-    // Return all unprocessed exchanges - filtering moved to processUserPromptSetCompletion
     return unprocessed;
   }
 
@@ -3187,7 +3163,8 @@ class EnhancedTranscriptMonitor {
                   this.currentUserPromptSet = [];
                 }
               } else {
-                // Skip non-relevant exchanges
+                // Not coding-related — skip LSL writing but still fire observation
+                this._firePromptSetObservation(this.currentUserPromptSet);
                 this.currentUserPromptSet = [];
               }
             }
@@ -3210,7 +3187,9 @@ class EnhancedTranscriptMonitor {
                   this.currentUserPromptSet = [];
                 }
               } else {
-                // Skip non-relevant exchanges
+                // Not coding-related — skip LSL writing but still fire observation
+                // Observations are about learning, not about LSL file routing
+                this._firePromptSetObservation(this.currentUserPromptSet);
                 this.currentUserPromptSet = [];
               }
 
