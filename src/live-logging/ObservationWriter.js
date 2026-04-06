@@ -85,6 +85,15 @@ export class ObservationWriter {
       )
     `);
 
+    // Add content_hash column for input-based dedup (idempotent)
+    try {
+      this.db.exec(`ALTER TABLE observations ADD COLUMN content_hash TEXT`);
+    } catch {
+      // Column already exists — ignore
+    }
+    // Index for fast dedup lookups
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)`);
+
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
   }
 
@@ -194,13 +203,20 @@ export class ObservationWriter {
       return null;
     }
 
-    // DB-level dedup: check if same summary already exists for this agent
     const agent = metadata.agent || null;
+
+    // Content-based dedup: hash the user message content (stable across LLM re-summarizations)
+    const userContent = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.content)
+      .join('|');
+    const contentHash = crypto.createHash('md5').update(userContent).digest('hex');
+
     const existing = this.db.prepare(
-      'SELECT id FROM observations WHERE agent = ? AND summary = ? LIMIT 1'
-    ).get(agent, summary);
+      'SELECT id FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
+    ).get(agent, contentHash);
     if (existing) {
-      process.stderr.write(`[ObservationWriter] Dedup: identical summary already in DB\n`);
+      process.stderr.write(`[ObservationWriter] Dedup: same input already observed (hash=${contentHash.slice(0, 8)})\n`);
       return null;
     }
 
@@ -208,19 +224,20 @@ export class ObservationWriter {
     const nowISO = new Date().toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata, content_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id,
       summary,
       JSON.stringify(messages),
-      metadata.agent || null,
+      agent,
       metadata.sessionId || null,
       metadata.sourceFile || null,
       nowISO,
       JSON.stringify(metadata),
+      contentHash,
     );
 
     return id;
