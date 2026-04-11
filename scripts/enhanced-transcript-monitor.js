@@ -466,6 +466,18 @@ class EnhancedTranscriptMonitor {
             const lastTs = tracker.currentUserPromptSet[tracker.currentUserPromptSet.length - 1].timestamp;
             const setAge = Date.now() - new Date(lastTs).getTime();
             if (setAge > 10000) {
+              // Check agent-specific completion before flushing
+              const completionState = this.isAssistantComplete(tPath, tracker.agentType, tracker.currentUserPromptSet);
+              if (!completionState.complete) {
+                // Safety cap: force flush after 5 minutes to prevent infinite buffering
+                const firstTs = tracker.currentUserPromptSet[0].timestamp;
+                const setDuration = Date.now() - new Date(firstTs).getTime();
+                if (setDuration <= 5 * 60 * 1000) {
+                  this.debug(`⏳ Deferring flush (${Math.round(setAge/1000)}s old): ${completionState.reason}`);
+                  continue;
+                }
+                this.debug(`⚠️ Force-flushing after ${Math.round(setDuration/60000)}min despite: ${completionState.reason}`);
+              }
               // Swap state to this transcript's context for the flush
               const savedPath = this.transcriptPath;
               const savedUuid = this.lastProcessedUuid;
@@ -546,17 +558,26 @@ class EnhancedTranscriptMonitor {
             const isStale = setAge > 10000;
             const isLongRunning = setDuration > 5 * 60 * 1000;
             if (isStale || isLongRunning) {
-              const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-              const target = await this.determineTargetProject(this.currentUserPromptSet[0]);
-              const reason = isLongRunning ? `long-running (${Math.round(setDuration/60000)}min)` : `stale (${Math.round(setAge/1000)}s)`;
-              if (target !== null) {
-                this.debug(`⏰ Flushing per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
-                await this.processUserPromptSetCompletion(this.currentUserPromptSet, target, setTranche);
+              // Check agent-specific completion before flushing
+              const completionState = this.isAssistantComplete(tPath, tracker.agentType, this.currentUserPromptSet);
+              if (!completionState.complete && !isLongRunning) {
+                this.debug(`⏳ Deferring per-transcript flush (${Math.round(setAge/1000)}s old): ${completionState.reason}`);
               } else {
-                // Not coding-related — skip LSL but still fire observation
-                this._firePromptSetObservation(this.currentUserPromptSet);
+                if (!completionState.complete) {
+                  this.debug(`⚠️ Force-flushing per-transcript set after ${Math.round(setDuration/60000)}min despite: ${completionState.reason}`);
+                }
+                const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+                const target = await this.determineTargetProject(this.currentUserPromptSet[0]);
+                const reason = isLongRunning ? `long-running (${Math.round(setDuration/60000)}min)` : `stale (${Math.round(setAge/1000)}s), ${completionState.reason}`;
+                if (target !== null) {
+                  this.debug(`⏰ Flushing per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
+                  await this.processUserPromptSetCompletion(this.currentUserPromptSet, target, setTranche);
+                } else {
+                  // Not coding-related — skip LSL but still fire observation
+                  this._firePromptSetObservation(this.currentUserPromptSet);
+                }
+                this.currentUserPromptSet = [];
               }
-              this.currentUserPromptSet = [];
             }
           }
 
@@ -784,8 +805,9 @@ class EnhancedTranscriptMonitor {
 
     const messages = [];
     for (const exchange of exchanges) {
-      // User message (only from first exchange to avoid repeating the prompt)
-      if (exchange.userMessage && messages.length === 0) {
+      // Include user messages from ALL exchanges so the LLM sees the full context
+      // (clarifications, follow-ups within the same prompt set)
+      if (exchange.userMessage) {
         messages.push({
           id: `${exchange.uuid || exchange.id}-user`,
           role: 'user',
@@ -834,12 +856,32 @@ class EnhancedTranscriptMonitor {
 
     if (messages.length < 2) return; // Need at least user + assistant
 
+    // Extract modified files programmatically from tool calls (ground truth, not LLM-inferred)
+    const modifiedFiles = [];
+    const readFiles = [];
+    for (const exchange of exchanges) {
+      if (exchange.toolCalls) {
+        for (const tc of exchange.toolCalls) {
+          const filePath = tc.input?.file_path || tc.input?.filePath;
+          if (filePath) {
+            if (tc.name === 'Edit' || tc.name === 'Write') {
+              if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
+            } else if (tc.name === 'Read') {
+              if (!readFiles.includes(filePath)) readFiles.push(filePath);
+            }
+          }
+        }
+      }
+    }
+
     // Fire-and-forget: do NOT await. Per D-04 and D-05.
     this.observationWriter.processMessages(messages, {
       agent: this.agentType,
       sessionId: this.sessionId || null,
       sourceFile: 'live-etm',
       project: path.basename(this.config.projectPath || ''),
+      modifiedFiles: modifiedFiles.length > 0 ? modifiedFiles : undefined,
+      readFiles: readFiles.length > 0 ? readFiles : undefined,
     }).catch(err => {
       process.stderr.write(`[ObservationTap] PromptSet error: ${err.message}\n`);
     });
@@ -1229,6 +1271,8 @@ class EnhancedTranscriptMonitor {
                       this.currentUserPromptSet = [];
                     }
                   } else {
+                    // Not coding-related — skip LSL but still fire observation
+                    this._firePromptSetObservation(this.currentUserPromptSet);
                     this.currentUserPromptSet = [];
                   }
                 }
@@ -1245,6 +1289,8 @@ class EnhancedTranscriptMonitor {
                       this.currentUserPromptSet = [];
                     }
                   } else {
+                    // Not coding-related — skip LSL but still fire observation
+                    this._firePromptSetObservation(this.currentUserPromptSet);
                     this.currentUserPromptSet = [];
                   }
                 }
@@ -1273,6 +1319,8 @@ class EnhancedTranscriptMonitor {
               this.currentUserPromptSet = [];
             }
           } else {
+            // Not coding-related — skip LSL but still fire observation
+            this._firePromptSetObservation(this.currentUserPromptSet);
             this.currentUserPromptSet = [];
           }
         }
@@ -1489,6 +1537,122 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * Check if the assistant has finished responding for a given transcript.
+   * Uses agent-specific completion signals to avoid flushing mid-response.
+   *
+   * @param {string} transcriptPath - The transcript path (file path or virtual opencode:// path)
+   * @param {string} agentType - Agent type: 'opencode', 'claude', 'copilot', 'mastra'
+   * @param {Array} promptSet - Current prompt set exchanges (used for fallback heuristics)
+   * @returns {{ complete: boolean, reason: string }}
+   */
+  isAssistantComplete(transcriptPath, agentType, promptSet) {
+    // OpenCode: query SQLite for definitive finish signal
+    if (this.isOpenCodePath(transcriptPath)) {
+      const sessionId = this.getOpenCodeSessionId(transcriptPath);
+
+      // Strategy: Check if a new user message has arrived AFTER the last exchange
+      // in the prompt set. If so, the previous prompt set is definitionally complete
+      // (the user moved on to a new prompt).
+      const lastExchange = promptSet[promptSet.length - 1];
+      const lastExchangeTs = lastExchange ? new Date(lastExchange.timestamp).getTime() : 0;
+      const newUserMsg = this._hasNewUserMessageAfter(sessionId, lastExchangeTs);
+      if (newUserMsg) {
+        return { complete: true, reason: 'new user message arrived after prompt set' };
+      }
+
+      // No new user message — check if the latest assistant message for this
+      // prompt set has a completion signal
+      const state = this.getOpenCodeCompletionState(sessionId);
+
+      if (!state.complete) {
+        if (state.hasToolsPending) {
+          return { complete: false, reason: 'tools still pending/running' };
+        }
+        if (state.finish === null) {
+          return { complete: false, reason: 'assistant still generating (no finish signal)' };
+        }
+        return { complete: false, reason: 'completion state incomplete' };
+      }
+
+      // finish='stop' means the assistant delivered a final text response — prompt set is done
+      if (state.finish === 'stop') {
+        return { complete: true, reason: 'assistant finish=stop' };
+      }
+
+      // finish='tool-calls' with no pending tools — the tools completed
+      if (state.finish === 'tool-calls' && !state.hasToolsPending) {
+        return { complete: true, reason: 'assistant finish=tool-calls, all tools done' };
+      }
+
+      return { complete: false, reason: `finish=${state.finish}, tools pending=${state.hasToolsPending}` };
+    }
+
+    // Claude Code: check if the last exchange in the prompt set has a stop_reason
+    if (agentType === 'claude') {
+      const lastExchange = promptSet[promptSet.length - 1];
+      if (lastExchange?.stopReason === 'end_turn' || lastExchange?.stopReason === 'stop') {
+        return { complete: true, reason: `stop_reason=${lastExchange.stopReason}` };
+      }
+      // Claude transcripts append claude_turn_end when the turn is done.
+      // If we have a non-empty assistant response, and the file hasn't grown in 10s,
+      // it's likely complete (Claude doesn't have a reliable end_turn for text responses).
+      if (lastExchange?.claudeResponse || lastExchange?.assistantMessage) {
+        return { complete: true, reason: 'has assistant response (Claude structural)' };
+      }
+      return { complete: false, reason: 'no assistant response yet' };
+    }
+
+    // Copilot: assistant.message events are only emitted when the response is complete
+    if (agentType === 'copilot') {
+      const lastExchange = promptSet[promptSet.length - 1];
+      if (lastExchange?.claudeResponse || lastExchange?.assistantMessage) {
+        return { complete: true, reason: 'copilot assistant.message received' };
+      }
+      return { complete: false, reason: 'no copilot response yet' };
+    }
+
+    // Mastra: the Stop hook fires when the assistant finishes, so any assistant
+    // message in the transcript means the response is complete
+    if (agentType === 'mastra') {
+      const lastExchange = promptSet[promptSet.length - 1];
+      if (lastExchange?.claudeResponse || lastExchange?.assistantMessage) {
+        return { complete: true, reason: 'mastra Stop hook fired' };
+      }
+      return { complete: false, reason: 'no mastra response yet' };
+    }
+
+    // Unknown agent — fall back to assuming complete (preserve existing behavior)
+    return { complete: true, reason: 'unknown agent type, defaulting to complete' };
+  }
+
+  /**
+   * Check if a new user message exists in the OpenCode DB after a given timestamp.
+   * Used to determine if the user has moved on to a new prompt, which means the
+   * previous prompt set is definitionally complete.
+   *
+   * @param {string} sessionId - OpenCode session ID
+   * @param {number} afterTimestamp - Unix ms timestamp to check after
+   * @returns {boolean}
+   */
+  _hasNewUserMessageAfter(sessionId, afterTimestamp) {
+    const dbPath = this.openCodeDbPath;
+    if (!fs.existsSync(dbPath)) return false;
+
+    try {
+      const execSync = _execSync;
+      const escapedId = sessionId.replace(/'/g, "''");
+      const query = `SELECT COUNT(*) FROM message WHERE session_id = '${escapedId}' AND json_extract(data, '$.role') = 'user' AND time_created > ${afterTimestamp};`;
+      const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
+        encoding: 'utf-8',
+        timeout: 3000
+      }).trim();
+      return (parseInt(result, 10) || 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Extract session ID from virtual OpenCode path
    */
   getOpenCodeSessionId(transcriptPath) {
@@ -1668,7 +1832,7 @@ class EnhancedTranscriptMonitor {
               message: {
                 role: 'assistant',
                 content,
-                stop_reason: msgData.finish || 'end_turn'
+                stop_reason: msgData.finish ?? undefined
               }
             });
           }
@@ -1700,6 +1864,56 @@ class EnhancedTranscriptMonitor {
       return parseInt(result, 10) || 0;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * Get the completion state of the latest assistant message in an OpenCode session.
+   * Used to determine if the assistant is still generating before flushing prompt sets.
+   *
+   * @param {string} sessionId - OpenCode session ID
+   * @returns {{ complete: boolean, finish: string|null, hasToolsPending: boolean }}
+   *   - complete: true if the last assistant message has a finish signal
+   *   - finish: 'stop' (text done), 'tool-calls' (intermediate), or null (still generating)
+   *   - hasToolsPending: true if any tool parts are in pending/running state
+   */
+  getOpenCodeCompletionState(sessionId) {
+    const dbPath = this.openCodeDbPath;
+    if (!fs.existsSync(dbPath)) return { complete: true, finish: null, hasToolsPending: false };
+
+    try {
+      const execSync = _execSync;
+      const escapedId = sessionId.replace(/'/g, "''");
+
+      // Get the latest assistant message's finish state and completion timestamp
+      const msgQuery = `SELECT json_extract(data, '$.finish') as finish, json_extract(data, '$.time.completed') as completed FROM message WHERE session_id = '${escapedId}' AND json_extract(data, '$.role') = 'assistant' ORDER BY time_created DESC LIMIT 1;`;
+      const msgResult = execSync(`sqlite3 "${dbPath}" "${msgQuery}"`, {
+        encoding: 'utf-8',
+        timeout: 3000
+      }).trim();
+
+      if (!msgResult) return { complete: true, finish: null, hasToolsPending: false };
+
+      const [finish, completed] = msgResult.split('|');
+      const hasFinish = finish && finish !== '' && finish !== 'null';
+      const hasCompleted = completed && completed !== '' && completed !== 'null';
+
+      // Check for pending/running tool parts in this session's latest messages
+      const toolQuery = `SELECT COUNT(*) FROM part WHERE session_id = '${escapedId}' AND json_extract(data, '$.type') = 'tool' AND (json_extract(data, '$.state.status') = 'pending' OR json_extract(data, '$.state.status') = 'running') AND message_id IN (SELECT id FROM message WHERE session_id = '${escapedId}' ORDER BY time_created DESC LIMIT 5);`;
+      const toolResult = execSync(`sqlite3 "${dbPath}" "${toolQuery}"`, {
+        encoding: 'utf-8',
+        timeout: 3000
+      }).trim();
+      const pendingTools = parseInt(toolResult, 10) || 0;
+
+      return {
+        complete: hasFinish && hasCompleted && pendingTools === 0,
+        finish: hasFinish ? finish : null,
+        hasToolsPending: pendingTools > 0
+      };
+    } catch (error) {
+      this.debug(`Error getting OpenCode completion state: ${error.message}`);
+      return { complete: true, finish: null, hasToolsPending: false }; // fail-open
     }
   }
 
@@ -2248,18 +2462,28 @@ class EnhancedTranscriptMonitor {
     
     // Regular 'all' mode logic - running from outside coding
     // (coding directory case is handled above, before mode check)
-    // Check ALL exchanges for coding content (not just first one)
+    // Require majority of exchanges to be coding-related before redirecting
+    // This prevents a single false positive from routing entire prompt sets away
+    let codingCount = 0;
+    let totalCount = 0;
     for (const exchange of exchanges) {
+      totalCount++;
       if (await this.isCodingRelated(exchange)) {
-        if (isSept14Debug) {
-          console.log(`   ✅ ROUTING TO CODING PROJECT - coding content detected in exchange`);
-        }
-        return codingPath; // Redirect to coding
+        codingCount++;
       }
     }
     
+    // Require >50% of exchanges to be coding-related for redirect
+    // (single exchange prompt sets still work: 1/1 = 100%)
+    if (codingCount > 0 && codingCount / totalCount > 0.5) {
+      if (isSept14Debug) {
+        console.log(`   ✅ ROUTING TO CODING PROJECT - ${codingCount}/${totalCount} exchanges are coding-related`);
+      }
+      return codingPath; // Redirect to coding
+    }
+    
     if (isSept14Debug) {
-      console.log(`   ✅ STAYING IN LOCAL PROJECT - no coding content detected`);
+      console.log(`   ✅ STAYING IN LOCAL PROJECT - only ${codingCount}/${totalCount} exchanges are coding-related`);
     }
     return this.config.projectPath; // Stay in local project
   }
@@ -3457,18 +3681,32 @@ class EnhancedTranscriptMonitor {
         const isLongRunning = setDuration > 5 * 60 * 1000; // 5 minutes since first exchange
 
         if (hourCrossed || isStale || isLongRunning) {
-          const reason = hourCrossed ? `hour boundary (${setTranche.timeString} → ${currentTranche.timeString})` : isLongRunning ? `long-running (${Math.round(setDuration/60000)}min, ${this.currentUserPromptSet.length} exchanges)` : `stale (${Math.round(setAge/1000)}s)`;
-          this.debug(`⏰ Flushing held prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
-          const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
-          if (targetProject !== null) {
-            const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
-            if (wasWritten) {
+          // Check agent-specific completion before flushing (unless hour boundary forces it)
+          const completionState = this.isAssistantComplete(this.transcriptPath, this.agentType, this.currentUserPromptSet);
+          const shouldFlush = hourCrossed || completionState.complete || isLongRunning;
+
+          if (!shouldFlush) {
+            this.debug(`⏳ Deferring held prompt set flush (${Math.round(setAge/1000)}s old): ${completionState.reason}`);
+          } else {
+            const reason = hourCrossed
+              ? `hour boundary (${setTranche.timeString} → ${currentTranche.timeString})`
+              : isLongRunning
+                ? `long-running (${Math.round(setDuration/60000)}min, ${this.currentUserPromptSet.length} exchanges)`
+                : `complete (${Math.round(setAge/1000)}s), ${completionState.reason}`;
+            this.debug(`⏰ Flushing held prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
+            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+            if (targetProject !== null) {
+              const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+              if (wasWritten) {
+                this.currentUserPromptSet = [];
+                this.lastTranche = currentTranche;
+              }
+            } else {
+              // Not coding-related — skip LSL but still fire observation
+              this._firePromptSetObservation(this.currentUserPromptSet);
               this.currentUserPromptSet = [];
               this.lastTranche = currentTranche;
             }
-          } else {
-            this.currentUserPromptSet = [];
-            this.lastTranche = currentTranche;
           }
         }
       }
