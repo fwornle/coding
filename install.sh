@@ -2873,6 +2873,7 @@ main() {
     setup_vscode_extension
     install_enhanced_lsl
     install_mastra_opencode
+    install_compaction_guard
     install_skills
     create_project_local_settings
     install_constraint_monitor_hooks
@@ -3065,6 +3066,95 @@ MASTRACONFIG
 
     cd "$CODING_REPO"
     success "Mastra OpenCode plugin installation complete"
+}
+
+# Install compaction-guard plugin to prevent "Bad Request" during OpenCode compaction.
+# When sessions grow too large (many tool calls, base64 images, large outputs),
+# the compaction request itself can exceed API proxy limits. This plugin truncates
+# old tool outputs and enriches compaction prompts to keep payloads manageable.
+# Also configures compaction.reserved=40000 in opencode.json to trigger compaction earlier.
+install_compaction_guard() {
+    echo -e "\n${CYAN}🛡️  Installing OpenCode compaction-guard plugin...${NC}"
+
+    local OPENCODE_HOME="$HOME/.opencode"
+    local OPENCODE_CONFIG="$HOME/.config/opencode"
+    local PLUGIN_SRC="$CODING_REPO/plugins/opencode/compaction-guard.js"
+    local PLUGIN_DST="$OPENCODE_HOME/plugins/compaction-guard.js"
+
+    # --- 1. Install the plugin file ---
+    if [[ ! -f "$PLUGIN_SRC" ]]; then
+        warning "compaction-guard.js not found at $PLUGIN_SRC -- skipping plugin install"
+        INSTALLATION_WARNINGS+=("Compaction guard: plugin source not found")
+        return 1
+    fi
+
+    mkdir -p "$OPENCODE_HOME/plugins"
+    cp "$PLUGIN_SRC" "$PLUGIN_DST"
+    success "Installed compaction-guard plugin → $PLUGIN_DST"
+
+    # --- 2. Ensure @opencode-ai/plugin SDK is available (needed for type hints) ---
+    if [[ -d "$OPENCODE_HOME/node_modules/@opencode-ai/plugin" ]]; then
+        info "@opencode-ai/plugin SDK already present"
+    else
+        info "Installing @opencode-ai/plugin SDK in $OPENCODE_HOME..."
+        (cd "$OPENCODE_HOME" && npm install @opencode-ai/plugin@latest 2>>"$INSTALL_LOG") \
+            && success "@opencode-ai/plugin SDK installed" \
+            || warning "@opencode-ai/plugin SDK install failed (plugin may still work)"
+    fi
+
+    # --- 3. Update opencode.json with compaction settings and plugin registration ---
+    local OPENCODE_JSON="$OPENCODE_CONFIG/opencode.json"
+    if [[ -f "$OPENCODE_JSON" ]]; then
+        if command -v jq &> /dev/null; then
+            local TMP_JSON
+            local needs_update=false
+
+            # 3a. Add compaction settings if missing
+            if jq -e '.compaction' "$OPENCODE_JSON" > /dev/null 2>&1; then
+                info "compaction settings already present in opencode.json -- skipping"
+            else
+                info "Adding compaction settings to opencode.json..."
+                TMP_JSON=$(mktemp)
+                jq '. + {"compaction": {"auto": true, "prune": true, "reserved": 40000}}' "$OPENCODE_JSON" > "$TMP_JSON" \
+                    && mv "$TMP_JSON" "$OPENCODE_JSON" \
+                    && success "Added compaction.reserved=40000 to opencode.json" \
+                    || { warning "Failed to update opencode.json"; rm -f "$TMP_JSON"; }
+            fi
+
+            # 3b. Register plugin in opencode.json so OpenCode actually loads it
+            local PLUGIN_PATH="$PLUGIN_DST"
+            if jq -e '.plugin' "$OPENCODE_JSON" > /dev/null 2>&1; then
+                # plugin key exists -- check if our path is already in the array
+                if jq -e --arg p "$PLUGIN_PATH" '.plugin | map(select(. == $p)) | length > 0' "$OPENCODE_JSON" > /dev/null 2>&1; then
+                    info "compaction-guard already registered in opencode.json plugin array"
+                else
+                    info "Adding compaction-guard to existing plugin array..."
+                    TMP_JSON=$(mktemp)
+                    jq --arg p "$PLUGIN_PATH" '.plugin += [$p]' "$OPENCODE_JSON" > "$TMP_JSON" \
+                        && mv "$TMP_JSON" "$OPENCODE_JSON" \
+                        && success "Added compaction-guard to plugin array in opencode.json" \
+                        || { warning "Failed to update opencode.json plugin array"; rm -f "$TMP_JSON"; }
+                fi
+            else
+                info "Adding plugin array with compaction-guard to opencode.json..."
+                TMP_JSON=$(mktemp)
+                jq --arg p "$PLUGIN_PATH" '. + {"plugin": [$p]}' "$OPENCODE_JSON" > "$TMP_JSON" \
+                    && mv "$TMP_JSON" "$OPENCODE_JSON" \
+                    && success "Registered compaction-guard plugin in opencode.json" \
+                    || { warning "Failed to add plugin array to opencode.json"; rm -f "$TMP_JSON"; }
+            fi
+        else
+            warning "jq not available -- cannot update opencode.json automatically"
+            info "Manually add to $OPENCODE_JSON:"
+            info '  "compaction": {"auto": true, "prune": true, "reserved": 40000}'
+            info "  \"plugin\": [\"$PLUGIN_DST\"]"
+        fi
+    else
+        info "opencode.json not found at $OPENCODE_JSON -- skipping compaction config"
+        info "(OpenCode will use defaults; create the file to customize compaction)"
+    fi
+
+    success "Compaction-guard installation complete"
 }
 
 # Install skills to all supported agents (Claude global, Copilot, OpenCode)
