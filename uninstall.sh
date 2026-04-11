@@ -225,6 +225,43 @@ if [[ -d "$CODING_REPO/.observations" ]]; then
     echo -e "  ${GREEN}Preserved .observations/ directory (contains observation data)${NC}"
 fi
 
+# Clean up compaction-guard plugin
+echo -e "\n${BLUE}🛡️  Removing compaction-guard plugin...${NC}"
+
+# Remove the plugin from ~/.opencode/plugins/
+if [[ -f "$HOME/.opencode/plugins/compaction-guard.js" ]]; then
+    rm -f "$HOME/.opencode/plugins/compaction-guard.js"
+    echo "  Removed ~/.opencode/plugins/compaction-guard.js"
+    # Remove plugins/ dir if empty
+    rmdir "$HOME/.opencode/plugins" 2>/dev/null || true
+else
+    echo "  compaction-guard.js not found in ~/.opencode/plugins/ -- skipping"
+fi
+
+# Remove compaction settings and plugin registration from opencode.json
+if command -v jq &> /dev/null && [[ -f "$HOME/.config/opencode/opencode.json" ]]; then
+    OPENCODE_JSON="$HOME/.config/opencode/opencode.json"
+
+    # Remove compaction settings
+    if jq -e '.compaction' "$OPENCODE_JSON" > /dev/null 2>&1; then
+        TMP_JSON=$(mktemp)
+        jq 'del(.compaction)' "$OPENCODE_JSON" > "$TMP_JSON" \
+            && mv "$TMP_JSON" "$OPENCODE_JSON" \
+            && echo "  Removed compaction settings from opencode.json" \
+            || { echo "  Failed to update opencode.json"; rm -f "$TMP_JSON"; }
+    fi
+
+    # Remove compaction-guard from plugin array
+    PLUGIN_PATH="$HOME/.opencode/plugins/compaction-guard.js"
+    if jq -e '.plugin' "$OPENCODE_JSON" > /dev/null 2>&1; then
+        TMP_JSON=$(mktemp)
+        jq --arg p "$PLUGIN_PATH" '.plugin = [.plugin[] | select(. != $p)] | if .plugin == [] then del(.plugin) else . end' "$OPENCODE_JSON" > "$TMP_JSON" \
+            && mv "$TMP_JSON" "$OPENCODE_JSON" \
+            && echo "  Removed compaction-guard from plugin array in opencode.json" \
+            || { echo "  Failed to update opencode.json plugin array"; rm -f "$TMP_JSON"; }
+    fi
+fi
+
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
 
