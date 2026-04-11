@@ -16,7 +16,8 @@ export type ProviderName =
   | 'ollama'
   | 'mock'
   | 'claude-code'
-  | 'copilot';
+  | 'copilot'
+  | 'proxy';
 
 export type ModelTier = 'fast' | 'standard' | 'premium';
 

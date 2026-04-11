@@ -66,6 +66,14 @@ export async function loadConfig(customPath?: string): Promise<LLMServiceConfig>
         path.join(process.cwd(), 'lib', 'llm', 'config', 'llm-providers.yaml'),
         // Fallback: look relative to this file for Docker contexts
         path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'config', 'llm-providers.yaml'),
+        // Fallback: CODING_TOOLS_PATH env var (set by global-lsl-coordinator when CWD != coding repo)
+        ...(process.env.CODING_TOOLS_PATH
+          ? [path.join(process.env.CODING_TOOLS_PATH, 'config', 'llm-providers.yaml')]
+          : []),
+        // Fallback: CODING_REPO env var
+        ...(process.env.CODING_REPO
+          ? [path.join(process.env.CODING_REPO, 'config', 'llm-providers.yaml')]
+          : []),
       ];
 
   for (const configPath of searchPaths) {

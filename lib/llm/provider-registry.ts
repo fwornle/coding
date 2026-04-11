@@ -20,6 +20,7 @@ import { OllamaProvider } from './providers/ollama-provider.js';
 import { MockProvider } from './providers/mock-provider.js';
 import { ClaudeCodeProvider } from './providers/claude-code-provider.js';
 import { CopilotProvider } from './providers/copilot-provider.js';
+import { ProxyProvider } from './providers/proxy-provider.js';
 
 export interface ProviderSelection {
   provider: LLMProvider;
@@ -39,6 +40,7 @@ export class ProviderRegistry {
    */
   async initializeAll(): Promise<void> {
     const providerInstances: Array<{ name: ProviderName; instance: LLMProvider }> = [
+      { name: 'proxy', instance: new ProxyProvider(this.config.providers?.proxy) },
       { name: 'claude-code', instance: new ClaudeCodeProvider(this.config.providers?.['claude-code']) },
       { name: 'copilot', instance: new CopilotProvider(this.config.providers?.copilot) },
       { name: 'groq', instance: new GroqProvider(this.config.providers?.groq) },
