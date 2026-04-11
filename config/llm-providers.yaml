@@ -59,21 +59,32 @@ providers:
     standard: "gpt-4.1"
     premium: "o4-mini"
 
+  # Local proxy provider — routes through llm-proxy on port 8089
+  # Handles network detection, provider failover, and subscription routing automatically
+  proxy:
+    baseUrl: "http://localhost:8089"
+    timeout: 30000
+    models:
+      fast: "auto"
+      standard: "auto"
+      premium: "auto"
+
 # Default provider priority per tier
-# Subscription providers first (claude-code Max, copilot Enterprise) — zero cost.
+# proxy routes through llm-proxy which handles network-adaptive failover internally.
+# Subscription providers next (claude-code Max, copilot Enterprise) — zero cost.
 # Groq as fast fallback when subscription quota exhausted or unavailable.
 provider_priority:
-  fast: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
-  standard: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
-  premium: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
+  fast: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
 
 # Task-level provider priority overrides
 # Overrides the tier-based priority for specific tasks that need different routing
 task_provider_priority:
-  semantic_code_analysis: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-  ontology_classification: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-  observation_generation: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-  content_analysis: ["claude-code", "copilot", "groq", "anthropic", "openai"]
+  semantic_code_analysis: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai"]
+  ontology_classification: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai"]
+  observation_generation: ["proxy", "claude-code", "copilot", "groq", "gemini", "openai", "anthropic"]
+  content_analysis: ["proxy", "claude-code", "copilot", "groq", "anthropic", "openai"]
   # Proxy-forwarded requests: honor the caller's explicit provider preference
   proxy_copilot: ["copilot", "claude-code", "groq", "anthropic", "openai"]
   proxy_claude-code: ["claude-code", "copilot", "groq", "anthropic", "openai"]
@@ -209,19 +220,23 @@ observation_defaults:
 # Applied by llm-proxy when VPN is detected
 network_overrides:
   vpn:
-    # Inside VPN: copilot is free via corporate subscription
+    # Inside VPN/CN: copilot is free via corporate subscription, claude-code may be unreachable
     default_provider: "copilot"
     provider_priority:
       fast: ["copilot", "groq", "gemini", "anthropic", "openai", "github-models"]
-      standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-      premium: ["copilot", "claude-code", "groq", "anthropic", "openai", "gemini", "github-models"]
+      standard: ["copilot", "groq", "gemini", "openai", "anthropic", "github-models"]
+      premium: ["copilot", "claude-code", "groq", "gemini", "openai", "anthropic", "github-models"]
+    task_provider_priority:
+      observation_generation: ["copilot", "groq", "gemini", "openai", "anthropic"]
   public:
     # Outside VPN: claude-code Max subscription is preferred (zero cost)
     default_provider: "claude-code"
     provider_priority:
-      fast: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
-      standard: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
-      premium: ["claude-code", "copilot", "groq", "anthropic", "openai", "gemini", "github-models"]
+      fast: ["claude-code", "copilot", "groq", "gemini", "openai", "anthropic", "github-models"]
+      standard: ["claude-code", "copilot", "groq", "gemini", "openai", "anthropic", "github-models"]
+      premium: ["claude-code", "copilot", "groq", "gemini", "openai", "anthropic", "github-models"]
+    task_provider_priority:
+      observation_generation: ["claude-code", "copilot", "groq", "gemini", "openai", "anthropic"]
 
 # Environment variable overrides
 # Set these to force specific tiers:

@@ -115,6 +115,23 @@ export class ObservationWriter {
       .map(m => `<${m.role}>\n${m.content}\n</${m.role}>`)
       .join('\n');
 
+    // Build ground-truth file list from metadata (extracted programmatically from tool calls)
+    const modifiedFiles = metadata.modifiedFiles || [];
+    const readFiles = metadata.readFiles || [];
+    let artifactHint = '';
+    if (modifiedFiles.length > 0) {
+      artifactHint = `\n\nGROUND TRUTH — Files modified/created by tool calls (use these for the Artifacts line):\n` +
+        modifiedFiles.map(f => `  - edited ${f}`).join('\n');
+      if (readFiles.length > 0) {
+        artifactHint += `\nFiles read (do NOT list these as artifacts unless also modified):\n` +
+          readFiles.map(f => `  - read ${f}`).join('\n');
+      }
+    } else if (readFiles.length > 0) {
+      artifactHint = `\n\nGROUND TRUTH — No files were modified/created. Files were only read:\n` +
+        readFiles.map(f => `  - read ${f}`).join('\n') +
+        `\nSet Artifacts to "none" since no files were changed.`;
+    }
+
     try {
       const requestBody = {
         ...(this.provider ? { provider: this.provider } : {}),
@@ -129,15 +146,18 @@ export class ObservationWriter {
               `Only describe what the developer actually requested in their message.\n\n` +
               'Respond using ONLY this template — nothing else:\n\n' +
               'Intent: [what the developer actually asked or requested — base this ONLY on the <user> message content]\n' +
-              'Approach: [key actions taken — 1-3 sentences]\n' +
+              'Approach: [architectural decisions, solution strategy, and key technical insights — 1-4 sentences]\n' +
               'Artifacts: [list each file modified/created/deleted with verb, e.g. "edited src/foo.ts, created lib/bar.js". Write "none" if no files were touched]\n' +
-              'Outcome: [what was achieved, learned, or decided — 1-3 sentences]\n' +
-              'Status: [done | in-progress | blocked | needs-followup]\n\n' +
+              'Result: [the concrete solution or outcome — what was built, fixed, configured, or decided. Include key details a future reader needs. 1-4 sentences]\n\n' +
               'Constraints:\n' +
-              '- Your ENTIRE response must be these 5 labeled lines. Nothing before, nothing after.\n' +
+              '- Your ENTIRE response must be these 4 labeled lines. Nothing before, nothing after.\n' +
               '- Never reproduce code, commands, file contents, or the assistant\'s words.\n' +
               '- Intent MUST reflect the user\'s actual question/request, not inferred topics from system context.\n' +
-              '- If the exchange has no real work (greetings, "yes", "proceed"), respond with only: "No actionable content."',
+              '- Approach should capture WHY this solution was chosen, not just WHAT was done.\n' +
+              '- Result should be specific enough that someone can understand the change without reading the code.\n' +
+              '- If the exchange has no real work (greetings, "yes", "proceed"), respond with only: "No actionable content."\n' +
+              '- CRITICAL: If GROUND TRUTH file data is provided below the exchange, you MUST use it for the Artifacts line. Do NOT override it with your own inference.' +
+              (artifactHint || ''),
           },
           {
             role: 'user',
@@ -199,14 +219,14 @@ export class ObservationWriter {
       throw new Error('Database not initialized. Call init() first.');
     }
 
-    // Skip trivial, raw, and no-work observations (no value for learning)
+    // Skip trivial and no-work observations (no value for learning)
+    // Note: [Raw] fallback summaries are NOT skipped — they are stored as quality='low'
+    // so observations are preserved even when the LLM proxy is unavailable.
     const lower = summary.toLowerCase();
     if (
       lower.includes('trivial exchange') ||
       lower.includes('no actionable content') ||
-      summary.startsWith('[Raw]') ||
-      (lower.includes('no new work was performed') && lower.includes('needs-followup')) ||
-      (lower.includes('no new work was performed') && lower.includes('needs followup')) ||
+      lower.includes('no new work was performed') ||
       (lower.includes('single-word check-in') && lower.includes('artifacts: none'))
     ) {
       process.stderr.write(`[ObservationWriter] Skipping low-value observation\n`);
@@ -215,12 +235,20 @@ export class ObservationWriter {
 
     const agent = metadata.agent || null;
 
-    // Content-based dedup: hash the user message content (stable across LLM re-summarizations)
+    // Content-based dedup: hash user messages + assistant content + session context
+    // Include assistant content because identical user prompts (e.g. "Continue") in
+    // different sessions produce completely different exchanges.
     const userContent = messages
       .filter(m => m.role === 'user')
       .map(m => m.content)
       .join('|');
-    const contentHash = crypto.createHash('md5').update(userContent).digest('hex');
+    const assistantContent = messages
+      .filter(m => m.role === 'assistant')
+      .map(m => typeof m.content === 'string' ? m.content.slice(0, 500) : '')
+      .join('|');
+    const sessionId = metadata.session_id || '';
+    const hashInput = `${sessionId}|${userContent}|${assistantContent}`;
+    const contentHash = crypto.createHash('md5').update(hashInput).digest('hex');
 
     const existing = this.db.prepare(
       'SELECT id FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'

@@ -76,7 +76,7 @@ function renderMarkdown(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-muted rounded text-xs font-mono">$1</code>')
     .replace(/^- /gm, '• ')
-    .replace(/^(Intent|Approach|Artifacts|Outcome|Status):/gm, '<strong>$1:</strong>')
+    .replace(/^(Intent|Approach|Artifacts|Result|Outcome|Status):/gm, '<strong>$1:</strong>')
 }
 
 function formatLlmTag(obs: Observation): string | null {

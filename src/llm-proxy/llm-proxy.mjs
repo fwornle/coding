@@ -19,8 +19,28 @@ import http from 'node:http';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
 const PORT = parseInt(process.env.LLM_PROXY_PORT || '8089', 10);
+
+// --- Corporate Proxy Setup ---
+// Node.js fetch() (undici) doesn't respect HTTP_PROXY env vars.
+// When running inside a corporate network with a proxy (e.g., Proxydetox),
+// we must set a global ProxyAgent so all fetch() calls route through it.
+// This is required for providers like Copilot (copilot-api.bmw.ghe.com)
+// that are only reachable through the corporate proxy.
+const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+if (proxyUrl) {
+  try {
+    const require = createRequire(import.meta.url);
+    const undiciPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'node_modules', 'undici');
+    const { ProxyAgent, setGlobalDispatcher } = require(undiciPath);
+    setGlobalDispatcher(new ProxyAgent(proxyUrl));
+    process.stderr.write(`[llm-proxy] Global fetch proxy set to ${proxyUrl}\n`);
+  } catch (err) {
+    process.stderr.write(`[llm-proxy] WARN: Could not set global proxy agent: ${err.message}\n`);
+  }
+}
 
 const log = (msg) => process.stderr.write(`[llm-proxy] ${msg}\n`);
 const logErr = (msg) => process.stderr.write(`[llm-proxy] ERROR: ${msg}\n`);

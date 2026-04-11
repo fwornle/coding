@@ -49,3 +49,4 @@ export { GitHubModelsProvider } from './providers/github-models-provider.js';
 export { DMRProvider } from './providers/dmr-provider.js';
 export { OllamaProvider } from './providers/ollama-provider.js';
 export { MockProvider } from './providers/mock-provider.js';
+export { ProxyProvider } from './providers/proxy-provider.js';
