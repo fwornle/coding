@@ -193,10 +193,13 @@ class GlobalLSLCoordinator {
         // RACE CONDITION FIX: Wait for old process to fully terminate before spawning new one
         setTimeout(() => {
           // CRITICAL FIX: Add project path as argument so pkill pattern can match
+          // Log to project's transcript-monitor.log for debuggability
+          const logFilePath = path.join(projectPath, 'transcript-monitor.log');
+          const logFd = fs.openSync(logFilePath, 'a');
           const child = spawn('node', [monitorScript, projectPath], {
           cwd: projectPath,
           detached: true,
-          stdio: ['ignore', 'ignore', 'ignore'],
+          stdio: ['ignore', logFd, logFd],
           env: {
             ...process.env,
             TRANSCRIPT_DEBUG: this.debug ? 'true' : 'false',
@@ -208,6 +211,7 @@ class GlobalLSLCoordinator {
         });
 
         child.unref(); // Allow parent to exit
+        fs.closeSync(logFd); // Close the log fd in the parent (child inherits it)
 
         // Verify monitor started successfully and register with PSM
         setTimeout(async () => {

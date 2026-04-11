@@ -1,15 +1,15 @@
 {
   "project": "coding",
   "description": "Minimal Positive Keywords for Coding Infrastructure Classification",
-  "classification_version": "2.2-threshold-fix",
+  "classification_version": "2.3-false-positive-fix",
   "keywords": {
     "primary": [
       "mcp-constraint-monitor", "semantic-analysis-system", "coding infrastructure",
       "ReliableCodingClassifier", "PathAnalyzer", "KeywordMatcher", "SemanticAnalyzer",
       "enhanced-transcript-monitor", "generate-proper-lsl-from-transcripts",
-      "post-session-logger", "LSL", "Live Session Logging", "UKB", "VKB", "CKB",
+      "post-session-logger", "UKB", "VKB", "CKB",
       "update_knowledge_base", "view_knowledge_base", "SynchronizationAgent",
-      "constraint monitor", "LSL files", "LSL system", "coding session",
+      "constraint monitor", "LSL system", "coding session",
       "batch facility", "generate-lsl", "ukb-cli.js", "vkb-cli.js"
     ],
     "secondary": [
@@ -30,22 +30,22 @@
     "path_patterns": [
       "/coding/", "/Agentic/coding/", "knowledge-management/",
       "semantic-analysis-system/", "integrations/mcp-", "src/live-logging/",
-      ".specstory/history/", "scripts/", "bin/coding"
+      "bin/coding", "scripts/enhanced-transcript-monitor", "scripts/coding-keywords"
     ],
     "mcp_patterns": [
       "mcp__constraint-monitor", "mcp__semantic-analysis",
       "determine_insights", "get_system_status", "search_knowledge"
     ]
   },
-  "exclusion_patterns": [],
+  "exclusion_patterns": ["brandschutz", "fire safety", "onboarding training", "quiz question", "successfactors"],
   "classification_rules": {
-    "minimum_score": 1,
+    "minimum_score": 4,
     "primary_weight": 4,
     "secondary_weight": 2,
     "file_patterns_weight": 3,
     "path_patterns_weight": 3,
     "mcp_patterns_weight": 4,
-    "exclusion_penalty": 0,
+    "exclusion_penalty": -5,
     "processing_timeout_ms": 5
   },
   "analysis_focus": [
