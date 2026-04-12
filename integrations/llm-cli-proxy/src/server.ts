@@ -45,6 +45,9 @@ interface ProviderStatus {
   available: boolean;
   version?: string;
   lastChecked: number;
+  recentFailures: number;
+  lastFailureTime: number;
+  consecutiveFailures: number;
 }
 
 interface HealthResponse {
@@ -60,6 +63,7 @@ const PORT = parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10);
 const HOST = '127.0.0.1';
 const PROVIDER_CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
+const PER_PROVIDER_TIMEOUT_MS = 30_000; // Per-provider timeout during fallback (total timeout still applies)
 const MAX_CLI_ARG_LENGTH = 200_000; // Use stdin for prompts exceeding this
 
 // --- State ---
@@ -67,6 +71,67 @@ const MAX_CLI_ARG_LENGTH = 200_000; // Use stdin for prompts exceeding this
 const providerStatuses: Record<string, ProviderStatus> = {};
 const inFlightProcesses = new Set<ChildProcess>();
 let startTime = Date.now();
+
+// Provider health tracking: cooldown period after consecutive failures
+const FAILURE_COOLDOWN_MS = 60_000; // 1 min cooldown after failures
+const MAX_CONSECUTIVE_BEFORE_COOLDOWN = 3; // After 3 consecutive failures, enter cooldown
+
+function recordProviderSuccess(providerName: string): void {
+  const status = providerStatuses[providerName];
+  if (status) {
+    status.consecutiveFailures = 0;
+  }
+}
+
+function recordProviderFailure(providerName: string): void {
+  const status = providerStatuses[providerName];
+  if (status) {
+    status.recentFailures++;
+    status.consecutiveFailures++;
+    status.lastFailureTime = Date.now();
+  }
+}
+
+function isProviderHealthy(providerName: string): boolean {
+  const status = providerStatuses[providerName];
+  if (!status?.available) return false;
+  // If too many consecutive failures, require cooldown before retrying
+  if (status.consecutiveFailures >= MAX_CONSECUTIVE_BEFORE_COOLDOWN) {
+    const elapsed = Date.now() - status.lastFailureTime;
+    if (elapsed < FAILURE_COOLDOWN_MS) {
+      return false; // Still in cooldown
+    }
+    // Cooldown expired, give it another chance
+  }
+  return true;
+}
+
+function selectBestProvider(): string | null {
+  // First pass: find a healthy provider
+  for (const p of Object.keys(CLI_CONFIGS)) {
+    if (isProviderHealthy(p)) return p;
+  }
+  // Second pass: any available provider (cooldown expired or not)
+  for (const p of Object.keys(CLI_CONFIGS)) {
+    if (providerStatuses[p]?.available) return p;
+  }
+  return null;
+}
+
+function getOrderedProviders(preferredProvider?: string): string[] {
+  const all = Object.keys(CLI_CONFIGS);
+  if (!preferredProvider) {
+    // Sort: healthy first, then by fewer consecutive failures
+    return all.sort((a, b) => {
+      const aHealthy = isProviderHealthy(a) ? 0 : 1;
+      const bHealthy = isProviderHealthy(b) ? 0 : 1;
+      if (aHealthy !== bHealthy) return aHealthy - bHealthy;
+      return (providerStatuses[a]?.consecutiveFailures || 0) - (providerStatuses[b]?.consecutiveFailures || 0);
+    });
+  }
+  // Put preferred first, then others
+  return [preferredProvider, ...all.filter(p => p !== preferredProvider)];
+}
 
 // --- Provider CLI Mapping ---
 
@@ -146,7 +211,7 @@ function estimateTokens(text: string): number {
 async function checkProviderAvailable(providerName: string): Promise<ProviderStatus> {
   const config = CLI_CONFIGS[providerName];
   if (!config) {
-    return { available: false, lastChecked: Date.now() };
+    return { available: false, lastChecked: Date.now(), recentFailures: 0, lastFailureTime: 0, consecutiveFailures: 0 };
   }
 
   try {
@@ -157,9 +222,18 @@ async function checkProviderAvailable(providerName: string): Promise<ProviderSta
       5000
     );
     const version = result.stdout.trim().split('\n')[0] || undefined;
-    return { available: result.exitCode === 0, version, lastChecked: Date.now() };
+    // Preserve failure tracking across version checks
+    const existing = providerStatuses[providerName];
+    return {
+      available: result.exitCode === 0,
+      version,
+      lastChecked: Date.now(),
+      recentFailures: existing?.recentFailures || 0,
+      lastFailureTime: existing?.lastFailureTime || 0,
+      consecutiveFailures: existing?.consecutiveFailures || 0,
+    };
   } catch {
-    return { available: false, lastChecked: Date.now() };
+    return { available: false, lastChecked: Date.now(), recentFailures: 0, lastFailureTime: 0, consecutiveFailures: 0 };
   }
 }
 
@@ -278,7 +352,7 @@ app.get('/health', (_req, res) => {
 app.post('/api/complete', async (req, res) => {
   const body = req.body as CompletionRequest;
   const { messages, model, maxTokens = 4096, temperature, tier } = body;
-  let { provider } = body;
+  const requestedProvider = body.provider;
 
   // Validate request
   if (!messages?.length) {
@@ -286,83 +360,101 @@ app.post('/api/complete', async (req, res) => {
     return;
   }
 
-  // Auto-select provider if not specified: pick first available
-  if (!provider) {
-    const available = Object.keys(CLI_CONFIGS).find(p => providerStatuses[p]?.available);
-    if (!available) {
-      res.status(503).json({ error: 'No provider specified and no providers available' });
-      return;
-    }
-    provider = available as CompletionRequest['provider'];
-    log(`[auto-select] No provider specified, using: ${provider}`);
-  }
+  // Build ordered list of providers to try
+  const providersToTry = requestedProvider
+    ? getOrderedProviders(requestedProvider)
+    : getOrderedProviders();
 
-  const config = CLI_CONFIGS[provider];
-  if (!config) {
-    res.status(400).json({ error: `Unknown provider: ${provider}. Supported: ${Object.keys(CLI_CONFIGS).join(', ')}` });
+  // Filter to only available providers
+  const availableProviders = providersToTry.filter(p => providerStatuses[p]?.available);
+  if (availableProviders.length === 0) {
+    res.status(503).json({ error: 'No providers available' });
     return;
   }
 
-  const status = providerStatuses[provider];
-  if (!status?.available) {
-    res.status(503).json({ error: `Provider ${provider} not available`, type: 'PROVIDER_UNAVAILABLE' });
-    return;
+  if (!requestedProvider) {
+    log(`[auto-select] Trying providers in order: ${availableProviders.join(' → ')}`);
   }
 
-  // Resolve model from tier or use explicit model
-  const resolvedModel = model || (tier ? config.tierModels[tier] : undefined) || config.defaultModel;
-  const prompt = formatPrompt(messages);
-  const requestStartTime = Date.now();
+  let lastError: { status: number; body: Record<string, unknown> } | null = null;
 
-  try {
-    let cliResult: { stdout: string; stderr: string; exitCode: number };
-    const timeoutMs = body.timeout || DEFAULT_TIMEOUT_MS;
+  for (const provider of availableProviders) {
+    const config = CLI_CONFIGS[provider];
+    if (!config) continue;
 
-    // Choose between arg-based or stdin-based invocation
-    if (config.useStdinForPrompt(prompt)) {
-      const args = config.buildArgsWithStdin(resolvedModel, maxTokens, temperature);
-      cliResult = await spawnCLIWithTimeout(config.command, args, prompt, timeoutMs);
-    } else {
-      const args = config.buildArgs(prompt, resolvedModel, maxTokens, temperature);
-      cliResult = await spawnCLIWithTimeout(config.command, args, undefined, timeoutMs);
-    }
+    // Resolve model from tier or use explicit model
+    const resolvedModel = model || (tier ? config.tierModels[tier] : undefined) || config.defaultModel;
+    const prompt = formatPrompt(messages);
+    const requestStartTime = Date.now();
 
-    if (cliResult.exitCode !== 0) {
-      // Some CLIs write errors to stdout (e.g. claude CLI), so check both
-      const errorOutput = cliResult.stderr.trim() || cliResult.stdout.trim();
-      const { status: httpStatus, type } = mapErrorToStatus(errorOutput);
-      res.status(httpStatus).json({
-        error: errorOutput || `CLI exited with code ${cliResult.exitCode}`,
-        type,
+    try {
+      let cliResult: { stdout: string; stderr: string; exitCode: number };
+      // When falling back across providers, use shorter per-provider timeout
+      // so we don't burn all time on a hung provider
+      const totalTimeout = body.timeout || DEFAULT_TIMEOUT_MS;
+      const timeoutMs = availableProviders.length > 1
+        ? Math.min(PER_PROVIDER_TIMEOUT_MS, totalTimeout)
+        : totalTimeout;
+
+      // Choose between arg-based or stdin-based invocation
+      if (config.useStdinForPrompt(prompt)) {
+        const args = config.buildArgsWithStdin(resolvedModel, maxTokens, temperature);
+        cliResult = await spawnCLIWithTimeout(config.command, args, prompt, timeoutMs);
+      } else {
+        const args = config.buildArgs(prompt, resolvedModel, maxTokens, temperature);
+        cliResult = await spawnCLIWithTimeout(config.command, args, undefined, timeoutMs);
+      }
+
+      if (cliResult.exitCode !== 0) {
+        // Some CLIs write errors to stdout (e.g. claude CLI), so check both
+        const errorOutput = cliResult.stderr.trim() || cliResult.stdout.trim();
+        const { status: httpStatus, type } = mapErrorToStatus(errorOutput);
+        recordProviderFailure(provider);
+        log(`[fallback] ${provider} failed (exit ${cliResult.exitCode}, type=${type}), ${availableProviders.indexOf(provider) < availableProviders.length - 1 ? 'trying next provider...' : 'no more providers'}`);
+        lastError = {
+          status: httpStatus,
+          body: { error: errorOutput || `CLI exited with code ${cliResult.exitCode}`, type, provider, exitCode: cliResult.exitCode },
+        };
+        // If explicitly requested, or retryable error on last provider → try next
+        continue;
+      }
+
+      const content = cliResult.stdout.trim();
+      const latencyMs = Date.now() - requestStartTime;
+      const inputTokens = estimateTokens(prompt);
+      const outputTokens = estimateTokens(content);
+
+      recordProviderSuccess(provider);
+
+      const response: CompletionResponse = {
+        content,
         provider,
-        exitCode: cliResult.exitCode,
-      });
+        model: resolvedModel,
+        tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
+        latencyMs,
+      };
+
+      res.json(response);
       return;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordProviderFailure(provider);
+      log(`[fallback] ${provider} threw: ${message}, ${availableProviders.indexOf(provider) < availableProviders.length - 1 ? 'trying next provider...' : 'no more providers'}`);
+
+      if (message.includes('timed out')) {
+        lastError = { status: 504, body: { error: message, type: 'TIMEOUT', provider } };
+      } else {
+        lastError = { status: 500, body: { error: message, type: 'INTERNAL_ERROR', provider } };
+      }
+      continue;
     }
+  }
 
-    const content = cliResult.stdout.trim();
-    const latencyMs = Date.now() - requestStartTime;
-    const inputTokens = estimateTokens(prompt);
-    const outputTokens = estimateTokens(content);
-
-    const response: CompletionResponse = {
-      content,
-      provider,
-      model: resolvedModel,
-      tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
-      latencyMs,
-    };
-
-    res.json(response);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    if (message.includes('timed out')) {
-      res.status(504).json({ error: message, type: 'TIMEOUT', provider });
-      return;
-    }
-
-    res.status(500).json({ error: message, type: 'INTERNAL_ERROR', provider });
+  // All providers failed — return the last error
+  if (lastError) {
+    res.status(lastError.status).json(lastError.body);
+  } else {
+    res.status(503).json({ error: 'No providers could handle the request' });
   }
 });
 
