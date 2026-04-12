@@ -68,7 +68,7 @@ Overall:  [██░░░░░░░░] 25% (1/4 phases)
 - [v4.0 roadmap]: Mastracode LSL via lifecycle hooks, not pipe-pane (pi-tui/tmux conflict)
 - [Phase 20]: Node.js >= 22 hard gate for @mastra/opencode; default model google/gemini-2.5-flash; .observations/ preserved on uninstall
 - [Phase 21]: AGENT_ENABLE_PIPE_CAPTURE=false per D-08: lifecycle hooks for transcript capture
-- [Phase 21]: LLM proxy health check on port 8089 (warn-only, D-15)
+- [Phase 21]: LLM proxy health check on port 12435 (warn-only, D-15)
 - [Phase 21]: Mastra uses magenta (colour13) with M: prefix in statusline
 - [Phase 21]: LLM proxy check for mastra is non-blocking per D-15
 - [Phase 21]: Mastra NDJSON events normalized to Claude-compatible format in ETM (same pattern as copilot)

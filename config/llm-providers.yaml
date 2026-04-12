@@ -59,10 +59,10 @@ providers:
     standard: "gpt-4.1"
     premium: "o4-mini"
 
-  # Local proxy provider — routes through llm-proxy on port 8089
+  # Local proxy provider — routes through llm-cli-proxy on port 12435
   # Handles network detection, provider failover, and subscription routing automatically
   proxy:
-    baseUrl: "http://localhost:8089"
+    baseUrl: "http://localhost:12435"
     timeout: 30000
     models:
       fast: "auto"

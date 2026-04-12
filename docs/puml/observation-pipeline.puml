@@ -22,7 +22,7 @@ rectangle "ObservationWriter" <<core>> as ow {
   component "DB-level dedup" as dedup
 }
 
-rectangle "LLM Proxy\n(localhost:8089)" <<api>> as proxy {
+rectangle "LLM CLI Proxy\n(localhost:12435)" <<api>> as proxy {
   component "LLMService" as llm
 }
 

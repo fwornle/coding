@@ -169,10 +169,10 @@ agent_pre_launch() {
 
   # D-07: All LLM calls route through coding LLM proxy
   # D-15: Check LLM proxy reachability (warn only, do not block)
-  if curl -sf http://localhost:8089/health &>/dev/null; then
-    _agent_log "LLM proxy reachable on port 8089"
+  if curl -sf http://localhost:12435/health &>/dev/null; then
+    _agent_log "LLM proxy reachable on port 12435"
   else
-    _agent_log "WARNING: LLM proxy not reachable on port 8089 -- mastracode may not have LLM access"
+    _agent_log "WARNING: LLM proxy not reachable on port 12435 -- mastracode may not have LLM access"
   fi
 
   # Network-adaptive model selection (same pattern as opencode.sh)

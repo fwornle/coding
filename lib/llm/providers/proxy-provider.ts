@@ -1,7 +1,7 @@
 /**
  * Proxy Provider
  *
- * Routes LLM calls through the local llm-proxy (port 8089) which handles
+ * Routes LLM calls through the local llm-proxy (port from LLM_CLI_PROXY_PORT, default 12435) which handles
  * network detection, provider failover, and has access to all configured
  * providers including subscription-based ones (copilot, claude-code).
  *
@@ -32,7 +32,8 @@ export class ProxyProvider extends BaseProvider {
       timeout: 30000,
       ...config,
     });
-    this.proxyUrl = (config as any).baseUrl || process.env.LLM_PROXY_URL || 'http://localhost:8089';
+    const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+    this.proxyUrl = (config as any).baseUrl || process.env.LLM_PROXY_URL || `http://localhost:${proxyPort}`;
   }
 
   async initialize(): Promise<void> {
