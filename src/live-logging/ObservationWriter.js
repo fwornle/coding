@@ -1,7 +1,7 @@
 /**
  * ObservationWriter - Writes normalized transcript messages as observations to LibSQL
  *
- * Routes LLM summarization calls through the coding LLM proxy (localhost:8089)
+ * Routes LLM summarization calls through the coding LLM proxy (port from LLM_CLI_PROXY_PORT env, default 12435)
  * rather than direct Google/Anthropic API calls, avoiding API key issues in
  * containerized environments.
  *
@@ -38,7 +38,7 @@ export class ObservationWriter {
   /**
    * @param {Object} [options]
    * @param {string} [options.dbPath] - Path to SQLite database file
-   * @param {string} [options.proxyUrl] - LLM proxy URL (default: http://localhost:8089)
+   * @param {string} [options.proxyUrl] - LLM proxy URL (default: http://localhost:$LLM_CLI_PROXY_PORT)
    * @param {string} [options.model] - Model identifier for summarization
    * @param {number} [options.batchSize] - Messages per summarization batch
    * @param {string} [options.configPath] - Path to .observations/config.json
@@ -48,7 +48,8 @@ export class ObservationWriter {
     const config = loadConfig(configPath);
 
     this.dbPath = options.dbPath || '.observations/observations.db';
-    this.proxyUrl = options.proxyUrl || 'http://localhost:8089';
+    const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+    this.proxyUrl = options.proxyUrl || `http://localhost:${proxyPort}`;
     // Provider is optional — if omitted, the LLM proxy uses network-adaptive routing
     // (VPN → copilot subscription, outside → claude-code subscription)
     this.provider = options.provider || null;

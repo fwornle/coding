@@ -21,7 +21,7 @@ package "Docker Container (coding-services)" {
 }
 
 rectangle "host.docker.internal" {
-  package "Host: LLM Proxy Bridge (port 8089)" {
+  package "Host: LLM Proxy Bridge (port 12435)" {
     component [llm-proxy.mjs\nExpress Server] as proxy <<api>>
     component [POST /api/complete] as complete <<api>>
     component [GET /health] as health <<api>>
@@ -54,8 +54,8 @@ database "Host Auth Stores" {
 }
 
 ' Cross-boundary connections
-copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:8089
-claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:8089
+copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
+claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
 groqprov ASYNC_LINE groqapi : HTTPS (direct)
 anthropicprov ASYNC_LINE anthropicapi : HTTPS (direct)
 

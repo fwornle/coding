@@ -11,7 +11,7 @@ Observational Memory captures per-exchange observations during coding sessions. 
 ![Observation Pipeline](../images/observation-pipeline.png)
 
 ```
-ETM (per project)          ObservationWriter          LLM Proxy (8089)
+ETM (per project)          ObservationWriter          LLM CLI Proxy (12435)
    |                            |                          |
    | _fireObservation()         |                          |
    |  user + assistant msg ---->| summarize() ------------>| claude-code (Max)
@@ -30,7 +30,7 @@ Dashboard (3032) <-- API (3033) <-- reads SQLite (readonly)
 | **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per exchange (fire-and-forget) |
 | **Health API** | `integrations/system-health-dashboard/server.js` | REST endpoints for querying observations |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/observations.tsx` | Browsable UI with filters, search, compact view |
-| **LLM Proxy** | `src/llm-proxy/llm-proxy.mjs` | Routes summarization to subscription providers |
+| **LLM CLI Proxy** | `integrations/llm-cli-proxy/` | Routes summarization to subscription providers (port 12435) |
 
 ## Observation Pipeline
 
@@ -67,7 +67,7 @@ Access at `http://localhost:3032/observations`.
 
 ## LLM Provider Routing
 
-Summarization uses the coding LLM proxy (`localhost:8089`) which routes through the LLMService provider chain:
+Summarization uses the LLM CLI proxy (`localhost:12435`) which routes through subscription providers:
 
 1. **claude-code** (Max subscription, zero cost, ~15s via CLI)
 2. **copilot** (Enterprise subscription, zero cost, ~2-5s via HTTP)
