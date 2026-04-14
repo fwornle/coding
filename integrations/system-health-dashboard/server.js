@@ -3789,19 +3789,31 @@ class SystemHealthAPIServer {
     // ── Observations API (Phase 23) ────────────────────────────────────
 
     /**
-     * Lazy-initialize a read-only connection to the observations SQLite database.
-     * Creates FTS5 virtual table for full-text search on summaries.
+     * Get a read-only connection to the observations SQLite database.
+     * Re-opens every 30s so WAL-mode writes from the host are visible.
      */
     _getObservationsDb() {
-        if (this._obsDb) return this._obsDb;
+        const now = Date.now();
+        const REOPEN_INTERVAL_MS = 30_000;
+
+        if (this._obsDb && this._obsDbOpenedAt && (now - this._obsDbOpenedAt) < REOPEN_INTERVAL_MS) {
+            return this._obsDb;
+        }
+
+        // Close stale connection before re-opening
+        if (this._obsDb) {
+            try { this._obsDb.close(); } catch { /* ignore */ }
+            this._obsDb = null;
+        }
+
         try {
             const Database = require_cjs('better-sqlite3');
             const dbPath = join(codingRoot, '.observations', 'observations.db');
             if (!existsSync(dbPath)) {
                 return null;
             }
-            // Open readonly for queries — FTS5 table is managed by ObservationWriter
             this._obsDb = new Database(dbPath, { readonly: true });
+            this._obsDbOpenedAt = now;
             return this._obsDb;
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] DB init failed: ${err.message}\n`);

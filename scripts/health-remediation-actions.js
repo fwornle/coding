@@ -191,6 +191,9 @@ export class HealthRemediationActions {
         case 'regenerate_services_file':
           result = await this.regenerateServicesFile(issueDetails);
           break;
+        case 'restart_llm_cli_proxy':
+          result = await this.restartLLMCLIProxy(issueDetails);
+          break;
         case 'check_llm_cli_proxy':
           result = await this.checkLLMCLIProxy(issueDetails);
           break;
@@ -852,6 +855,65 @@ export class HealthRemediationActions {
 
     } catch (error) {
       return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Restart LLM CLI Proxy - kills any existing process and spawns a new one.
+   * Required for observation summarization. Runs on host (not Docker).
+   */
+  async restartLLMCLIProxy(details) {
+    try {
+      this.log('Restarting LLM CLI Proxy...');
+      const { execSync, spawn } = require('child_process');
+      const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+      const codingDir = process.env.CODING_REPO || process.env.CODING_TOOLS_PATH || '/Users/Q284340/Agentic/coding';
+      const proxyDir = require('path').join(codingDir, 'integrations/llm-cli-proxy');
+      const distEntry = require('path').join(proxyDir, 'dist/server.js');
+      const fs = require('fs');
+
+      // Kill any existing proxy process on the port
+      try {
+        const pids = execSync(`lsof -ti:${proxyPort} 2>/dev/null`, { encoding: 'utf8' }).trim();
+        if (pids) {
+          execSync(`kill ${pids.split('\n').join(' ')} 2>/dev/null`);
+          this.log(`Killed existing proxy process(es): ${pids.replace(/\n/g, ', ')}`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      } catch { /* no process on port */ }
+
+      // Check dist exists
+      if (!fs.existsSync(distEntry)) {
+        try {
+          execSync('npm run build', { cwd: proxyDir, timeout: 30000, stdio: 'pipe' });
+        } catch (buildErr) {
+          return { success: false, message: `LLM CLI Proxy build failed: ${buildErr.message}` };
+        }
+      }
+
+      // Spawn new proxy process
+      const logFile = require('path').join(codingDir, '.data', 'llm-cli-proxy.log');
+      const logFd = fs.openSync(logFile, 'a');
+      const child = spawn('node', [distEntry], {
+        detached: true,
+        stdio: ['ignore', logFd, logFd],
+        cwd: proxyDir,
+        env: { ...process.env, LLM_CLI_PROXY_PORT: proxyPort }
+      });
+      child.unref();
+      fs.closeSync(logFd);
+
+      // Wait and verify
+      await new Promise(r => setTimeout(r, 2000));
+
+      const isHealthy = await this.checkHttpHealth(`http://localhost:${proxyPort}/health`, 3000);
+      if (isHealthy) {
+        return { success: true, message: `LLM CLI Proxy restarted (PID ${child.pid}) on port ${proxyPort}` };
+      }
+
+      return { success: false, message: `LLM CLI Proxy spawned (PID ${child.pid}) but health check failed` };
+    } catch (error) {
+      return { success: false, message: `LLM CLI Proxy restart failed: ${error.message}` };
     }
   }
 

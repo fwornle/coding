@@ -166,30 +166,52 @@ export class ObservationWriter {
           },
         ],
       };
-      process.stderr.write(`[ObservationWriter] Calling proxy: ${this.proxyUrl}/api/complete (provider: ${this.provider || 'auto'})\n`);
+      // Retry loop: 2 attempts with 3s backoff
+      const MAX_RETRIES = 2;
+      let lastError = null;
 
-      const response = await fetch(`${this.proxyUrl}/api/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
-      });
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          process.stderr.write(`[ObservationWriter] Calling proxy (attempt ${attempt}/${MAX_RETRIES}, provider: ${this.provider || 'auto'})\n`);
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        process.stderr.write(`[ObservationWriter] Proxy error ${response.status}: ${errBody}\n`);
-        return { summary: this._fallbackSummary(messages) };
+          const response = await fetch(`${this.proxyUrl}/api/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (!response.ok) {
+            const errBody = await response.text();
+            lastError = `Proxy error ${response.status}: ${errBody.slice(0, 200)}`;
+            process.stderr.write(`[ObservationWriter] ${lastError}\n`);
+            if (attempt < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, 3000));
+              continue;
+            }
+            return { summary: this._fallbackSummary(messages) };
+          }
+
+          const result = await response.json();
+          const summary = result.content || this._fallbackSummary(messages);
+          const llm = result.model && result.provider
+            ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
+            : undefined;
+          process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING'} (${summary.length} chars) via ${llm ? `${llm.model}@${llm.provider}` : 'fallback'}\n`);
+          return { summary, llm };
+        } catch (err) {
+          lastError = err.message;
+          process.stderr.write(`[ObservationWriter] Attempt ${attempt} failed: ${err.message}\n`);
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 3000));
+          }
+        }
       }
 
-      const result = await response.json();
-      const summary = result.content || this._fallbackSummary(messages);
-      const llm = result.model && result.provider
-        ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
-        : undefined;
-      process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING'} (${summary.length} chars) via ${llm ? `${llm.model}@${llm.provider}` : 'fallback'}\n`);
-      return { summary, llm };
+      process.stderr.write(`[ObservationWriter] All ${MAX_RETRIES} attempts failed. Last error: ${lastError}. Storing raw summary.\n`);
+      return { summary: this._fallbackSummary(messages) };
     } catch (err) {
-      process.stderr.write(`[ObservationWriter] Proxy unavailable: ${err.message}. Storing raw summary.\n`);
+      process.stderr.write(`[ObservationWriter] Unexpected error: ${err.message}. Storing raw summary.\n`);
       return { summary: this._fallbackSummary(messages) };
     }
   }

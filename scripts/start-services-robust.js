@@ -223,14 +223,17 @@ const SERVICE_CONFIGS = {
         return { pid: osCheck.pid, service: 'transcript-monitor', skipRegistration: true };
       }
 
+      const etmLogFile = path.join(CODING_DIR, '.data', 'etm.log');
+      const etmLogFd = fs.openSync(etmLogFile, 'a');
       const child = spawn('node', [
         path.join(SCRIPT_DIR, 'enhanced-transcript-monitor.js'),
         TARGET_PROJECT_PATH  // Pass target project path as argument
       ], {
         detached: true,
-        stdio: ['ignore', 'ignore', 'ignore'],
+        stdio: ['ignore', etmLogFd, etmLogFd],
         cwd: CODING_DIR
       });
+      fs.closeSync(etmLogFd);
 
       child.unref();
 
@@ -1011,15 +1014,18 @@ const SERVICE_CONFIGS = {
         }
       }
 
+      const proxyLogFile = path.join(CODING_DIR, '.data', 'llm-cli-proxy.log');
+      const proxyLogFd = fs.openSync(proxyLogFile, 'a');
       const child = spawn('node', [distEntry], {
         detached: true,
-        stdio: ['ignore', 'ignore', 'ignore'],
+        stdio: ['ignore', proxyLogFd, proxyLogFd],
         cwd: proxyDir,
         env: {
           ...process.env,
           LLM_CLI_PROXY_PORT: String(PORTS.LLM_CLI_PROXY)
         }
       });
+      fs.closeSync(proxyLogFd);
 
       child.unref();
 

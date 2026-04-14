@@ -235,6 +235,11 @@ class HealthVerifier extends EventEmitter {
       const serviceChecks = await this.verifyServices();
       checks.push(...serviceChecks);
 
+      // Priority Check 2b: Observation Quality
+      this.log('Checking observation quality...');
+      const obsChecks = await this.verifyObservationQuality();
+      checks.push(...obsChecks);
+
       // Priority Check 3: Process Health
       this.log('Checking process health...');
       const processChecks = await this.verifyProcesses();
@@ -462,6 +467,22 @@ class HealthVerifier extends EventEmitter {
       });
     }
 
+    // Check LLM CLI Proxy (required for observation summarization)
+    if (serviceRules.llm_cli_proxy?.enabled) {
+      const rule = serviceRules.llm_cli_proxy;
+      const proxyCheck = await this.checkHTTPHealth(
+        'llm_cli_proxy',
+        rule.endpoint,
+        rule.timeout_ms
+      );
+      checks.push({
+        ...proxyCheck,
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
+      });
+    }
+
     // Check Enhanced Transcript Monitor (LSL system - CRITICAL for session history)
     if (serviceRules.enhanced_transcript_monitor?.enabled) {
       const rule = serviceRules.enhanced_transcript_monitor;
@@ -487,6 +508,51 @@ class HealthVerifier extends EventEmitter {
       }
     }
 
+    return checks;
+  }
+
+  /**
+   * Verify observation quality — detects when recent observations are [Raw] (LLM proxy failures).
+   * If recent observations are degraded, triggers auto-heal of the LLM proxy.
+   */
+  async verifyObservationQuality() {
+    const checks = [];
+    try {
+      const dbPath = path.join(this.codingRoot, '.observations', 'observations.db');
+      if (!fsSync.existsSync(dbPath)) return checks;
+
+      const { execSync } = await import('child_process');
+      // Count [Raw] observations in the last 2 hours
+      const result = execSync(
+        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM observations WHERE summary LIKE '[Raw]%' AND created_at > datetime('now', '-2 hours');"`,
+        { encoding: 'utf8', timeout: 5000 }
+      ).trim();
+      const recentRawCount = parseInt(result, 10) || 0;
+
+      const totalResult = execSync(
+        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM observations WHERE created_at > datetime('now', '-2 hours');"`,
+        { encoding: 'utf8', timeout: 5000 }
+      ).trim();
+      const recentTotalCount = parseInt(totalResult, 10) || 0;
+
+      const isHealthy = recentRawCount === 0;
+      const check = {
+        category: 'services',
+        check: 'observation_quality',
+        check_id: `observation_quality_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        status: isHealthy ? 'healthy' : 'degraded',
+        details: isHealthy
+          ? `Observations healthy: ${recentTotalCount} recent observations, 0 [Raw]`
+          : `Observation quality degraded: ${recentRawCount}/${recentTotalCount} recent observations are [Raw] (LLM proxy may be failing)`,
+        auto_heal: !isHealthy,
+        auto_heal_action: 'restart_llm_cli_proxy',
+        severity: 'warning'
+      };
+      checks.push(check);
+    } catch (err) {
+      this.log(`Observation quality check skipped: ${err.message}`);
+    }
     return checks;
   }
 
