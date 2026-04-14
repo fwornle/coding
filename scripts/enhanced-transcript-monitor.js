@@ -888,11 +888,11 @@ class EnhancedTranscriptMonitor {
       readFiles: readFiles.length > 0 ? readFiles : undefined,
     };
 
-    // Check if the PREVIOUS observation needs updating with artifacts from this prompt set.
-    // This handles the case where a multi-turn conversation fires an observation early
-    // (before tool calls complete), then continuation exchanges arrive with the actual edits.
-    if (this._lastObservationId && modifiedFiles.length > 0) {
-      this._updatePreviousObservationArtifacts(this._lastObservationId, modifiedFiles, readFiles, messages);
+    // Patch recent observations that have "Artifacts: none" with the actual modified files.
+    // Handles: incremental re-processing where early fires miss Edit calls,
+    // multi-turn tool calls across prompt set boundaries, ETM restarts.
+    if (modifiedFiles.length > 0) {
+      this._patchRecentObservationsWithArtifacts(modifiedFiles, readFiles);
     }
 
     // Fire-and-forget: do NOT await. Per D-04 and D-05.
@@ -907,40 +907,46 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Update a previously-written observation with artifacts discovered in a later prompt set.
-   * This handles multi-turn conversations where tool calls span across prompt set boundaries.
+   * Patch recent observations that have "Artifacts: none" with actual modified files.
+   * Scans the last 30 minutes of observations for this agent and patches any missing artifacts.
+   * Handles: (1) incremental re-processing where early fires miss Edit calls,
+   * (2) multi-turn tool calls across prompt set boundaries,
+   * (3) ETM restarts re-processing already-written exchanges.
    */
-  _updatePreviousObservationArtifacts(obsId, modifiedFiles, readFiles, currentMessages) {
+  _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles) {
     if (!this.observationWriter?.db) return;
+    if (!modifiedFiles || modifiedFiles.length === 0) return;
     try {
       const db = this.observationWriter.db;
-      const row = db.prepare('SELECT summary, metadata FROM observations WHERE id = ?').get(obsId);
-      if (!row) return;
+      const rows = db.prepare(
+        `SELECT id, summary, metadata FROM observations
+         WHERE agent = ? AND summary LIKE '%Artifacts: none%'
+         AND created_at > datetime('now', '-30 minutes')
+         ORDER BY created_at DESC LIMIT 10`
+      ).all(this.agentType);
 
-      // Only update if the previous observation has no artifacts
-      const hasNoArtifacts = /Artifacts:\s*none/i.test(row.summary);
-      if (!hasNoArtifacts) return;
+      if (rows.length === 0) return;
 
-      // Build new Artifacts line from the continuation's modified files
-      const artifactsList = modifiedFiles.map(f => `edited ${path.basename(f)}`).join(', ');
-      const newArtifactsLine = `Artifacts: ${artifactsList}`;
+      const artifactsList = modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
 
-      // Replace the Artifacts line in the summary
-      const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, newArtifactsLine);
-      if (updatedSummary === row.summary) return; // No change
+      for (const row of rows) {
+        const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
+        if (updatedSummary === row.summary) continue;
 
-      // Also update metadata with the file list
-      let meta = {};
-      try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
-      meta.modifiedFiles = modifiedFiles;
-      if (readFiles.length > 0) meta.readFiles = [...(meta.readFiles || []), ...readFiles];
+        let meta = {};
+        try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
+        if (meta.modifiedFiles && meta.modifiedFiles.length > 0) continue;
+        meta.modifiedFiles = modifiedFiles;
+        if (readFiles && readFiles.length > 0) {
+          meta.readFiles = [...new Set([...(meta.readFiles || []), ...readFiles])];
+        }
 
-      db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
-        .run(updatedSummary, JSON.stringify(meta), obsId);
-
-      process.stderr.write(`[ObservationTap] Updated previous observation ${obsId.slice(0,8)} with ${modifiedFiles.length} artifacts from continuation\n`);
+        db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
+          .run(updatedSummary, JSON.stringify(meta), row.id);
+        process.stderr.write(`[ObservationTap] Patched observation ${row.id.slice(0,8)} with ${modifiedFiles.length} artifacts\n`);
+      }
     } catch (err) {
-      process.stderr.write(`[ObservationTap] Failed to update previous observation: ${err.message}\n`);
+      process.stderr.write(`[ObservationTap] Failed to patch observations: ${err.message}\n`);
     }
   }
 
