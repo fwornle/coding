@@ -274,9 +274,27 @@ export class ObservationWriter {
     const contentHash = crypto.createHash('md5').update(hashInput).digest('hex');
 
     const existing = this.db.prepare(
-      'SELECT id FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
+      'SELECT id, summary, metadata FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
     ).get(agent, contentHash);
     if (existing) {
+      // If the existing observation has no artifacts but this re-fire does, patch it
+      const hasNoArtifacts = /Artifacts:\s*none/i.test(existing.summary);
+      const newModifiedFiles = metadata.modifiedFiles;
+      if (hasNoArtifacts && newModifiedFiles && newModifiedFiles.length > 0) {
+        const artifactsList = newModifiedFiles.map(f => {
+          const base = f.split('/').pop();
+          return `edited ${base}`;
+        }).join(', ');
+        const updatedSummary = existing.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
+        let existingMeta = {};
+        try { existingMeta = JSON.parse(existing.metadata || '{}'); } catch { /* ignore */ }
+        existingMeta.modifiedFiles = newModifiedFiles;
+        if (metadata.readFiles) existingMeta.readFiles = metadata.readFiles;
+        this.db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
+          .run(updatedSummary, JSON.stringify(existingMeta), existing.id);
+        process.stderr.write(`[ObservationWriter] Dedup+patch: updated ${existing.id.slice(0, 8)} with ${newModifiedFiles.length} artifacts\n`);
+        return existing.id;
+      }
       process.stderr.write(`[ObservationWriter] Dedup: same input already observed (hash=${contentHash.slice(0, 8)})\n`);
       return null;
     }

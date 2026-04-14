@@ -875,6 +875,10 @@ class EnhancedTranscriptMonitor {
       }
     }
 
+    // Debug: log tool call extraction for artifact tracking diagnosis
+    const allToolCalls = exchanges.flatMap(ex => (ex.toolCalls || []).map(tc => tc.name));
+    process.stderr.write(`[ObservationTap] Prompt set: ${exchanges.length} exchanges, ${allToolCalls.length} tool calls [${[...new Set(allToolCalls)].join(',')}], ${modifiedFiles.length} modified, ${readFiles.length} read\n`);
+
     const metadata = {
       agent: this.agentType,
       sessionId: this.sessionId || null,
