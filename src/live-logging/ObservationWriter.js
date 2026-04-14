@@ -412,6 +412,7 @@ export class ObservationWriter {
 
     let observations = 0;
     let errors = 0;
+    let lastObservationId = null;
 
     for (const chunk of chunks) {
       try {
@@ -419,7 +420,8 @@ export class ObservationWriter {
         const enrichedMeta = llm
           ? { ...metadata, llmModel: llm.model, llmProvider: llm.provider, llmTokens: llm.tokens, llmLatencyMs: llm.latencyMs }
           : metadata;
-        await this.writeObservation(summary, chunk, enrichedMeta);
+        const obsId = await this.writeObservation(summary, chunk, enrichedMeta);
+        if (obsId) lastObservationId = obsId;
         observations++;
       } catch (err) {
         errors++;
@@ -427,7 +429,7 @@ export class ObservationWriter {
       }
     }
 
-    return { observations, errors };
+    return { observations, errors, lastObservationId };
   }
 
   /**

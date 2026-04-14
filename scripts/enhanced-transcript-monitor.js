@@ -204,6 +204,7 @@ class EnhancedTranscriptMonitor {
 
     // Observation tap - fire-and-forget per D-04 (Phase 23)
     this.observationWriter = null;
+    this._lastObservationId = null; // Track last written observation for cross-prompt-set artifact updates
     this._initObservationWriter();
 
     // Initialize classification logger for tracking 4-layer classification decisions
@@ -874,17 +875,69 @@ class EnhancedTranscriptMonitor {
       }
     }
 
-    // Fire-and-forget: do NOT await. Per D-04 and D-05.
-    this.observationWriter.processMessages(messages, {
+    const metadata = {
       agent: this.agentType,
       sessionId: this.sessionId || null,
       sourceFile: 'live-etm',
       project: path.basename(this.config.projectPath || ''),
       modifiedFiles: modifiedFiles.length > 0 ? modifiedFiles : undefined,
       readFiles: readFiles.length > 0 ? readFiles : undefined,
+    };
+
+    // Check if the PREVIOUS observation needs updating with artifacts from this prompt set.
+    // This handles the case where a multi-turn conversation fires an observation early
+    // (before tool calls complete), then continuation exchanges arrive with the actual edits.
+    if (this._lastObservationId && modifiedFiles.length > 0) {
+      this._updatePreviousObservationArtifacts(this._lastObservationId, modifiedFiles, readFiles, messages);
+    }
+
+    // Fire-and-forget: do NOT await. Per D-04 and D-05.
+    this.observationWriter.processMessages(messages, metadata).then(result => {
+      // Store the observation ID so the NEXT prompt set can update it if needed
+      if (result && result.lastObservationId) {
+        this._lastObservationId = result.lastObservationId;
+      }
     }).catch(err => {
       process.stderr.write(`[ObservationTap] PromptSet error: ${err.message}\n`);
     });
+  }
+
+  /**
+   * Update a previously-written observation with artifacts discovered in a later prompt set.
+   * This handles multi-turn conversations where tool calls span across prompt set boundaries.
+   */
+  _updatePreviousObservationArtifacts(obsId, modifiedFiles, readFiles, currentMessages) {
+    if (!this.observationWriter?.db) return;
+    try {
+      const db = this.observationWriter.db;
+      const row = db.prepare('SELECT summary, metadata FROM observations WHERE id = ?').get(obsId);
+      if (!row) return;
+
+      // Only update if the previous observation has no artifacts
+      const hasNoArtifacts = /Artifacts:\s*none/i.test(row.summary);
+      if (!hasNoArtifacts) return;
+
+      // Build new Artifacts line from the continuation's modified files
+      const artifactsList = modifiedFiles.map(f => `edited ${path.basename(f)}`).join(', ');
+      const newArtifactsLine = `Artifacts: ${artifactsList}`;
+
+      // Replace the Artifacts line in the summary
+      const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, newArtifactsLine);
+      if (updatedSummary === row.summary) return; // No change
+
+      // Also update metadata with the file list
+      let meta = {};
+      try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
+      meta.modifiedFiles = modifiedFiles;
+      if (readFiles.length > 0) meta.readFiles = [...(meta.readFiles || []), ...readFiles];
+
+      db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
+        .run(updatedSummary, JSON.stringify(meta), obsId);
+
+      process.stderr.write(`[ObservationTap] Updated previous observation ${obsId.slice(0,8)} with ${modifiedFiles.length} artifacts from continuation\n`);
+    } catch (err) {
+      process.stderr.write(`[ObservationTap] Failed to update previous observation: ${err.message}\n`);
+    }
   }
 
   async initializeReliableCodingClassifier() {
