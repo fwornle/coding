@@ -10,6 +10,7 @@ Central documentation for the unified semantic analysis & knowledge management s
 
 ### Core Systems
 - **[Live Session Logging (LSL)](lsl/README.md)** - Real-time conversation classification and routing
+- **[Observational Memory](observations/README.md)** - Per-exchange LLM observations with browsable dashboard
 - **[Constraint Monitoring](constraints/README.md)** - Real-time code quality enforcement
 - **[Trajectory Generation](trajectories/README.md)** - Automated project analysis and documentation
 - **[Status Line System](health-system/README.md)** - Visual system status and activity indicators
@@ -59,6 +60,8 @@ Each integration component is self-contained with its own comprehensive document
 **Understanding the System?** Read [System Overview](system-overview.md)
 
 **Working with LSL?** See [Live Session Logging](lsl/README.md)
+
+**Browsing Observations?** See [Observational Memory](observations/README.md)
 
 **Setting up Integrations?** Check [Integration Overview](integrations/README.md)
 

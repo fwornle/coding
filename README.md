@@ -216,16 +216,18 @@ Real-time code quality enforcement through PreToolUse hooks
 - **Visualization (VKB)**: Web-based graph visualization at `http://localhost:8080`
 - **Ontology Classification**: 4-layer classification pipeline
 
-#### [👁️ Observational Memory](docs-content/core-systems/observational-memory.md)
-Real-time per-exchange observations from live coding sessions:
-- **LLM-powered summaries**: Each exchange summarized into 1-3 sentence observations via claude-code (Max subscription)
+#### [👁️ Observational Memory](docs/observations/)
+Real-time per-exchange observations from live coding sessions, inspired by the observational memory concepts in the Mastra codebase:
+- **Structured LLM summaries**: Each exchange summarized into Intent/Approach/Artifacts/Result via subscription providers
 - **Multi-agent capture**: All four agents (Claude, Copilot, OpenCode, Mastracode) generate observations
 - **Dashboard**: Browsable at `http://localhost:3032/observations` with filters, search, compact view
+- **Auto-fallback**: LLM proxy automatically tries the next provider on failure (health tracking with cooldowns)
 - **Transcript converters**: Batch-convert historical Claude JSONL, Copilot events, and .specstory files
-- **Deduplication**: DB-level dedup prevents duplicate observations across ETM restarts
 - **Zero-cost summarization**: Routes through subscription providers (Claude Max, Copilot Enterprise)
 
-![Observation Pipeline](docs/images/observation-pipeline.png)
+![Observation Viewer -- browsable dashboard with agent/project filters](docs/images/observation-viewer.png)
+
+![Observation Viewer -- expanded observation with structured summary](docs/images/observation-viewer-item.png)
 
 ![Mastracode in VS Code](docs/images/coding-mastracode-vscode.png)
 

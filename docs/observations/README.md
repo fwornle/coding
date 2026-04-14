@@ -2,9 +2,16 @@
 
 Real-time observation capture from live coding sessions across all agents, with LLM-powered summarization and a browsable dashboard. Inspired by the observational memory concepts in the Mastra codebase, adapted to work across all supported coding agents.
 
-## Overview
+## What It Does
 
-Observational Memory captures per-exchange observations during coding sessions. Each user-assistant exchange is summarized by an LLM into a structured observation (Intent, Approach, Artifacts, Result), then stored in a local SQLite database. Observations are browsable via the health dashboard at `http://localhost:3032/observations`.
+Observational Memory captures per-exchange observations during coding sessions. Each user-assistant exchange is summarized by an LLM into a structured observation (Intent, Approach, Artifacts, Result), then stored in a local SQLite database.
+
+- **Real-Time Capture** - Every exchange generates an observation via fire-and-forget (never blocks LSL)
+- **LLM Summarization** - Structured summaries via the LLM CLI proxy with automatic provider fallback
+- **Multi-Agent Support** - Claude Code, Copilot CLI, OpenCode, and Mastracode all generate observations
+- **Browsable Dashboard** - Filter by agent, project, time range, and full-text search
+- **Zero-Cost** - Routes through subscription providers (Claude Max, Copilot Enterprise)
+- **Backfill Support** - Historical transcripts can be batch-converted into observations
 
 ## Architecture
 
@@ -14,8 +21,8 @@ Observational Memory captures per-exchange observations during coding sessions. 
 ETM (per project)          ObservationWriter          LLM CLI Proxy (12435)
    |                            |                          |
    | _fireObservation()         |                          |
-   |  user + assistant msg ---->| summarize() ------------>| claude-code (Max)
-   |                            |<---- summary + metadata -|
+   |  user + assistant msg ---->| summarize() ------------>| claude-code / copilot
+   |                            |<---- summary + metadata -|  (auto-fallback)
    |                            | writeObservation()       |
    |                            |  --> SQLite (.observations/observations.db)
    |                            |
@@ -32,11 +39,11 @@ Dashboard (3032) <-- API (3033) <-- reads SQLite (readonly)
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/observations.tsx` | Browsable UI with filters, search, compact view |
 | **LLM CLI Proxy** | `integrations/llm-cli-proxy/` | Routes summarization to subscription providers (port 12435) |
 
-## Observation Pipeline
+## Pipeline
 
 1. **Exchange completed** -- the ETM detects a user-assistant exchange
 2. **Fire-and-forget** -- `_fireObservation()` sends messages to ObservationWriter (never awaited, never blocks LSL)
-3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a 1-3 sentence summary
+3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a structured summary
 4. **Dedup check** -- DB-level dedup prevents storing duplicate summaries per agent
 5. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens)
 6. **Dashboard** -- REST API serves observations; dashboard polls every 30s
@@ -52,11 +59,11 @@ All four agents generate observations:
 | **OpenCode** | ETM pipe-pane capture | `path.basename(projectPath)` |
 | **Mastracode** | ETM lifecycle hook transcripts | `path.basename(projectPath)` |
 
-## Dashboard Features
+## Dashboard
 
 Access at `http://localhost:3032/observations`.
 
-![Observation Viewer — list view with filters](../images/observation-viewer.png)
+![Observation Viewer -- list view with filters](../images/observation-viewer.png)
 
 - **Agent filter** -- checkbox per agent (claude, copilot, opencode, mastra)
 - **Time range** -- date pickers for from/to
@@ -66,13 +73,12 @@ Access at `http://localhost:3032/observations`.
 - **Hide low-value** -- filters out "No actionable content" observations
 - **LLM metadata** -- each card shows `model@provider` and token counts when expanded
 - **Markdown rendering** -- bold, headers, inline code rendered in expanded view
-- **ESC / click-outside** -- closes expanded observation cards
 
-![Observation Viewer — expanded observation with structured summary](../images/observation-viewer-item.png)
+![Observation Viewer -- expanded observation with structured summary](../images/observation-viewer-item.png)
 
 ## LLM Provider Routing
 
-Summarization uses the LLM CLI proxy (`localhost:12435`) which routes through subscription providers with **automatic fallback**:
+Summarization uses the LLM CLI proxy (`localhost:12435`) with **automatic fallback**:
 
 1. **claude-code** (Max subscription, zero cost, ~15s via CLI)
 2. **copilot** (Enterprise subscription, zero cost, ~2-5s via HTTP)
@@ -81,7 +87,7 @@ Summarization uses the LLM CLI proxy (`localhost:12435`) which routes through su
 
 The proxy tracks provider health and automatically falls back to the next available provider on failure. Providers that fail 3 times consecutively enter a 1-minute cooldown. Per-provider timeouts (30s) prevent a hung provider from burning the entire request budget.
 
-The provider priority is configured in `config/llm-providers.yaml`.
+Provider priority is configured in `config/llm-providers.yaml`.
 
 ## Transcript Converters
 
@@ -96,6 +102,9 @@ node scripts/convert-transcripts.js copilot path/to/events.jsonl
 
 # Batch convert .specstory files (with manifest idempotency)
 node scripts/convert-transcripts.js specstory
+
+# Backfill [Raw] observations that failed LLM summarization
+node scripts/backfill-raw-observations.js
 ```
 
 ## Database
@@ -136,10 +145,6 @@ CREATE TABLE observations (
 }
 ```
 
-### LLM provider priority
-
-`config/llm-providers.yaml` -- `provider_priority` section controls which provider handles summarization.
-
 ### Mastracode built-in OM
 
 Mastracode has its own observational memory system (separate from ours). It can be disabled in `~/Library/Application Support/mastracode/settings.json` by setting `activeOmPackId: "disabled"`.
@@ -149,3 +154,18 @@ Mastracode has its own observational memory system (separate from ours). It can 
 - **DB-level**: identical `(agent, summary)` pairs are rejected before insert
 - **Trivial filter**: observations containing "trivial exchange" are skipped entirely
 - **WAL mode**: SQLite WAL mode prevents corruption from concurrent ETM writes
+
+## Relationship to LSL
+
+Observational Memory and [Live Session Logging (LSL)](../lsl/) are complementary systems that run in parallel:
+
+| Aspect | LSL | Observational Memory |
+|--------|-----|---------------------|
+| **Granularity** | Full session transcripts | Per-exchange summaries |
+| **Storage** | Markdown files in `.specstory/history/` | SQLite database in `.observations/` |
+| **Content** | Raw tool calls, messages, outputs | Structured Intent/Approach/Artifacts/Result |
+| **Classification** | 5-layer LOCAL vs CODING routing | None (all exchanges captured) |
+| **Use case** | Session replay, continuity, debugging | Activity tracking, knowledge extraction feed |
+| **Blocking** | Synchronous (writes during session) | Fire-and-forget (never blocks ETM) |
+
+Both systems are driven by the Enhanced Transcript Monitor (ETM). LSL captures the verbatim session log; Observational Memory generates a concise LLM summary of each exchange within that session.
