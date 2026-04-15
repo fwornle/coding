@@ -178,7 +178,7 @@ export class ObservationWriter {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(60000),
           });
 
           if (!response.ok) {

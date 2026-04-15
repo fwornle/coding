@@ -63,7 +63,7 @@ const PORT = parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10);
 const HOST = '127.0.0.1';
 const PROVIDER_CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
-const PER_PROVIDER_TIMEOUT_MS = 30_000; // Per-provider timeout during fallback (total timeout still applies)
+const PER_PROVIDER_TIMEOUT_MS = 15_000; // Per-provider timeout during fallback — reduced from 30s to avoid burning the caller's budget on a hung provider
 const MAX_CLI_ARG_LENGTH = 200_000; // Use stdin for prompts exceeding this
 
 // --- State ---
@@ -73,13 +73,16 @@ const inFlightProcesses = new Set<ChildProcess>();
 let startTime = Date.now();
 
 // Provider health tracking: cooldown period after consecutive failures
-const FAILURE_COOLDOWN_MS = 60_000; // 1 min cooldown after failures
+const FAILURE_COOLDOWN_MS = 120_000; // 2 min cooldown after failures (increased from 1 min)
 const MAX_CONSECUTIVE_BEFORE_COOLDOWN = 3; // After 3 consecutive failures, enter cooldown
+const FAILURE_CAP = 50; // Cap consecutive failures — prevents counter from growing indefinitely
 
 function recordProviderSuccess(providerName: string): void {
   const status = providerStatuses[providerName];
   if (status) {
     status.consecutiveFailures = 0;
+    // Also decay recentFailures on success so healthy providers have better stats
+    status.recentFailures = Math.max(0, status.recentFailures - 1);
   }
 }
 
@@ -87,7 +90,7 @@ function recordProviderFailure(providerName: string): void {
   const status = providerStatuses[providerName];
   if (status) {
     status.recentFailures++;
-    status.consecutiveFailures++;
+    status.consecutiveFailures = Math.min(status.consecutiveFailures + 1, FAILURE_CAP);
     status.lastFailureTime = Date.now();
   }
 }
@@ -101,7 +104,10 @@ function isProviderHealthy(providerName: string): boolean {
     if (elapsed < FAILURE_COOLDOWN_MS) {
       return false; // Still in cooldown
     }
-    // Cooldown expired, give it another chance
+    // Cooldown expired — reset consecutive failures to give it a fair chance
+    // (one retry at a time; if it fails again, it re-enters cooldown from 1)
+    status.consecutiveFailures = 0;
+    log(`[health] ${providerName} cooldown expired, resetting failure counter for retry`);
   }
   return true;
 }
@@ -111,9 +117,14 @@ function selectBestProvider(): string | null {
   for (const p of Object.keys(CLI_CONFIGS)) {
     if (isProviderHealthy(p)) return p;
   }
-  // Second pass: any available provider (cooldown expired or not)
+  // Second pass: any available provider (cooldown expired or not) — but only if
+  // cooldown has actually expired. This prevents retrying a provider that just
+  // failed 3 times in the last 2 minutes.
   for (const p of Object.keys(CLI_CONFIGS)) {
-    if (providerStatuses[p]?.available) return p;
+    const status = providerStatuses[p];
+    if (!status?.available) continue;
+    const elapsed = Date.now() - (status.lastFailureTime || 0);
+    if (elapsed >= FAILURE_COOLDOWN_MS) return p;
   }
   return null;
 }
@@ -122,15 +133,36 @@ function getOrderedProviders(preferredProvider?: string): string[] {
   const all = Object.keys(CLI_CONFIGS);
   if (!preferredProvider) {
     // Sort: healthy first, then by fewer consecutive failures
-    return all.sort((a, b) => {
-      const aHealthy = isProviderHealthy(a) ? 0 : 1;
-      const bHealthy = isProviderHealthy(b) ? 0 : 1;
-      if (aHealthy !== bHealthy) return aHealthy - bHealthy;
-      return (providerStatuses[a]?.consecutiveFailures || 0) - (providerStatuses[b]?.consecutiveFailures || 0);
-    });
+    // Filter out providers in cooldown entirely — don't waste time on them
+    return all
+      .filter(p => {
+        const status = providerStatuses[p];
+        if (!status?.available) return false;
+        // Skip providers deep in cooldown (failed recently with many consecutive failures)
+        if (status.consecutiveFailures >= MAX_CONSECUTIVE_BEFORE_COOLDOWN) {
+          const elapsed = Date.now() - status.lastFailureTime;
+          if (elapsed < FAILURE_COOLDOWN_MS) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aHealthy = isProviderHealthy(a) ? 0 : 1;
+        const bHealthy = isProviderHealthy(b) ? 0 : 1;
+        if (aHealthy !== bHealthy) return aHealthy - bHealthy;
+        return (providerStatuses[a]?.consecutiveFailures || 0) - (providerStatuses[b]?.consecutiveFailures || 0);
+      });
   }
-  // Put preferred first, then others
-  return [preferredProvider, ...all.filter(p => p !== preferredProvider)];
+  // Put preferred first, filter out providers in cooldown (except the preferred one)
+  return [preferredProvider, ...all.filter(p => {
+    if (p === preferredProvider) return false;
+    const status = providerStatuses[p];
+    if (!status?.available) return false;
+    if (status.consecutiveFailures >= MAX_CONSECUTIVE_BEFORE_COOLDOWN) {
+      const elapsed = Date.now() - status.lastFailureTime;
+      if (elapsed < FAILURE_COOLDOWN_MS) return false;
+    }
+    return true;
+  })];
 }
 
 // --- Provider CLI Mapping ---
@@ -368,8 +400,14 @@ app.post('/api/complete', async (req, res) => {
   // Filter to only available providers
   const availableProviders = providersToTry.filter(p => providerStatuses[p]?.available);
   if (availableProviders.length === 0) {
-    res.status(503).json({ error: 'No providers available' });
-    return;
+    // If all providers are in cooldown, try any available one as last resort
+    const anyAvailable = Object.keys(CLI_CONFIGS).filter(p => providerStatuses[p]?.available);
+    if (anyAvailable.length === 0) {
+      res.status(503).json({ error: 'No providers available' });
+      return;
+    }
+    log(`[fallback] All providers in cooldown, trying ${anyAvailable[0]} as last resort`);
+    availableProviders.push(anyAvailable[0]);
   }
 
   if (!requestedProvider) {

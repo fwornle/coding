@@ -57,7 +57,7 @@ export function ObservationsPage() {
   const [fetching, setFetching] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [compact, setCompact] = useState(false)
+  const [compact, setCompact] = useState(true)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
