@@ -84,15 +84,20 @@ class SystemMonitorWatchdog {
 
       if (!isRunning) {
         // Check if coordinator is running at OS level but not registered in PSM
+        let osPids = [];
         try {
           const { stdout } = await execAsync('pgrep -f "global-service-coordinator.js"', { timeout: 5000 });
-          const pids = stdout.trim().split('\n').filter(p => p).map(p => parseInt(p, 10));
+          osPids = stdout.trim().split('\n').filter(p => p).map(p => parseInt(p, 10));
+        } catch (pgrepError) {
+          // No coordinator running at OS level (pgrep returns non-zero when no match)
+        }
 
-          if (pids.length > 0) {
-            const pid = pids[0];
-            this.log(`Found coordinator running at OS level (PID: ${pid}) but not in PSM - registering...`);
+        if (osPids.length > 0) {
+          const pid = osPids[0];
+          this.log(`Found coordinator running at OS level (PID: ${pid}) but not in PSM - registering...`);
 
-            // Register the orphaned coordinator
+          // Try to register with PSM (best-effort — lock contention may prevent it)
+          try {
             await this.psm.registerService({
               name: 'global-service-coordinator',
               pid: pid,
@@ -100,11 +105,13 @@ class SystemMonitorWatchdog {
               script: 'scripts/global-service-coordinator.js',
               metadata: { managedBy: 'watchdog-recovery', recoveredAt: new Date().toISOString() }
             });
-
-            return { alive: true, pid: pid, healthAge: 0, recovered: true };
+          } catch (registerError) {
+            // PSM registration failed (likely lock contention) — not fatal,
+            // the coordinator is still alive at OS level
+            this.warn(`PSM registration failed (non-fatal): ${registerError.message}`);
           }
-        } catch (pgrepError) {
-          // No coordinator running at OS level
+
+          return { alive: true, pid: pid, healthAge: 0, recovered: true };
         }
 
         this.warn('Coordinator not running according to PSM');
@@ -163,6 +170,26 @@ class SystemMonitorWatchdog {
       if (!fs.existsSync(this.coordinatorScript)) {
         this.error(`Coordinator script not found: ${this.coordinatorScript}`);
         return false;
+      }
+
+      // Kill any existing coordinator processes first to avoid singleton conflicts
+      try {
+        const { stdout } = await execAsync('pgrep -f "global-service-coordinator.js"', { timeout: 5000 });
+        const stalePids = stdout.trim().split('\n').filter(p => p).map(p => parseInt(p, 10));
+        for (const stalePid of stalePids) {
+          this.log(`Killing stale coordinator process ${stalePid} before restart`);
+          try { process.kill(stalePid, 'SIGTERM'); } catch (e) { /* already gone */ }
+        }
+        if (stalePids.length > 0) {
+          // Wait for graceful shutdown
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Force kill any survivors
+          for (const stalePid of stalePids) {
+            try { process.kill(stalePid, 'SIGKILL'); } catch (e) { /* already gone */ }
+          }
+        }
+      } catch (pgrepError) {
+        // No existing coordinator processes — good
       }
 
       // Clean up stale registry first

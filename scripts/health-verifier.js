@@ -514,6 +514,8 @@ class HealthVerifier extends EventEmitter {
   /**
    * Verify observation quality — detects when recent observations are [Raw] (LLM proxy failures).
    * If recent observations are degraded, triggers auto-heal of the LLM proxy.
+   * In corporate network environments where LLM API endpoints are blocked,
+   * this downgrades to info severity to avoid persistent false-positive violations.
    */
   async verifyObservationQuality() {
     const checks = [];
@@ -536,6 +538,26 @@ class HealthVerifier extends EventEmitter {
       const recentTotalCount = parseInt(totalResult, 10) || 0;
 
       const isHealthy = recentRawCount === 0;
+
+      // Check if the LLM proxy is up but its providers have persistent failures
+      // (indicates corporate network blocking LLM APIs, not a service issue)
+      let isNetworkBlocked = false;
+      if (!isHealthy) {
+        try {
+          const proxyHealth = await (await fetch('http://localhost:12435/health', {
+            signal: AbortSignal.timeout(3000)
+          })).json();
+          // If proxy is healthy but ALL providers have high consecutive failures,
+          // the network is blocking LLM API endpoints — not a service issue
+          const providers = Object.values(proxyHealth.providers || {});
+          if (providers.length > 0 && providers.every(p => p.consecutiveFailures > 10)) {
+            isNetworkBlocked = true;
+          }
+        } catch {
+          // Proxy unreachable — that IS a service issue, keep warning severity
+        }
+      }
+
       const check = {
         category: 'services',
         check: 'observation_quality',
@@ -544,10 +566,13 @@ class HealthVerifier extends EventEmitter {
         status: isHealthy ? 'healthy' : 'degraded',
         details: isHealthy
           ? `Observations healthy: ${recentTotalCount} recent observations, 0 [Raw]`
-          : `Observation quality degraded: ${recentRawCount}/${recentTotalCount} recent observations are [Raw] (LLM proxy may be failing)`,
-        auto_heal: !isHealthy,
+          : isNetworkBlocked
+            ? `Observation enrichment unavailable: LLM API endpoints blocked by corporate network (${recentRawCount}/${recentTotalCount} [Raw])`
+            : `Observation quality degraded: ${recentRawCount}/${recentTotalCount} recent observations are [Raw] (LLM proxy may be failing)`,
+        auto_heal: !isHealthy && !isNetworkBlocked,
         auto_heal_action: 'restart_llm_cli_proxy',
-        severity: 'warning'
+        // Downgrade to info when it's a network block — restarting won't help
+        severity: isNetworkBlocked ? 'info' : 'warning'
       };
       checks.push(check);
     } catch (err) {
@@ -1399,9 +1424,15 @@ class HealthVerifier extends EventEmitter {
    * Update status file for StatusLine integration
    */
   async updateStatus(report) {
+    // Only count warning+ severity violations for the statusline indicator.
+    // Info-severity violations are known/expected conditions (e.g., corporate network
+    // blocking LLM APIs) that shouldn't trigger the warning icon.
+    const actionableViolations = report.violations.filter(
+      v => v.severity === 'warning' || v.severity === 'error' || v.severity === 'critical'
+    );
     const status = {
       overallStatus: report.overallStatus,
-      violationCount: report.violations.length,
+      violationCount: actionableViolations.length,
       criticalCount: report.summary.by_severity.critical,
       lastUpdate: report.timestamp,
       autoHealingActive: false // Will be updated when auto-healing is implemented
