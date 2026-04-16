@@ -1463,10 +1463,14 @@ except Exception as e:
     # Setup project-level configuration (legacy support)
     setup_project_level_mcp_config "$temp_file"
     
+    # Setup non-Claude agent MCP configurations
+    setup_opencode_mcp_config "$temp_file"
+    setup_copilot_mcp_config "$temp_file"
+    
     # Clean up
     rm -f "$temp_file"
     
-    success "MCP configuration setup completed"
+    success "MCP configuration setup completed (Claude, OpenCode, Copilot)"
 }
 
 # Setup user-level MCP configuration for cross-project use
@@ -1545,6 +1549,133 @@ setup_project_level_mcp_config() {
     else
         info "Claude app directory not found (this is normal for CLI-only usage)"
     fi
+}
+
+# Setup OpenCode MCP configuration
+# OpenCode format: { "mcp": { "name": { "type": "local", "command": ["cmd", ...args], "enabled": true, "environment": {...} } } }
+setup_opencode_mcp_config() {
+    local temp_file="$1"
+    
+    echo -e "\n${CYAN}📋 Setting up OpenCode MCP configuration...${NC}"
+    
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping OpenCode MCP configuration"
+        return 0
+    fi
+    
+    local opencode_config="$HOME/.config/opencode/opencode.json"
+    
+    if [[ ! -f "$opencode_config" ]]; then
+        info "OpenCode config not found at $opencode_config, skipping..."
+        return 0
+    fi
+    
+    if ! command -v python3 >/dev/null 2>&1; then
+        warning "python3 not found, skipping OpenCode MCP config..."
+        return 0
+    fi
+    
+    # Backup existing config
+    cp "$opencode_config" "$opencode_config.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # Convert Claude MCP format to OpenCode MCP format and merge into existing config
+    python3 -c "
+import json, sys
+
+# Read Claude MCP config (processed template)
+with open('$temp_file', 'r') as f:
+    claude_config = json.load(f)
+
+# Read existing OpenCode config
+with open('$opencode_config', 'r') as f:
+    oc_config = json.load(f)
+
+# Convert Claude mcpServers to OpenCode mcp format
+mcp_servers = claude_config.get('mcpServers', {})
+oc_mcp = {}
+
+for name, server in mcp_servers.items():
+    cmd = server.get('command', '')
+    args = server.get('args', [])
+    env = server.get('env', {})
+    
+    # OpenCode format: command is array of [command, ...args]
+    command_list = [cmd] + args
+    
+    oc_mcp[name] = {
+        'type': 'local',
+        'command': command_list,
+        'enabled': True,
+    }
+    if env:
+        oc_mcp[name]['environment'] = env
+
+# Merge into existing config (preserve all existing settings)
+oc_config['mcp'] = oc_mcp
+
+with open('$opencode_config', 'w') as f:
+    json.dump(oc_config, f, indent=2)
+
+print(f'Configured {len(oc_mcp)} MCP servers for OpenCode')
+" || { warning "Failed to configure OpenCode MCP"; return 0; }
+    
+    success "OpenCode MCP configuration updated: $opencode_config"
+}
+
+# Setup Copilot MCP configuration (VS Code / GitHub Copilot)
+# Copilot format: { "servers": { "name": { "type": "stdio", "command": "...", "args": [...], "env": {...} } } }
+setup_copilot_mcp_config() {
+    local temp_file="$1"
+    
+    echo -e "\n${CYAN}📋 Setting up Copilot MCP configuration...${NC}"
+    
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping Copilot MCP configuration"
+        return 0
+    fi
+    
+    if ! command -v python3 >/dev/null 2>&1; then
+        warning "python3 not found, skipping Copilot MCP config..."
+        return 0
+    fi
+    
+    # Create .vscode directory if it doesn't exist
+    local vscode_dir="$CODING_REPO/.vscode"
+    mkdir -p "$vscode_dir"
+    
+    local copilot_mcp="$vscode_dir/mcp.json"
+    
+    # Convert Claude MCP format to Copilot MCP format
+    python3 -c "
+import json, sys
+
+# Read Claude MCP config (processed template)
+with open('$temp_file', 'r') as f:
+    claude_config = json.load(f)
+
+# Convert Claude mcpServers to Copilot servers format
+mcp_servers = claude_config.get('mcpServers', {})
+copilot_servers = {}
+
+for name, server in mcp_servers.items():
+    copilot_servers[name] = {
+        'type': 'stdio',
+        'command': server.get('command', ''),
+        'args': server.get('args', []),
+    }
+    env = server.get('env', {})
+    if env:
+        copilot_servers[name]['env'] = env
+
+copilot_config = {'servers': copilot_servers}
+
+with open('$copilot_mcp', 'w') as f:
+    json.dump(copilot_config, f, indent=2)
+
+print(f'Configured {len(copilot_servers)} MCP servers for Copilot')
+" || { warning "Failed to configure Copilot MCP"; return 0; }
+    
+    success "Copilot MCP configuration created: $copilot_mcp"
 }
 
 # Initialize knowledge management system
@@ -2876,6 +3007,7 @@ main() {
     install_compaction_guard
     install_skills
     create_project_local_settings
+    install_okb_snapshot_guard
     install_constraint_monitor_hooks
     verify_installation
     setup_api_admin_keys
@@ -3315,6 +3447,40 @@ EOF
     rm -f "$project_settings_file.bak"
 
     success "Created .claude/settings.local.json with platform-specific paths"
+}
+
+# Install OKB snapshot guard pre-commit hooks
+# Prevents .data/ files from being accidentally committed with unrelated changes.
+# Only allows .data/ commits when OKB_SNAPSHOT=1 is explicitly set.
+install_okb_snapshot_guard() {
+    echo -e "\n${CYAN}Installing OKB snapshot guard hooks...${NC}"
+
+    local hook_template="$CODING_REPO/scripts/hooks/pre-commit-okb-guard.sh"
+    if [[ ! -f "$hook_template" ]]; then
+        warning "OKB pre-commit hook template not found at $hook_template"
+        return 1
+    fi
+
+    # Install in coding repo itself
+    local coding_hook="$CODING_REPO/.git/hooks/pre-commit"
+    if [[ -d "$CODING_REPO/.git/hooks" ]]; then
+        cp "$hook_template" "$coding_hook"
+        chmod +x "$coding_hook"
+        success "OKB snapshot guard installed in coding repo"
+    fi
+
+    # Install in consumer repos that have OKB as a submodule
+    local consumer_repos=(
+        "$HOME/Agentic/_work/rapid-automations"
+    )
+    for repo in "${consumer_repos[@]}"; do
+        local submodule_hooks_dir="$repo/.git/modules/integrations/operational-knowledge-management/hooks"
+        if [[ -d "$submodule_hooks_dir" ]]; then
+            cp "$hook_template" "$submodule_hooks_dir/pre-commit"
+            chmod +x "$submodule_hooks_dir/pre-commit"
+            success "OKB snapshot guard installed in $(basename "$repo") OKB submodule"
+        fi
+    done
 }
 
 # Install constraint monitor hooks and LSL logging hooks
