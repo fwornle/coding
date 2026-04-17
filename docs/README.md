@@ -19,8 +19,7 @@ Central documentation for the unified semantic analysis & knowledge management s
 - **[Integration Overview](integrations/README.md)** - How external components integrate
 - **[MCP Semantic Analysis](integrations/mcp-semantic-analysis.md)** - 14-agent AI analysis system
 - **[MCP Constraint Monitor](integrations/mcp-constraint-monitor.md)** - Real-time constraint enforcement
-- **[Serena AST Analysis](integrations/serena-ast-analysis.md)** - AST-based code search and analysis
-- **[Browser Access](integrations/browser-access.md)** - Stagehand browser automation
+- **[Code Graph RAG](integrations/code-graph-rag.md)** - AST-based code search via Memgraph
 - **[VSCode CoPilot](integrations/vscode-copilot.md)** - Enhanced CoPilot integration
 
 ### Knowledge Management
@@ -47,8 +46,7 @@ Each integration component is self-contained with its own comprehensive document
 
 - **[MCP Semantic Analysis Server](../integrations/mcp-server-semantic-analysis/README.md)** - Standalone Node.js MCP server with 14 intelligent agents
 - **[MCP Constraint Monitor](../integrations/mcp-constraint-monitor/README.md)** - Real-time code quality enforcement server
-- **[Serena AST Analysis](../integrations/serena/README.md)** - AST-based semantic code analysis and retrieval
-- **[Browser Access](../integrations/browser-access/README.md)** - Stagehand browser automation MCP server
+- **[Code Graph RAG](../integrations/code-graph-rag/README.md)** - AST-based code search via Memgraph
 - **[VSCode Knowledge Management CoPilot](../integrations/vscode-km-copilot/README.md)** - Enhanced GitHub CoPilot with knowledge management
 
 ---

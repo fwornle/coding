@@ -60,31 +60,6 @@ Each integration component:
 
 **Documentation**: [code-graph-rag.md](code-graph-rag.md) | [GitHub](https://github.com/anthropics/code-graph-rag)
 
-#### Serena AST Analysis
-**Location**: `integrations/serena/`
-
-**What it provides:**
-- AST-based semantic code search
-- Structure-aware code navigation
-- Security vulnerability detection
-- Refactoring support with dependency analysis
-- Cross-language analysis support
-
-**Documentation**: [serena-ast-analysis.md](serena-ast-analysis.md) | [Full README](https://github.com/oraios/serena/blob/main/README.md)
-
-### Browser Automation
-
-#### Browser Access (Stagehand)
-**Location**: `integrations/browser-access/`
-
-**What it provides:**
-- MCP server for browser automation
-- Web scraping and interaction
-- Automated testing support
-- Page navigation and data extraction
-
-**Documentation**: [browser-access.md](browser-access.md) | [Full README](../../integrations/browser-access/README.md)
-
 ### Editor Integration
 
 #### VSCode CoPilot Integration
@@ -115,7 +90,6 @@ The core systems communicate with integrations through different protocols:
 
 **Trajectory Generation**:
 - Uses MCP Semantic Analysis (14 agents, 11 use LLM) for deep repository insights
-- Uses Serena AST for code structure analysis
 - Comprehensive architectural pattern extraction
 
 **Constraint Monitoring**:
@@ -194,9 +168,9 @@ MCP servers are configured in Claude Code's config:
       "command": "node",
       "args": ["/path/to/coding/integrations/mcp-constraint-monitor/src/mcp-server.js"]
     },
-    "serena": {
+    "code-graph-rag": {
       "command": "node",
-      "args": ["/path/to/coding/integrations/serena/src/mcp/server.js"]
+      "args": ["/path/to/coding/integrations/code-graph-rag/build/index.js"]
     }
   }
 }

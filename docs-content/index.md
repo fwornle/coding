@@ -189,9 +189,7 @@ Coding provides several MCP (Model Context Protocol) servers:
 |-------------|---------|
 | [Semantic Analysis](integrations/semantic-analysis.md) | 14-agent AI-powered code analysis |
 | [Constraint Monitor](integrations/constraint-monitor.md) | Real-time violation detection |
-| [Browser Access](integrations/browser-access.md) | Stagehand browser automation |
 | [Code Graph RAG](integrations/code-graph-rag.md) | AST-based code search via Memgraph |
-| [Serena](integrations/serena.md) | Advanced code navigation |
 
 ---
 

@@ -43,8 +43,7 @@ learning -down-> localllm : sensitive\ndata
 package "MCP Integration Servers" as mcp #E0E7FF {
   [Semantic Analysis\n(14 Agents)] as semantic <<mcp>>
   [Constraint Monitor] as mcp_constraint <<mcp>>
-  [Serena AST] as serena <<mcp>>
-  [Browser/Spec] as other_mcp <<mcp>>
+  [Code Graph RAG] as code_graph <<mcp>>
 }
 
 trajectory -down-> mcp : deep analysis

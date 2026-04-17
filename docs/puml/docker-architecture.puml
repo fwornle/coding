@@ -12,7 +12,6 @@ rectangle "HOST (Native)" as host #F5F5F5 {
 
     package "Stdio Proxies" <<util>> {
         component "semantic-analysis\nproxy" as sa_proxy <<util>>
-        component "browser-access\nproxy" as ba_proxy <<util>>
         component "constraint-monitor\nproxy" as cm_proxy <<util>>
         component "code-graph-rag\nproxy" as cgr_proxy <<util>>
     }
@@ -31,7 +30,6 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
     package "coding-services" <<core>> {
         package "MCP Servers (HTTP/SSE)" {
             component "semantic-analysis\n:3848" as sa_sse <<api>>
-            component "browser-access\n:3847" as ba_sse <<api>>
             component "constraint-monitor\n:3849" as cm_sse <<api>>
             component "code-graph-rag\n:3850" as cgr_sse <<api>>
         }
@@ -64,13 +62,11 @@ rectangle "Volume Mounts" as volumes #FFF9C4 {
 
 ' Claude to Proxies (stdio)
 claude SYNC_LINE sa_proxy : stdio
-claude SYNC_LINE ba_proxy : stdio
 claude SYNC_LINE cm_proxy : stdio
 claude SYNC_LINE cgr_proxy : stdio
 
 ' Proxies to SSE Servers (HTTP)
 sa_proxy ASYNC_LINE sa_sse : HTTP/SSE
-ba_proxy ASYNC_LINE ba_sse : HTTP/SSE
 cm_proxy ASYNC_LINE cm_sse : HTTP/SSE
 cgr_proxy ASYNC_LINE cgr_sse : HTTP/SSE
 

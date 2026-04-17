@@ -42,20 +42,6 @@ MCP servers and tools that extend the coding infrastructure.
 
     [:octicons-arrow-right-24: Details](constraint-monitor.md)
 
--   :material-web:{ .lg .middle } **Browser Access**
-
-    ---
-
-    AI-powered browser automation via Stagehand.
-
-    - Visual scraping
-    - Form automation
-    - Screenshot capture
-
-    **Port**: 3847 (Docker)
-
-    [:octicons-arrow-right-24: Details](browser-access.md)
-
 -   :material-graph:{ .lg .middle } **Code Graph RAG**
 
     ---
@@ -69,20 +55,6 @@ MCP servers and tools that extend the coding infrastructure.
     **Port**: 3850 (Docker)
 
     [:octicons-arrow-right-24: Details](code-graph-rag.md)
-
--   :material-magnify:{ .lg .middle } **Serena**
-
-    ---
-
-    AST-based code analysis (read-only).
-
-    - Deep code navigation
-    - Pattern matching
-    - Semantic search
-
-    **Mode**: Native only
-
-    [:octicons-arrow-right-24: Details](serena.md)
 
 -   :material-view-dashboard:{ .lg .middle } **Dashboard**
 
@@ -122,7 +94,6 @@ MCP servers and tools that extend the coding infrastructure.
 
 | Service | Port | Protocol | Health Check |
 |---------|------|----------|--------------|
-| Browser Access | 3847 | HTTP/SSE | `/health` |
 | Semantic Analysis | 3848 | HTTP/SSE | `/health` |
 | Constraint Monitor | 3031/3849 | HTTP | `/health` |
 | Code Graph RAG | 3850 | HTTP/SSE | `/health` |
@@ -142,9 +113,7 @@ flowchart TB
     CC[Claude Code] --> MCP{MCP Protocol}
     MCP --> SA[Semantic Analysis]
     MCP --> CM[Constraint Monitor]
-    MCP --> BA[Browser Access]
     MCP --> CGR[Code Graph RAG]
-    MCP --> SER[Serena]
 
     SA --> GDB[(GraphDB)]
     SA --> QD[(Qdrant)]
@@ -211,16 +180,6 @@ Each MCP server provides tools accessible within Claude sessions:
 | `get_constraint_status` | Current compliance metrics |
 | `update_constraints` | Modify constraint rules |
 
-### Browser Access Tools
-
-| Tool | Purpose |
-|------|---------|
-| `stagehand_navigate` | Navigate to URL |
-| `stagehand_act` | Perform page actions |
-| `stagehand_extract` | Extract page content |
-| `stagehand_observe` | Find interactive elements |
-| `screenshot` | Capture page screenshot |
-
 ### Code Graph RAG Tools
 
 | Tool | Purpose |
@@ -238,7 +197,7 @@ Each MCP server provides tools accessible within Claude sessions:
 
 ```bash
 # Check all health endpoints
-for port in 3847 3848 3849 3850 8080 3032; do
+for port in 3848 3849 3850 8080 3032; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "N/A"')"
 done
 ```

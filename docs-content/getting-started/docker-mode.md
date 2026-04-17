@@ -81,7 +81,7 @@ curl http://localhost:3850/health  # Code Graph RAG
 The Docker architecture consists of:
 
 - **Host Machine**: Claude CLI with lightweight stdio proxies
-- **Container**: MCP SSE servers (semantic-analysis, browser-access, constraint-monitor, code-graph-rag)
+- **Container**: MCP SSE servers (semantic-analysis, constraint-monitor, code-graph-rag)
 - **Databases**: Qdrant, Redis, Memgraph running in containers
 
 See [Architecture > Data Flow](../architecture/data-flow.md) for detailed diagrams.

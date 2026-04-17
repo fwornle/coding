@@ -189,7 +189,6 @@ Files requiring Logger migration are prioritized as follows:
 ### Phase 2: MCP Servers
 - `integrations/mcp-server-semantic-analysis/` - Semantic analysis
 - `integrations/mcp-constraint-monitor/` - Constraint system
-- `integrations/browser-access/` - Browser automation
 
 ### Phase 3: Knowledge Management
 - `src/knowledge-management/` - UKB services

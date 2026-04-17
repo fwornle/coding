@@ -58,7 +58,6 @@ These are MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Even
 | Service | Port | Language | Purpose |
 |---------|------|----------|---------|
 | **semantic-analysis** | 3848 | TypeScript | LLM-powered code analysis, UKB workflow engine, ontology classification, pattern extraction |
-| **browser-access** | 3847 | TypeScript | Web page fetching, content extraction, screenshot capture |
 | **constraint-monitor** | 3849 | TypeScript | Code quality rules enforcement, real-time violation tracking |
 | **code-graph-rag** | 3850 | Python 3.12 | AST-based code indexing via Tree-sitter, call graph analysis, natural language code queries |
 

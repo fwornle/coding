@@ -98,27 +98,6 @@ The system is built on **self-contained integration components**, each with its 
 
 **Documentation:** [integrations/mcp-constraint-monitor/](../integrations/mcp-constraint-monitor/)
 
-### Serena AST Analysis
-
-**AST-based semantic code search and analysis**
-
-- Structure-based code search (not text patterns)
-- Semantic relationship understanding
-- Security vulnerability detection through structure
-- Refactoring support with dependency analysis
-
-**Documentation:** [integrations/serena/](../integrations/serena/)
-
-### Browser Access (Stagehand)
-
-**Browser automation for web research and testing**
-
-- MCP server for browser control
-- Web scraping and interaction
-- Automated testing support
-
-**Documentation:** [integrations/browser-access/](../integrations/browser-access/)
-
 ### LLM CLI Proxy Bridge
 
 **HTTP bridge enabling Docker containers to use host-side CLI tools**

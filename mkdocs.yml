@@ -91,9 +91,7 @@ nav:
     - Overview: integrations/index.md
     - Semantic Analysis: integrations/semantic-analysis.md
     - Constraint Monitor: integrations/constraint-monitor.md
-    - Browser Access: integrations/browser-access.md
     - Code Graph RAG: integrations/code-graph-rag.md
-    - Serena: integrations/serena.md
     - Dashboard: integrations/dashboard.md
     - LLM CLI Proxy: integrations/llm-cli-proxy.md
   - Guides:

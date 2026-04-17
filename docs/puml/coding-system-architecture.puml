@@ -26,11 +26,9 @@ package "Knowledge Management" as km #FFF9E6 {
 
 ' MCP Integration Layer
 package "MCP Integrations" as mcp #E0E7FF {
-  [Semantic Analysis\n(11 Agents)] as semantic <<mcp>>
+  [Semantic Analysis\n(14 Agents)] as semantic <<mcp>>
   [Constraint Monitor\n(Dashboard)] as mcp_constraints <<mcp>>
-  [Serena AST\n(Code Analysis)] as serena <<mcp>>
-  [Browser Access\n(Stagehand)] as browser <<mcp>>
-  [Spec Workflow] as spec_workflow <<mcp>>
+  [Code Graph RAG\n(AST Search)] as code_graph <<mcp>>
 }
 
 ' Storage Layer
@@ -42,7 +40,6 @@ package "Storage Layer" as storage #F5F5F5 {
 
 ' File Outputs
 folder ".specstory/history/" as lsl_logs #F0F0F0
-folder ".spec-workflow/" as spec_files #F0F0F0
 file ".data/knowledge-export/\n<team>.json" as json #F0F0F0
 
 ' User interactions
@@ -66,7 +63,6 @@ vkb -up-> qdrant : semantic search
 
 ' MCP integrations
 semantic -down-> graphdb : insights
-spec_workflow -down-> spec_files : requirements/design/tasks
 
 ' Analytics
 lsl -down-> sqlite : session metrics

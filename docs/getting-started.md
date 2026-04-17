@@ -52,7 +52,7 @@ cd ~/Agentic/coding
 source ~/.bashrc  # or ~/.zshrc on macOS
 ```
 
-**Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, browserbase, serena, constraint-monitor). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
+**Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, constraint-monitor, code-graph-rag). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
 
 ### Installation Safety
 
@@ -138,15 +138,13 @@ git submodule update --remote integrations/memory-visualizer
 git submodule update --init --recursive
 
 # Or initialize a specific submodule
-git submodule update --init integrations/serena
+git submodule update --init integrations/mcp-server-semantic-analysis
 ```
 
 **Submodule Structure:**
 - `integrations/mcp-constraint-monitor` (Own repo - SSH)
 - `integrations/memory-visualizer` (Own repo - SSH)
 - `integrations/mcp-server-semantic-analysis` (Own repo - SSH)
-- `integrations/serena` (Third-party - HTTPS)
-- `integrations/mcp-server-browserbase` (Third-party - HTTPS)
 
 ---
 
@@ -197,14 +195,13 @@ docker compose -f docker/docker-compose.yml ps
 
 # Check MCP server health endpoints
 curl http://localhost:3848/health  # semantic-analysis
-curl http://localhost:3847/health  # browser-access
+curl http://localhost:3849/health  # constraint-monitor
 ```
 
 ### Docker Port Mapping
 
 | Service | Port | Protocol |
 |---------|------|----------|
-| Browser Access SSE | 3847 | HTTP/SSE |
 | Semantic Analysis SSE | 3848 | HTTP/SSE |
 | Constraint Monitor SSE | 3849 | HTTP/SSE |
 | Code Graph RAG SSE | 3850 | HTTP/SSE |
@@ -267,7 +264,7 @@ DMR_HOST=localhost  # Use host.docker.internal on Windows
 # Legacy: llama.cpp fallback (if DMR unavailable)
 LOCAL_MODEL_ENDPOINT=http://localhost:11434
 
-# Browser automation (if using browser-access)
+# Browser automation (if using playwright-cli skill)
 LOCAL_CDP_URL=ws://localhost:9222
 
 # Automatically set by installer
@@ -627,7 +624,6 @@ docker compose -f docker/docker-compose.yml logs -f coding-services
 
 # Check MCP SSE server health
 curl http://localhost:3848/health  # semantic-analysis
-curl http://localhost:3847/health  # browser-access
 curl http://localhost:3849/health  # constraint-monitor
 curl http://localhost:3850/health  # code-graph-rag
 
