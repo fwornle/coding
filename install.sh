@@ -34,9 +34,6 @@ MEMORY_VISUALIZER_REPO_SSH=""
 MEMORY_VISUALIZER_REPO_HTTPS=""
 MEMORY_VISUALIZER_DIR="$CODING_REPO/integrations/memory-visualizer"
 
-BROWSERBASE_REPO_SSH=""
-BROWSERBASE_REPO_HTTPS=""
-BROWSERBASE_DIR="$CODING_REPO/integrations/mcp-server-browserbase"
 SEMANTIC_ANALYSIS_DIR="$CODING_REPO/integrations/mcp-server-semantic-analysis"
 
 # Installation status tracking
@@ -99,10 +96,6 @@ MEMORY_VISUALIZER_CN_SSH="git@cc-github.bmwgroup.net:frankwoernle/memory-visuali
 MEMORY_VISUALIZER_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/memory-visualizer.git"
 MEMORY_VISUALIZER_PUBLIC_SSH="git@github.com:fwornle/memory-visualizer.git"
 MEMORY_VISUALIZER_PUBLIC_HTTPS="https://github.com/fwornle/memory-visualizer.git"
-
-# Browserbase (NO CN MIRROR - always use public)
-BROWSERBASE_SSH="git@github.com:browserbase/mcp-server-browserbase.git"
-BROWSERBASE_HTTPS="https://github.com/browserbase/mcp-server-browserbase.git"
 
 # Semantic Analysis MCP Server (HAS CN MIRROR)
 SEMANTIC_ANALYSIS_CN_SSH="git@cc-github.bmwgroup.net:frankwoernle/mcp-server-semantic-analysis.git"
@@ -281,9 +274,7 @@ detect_network_and_set_repos() {
         # Semantic Analysis: Use CN mirror (has corporate modifications)
         SEMANTIC_ANALYSIS_REPO_SSH="$SEMANTIC_ANALYSIS_CN_SSH"
         SEMANTIC_ANALYSIS_REPO_HTTPS="$SEMANTIC_ANALYSIS_CN_HTTPS"
-        # Browserbase: Use public repo (no CN mirror)
-        BROWSERBASE_REPO_SSH="$BROWSERBASE_SSH"
-        BROWSERBASE_REPO_HTTPS="$BROWSERBASE_HTTPS"
+
     else
         info "🌍 Public network detected - using public repositories"
         # Test public GitHub SSH
@@ -299,15 +290,13 @@ detect_network_and_set_repos() {
         MEMORY_VISUALIZER_REPO_HTTPS="$MEMORY_VISUALIZER_PUBLIC_HTTPS"
         SEMANTIC_ANALYSIS_REPO_SSH="$SEMANTIC_ANALYSIS_PUBLIC_SSH"
         SEMANTIC_ANALYSIS_REPO_HTTPS="$SEMANTIC_ANALYSIS_PUBLIC_HTTPS"
-        BROWSERBASE_REPO_SSH="$BROWSERBASE_SSH"
-        BROWSERBASE_REPO_HTTPS="$BROWSERBASE_HTTPS"
+
     fi
     
     # Log selected repositories
     info "Selected repositories:"
     info "  Memory Visualizer: $(echo "$MEMORY_VISUALIZER_REPO_SSH" | sed 's/git@//' | sed 's/.git$//')"
     info "  Semantic Analysis: $(echo "$SEMANTIC_ANALYSIS_REPO_SSH" | sed 's/git@//' | sed 's/.git$//')"
-    info "  Browserbase: $(echo "$BROWSERBASE_REPO_SSH" | sed 's/git@//' | sed 's/.git$//')"
     
     return 0
 }
@@ -616,64 +605,6 @@ install_memory_visualizer() {
     success "Memory visualizer installed successfully"
 }
 
-# Install mcp-server-browserbase (regular git clone)
-install_browserbase() {
-    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase (public repo)...${NC}"
-
-    cd "$CODING_REPO"
-
-    if [[ -d "$BROWSERBASE_DIR/.git" ]]; then
-        info "mcp-server-browserbase already exists, updating..."
-        cd "$BROWSERBASE_DIR"
-        if timeout 10s git pull origin main 2>/dev/null; then
-            success "mcp-server-browserbase updated"
-        else
-            warning "Could not update mcp-server-browserbase, using existing version"
-        fi
-    else
-        info "Cloning mcp-server-browserbase from GitHub..."
-        if git clone "$BROWSERBASE_HTTPS" "$BROWSERBASE_DIR" 2>/dev/null; then
-            success "mcp-server-browserbase cloned successfully"
-        else
-            # Try SSH if HTTPS fails
-            warning "HTTPS clone failed, trying SSH..."
-            git clone "$BROWSERBASE_SSH" "$BROWSERBASE_DIR" || error_exit "Failed to clone browserbase repository"
-        fi
-    fi
-
-    cd "$BROWSERBASE_DIR"
-
-    # Install dependencies (skip postinstall scripts to avoid mcpvals build issues)
-    # Use --legacy-peer-deps to handle stagehand/zod peer dependency conflicts
-    info "Installing browserbase dependencies (includes stagehand)..."
-    npm install --ignore-scripts --legacy-peer-deps || error_exit "Failed to install browserbase dependencies"
-
-    # Fix TypeScript compatibility with newer MCP SDK (@modelcontextprotocol/sdk v1.22+)
-    # The McpServer constructor API changed from single object to two parameters
-    info "Fixing TypeScript compatibility..."
-    if grep -q "description:" src/index.ts 2>/dev/null; then
-        cat > /tmp/fix-mcp-server.js << 'EOF'
-const fs = require('fs');
-const content = fs.readFileSync('src/index.ts', 'utf8');
-// Replace old single-param constructor with new two-param form
-const fixed = content.replace(
-  /const server = new McpServer\(\{\s*name: "([^"]+)",\s*version: "([^"]+)",\s*description:\s*"[^"]*",\s*capabilities: \{/s,
-  'const server = new McpServer(\n    {\n      name: "$1",\n      version: "$2",\n    },\n    {\n      capabilities: {'
-);
-fs.writeFileSync('src/index.ts', fixed, 'utf8');
-EOF
-        node /tmp/fix-mcp-server.js || warning "Could not auto-fix TypeScript compatibility"
-        rm -f /tmp/fix-mcp-server.js
-    fi
-
-    info "Building browserbase..."
-    npm run build || error_exit "Failed to build browserbase"
-
-    success "Browserbase with Stagehand installed successfully"
-
-    cd "$CODING_REPO"
-}
-
 # Install semantic analysis MCP server (git submodule)
 install_semantic_analysis() {
     echo -e "\n${CYAN}🧠 Installing semantic analysis MCP server (git submodule)...${NC}"
@@ -719,69 +650,6 @@ install_semantic_analysis() {
         warning "Semantic analysis repository not available - skipping build"
     fi
 
-    cd "$CODING_REPO"
-}
-
-# Install Serena MCP server for AST-based code analysis (git submodule)
-install_serena() {
-    echo -e "\n${CYAN}🔍 Installing Serena MCP server (git submodule)...${NC}"
-
-    local serena_dir="$CODING_REPO/integrations/serena"
-
-    cd "$CODING_REPO"
-
-    # Check if uv is available
-    if ! command -v uv >/dev/null 2>&1; then
-        warning "uv not found. Serena requires uv for installation."
-        info "Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        INSTALLATION_WARNINGS+=("Serena: uv package manager required but not found")
-        return 1
-    fi
-
-    # Install or update Serena submodule (check for both .git directory and .git file)
-    if [[ -d "$serena_dir/.git" ]] || [[ -f "$serena_dir/.git" ]]; then
-        info "Serena submodule already exists, updating..."
-        cd "$serena_dir"
-        if timeout 10s git pull origin main 2>/dev/null; then
-            success "Serena updated from repository"
-        else
-            info "Could not update Serena (may be on specific commit)"
-        fi
-    else
-        info "Initializing Serena submodule..."
-        git submodule update --init --recursive integrations/serena || error_exit "Failed to initialize Serena submodule"
-    fi
-
-    cd "$serena_dir"
-
-    # Verify pyproject.toml exists before running uv sync
-    if [[ ! -f "pyproject.toml" ]]; then
-        warning "pyproject.toml not found in $serena_dir"
-        INSTALLATION_WARNINGS+=("Serena: pyproject.toml missing")
-        cd "$CODING_REPO"
-        return 1
-    fi
-
-    # Install/Update dependencies
-    info "Installing Serena dependencies..."
-    if uv sync; then
-        success "Serena dependencies installed"
-    else
-        warning "Failed to install Serena dependencies"
-        INSTALLATION_WARNINGS+=("Serena: Failed to install dependencies")
-    fi
-
-    cd "$CODING_REPO"
-
-    # Verify installation
-    if [[ -f "$serena_dir/pyproject.toml" ]]; then
-        success "Serena MCP server installed successfully"
-        info "Serena provides AST-based code indexing and semantic retrieval"
-    else
-        warning "Serena installation verification failed"
-        INSTALLATION_WARNINGS+=("Serena: Installation verification failed")
-    fi
-    
     cd "$CODING_REPO"
 }
 
@@ -881,130 +749,6 @@ install_system_health_dashboard() {
     info "Access at: http://localhost:3032"
 
     cd "$CODING_REPO"
-}
-
-# Install shadcn/ui MCP server for professional dashboard components
-install_shadcn_mcp() {
-    echo -e "\n${CYAN}🎨 Installing shadcn/ui MCP server for professional dashboard components...${NC}"
-    
-    # Check if pnpm is available (preferred for shadcn)
-    local package_manager="npm"
-    if command -v pnpm >/dev/null 2>&1; then
-        package_manager="pnpm"
-        info "Using pnpm for shadcn installation"
-    else
-        info "Using npm for shadcn installation (consider installing pnpm for better performance)"
-    fi
-    
-    # Create shadcn MCP directory if it doesn't exist
-    local shadcn_dir="$CODING_REPO/integrations/shadcn-mcp"
-    
-    if [[ ! -d "$shadcn_dir" ]]; then
-        info "Creating shadcn MCP integration directory..."
-        mkdir -p "$shadcn_dir"
-        cd "$shadcn_dir"
-        
-        # Initialize shadcn MCP server
-        info "Initializing shadcn MCP server..."
-        if command -v pnpm >/dev/null 2>&1; then
-            pnpm dlx shadcn@latest mcp init --client claude || {
-                warning "pnpm shadcn init failed, trying npm"
-                npx shadcn@latest mcp init --client claude || {
-                    warning "Failed to initialize shadcn MCP server"
-                    INSTALLATION_WARNINGS+=("shadcn MCP: Failed to initialize server")
-                    return 1
-                }
-            }
-        else
-            npx shadcn@latest mcp init --client claude || {
-                warning "Failed to initialize shadcn MCP server"
-                INSTALLATION_WARNINGS+=("shadcn MCP: Failed to initialize server")
-                return 1
-            }
-        fi
-
-        success "shadcn/ui MCP server initialized"
-
-        # Install dependencies after initialization
-        info "Installing shadcn MCP dependencies..."
-        if [[ "$package_manager" == "pnpm" ]]; then
-            pnpm install || {
-                warning "pnpm install failed, trying npm"
-                npm install || warning "Failed to install shadcn dependencies"
-            }
-        else
-            npm install || warning "Failed to install shadcn dependencies"
-        fi
-    else
-        info "shadcn MCP directory already exists, updating..."
-        cd "$shadcn_dir"
-        
-        # Update dependencies if package.json exists
-        if [[ -f "package.json" ]]; then
-            info "Updating shadcn MCP dependencies..."
-            if [[ "$package_manager" == "pnpm" ]]; then
-                pnpm update || warning "Failed to update shadcn dependencies"
-            else
-                npm update || warning "Failed to update shadcn dependencies"
-            fi
-        fi
-    fi
-    
-    # Install additional shadcn components commonly used in dashboards
-    if [[ -f "package.json" ]]; then
-        info "Installing commonly used shadcn components..."
-        local components=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
-        
-        for component in "${components[@]}"; do
-            info "Adding $component component..."
-            if command -v pnpm >/dev/null 2>&1; then
-                pnpm dlx shadcn@latest add "$component" --yes 2>/dev/null || true
-            else
-                npx shadcn@latest add "$component" --yes 2>/dev/null || true
-            fi
-        done
-        
-        success "shadcn/ui components installed"
-    fi
-    
-    # Build if build script exists
-    if [[ -f "package.json" ]] && jq -e '.scripts.build' package.json >/dev/null 2>&1; then
-        info "Building shadcn MCP server..."
-        if [[ "$package_manager" == "pnpm" ]]; then
-            pnpm run build || warning "Failed to build shadcn MCP server"
-        else
-            npm run build || warning "Failed to build shadcn MCP server"
-        fi
-    fi
-    
-    success "shadcn/ui MCP server installed successfully"
-    info "Provides professional UI components for dashboard development"
-    
-    cd "$CODING_REPO"
-}
-
-# Install MCP servers
-install_mcp_servers() {
-    echo -e "\n${CYAN}🔌 Installing MCP servers...${NC}"
-    
-    # Install browser-access (Stagehand with SSE architecture)
-    if [[ -d "$CODING_REPO/integrations/browser-access" ]]; then
-        info "Installing browser-access MCP server (SSE architecture)..."
-        cd "$CODING_REPO/integrations/browser-access"
-        npm install || error_exit "Failed to install browser-access dependencies"
-        npm run build || error_exit "Failed to build browser-access"
-        chmod +x dist/index.js dist/sse-server.js dist/stdio-proxy.js browser-access-server 2>/dev/null || true
-
-        # Ensure logs directory exists for SSE server
-        mkdir -p "$CODING_REPO/integrations/browser-access/logs"
-
-        success "Browser-access MCP server installed (SSE + proxy architecture)"
-        info "  - SSE server: dist/sse-server.js (shared, port 3847)"
-        info "  - Stdio proxy: dist/stdio-proxy.js (per-session)"
-        info "  - Management: ./browser-access-server {start|stop|status}"
-    else
-        warning "browser-access directory not found, skipping..."
-    fi
 }
 
 # Install code-graph-rag MCP server (AST-based code knowledge graph)
@@ -1754,11 +1498,8 @@ create_example_configs() {
         cat > "$CODING_REPO/.env.example" << 'EOF'
 # Claude Knowledge Management System - Environment Variables
 
-# For browser-access MCP server (optional)
+# API Keys
 ANTHROPIC_API_KEY=your-anthropic-api-key
-BROWSERBASE_API_KEY=your-browserbase-api-key
-BROWSERBASE_PROJECT_ID=your-project-id
-LOCAL_CDP_URL=ws://localhost:9222
 
 # Primary coding tools path (set automatically by installer)
 # This is the main path used throughout the system
@@ -1801,11 +1542,8 @@ EOF
         cat > "$CODING_REPO/.env" << EOF
 # Claude Knowledge Management System - Environment Variables
 
-# For browser-access MCP server (optional)
+# API Keys
 ANTHROPIC_API_KEY=
-BROWSERBASE_API_KEY=
-BROWSERBASE_PROJECT_ID=
-LOCAL_CDP_URL=ws://localhost:9222
 
 # Project path - automatically set by installer
 CLAUDE_PROJECT_PATH=$CODING_REPO
@@ -1885,13 +1623,6 @@ verify_installation() {
         ((errors++))
     fi
     
-    # Check MCP servers
-    if [[ -f "$CODING_REPO/integrations/browser-access/dist/index.js" ]]; then
-        success "Browser-access MCP server is built"
-    else
-        warning "Browser-access MCP server not built"
-    fi
-
     # Check Constraint Monitor with Professional Dashboard
     if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
         success "MCP Constraint Monitor (standalone) configured"
@@ -1922,26 +1653,6 @@ verify_installation() {
         warning "Semantic Analysis MCP server not built"
     fi
 
-    # Check Browserbase MCP server
-    if [[ -f "$CODING_REPO/integrations/mcp-server-browserbase/dist/index.js" ]]; then
-        success "Browserbase MCP server is built"
-    else
-        warning "Browserbase MCP server not built"
-    fi
-
-    # Check Serena MCP server
-    if [[ -f "$CODING_REPO/integrations/serena/pyproject.toml" ]]; then
-        success "Serena MCP server is installed"
-    else
-        warning "Serena MCP server not installed"
-    fi
-
-    # Check shadcn/ui MCP server
-    if [[ -d "$CODING_REPO/integrations/shadcn-mcp" ]]; then
-        success "shadcn/ui MCP server is installed"
-    else
-        warning "shadcn/ui MCP server not installed"
-    fi
     
     
     if [[ $errors -eq 0 ]]; then
@@ -2986,13 +2697,9 @@ main() {
     detect_network_and_set_repos
     test_proxy_connectivity
     install_memory_visualizer
-    install_browserbase
     install_semantic_analysis
-    install_serena
     install_constraint_monitor
     install_system_health_dashboard
-    install_shadcn_mcp
-    install_mcp_servers
     install_code_graph_rag
     configure_docker_mode
     create_command_wrappers
@@ -3318,23 +3025,14 @@ create_project_local_settings() {
   "permissions": {
     "allow": [
       "Bash(npm run api:*)",
-      "mcp__serena__find_symbol",
-      "mcp__serena__search_for_pattern",
       "Bash(TRANSCRIPT_DEBUG=true node scripts/enhanced-transcript-monitor.js --test)",
       "Bash(node:*)",
       "Bash(plantuml:*)",
-      "mcp__serena__check_onboarding_performed",
       "Bash(bin/coding:*)",
       "Bash(cp:*)",
-      "mcp__serena__find_file",
-      "mcp__serena__replace_symbol_body",
-      "mcp__serena__activate_project",
-      "mcp__serena__get_symbols_overview",
       "Bash(cat:*)",
       "Bash(timeout:*)",
       "Bash(watch:*)",
-      "mcp__serena__list_dir",
-      "mcp__serena__insert_after_symbol",
       "Bash(find:*)",
       "Bash(CODING_REPO=CODING_REPO_PLACEHOLDER node CODING_REPO_PLACEHOLDER/scripts/combined-status-line.js)",
       "Bash(kill:*)",
@@ -3343,7 +3041,6 @@ create_project_local_settings() {
       "Bash(lsof:*)",
       "Bash(curl:*)",
       "Bash(PORT=3030 npm run dev)",
-      "mcp__serena__insert_before_symbol",
       "mcp__constraint-monitor__check_constraints",
       "Bash(npm start)",
       "Bash(git rm:*)",
@@ -3363,18 +3060,11 @@ create_project_local_settings() {
       "WebSearch",
       "Bash(git remote get-url:*)",
       "Bash(basename:*)",
-      "mcp__spec-workflow__spec-workflow-guide",
-      "mcp__spec-workflow__approvals",
       "Bash(PORT=3030 npm run dashboard)",
       "Bash(sort:*)",
-      "mcp__serena__think_about_task_adherence",
       "Bash(awk:*)",
       "Bash(PORT=3031 node src/dashboard-server.js)",
-      "mcp__serena__onboarding",
-      "mcp__serena__write_memory",
       "Bash(jq:*)",
-      "mcp__serena__think_about_collected_information",
-      "mcp__serena__get_current_config",
       "Bash(npm install:*)",
       "Read(//USER_HOME_PLACEHOLDER/.claude/**)",
       "WebFetch(domain:console.groq.com)",
@@ -3387,7 +3077,6 @@ create_project_local_settings() {
       "Bash(bin/vkb restart:*)",
       "Bash(ps:*)",
       "Bash(git submodule:*)",
-      "mcp__serena__find_referencing_symbols",
       "Bash(git config:*)",
       "Bash(git restore:*)",
       "Bash(git diff:*)",
@@ -3401,7 +3090,6 @@ create_project_local_settings() {
       "Bash(docker info:*)",
       "Bash(bin/vkb:*)",
       "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
-      "mcp__serena__initial_instructions",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(rm:*)",

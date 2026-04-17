@@ -4,14 +4,6 @@
     "postSessionHook": "{{CODING_TOOLS_PATH}}/scripts/post-session-logger.js"
   },
   "mcpServers": {
-    "browser-access": {
-      "command": "node",
-      "args": ["{{CODING_TOOLS_PATH}}/integrations/browser-access/dist/index.js"],
-      "env": {
-        "LOCAL_CDP_URL": "{{LOCAL_CDP_URL}}",
-        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
-      }
-    },
     "semantic-analysis": {
       "command": "node",
       "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-server-semantic-analysis/dist/index.js"],
@@ -24,13 +16,6 @@
         "OPENAI_API_KEY": "{{OPENAI_API_KEY}}"
       }
     },
-    "serena Docs": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://gitmcp.io/oraios/serena?tab=readme-ov-file"
-      ]
-    },
     "constraint-monitor": {
       "command": "node",
       "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-constraint-monitor/src/server.js"],
@@ -39,10 +24,6 @@
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
         "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}"
       }
-    },
-    "spec-workflow": {
-      "command": "npx",
-      "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "{{CODING_TOOLS_PATH}}"]
     },
     "code-graph-rag": {
       "command": "uv",
