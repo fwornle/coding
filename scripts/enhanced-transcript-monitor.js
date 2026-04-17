@@ -2709,6 +2709,69 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * Get the active (current) session file path, splitting into a new part file
+   * if the current one exceeds the configured max size.
+   * Returns the path to the file that should be appended to.
+   */
+  getActiveSessionFilePath(targetProject, tranche) {
+    const baseFile = this.getSessionFilePath(targetProject, tranche);
+    
+    // Read max file size from config (default 200KB)
+    const maxSizeKB = this.config?.liveLogging?.max_lsl_file_size_kb
+      || this.liveLoggingConfig?.max_lsl_file_size_kb
+      || 200;
+    const maxSizeBytes = maxSizeKB * 1024;
+
+    // If base file doesn't exist or is under the limit, use it
+    if (!fs.existsSync(baseFile)) return baseFile;
+    const baseStats = fs.statSync(baseFile);
+    if (baseStats.size < maxSizeBytes) return baseFile;
+
+    // Base file is too large — find the highest existing part number
+    const dir = path.dirname(baseFile);
+    const baseName = path.basename(baseFile, '.md'); // e.g. 2026-04-17_1100-1200_c197ef
+    // baseName may contain _from-<project> suffix; the part number sits between
+    // the time window and the user hash: YYYY-MM-DD_HHMM-HHMM-N_hash[_from-proj]
+    // We need to list existing part files and find the max N.
+    
+    const currentProjectName = path.basename(this.config.projectPath);
+    const resolvedTarget = path.resolve(targetProject);
+    const resolvedProject = path.resolve(this.config.projectPath);
+    const isRedirected = resolvedTarget !== resolvedProject;
+    const timestamp = tranche.originalTimestamp ||
+      new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
+
+    // Try increasing part numbers until we find one that doesn't exist or is under limit
+    let partNumber = 1;
+    while (true) {
+      const partFilename = generateLSLFilename(
+        timestamp, currentProjectName, targetProject,
+        isRedirected ? this.config.projectPath : targetProject,
+        { partNumber }
+      );
+      const partFile = path.join(dir, partFilename);
+      
+      if (!fs.existsSync(partFile)) {
+        this.debug(`📂 Splitting LSL file: starting part ${partNumber} (${path.basename(baseFile)} exceeded ${maxSizeKB}KB)`);
+        return partFile;
+      }
+      
+      const partStats = fs.statSync(partFile);
+      if (partStats.size < maxSizeBytes) {
+        return partFile; // This part still has room
+      }
+      
+      partNumber++;
+      
+      // Safety: don't create more than 99 parts per hour window
+      if (partNumber > 99) {
+        this.debug(`⚠️ LSL split limit reached (99 parts), appending to last part`);
+        return partFile;
+      }
+    }
+  }
+
+  /**
    * Update comprehensive trajectory file
    */
   async updateComprehensiveTrajectory(targetProject) {
@@ -2761,8 +2824,8 @@ class EnhancedTranscriptMonitor {
   /**
    * Create session file with initial content (no longer creates empty files)
    */
-  async createSessionFileWithContent(targetProject, tranche, initialContent) {
-    const sessionFile = this.getSessionFilePath(targetProject, tranche);
+  async createSessionFileWithContent(targetProject, tranche, initialContent, explicitFilePath = null) {
+    const sessionFile = explicitFilePath || this.getSessionFilePath(targetProject, tranche);
     
     try {
       // Ensure directory exists
@@ -2984,7 +3047,8 @@ class EnhancedTranscriptMonitor {
       return false;
     }
 
-    const sessionFile = this.getSessionFilePath(targetProject, tranche);
+    // Use split-aware file path: automatically creates numbered parts when files exceed max size
+    const sessionFile = this.getActiveSessionFilePath(targetProject, tranche);
 
     // Create session file with the actual content (no empty files)
     // Add prompt set anchor and header for classification log links
@@ -3014,10 +3078,10 @@ class EnhancedTranscriptMonitor {
     sessionContent += `---\n\n`;
     
     if (!fs.existsSync(sessionFile)) {
-      // Create file with content immediately
-      await this.createSessionFileWithContent(targetProject, tranche, sessionContent);
+      // Create file with content immediately (may be a new split part)
+      await this.createSessionFileWithContent(targetProject, tranche, sessionContent, sessionFile);
     } else {
-      // Check if file needs rotation before appending
+      // Check if file needs rotation before appending (legacy archive rotation at 40MB)
       const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
       
       if (rotationCheck.needsRotation) {

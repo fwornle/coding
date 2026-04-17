@@ -71,6 +71,7 @@
   "live_logging": {
     "session_duration": 3600000,
     "max_file_size": 1048576,
+    "max_lsl_file_size_kb": 200,
     "consolidation": {
       "enabled": true,
       "session_duration": 3600000,

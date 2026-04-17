@@ -204,8 +204,11 @@ export function generateLSLFilename(timestamp, projectName, targetProject, sourc
   // Generate user hash for multi-user collision prevention
   const userHash = UserHashGenerator.generateHash({ debug: options.debug });
   
-  // Format: YYYY-MM-DD_HHMM-HHMM_hash
-  const baseName = `${year}-${month}-${day}_${timeWindow}_${userHash}`;
+  // Part number for file splitting (e.g., -1, -2, -3)
+  const partSuffix = options.partNumber ? `-${options.partNumber}` : '';
+  
+  // Format: YYYY-MM-DD_HHMM-HHMM[-N]_hash
+  const baseName = `${year}-${month}-${day}_${timeWindow}${partSuffix}_${userHash}`;
   
   // Determine if this is a local file or redirected file
   if (!sourceProject || targetProject === sourceProject) {
