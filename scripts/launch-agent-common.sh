@@ -166,6 +166,111 @@ _ensure_docker() {
   fi
 }
 
+# Check if coding-services container has unbound ports (running but ports not mapped to host).
+# Returns 0 if ports are broken, 1 if OK or container not running.
+_container_has_unbound_ports() {
+  local state
+  state=$(docker inspect coding-services --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+  [ "$state" != "running" ] && return 1
+
+  local port_bindings
+  port_bindings=$(docker inspect coding-services --format '{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}={{if $conf}}{{(index $conf 0).HostPort}}{{else}}UNBOUND{{end}} {{end}}' 2>/dev/null || true)
+
+  echo "$port_bindings" | grep -q "UNBOUND"
+}
+
+# Force-recreate coding-services after resolving port conflicts.
+# Returns 0 on successful recovery, 1 on failure.
+_recover_stale_container() {
+  local docker_dir="$1"
+  local max_wait="${2:-20}"
+
+  _agent_log "⚠️  Container has unbound ports — resolving conflicts and recreating..."
+  _resolve_port_conflicts "$docker_dir/docker-compose.yml"
+
+  docker compose -f "$docker_dir/docker-compose.yml" up -d --force-recreate coding-services 2>/dev/null
+
+  for j in $(seq 1 "$max_wait"); do
+    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+      _agent_log "✅ Recovered after port conflict resolution (${j}s)"
+      return 0
+    fi
+    sleep 1
+  done
+
+  _agent_log "❌ Recovery failed after ${max_wait}s"
+  return 1
+}
+
+# Diagnose why coding-services failed to become healthy.
+# Attempts recovery and returns 0 on success, 1 on failure.
+_diagnose_unhealthy_services() {
+  local docker_dir="$1"
+
+  local state
+  state=$(docker inspect coding-services --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+  _agent_log "   Container state: $state"
+
+  if [ "$state" = "running" ] && _container_has_unbound_ports; then
+    _recover_stale_container "$docker_dir" 20 && return 0
+  fi
+
+  # Show recent logs for debugging
+  _agent_log "   Recent logs:"
+  docker compose -f "$docker_dir/docker-compose.yml" logs --tail 10 coding-services 2>/dev/null | sed 's/^/   /'
+  _agent_log "   Full logs: docker compose -f $docker_dir/docker-compose.yml logs coding-services"
+  return 1
+}
+
+# Resolve port conflicts before starting Docker services.
+# Extracts published host ports from docker-compose.yml and kills any
+# non-Docker process occupying them.
+_resolve_port_conflicts() {
+  local compose_file="$1"
+  local conflicts_found=false
+
+  # Extract host ports from docker-compose port mappings (format: "HOST:CONTAINER")
+  local host_ports
+  host_ports=$(grep -oE '^\s+- "([0-9]+):' "$compose_file" | grep -oE '[0-9]+' || true)
+
+  if [ -z "$host_ports" ]; then
+    return 0
+  fi
+
+  for port in $host_ports; do
+    # Find PID listening on this port (exclude docker-proxy which is expected)
+    local pid
+    pid=$(lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+
+    if [ -z "$pid" ]; then
+      continue
+    fi
+
+    # Check if this is a Docker process (com.docker or docker-proxy) — leave those alone
+    local proc_name
+    proc_name=$(ps -p "$pid" -o comm= 2>/dev/null || true)
+    if [[ "$proc_name" == *docker* ]] || [[ "$proc_name" == *com.docker* ]]; then
+      continue
+    fi
+
+    local proc_cmd
+    proc_cmd=$(ps -p "$pid" -o args= 2>/dev/null | head -c 120 || true)
+    _agent_log "⚠️  Port $port blocked by PID $pid: $proc_cmd"
+
+    kill "$pid" 2>/dev/null && {
+      _agent_log "   Killed PID $pid to free port $port"
+      conflicts_found=true
+    } || {
+      _agent_log "   Failed to kill PID $pid — try: sudo kill $pid"
+    }
+  done
+
+  if [ "$conflicts_found" = true ]; then
+    # Brief pause for ports to be released by the kernel
+    sleep 1
+  fi
+}
+
 # Start coding services (Docker or Native mode)
 _start_services() {
   # Check if Node.js is available
@@ -182,28 +287,42 @@ _start_services() {
       exit 1
     fi
 
-    # Check if containers are already healthy - skip docker compose if so
+    # Fast path: already healthy and ports are bound
     # (skip this shortcut after --force, since we just tore everything down)
     if [ "$CODING_FORCE_CLEAN" != "true" ] && curl -sf http://localhost:8080/health >/dev/null 2>&1; then
       _agent_log "✅ coding-services already running and healthy - reusing existing containers"
     else
-      _agent_log "🐳 Starting coding services via Docker..."
-      export CODING_REPO
-
-      if ! docker compose -f "$docker_dir/docker-compose.yml" up -d; then
-        _agent_log "Error: Failed to start Docker containers"
-        exit 1
+      # Detect stale container (running but ports not bound to host) — common after
+      # Docker Desktop crashes or port conflicts.  Fix it immediately instead of
+      # waiting 60s to fail.
+      if _container_has_unbound_ports; then
+        _resolve_port_conflicts "$docker_dir/docker-compose.yml"
+        _agent_log "🐳 Recreating coding-services (stale port bindings)..."
+        export CODING_REPO
+        docker compose -f "$docker_dir/docker-compose.yml" up -d --force-recreate coding-services
+      else
+        # Normal startup path
+        _resolve_port_conflicts "$docker_dir/docker-compose.yml"
+        _agent_log "🐳 Starting coding services via Docker..."
+        export CODING_REPO
+        if ! docker compose -f "$docker_dir/docker-compose.yml" up -d; then
+          _agent_log "Error: Failed to start Docker containers"
+          exit 1
+        fi
       fi
 
       _agent_log "⏳ Waiting for coding-services to be healthy..."
-      for i in {1..60}; do
+      local max_wait=30
+      for i in $(seq 1 $max_wait); do
         if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
-          _agent_log "✅ coding-services healthy after ${i} seconds"
+          _agent_log "✅ coding-services healthy after ${i}s"
           break
         fi
-        if [ $i -eq 60 ]; then
-          _agent_log "❌ coding-services health check failed after 60 seconds"
-          _agent_log "   Check logs: docker compose -f $docker_dir/docker-compose.yml logs"
+        if [ "$i" -eq "$max_wait" ]; then
+          _agent_log "❌ coding-services health check failed after ${max_wait}s"
+          if _diagnose_unhealthy_services "$docker_dir"; then
+            break  # recovery succeeded
+          fi
           exit 1
         fi
         sleep 1

@@ -168,17 +168,19 @@ early_docker_launch() {
 
       open -F -a "Docker" 2>/dev/null
 
-      # Wait for process to appear (takes 3-5s normally)
-      sleep 5
+      # Wait for process to appear (poll quickly instead of fixed sleep)
+      for _i in $(seq 1 10); do
+        docker_pids=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+        if [ -n "$docker_pids" ]; then
+          log "  Docker Desktop started after ${_i}s (PIDs: $docker_pids)"
+          break
+        fi
+        sleep 1
+      done
 
-      # Verify process started
-      docker_pids=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
-      if [ -n "$docker_pids" ]; then
-        log "  Docker Desktop started (PIDs: $docker_pids)"
-      else
-        log "Docker Desktop process not found after 5s"
-        log "Check if Docker Desktop window appeared"
-        log "If not, try starting it manually from Applications"
+      if [ -z "$docker_pids" ]; then
+        log "Docker Desktop process not found after 10s"
+        log "Try starting it manually from Applications"
       fi
     fi
   elif [ "$PLATFORM" = "linux" ]; then
