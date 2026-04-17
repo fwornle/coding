@@ -708,7 +708,7 @@ install_constraint_monitor() {
 
             cd ..
             success "Professional Dashboard dependencies installed"
-            info "Dashboard runs on port 3030 with shadcn/ui components"
+            info "Dashboard runs on port 3030"
         else
             warning "Dashboard directory not found in constraint monitor"
         fi
@@ -2503,7 +2503,7 @@ install_node_dependencies() {
         success "✓ Node.js dependencies installed (including better-sqlite3 for knowledge databases)"
 
         # Rebuild better-sqlite3 to ensure native bindings are compiled
-        # This is necessary because pnpm (used by shadcn) may block build scripts
+        # This is necessary because some package managers may block build scripts
         info "Rebuilding better-sqlite3 native bindings..."
         if npm rebuild better-sqlite3 2>&1 | grep -q "rebuilt dependencies successfully"; then
             success "✓ better-sqlite3 native bindings rebuilt"

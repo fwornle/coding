@@ -61,14 +61,6 @@ if [[ -d "$CODING_REPO/integrations/memory-visualizer" ]]; then
     echo "    Removed build artifacts (source code preserved)"
 fi
 
-# Clean mcp-server-browserbase (git submodule - preserve source)
-if [[ -d "$CODING_REPO/integrations/mcp-server-browserbase" ]]; then
-    echo "  Cleaning mcp-server-browserbase (git submodule)..."
-    rm -rf "$CODING_REPO/integrations/mcp-server-browserbase/node_modules"
-    rm -rf "$CODING_REPO/integrations/mcp-server-browserbase/dist"
-    echo "    Removed build artifacts (source code preserved)"
-fi
-
 # Clean semantic analysis MCP server (git submodule - preserve source)
 if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis" ]]; then
     echo "  Cleaning semantic analysis MCP server (git submodule)..."
@@ -92,67 +84,6 @@ if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis" ]]; then
     fi
 
     echo "    Git submodule source code preserved"
-fi
-
-# Clean Serena MCP server (git submodule - preserve source)
-if [[ -d "$CODING_REPO/integrations/serena" ]]; then
-    echo "  Cleaning Serena MCP server (git submodule)..."
-
-    # Remove .venv directory (uv virtual environment)
-    if [[ -d "$CODING_REPO/integrations/serena/.venv" ]]; then
-        rm -rf "$CODING_REPO/integrations/serena/.venv"
-        echo "    Removed Python virtual environment"
-    fi
-
-    # Remove __pycache__ directories
-    find "$CODING_REPO/integrations/serena" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-    echo "    Removed Python cache files"
-
-    # Remove .pyc files
-    find "$CODING_REPO/integrations/serena" -name "*.pyc" -type f -exec rm -f {} + 2>/dev/null || true
-
-    # Remove uv.lock file
-    if [[ -f "$CODING_REPO/integrations/serena/uv.lock" ]]; then
-        rm -f "$CODING_REPO/integrations/serena/uv.lock"
-        echo "    Removed uv lock file"
-    fi
-
-    echo "    Git submodule source code preserved"
-fi
-
-# Clean up browser-access MCP server (SSE architecture)
-if [[ -d "$CODING_REPO/integrations/browser-access" ]]; then
-    echo "  Cleaning browser-access MCP server..."
-
-    # Stop the SSE server if running
-    if lsof -i :3847 -sTCP:LISTEN >/dev/null 2>&1; then
-        echo "    Stopping browser-access SSE server..."
-        "$CODING_REPO/integrations/browser-access/browser-access-server" stop 2>/dev/null || true
-    fi
-
-    # Kill any remaining browser-access processes
-    pkill -f "browser-access.*sse-server" 2>/dev/null || true
-    pkill -f "browser-access.*stdio-proxy" 2>/dev/null || true
-
-    # Remove node_modules
-    if [[ -d "$CODING_REPO/integrations/browser-access/node_modules" ]]; then
-        rm -rf "$CODING_REPO/integrations/browser-access/node_modules"
-        echo "    Removed node_modules"
-    fi
-
-    # Remove dist
-    if [[ -d "$CODING_REPO/integrations/browser-access/dist" ]]; then
-        rm -rf "$CODING_REPO/integrations/browser-access/dist"
-        echo "    Removed dist"
-    fi
-
-    # Remove logs
-    if [[ -d "$CODING_REPO/integrations/browser-access/logs" ]]; then
-        rm -rf "$CODING_REPO/integrations/browser-access/logs"
-        echo "    Removed logs"
-    fi
-
-    echo "    Source code preserved"
 fi
 
 # Clean up LLM CLI Proxy
