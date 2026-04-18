@@ -219,7 +219,7 @@ Similarly, it's not locked to any LLM provider. The system supports 10 providers
 
 ### Unified LLM Layer Architecture
 
-Under the hood, all LLM requests flow through `lib/llm/` — a unified abstraction layer that consolidates what used to be three separate LLM implementations. This layer provides intelligent routing, resilience, and cost optimization across all 10 providers.
+Under the hood, all LLM requests flow through [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) — a standalone abstraction layer that provides intelligent routing, resilience, and cost optimization across 14 LLM providers.
 
 ![LLM Provider Architecture](../../images/llm-provider-architecture.png)
 *The unified LLM layer with subscription-first routing, circuit breaker, cache, and quota tracking.*

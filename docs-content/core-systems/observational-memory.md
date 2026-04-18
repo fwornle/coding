@@ -11,10 +11,10 @@ Observational Memory captures per-exchange observations during coding sessions. 
 ![Observation Pipeline](../images/observation-pipeline.png)
 
 ```
-ETM (per project)          ObservationWriter          LLM CLI Proxy (12435)
+ETM (per project)          ObservationWriter          LLM Proxy Bridge (12435)
    |                            |                          |
    | _fireObservation()         |                          |
-   |  user + assistant msg ---->| summarize() ------------>| claude-code (Max)
+   |  user + assistant msg ---->| summarize() ------------>| @rapid/llm-proxy
    |                            |<---- summary + metadata -|
    |                            | writeObservation()       |
    |                            |  --> SQLite (.observations/observations.db)
@@ -30,7 +30,7 @@ Dashboard (3032) <-- API (3033) <-- reads SQLite (readonly)
 | **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per exchange (fire-and-forget) |
 | **Health API** | `integrations/system-health-dashboard/server.js` | REST endpoints for querying observations |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/observations.tsx` | Browsable UI with filters, search, compact view |
-| **LLM CLI Proxy** | `integrations/llm-cli-proxy/` | Routes summarization to subscription providers (port 12435) |
+| **LLM Proxy Bridge** | [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) | Routes summarization to subscription providers (port 12435) |
 
 ## Observation Pipeline
 

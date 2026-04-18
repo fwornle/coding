@@ -2,12 +2,12 @@
 
 ## Overview
 
-The `lib/llm/` unified LLM support layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across 10 different LLM providers, including **subscription-based providers** that eliminate per-token API costs.
+The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across 14 different LLM providers, including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
 
 **Why it was created:**
 - **Before**: 3 separate LLM abstractions (Semantic Analysis, Unified Inference Engine, Semantic Validator)
 - **Problem**: Code duplication, inconsistent provider handling, no shared caching or resilience
-- **After**: Single unified layer with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
+- **After**: Single unified layer ([`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy)) with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
 
 **Key Features:**
 - **Parallelized copilot-first routing** — Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent)
@@ -61,7 +61,7 @@ The unified layer serves three primary consumers:
 
 ## Supported Providers
 
-The system supports 10 LLM providers with tier-based model selection:
+The system supports 14 LLM providers with tier-based model selection:
 
 ### Subscription Providers (Zero Cost)
 
@@ -84,10 +84,10 @@ The system supports 10 LLM providers with tier-based model selection:
 - Automatic quota tracking with persistent storage
 - Exponential backoff on exhaustion (5m → 15m → 1h)
 - Seamless fallback to API providers
-- **Docker mode**: Falls back to [LLM CLI Proxy](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) on `host.docker.internal:12435`
 
 #### 2. GitHub Copilot (Primary Provider)
-**CLI Command**: `copilot-cli`
+**Method**: Direct HTTP POST to Copilot API
 **Cost**: $0 per token (uses existing GitHub Copilot subscription)
 
 | Tier | Model | Description |
@@ -96,24 +96,24 @@ The system supports 10 LLM providers with tier-based model selection:
 | Standard | `claude-sonnet-4.5` | Claude Sonnet 4.5 via Copilot |
 | Premium | `claude-opus-4.6` | Claude Opus 4.6 via Copilot |
 
-**Why Copilot is primary**: Performance benchmarks revealed that copilot CLI calls scale beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all` (concurrency 5-20), copilot as the first-choice provider unlocks peak throughput.
+**Why Copilot is primary**: Performance benchmarks revealed that Copilot API calls scale beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all` (concurrency 5-20), copilot as the first-choice provider unlocks peak throughput.
 
-**Requirements**:
-- Install Copilot CLI: `npm install -g @githubnext/github-copilot-cli`
-- Authenticate via GitHub
-- Verify: `copilot-cli --version`
+**Authentication**:
+- Reads OAuth token from `~/.local/share/opencode/auth.json`
+- Direct HTTP POST to OpenAI-compatible Copilot API endpoint
+- No CLI tools required
 
 **Features**:
 - Shared quota tracking system
 - Automatic provider rotation on exhaustion
 - Zero API costs
-- **Docker mode**: Falls back to [LLM CLI Proxy](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) on `host.docker.internal:12435`
 
 ---
 
-### LLM CLI Proxy (Docker Bridge)
+### LLM Proxy Bridge (Docker Bridge)
 
-When running inside Docker, CLI tools (`claude`, `copilot-cli`) are unavailable. The [LLM CLI Proxy](../integrations/llm-cli-proxy.md) runs on the host (port 12435) and forwards requests to local CLIs. Each CLI provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
+When running inside Docker, host-side tools are unavailable. The [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) runs on the host (port 12435) and forwards requests. For **Copilot**, the proxy bridge reads OAuth tokens from `~/.local/share/opencode/auth.json` and makes direct HTTP POST calls to the Copilot API. For **Claude Code**, it spawns the `claude` CLI. Each provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
 
 ---
 
@@ -520,9 +520,8 @@ Metrics are exposed via the `LLMService.getMetrics()` method.
 ## Integration Example
 
 ```typescript
-import { LLMService } from '@/lib/llm/llm-service.js';
-import { Logger } from '@/lib/logger.js';
-import type { LLMCompletionRequest } from '@/lib/llm/types.js';
+import { LLMService, loadProviderConfig } from '@rapid/llm-proxy';
+import type { LLMCompletionRequest } from '@rapid/llm-proxy';
 
 const llmService = LLMService.getInstance();
 

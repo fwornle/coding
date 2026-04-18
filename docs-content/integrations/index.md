@@ -72,13 +72,13 @@ MCP servers and tools that extend the coding infrastructure.
 
     [:octicons-arrow-right-24: Details](dashboard.md)
 
--   :material-swap-horizontal:{ .lg .middle } **LLM CLI Proxy**
+-   :material-swap-horizontal:{ .lg .middle } **LLM Proxy Bridge**
 
     ---
 
-    HTTP bridge to host CLI tools for Docker containers.
+    HTTP bridge exposing [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) to Docker containers.
 
-    - Forwards to `claude` and `copilot-cli`
+    - Direct HTTP to Copilot API, CLI for Claude Code
     - Zero-cost subscription routing
     - Automatic provider fallback
 
@@ -102,7 +102,7 @@ MCP servers and tools that extend the coding infrastructure.
 | Memgraph | 7687 | Bolt | N/A |
 | Memgraph Lab | 3100 | HTTP | N/A |
 | Qdrant | 6333/6334 | HTTP/gRPC | `/health` |
-| LLM CLI Proxy | 12435 | HTTP | `/health` |
+| LLM Proxy Bridge | 12435 | HTTP | `/health` |
 
 ---
 

@@ -19,7 +19,7 @@ You can use subscription providers, cloud APIs, local models, or a combination:
 
 | Mode | Providers | Cost | Privacy | Speed |
 |------|-----------|------|---------|-------|
-| **Subscription** | Claude Code, Copilot | **$0** | Uses existing subscription | Fast (CLI) |
+| **Subscription** | Claude Code, Copilot | **$0** | Uses existing subscription | Fast (CLI / HTTP) |
 | **Cloud** | Groq, Anthropic, OpenAI | $$$ | Data sent externally | Fast (API) |
 | **Local** | DMR/llama.cpp | Free | Data stays local | Varies |
 | **Mock** | Simulated | Free | N/A | Instant |
@@ -63,25 +63,21 @@ claude --print --silent "Say hello"
 
 ### GitHub Copilot (Primary Provider — Parallelism-Optimized)
 
-Route requests through your GitHub Copilot subscription. **This is the primary provider for all tiers** because it scales beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Batch agents already use `Promise.all`, so copilot as primary unlocks peak throughput.
+Route requests through your GitHub Copilot subscription via **direct HTTP POST** to the Copilot API. **This is the primary provider for all tiers** because it scales beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Batch agents already use `Promise.all`, so copilot as primary unlocks peak throughput.
 
 **Setup:**
 
+The Copilot provider reads OAuth tokens automatically from `~/.local/share/opencode/auth.json` (populated by OpenCode on login). No manual setup required if you use OpenCode.
+
 ```bash
-# 1. Install Copilot CLI
-npm install -g @githubnext/github-copilot-cli
+# Verify auth tokens exist
+cat ~/.local/share/opencode/auth.json | jq '.github_token | length'
 
-# 2. Verify installation
-copilot-cli --version
-
-# 3. Authenticate via GitHub
-# (Handled automatically if you have Copilot access)
-
-# 4. Test
-copilot-cli --prompt "Say hello" --silent
+# If missing, launch OpenCode to trigger OAuth flow
+opencode
 ```
 
-**No environment variables needed** - uses CLI directly.
+**No environment variables or CLI tools needed** — uses direct HTTP to the Copilot API.
 
 **Supported Models:**
 
@@ -271,9 +267,9 @@ curl -X POST http://localhost:12434/v1/models/pull \
 
 ## Unified LLM Layer
 
-All LLM requests route through the `lib/llm/` unified layer, which provides:
+All LLM requests route through the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified layer, which provides:
 
-- **10 providers**: 2 subscription (Copilot, Claude Code), 5 cloud API, 2 local, 1 mock
+- **14 providers**: 2 subscription (Copilot via direct HTTP, Claude Code via CLI), 5 cloud API, 2 local, 1 mock, plus proxy and OpenAI-compatible
 - **Copilot-first parallelized routing**: Copilot scales with concurrency (0.77s @10 parallel), always tried first
 - **Tier-based routing**: Automatic provider selection based on task complexity
 - **Quota tracking**: Persistent usage tracking with exponential backoff
@@ -283,7 +279,7 @@ All LLM requests route through the `lib/llm/` unified layer, which provides:
 
 **Cost Savings**: ~$50-100/month for active development (all UKB/LSL analysis routes through subscriptions first)
 
-See [LLM Architecture](../architecture/llm-architecture.md) for complete details.
+See [`@rapid/llm-proxy` Architecture](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/architecture.md) and [LLM Architecture](../architecture/llm-architecture.md) for complete details.
 
 ## Tier-Based Routing
 
