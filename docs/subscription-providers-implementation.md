@@ -1,5 +1,7 @@
 # Subscription-Based LLM Providers Implementation
 
+> **Note:** The LLM provider layer has been extracted into the standalone [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) package. This document describes the provider behavior; the canonical source code now lives in that repo.
+
 ## Status: Direct HTTP / CLI Rewrite Complete
 
 Subscription providers rewritten to eliminate SDK overhead. Copilot uses direct HTTP (~2s), Claude Code uses CLI shell-out with JSON output (~12s).
@@ -36,7 +38,7 @@ BaseProvider (abstract)
 
 ## Copilot Provider: Direct HTTP
 
-**File:** `lib/llm/providers/copilot-provider.ts`
+**File:** `@rapid/llm-proxy` → `src/providers/copilot-provider.ts`
 
 The copilot provider sends a direct HTTP POST to the GitHub Copilot chat completions endpoint (OpenAI-compatible):
 
@@ -71,7 +73,7 @@ In Docker (`LLM_CLI_PROXY_URL` set), the provider delegates to the host-side pro
 
 ## Claude Code Provider: CLI Shell-Out
 
-**File:** `lib/llm/providers/claude-code-provider.ts`
+**File:** `@rapid/llm-proxy` → `src/providers/claude-code-provider.ts`
 
 The claude-code provider shells out to the `claude` CLI in non-interactive mode:
 

@@ -98,20 +98,23 @@ The system is built on **self-contained integration components**, each with its 
 
 **Documentation:** [integrations/mcp-constraint-monitor/](../integrations/mcp-constraint-monitor/)
 
-### LLM CLI Proxy Bridge
+### LLM Provider Layer (`@rapid/llm-proxy`)
 
-**HTTP bridge enabling Docker containers to use host-side CLI tools**
+**Standalone LLM abstraction with 14 providers, tier-based routing, and proxy bridge**
 
-- Routes LLM requests through host's `claude` CLI (Claude Max subscription)
-- Falls back from local CLI to proxy automatically when running in Docker
-- Stateless bridge on port 12435 (adjacent to DMR on 12434)
-- Supports `claude-code` and `copilot` providers via HTTP
+- **External dependency:** [`rapid-llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) — shared with OKB
+- Copilot: Direct HTTP POST to Copilot API (~2s, OAuth from `auth.json`)
+- Claude Code: CLI shell-out `claude -p --output-format json` (~12s)
+- Cloud API fallbacks: Groq, Anthropic, OpenAI, Gemini, GitHub Models
+- Local fallbacks: DMR, Ollama
+- Infrastructure: circuit breaker, LRU cache, metrics, quota tracking
+- Proxy bridge (port 12435) for Docker containers without host CLI access
 
-![LLM CLI Proxy Architecture](images/llm-cli-proxy-architecture.png)
+![LLM Proxy Architecture](images/llm-cli-proxy-architecture.png)
 
-**Why**: Inside Docker, CLI tools aren't available. Without the proxy, the UKB workflow falls back to paid API providers (Groq, Anthropic). With the proxy, it routes through GitHub Copilot (primary, parallelism-optimized) and Claude Max subscriptions at zero per-token cost. Copilot scales beautifully with parallelism — 0.77s effective per call at 10 concurrent requests.
+**Why**: A single provider-agnostic LLM layer shared across projects. Subscription providers (Copilot, Claude Max) run at zero per-token cost; paid APIs serve as fallback. Copilot scales with parallelism — 0.77s effective per call at 10 concurrent requests.
 
-**Documentation:** [integrations/llm-cli-proxy/](../integrations/llm-cli-proxy/)
+**Documentation:** [rapid-llm-proxy repo](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) · [Provider Configuration](provider-configuration.md)
 
 ### VSCode CoPilot Integration
 

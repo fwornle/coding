@@ -3,7 +3,7 @@
 
 top to bottom direction
 
-title Unified LLM Provider Architecture (lib/llm/)
+title Unified LLM Provider Architecture (@rapid/llm-proxy)
 
 package "Consumers" {
   component [SemanticAnalyzer] <<agent>>
@@ -11,7 +11,7 @@ package "Consumers" {
   component [SemanticValidator] <<agent>>
 }
 
-package "lib/llm/ - Unified LLM Layer" {
+package "@rapid/llm-proxy (external dependency)" {
   component [LLMService\nFacade] <<core>> as LLMService
 
   package "Provider Registry" {

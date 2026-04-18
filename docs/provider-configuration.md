@@ -47,7 +47,7 @@ node scripts/enhanced-transcript-monitor.js
 
 ## Tier-Based Routing
 
-The system uses tier-based provider routing via the `lib/llm/` unified layer, with **Copilot as the primary provider** for all tiers. Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent), and batch agents already use `Promise.all` with concurrency 5-20.
+The system uses tier-based provider routing via the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified layer, with **Copilot as the primary provider** for all tiers. Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent), and batch agents already use `Promise.all` with concurrency 5-20.
 
 | Tier | Provider Priority | Use Cases |
 |------|-------------------|-----------|

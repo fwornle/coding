@@ -1,7 +1,7 @@
 @startuml llm-cli-proxy-architecture
 !include _standard-style.puml
 
-title LLM Subscription Provider Architecture\nDirect HTTP + CLI Shell-Out with Proxy Bridge
+title LLM Subscription Provider Architecture (@rapid/llm-proxy)\nDirect HTTP + CLI Shell-Out with Proxy Bridge
 
 top to bottom direction
 
