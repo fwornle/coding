@@ -2,7 +2,7 @@
  * UnifiedInferenceEngine
  *
  * Centralized LLM inference engine shared by all components (trajectory, knowledge extraction, etc.)
- * Now delegates all provider management to LLMService from lib/llm/.
+ * Now delegates all provider management to LLMService from @rapid/llm-proxy.
  *
  * Key Features (preserved):
  * - EventEmitter pattern for inference lifecycle events
@@ -18,7 +18,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { LLMService } from '../../lib/llm/dist/index.js';
+import { LLMService } from '@rapid/llm-proxy';
 
 // Dynamic imports for optional dependencies
 let BudgetTracker, SensitivityClassifier;

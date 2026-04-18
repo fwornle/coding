@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.15.1",
+    "@rapid/llm-proxy": "git+https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy.git",
     "@xenova/transformers": "^2.17.2",
     "axios": "^1.10.0",
     "better-sqlite3": "^11.7.0",
