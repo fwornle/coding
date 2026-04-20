@@ -125,7 +125,7 @@ The `--output-format json` flag returns structured output with exact token count
 
 ## Proxy Bridge Architecture
 
-Both providers support Docker containers via the HTTP proxy bridge (`src/llm-proxy/llm-proxy.mjs`):
+Both providers support Docker containers via the HTTP proxy bridge (local thin wrapper `src/llm-proxy/llm-proxy.mjs` delegates to `@rapid/llm-proxy`):
 
 ```
 Docker Container                    Host Machine
@@ -205,15 +205,19 @@ providers:
 
 ## Files
 
-### Provider Files
-1. `lib/llm/providers/copilot-provider.ts` — Direct HTTP to Copilot API
-2. `lib/llm/providers/claude-code-provider.ts` — CLI shell-out with JSON output
-3. `lib/llm/providers/base-provider.ts` — Abstract base (both extend this directly)
-4. `lib/llm/providers/cli-provider-base.ts` — Legacy CLI base (kept for reference, unused by subscription providers)
+> All provider source code now lives in the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) package.
 
-### Infrastructure
-5. `lib/llm/subscription-quota-tracker.ts` — Quota tracking with exponential backoff
-6. `src/llm-proxy/llm-proxy.mjs` — HTTP proxy bridge for Docker containers
+### Provider Files (in @rapid/llm-proxy)
+1. `src/providers/copilot-provider.ts` — Direct HTTP to Copilot API
+2. `src/providers/claude-code-provider.ts` — CLI shell-out with JSON output
+3. `src/providers/base-provider.ts` — Abstract base (both extend this directly)
+4. `src/providers/cli-provider-base.ts` — Legacy CLI base (kept for reference, unused by subscription providers)
+
+### Infrastructure (in @rapid/llm-proxy)
+5. `src/subscription-quota-tracker.ts` — Quota tracking with exponential backoff
+
+### Local Bridge
+6. `src/llm-proxy/llm-proxy.mjs` — HTTP proxy bridge for Docker containers (thin wrapper delegating to @rapid/llm-proxy)
 
 ### Configuration
 7. `config/llm-providers.yaml` — Provider configs, model tiers, network overrides

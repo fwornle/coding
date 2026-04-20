@@ -77,7 +77,7 @@ The system relies on the following operational services:
 
 The system is built around several key components:
 
-**Inference Layer**:
+**Inference Layer** (delegates to `@rapid/llm-proxy`):
 - `UnifiedInferenceEngine` - Central LLM inference with multi-provider support
 - `BudgetTracker` - Cost tracking and $8.33/month enforcement
 - `SensitivityClassifier` - 5-layer privacy detection

@@ -351,7 +351,7 @@ vkb
 - `src/live-logging/StreamingKnowledgeExtractor.js` - Real-time extraction
 - `src/knowledge-management/EmbeddingGenerator.js` - Vector embeddings
 - `src/databases/DatabaseManager.js` - Qdrant + SQLite coordination
-- `src/inference/UnifiedInferenceEngine.js` - Multi-provider LLM routing
+- `src/inference/UnifiedInferenceEngine.js` - Multi-provider LLM routing (delegates to `@rapid/llm-proxy`)
 - `.cache/knowledge.db` - SQLite analytics database
 
 **VKB (Visualization)**:
