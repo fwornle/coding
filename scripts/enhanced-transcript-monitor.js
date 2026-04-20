@@ -804,23 +804,22 @@ class EnhancedTranscriptMonitor {
     if (!this.observationWriter) return;
     if (!exchanges || exchanges.length === 0) return;
 
-    // Deduplicate: same user prompt within 120s window → skip (assistant content grows
-    // between poll cycles, producing different hashes for the same logical turn)
+    // Deduplicate: prevent rapid-fire observations for the same exchange
+    // Use exchange count + latest message UUID as dedup key (stable per logical turn)
     if (!this._firedPromptKeys) this._firedPromptKeys = new Map();
-    const userKey = exchanges.map(e => {
-      const msg = e.userMessage;
-      return typeof msg === 'string' ? msg.slice(0, 200) : JSON.stringify(msg).slice(0, 200);
-    }).join('|');
+    const lastExchange = exchanges[exchanges.length - 1];
+    const exchangeId = lastExchange?.id || lastExchange?.uuid || '';
+    const userKey = `${exchanges.length}|${exchangeId}`;
     const now = Date.now();
     const lastFired = this._firedPromptKeys.get(userKey);
-    if (lastFired && (now - lastFired) < 120000) {
-      this.debug?.(`[ObservationTap] Dedup: skipping duplicate fire for same prompt set (${Math.round((now - lastFired)/1000)}s ago)`);
+    if (lastFired && (now - lastFired) < 15000) {
+      this.debug?.(`[ObservationTap] Dedup: skipping duplicate fire for same exchange (${Math.round((now - lastFired)/1000)}s ago)`);
       return;
     }
     this._firedPromptKeys.set(userKey, now);
-    // Prune old keys (>5min) to prevent memory leak
+    // Prune old keys (>2min) to prevent memory leak
     for (const [k, t] of this._firedPromptKeys) {
-      if (now - t > 300000) this._firedPromptKeys.delete(k);
+      if (now - t > 120000) this._firedPromptKeys.delete(k);
     }
 
     const messages = [];
@@ -940,7 +939,7 @@ class EnhancedTranscriptMonitor {
       const rows = db.prepare(
         `SELECT id, summary, metadata FROM observations
          WHERE agent = ? AND summary LIKE '%Artifacts: none%'
-         AND created_at > datetime('now', '-30 minutes')
+          AND created_at > datetime('now', '-4 hours')
          ORDER BY created_at DESC LIMIT 10`
       ).all(this.agentType);
 
@@ -964,12 +963,50 @@ class EnhancedTranscriptMonitor {
           .run(updatedSummary, JSON.stringify(meta), row.id);
         process.stderr.write(`[ObservationTap] Patched observation ${row.id.slice(0,8)} with ${modifiedFiles.length} artifacts\n`);
       }
-    } catch (err) {
-      process.stderr.write(`[ObservationTap] Failed to patch observations: ${err.message}\n`);
-    }
-  }
+     } catch (err) {
+       process.stderr.write(`[ObservationTap] Failed to patch observations: ${err.message}\n`);
+     }
+   }
 
-  async initializeReliableCodingClassifier() {
+   /**
+    * One-time startup patch: fix ALL historical observations where metadata
+    * contains modifiedFiles but summary says "Artifacts: none".
+    * This handles backfilled observations and old entries the live patcher missed.
+    */
+   _patchHistoricalArtifacts() {
+     if (!this.observationWriter?.db) return;
+     try {
+       const db = this.observationWriter.db;
+       const rows = db.prepare(
+         `SELECT id, summary, metadata FROM observations
+          WHERE summary LIKE '%Artifacts: none%'
+          AND metadata IS NOT NULL AND metadata != '{}'
+          ORDER BY created_at DESC LIMIT 500`
+       ).all();
+
+       let patched = 0;
+       for (const row of rows) {
+         let meta = {};
+         try { meta = JSON.parse(row.metadata || '{}'); } catch { continue; }
+         if (!meta.modifiedFiles || meta.modifiedFiles.length === 0) continue;
+
+         const artifactsList = meta.modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
+         const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
+         if (updatedSummary === row.summary) continue;
+
+         db.prepare('UPDATE observations SET summary = ? WHERE id = ?')
+           .run(updatedSummary, row.id);
+         patched++;
+       }
+       if (patched > 0) {
+         process.stderr.write(`[ObservationTap] Startup: patched ${patched} historical observations with artifacts from metadata\n`);
+       }
+     } catch (err) {
+       process.stderr.write(`[ObservationTap] Historical artifact patch failed: ${err.message}\n`);
+     }
+   }
+
+   async initializeReliableCodingClassifier() {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
 
@@ -1810,6 +1847,20 @@ class EnhancedTranscriptMonitor {
         FROM message m
         LEFT JOIN part p ON p.message_id = m.id
         WHERE m.session_id = '${sessionId.replace(/'/g, "''")}'
+          AND m.id IN (
+            SELECT id FROM (
+              SELECT id FROM message 
+              WHERE session_id = '${sessionId.replace(/'/g, "''")}'
+              ORDER BY time_created DESC LIMIT 50
+            )
+            UNION
+            SELECT id FROM (
+              SELECT id FROM message
+              WHERE session_id = '${sessionId.replace(/'/g, "''")}'
+                AND json_extract(data, '$.role') = 'user'
+              ORDER BY time_created DESC LIMIT 10
+            )
+          )
         GROUP BY m.id
         ORDER BY m.time_created ASC;
       `;
@@ -3731,6 +3782,9 @@ class EnhancedTranscriptMonitor {
     const sessionDurationMins = Math.round(this.getSessionDurationMs() / 60000);
     console.log(`⏰ Session boundaries: Every ${sessionDurationMins} minutes`);
 
+    // One-time startup: patch historical observations missing artifacts
+    this._patchHistoricalArtifacts();
+
     // Create initial health file
     this.updateHealthFile();
     
@@ -3747,8 +3801,19 @@ class EnhancedTranscriptMonitor {
     let finalizationCounter = 0;
     const FINALIZATION_INTERVAL = 900; // Finalize every 900 cycles (30 minutes at 2s intervals)
 
+    // Artifact patcher counter — patch "Artifacts: none" entries every 5 minutes
+    let artifactPatchCounter = 0;
+    const ARTIFACT_PATCH_INTERVAL = 150; // Every 150 cycles (5 minutes at 2s intervals)
+
     this.intervalId = setInterval(async () => {
       if (this.isProcessing) return;
+
+      // Periodically patch observations missing artifact info
+      artifactPatchCounter++;
+      if (artifactPatchCounter >= ARTIFACT_PATCH_INTERVAL) {
+        artifactPatchCounter = 0;
+        this._patchRecentObservationsWithArtifacts();
+      }
 
       // Periodically finalize classification logger to generate MD summary reports
       finalizationCounter++;

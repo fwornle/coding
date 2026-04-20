@@ -18,7 +18,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { LLMService } from '@rapid/llm-proxy';
+import http from 'http';
 
 // Dynamic imports for optional dependencies
 let BudgetTracker, SensitivityClassifier;
@@ -57,18 +57,9 @@ export class UnifiedInferenceEngine extends EventEmitter {
       'default': 'groq/llama-3.3-70b-versatile'
     };
 
-    // Initialize LLM service with config
-    this.llmService = new LLMService({
-      modelRouting: this.modelRouting,
-      cache: {
-        maxSize: config.cacheMaxSize || 1000,
-        ttlMs: config.cacheTTL || 3600000,
-      },
-      circuitBreaker: {
-        threshold: config.circuitBreakerThreshold || 5,
-        resetTimeoutMs: config.circuitBreakerReset || 60000,
-      },
-    });
+    // Route all LLM calls through the bridge server (handles proxy, VPN, fallback)
+    this.proxyPort = parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10);
+    this.proxyHost = '127.0.0.1';
 
     // Budget and sensitivity components (loaded on initialize)
     this.budgetTracker = null;
@@ -84,16 +75,13 @@ export class UnifiedInferenceEngine extends EventEmitter {
     // Load optional dependencies
     await loadOptionalDependencies();
 
-    // Initialize LLM service
-    await this.llmService.initialize();
+    // Bridge server handles LLM provider initialization
 
     // Initialize budget tracker if available
     if (BudgetTracker && this.config.budgetTracking !== false) {
       try {
         this.budgetTracker = new BudgetTracker(this.config.budgetConfig || {});
         await this.budgetTracker.initialize();
-        // Wire budget tracker into LLM service
-        this.llmService.setBudgetTracker(this.budgetTracker);
         console.info('[UnifiedInferenceEngine] BudgetTracker initialized');
       } catch (error) {
         console.warn('[UnifiedInferenceEngine] Failed to initialize BudgetTracker:', error);
@@ -105,8 +93,6 @@ export class UnifiedInferenceEngine extends EventEmitter {
       try {
         this.sensitivityClassifier = new SensitivityClassifier(this.config.sensitivityConfig || {});
         await this.sensitivityClassifier.initialize();
-        // Wire sensitivity classifier into LLM service
-        this.llmService.setSensitivityClassifier(this.sensitivityClassifier);
         console.info('[UnifiedInferenceEngine] SensitivityClassifier initialized');
       } catch (error) {
         console.warn('[UnifiedInferenceEngine] Failed to initialize SensitivityClassifier:', error);
@@ -115,7 +101,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
 
     this.initialized = true;
     this.emit('initialized');
-    console.info('[UnifiedInferenceEngine] Initialized with providers:', this.llmService.getAvailableProviders());
+    console.info(`[UnifiedInferenceEngine] Initialized (bridge server on ${this.proxyHost}:${this.proxyPort})`);
   }
 
   /**
@@ -126,21 +112,16 @@ export class UnifiedInferenceEngine extends EventEmitter {
    * @param {object} options - Inference options
    * @returns {Promise<object>} Inference result
    */
-  async infer(prompt, context = {}, options = {}) {
+   async infer(prompt, context = {}, options = {}) {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
-      const result = await this.llmService.complete({
+      const result = await this._callBridge({
         messages: [{ role: 'user', content: prompt }],
-        operationType: context.operationType,
-        maxTokens: options.maxTokens || context.maxTokens || 500,
+        max_tokens: options.maxTokens || context.maxTokens || 500,
         temperature: options.temperature ?? context.temperature ?? 0.3,
-        stream: options.stream,
-        privacy: options.privacy,
-        skipCache: options.skipCache,
-        forcePaid: options.forcePaid,
       });
 
       this.emit('inference-complete', {
@@ -149,14 +130,13 @@ export class UnifiedInferenceEngine extends EventEmitter {
         duration: result.latencyMs,
       });
 
-      // Return in the format consumers expect
       return {
         content: result.content,
         provider: result.provider,
         model: result.model,
-        tokens: result.tokens.total,
-        local: result.local,
-        cached: result.cached,
+        tokens: result.usage?.total_tokens || 0,
+        local: false,
+        cached: false,
       };
 
     } catch (error) {
@@ -166,6 +146,43 @@ export class UnifiedInferenceEngine extends EventEmitter {
       });
       throw error;
     }
+  }
+
+  /**
+   * Call the LLM proxy bridge server on port 12435
+   */
+  _callBridge(body) {
+    return new Promise((resolve, reject) => {
+      const data = JSON.stringify(body);
+      const req = http.request({
+        hostname: this.proxyHost,
+        port: this.proxyPort,
+        path: '/api/complete',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+        timeout: 60000,
+      }, (res) => {
+        let chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(Buffer.concat(chunks).toString());
+            if (res.statusCode >= 400) reject(new Error(json.error || `Bridge returned ${res.statusCode}`));
+            else resolve({
+              content: json.choices?.[0]?.message?.content || json.content || '',
+              provider: json.provider || 'unknown',
+              model: json.model || 'unknown',
+              usage: json.usage,
+              latencyMs: json.latencyMs || 0,
+            });
+          } catch (e) { reject(new Error(`Bridge parse error: ${e.message}`)); }
+        });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Bridge timeout (60s)')); });
+      req.write(data);
+      req.end();
+    });
   }
 
   /**
@@ -179,15 +196,14 @@ export class UnifiedInferenceEngine extends EventEmitter {
    * Clear inference cache
    */
   clearCache() {
-    this.llmService.clearCache();
-    console.info('[UnifiedInferenceEngine] Cache cleared');
+    console.info('[UnifiedInferenceEngine] Cache clear delegated to bridge server');
   }
 
   /**
    * Get inference statistics
    */
   getStats() {
-    return this.llmService.getStats();
+    return { provider: 'bridge', host: this.proxyHost, port: this.proxyPort };
   }
 }
 

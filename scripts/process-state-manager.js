@@ -642,7 +642,7 @@ class ProcessStateManager {
       await fs.access(levelDBLockPath);
       // Lock file exists - check who owns it
       const { spawn } = await import('child_process');
-      const lsof = spawn('lsof', [levelDBLockPath]);
+      const lsof = spawn('/usr/sbin/lsof', [levelDBLockPath]);
 
       let output = '';
       lsof.stdout.on('data', (data) => {
