@@ -93,6 +93,11 @@ export class ObservationWriter {
     // Index for fast dedup lookups
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)`);
 
+    // Periodic WAL checkpoint so readonly connections (e.g. Docker health dashboard) see fresh data
+    this._walCheckpointInterval = setInterval(() => {
+      try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* db may be closed */ }
+    }, 15_000); // every 15 seconds
+
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
   }
 
@@ -454,7 +459,12 @@ export class ObservationWriter {
    * Close the database connection.
    */
   async close() {
+    if (this._walCheckpointInterval) {
+      clearInterval(this._walCheckpointInterval);
+      this._walCheckpointInterval = null;
+    }
     if (this.db) {
+      try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       this.db.close();
       this.db = null;
       process.stderr.write('[ObservationWriter] Database connection closed.\n');

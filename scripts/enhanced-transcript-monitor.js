@@ -21,7 +21,7 @@ import os from 'os';
 import readline from 'readline';
 import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
 import AdaptiveExchangeExtractor from '../src/live-logging/AdaptiveExchangeExtractor.js';
-import { SemanticAnalyzer } from '../src/live-logging/SemanticAnalyzer.js';
+// SemanticAnalyzer removed — called APIs directly without proxy support, hanging on VPN
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import StreamingTranscriptReader from '../src/live-logging/StreamingTranscriptReader.js';
 import MastraTranscriptReader from '../src/live-logging/MastraTranscriptReader.js';
@@ -169,20 +169,9 @@ class EnhancedTranscriptMonitor {
       });
     }
     
-    // Initialize semantic analyzer for content classification (fallback)
+    // Semantic analyzer removed — all LLM calls route through the LLM proxy (port 12435)
+    // SemanticAnalyzer called APIs directly (no proxy support), hanging on VPN
     this.semanticAnalyzer = null;
-    try {
-      const apiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY || process.env.OPENAI_API_KEY;
-      if (apiKey) {
-        this.semanticAnalyzer = new SemanticAnalyzer(apiKey);
-        this.debug('Semantic analyzer initialized for content classification (fallback)');
-      } else {
-        this.debug('No API key found - semantic analysis disabled');
-      }
-    } catch (error) {
-      console.error('Failed to initialize semantic analyzer:', error.message);
-      this.semanticAnalyzer = null;
-    }
     
     // Initialize real-time trajectory analyzer (if available)
     this.trajectoryAnalyzer = null;
@@ -700,9 +689,20 @@ class EnhancedTranscriptMonitor {
       //   debug: this.debug_enabled
       // });
 
-      // Initialize inference engine
+      // Initialize inference engine — route all models through copilot on VPN
+      // Direct API providers (groq, openai, anthropic) hang on corporate VPN
+      const vpnSafeRouting = {
+        'trajectory-intent': 'copilot/claude-sonnet-4.6',
+        'trajectory-goal': 'copilot/claude-sonnet-4.6',
+        'knowledge-pattern': 'copilot/claude-sonnet-4.6',
+        'knowledge-concept': 'copilot/claude-sonnet-4.6',
+        'concept-abstraction': 'copilot/claude-sonnet-4.6',
+        'sensitive-analysis': 'copilot/claude-sonnet-4.6',
+        'default': 'copilot/claude-sonnet-4.6'
+      };
       const inferenceEngine = new UnifiedInferenceEngine({
         projectPath: this.config.projectPath,
+        modelRouting: vpnSafeRouting,
         debug: this.debug_enabled
       });
 
@@ -803,6 +803,25 @@ class EnhancedTranscriptMonitor {
   _firePromptSetObservation(exchanges) {
     if (!this.observationWriter) return;
     if (!exchanges || exchanges.length === 0) return;
+
+    // Deduplicate: same user prompt within 120s window → skip (assistant content grows
+    // between poll cycles, producing different hashes for the same logical turn)
+    if (!this._firedPromptKeys) this._firedPromptKeys = new Map();
+    const userKey = exchanges.map(e => {
+      const msg = e.userMessage;
+      return typeof msg === 'string' ? msg.slice(0, 200) : JSON.stringify(msg).slice(0, 200);
+    }).join('|');
+    const now = Date.now();
+    const lastFired = this._firedPromptKeys.get(userKey);
+    if (lastFired && (now - lastFired) < 120000) {
+      this.debug?.(`[ObservationTap] Dedup: skipping duplicate fire for same prompt set (${Math.round((now - lastFired)/1000)}s ago)`);
+      return;
+    }
+    this._firedPromptKeys.set(userKey, now);
+    // Prune old keys (>5min) to prevent memory leak
+    for (const [k, t] of this._firedPromptKeys) {
+      if (now - t > 300000) this._firedPromptKeys.delete(k);
+    }
 
     const messages = [];
     for (const exchange of exchanges) {

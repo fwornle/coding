@@ -812,6 +812,18 @@ class ProcessStateManager {
           }
         }
 
+        // Exclude macOS system processes (Docker Virtualization.framework, Spotlight, etc.)
+        // These hold read-only file handles but don't actually lock LevelDB for writes
+        if (!isRegistered) {
+          try {
+            const { execSync } = require('child_process');
+            const comm = execSync(`ps -p ${lockHolderPid} -o comm= 2>/dev/null`, { encoding: 'utf8' }).trim();
+            if (comm.includes('com.apple.') || comm.includes('Virtualization') || comm.includes('mds') || comm.includes('Spotlight')) {
+              isRegistered = true; // Treat system processes as benign
+            }
+          } catch { /* process may have exited */ }
+        }
+
         if (!isRegistered) {
           status.databaseIssues.push({
             type: 'leveldb_lock',

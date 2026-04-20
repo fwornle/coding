@@ -572,7 +572,7 @@ class HealthVerifier extends EventEmitter {
         auto_heal: !isHealthy && !isNetworkBlocked,
         auto_heal_action: 'restart_llm_cli_proxy',
         // Downgrade to info when it's a network block — restarting won't help
-        severity: isNetworkBlocked ? 'info' : 'warning'
+        severity: isHealthy ? 'info' : (isNetworkBlocked ? 'info' : 'warning')
       };
       checks.push(check);
     } catch (err) {

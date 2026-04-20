@@ -746,32 +746,33 @@ Return JSON: {"intent": "intent_name", "confidence": 0.0-1.0, "reasoning": "brie
   }
 
   /**
-   * Perform inference with specific provider configuration
+   * Perform inference with specific provider configuration.
+   * Routes through the LLM proxy (port LLM_CLI_PROXY_PORT, default 12435)
+   * which handles VPN/CN-aware provider selection and corporate proxy tunneling.
    */
   async performInferenceWithProvider(prompt, engine) {
-    const { provider, model, apiKey, baseUrl } = engine;
+    const { provider, model } = engine;
+    const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+    const proxyUrl = `http://localhost:${proxyPort}/api/complete`;
     
     const requestBody = {
-      model,
       messages: [{ role: 'user', content: prompt }],
+      model: model || undefined,
+      provider: provider || undefined,
       max_tokens: 150,
       temperature: 0.3
     };
     
-    const url = `${baseUrl}/chat/completions`;
-    
     // Debug logging
-    this.debug('Making API request to Groq', {
-      url,
+    this.debug('Making API request via LLM proxy', {
+      proxyUrl,
       model,
-      provider,
-      hasApiKey: !!apiKey
+      provider: provider || 'auto'
     });
     
-    const response = await fetch(url, {
+    const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestBody)
