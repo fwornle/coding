@@ -5,28 +5,60 @@
  * AI analysis of tool interactions using configurable LLM providers (XAI/Grok, etc.)
  */
 
-// Semantic analysis with multiple provider support - direct HTTP approach
+// Semantic analysis routed through LLM proxy bridge server (VPN-safe)
+import http from 'node:http';
 
 export class SemanticAnalyzer {
   constructor(apiKey, model = null) {
     if (!apiKey) {
-      throw new Error('Semantic API key is required');
+      // apiKey kept for backward compat but not used — bridge handles auth
     }
     
-    // Detect API type based on key prefix
-    if (apiKey.startsWith('xai-')) {
+    // Detect API type for logging only
+    if (apiKey && apiKey.startsWith('xai-')) {
       this.apiType = 'xai';
-      this.baseURL = 'https://api.x.ai/v1';
-      // Use the correct XAI model name - try common ones
       this.model = model || 'grok-2-1212';
     } else {
       this.apiType = 'openai';
-      this.baseURL = 'https://api.openai.com/v1';
       this.model = model || 'gpt-4o-mini';
     }
     
     this.apiKey = apiKey;
-    this.timeout = 10000; // 10 second timeout
+    this.proxyPort = parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10);
+    this.timeout = 15000; // 15 second timeout
+  }
+  
+  /**
+   * Call the LLM proxy bridge server instead of direct API
+   */
+  _callBridge(body) {
+    return new Promise((resolve, reject) => {
+      const payload = JSON.stringify(body);
+      const timer = setTimeout(() => reject(new Error('Bridge timeout')), this.timeout);
+      const req = http.request({
+        hostname: '127.0.0.1', port: this.proxyPort,
+        path: '/api/complete', method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, (res) => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          clearTimeout(timer);
+          try { resolve(JSON.parse(data)); } catch { reject(new Error(`Bridge parse error: ${data.slice(0, 200)}`)); }
+        });
+      });
+      req.on('error', e => { clearTimeout(timer); reject(e); });
+      req.write(payload);
+      req.end();
+    });
+  }
+
+  /**
+   * Shared LLM completion via bridge server
+   */
+  async _complete(messages, maxTokens = 200) {
+    const data = await this._callBridge({ messages, model: this.model, max_tokens: maxTokens });
+    return data.choices?.[0]?.message?.content?.trim() || data.text?.trim() || '';
   }
 
   /**
@@ -35,40 +67,10 @@ export class SemanticAnalyzer {
   async analyzeToolInteraction(interaction, context = {}) {
     try {
       const prompt = this.buildAnalysisPrompt(interaction, context);
-      
-      const requestBody = {
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant that analyzes Claude Code tool interactions to provide brief, insightful observations. Keep responses concise and actionable.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        model: this.model,
-        temperature: 0.7,
-        max_tokens: 200
-      };
-
-      const response = await fetch(`${this.baseURL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(this.timeout)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(`${response.status} ${JSON.stringify(errorData)}`);
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
+      const content = await this._complete([
+        { role: 'system', content: 'You are an AI assistant that analyzes Claude Code tool interactions to provide brief, insightful observations. Keep responses concise and actionable.' },
+        { role: 'user', content: prompt }
+      ]);
       if (!content) {
         return { insight: 'Analysis completed', category: 'info' };
       }
@@ -345,39 +347,10 @@ Determine if this conversation is primarily about CODING INFRASTRUCTURE or NOT.
 
 Format: CLASSIFICATION: [CODING_INFRASTRUCTURE|NOT_CODING_INFRASTRUCTURE] | CONFIDENCE: [high|medium|low] | REASON: [brief explanation]`;
 
-      const requestBody = {
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a content classifier that determines whether conversations are about coding/development infrastructure or any other topic. Consider both semantic meaning AND specific technical keywords. LSL systems, session logs, batch mode, foreign files, and redirected files are ALWAYS coding infrastructure topics. Be precise - only classify as CODING_INFRASTRUCTURE if the conversation is actually about development tools, systems, or infrastructure.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        model: this.model,
-        temperature: 0.1,  // Low temperature for consistent classification
-        max_tokens: 200
-      };
-
-      const response = await fetch(`${this.baseURL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(this.timeout)
-      });
-
-      if (!response.ok) {
-        console.error(`Classification API error: ${response.status}`);
-        return this.fallbackClassification(exchange);
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
+      const content = await this._complete([
+        { role: 'system', content: 'You are a content classifier that determines whether conversations are about coding/development infrastructure or any other topic. Consider both semantic meaning AND specific technical keywords. LSL systems, session logs, batch mode, foreign files, and redirected files are ALWAYS coding infrastructure topics. Be precise - only classify as CODING_INFRASTRUCTURE if the conversation is actually about development tools, systems, or infrastructure.' },
+        { role: 'user', content: prompt }
+      ]);
       
       if (!content) {
         return this.fallbackClassification(exchange);
@@ -483,25 +456,11 @@ ${interactions.slice(-5).map(i => `- ${i.toolName}: ${i.success ? 'success' : 'f
 Provide a brief session summary and productivity assessment.
 Format as: SUMMARY: [your summary] | PRODUCTIVITY: [high|medium|low]`;
 
-      const response = await this.client.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant that analyzes coding session productivity. Be encouraging and constructive.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        model: this.model,
-        temperature: 0.6,
-        max_tokens: 150,
-        timeout: this.timeout
-      });
-
-      const content = response.choices[0]?.message?.content?.trim() || '';
-      return this.parseSessionSummary(content, interactions);
+      const content = await this._complete([
+        { role: 'system', content: 'You are an AI assistant that analyzes coding session productivity. Be encouraging and constructive.' },
+        { role: 'user', content: prompt }
+      ], 150);
+      return this.parseSessionSummary(content || '', interactions);
 
     } catch (error) {
       console.error(`Session analysis error: ${error.message}`);

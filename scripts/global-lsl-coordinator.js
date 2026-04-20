@@ -187,10 +187,24 @@ class GlobalLSLCoordinator {
         this.log(`PSM check failed: ${psmError.message} - continuing with startup`);
       }
 
-      // Kill any existing monitors for this project first
-      // CRITICAL FIX: Pass project path as argument so pkill can find it
-      exec(`pkill -f "enhanced-transcript-monitor.js ${projectPath}"`, () => {
-        // RACE CONDITION FIX: Wait for old process to fully terminate before spawning new one
+      // Kill any existing monitors for this project first — but verify via OS first
+      // to avoid killing a healthy monitor that PSM didn't know about
+      let existingPids = [];
+      try {
+        const { execSync: execSyncLocal } = await import('child_process');
+        const pgrepOut = execSyncLocal(`pgrep -f "enhanced-transcript-monitor.js.*${projectName}" 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+        existingPids = pgrepOut ? pgrepOut.split('\n').map(Number).filter(p => p !== process.pid) : [];
+      } catch { /* ignore */ }
+
+      if (existingPids.length > 0) {
+        this.log(`Killing ${existingPids.length} existing monitor(s) for ${projectName}: ${existingPids.join(', ')}`);
+        for (const pid of existingPids) {
+          try { process.kill(pid, 'SIGTERM'); } catch { /* already dead */ }
+        }
+      }
+
+      // Wait for old process to fully terminate before spawning new one
+      exec(`sleep 0`, () => {
         setTimeout(() => {
           // CRITICAL FIX: Add project path as argument so pkill pattern can match
           // Log to project's transcript-monitor.log for debuggability
@@ -269,6 +283,16 @@ class GlobalLSLCoordinator {
       this.log(`Monitor PID ${monitorPid} not found`);
       return false;
     }
+
+    // GRACE PERIOD: Monitors take up to 5 minutes to initialize (scanning 18K+ LSL files,
+    // classifier init, PSM registration). During this time they won't write health files.
+    // If the process is alive and was started recently, consider it healthy.
+    const processAge = Date.now() - (startTime || 0);
+    const INIT_GRACE_PERIOD = 5 * 60 * 1000; // 5 minutes
+    if (processAge < INIT_GRACE_PERIOD) {
+      this.log(`Monitor PID ${monitorPid} still initializing (${Math.round(processAge / 1000)}s old) — healthy by grace period`);
+      return true;
+    }
     
     // Check health file (stored in coding project's .health directory)
     const projectName = path.basename(projectPath);
@@ -282,8 +306,9 @@ class GlobalLSLCoordinator {
       const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
       const age = Date.now() - healthData.timestamp;
       
-      // Health file should be updated recently (within 60 seconds)
-      if (age > 60000) {
+      // Health file should be updated recently (within 120 seconds — relaxed from 60s
+      // to account for slow poll cycles and large DB queries)
+      if (age > 120000) {
         this.log(`Stale health file for ${projectName} (${age}ms old)`);
         return false;
       }

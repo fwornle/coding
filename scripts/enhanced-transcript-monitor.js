@@ -8,7 +8,9 @@
 // Load environment variables from coding/.env
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { dirname, join } from 'path';
+const require = createRequire(import.meta.url);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -535,8 +537,28 @@ class EnhancedTranscriptMonitor {
 
         try {
           const exchanges = await this.getUnprocessedExchanges();
+          console.log(`[ObsDebug] ${exchanges.length} exchanges, promptSet=${this.currentUserPromptSet.length}, lastUuid=${this.lastProcessedUuid?.slice(-8) || 'none'}`);
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
+            console.log(`[ObsDebug] After processExchanges: promptSet=${this.currentUserPromptSet.length}`);
+          }
+
+          // Time-based flush: fire observation for accumulated exchanges even when
+          // no NEW exchanges arrive (handles OpenCode user-message persistence gap)
+          if (exchanges.length === 0 && this.currentUserPromptSet.length > 0) {
+            const oldestExchange = this.currentUserPromptSet[0];
+            const ageMs = Date.now() - (oldestExchange.timestamp ? new Date(oldestExchange.timestamp).getTime() : Date.now());
+            const FLUSH_THRESHOLD_MS = 3 * 60 * 1000;
+            if (ageMs > FLUSH_THRESHOLD_MS) {
+              console.log(`⏰ Time-based flush (no new exchanges): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
+              this._firePromptSetObservation(this.currentUserPromptSet);
+              // Update lastProcessedUuid so we don't re-read
+              const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+              if (lastExch && lastExch.id) {
+                this.lastProcessedUuid = lastExch.id;
+              }
+              this.currentUserPromptSet = [];
+            }
           }
 
           // Flush stale or long-running prompt set for this transcript
@@ -1819,6 +1841,7 @@ class EnhancedTranscriptMonitor {
         return null;
       }
 
+      this.openCodeSessionId = sessionId;
       this.debug(`Found OpenCode session: ${sessionId} (${title}, ${Math.round(sessionAge / 1000)}s ago)`);
       return `opencode://${sessionId}`;
     } catch (error) {
@@ -1832,65 +1855,60 @@ class EnhancedTranscriptMonitor {
    * Queries the message + part tables and converts to Claude-compatible format
    * that the existing extractExchanges pipeline can process.
    */
-  readOpenCodeMessages(sessionId) {
+    readOpenCodeMessages(sessionId) {
     const dbPath = this.openCodeDbPath;
     if (!fs.existsSync(dbPath)) return [];
 
     try {
-      const execSync = _execSync;
+      // Use better-sqlite3 directly — no process spawn, no pipe buffer limits, no ETIMEDOUT
+      let Database;
+      try { 
+        Database = require('better-sqlite3'); 
+      } catch { 
+        try {
+          // Try absolute path if CWD-relative require fails
+          Database = require('/Users/Q284340/Agentic/coding/node_modules/better-sqlite3');
+        } catch {
+          this.debug('better-sqlite3 not available, using sqlite3 CLI fallback');
+          return this._readOpenCodeMessagesCli(sessionId);
+        }
+      }
+      const db = Database(dbPath, { readonly: true });
+      
+      const query = `SELECT m.id, m.time_created, m.data as msg_data,
+  (SELECT json_group_array(p.data) FROM part p WHERE p.message_id = m.id) as parts_json
+FROM message m
+WHERE m.id IN (
+  SELECT id FROM (
+    SELECT id FROM message WHERE session_id = ? ORDER BY time_created DESC LIMIT 50
+  )
+  UNION
+  SELECT id FROM (
+    SELECT id FROM message WHERE session_id = ? AND json_extract(data, '$.role') = 'user' ORDER BY time_created DESC LIMIT 10
+  )
+)
+ORDER BY m.time_created ASC`;
+      
+      const rows = db.prepare(query).all(sessionId, sessionId);
+      db.close();
 
-      // Get messages with their parts joined together
-      // Using JSON output mode for reliable parsing
-      const query = `
-        SELECT m.id, m.time_created, m.data as msg_data,
-               GROUP_CONCAT(p.data, '|||PART_SEP|||') as parts_data
-        FROM message m
-        LEFT JOIN part p ON p.message_id = m.id
-        WHERE m.session_id = '${sessionId.replace(/'/g, "''")}'
-          AND m.id IN (
-            SELECT id FROM (
-              SELECT id FROM message 
-              WHERE session_id = '${sessionId.replace(/'/g, "''")}'
-              ORDER BY time_created DESC LIMIT 50
-            )
-            UNION
-            SELECT id FROM (
-              SELECT id FROM message
-              WHERE session_id = '${sessionId.replace(/'/g, "''")}'
-                AND json_extract(data, '$.role') = 'user'
-              ORDER BY time_created DESC LIMIT 10
-            )
-          )
-        GROUP BY m.id
-        ORDER BY m.time_created ASC;
-      `;
-      const result = execSync(`sqlite3 -separator '|||COL_SEP|||' "${dbPath}" "${query}"`, {
-        encoding: 'utf-8',
-        timeout: 15000,
-        maxBuffer: 50 * 1024 * 1024 // 50MB buffer for large sessions
-      }).trim();
-
-      if (!result) return [];
+      if (rows.length === 0) return [];
 
       const normalized = [];
-      const rows = result.split('\n');
 
       for (const row of rows) {
-        if (!row.trim()) continue;
-        const cols = row.split('|||COL_SEP|||');
-        if (cols.length < 3) continue;
-
-        const msgId = cols[0];
-        const timeCreated = cols[1];
+        const msgId = row.id;
+        const timeCreated = row.time_created;
         let msgData;
         try {
-          msgData = JSON.parse(cols[2]);
+          msgData = JSON.parse(row.msg_data);
         } catch { continue; }
 
-        const partsRaw = cols.length > 3 ? cols[3] : '';
-        const parts = partsRaw
-          ? partsRaw.split('|||PART_SEP|||').map(p => { try { return JSON.parse(p); } catch { return null; } }).filter(Boolean)
-          : [];
+        let parts = [];
+        try {
+          const partsArr = JSON.parse(row.parts_json || '[]');
+          parts = partsArr.map(p => { try { return typeof p === 'string' ? JSON.parse(p) : p; } catch { return null; } }).filter(Boolean);
+        } catch {}
 
         const timestamp = new Date(parseInt(timeCreated, 10)).toISOString();
 
@@ -1981,20 +1999,61 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * CLI fallback for readOpenCodeMessages when better-sqlite3 is unavailable
+   */
+  _readOpenCodeMessagesCli(sessionId) {
+    const dbPath = this.openCodeDbPath;
+    // Use sqlite3 CLI with file redirect to avoid pipe buffer overflow
+    const tmpDir = '/tmp/etm-opencode';
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const sqlFile = path.join(tmpDir, 'query.sql');
+    const outFile = path.join(tmpDir, 'result.json');
+    const query = `SELECT m.id, m.time_created, json_extract(m.data, '$.role') as role
+FROM message m
+WHERE m.id IN (
+  SELECT id FROM (SELECT id FROM message WHERE session_id = '${sessionId}' ORDER BY time_created DESC LIMIT 50)
+  UNION
+  SELECT id FROM (SELECT id FROM message WHERE session_id = '${sessionId}' AND json_extract(data, '$.role') = 'user' ORDER BY time_created DESC LIMIT 10)
+)
+ORDER BY m.time_created ASC;`;
+    fs.writeFileSync(sqlFile, `.mode json\n${query}`);
+    try {
+      _execSync(`sqlite3 "${dbPath}" < "${sqlFile}" > "${outFile}" 2>/dev/null`, { timeout: 15000 });
+      const raw = fs.readFileSync(outFile, 'utf8').trim();
+      if (!raw) return [];
+      const rows = JSON.parse(raw);
+      return rows.map(r => ({
+        type: r.role === 'user' ? 'user' : 'assistant',
+        uuid: r.id,
+        timestamp: new Date(parseInt(r.time_created, 10)).toISOString(),
+        message: { role: r.role || 'assistant', content: '' }
+      }));
+    } catch (e) {
+      this.debug(`CLI fallback failed: ${e.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Get the current message count for an OpenCode session (used for change detection)
    */
-  getOpenCodeMessageCount(sessionId) {
+   getOpenCodeMessageCount(sessionId) {
     const dbPath = this.openCodeDbPath;
     if (!fs.existsSync(dbPath)) return 0;
 
     try {
-      const execSync = _execSync;
-      const query = `SELECT COUNT(*) FROM message WHERE session_id = '${sessionId.replace(/'/g, "''")}';`;
-      const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
-        encoding: 'utf-8',
-        timeout: 3000
-      }).trim();
-      return parseInt(result, 10) || 0;
+      let Database;
+      try { Database = require('better-sqlite3'); } catch {
+        // Fallback to execSync
+        const result = _execSync(`sqlite3 "${dbPath}" "SELECT COUNT(*) FROM message WHERE session_id = '${sessionId.replace(/'/g, "''")}';"`, {
+          encoding: 'utf-8', timeout: 3000
+        }).trim();
+        return parseInt(result, 10) || 0;
+      }
+      const db = Database(dbPath, { readonly: true });
+      const row = db.prepare('SELECT COUNT(*) as cnt FROM message WHERE session_id = ?').get(sessionId);
+      db.close();
+      return row ? row.cnt : 0;
     } catch {
       return 0;
     }
@@ -3659,19 +3718,44 @@ class EnhancedTranscriptMonitor {
       });
     }
 
-    // CRITICAL FIX: Do NOT process remaining prompt set immediately!
-    // The currentUserPromptSet likely contains just the user message without the assistant's
-    // response (including tool calls). Writing it now would create incomplete "Text-only exchange"
-    // entries in the LSL files.
-    //
-    // The prompt set will be completed when:
-    // 1. A NEW user prompt arrives (triggering completion of the previous set)
-    // 2. On graceful shutdown (handled in the shutdown handler)
-    //
-    // This allows the assistant response and tool calls to accumulate in subsequent monitoring
-    // cycles before the exchange is written to the LSL file.
+    // Time-based flush: if the prompt set has been accumulating for too long without
+    // a user prompt (e.g., OpenCode stops persisting user messages after session grows),
+    // flush it anyway so observations don't stop. This handles the case where user messages
+    // are missing from the DB but the conversation is still active.
     if (this.currentUserPromptSet.length > 0) {
-      this.debug(`⏳ Holding ${this.currentUserPromptSet.length} exchanges in prompt set - waiting for assistant response/completion`);
+      const oldestExchange = this.currentUserPromptSet[0];
+      const ageMs = Date.now() - (oldestExchange.timestamp ? new Date(oldestExchange.timestamp).getTime() : Date.now());
+      const FLUSH_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes — flush if held for 3+ min
+      
+      if (ageMs > FLUSH_THRESHOLD_MS && this.currentUserPromptSet.length >= 1) {
+        console.log(`⏰ Time-based flush: prompt set held for ${Math.round(ageMs / 1000)}s with ${this.currentUserPromptSet.length} exchanges — flushing (no user prompt detected)`);
+        
+        // Fire observation for the accumulated exchanges
+        this._firePromptSetObservation(this.currentUserPromptSet);
+        
+        // Also write to LSL if possible
+        try {
+          const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+          if (targetProject !== null) {
+            const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+            await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+          }
+        } catch (err) {
+          this.debug(`Time-based flush LSL write failed (non-critical): ${err.message}`);
+        }
+        
+        // Update lastProcessedUuid so next cycle doesn't re-read the same messages
+        const lastExchange = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+        if (lastExchange && lastExchange.id) {
+          this.lastProcessedUuid = lastExchange.id;
+          this.saveLastProcessedUuid();
+          this.debug(`📌 Updated lastProcessedUuid to ${lastExchange.id} after time-based flush`);
+        }
+        
+        this.currentUserPromptSet = [];
+      } else {
+        this.debug(`⏳ Holding ${this.currentUserPromptSet.length} exchanges in prompt set (age: ${Math.round(ageMs / 1000)}s) - waiting for user prompt or flush threshold`);
+      }
     }
   }
 
@@ -3730,11 +3814,14 @@ class EnhancedTranscriptMonitor {
 
     // Initialize PSM if not already done
     if (!this.processStateManager.initialized) {
+      console.log('[PSM] Initializing...');
       await this.processStateManager.initialize();
+      console.log('[PSM] Initialized');
     }
 
     // Clean up dead PIDs before checking for duplicates
     // This prevents stale registry entries from blocking new registrations
+    console.log('[PSM] Cleaning up dead processes...');
     const cleanupStats = await this.processStateManager.cleanupDeadProcesses();
     if (cleanupStats.total > 0) {
       console.log(`🧹 Cleaned up ${cleanupStats.total} dead process(es) from registry`);
@@ -3844,22 +3931,53 @@ class EnhancedTranscriptMonitor {
       // This prevents orphaned monitors when Claude sessions are force-quit
       const idleTime = Date.now() - this.lastActivityTime;
       if (idleTime > this.idleTimeout) {
-        // Before exiting, check if there's still an active tmux session for this project.
-        // If so, stay alive (idling) rather than exit and consume GPS restart budget.
-        // The idle-exit/restart cycle wastes 10 restarts/hour overnight when no session
-        // is active, leaving no budget for genuine crash recovery.
-        let hasActiveTmuxSession = false;
+        // Before exiting, check if there's still an active session for this project.
+        // Check both tmux (Claude CLI) and OpenCode sessions.
+        let hasActiveSession = false;
         try {
           const { execSync } = await import('child_process');
-          // Check if any tmux pane has cwd pointing to this project
-          const paneOutput = execSync('tmux list-panes -a -F "#{pane_current_path}" 2>/dev/null', { encoding: 'utf-8', timeout: 3000 });
-          hasActiveTmuxSession = paneOutput.split('\n').some(p => p.trim() === this.config.projectPath);
-        } catch { /* tmux not available or no sessions — proceed with exit */ }
+          // Check tmux sessions (Claude CLI)
+          try {
+            const paneOutput = execSync('tmux list-panes -a -F "#{pane_current_path}" 2>/dev/null', { encoding: 'utf-8', timeout: 3000 });
+            hasActiveSession = paneOutput.split('\n').some(p => p.trim() === this.config.projectPath);
+          } catch { /* tmux not available */ }
+          
+           // Check OpenCode sessions — query the DB for recent messages
+          if (!hasActiveSession && this.openCodeSessionId) {
+            try {
+              const dbPath = path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
+              if (fs.existsSync(dbPath)) {
+                let latestMs = 0;
+                try {
+                  const Database = require('better-sqlite3');
+                  const db = Database(dbPath, { readonly: true });
+                  const row = db.prepare('SELECT MAX(p.time_created) as latest FROM part p JOIN message m ON p.message_id = m.id WHERE m.session_id = ?').get(this.openCodeSessionId);
+                  db.close();
+                  latestMs = row && row.latest ? Number(row.latest) : 0;
+                } catch {
+                  const escapedId = this.openCodeSessionId.replace(/'/g, "''");
+                  const result = _execSync(`sqlite3 "${dbPath}" "SELECT MAX(p.time_created) FROM part p JOIN message m ON p.message_id = m.id WHERE m.session_id = '${escapedId}';"`, {
+                    encoding: 'utf-8', timeout: 3000
+                  }).trim();
+                  latestMs = Number(result) || new Date(result).getTime() || 0;
+                }
+                if (latestMs > 0) {
+                  const ageMs = Date.now() - latestMs;
+                  if (ageMs < this.idleTimeout) {
+                    hasActiveSession = true;
+                    this.lastActivityTime = Date.now();
+                    this.debug(`⏰ OpenCode session still active (last message ${Math.round(ageMs/1000)}s ago)`);
+                  }
+                }
+              }
+            } catch (e) { this.debug(`OpenCode session check failed: ${e.message}`); }
+          }
+        } catch { /* checks failed — proceed with exit */ }
 
-        if (hasActiveTmuxSession) {
+        if (hasActiveSession) {
           // Reset activity time to prevent checking every cycle
           this.lastActivityTime = Date.now();
-          this.debug('⏰ Idle timeout reached but tmux session still active — staying alive');
+          this.debug('⏰ Idle timeout reached but active session detected — staying alive');
         } else {
           const idleMinutes = Math.round(idleTime / 60000);
           process.stderr.write(`[EnhancedTranscriptMonitor] ${new Date().toISOString()} Idle timeout reached: no transcript activity for ${idleMinutes} minutes. Auto-exiting.\n`);
@@ -3922,6 +4040,14 @@ class EnhancedTranscriptMonitor {
         }
       }
 
+      // POLL LOOP DEBUG - trace which branch we take
+      const _ttSize = this.trackedTranscripts.size;
+      const _psLen = this.currentUserPromptSet.length;
+      if (this._pollDebugCounter === undefined) this._pollDebugCounter = 0;
+      if (++this._pollDebugCounter % 30 === 1) { // every 60s (30 * 2s)
+        console.error(`[POLL] trackedTranscripts=${_ttSize} promptSet=${_psLen} isProcessing=${this.isProcessing} transcript=${this.transcriptPath ? 'yes' : 'no'}`);
+      }
+
       // Multi-transcript processing: check ALL tracked transcripts for new content
       if (this.trackedTranscripts.size > 1) {
         this.isProcessing = true;
@@ -3935,13 +4061,40 @@ class EnhancedTranscriptMonitor {
         }
       } else {
         // Single-transcript fallback (original behavior)
+        // Time-based flush MUST run even when hasNewContent() returns false
+        // (handles OpenCode user-message persistence gap — assistant-only accumulation)
+        if (this.currentUserPromptSet.length > 0) {
+          const oldestExchange = this.currentUserPromptSet[0];
+          const ageMs = Date.now() - (oldestExchange.timestamp ? new Date(oldestExchange.timestamp).getTime() : Date.now());
+          const FLUSH_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+          if (ageMs > FLUSH_THRESHOLD_MS) {
+            this.isProcessing = true;
+            try {
+              console.log(`⏰ Time-based flush (single-transcript): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
+              this._firePromptSetObservation(this.currentUserPromptSet);
+              const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+              if (lastExch && lastExch.id) {
+                this.lastProcessedUuid = lastExch.id;
+                this.saveLastProcessedUuid(this.lastProcessedUuid);
+              }
+              this.currentUserPromptSet = [];
+            } catch (error) {
+              this.debug(`Error in time-based flush: ${error.message}`);
+            } finally {
+              this.isProcessing = false;
+            }
+          }
+        }
+
         if (!this.hasNewContent()) return;
 
         this.isProcessing = true;
         try {
           const exchanges = await this.getUnprocessedExchanges();
+          console.log(`[ObsDebug-single] ${exchanges.length} exchanges, promptSet=${this.currentUserPromptSet.length}, lastUuid=${this.lastProcessedUuid?.slice(-8) || 'none'}`);
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
+            console.log(`[ObsDebug-single] After processExchanges: promptSet=${this.currentUserPromptSet.length}`);
           }
         } catch (error) {
           this.debug(`Error in monitoring loop: ${error.message}`);
@@ -4388,6 +4541,7 @@ async function main() {
     });
   } catch (error) {
     console.error('❌ Failed to start transcript monitor:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 }

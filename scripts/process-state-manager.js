@@ -83,8 +83,18 @@ class ProcessStateManager {
    * Read registry data
    */
   async readRegistry() {
-    const content = await fs.readFile(this.registryPath, 'utf8');
-    return JSON.parse(content);
+    try {
+      const content = await fs.readFile(this.registryPath, 'utf8');
+      const data = JSON.parse(content);
+      // Ensure structure integrity
+      if (!data.services) data.services = { global: {}, projects: {} };
+      if (!data.services.global) data.services.global = {};
+      if (!data.services.projects) data.services.projects = {};
+      if (!data.sessions) data.sessions = {};
+      return data;
+    } catch {
+      return { services: { global: {}, projects: {} }, sessions: {}, lastChange: 0 };
+    }
   }
 
   /**
@@ -297,13 +307,13 @@ class ProcessStateManager {
       const registry = await this.readRegistry();
 
       if (type === 'global') {
-        return registry.services.global[name] || null;
+        return registry.services?.global?.[name] || null;
       } else if (type === 'per-project' && context.projectPath) {
-        const projectServices = registry.services.projects[context.projectPath];
+        const projectServices = registry.services?.projects?.[context.projectPath];
         return projectServices ? projectServices[name] || null : null;
       } else if (type === 'per-session' && context.sessionId) {
-        const session = registry.sessions[context.sessionId];
-        return session ? session.services[name] || null : null;
+        const session = registry.sessions?.[context.sessionId];
+        return session ? session.services?.[name] || null : null;
       }
 
       return null;
@@ -392,7 +402,7 @@ class ProcessStateManager {
       let sessionsCleaned = 0;
 
       // Clean up global services with dead PIDs
-      for (const [serviceName, serviceRecord] of Object.entries(registry.services.global)) {
+      for (const [serviceName, serviceRecord] of Object.entries(registry.services.global || {})) {
         if (!this.isProcessAlive(serviceRecord.pid)) {
           delete registry.services.global[serviceName];
           globalCleaned++;
@@ -400,7 +410,7 @@ class ProcessStateManager {
       }
 
       // Clean up per-project services with dead PIDs
-      for (const [projectPath, projectServices] of Object.entries(registry.services.projects)) {
+      for (const [projectPath, projectServices] of Object.entries(registry.services.projects || {})) {
         for (const [serviceName, serviceRecord] of Object.entries(projectServices)) {
           if (!this.isProcessAlive(serviceRecord.pid)) {
             delete projectServices[serviceName];
@@ -414,7 +424,7 @@ class ProcessStateManager {
       }
 
       // Clean up per-session services with dead PIDs
-      for (const [sessionId, session] of Object.entries(registry.sessions)) {
+      for (const [sessionId, session] of Object.entries(registry.sessions || {})) {
         for (const [serviceName, serviceRecord] of Object.entries(session.services || {})) {
           if (!this.isProcessAlive(serviceRecord.pid)) {
             delete session.services[serviceName];
