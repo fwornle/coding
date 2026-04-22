@@ -84,7 +84,7 @@ The system supports 14 LLM providers with tier-based model selection:
 - Automatic quota tracking with persistent storage
 - Exponential backoff on exhaustion (5m → 15m → 1h)
 - Seamless fallback to API providers
-- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) on `host.docker.internal:12435`
+- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
 #### 2. GitHub Copilot (Primary Provider)
 **Method**: Direct HTTP POST to Copilot API
@@ -107,13 +107,13 @@ The system supports 14 LLM providers with tier-based model selection:
 - Shared quota tracking system
 - Automatic provider rotation on exhaustion
 - Zero API costs
-- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) on `host.docker.internal:12435`
+- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
 ---
 
 ### LLM Proxy Bridge (Docker Bridge)
 
-When running inside Docker, host-side tools are unavailable. The [LLM Proxy Bridge](../integrations/llm-proxy-bridge.md) runs on the host (port 12435) and forwards requests. For **Copilot**, the proxy bridge reads OAuth tokens from `~/.local/share/opencode/auth.json` and makes direct HTTP POST calls to the Copilot API. For **Claude Code**, it spawns the `claude` CLI. Each provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
+When running inside Docker, host-side tools are unavailable. The [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) runs on the host (port 12435) and forwards requests. For **Copilot**, the proxy bridge reads OAuth tokens from `~/.local/share/opencode/auth.json` and makes direct HTTP POST calls to the Copilot API. For **Claude Code**, it spawns the `claude` CLI. Each provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
 
 ---
 
