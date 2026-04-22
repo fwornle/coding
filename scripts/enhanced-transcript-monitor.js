@@ -3892,7 +3892,9 @@ ORDER BY m.time_created ASC;`;
     let artifactPatchCounter = 0;
     const ARTIFACT_PATCH_INTERVAL = 150; // Every 150 cycles (5 minutes at 2s intervals)
 
+    this.pollCount = 0;
     this.intervalId = setInterval(async () => {
+      this.pollCount++;
       if (this.isProcessing) return;
 
       // Periodically patch observations missing artifact info
@@ -4258,7 +4260,8 @@ ORDER BY m.time_created ASC;`;
           cpuUser: cpuUsage.user,
           cpuSystem: cpuUsage.system,
           uptimeSeconds: Math.round(uptime),
-          processId: process.pid
+          processId: process.pid,
+          pollCount: this.pollCount || 0
         },
         transcriptInfo: {
           status: transcriptStatus,

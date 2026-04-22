@@ -90,10 +90,12 @@ export function ObservationsPage() {
     fetchObservations(filters, page)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-refresh polling
+  // Auto-refresh polling — recompute 'to' date so the window doesn't go stale overnight
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      fetchObservations(filters, page, true)
+      const freshTo = new Date().toISOString().split('T')[0]
+      const refreshFilters = { ...filters, to: freshTo }
+      fetchObservations(refreshFilters, page, true)
     }, REFRESH_INTERVAL)
 
     return () => {

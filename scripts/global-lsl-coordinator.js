@@ -85,7 +85,24 @@ class GlobalLSLCoordinator {
    */
   async ensure(projectPath, parentPid = null) {
     const projectName = path.basename(projectPath);
-    const absoluteProjectPath = path.resolve(projectPath);
+    let absoluteProjectPath = path.resolve(projectPath);
+
+    // BOMB-PROOF PATH VALIDATION: Resolve symlinks and verify this is a real git repo.
+    // Prevents the "shadow directory" bug where a stale directory without .git silently
+    // runs ETM against nothing, producing zero observations and zero LSLs while reporting healthy.
+    try {
+      absoluteProjectPath = fs.realpathSync(absoluteProjectPath);
+    } catch (err) {
+      this.log(`Path does not exist: ${absoluteProjectPath} — ${err.message}`);
+      return false;
+    }
+
+    // Must contain .git (directory or file for worktrees) to be a valid project
+    const gitPath = path.join(absoluteProjectPath, '.git');
+    if (!fs.existsSync(gitPath)) {
+      this.log(`REJECTED: ${absoluteProjectPath} has no .git — not a valid project (shadow directory?)`);
+      return false;
+    }
 
     this.log(`Ensuring LSL for project: ${projectName} (${absoluteProjectPath})`);
 
@@ -318,6 +335,21 @@ class GlobalLSLCoordinator {
         this.log(`Suspicious activity detected for ${projectName}: ${healthData.activity.suspicionReason}`);
         return false;
       }
+
+      // BOMB-PROOF: Detect monitors running against wrong/phantom paths.
+      // If transcript is "not_found" and zero exchanges, the monitor is pointed at a directory
+      // with no active OpenCode session — likely a shadow directory.
+      // Uses BOTH uptime AND poll count to avoid the race where process restarts reset uptime
+      // but the monitor has been failing for hours (426+ polls with zero transcripts).
+      if (healthData.transcriptInfo && healthData.transcriptInfo.status === 'not_found') {
+        const uptime = healthData.metrics ? healthData.metrics.uptimeSeconds : 0;
+        const exchanges = healthData.activity ? healthData.activity.exchangeCount : 0;
+        const pollCount = healthData.metrics ? (healthData.metrics.pollCount || 0) : 0;
+        if (exchanges === 0 && (uptime > 600 || pollCount > 10)) {
+          this.log(`CRITICAL: ${projectName} monitor running ${uptime}s (${pollCount} polls) with NO transcript found and 0 exchanges — likely phantom path`);
+          return false;
+        }
+      }
       
       return true;
     } catch (error) {
@@ -416,6 +448,33 @@ class GlobalLSLCoordinator {
 
     for (const projectName of projects) {
       const projectInfo = this.registry.projects[projectName];
+
+      // BOMB-PROOF PATH REVALIDATION: Catch grandfathered bad paths in the registry.
+      // The ensure() validation only runs on new registrations — existing entries from
+      // before the .git check was added can persist indefinitely with wrong paths.
+      // Re-validate on every health check: resolve symlinks, verify .git exists.
+      try {
+        const resolvedPath = fs.realpathSync(projectInfo.projectPath);
+        const gitExists = fs.existsSync(path.join(resolvedPath, '.git'));
+        if (!gitExists) {
+          this.log(`CRITICAL: Registry path for ${projectName} has no .git: ${projectInfo.projectPath} (resolved: ${resolvedPath}) — removing phantom entry`);
+          await this.cleanupStaleMonitor(projectInfo);
+          delete this.registry.projects[projectName];
+          prunedCount++;
+          continue;
+        }
+        // Auto-fix: if symlink resolution changed the path, update the registry
+        if (resolvedPath !== projectInfo.projectPath) {
+          this.log(`Auto-correcting path for ${projectName}: ${projectInfo.projectPath} → ${resolvedPath}`);
+          projectInfo.projectPath = resolvedPath;
+        }
+      } catch (err) {
+        this.log(`CRITICAL: Registry path for ${projectName} does not exist: ${projectInfo.projectPath} — ${err.message} — removing`);
+        await this.cleanupStaleMonitor(projectInfo);
+        delete this.registry.projects[projectName];
+        prunedCount++;
+        continue;
+      }
 
       // PRUNE: Remove projects with no active tmux session.
       // Monitors should only run for projects with an open Claude/Copilot session.

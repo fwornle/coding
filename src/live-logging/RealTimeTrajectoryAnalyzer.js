@@ -138,25 +138,17 @@ export class RealTimeTrajectoryAnalyzer {
   }
 
   /**
-   * Initialize fast inference engine for real-time analysis
-   * LEGACY: Will be deprecated in favor of UnifiedInferenceEngine
+   * Initialize fast inference engine for real-time analysis.
+   * Only stores provider + model; actual routing is handled by the LLM proxy.
    */
   async initializeFastInference() {
     try {
       const provider = this.config.trajectoryConfig.inference_provider || 'groq';
       const model = this.config.trajectoryConfig.inference_model || 'gpt-oss:20b';
 
-      // Get API key based on provider
-      const apiKey = this.getApiKeyForProvider(provider);
-      if (!apiKey) {
-        throw new Error(`No API key found for provider: ${provider}`);
-      }
-
       this.fastInferenceEngine = {
         provider,
         model,
-        apiKey,
-        baseUrl: this.getBaseUrlForProvider(provider),
         initialized: true
       };
 
@@ -166,34 +158,6 @@ export class RealTimeTrajectoryAnalyzer {
       console.error('Failed to initialize fast inference engine:', error.message);
       this.fastInferenceEngine = null;
     }
-  }
-
-  /**
-   * Get API key for the specified provider
-   */
-  getApiKeyForProvider(provider) {
-    const keyMap = {
-      'groq': process.env.GROQ_API_KEY,
-      'openai': process.env.OPENAI_API_KEY,
-      'anthropic': process.env.ANTHROPIC_API_KEY,
-      'xai': process.env.XAI_API_KEY
-    };
-    
-    return keyMap[provider];
-  }
-
-  /**
-   * Get base URL for the specified provider
-   */
-  getBaseUrlForProvider(provider) {
-    const urlMap = {
-      'groq': 'https://api.groq.com/openai/v1',
-      'openai': 'https://api.openai.com/v1',
-      'anthropic': 'https://api.anthropic.com/v1',
-      'xai': 'https://api.x.ai/v1'
-    };
-    
-    return urlMap[provider];
   }
 
   /**
@@ -720,13 +684,9 @@ Return JSON: {"intent": "intent_name", "confidence": 0.0-1.0, "reasoning": "brie
       // Try fallback provider
       const fallbackConfig = this.config.trajectoryConfig;
       if (fallbackConfig.fallback_provider && fallbackConfig.fallback_model) {
-        const fallbackApiKey = this.getApiKeyForProvider(fallbackConfig.fallback_provider);
-        if (fallbackApiKey) {
           const fallbackEngine = {
             provider: fallbackConfig.fallback_provider,
-            model: fallbackConfig.fallback_model,
-            apiKey: fallbackApiKey,
-            baseUrl: this.getBaseUrlForProvider(fallbackConfig.fallback_provider)
+            model: fallbackConfig.fallback_model
           };
 
           try {
@@ -737,7 +697,6 @@ Return JSON: {"intent": "intent_name", "confidence": 0.0-1.0, "reasoning": "brie
             this.debug('Fallback provider also failed', { error: fallbackError.message });
             throw fallbackError;
           }
-        }
       }
 
       // If we get here, both primary and fallback failed
@@ -784,7 +743,7 @@ Return JSON: {"intent": "intent_name", "confidence": 0.0-1.0, "reasoning": "brie
         status: response.status,
         statusText: response.statusText,
         error: errorText,
-        url,
+        proxyUrl,
         model
       });
       throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
