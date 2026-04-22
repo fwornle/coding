@@ -81,6 +81,8 @@ services:
       - ${CODING_REPO:-.}/docs/puml:/coding/docs/puml:ro
       # Dashboard build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
+      # Dashboard server (live-mounted to avoid Docker rebuild for API changes)
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/server.js:/coding/integrations/system-health-dashboard/server.js:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)

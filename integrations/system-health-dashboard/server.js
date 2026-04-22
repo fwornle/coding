@@ -163,6 +163,12 @@ class SystemHealthAPIServer {
         this.app.get('/api/observations', this.handleGetObservations.bind(this));
         this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));
 
+        // Digests & Insights API (observation consolidation)
+        this.app.get('/api/digests', this.handleGetDigests.bind(this));
+        this.app.get('/api/insights', this.handleGetInsights.bind(this));
+        this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
+        this.app.post('/api/consolidation/run', this.handleRunConsolidation.bind(this));
+
         // Error handling
         this.app.use(this.handleError.bind(this));
     }
@@ -3936,6 +3942,188 @@ class SystemHealthAPIServer {
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] Projects query error: ${err.message}\n`);
             res.status(500).json({ error: 'Failed to query projects' });
+        }
+    }
+
+    /**
+     * GET /api/digests — paginated daily digests with filtering.
+     * Query params: date, from, to, q, limit, offset
+     */
+    handleGetDigests(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) {
+            return res.status(503).json({ error: 'Observations database unavailable' });
+        }
+
+        const { date, from, to, q, limit: limitStr, offset: offsetStr } = req.query;
+        const limit = Math.min(parseInt(limitStr) || 50, 200);
+        const offset = parseInt(offsetStr) || 0;
+
+        try {
+            // Check if digests table exists
+            try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch {
+                return res.json({ data: [], total: 0, limit, offset });
+            }
+
+            const where = [];
+            const params = {};
+
+            if (date) {
+                where.push('date = @date');
+                params.date = date;
+            }
+            if (from) {
+                where.push('date >= @from');
+                params.from = from;
+            }
+            if (to) {
+                where.push('date <= @to');
+                params.to = to;
+            }
+            if (q) {
+                where.push('(theme LIKE @q OR summary LIKE @q)');
+                params.q = `%${q}%`;
+            }
+
+            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+            const { total } = db.prepare(`SELECT COUNT(*) as total FROM digests ${whereClause}`).get(params);
+
+            params.limit = limit;
+            params.offset = offset;
+            const rows = db.prepare(`
+                SELECT id, date, theme, summary, observation_ids as observationIds,
+                       agents, files_touched as filesTouched, quality, created_at as createdAt
+                FROM digests ${whereClause}
+                ORDER BY date DESC, created_at DESC
+                LIMIT @limit OFFSET @offset
+            `).all(params);
+
+            const data = rows.map(row => ({
+                ...row,
+                observationIds: JSON.parse(row.observationIds || '[]'),
+                agents: JSON.parse(row.agents || '[]'),
+                filesTouched: JSON.parse(row.filesTouched || '[]'),
+            }));
+
+            res.json({ data, total, limit, offset });
+        } catch (err) {
+            process.stderr.write(`[DigestsAPI] Query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query digests' });
+        }
+    }
+
+    /**
+     * GET /api/insights — all project insights.
+     * Query params: topic, q
+     */
+    handleGetInsights(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) {
+            return res.status(503).json({ error: 'Observations database unavailable' });
+        }
+
+        const { topic, q } = req.query;
+
+        try {
+            // Check if insights table exists
+            try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
+                return res.json({ data: [], total: 0 });
+            }
+
+            const where = [];
+            const params = {};
+
+            if (topic) {
+                where.push('topic = @topic');
+                params.topic = topic;
+            }
+            if (q) {
+                where.push('(topic LIKE @q OR summary LIKE @q)');
+                params.q = `%${q}%`;
+            }
+
+            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+            const rows = db.prepare(`
+                SELECT id, topic, summary, confidence, digest_ids as digestIds,
+                       last_updated as lastUpdated, created_at as createdAt
+                FROM insights ${whereClause}
+                ORDER BY confidence DESC, last_updated DESC
+            `).all(params);
+
+            const data = rows.map(row => ({
+                ...row,
+                digestIds: JSON.parse(row.digestIds || '[]'),
+            }));
+
+            res.json({ data, total: data.length });
+        } catch (err) {
+            process.stderr.write(`[InsightsAPI] Query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query insights' });
+        }
+    }
+
+    /**
+     * GET /api/consolidation/status — overview of consolidation state.
+     */
+    handleGetConsolidationStatus(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) {
+            return res.status(503).json({ error: 'Observations database unavailable' });
+        }
+
+        try {
+            const totalObs = db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
+
+            // Safely check tables that may not exist yet
+            let undigested = totalObs;
+            try {
+                undigested = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL").get().cnt;
+            } catch { /* digested_at column may not exist */ }
+
+            let totalDigests = 0;
+            try { totalDigests = db.prepare('SELECT COUNT(*) as cnt FROM digests').get().cnt; } catch { /* table may not exist */ }
+
+            let totalInsights = 0;
+            try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
+
+            res.json({ totalObs, undigested, digested: totalObs - undigested, totalDigests, totalInsights });
+        } catch (err) {
+            process.stderr.write(`[ConsolidationAPI] Status error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to get consolidation status' });
+        }
+    }
+
+    /**
+     * POST /api/consolidation/run — trigger consolidation (digests + insights).
+     * Body: { date?: string } — optional specific date to consolidate
+     */
+    async handleRunConsolidation(req, res) {
+        try {
+            // Dynamic import — consolidator lives on host, not in container
+            // This endpoint is called from host-side scripts
+            const { ObservationConsolidator } = await import(
+                join(codingRoot, 'src', 'live-logging', 'ObservationConsolidator.js')
+            );
+            const consolidator = new ObservationConsolidator({
+                dbPath: join(codingRoot, '.observations', 'observations.db'),
+            });
+            await consolidator.init();
+
+            let result;
+            if (req.body?.date) {
+                const digestResult = await consolidator.consolidateDay(req.body.date);
+                result = { ...digestResult, created: 0, updated: 0 };
+            } else {
+                result = await consolidator.run();
+            }
+
+            consolidator.close();
+            res.json({ success: true, ...result });
+        } catch (err) {
+            process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
+            res.status(500).json({ error: `Consolidation failed: ${err.message}` });
         }
     }
 }
