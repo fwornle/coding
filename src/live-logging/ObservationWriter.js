@@ -337,41 +337,108 @@ export class ObservationWriter {
     return id;
   }
 
+  /** Stop words excluded from similarity comparisons */
+  static _STOP_WORDS = new Set([
+    'the', 'and', 'for', 'that', 'this', 'with', 'from', 'into', 'after',
+    'before', 'about', 'then', 'than', 'also', 'just', 'more', 'some',
+    'what', 'when', 'where', 'which', 'while', 'being', 'been', 'have',
+    'does', 'doing', 'done', 'were', 'will', 'would', 'could', 'should',
+    'their', 'them', 'they', 'your', 'using', 'used', 'make', 'made',
+    'still', 'already', 'currently', 'previously', 'specifically',
+    'issue', 'issues', 'problem', 'check', 'checking', 'needed',
+    'trying', 'appears', 'whether', 'without', 'because', 'through',
+    'work', 'working', 'session', 'logs', 'files', 'file', 'code',
+    'data', 'started', 'continue', 'first', 'context', 'prior',
+    'understand', 'reading', 'read', 'look', 'looking', 'find',
+    'morning', 'progress', 'reconstruct', 'steps', 'next',
+  ]);
+
+  /** Map synonymous verbs/nouns to canonical forms */
+  static _STEM_MAP = {
+    debug: 'debug', debugging: 'debug', diagnose: 'debug', diagnosing: 'debug',
+    investigate: 'debug', investigating: 'debug', traced: 'debug', tracing: 'debug',
+    showing: 'show', shown: 'show', show: 'show', displaying: 'show', display: 'show',
+    appearing: 'show', appears: 'show', appear: 'show', visible: 'show',
+    missing: 'absent', absent: 'absent',
+    fixing: 'fix', fixed: 'fix', repair: 'fix', resolve: 'fix', resolved: 'fix',
+    removing: 'remove', removed: 'remove', delete: 'remove', deleted: 'remove',
+    clean: 'remove', cleanup: 'remove', reclassify: 'reclassify', reclassification: 'reclassify',
+    miscategorized: 'reclassify', miscategor: 'reclassify',
+    resuming: 'resume', resumed: 'resume', restore: 'resume', restoring: 'resume',
+    recovering: 'resume', recover: 'resume', interrupted: 'resume',
+    crash: 'crash', crashed: 'crash', crashed: 'crash',
+    observations: 'observation', observation: 'observation',
+    frontend: 'frontend', dashboard: 'frontend',
+    folder: 'folder', directory: 'folder',
+    shadow: 'shadow',
+  };
+
+  /**
+   * Extract stemmed content-bearing keywords from text.
+   * @param {string} text
+   * @returns {Set<string>}
+   */
+  _extractKeywords(text) {
+    const words = text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !ObservationWriter._STOP_WORDS.has(w));
+
+    const stemmed = words.map(w => ObservationWriter._STEM_MAP[w] || w);
+    return new Set(stemmed);
+  }
+
   /**
    * Check if a semantically similar observation already exists for this agent.
-   * Extracts the Intent line and compares word overlap with recent observations.
+   * Uses stemmed keyword overlap with both Jaccard and containment measures
+   * against a 4-hour window of recent observations.
    */
   _isSemanticallyDuplicate(agent, summary) {
     if (!this.db) return false;
 
-    // Extract Intent line from new summary
     const newIntent = this._extractIntent(summary);
-    if (!newIntent || newIntent.length < 20) return false;
+    const newApproach = this._extractApproach(summary);
+    const newText = [newIntent, newApproach].filter(Boolean).join(' ');
+    if (!newText || newText.length < 20) return false;
 
-    // Get recent observations for this agent (last 10)
+    // Check last 50 observations within the past 4 hours (covers rapid-fire sessions)
     const recent = this.db.prepare(
-      'SELECT summary FROM observations WHERE agent = ? ORDER BY created_at DESC LIMIT 10'
+      `SELECT summary FROM observations
+       WHERE agent = ? AND created_at > datetime('now', '-4 hours')
+       ORDER BY created_at DESC LIMIT 50`
     ).all(agent);
 
-    const newWords = new Set(newIntent.toLowerCase().split(/\s+/).filter(w => w.length > 3));
-    if (newWords.size < 3) return false;
+    const newKeywords = this._extractKeywords(newText);
+    if (newKeywords.size < 3) return false;
 
     for (const row of recent) {
       const existingIntent = this._extractIntent(row.summary);
-      if (!existingIntent) continue;
+      const existingApproach = this._extractApproach(row.summary);
+      const existingText = [existingIntent, existingApproach].filter(Boolean).join(' ');
+      if (!existingText) continue;
 
-      const existingWords = new Set(existingIntent.toLowerCase().split(/\s+/).filter(w => w.length > 3));
-      if (existingWords.size < 3) continue;
+      const existingKeywords = this._extractKeywords(existingText);
+      if (existingKeywords.size < 3) continue;
 
-      // Calculate Jaccard similarity
+      // Count intersection
       let intersection = 0;
-      for (const w of newWords) {
-        if (existingWords.has(w)) intersection++;
+      for (const w of newKeywords) {
+        if (existingKeywords.has(w)) intersection++;
       }
-      const union = new Set([...newWords, ...existingWords]).size;
-      const similarity = intersection / union;
 
-      if (similarity > 0.7) return true;
+      // Two complementary measures:
+      // 1. Jaccard: shared / total unique keywords (catches equal-length overlap)
+      const union = new Set([...newKeywords, ...existingKeywords]).size;
+      const jaccard = intersection / union;
+
+      // 2. Containment: shared / min set size (catches subset relationships,
+      //    e.g. "fix observations frontend" is contained in "fix three issues
+      //    shadow folder observations frontend reclassify")
+      const minSize = Math.min(newKeywords.size, existingKeywords.size);
+      const containment = intersection / minSize;
+
+      // Duplicate if either: strong Jaccard OR high containment of the smaller set
+      if (jaccard > 0.4 || containment > 0.7) return true;
     }
     return false;
   }
@@ -379,6 +446,12 @@ export class ObservationWriter {
   /** Extract the Intent line from a structured observation summary */
   _extractIntent(summary) {
     const match = summary.match(/^Intent:\s*(.+)$/m);
+    return match ? match[1].trim() : null;
+  }
+
+  /** Extract the Approach line from a structured observation summary */
+  _extractApproach(summary) {
+    const match = summary.match(/^Approach:\s*(.+)$/m);
     return match ? match[1].trim() : null;
   }
 
