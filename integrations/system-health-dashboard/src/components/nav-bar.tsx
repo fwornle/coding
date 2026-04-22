@@ -8,17 +8,29 @@ const API_BASE_URL = `http://localhost:${API_PORT}`
 export function NavBar() {
   const location = useLocation()
   const [obsCount, setObsCount] = useState<number | null>(null)
+  const [digestCount, setDigestCount] = useState<number | null>(null)
+  const [insightCount, setInsightCount] = useState<number | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/observations?limit=0`)
       .then(r => r.json())
       .then(d => setObsCount(d.total ?? null))
       .catch(() => setObsCount(null))
+
+    fetch(`${API_BASE_URL}/api/consolidation/status`)
+      .then(r => r.json())
+      .then(d => {
+        setDigestCount(d.totalDigests ?? null)
+        setInsightCount(d.totalInsights ?? null)
+      })
+      .catch(() => { setDigestCount(null); setInsightCount(null) })
   }, [location.pathname])
 
   const tabs = [
     { label: 'Health', path: '/' },
     { label: 'Observations', path: '/observations', count: obsCount },
+    { label: 'Digests', path: '/digests', count: digestCount },
+    { label: 'Insights', path: '/insights', count: insightCount },
   ]
 
   return (
