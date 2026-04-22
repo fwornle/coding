@@ -1,0 +1,650 @@
+/**
+ * ObservationConsolidator - Aggregates fine-grained observations into digests and insights.
+ *
+ * Implements a two-level memory hierarchy inspired by Mastra's Observer/Reflector pattern:
+ *
+ *   observations (per prompt-set)
+ *       ↓  consolidateDay() — LLM groups by theme, merges narratives
+ *   digests (daily thematic summaries)
+ *       ↓  synthesizeInsights() — LLM extracts persistent project knowledge
+ *   insights (living knowledge, updated in-place)
+ *
+ * Uses the same LLM proxy as ObservationWriter for summarization calls.
+ *
+ * @module ObservationConsolidator
+ */
+
+import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const require = createRequire(import.meta.url);
+
+export class ObservationConsolidator {
+  /**
+   * @param {Object} [options]
+   * @param {string} [options.dbPath] - Path to observations SQLite database
+   * @param {string} [options.proxyUrl] - LLM proxy URL
+   * @param {string} [options.provider] - LLM provider override
+   */
+  constructor(options = {}) {
+    this.dbPath = options.dbPath || '.observations/observations.db';
+    const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+    this.proxyUrl = options.proxyUrl || `http://localhost:${proxyPort}`;
+    this.provider = options.provider || null;
+    this.db = null;
+  }
+
+  /**
+   * Initialize DB connection and ensure digest/insight tables exist.
+   */
+  async init() {
+    const Database = require('better-sqlite3');
+    this.db = new Database(this.dbPath);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS digests (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        theme TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        observation_ids TEXT NOT NULL,
+        agents TEXT,
+        files_touched TEXT,
+        quality TEXT DEFAULT 'normal',
+        created_at TEXT NOT NULL,
+        metadata TEXT
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS insights (
+        id TEXT PRIMARY KEY,
+        topic TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        confidence REAL DEFAULT 0.8,
+        digest_ids TEXT NOT NULL,
+        last_updated TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        metadata TEXT
+      )
+    `);
+
+    // Track which observations have been digested
+    try {
+      this.db.exec('ALTER TABLE observations ADD COLUMN digested_at TEXT');
+    } catch { /* column exists */ }
+
+    // Index for efficient undigested lookups
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_obs_digested ON observations(digested_at)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_date ON digests(date)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_topic ON insights(topic)');
+
+    process.stderr.write(`[Consolidator] Database initialized\n`);
+  }
+
+  /**
+   * Consolidate a single day's observations into thematic digests.
+   * @param {string} date - YYYY-MM-DD
+   * @returns {Promise<{digests: number, observations: number}>}
+   */
+  async consolidateDay(date) {
+    if (!this.db) throw new Error('Not initialized');
+
+    // Get undigested observations for this date
+    const observations = this.db.prepare(`
+      SELECT id, summary, agent, created_at, metadata, quality
+      FROM observations
+      WHERE substr(created_at, 1, 10) = ?
+        AND digested_at IS NULL
+        AND quality != 'low'
+      ORDER BY created_at ASC
+    `).all(date);
+
+    if (observations.length === 0) {
+      process.stderr.write(`[Consolidator] No undigested observations for ${date}\n`);
+      return { digests: 0, observations: 0 };
+    }
+
+    process.stderr.write(`[Consolidator] Consolidating ${observations.length} observations for ${date}\n`);
+
+    // Chunk large days to avoid LLM timeouts (max ~35 observations per call)
+    const CHUNK_SIZE = 35;
+    const chunks = [];
+    for (let i = 0; i < observations.length; i += CHUNK_SIZE) {
+      chunks.push(observations.slice(i, i + CHUNK_SIZE));
+    }
+
+    const allDigestEntries = [];
+    for (let ci = 0; ci < chunks.length; ci++) {
+      const chunk = chunks[ci];
+      const globalOffset = ci * CHUNK_SIZE;
+
+      const obsBlock = chunk.map((o, i) => {
+        const time = o.created_at.split('T')[1]?.slice(0, 5) || '??:??';
+        return `[${globalOffset + i + 1}] ${time} (${o.agent || 'unknown'}) ${o.summary}`;
+      }).join('\n\n');
+
+      const prompt = this._buildConsolidationPrompt(date, obsBlock, chunk.length);
+      const result = await this._callLLM(prompt);
+
+      if (!result) {
+        process.stderr.write(`[Consolidator] LLM call failed for ${date} chunk ${ci + 1}/${chunks.length}, skipping chunk\n`);
+        continue;
+      }
+
+      // Parse with the chunk's observations but map indices relative to global offset
+      const chunkDigests = this._parseDigests(result, date, chunk, globalOffset);
+      allDigestEntries.push(...chunkDigests);
+    }
+
+    const digestEntries = allDigestEntries;
+    if (digestEntries.length === 0) {
+      process.stderr.write(`[Consolidator] No digests parsed from LLM response for ${date}\n`);
+      return { digests: 0, observations: 0 };
+    }
+
+    // Write digests and mark observations as digested
+    const now = new Date().toISOString();
+    const insertDigest = this.db.prepare(`
+      INSERT INTO digests (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const markDigested = this.db.prepare(
+      'UPDATE observations SET digested_at = ? WHERE id = ?'
+    );
+
+    const digestedObsIds = new Set();
+    const transaction = this.db.transaction(() => {
+      for (const d of digestEntries) {
+        insertDigest.run(
+          d.id, d.date, d.theme, d.summary,
+          JSON.stringify(d.observationIds),
+          JSON.stringify(d.agents),
+          JSON.stringify(d.filesTouched),
+          d.quality, now, JSON.stringify(d.metadata || {})
+        );
+        for (const obsId of d.observationIds) {
+          digestedObsIds.add(obsId);
+        }
+      }
+      for (const obsId of digestedObsIds) {
+        markDigested.run(now, obsId);
+      }
+    });
+    transaction();
+
+    // WAL checkpoint for readonly readers
+    try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
+
+    process.stderr.write(`[Consolidator] Created ${digestEntries.length} digests from ${digestedObsIds.size} observations for ${date}\n`);
+    return { digests: digestEntries.length, observations: digestedObsIds.size };
+  }
+
+  /**
+   * Consolidate all days with undigested observations.
+   * @returns {Promise<{days: number, digests: number, observations: number}>}
+   */
+  async consolidateAll() {
+    if (!this.db) throw new Error('Not initialized');
+
+    const days = this.db.prepare(`
+      SELECT DISTINCT substr(created_at, 1, 10) as date
+      FROM observations
+      WHERE digested_at IS NULL AND quality != 'low'
+      ORDER BY date ASC
+    `).all();
+
+    // Don't consolidate today — observations are still being written
+    const today = new Date().toISOString().split('T')[0];
+    const pastDays = days.filter(d => d.date < today);
+
+    if (pastDays.length === 0) {
+      process.stderr.write(`[Consolidator] No past days with undigested observations\n`);
+      return { days: 0, digests: 0, observations: 0 };
+    }
+
+    let totalDigests = 0;
+    let totalObs = 0;
+
+    for (const { date } of pastDays) {
+      const result = await this.consolidateDay(date);
+      totalDigests += result.digests;
+      totalObs += result.observations;
+    }
+
+    process.stderr.write(`[Consolidator] Consolidated ${pastDays.length} days: ${totalDigests} digests from ${totalObs} observations\n`);
+    return { days: pastDays.length, digests: totalDigests, observations: totalObs };
+  }
+
+  /**
+   * Synthesize digests into persistent project insights.
+   * Merges with existing insights when topics overlap.
+   * @returns {Promise<{created: number, updated: number}>}
+   */
+  async synthesizeInsights() {
+    if (!this.db) throw new Error('Not initialized');
+
+    // Get unsynthesized digests
+    const digests = this.db.prepare(`
+      SELECT d.id, d.date, d.theme, d.summary, d.agents, d.files_touched, d.metadata
+      FROM digests d
+      LEFT JOIN insights i ON d.id IN (
+        SELECT value FROM json_each(i.digest_ids)
+      )
+      WHERE i.id IS NULL
+      ORDER BY d.date ASC
+    `).all();
+
+    if (digests.length === 0) {
+      process.stderr.write(`[Consolidator] No unsynthesized digests\n`);
+      return { created: 0, updated: 0 };
+    }
+
+    // Also load existing insights for context
+    const existingInsights = this.db.prepare(
+      'SELECT id, topic, summary, digest_ids FROM insights ORDER BY last_updated DESC'
+    ).all();
+
+    process.stderr.write(`[Consolidator] Synthesizing ${digests.length} digests into insights (${existingInsights.length} existing)\n`);
+
+    // Chunk digests to avoid LLM timeouts (max ~30 digests per call)
+    const DIGEST_CHUNK_SIZE = 30;
+    const digestChunks = [];
+    for (let i = 0; i < digests.length; i += DIGEST_CHUNK_SIZE) {
+      digestChunks.push(digests.slice(i, i + DIGEST_CHUNK_SIZE));
+    }
+
+    // Process each chunk, building insights incrementally
+    let allInsightEntries = [];
+    for (let ci = 0; ci < digestChunks.length; ci++) {
+      const chunk = digestChunks[ci];
+
+      const digestBlock = chunk.map(d =>
+        `[${d.date}] ${d.theme}\n${d.summary}`
+      ).join('\n\n---\n\n');
+
+      // Include both DB insights and insights from previous chunks
+      const currentInsights = [
+        ...existingInsights.map(i => ({ topic: i.topic, summary: i.summary })),
+        ...allInsightEntries,
+      ];
+      const existingBlock = currentInsights.length > 0
+        ? currentInsights.map(i => `## ${i.topic}\n${i.summary}`).join('\n\n')
+        : 'None yet.';
+
+      process.stderr.write(`[Consolidator] Insight synthesis chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
+
+      const prompt = this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
+      const result = await this._callLLM(prompt);
+
+      if (!result) {
+        process.stderr.write(`[Consolidator] LLM call failed for insight chunk ${ci + 1}, skipping\n`);
+        continue;
+      }
+
+      const chunkInsights = this._parseInsights(result, chunk);
+      // Merge with existing entries (update topics we've already seen)
+      for (const newInsight of chunkInsights) {
+        const existingIdx = allInsightEntries.findIndex(e => e.topic === newInsight.topic);
+        if (existingIdx >= 0) {
+          allInsightEntries[existingIdx] = newInsight; // overwrite with updated version
+        } else {
+          allInsightEntries.push(newInsight);
+        }
+      }
+    }
+
+    const insightEntries = allInsightEntries;
+    if (insightEntries.length === 0) {
+      process.stderr.write(`[Consolidator] No insights produced from any chunk\n`);
+      return { created: 0, updated: 0 };
+    }
+
+    const now = new Date().toISOString();
+    const newDigestIds = digests.map(d => d.id);
+    let created = 0;
+    let updated = 0;
+
+    const transaction = this.db.transaction(() => {
+      for (const entry of insightEntries) {
+        // Check if an existing insight matches this topic
+        const existing = this.db.prepare(
+          'SELECT id, digest_ids FROM insights WHERE topic = ?'
+        ).get(entry.topic);
+
+        if (existing) {
+          // Merge digest_ids and update summary
+          let existingDigestIds = [];
+          try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
+          const mergedDigestIds = [...new Set([...existingDigestIds, ...newDigestIds])];
+
+          this.db.prepare(`
+            UPDATE insights SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?
+            WHERE id = ?
+          `).run(entry.summary, JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
+          updated++;
+        } else {
+          this.db.prepare(`
+            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            crypto.randomUUID(), entry.topic, entry.summary,
+            entry.confidence, JSON.stringify(newDigestIds),
+            now, now, JSON.stringify(entry.metadata || {})
+          );
+          created++;
+        }
+      }
+    });
+    transaction();
+
+    try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
+
+    process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated\n`);
+    return { created, updated };
+  }
+
+  /**
+   * Run full consolidation pipeline: digests then insights.
+   * @returns {Promise<Object>}
+   */
+  async run() {
+    const digestResult = await this.consolidateAll();
+    let insightResult = { created: 0, updated: 0 };
+
+    // Only synthesize insights if we have enough digests (>= 5 unsynthesized)
+    const unsynthesizedCount = this.db.prepare(`
+      SELECT COUNT(*) as cnt FROM digests d
+      LEFT JOIN insights i ON d.id IN (SELECT value FROM json_each(i.digest_ids))
+      WHERE i.id IS NULL
+    `).get().cnt;
+
+    if (unsynthesizedCount >= 5) {
+      insightResult = await this.synthesizeInsights();
+    } else {
+      process.stderr.write(`[Consolidator] Only ${unsynthesizedCount} unsynthesized digests — waiting for >= 5 before insight synthesis\n`);
+    }
+
+    // Apply confidence decay to existing insights
+    this._decayConfidence();
+
+    return { ...digestResult, ...insightResult };
+  }
+
+  /**
+   * Decay confidence of insights that haven't been updated recently.
+   * Reduces confidence by 0.05 per week of inactivity, flooring at 0.3.
+   */
+  _decayConfidence() {
+    if (!this.db) return;
+
+    const DECAY_PER_WEEK = 0.05;
+    const MIN_CONFIDENCE = 0.3;
+
+    const insights = this.db.prepare(
+      'SELECT id, confidence, last_updated FROM insights'
+    ).all();
+
+    const now = Date.now();
+    const update = this.db.prepare(
+      'UPDATE insights SET confidence = ? WHERE id = ?'
+    );
+
+    let decayed = 0;
+    for (const ins of insights) {
+      const lastUpdated = new Date(ins.last_updated).getTime();
+      const weeksStale = (now - lastUpdated) / (7 * 86400000);
+      if (weeksStale < 1) continue;
+
+      const newConfidence = Math.max(MIN_CONFIDENCE, ins.confidence - (DECAY_PER_WEEK * Math.floor(weeksStale)));
+      if (newConfidence < ins.confidence) {
+        update.run(newConfidence, ins.id);
+        decayed++;
+      }
+    }
+
+    if (decayed > 0) {
+      process.stderr.write(`[Consolidator] Decayed confidence on ${decayed} stale insights\n`);
+    }
+  }
+
+  // --- LLM interaction ---
+
+  /**
+   * Call the LLM proxy with a system+user prompt.
+   * @param {{system: string, user: string}} prompt
+   * @returns {Promise<string|null>}
+   */
+  async _callLLM(prompt) {
+    const requestBody = {
+      ...(this.provider ? { provider: this.provider } : {}),
+      messages: [
+        { role: 'system', content: prompt.system },
+        { role: 'user', content: prompt.user },
+      ],
+    };
+
+    try {
+      const response = await fetch(`${this.proxyUrl}/api/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(180000), // 3min — consolidation prompts can be large
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        process.stderr.write(`[Consolidator] LLM proxy error ${response.status}: ${errBody.slice(0, 200)}\n`);
+        return null;
+      }
+
+      const result = await response.json();
+      return result.content || null;
+    } catch (err) {
+      process.stderr.write(`[Consolidator] LLM call failed: ${err.message}\n`);
+      return null;
+    }
+  }
+
+  // --- Prompt builders ---
+
+  _buildConsolidationPrompt(date, obsBlock, count) {
+    return {
+      system: `You consolidate daily coding observations into thematic digests.
+
+INPUT: A numbered list of observations from a single day. Each has a timestamp, agent name, and a structured summary (Intent/Approach/Artifacts/Result lines).
+
+TASK: Group observations that belong to the SAME logical work session or topic. For each group, produce a consolidated digest.
+
+OUTPUT FORMAT — respond with one or more digest blocks, each in this exact format:
+
+<digest>
+<theme>Short descriptive title (5-10 words)</theme>
+<observations>1,3,5,7</observations>
+<summary>
+Consolidated narrative of what happened: what was the goal, what approach was taken, what was achieved, what files were changed. 3-8 sentences. Include specific technical details that would help someone understand the work without reading the raw observations.
+</summary>
+</digest>
+
+RULES:
+- Group observations by cognitive topic — even if worded differently, "debug observations frontend" and "fix observations not showing" are the same topic.
+- A single observation that doesn't fit any group gets its own digest.
+- Preserve technical specifics: file paths, error messages, architectural decisions.
+- Mention which agents were involved if multiple agents worked on the same topic.
+- Order digests chronologically by the earliest observation in each group.
+- Do NOT include observation numbers that don't exist in the input.`,
+
+      user: `Date: ${date}
+Observation count: ${count}
+
+${obsBlock}
+
+Produce the digests.`,
+    };
+  }
+
+  _buildInsightPrompt(digestBlock, existingBlock, count) {
+    return {
+      system: `You are the long-term memory of a software project. You consolidate daily work digests into persistent knowledge.
+
+INPUT: Daily digests describing work sessions, plus existing insights (if any).
+
+TASK: Extract or update persistent project knowledge from the digests. Focus on:
+- What components/systems have been built or changed
+- Recurring problems and their solutions
+- Architectural decisions and their rationale
+- Tools, patterns, and workflows the team uses
+- Known issues and technical debt
+
+OUTPUT FORMAT — respond with one or more insight blocks:
+
+<insight>
+<topic>Component or area name (e.g. "Dashboard Observations System", "Docker Build Pipeline")</topic>
+<confidence>0.0-1.0 — how well-established this knowledge is</confidence>
+<summary>
+What we know about this topic. Written as reference documentation someone could consult to understand the current state. 3-10 sentences. Include specifics: file paths, architectural choices, known gotchas.
+</summary>
+</insight>
+
+RULES:
+- If an existing insight's topic matches new digest content, produce an UPDATED version (same topic name) with merged knowledge.
+- Don't create insights for one-off tasks that are fully complete and unlikely to recur.
+- Prefer fewer, richer insights over many thin ones.
+- Confidence reflects how many data points support the insight (0.5 = single digest, 0.9 = many corroborating digests).
+- Remove stale information from existing insights when digests show things have changed.
+- Topic names should be stable across updates (don't rename topics).`,
+
+      user: `--- NEW DIGESTS (${count}) ---
+
+${digestBlock}
+
+--- EXISTING INSIGHTS ---
+
+${existingBlock}
+
+Produce updated/new insights.`,
+    };
+  }
+
+  // --- Response parsers ---
+
+  /**
+   * Parse <digest> blocks from LLM response.
+   */
+  _parseDigests(response, date, observations, globalOffset = 0) {
+    const digestPattern = /<digest>\s*<theme>(.*?)<\/theme>\s*<observations>(.*?)<\/observations>\s*<summary>([\s\S]*?)<\/summary>\s*<\/digest>/g;
+
+    const digests = [];
+    let match;
+    while ((match = digestPattern.exec(response)) !== null) {
+      const theme = match[1].trim();
+      const obsNumbers = match[2].trim().split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+      const summary = match[3].trim();
+
+      // Map observation numbers (1-indexed, possibly with global offset) to actual IDs
+      const observationIds = obsNumbers
+        .map(n => n - globalOffset) // normalize to chunk-local index
+        .filter(n => n >= 1 && n <= observations.length)
+        .map(n => observations[n - 1].id);
+
+      if (observationIds.length === 0) continue;
+
+      // Extract unique agents and files from the mapped observations
+      const agents = [...new Set(observationIds.map(id => {
+        const obs = observations.find(o => o.id === id);
+        return obs?.agent;
+      }).filter(Boolean))];
+
+      const filesTouched = this._extractFiles(observationIds, observations);
+
+      // Quality: high if any source observation is high-quality
+      const quality = observationIds.some(id => {
+        const obs = observations.find(o => o.id === id);
+        return obs?.quality === 'high';
+      }) ? 'high' : 'normal';
+
+      digests.push({
+        id: crypto.randomUUID(),
+        date,
+        theme,
+        summary,
+        observationIds,
+        agents,
+        filesTouched,
+        quality,
+        metadata: { sourceCount: observationIds.length },
+      });
+    }
+
+    return digests;
+  }
+
+  /**
+   * Parse <insight> blocks from LLM response.
+   */
+  _parseInsights(response, digests) {
+    const insightPattern = /<insight>\s*<topic>(.*?)<\/topic>\s*<confidence>(.*?)<\/confidence>\s*<summary>([\s\S]*?)<\/summary>\s*<\/insight>/g;
+
+    const insights = [];
+    let match;
+    while ((match = insightPattern.exec(response)) !== null) {
+      const topic = match[1].trim();
+      const confidence = Math.min(1.0, Math.max(0.0, parseFloat(match[2].trim()) || 0.5));
+      const summary = match[3].trim();
+
+      insights.push({ topic, summary, confidence, metadata: {} });
+    }
+
+    return insights;
+  }
+
+  /**
+   * Extract file paths from observation summaries.
+   */
+  _extractFiles(obsIds, observations) {
+    const files = new Set();
+    for (const id of obsIds) {
+      const obs = observations.find(o => o.id === id);
+      if (!obs) continue;
+      // Extract from Artifacts line
+      const artifactsMatch = obs.summary.match(/^Artifacts:\s*(.+)$/m);
+      if (artifactsMatch && !/none/i.test(artifactsMatch[1])) {
+        const parts = artifactsMatch[1].split(',').map(p => p.trim());
+        for (const part of parts) {
+          // "edited src/foo.ts" → "src/foo.ts"
+          const fileMatch = part.match(/(?:edited|created|deleted|modified)\s+(.+)/i);
+          if (fileMatch) files.add(fileMatch[1].trim());
+        }
+      }
+      // Also check metadata for modifiedFiles
+      try {
+        const meta = JSON.parse(obs.metadata || '{}');
+        if (meta.modifiedFiles) meta.modifiedFiles.forEach(f => files.add(f));
+      } catch { /* ok */ }
+    }
+    return [...files];
+  }
+
+  /**
+   * Get consolidation status.
+   */
+  getStatus() {
+    if (!this.db) return null;
+
+    const totalObs = this.db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
+    const undigested = this.db.prepare('SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL').get().cnt;
+    const totalDigests = this.db.prepare('SELECT COUNT(*) as cnt FROM digests').get().cnt;
+    const totalInsights = this.db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt;
+
+    return { totalObs, undigested, totalDigests, totalInsights };
+  }
+
+  close() {
+    if (this.db) {
+      try { this.db.close(); } catch { /* ok */ }
+      this.db = null;
+    }
+  }
+}

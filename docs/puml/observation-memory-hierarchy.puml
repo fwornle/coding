@@ -1,0 +1,75 @@
+@startuml observation-memory-hierarchy
+!include _standard-style.puml
+
+top to bottom direction
+title Observation Memory Hierarchy
+
+rectangle "Real-Time Capture" {
+  component "ETM\n(Enhanced Transcript Monitor)" as ETM <<infra>>
+  component "ObservationWriter" as OW <<core>>
+  database "observations.db\nobservations table" as OBS <<storage>>
+}
+
+rectangle "Consolidation Pipeline" {
+  component "ObservationConsolidator" as OC <<core>>
+  database "observations.db\ndigests table" as DIG <<storage>>
+  database "observations.db\ninsights table" as INS <<storage>>
+}
+
+rectangle "LLM Services" {
+  component "LLM Proxy\n(port 12435)" as LLM <<agent>>
+}
+
+rectangle "Dashboard (port 3032)" {
+  component "/observations" as UI_OBS <<api>>
+  component "/digests" as UI_DIG <<api>>
+  component "/insights" as UI_INS <<api>>
+}
+
+rectangle "API (port 3033)" {
+  component "GET /api/observations" as API_OBS <<api>>
+  component "GET /api/digests" as API_DIG <<api>>
+  component "GET /api/insights" as API_INS <<api>>
+  component "GET /api/consolidation/status" as API_STATUS <<api>>
+}
+
+' Real-time flow
+ETM SYNC_LINE OW : per exchange
+OW SYNC_LINE LLM : summarize()
+OW DATA_LINE OBS : writeObservation()
+
+' Consolidation flow
+OBS ASYNC_LINE OC : undigested\nobservations
+OC SYNC_LINE LLM : consolidateDay()\nsynthesizeInsights()
+OC DATA_LINE DIG : thematic\ndigests
+OC DATA_LINE INS : persistent\nknowledge
+
+' API reads
+OBS ..> API_OBS
+DIG ..> API_DIG
+INS ..> API_INS
+
+' UI
+API_OBS ..> UI_OBS
+API_DIG ..> UI_DIG
+API_INS ..> UI_INS
+
+note right of OC
+  **Triggers:**
+  Daily cron (--daemon at 02:00)
+  Manual: node scripts/consolidate-observations.js
+  API: POST /api/consolidation/run
+
+  **Thresholds:**
+  Digests: per day, skip today
+  Insights: >= 5 unsynthesized digests
+  Confidence decay: -0.05/week (floor 0.3)
+end note
+
+note bottom of OBS
+  **Dedup:** stemmed keyword
+  Jaccard + containment
+  4-hour sliding window
+end note
+
+@enduml
