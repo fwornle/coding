@@ -93,7 +93,13 @@ Four phases that make the health system truthful and self-healing. Phase 24 buil
   4. Health verifier reads supervisord process status from inside the Docker container and exposes it to the API
   5. FATAL or STOPPED supervisord processes appear as critical violations in the health report
   6. Dashboard shows a supervisord process list with per-process status (RUNNING / FATAL / STOPPED)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — Fix port 3030 disable, add port 3848 rule, implement supervisord integration
+- [ ] 24-02-PLAN.md — Dashboard Service Detail section with per-port and per-supervisord-process status
+- [ ] 24-03-PLAN.md — Docker rebuild and end-to-end visual verification
+
 **UI hint**: yes
 
 #### Phase 25: Database Health & Process Lifecycle
@@ -143,7 +149,7 @@ Four phases that make the health system truthful and self-healing. Phase 24 buil
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 24. Port Liveness & Supervisord Checks | v5.0 | 0/TBD | Not started | - |
+| 24. Port Liveness & Supervisord Checks | v5.0 | 0/3 | Planned | - |
 | 25. Database Health & Process Lifecycle | v5.0 | 0/TBD | Not started | - |
 | 26. Dashboard Accuracy & Auto-Healing | v5.0 | 0/TBD | Not started | - |
 | 27. Insight Validation | v5.0 | 0/TBD | Not started | - |
