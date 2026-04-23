@@ -13,7 +13,8 @@ Requirements for service reliability milestone. Each maps to roadmap phases.
 **: Health verifier checks all expected ports (3030, 3032, 3033, 3848, 8080, 12435) and reports unreachable ones as failures
 - [x] **PORT-02
 **: Port check runs every 30 seconds with configurable timeout
-- [ ] **PORT-03**: Dashboard health card shows per-port status (green/red) with last-checked timestamp
+- [x] **PORT-03
+**: Dashboard health card shows per-port status (green/red) with last-checked timestamp
 - [ ] **PORT-04**: Auto-restart triggered when a port is unreachable for 2 consecutive checks
 
 ### Supervisord Integration
@@ -23,7 +24,8 @@ Requirements for service reliability milestone. Each maps to roadmap phases.
 - [x] **SUPV-02
 **: FATAL or STOPPED processes are reported as critical health violations
 - [ ] **SUPV-03**: Auto-restart attempted for FATAL processes via supervisord API
-- [ ] **SUPV-04**: Dashboard shows supervisord process list with status (RUNNING/FATAL/STOPPED)
+- [x] **SUPV-04
+**: Dashboard shows supervisord process list with status (RUNNING/FATAL/STOPPED)
 
 ### Database Health
 
