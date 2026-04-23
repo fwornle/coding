@@ -83,6 +83,24 @@ rectangle "coding-services container" as container {
       Workflow visualization
       Auto-refresh (500ms)
     end note
+
+    component "Constraint Dashboard\nPort 3030 (HTTP)" <<api>> as cdash {
+    }
+    note right of cdash
+      Next.js (production)
+      Violations timeline
+      Compliance tracking
+      Constraint configuration
+    end note
+
+    component "Constraint Dashboard API\nPort 3031 (HTTP)" <<api>> as cdash_api {
+    }
+    note right of cdash_api
+      Express REST API
+      Enforcement engine
+      Violation storage
+      Configuration management
+    end note
   }
 
   ' ============================================
@@ -120,6 +138,8 @@ supervisor --> cgr : "autostart\nautorestart"
 supervisor --> vkb : "autostart\nautorestart"
 supervisor --> health_api : "autostart\nautorestart"
 supervisor --> health_ui : "autostart\nautorestart"
+supervisor --> cdash : "autostart\nautorestart"
+supervisor --> cdash_api : "autostart\nautorestart"
 supervisor --> verifier : "autostart\nautorestart"
 
 ' Internal data flows
@@ -129,6 +149,8 @@ verifier --> svcfile : "regenerate"
 verifier --> config : "rules"
 health_api --> healthdata : "serve"
 health_ui DATA_LINE health_api : "fetch API data"
+cdash DATA_LINE cdash_api : "fetch API data"
+cdash_api --> config : "constraints"
 
 ' Cross-service communication
 verifier CONTROL_LINE supervisor : "supervisorctl\nrestart"

@@ -90,7 +90,7 @@ See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new ag
 coding --switch-to-native
 ```
 
-The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) with 8 internal services managed by supervisord, using ~1.75 GB memory total.
+The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools like Claude Code and GitHub Copilot.
 
 ![Docker Container Architecture](docs/images/dockerized-system-architecture.png)
 

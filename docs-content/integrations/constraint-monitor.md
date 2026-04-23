@@ -10,9 +10,9 @@ Real-time code quality enforcement via MCP and PreToolUse hooks.
 |----------|-------|
 | Component | `mcp-constraint-monitor` |
 | Type | MCP Server + Hooks |
-| Port (Docker) | 3849 |
-| Dashboard | http://localhost:3030 |
-| API | http://localhost:3031 |
+| Port (Docker) | 3849 (SSE), 3030 (Dashboard), 3031 (API) |
+| Dashboard | http://localhost:3030 (Next.js, runs in Docker) |
+| API | http://localhost:3031 (Express, runs in Docker) |
 
 ## Enforcement Mechanism
 

@@ -95,7 +95,7 @@ MCP servers and tools that extend the coding infrastructure.
 | Service | Port | Protocol | Health Check |
 |---------|------|----------|--------------|
 | Semantic Analysis | 3848 | HTTP/SSE | `/health` |
-| Constraint Monitor | 3031/3849 | HTTP | `/health` |
+| Constraint Monitor | 3030/3031/3849 | HTTP | `/health` |
 | Code Graph RAG | 3850 | HTTP/SSE | `/health` |
 | VKB Server | 8080 | HTTP | `/health` |
 | Health Dashboard | 3032 | HTTP | `/health` |

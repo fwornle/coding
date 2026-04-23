@@ -30,27 +30,23 @@ CODING_REPO=/Users/<username>/Agentic/coding
 
 All ports are centralized in `.env.ports`:
 
-| Port | Service |
-|------|---------|
-| 8080 | VKB Server (Knowledge visualization) |
-| 3030 | Constraint Dashboard UI |
-| 3031 | Constraint Monitor API |
-| 3032 | System Health Dashboard UI |
-| 3033 | System Health API |
-| 7687 | Memgraph (Bolt protocol) |
-| 3100 | Memgraph Lab UI |
-| 12434 | Docker Model Runner |
-
-### Docker Mode Ports
-
-| Port | Service |
-|------|---------|
-| 3847 | Browser Access SSE |
-| 3848 | Semantic Analysis SSE |
-| 3849 | Constraint Monitor SSE |
-| 3850 | Code Graph RAG SSE |
-| 6333 | Qdrant HTTP |
-| 6379 | Redis |
+| Port | Service | Location |
+|------|---------|----------|
+| 3030 | Constraint Dashboard UI | Docker |
+| 3031 | Constraint Monitor API | Docker |
+| 3032 | System Health Dashboard UI | Docker |
+| 3033 | System Health API | Docker |
+| 3847 | Browser Access SSE | Docker |
+| 3848 | Semantic Analysis SSE | Docker |
+| 3849 | Constraint Monitor SSE | Docker |
+| 3850 | Code Graph RAG SSE | Docker |
+| 8080 | VKB Server (Knowledge visualization) | Docker |
+| 6333 | Qdrant HTTP | Docker |
+| 6379 | Redis | Docker |
+| 7687 | Memgraph (Bolt protocol) | Docker |
+| 3100 | Memgraph Lab UI | Docker |
+| 12435 | LLM CLI Proxy | Host |
+| 12434 | Docker Model Runner | Host |
 
 ## MCP & Hook Configuration
 

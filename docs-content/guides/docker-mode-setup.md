@@ -375,7 +375,7 @@ docker compose -f docker/docker-compose.yml restart
 | VKB Server | 8080 | 8080 | `/health` |
 | Browser Access | 3847 | 3847 | `/health` |
 | Semantic Analysis | - | 3848 | `/health` |
-| Constraint Monitor | 3030/3031 | 3849 | `/health` |
+| Constraint Monitor | 3030/3031 | 3030/3031/3849 | `/health` |
 | Code Graph RAG | - | 3850 | `/health` |
 | Health Dashboard | 3032/3033 | 3032/3033 | `/health` |
 

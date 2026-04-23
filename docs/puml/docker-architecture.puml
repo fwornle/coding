@@ -15,6 +15,14 @@ rectangle "HOST (Native)" as host #F5F5F5 {
         component "constraint-monitor\nproxy" as cm_proxy <<util>>
         component "code-graph-rag\nproxy" as cgr_proxy <<util>>
     }
+
+    component "LLM CLI Proxy\n:12435" <<api>> as llm_proxy
+
+    note right of llm_proxy
+      Bridges to host-local
+      Claude Code & Copilot CLIs
+      (cannot run in Docker)
+    end note
 }
 
 note right of host
@@ -37,6 +45,7 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
         package "Web Services" {
             component "VKB Server\n:8080" as vkb <<api>>
             component "Health Dashboard\n:3032/:3033" as health <<api>>
+            component "Constraint Dashboard\n:3030/:3031" as cdash <<api>>
         }
     }
 
@@ -78,6 +87,7 @@ cgr_sse DATA_LINE memgraph
 
 ' Web Services to Databases
 vkb DATA_LINE qdrant
+cdash DATA_LINE cm_sse : "violations"
 
 ' Volume Connections
 docker ..> data_vol : bind mount

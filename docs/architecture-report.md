@@ -6,13 +6,13 @@ A comprehensive overview of the "coding" infrastructure system - a containerized
 
 ## System Overview
 
-The coding system runs as a Docker Compose stack with 4 containers and 8 internal services, designed to augment Claude Code (CLI agent) with specialized AI-powered tools.
+The coding system runs as a Docker Compose stack with 4 containers and 10 internal services, designed to augment Claude Code (CLI agent) with specialized AI-powered tools. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools.
 
 | Metric | Value |
 |--------|-------|
 | Total Containers | 4 |
-| Internal Services | 8 (managed by supervisord) |
-| Exposed Ports | 11 |
+| Internal Services | 10 (managed by supervisord) |
+| Exposed Ports | 12 |
 | Total Memory Usage | ~1.13 GB |
 | Total CPU Usage | ~3.15% |
 | Network | Bridge (coding-network) |
@@ -27,7 +27,7 @@ The coding system runs as a Docker Compose stack with 4 containers and 8 interna
 
 | Container | Image | Role | Ports | Memory |
 |-----------|-------|------|-------|--------|
-| `coding-services` | docker-coding-services | Main application (8 services) | 8080, 3032-3033, 3847-3850 | ~17.9% |
+| `coding-services` | docker-coding-services | Main application (10 services) | 3030-3031, 3032-3033, 3847-3850, 8080 | ~17.9% |
 | `coding-qdrant` | qdrant/qdrant:latest | Vector database | 6333, 6334 | ~2.7% |
 | `coding-memgraph` | memgraph-platform:latest | Graph database (code) | 7687, 3100 | ~2.6% |
 | `coding-redis` | redis:7-alpine | Cache & state | 6379 | ~0.1% |
@@ -49,15 +49,16 @@ All containers communicate over the `coding-network` bridge network using contai
 
 ![Internal Services Architecture](images/coding-services-internal.png)
 
-The `coding-services` container runs **supervisord** as PID 1, managing 8 services organized into 3 groups:
+The `coding-services` container runs **supervisord** as PID 1, managing 10 services organized into 3 groups:
 
 ### Group: mcp-servers (priority: 100)
 
-These are MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Events), consumed by Claude Code.
+MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Events), consumed by Claude Code.
 
 | Service | Port | Language | Purpose |
 |---------|------|----------|---------|
 | **semantic-analysis** | 3848 | TypeScript | LLM-powered code analysis, UKB workflow engine, ontology classification, pattern extraction |
+| **browser-access** | 3847 | TypeScript | Web page fetching, content extraction, screenshot capture |
 | **constraint-monitor** | 3849 | TypeScript | Code quality rules enforcement, real-time violation tracking |
 | **code-graph-rag** | 3850 | Python 3.12 | AST-based code indexing via Tree-sitter, call graph analysis, natural language code queries |
 
@@ -70,6 +71,8 @@ User-facing web applications and APIs.
 | **vkb-server** | 8080 | Knowledge graph viewer (D3.js visualization), entity CRUD API, insight document serving |
 | **health-dashboard** | 3033 | Health verification API, UKB workflow monitoring, SSE real-time updates, API quota checking |
 | **health-dashboard-frontend** | 3032 | React + Redux UI, real-time health status, workflow visualization |
+| **constraint-dashboard** | 3030 | Constraint Monitor Dashboard (Next.js), violations timeline, compliance tracking |
+| **constraint-dashboard-api** | 3031 | Constraint Monitor REST API, enforcement engine, configuration management |
 
 ### Group: monitoring (priority: 200)
 
@@ -78,6 +81,12 @@ Background monitoring services.
 | Service | Interval | Purpose |
 |---------|----------|---------|
 | **health-verifier** | 15s | Database health checks, service availability, process monitoring, Docker-aware auto-healing |
+
+### Host-side services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **LLM CLI Proxy** | 12435 | Bridges to host-local Claude Code and GitHub Copilot CLI tools (requires host network access) |
 
 ---
 

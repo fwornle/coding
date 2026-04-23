@@ -45,6 +45,8 @@ rectangle "Docker Network: coding-network (bridge)" as network {
       component "VKB Server\n:8080" <<core>> as vkb
       component "Health Dashboard API\n:3033" <<api>> as health_api
       component "Health Dashboard UI\n:3032" <<api>> as health_ui
+      component "Constraint Dashboard\n:3030" <<api>> as cdash
+      component "Constraint Dashboard API\n:3031" <<api>> as cdash_api
     }
 
     rectangle "Monitoring" as mon_group {
@@ -78,6 +80,7 @@ copilot ASYNC_LINE sem : "HTTP fallback"
 copilot ASYNC_LINE browser : "HTTP fallback"
 
 dev --> health_ui : "http://localhost:3032"
+dev --> cdash : "http://localhost:3030"
 dev --> vkb : "http://localhost:8080"
 
 supervisor --> mcp_group : manages
@@ -90,6 +93,8 @@ cgr --> memgraph : "code graph"
 vkb --> qdrant : "search"
 constraint --> qdrant : "embeddings"
 constraint --> redis : "state"
+cdash_api --> constraint : "rules/violations"
+cdash DATA_LINE cdash_api : "fetch API"
 verifier DATA_LINE health_api : "status files"
 
 qdrant --> qvol

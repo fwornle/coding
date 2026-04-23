@@ -7,17 +7,14 @@ This directory contains Docker configuration for containerized deployment of the
 ![Docker Architecture](../docs/images/docker-architecture.png)
 
 **Host (Native):**
-- Claude CLI
-- Lightweight stdio proxies (connect to containers via HTTP/SSE)
+- Claude CLI + lightweight stdio proxies (connect to containers via HTTP/SSE)
+- LLM CLI Proxy: Port 12435 (bridges to host-local Claude Code / Copilot CLIs)
 
-**Docker Containers:**
-- **coding-services**: MCP servers running as HTTP/SSE services
-  - semantic-analysis: Port 3848
-  - browser-access: Port 3847
-  - constraint-monitor: Port 3849
-  - code-graph-rag: Port 3850
-  - VKB Server: Port 8080
-  - Health Dashboard: Ports 3032/3033
+**Docker Containers (10 supervisord-managed services):**
+- **coding-services**:
+  - MCP Servers: semantic-analysis (3848), browser-access (3847), constraint-monitor (3849), code-graph-rag (3850)
+  - Web Services: VKB Server (8080), Health Dashboard (3032/3033), Constraint Dashboard (3030/3031)
+  - Monitoring: health-verifier (background daemon)
 
 - **Databases:**
   - Qdrant: Ports 6333/6334
@@ -90,13 +87,15 @@ See `.env.ports` in the main repository for all port configurations:
 
 | Service | Port | Protocol |
 |---------|------|----------|
+| Constraint Dashboard (Next.js) | 3030 | HTTP |
+| Constraint Dashboard API | 3031 | HTTP |
+| Health Dashboard UI | 3032 | HTTP |
+| Health Dashboard API | 3033 | HTTP/WS |
 | Browser Access SSE | 3847 | HTTP/SSE |
 | Semantic Analysis SSE | 3848 | HTTP/SSE |
 | Constraint Monitor SSE | 3849 | HTTP/SSE |
 | Code Graph RAG SSE | 3850 | HTTP/SSE |
 | VKB Server | 8080 | HTTP |
-| Health Dashboard UI | 3032 | HTTP |
-| Health Dashboard API | 3033 | HTTP |
 | Qdrant HTTP | 6333 | HTTP |
 | Qdrant gRPC | 6334 | gRPC |
 | Redis | 6379 | TCP |
