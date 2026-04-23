@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ObservationExporter } from './ObservationExporter.js';
+import ConfigurableRedactor from './ConfigurableRedactor.js';
 
 const require = createRequire(import.meta.url);
 
@@ -113,7 +114,35 @@ export class ObservationWriter {
     this._exporter = new ObservationExporter({ db: this.db, projectRoot });
     this._exportTimer = null;
 
+    // Initialize redactor for PII/secret scrubbing (same rules as LSL system)
+    try {
+      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+      this._redactor = new ConfigurableRedactor({
+        configDir: path.join(projectRoot, '.specstory', 'config'),
+      });
+      await this._redactor.initialize();
+      process.stderr.write(`[ObservationWriter] Redactor initialized (${this._redactor.compiledPatterns?.length || 0} patterns)\n`);
+    } catch (err) {
+      process.stderr.write(`[ObservationWriter] Redactor init failed (observations will be stored unredacted): ${err.message}\n`);
+      this._redactor = null;
+    }
+
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
+  }
+
+  /**
+   * Redact PII/secrets from text using the same rules as the LSL system.
+   * Falls back to identity if redactor is not initialized.
+   * @param {string} text
+   * @returns {string}
+   */
+  _redact(text) {
+    if (!text || !this._redactor) return text;
+    try {
+      return this._redactor.redact(text);
+    } catch {
+      return text;
+    }
   }
 
   /**
@@ -372,6 +401,13 @@ export class ObservationWriter {
     // Classify observation quality
     const quality = this._classifyQuality(summary);
 
+    // Redact PII/secrets from summary and messages before storage
+    const redactedSummary = this._redact(summary);
+    const redactedMessages = messages.map(m => ({
+      ...m,
+      content: typeof m.content === 'string' ? this._redact(m.content) : m.content,
+    }));
+
     const id = crypto.randomUUID();
     const nowISO = new Date().toISOString();
 
@@ -382,8 +418,8 @@ export class ObservationWriter {
 
     stmt.run(
       id,
-      summary,
-      JSON.stringify(messages),
+      redactedSummary,
+      JSON.stringify(redactedMessages),
       agent,
       metadata.sessionId || null,
       metadata.sourceFile || null,

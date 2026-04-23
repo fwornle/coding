@@ -19,6 +19,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ObservationExporter } from './ObservationExporter.js';
+import ConfigurableRedactor from './ConfigurableRedactor.js';
 
 const require = createRequire(import.meta.url);
 
@@ -90,7 +91,29 @@ export class ObservationConsolidator {
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
     this._exporter = new ObservationExporter({ db: this.db, projectRoot });
 
+    // Initialize redactor for PII/secret scrubbing (defense-in-depth for LLM outputs)
+    try {
+      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+      this._redactor = new ConfigurableRedactor({
+        configDir: path.join(projectRoot, '.specstory', 'config'),
+      });
+      await this._redactor.initialize();
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Redactor init failed: ${err.message}\n`);
+      this._redactor = null;
+    }
+
     process.stderr.write(`[Consolidator] Database initialized\n`);
+  }
+
+  /**
+   * Redact PII/secrets from text. Falls back to identity if redactor unavailable.
+   * @param {string} text
+   * @returns {string}
+   */
+  _redact(text) {
+    if (!text || !this._redactor) return text;
+    try { return this._redactor.redact(text); } catch { return text; }
   }
 
   /**
@@ -168,7 +191,7 @@ export class ObservationConsolidator {
     const transaction = this.db.transaction(() => {
       for (const d of digestEntries) {
         insertDigest.run(
-          d.id, d.date, d.theme, d.summary,
+          d.id, d.date, this._redact(d.theme), this._redact(d.summary),
           JSON.stringify(d.observationIds),
           JSON.stringify(d.agents),
           JSON.stringify(d.filesTouched),
@@ -333,14 +356,14 @@ export class ObservationConsolidator {
           this.db.prepare(`
             UPDATE insights SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?
             WHERE id = ?
-          `).run(entry.summary, JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
+          `).run(this._redact(entry.summary), JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
           updated++;
         } else {
           this.db.prepare(`
             INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
-            crypto.randomUUID(), entry.topic, entry.summary,
+            crypto.randomUUID(), this._redact(entry.topic), this._redact(entry.summary),
             entry.confidence, JSON.stringify(newDigestIds),
             now, now, JSON.stringify(entry.metadata || {})
           );
