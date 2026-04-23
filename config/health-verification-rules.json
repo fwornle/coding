@@ -102,6 +102,16 @@
         "auto_heal_action": "restart_health_frontend",
         "expected_status": "optional"
       },
+      "semantic_analysis_sse": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "http_health",
+        "endpoint": "http://localhost:3848/health",
+        "timeout_ms": 3000,
+        "description": "Semantic Analysis SSE server - required for UKB workflows and knowledge extraction",
+        "auto_heal": false,
+        "expected_status": "critical"
+      },
       "llm_cli_proxy": {
         "enabled": true,
         "severity": "warning",

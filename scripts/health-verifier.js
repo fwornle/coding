@@ -137,11 +137,8 @@ class HealthVerifier extends EventEmitter {
       services.constraint_monitor.port = parseInt(port);
     }
 
-    // Dashboard server check (port 3030) doesn't exist in Docker
-    // The health_dashboard_frontend check (port 3032) covers it
-    if (services.dashboard_server) {
-      services.dashboard_server.enabled = false;
-    }
+    // Dashboard server (port 3030) runs inside Docker via supervisord (constraint-dashboard)
+    // Kept enabled — supervisord manages it with autorestart
 
     // LevelDB lock check: VKB owns the lock legitimately in Docker - disable entirely
     if (databases.leveldb_lock_check) {
@@ -477,6 +474,22 @@ class HealthVerifier extends EventEmitter {
       );
       checks.push({
         ...proxyCheck,
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
+      });
+    }
+
+    // Check Semantic Analysis SSE Server (required for UKB workflows)
+    if (serviceRules.semantic_analysis_sse?.enabled) {
+      const rule = serviceRules.semantic_analysis_sse;
+      const sseCheck = await this.checkHTTPHealth(
+        'semantic_analysis_sse',
+        rule.endpoint,
+        rule.timeout_ms
+      );
+      checks.push({
+        ...sseCheck,
         auto_heal: rule.auto_heal,
         auto_heal_action: rule.auto_heal_action,
         severity: rule.severity
