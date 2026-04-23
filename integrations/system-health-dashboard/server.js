@@ -4129,11 +4129,18 @@ class SystemHealthAPIServer {
 
         try {
             const totalObs = db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
+            const today = new Date().toISOString().split('T')[0];
 
             // Safely check tables that may not exist yet
             let undigested = totalObs;
+            let pendingPast = 0;
+            let pendingToday = 0;
+            let lowQuality = 0;
             try {
-                undigested = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL").get().cnt;
+                undigested = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
+                lowQuality = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality = 'low'").get().cnt;
+                pendingPast = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) < ?").get(today).cnt;
+                pendingToday = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) = ?").get(today).cnt;
             } catch { /* digested_at column may not exist */ }
 
             let totalDigests = 0;
@@ -4142,7 +4149,7 @@ class SystemHealthAPIServer {
             let totalInsights = 0;
             try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
 
-            res.json({ totalObs, undigested, digested: totalObs - undigested, totalDigests, totalInsights });
+            res.json({ totalObs, undigested, lowQuality, pendingPast, pendingToday, digested: totalObs - undigested - lowQuality, totalDigests, totalInsights });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Status error: ${err.message}\n`);
             res.status(500).json({ error: 'Failed to get consolidation status' });
@@ -4170,7 +4177,8 @@ class SystemHealthAPIServer {
                 const digestResult = await consolidator.consolidateDay(req.body.date);
                 result = { ...digestResult, created: 0, updated: 0 };
             } else {
-                result = await consolidator.run();
+                // Manual trigger includes today's observations
+                result = await consolidator.run({ includeToday: true });
             }
 
             consolidator.close();

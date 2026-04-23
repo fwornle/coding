@@ -76,6 +76,7 @@ export function InsightsPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
+  const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
 
   const fetchInsights = useCallback(async (q = '') => {
     setLoading(true)
@@ -103,6 +104,7 @@ export function InsightsPage() {
   const runConsolidation = useCallback(async () => {
     setConsolidating(true)
     setConsolidationError(null)
+    setConsolidationResult(null)
     try {
       const res = await fetch(`${API_BASE_URL}/api/consolidation/run`, {
         method: 'POST',
@@ -111,6 +113,12 @@ export function InsightsPage() {
       const data = await res.json()
       if (!res.ok) {
         setConsolidationError(data.error || `HTTP ${res.status}`)
+      } else {
+        const parts = []
+        if (data.digests > 0) parts.push(`${data.digests} digests`)
+        if (data.created > 0) parts.push(`${data.created} new insights`)
+        if (data.updated > 0) parts.push(`${data.updated} insights updated`)
+        setConsolidationResult(parts.length > 0 ? parts.join(', ') : 'No new content to consolidate')
       }
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
@@ -145,10 +153,6 @@ export function InsightsPage() {
               <div>{status.totalInsights} insights from {status.totalDigests} digests</div>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => { fetchInsights(query); fetchStatus() }} disabled={loading || consolidating}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           {status && status.undigested > 0 && (
             <Button size="sm" onClick={runConsolidation} disabled={consolidating || loading}>
               {consolidating ? (
@@ -183,6 +187,11 @@ export function InsightsPage() {
       {consolidationError && (
         <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">
           Consolidation failed: {consolidationError}
+        </div>
+      )}
+      {consolidationResult && !consolidationError && (
+        <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-sm">
+          {consolidationResult}
         </div>
       )}
 

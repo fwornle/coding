@@ -8,9 +8,22 @@ An agentic coding environment with multi-agent support (Claude, Copilot, OpenCod
 
 A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable — across all AI coding agents.
 
+## Current Milestone: v5.0 Service Reliability & Health System Overhaul
+
+**Goal:** Make the health system detect all failures — if any service dies, the dashboard shows unhealthy within 60 seconds and attempts auto-healing.
+
+**Target features:**
+- Port liveness checks for all services (3030, 3032, 3033, 3848, 8080, 12435)
+- Supervisord status integration — detect FATAL/STOPPED processes inside Docker
+- Database integrity monitoring (SQLite WAL corruption, malformed JSON)
+- Stale status file detection (PID gone but status file says "running")
+- Auto-restart for crashed services (supervisord + host-side processes)
+- Statusline and dashboard accuracy — no green when services are down
+- Observation consolidation daemon reliability
+
 ## Current State
 
-**v4.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files.
+**v4.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon.
 
 ## Requirements
 
@@ -28,7 +41,7 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ### Active
 
-(Next milestone — to be defined via `/gsd:new-milestone`)
+(Defined in REQUIREMENTS.md for v5.0)
 
 ### Shipped in v4.0
 
@@ -96,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 after v4.0 milestone completion*
+*Last updated: 2026-04-23 after v5.0 milestone start*

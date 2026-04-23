@@ -1,103 +1,59 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.0
-milestone_name: -- Mastra Integration & LSL Observational Memory
-status: verifying
-stopped_at: Completed 23-02-PLAN.md (Tasks 1-2; Task 3 checkpoint pending)
-last_updated: "2026-04-05T10:11:56.818Z"
-last_activity: 2026-04-05
+milestone: v5.0
+milestone_name: Service Reliability & Health System Overhaul
+status: defining_requirements
+last_updated: "2026-04-23"
+last_activity: 2026-04-23
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-29)
+See: .planning/PROJECT.md (updated 2026-04-23)
 
-**Core value:** Intelligent observational memory replacing verbatim logging -- mastra.ai integration across all coding agents
-**Current focus:** Phase 23 — live-observation-tap-dashboard
+**Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable
+**Current focus:** Defining requirements for v5.0 Service Reliability
 
 ## Current Position
 
-Phase: 23
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-05
-
-Progress: [██████████] 100% (Phase 20)
-Overall:  [██░░░░░░░░] 25% (1/4 phases)
-
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed: 0 (v4.0) / 11 cumulative (v3.0)
-- Average duration: 7min (from v3.0)
-- Total execution time: 0min (v4.0)
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-23 — Milestone v5.0 started
 
 ## Accumulated Context
 
-| Phase 20 P02 | 26min | 2 tasks | 3 files |
-| Phase 21 P01 | 2min | 3 tasks | 5 files |
-| Phase 21 P02 | 5min | 2 tasks | 4 files |
-| Phase 21 P03 | 6min | 2 tasks | 3 files |
-| Phase 21 P04 | 3min | 1 tasks | 1 files |
-| Phase 22 P01 | 7min | 2 tasks | 3 files |
-| Phase 22 P03 | 3min | 2 tasks | 2 files |
-| Phase 22 P02 | 4min | 2 tasks | 2 files |
-| Phase 23 P01 | 3min | 2 tasks | 2 files |
-| Phase 23 P02 | 4min | 2 tasks | 12 files |
+### From v4.0
+
+- 4 phases (20-23), 11 plans completed
+- Mastracode integration, transcript converters, live observation tap, observations dashboard
+- Observation consolidation (digests + insights) added post-milestone
+
+### Known Issues Driving v5.0
+
+- Health dashboard reports "Healthy" while constraint dashboard (3030) and semantic analysis (3848) are down
+- Supervisord processes can be FATAL without health verifier detecting it
+- SQLite database corruption from concurrent writes went undetected
+- Stale status files (PID gone, file says "running") not caught
+- Auto-consolidation daemon added but untested for long-term reliability
+- PSM (Process Supervisor Manager) has blind spots for container-internal services
 
 ### Decisions
 
-- [v4.0 roadmap]: 4 phases derived from 13 requirements (OCOM/CONV/MSTR/LIVE categories)
-- [v4.0 roadmap]: Phase order: foundation first, live tap last (highest risk)
-- [v4.0 roadmap]: Observer/reflector must use coding LLM proxy, not direct API keys
-- [v4.0 roadmap]: Mastracode LSL via lifecycle hooks, not pipe-pane (pi-tui/tmux conflict)
-- [Phase 20]: Node.js >= 22 hard gate for @mastra/opencode; default model google/gemini-2.5-flash; .observations/ preserved on uninstall
-- [Phase 21]: AGENT_ENABLE_PIPE_CAPTURE=false per D-08: lifecycle hooks for transcript capture
-- [Phase 21]: LLM proxy health check on port 12435 (warn-only, D-15)
-- [Phase 21]: Mastra uses magenta (colour13) with M: prefix in statusline
-- [Phase 21]: LLM proxy check for mastra is non-blocking per D-15
-- [Phase 21]: Mastra NDJSON events normalized to Claude-compatible format in ETM (same pattern as copilot)
-- [Phase 21]: Agent identity added to ALL LSL session headers per D-11
-- [Phase 21]: Single rolling transcript file with session boundary events rather than per-session files
-- [Phase 21]: 6 lifecycle hooks (incl. tool use) for complete mastra conversation capture
-- [Phase 22]: Deterministic SHA-256 IDs from content+timestamp for transcript dedup
-- [Phase 22]: better-sqlite3 for ObservationWriter (sync, already in project deps)
-- [Phase 22]: LLM proxy fallback: store raw message stats when proxy unavailable
-- [Phase 22]: Manifest saved after each file for crash-safe incremental progress
-- [Phase 22]: Directories auto-batch for specstory without --batch flag
-- [Phase 22]: Exchange grouping flushes on user+assistant pair, not fixed batch size
-- [Phase 22]: Tool messages mapped to role 'tool' with descriptive content for observation context
-- [Phase 23]: Fire-and-forget observation tap: _fireObservation never awaited, errors caught to stderr
-- [Phase 23]: Read-only DB for dashboard API; FTS5 virtual table for full-text search on summaries
-- [Phase 23]: Manual shadcn component creation (CLI pnpm detection issue); reused API_PORT convention
-
-### Research Flags
-
-- `@mastra/opencode` npm availability uncertain -- may need monorepo build (affects Phase 20)
-- `MastraDBMessage` type shape needs confirmation before Phase 22 normalization design
-- Mastracode first-run OAuth in headless tmux is untested (Phase 21)
-
-### Blockers/Concerns
-
-- v3.0 Phase 19.1 still in progress (2/4 plans) -- v4.0 is independent work, no blocker
+- [v5.0 start]: Health verifier must check ALL services, not just databases and external APIs
+- [v5.0 start]: 60-second detection SLA for any service failure
+- [v5.0 start]: Auto-healing should attempt restart before alerting
 
 ## Session Continuity
 
-Last session: 2026-04-05T06:03:06.383Z
-Stopped at: Completed 23-02-PLAN.md (Tasks 1-2; Task 3 checkpoint pending)
-Resume with: `/gsd:plan-phase 21` or `/gsd:verify-work 20`
+Last session: 2026-04-23
+Stopped at: Milestone v5.0 initialization
+Resume with: `/gsd-plan-phase 24`

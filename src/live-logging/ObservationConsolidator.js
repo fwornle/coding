@@ -184,9 +184,11 @@ export class ObservationConsolidator {
 
   /**
    * Consolidate all days with undigested observations.
+   * @param {Object} [options]
+   * @param {boolean} [options.includeToday=false] - Include today's observations (skip for daemon, include for manual trigger)
    * @returns {Promise<{days: number, digests: number, observations: number}>}
    */
-  async consolidateAll() {
+  async consolidateAll({ includeToday = false } = {}) {
     if (!this.db) throw new Error('Not initialized');
 
     const days = this.db.prepare(`
@@ -196,26 +198,25 @@ export class ObservationConsolidator {
       ORDER BY date ASC
     `).all();
 
-    // Don't consolidate today — observations are still being written
     const today = new Date().toISOString().split('T')[0];
-    const pastDays = days.filter(d => d.date < today);
+    const eligibleDays = includeToday ? days : days.filter(d => d.date < today);
 
-    if (pastDays.length === 0) {
-      process.stderr.write(`[Consolidator] No past days with undigested observations\n`);
+    if (eligibleDays.length === 0) {
+      process.stderr.write(`[Consolidator] No days with undigested observations\n`);
       return { days: 0, digests: 0, observations: 0 };
     }
 
     let totalDigests = 0;
     let totalObs = 0;
 
-    for (const { date } of pastDays) {
+    for (const { date } of eligibleDays) {
       const result = await this.consolidateDay(date);
       totalDigests += result.digests;
       totalObs += result.observations;
     }
 
-    process.stderr.write(`[Consolidator] Consolidated ${pastDays.length} days: ${totalDigests} digests from ${totalObs} observations\n`);
-    return { days: pastDays.length, digests: totalDigests, observations: totalObs };
+    process.stderr.write(`[Consolidator] Consolidated ${eligibleDays.length} days: ${totalDigests} digests from ${totalObs} observations\n`);
+    return { days: eligibleDays.length, digests: totalDigests, observations: totalObs };
   }
 
   /**
@@ -350,8 +351,8 @@ export class ObservationConsolidator {
    * Run full consolidation pipeline: digests then insights.
    * @returns {Promise<Object>}
    */
-  async run() {
-    const digestResult = await this.consolidateAll();
+  async run({ includeToday = false } = {}) {
+    const digestResult = await this.consolidateAll({ includeToday });
     let insightResult = { created: 0, updated: 0 };
 
     // Only synthesize insights if we have enough digests (>= 5 unsynthesized)

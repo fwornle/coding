@@ -80,8 +80,9 @@ export function DigestsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [status, setStatus] = useState<{ totalDigests: number; undigested: number; totalInsights: number } | null>(null)
+  const [status, setStatus] = useState<{ totalDigests: number; undigested: number; pendingPast?: number; pendingToday?: number; totalInsights: number } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
+  const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
 
   const fetchDigests = useCallback(async () => {
     setLoading(true)
@@ -110,6 +111,7 @@ export function DigestsPage() {
   const runConsolidation = useCallback(async () => {
     setConsolidating(true)
     setConsolidationError(null)
+    setConsolidationResult(null)
     try {
       const res = await fetch(`${API_BASE_URL}/api/consolidation/run`, {
         method: 'POST',
@@ -118,6 +120,10 @@ export function DigestsPage() {
       const data = await res.json()
       if (!res.ok) {
         setConsolidationError(data.error || `HTTP ${res.status}`)
+      } else if (data.digests === 0) {
+        setConsolidationResult('No new digests — observations may already be consolidated or too few to group')
+      } else {
+        setConsolidationResult(`Created ${data.digests} digests from ${data.observations} observations across ${data.days} days`)
       }
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
@@ -152,13 +158,9 @@ export function DigestsPage() {
         <div className="flex items-center gap-3">
           {status && (
             <div className="text-xs text-muted-foreground text-right">
-              <div>{status.totalDigests} digests / {status.undigested} undigested obs</div>
+              <div>{status.totalDigests} digests</div>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => { fetchDigests(); fetchStatus() }} disabled={loading || consolidating}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           {status && status.undigested > 0 && (
             <Button size="sm" onClick={runConsolidation} disabled={consolidating || loading}>
               {consolidating ? (
@@ -174,6 +176,11 @@ export function DigestsPage() {
       {consolidationError && (
         <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">
           Consolidation failed: {consolidationError}
+        </div>
+      )}
+      {consolidationResult && !consolidationError && (
+        <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-sm">
+          {consolidationResult}
         </div>
       )}
 

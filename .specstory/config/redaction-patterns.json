@@ -70,6 +70,39 @@
       "severity": "critical"
     },
     {
+      "id": "github_oauth_tokens",
+      "name": "GitHub OAuth Tokens",
+      "description": "GitHub OAuth App User Access Tokens (gho_ prefix)",
+      "pattern": "\\bgho_[a-zA-Z0-9]{20,}",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<GITHUB_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "github_pat_tokens",
+      "name": "GitHub Personal Access Tokens",
+      "description": "GitHub fine-grained and classic PATs (ghp_ and github_pat_ prefixes)",
+      "pattern": "\\b(ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,})",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<GITHUB_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "github_app_tokens",
+      "name": "GitHub App & Refresh Tokens",
+      "description": "GitHub App installation tokens (ghs_), refresh tokens (ghr_)",
+      "pattern": "\\b(ghs_[a-zA-Z0-9]{20,}|ghr_[a-zA-Z0-9]{20,})",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<GITHUB_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
       "id": "groq_keys",
       "name": "Groq API Keys",
       "description": "Groq API keys with gsk_ prefix",
