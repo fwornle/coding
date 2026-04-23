@@ -1,0 +1,2671 @@
+[
+  {
+    "id": "baa49b86-e902-4a7f-8023-a9a3fde2f476",
+    "date": "2026-04-05",
+    "theme": "Invalid or Empty Observations Lacking Session Content",
+    "summary": "Two observations captured at 10:56 and 12:47 by the mastra agent contained no actual coding session content to summarize. In both cases, the agent noted that no exchange had been provided or that the conversation had just started. These represent empty or placeholder captures with no technical work, decisions, or file changes recorded.",
+    "observationIds": [
+      "d8e0bca3-608d-4359-9c0f-54a5b013e4d3",
+      "a07f5ca2-a4dc-4340-aa9a-0ed0c91cbd68"
+    ],
+    "agents": [
+      "mastra"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "da1dfdd8-a2ad-4f2c-b431-a44ce8e8d411",
+    "date": "2026-04-05",
+    "theme": "Investigating and Reporting LSL and Observations Wiring",
+    "summary": "The mastra agent reported on the third and final task in a structured investigation workflow: \"Reporting findings.\" The developer had previously completed two investigation tasks covering the `.specstory` LSL hook mechanism and the `.observations` transcript capture wiring. The reporting task required summarizing how these two systems connect — specifically how `.specstory/history/` session logs are captured and how the `.observations` transcript pipeline is wired into the broader Live Session Logging infrastructure. No code was written; this was a documentation and synthesis step.",
+    "observationIds": [
+      "e3a10910-cc28-49a8-a74b-c3888a1feaf9",
+      "b867f5bf-aa0c-4eae-89a2-dc42089065e5"
+    ],
+    "agents": [
+      "mastra"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "c14a53cc-27f3-40e6-a1f0-4ae22e270600",
+    "date": "2026-04-05",
+    "theme": "LSL Startup Ritual Reminder for Session Continuity",
+    "summary": "Two observations, from mastra (14:08) and claude (17:47), relate to the LSL session-start ritual using the `/sl` command. The 14:08 mastra observation flagged that the assistant had stopped performing the startup habit of reading `.specstory/history/` session logs via `/sl` for continuity — no code was changed, just a procedural reminder. By 17:47, the claude agent recorded that the `/sl` skill command was successfully invoked to load session history from `.specstory/history/`, initiating log loading with no code changes performed.",
+    "observationIds": [
+      "23ca90dd-05d6-45de-b9cc-24855481983a",
+      "863ea263-0f2b-4a59-9437-09aecd51984a"
+    ],
+    "agents": [
+      "mastra",
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "c2958c94-d8f1-4eeb-8b62-1a810a4c7332",
+    "date": "2026-04-05",
+    "theme": "LLM Proxy Routing Logic Updated for VPN Context",
+    "summary": "The claude agent discussed updating the LLM proxy routing logic to differentiate behavior based on network context. Outside VPN/CN, `claude-code` remains the preferred provider. Inside VPN/CN, the preferred provider order is updated to: Copilot (work subscription) → Groq → OpenAI → Anthropic API key-based LLMs. No specific files were named in the observation, but this represents an architectural decision for the LLM proxy configuration layer.",
+    "observationIds": [
+      "c1a68fd5-adb6-4015-a755-adfd2db72c88"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "5e5b354c-6b24-400f-8339-628c050eb22e",
+    "date": "2026-04-05",
+    "theme": "Repository Overview: AI Coding Assistant Infrastructure Platform",
+    "summary": "The mastra agent produced a comprehensive overview of the `onboarding-repro` repository at 16:05. The project is a self-hosted agentic development environment wrapping Claude and other LLMs with tooling and memory. Key components include: the UKB (Universal Knowledge Base) using Graphology + LevelDB + optional Qdrant for graph-based knowledge storage; Live Session Logging (LSL) for real-time transcript monitoring stored in `.specstory/history/`; and multiple MCP server integrations including `mcp-server-semantic-analysis`, `mcp-constraint-monitor`, `code-graph-rag`, and `system-health-dashboard`. The architecture is Dockerized with services exposed via MCP protocol, a dashboard at `localhost:3032`, health API at `localhost:3033`, and an SSE workflow server at `localhost:3848`.",
+    "observationIds": [
+      "868b2010-7195-42e3-8a9c-c704b5dafc04"
+    ],
+    "agents": [
+      "mastra"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "9f8ff8ea-f9d1-4a30-92b7-367b96be92e1",
+    "date": "2026-04-05",
+    "theme": "Claude CLI Authentication Failure Diagnosis and Fix",
+    "summary": "The mastra agent investigated a Claude CLI authentication error at 16:08, determining the most likely causes were a missing or expired `ANTHROPIC_API_KEY` environment variable, or launching the CLI with bare `claude` instead of the project wrappers `claude-mcp` or `coding --claude`. Recommended fixes included verifying the key via `echo $ANTHROPIC_API_KEY`, re-exporting it from `.env` if needed, using the correct startup command as documented in `CLAUDE.md`, or running `/login` at the CLI prompt. No code was modified; this was a diagnostics and guidance response.",
+    "observationIds": [
+      "8d234dfa-fc01-4154-a0ac-bf8308c45b31"
+    ],
+    "agents": [
+      "mastra"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:03.364Z"
+  },
+  {
+    "id": "f97c37f0-7863-4fb8-941d-0906af2f020a",
+    "date": "2026-04-06",
+    "theme": "ETM Mastra Session Wrong Model Provider Blocked",
+    "summary": "A parallel Mastra session was misconfigured to reference a `GOOGLE_GENERATIVE_AI_API_KEY` instead of the intended model provider. Attempts to kill and restart the three affected ETM monitor processes were defeated by a watchdog process that continuously respawned them before any fix could be applied. No code edits were made and the root cause remains unresolved, with all three ETM instances still running with the broken model ID configuration.",
+    "observationIds": [
+      "20c958b4-556f-4fa0-a8a9-36f88d372c37"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "70f9c2d7-c297-4e08-aa61-0a548d12e733",
+    "date": "2026-04-06",
+    "theme": "Observation Log Quality: Dedup and Artifact Tracking Requests",
+    "summary": "The developer identified two enhancement requests via a screenshot review: (1) the first two entries in an observation list were semantically identical duplicates, prompting a request for semantic deduplication logic to detect and suppress near-identical entries at write time; (2) the logging system should be augmented to capture which software artifacts are being modified and in what way. No tools were invoked and no code was changed — the requests were recorded for follow-up implementation.",
+    "observationIds": [
+      "d6101c33-a905-49c4-ade2-7013ff6bd3a9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "3da049dc-8ba9-436f-ba89-f23c76817fd4",
+    "date": "2026-04-06",
+    "theme": "OKB MkDocs Documentation Ingestion Async Restart",
+    "summary": "The MkDocs documentation ingestion process for the Operational Knowledge Base (OKB) appeared to stall at chunk 11/17 during a synchronous run, with each chunk taking approximately 3 minutes. The ingest command was relaunched asynchronously via bash with periodic status polling to report chunk progress without appearing frozen. No artifacts were modified; the ingestion was left running in async mode.",
+    "observationIds": [
+      "d56db59b-0a62-4083-9fa4-7e9ba42d8097"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "df95f3b0-fba8-499f-a47e-70d7920f6089",
+    "date": "2026-04-06",
+    "theme": "OKB Source Type Research, Pipeline Tracing, and Evidence Links",
+    "summary": "A thorough research effort across the `integrations/operational-knowledge-management/` codebase mapped how the OKB handles RCA vs. documentation source types, covering entity metadata fields, viewer node rendering, ontology config, search/API exposure, and correlation engine behavior (obs 4, 5). The full MkDocs ingestion pipeline was traced from CLI entry point through the batch API to entity storage, identifying that the MkDocs adapter creates `artifactRefs` with local file paths but never generates `evidenceLinks` or `sourceDocuments` — the root cause for why documentation entities show no evidence links in the viewer (obs 10). The `NodeDetails.tsx` component and its sub-components and API client evidence-fetching methods were retrieved in full (obs 12). Finally, the developer provided the published URL structure for their MkDocs docs and local ingestion paths, confirming that a URL-mapping step bridging local paths to live published URLs is the missing piece to generate proper evidence links (obs 13). No files were modified across these investigative sessions.",
+    "observationIds": [
+      "a796d363-7ed1-49ff-bcd0-c42d15d5fe4f",
+      "7ab0d6e9-5480-439c-aa1e-ab3bbcf04c76",
+      "9e53f4bc-36c5-45aa-b055-4cef6cbc5e29",
+      "04073239-b679-47e5-95d4-eb03e44e898f",
+      "a89d384e-909b-451f-9fdf-7aa2dec3a52a"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "4d6c9e08-1376-4b74-8ea3-70ce77b3a8a0",
+    "date": "2026-04-06",
+    "theme": "OKB Viewer Visual Differentiation and Correlation Engine Generalization",
+    "summary": "After confirming documentation entities were not visually distinguishable in the knowledge graph viewer, the agent implemented visual differentiation by applying a distinct green stroke border to documentation nodes based on the `sourceAuthority` field in `GraphVisualization.tsx` and `okbClient.ts`. The correlation engine in `src/intelligence/correlation.ts` was also refactored from a hardcoded binary raas/kpifw domain split to an N-domain system so that `general` and business domains participate in correlation analysis rather than being silently dropped. Two new correlation tests were added to `tests/unit/correlation.test.ts`, and all 508 tests pass.",
+    "observationIds": [
+      "79e78db9-34d3-4b0b-ab0c-38ea6bd6602b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "viewer/src/api/okbClient.ts",
+      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "src/intelligence/correlation.ts",
+      "tests/unit/correlation.test.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "34768617-c5a2-47c2-b582-cf9c8e27dc26",
+    "date": "2026-04-06",
+    "theme": "ObservationWriter.js Live Logging Module Edit",
+    "summary": "A direct source edit was made to `/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js` to modify observation writing logic. The specific nature of the changes was not detailed in the exchange, but the file was confirmed updated.",
+    "observationIds": [
+      "55344574-b237-4f27-a79e-479ff8e7d470"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "836454cb-b75e-40ed-8e8a-6f29d9004a8c",
+    "date": "2026-04-06",
+    "theme": "System Health Dashboard Observation Filters UI Fix",
+    "summary": "A UI issue visible in a screenshot of the system health dashboard was addressed by applying three targeted edits to `integrations/system-health-dashboard/src/components/observation-filters.tsx`. After the edits the dashboard UI was rebuilt successfully.",
+    "observationIds": [
+      "fbef58c5-ca20-4edd-877f-80b3906b1b25"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "integrations/system-health-dashboard/src/components/observation-filters.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "ff0e40ba-6b26-4ecc-9da6-4eee4d769a0f",
+    "date": "2026-04-06",
+    "theme": "Enhanced Transcript Monitor Flush Trigger Updated to User Prompt Boundary",
+    "summary": "The enhanced transcript monitor was updated so it flushes and fires observations at the return-to-user-prompt boundary rather than mid-exchange, ensuring that complete sequences (user prompt → agent response → tool calls → results) are captured as atomic units. The change was applied directly to `/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js`, the running process was killed, and PSM respawned it with the updated logic.",
+    "observationIds": [
+      "cd83976e-2112-423a-ac86-fcdac26670ae"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "2a7f0a64-6d63-4e65-ac68-30245605fc0b",
+    "date": "2026-04-06",
+    "theme": "Session Log Loading for Context Continuity",
+    "summary": "Multiple LSL files from `.specstory/history/` in the coding project were listed and read to establish context continuity from prior sessions. The loaded logs spanned the 0900–1500 range of 2026-04-06, providing the current session with sufficient background to continue ongoing work without rereading raw transcripts.",
+    "observationIds": [
+      "f28212f0-0c01-4188-bb32-2feb01a22d50"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "47df3e07-e2a1-45d1-b787-4d962e9f3160",
+    "date": "2026-04-06",
+    "theme": "Rapid Automations Repository Changes Committed",
+    "summary": "All uncommitted changes in the rapid-automations project were staged and committed to version control via a single bash command. No specific file list or commit message details were captured in the observation.",
+    "observationIds": [
+      "623ef807-f9c4-45a8-9736-2e0207031f82"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "c9b326ae-bb6e-4ab6-9998-ed88da5144ae",
+    "date": "2026-04-06",
+    "theme": "ETM Missing Observations Debug, Fix, and Restart",
+    "summary": "A multi-step investigation was conducted after the coding ETM stopped producing new observations following a restart (obs 15). The root cause was identified in `getUnprocessedExchanges`: `lastProcessedUuid` pointed to a mid-exchange `tool_result` message, causing all remaining messages to be sliced into continuation-only exchanges that were subsequently filtered out as containing no meaningful content, so no observations were ever fired. The fix changed unprocessed exchange detection to use the full properly-split exchange list filtered by message position rather than a raw message slice. Changes were staged for commit but the commit was not completed in the session (obs 16). A secondary issue was also found: the ETM had been restarted before the active session transcript file (`a537a28e`) existed, so it missed all exchanges from that session entirely; a manual restart corrected this and a test observation confirmed normal operation (obs 17). It was further clarified that observations fire at the *next* user-prompt boundary, explaining why an observation for a given exchange only appears after the following message is sent (obs 18). All edits targeted `/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js`.",
+    "observationIds": [
+      "fcd1e48b-9dab-4c30-8ec4-445c55d18a24",
+      "4239b648-2d5d-4f3e-b96f-a0e98c903d22",
+      "74489a39-b0bc-49db-8451-318b890540e4",
+      "f4d6c4b7-f0d3-4834-ad84-e86c94a80b0d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "c453e39b-eee6-4d79-8c84-3c097f70142b",
+    "date": "2026-04-06",
+    "theme": "Observations API Endpoint Returning 500 Errors",
+    "summary": "A screenshot shared by the developer prompted investigation of a 500 error on the `/api/observations?limit=50&offset=0` endpoint. Curl requests with varying `limit` and `offset` parameters consistently reproduced the 500 response, suggesting a pagination or query parameter handling bug in the observations API. The investigation was cut off mid-response and the root cause was not yet identified.",
+    "observationIds": [
+      "971d3996-a942-41d6-a17f-750ab1697cf3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:44:59.370Z"
+  },
+  {
+    "id": "6cdd2b72-a4c7-4cef-9382-d6f99cba8d04",
+    "date": "2026-04-07",
+    "theme": "Initial Observation System Architecture Investigation",
+    "summary": "Early morning investigation into why the observation logging system had stopped producing entries since the previous day. The agent explored `.observations/`, `.coding/`, `config/`, `transcript-monitor.log`, `.constraint-monitor.yaml`, and related scripts to map pipeline components. The transcript monitor process (PID 56900) was found running but its log was stale from April 6, suggesting the process was stuck or writing elsewhere. A separate search was initiated to locate the component responsible for writing to `mastra-transcript.jsonl`, tracing hook registrations and configuration files, but all three exchanges ended before delivering complete findings — the root cause remained unresolved at this stage.",
+    "observationIds": [
+      "019e78d3-34b5-43ba-8467-35a64d2c6562",
+      "318fc2ac-5cbb-41a0-8d8d-a0c9f797556b",
+      "174afbb0-6738-455c-824d-d397a8e4e1bf"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "4a77f82f-bd6d-4d35-aa5d-c19480280ca2",
+    "date": "2026-04-07",
+    "theme": "MkDocs Documentation Site Build and Serve",
+    "summary": "Two sequential operations on a MkDocs documentation site. First, a running local server was stopped and a static build was executed, generating output to the `site/` directory with both English and German locales for publication. Second, missing packages were installed, a conflicting process on port 8000 was killed, and a new MkDocs dev server was started in the background (PID 1502) at http://127.0.0.1:8000/ with live reload and multi-locale support.",
+    "observationIds": [
+      "793cd09e-4466-4232-a425-df689dd736a1",
+      "80c3ba06-b5ec-44ec-9a85-0881d4622ec4"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "fecb1ea8-8206-45b0-9f59-c67811fef43d",
+    "date": "2026-04-07",
+    "theme": "LLM Proxy Corporate Copilot Routing and OKB Ingestion Setup",
+    "summary": "The developer instructed the agent to abandon Groq and route LLM calls through the corporate GitHub Enterprise Copilot API via VPN proxy. The root cause of failure was that Node.js `fetch` does not respect system proxy environment variables; the fix was integrating `undici`'s `ProxyAgent` as the global dispatcher directly in `llm-proxy.mjs` startup code. The `source-documents` LevelDB content hash entries were cleared to allow re-ingestion of 80 Confluence pages. During the subsequent batch ingestion, concurrent API calls were taking 26–52 seconds each with 180-second timeouts. A container health check confirmed a baseline graph of 875 nodes and 2000 edges, and investigation into the ingest API request body format was underway for end-to-end pipeline testing.",
+    "observationIds": [
+      "b7fa4be0-8c21-49e4-8246-31e3903a07aa",
+      "601b27be-1a5c-4fee-8c26-a113f8fbb9ce",
+      "8f54c204-e957-4da1-bbfc-d1651f29c050"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "llm-proxy.mjs (integrated corporate proxy setup directly)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "69560de7-e2b3-4156-9416-2155bc0a6f1e",
+    "date": "2026-04-07",
+    "theme": "ETM Completion Detection Redesign and Provider Chain Research",
+    "summary": "Investigation and remediation of the Enhanced Transcript Monitor's unreliable prompt-set completion detection. The root cause was identified as the ETM detecting stale prompt sets prematurely before subagent results return, causing observations to be written mid-exchange. Research was conducted across `enhanced-transcript-monitor.js`, `mastra-transcript.jsonl`, `MastraTranscriptReader`, and `llm-proxy.mjs` to map completion signals per agent type: `stop_reason` for Claude, `reason:\"complete\"` for Mastra, and Copilot-specific event types. Separately, the LLM provider chain in `llm-proxy.mjs` was reconfigured to Copilot-only to stop wasting time falling through to VPN-blocked Claude, Groq, and OpenAI providers; a rebuild and restart was initiated to apply the change.",
+    "observationIds": [
+      "861c3615-b492-4de9-918b-d2acaec90fce",
+      "ebd80870-4ba5-49d3-b86b-36be2d50790c",
+      "972f0258-4725-4500-98fb-f936f028b777"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "provider chain configuration file (specific filename not shown in exchange)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "1257e854-823e-4501-a2e1-d0e7f2b243cf",
+    "date": "2026-04-07",
+    "theme": "Dashboard Frontend Process Restored After Crash",
+    "summary": "A screenshot from the developer triggered diagnosis of a downed dashboard. The frontend server on port 3032 had stopped while the API on port 3033 remained running. The frontend service was restarted, restoring the dashboard at `localhost:3032/observations` with 107 observations visible.",
+    "observationIds": [
+      "58e0ced6-a8f3-4f5d-ba7e-1e44811be723"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "1101dd74-1635-427a-b91f-70c540e2f5df",
+    "date": "2026-04-07",
+    "theme": "ETM Idle Timeout Misdiagnosis and isAssistantComplete Bug",
+    "summary": "Investigation into a gap in observations since 1:38 PM revealed two distinct bugs in the Enhanced Transcript Monitor. First, the ETM was being repeatedly killed not by genuine idle timeout but by its own auto-restart file watcher detecting changes to the script itself — the \"Idle timeout exit\" log message appeared in the shutdown path regardless of the actual cause, making it misleading. Second, a logic bug was identified where `isAssistantComplete` checks the globally latest message rather than the message relative to the buffered prompt set, causing flush deferral to stall during active sessions.",
+    "observationIds": [
+      "71d131dd-1761-47d4-9f99-176c57d652ed"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "9ee2e1e4-2852-4faf-b558-8f0293cb46fe",
+    "date": "2026-04-07",
+    "theme": "Git History Reconstruction of Confluence Ingestion Session",
+    "summary": "The agent searched git history and repository artifacts to reconstruct what went wrong during a multi-hour Confluence-to-OKB ingestion session. Multiple parallel `git log` queries were scoped to specific directories, combined with glob searches for planning documents and scratch files, to surface commits, stash entries, and temporary files. OKB ingestion documentation and a relevant commit history were located, but deeper investigation into specific artifacts was still in progress at exchange end.",
+    "observationIds": [
+      "fdc27bc6-0183-469e-b30e-5af007a7e63c"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "b760c479-d76f-46ca-bfe1-8b07170da244",
+    "date": "2026-04-07",
+    "theme": "Dedup Hash Collision Fix and Dashboard Result Bold Rendering",
+    "summary": "Two bugs were diagnosed and fixed to address a gap in observations since 2:52 PM. The primary cause was a deduplication hash collision: short generic user messages like \"Continue\" always produced the same hash, causing the `ObservationWriter` to silently drop observations as duplicates. The fix in `ObservationWriter.js` incorporated session ID and assistant content into the hash to make it context-specific. A secondary cosmetic fix added bold rendering for the \"Result\" keyword in the dashboard frontend renderer (matching the style of other field labels like Intent/Approach/Artifacts). Dashboard dist files were rebuilt and the ETM was restarted to load the updated `ObservationWriter` logic.",
+    "observationIds": [
+      "1af261da-25d2-418e-94f6-81ae816ed8c2"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js (dedup hash now includes session ID and assistant content)",
+      "dashboard frontend rendering code (added bold for \"Result\" keyword)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "ad68260d-f322-4818-ae12-3ad586a9b1ee",
+    "date": "2026-04-07",
+    "theme": "Dashboard Stale View and ETM Session ID Mismatch Diagnosis",
+    "summary": "Two sequential investigations into an apparent observation gap since 2:52 PM. The first (obs 16) found that the ETM (PID 79934, started 3:38 PM) was running and the API on port 3033 showed 118 total observations with the latest at 13:39 UTC, but the Docker-served dashboard on port 3032 was not reflecting newer ones. The ETM health file showed the tracked transcript had `status: \"missing\"` with `sizeBytes: 0`, and a session ID mismatch existed between the state file (`ses_299548...`) and the health file (`ses_297cea...`), suggesting the ETM had lost track of the current session. The follow-up investigation (obs 17) resolved this: the dashboard was displaying a stale cached view, newer observations at 3:35, 3:39, and 3:51 PM local time did exist in the API (120 total), and the apparent gap after 3:51 PM was genuine downtime with no coding activity — a dashboard browser refresh resolved the display issue.",
+    "observationIds": [
+      "1f40fe58-fe83-4830-8c36-dc4dd165f888",
+      "a52e5c40-e376-4f73-80a3-ffcba4265549"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "59f4a62b-716e-4aaa-a4ff-b0f5f3323bc7",
+    "date": "2026-04-07",
+    "theme": "Rapid-Automations ETM Invisible Logging and Semantic Dedup Suppression",
+    "summary": "Investigation into why a long Confluence-to-OKB ingestion session in the `rapid-automation` project produced no dashboard observations. Two root causes were identified. First, the rapid-automations ETM was launched as a detached daemon with stdout/stderr redirected to `/dev/null`, making all logs invisible — unlike the `onboarding-repro` ETM which logs to `transcript-monitor.log` via the global LSL coordinator. Second, the ETM state confirmed `lastProcessedUuid` was updated at 15:38 UTC meaning the prompt set was flushed, but the observation was silently suppressed — likely by `ObservationWriter`'s semantic dedup filter (0.7 Jaccard threshold) because three prior observations about the same Confluence-to-OKB topic already existed from the same session earlier that afternoon.",
+    "observationIds": [
+      "f9ced2eb-268c-4c60-a08b-bc2cf787af38"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "6e34f879-8f10-4d22-a2c5-ab3fda10137f",
+    "date": "2026-04-07",
+    "theme": "ETM Classification Pipeline Analysis and observations.db Location",
+    "summary": "Deep analysis of the ETM's classification and observation-firing pipeline. Observation 19 located and read the main ETM script, `coding-keywords.json`, and `PathAnalyzer` to surface `determineTargetProject` return-null conditions, the `_firePromptSetObservation` mechanism, and the LSL-vs-observation-only flush decision path around lines 570–577. Observation 20 traced why `observations.db` in the `onboarding-repro` project directory remained 0 bytes: the real active database is at `/Users/Q284340/Agentic/coding/.observations/observations.db` (360KB with active WAL). The `onboarding-repro` local database stays empty because the ETM's foreign mode logic for `rapid-automations` hits an early-return or guard condition when classification returns a LOCAL/null target, preventing `_firePromptSetObservation` from being called in that project context.",
+    "observationIds": [
+      "f4c5f140-4035-425d-afde-29fafa4eee7a",
+      "98b8d210-1a0b-451e-9f8a-a0782d4e2445"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "beaade18-f7c2-4c9e-9284-20bdc7631e81",
+    "date": "2026-04-07",
+    "theme": "OKB Skill Extended to v1.3.0 With Six Bug Fixes",
+    "summary": "Root cause analysis of a 2–3 hour Confluence-to-OKB ingestion session identified six failure modes: three code bugs (Zod nullable schema failure, Copilot JSON truncation with markdown fence wrapping, PII filter false positives blocking valid entities) and three documentation gaps (missing Confluence/CodeBeamer workflow paths, no LLM provider guidance for VPN environments, incomplete error handling reference). Rather than creating a new skill, the existing `SKILL.md` (hardlinked between `integrations/rapid-toolkit/.agents/skills/okb-ingest/` and `.opencode/skills/okb-ingest/`) was extended to v1.3.0 with new Path D (Confluence ingestion) and Path E (CodeBeamer ingestion), a mandatory Copilot-on-VPN LLM provider configuration section with Docker proxy guidance, and six new error handling rows. All three code bugs were fixed and committed in the OKB submodule, with submodule pointers updated in the parent repo.",
+    "observationIds": [
+      "fea28439-36f0-4a12-934b-2ac39d6ef715"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/rapid-toolkit/.agents/skills/okb-ingest/SKILL.md (also .opencode/skills/okb-ingest/SKILL.md via hardlink)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "3449e85b-e265-4986-bd4a-10450d7f31f5",
+    "date": "2026-04-07",
+    "theme": "ETM Silent Observation Drop Fixed in Four Else Branches",
+    "summary": "Investigation into why OKB-related work in `rapid-automations` from approximately 1 PM onward produced no observation log entries. The agent traced the full ETM pipeline from transcript ingestion through classification, target project resolution, LSL writing, and observation firing, and identified four code locations (approximately lines 1253, 1269, 1297, and 3668 in the ETM source) where `else` branches for non-coding-infrastructure exchanges cleared `currentUserPromptSet` without first calling `_firePromptSetObservation`, silently discarding observations. All four locations were patched to call `_firePromptSetObservation` before clearing. A deeper unresolved question remained: in `'all'` mode `determineTargetProject` never returns `null`, so the full 3-hour gap (13:34–16:46 UTC) in rapid-automations observations may also involve semantic deduplication suppressing repetitive Confluence ingestion exchanges or silent failures in the LLM proxy at localhost:8089.",
+    "observationIds": [
+      "93bdfe4d-768a-4716-9411-40f14b4f8031"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "the ETM source file at 4 locations where `else` branches silently dropped prompt sets without firing observations (lines ~1253"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "ff9e4479-bf37-4669-b359-8bee737c76a0",
+    "date": "2026-04-07",
+    "theme": "Observation Logging System Code Mapping and Pipeline Trace",
+    "summary": "A broad codebase search to map the observation logging system's key components. Grep and glob searches across the project and linked directories traced from `onboarding-repro` symlinks into the actual source at `/Users/Q284340/Agentic/coding/`. The ETM file (`enhanced-transcript-monitor.js`) was confirmed to host both `_firePromptSetObservation` and `processUserPromptSetCompletion`; the Artifacts field is populated via a summarization prompt within the same file; modified files tracking occurs through tool call inspection in the exchange processing logic; and specstory classification and observation recording are handled by a `SpecstoryBatchConverter` class in a related specstory file in the same directory.",
+    "observationIds": [
+      "7913b69a-af28-4e51-ae20-870384d73029"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T07:02:23.228Z"
+  },
+  {
+    "id": "a7e0a450-4ebd-421f-b876-b80aba708fef",
+    "date": "2026-04-07",
+    "theme": "Fix Observation Artifacts Field and Compaction Errors",
+    "summary": "Developer flagged two bugs: repeated \"Bad Request\" errors during compaction, and observations incorrectly logging `Artifacts: none` despite real git changes existing.\n\n- **Compaction errors**: traced to OpenCode/LLM provider context size limits — a provider-side issue, no code fix applicable.\n- **Artifacts omission**: traced to `ObservationWriter.summarize()` relying on LLM inference to detect modified files from tool call text, which was unreliable.\n\n**Fix applied across two files:**\n- `src/live-logging/ObservationWriter.js` — updated `summarize()` to accept and inject a `metadata.modifiedFiles` list as ground-truth context into the LLM summarization prompt.\n- `src/live-logging/SessionEventHandler.js` / `src/ObservationHandler.js` / `src/session/SessionManager.js` (exact filename varies across observations) — updated `_firePromptSetObservation` to programmatically extract file paths from Edit/Write tool calls and pass them as `metadata.modifiedFiles` before summarization.\n\nThe Artifacts field is now populated from actual tool call data rather than LLM inference.",
+    "observationIds": [
+      "30bfd9bb-92f1-4288-9e20-7408d2a6612b",
+      "6e668476-d77e-47e4-a6c9-385ad0a4a9ea",
+      "e6218d87-cf7d-4194-8c8e-7372c171b1c0"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/live-logging/ObservationWriter.js",
+      "src/live-logging/SessionEventHandler.js (or equivalent `_firePromptSetObservation` host file in the coding project)",
+      "src/ObservationHandler.js (or equivalent live-logging pipeline files in the coding project)",
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "/Users/Q284340/Agentic/coding/src/session/SessionManager.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:22:05.198Z"
+  },
+  {
+    "id": "3a504b79-743b-431a-9b45-d7f453aa7e00",
+    "date": "2026-04-07",
+    "theme": "Commit Uncommitted Changes Across Repo and Submodules",
+    "summary": "- Checked repository status and identified uncommitted files in the OKB submodule (data exports and LLM settings).\n- Committed OKB submodule changes first, then committed the parent repo to update submodule pointers alongside staged specstory files.\n- The `rapid-toolkit` submodule pointer was already current and required no action.",
+    "observationIds": [
+      "481b7bfd-af51-4cdf-9958-82ad7af452cb"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:22:05.198Z"
+  },
+  {
+    "id": "48fe32e4-9c18-45fe-a7fe-5234d33fc8fe",
+    "date": "2026-04-08",
+    "theme": "GSD Tool Update Check and Changelog Display",
+    "summary": "The claude agent ran the get-shit-done-cc update workflow, which detected that a newer version of the npm package was available. The workflow fetched the changelog from GitHub and displayed the changes to the user before prompting for confirmation to proceed with the update. No files were modified during this exchange.",
+    "observationIds": [
+      "bf3ddc96-d94e-44ce-bb1c-78a6eceb7008"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "189604f3-5fce-41ab-98ce-74cfd2162508",
+    "date": "2026-04-08",
+    "theme": "VOKB Guided Reading Tour Feature Implementation",
+    "summary": "The opencode agent performed a full reconnaissance of the VOKB React application under `integrations/operational-knowledge-management/viewer/`, reading all source files covering sigma.js/react-sigma graph rendering, Redux store slices, NodeDetails sidebar, navigation behavior, and TypeScript types. A guided reading tour feature was then designed and partially implemented before a Bad Request error interrupted the session. After resuming, the feature was completed: a BFS-based traversal utility (`viewer/src/utils/guidedTraversal.ts`) computes a prioritized sequence using edge-type tiers (causal→resolution→structural→operational→data-flow), five new Redux reducers were added to `navigationSlice.ts` (start/stop/next/back/goTo) with auto-sync for mid-tour node clicks, pulsing violet ring animations were added via `index.css` to highlight the next 3 upcoming nodes in `GraphVisualization.tsx`, and a tour control bar with progress indicator and Prev/Next/Exit controls was added to `NodeDetails.tsx`. The build passed cleanly.",
+    "observationIds": [
+      "5115371a-107b-486b-b263-b66c527b4e1f",
+      "e606b7ba-eb48-4937-a0a0-b03d8e1f1b39",
+      "c24e8ec7-2f68-47dc-8d06-6f11cf8e3624"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(sequence computation logic written to disk before context reset)",
+      "viewer/src/utils/guidedTraversal.ts",
+      "viewer/src/store/slices/navigationSlice.ts",
+      "viewer/src/index.css",
+      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "viewer/src/components/KnowledgeGraph/NodeDetails.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "5088f74c-613a-48e6-ad05-548495674a79",
+    "date": "2026-04-08",
+    "theme": "OKB Operational Evidence Links Lost After Doc Ingestion Purge",
+    "summary": "The opencode agent investigated why evidence links (Argo Workflows, S3, CloudWatch, Grafana, RaaS) had disappeared from OKB entities. By tracing git log and diffing export JSONs, the root cause was confirmed as a full graph purge and re-ingest in commit `a9dd8fd` (2026-04-06) that backfilled 875 entities from MkDocs sourceRefs only, replacing all prior operationally-sourced entities — before the purge there were 463+ `argo_workflow` references across 106 entities; after, zero. Entity UUIDs all changed and node count doubled. A secondary latent risk was also identified: when the deduplicator runs without a `context` object, `mergeEvidenceMetadata` is skipped and a shallow spread (`{ ...existingEntity.metadata, ...entity.metadata }`) can silently overwrite existing sourceRefs in future partial ingestions. The fix is to re-run the existing backfill script to append operational links via union-based `mergeSourceRefs` logic.",
+    "observationIds": [
+      "b9621b6f-8f45-43d1-807b-7beeec8bda96",
+      "4d9814f3-01b5-4d88-9c93-c9a80d189821"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "e725cb2b-23bf-4f9d-88ba-9871d2e81c30",
+    "date": "2026-04-08",
+    "theme": "LSL Red Status Indicator Root Cause Investigation",
+    "summary": "Across three separate exchanges, the opencode agent investigated the \"[LSL●]\" red indicator appearing in the tmux status bar. The investigation involved parallel filesystem searches across tmux config files, shell rc files, and scripts directories. The health check logic was traced to `combined-status-line-wrapper.js` containing a `getLSLHealthStatus` method, which calls a `health-prompt-hook.js` script that writes to a health file; the red state is triggered when that file reports an unhealthy condition. No files were modified and no fix was applied during these exchanges — the investigation concluded with the logic located and read but the specific triggering threshold left unresolved.",
+    "observationIds": [
+      "9e3e80c3-d077-4160-8c01-05dce0740660",
+      "2e328eef-c3ea-436b-8ad0-e404db31d042",
+      "93890dbd-ae05-4329-9d81-0588a6d709f5"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "70e74f13-e72e-4287-a5b2-46b90b0e180d",
+    "date": "2026-04-08",
+    "theme": "Restoring Operational Evidence Links via Backfill and Re-RCA",
+    "summary": "The opencode agent attempted to restore the 2,122 operational evidence links lost in the purge by running the existing backfill script, but the required RCA JSON input files were missing from `/tmp`. A pre-purge LevelDB snapshot (commit `2c4f94c8`) with 236 entities and 2,122 operational links was located, and a name+ontologyClass merge approach was attempted — but only 4–6 exact matches and 21 fuzzy matches were found against 209 unmatched entities (renamed after the purge). The decision was made to instead run a fresh end-to-end RCA for RaaS and KPI-FW and rely on the OKB dedup system to handle entity matching on re-ingest. Preflight checks revealed expired authentication across AWS SSO, RaaS API, and RaaS DQ; the output directory was created at `.data/rca/2026-04-08T16-08-58_rpr-e2e-rca` but execution was blocked pending re-authentication. A PATH issue with the `raas-api` binary was also resolved by exporting the rapid-toolkit bin directory.",
+    "observationIds": [
+      "50f2b788-5453-4246-978a-22a09c0708d4",
+      "cc0a793a-2d31-4555-8b7c-37b3aa592348",
+      "b3ec0833-f42d-4d00-98b2-263d24569f5f"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "1548e6d5-49e6-47d0-9196-23fadf43dca8",
+    "date": "2026-04-08",
+    "theme": "Full E2E RCA for RaaS and KPI-FW Pipeline Failures",
+    "summary": "The opencode agent ran a comprehensive multi-phase RCA across RaaS (1,963 failed jobs) and KPI-FW (493 failed jobs) over the 24-hour window of 2026-04-08. A unified triage subagent identified 22 failure groups, followed by 10 parallel deep-dive subagents covering 97.8% of non-cascading job failures. Key root causes identified included: Iceberg schema mismatch (2,118 KPI-FW jobs), NoReproTriggerSignal for bmw_sil_admake RPU (1,663 RaaS jobs), MRTL metrics incompatibility for semantic-road KPI image (1,103 jobs), `KeyError: 'bdc_timestamp'` in `extract_mrtl_data.py:240` (1,052 KPI-FW jobs), and cluster-level IP address exhaustion (893 CNI failures causing SIGTERM/deadline-exceeded). Individual cluster findings were written to JSON files (e.g., `raas-rca-cluster-2.json`, `kpifw-rca-group-4.json`), and a synthesis subagent produced three final artifacts: `rca-report-2026-04-08.md`, `rca-teams-2026-04-08.md`, and `rca-contract-2026-04-08.json` containing a globally-ranked top-10 failure list with all evidence links and a concatenated learn field for OKB ingestion.",
+    "observationIds": [
+      "b2231ddf-154d-4031-8cfe-fe89ab04c0dc",
+      "4a6c30e6-24ea-4331-9d51-2fccc986d5cf",
+      "5c47e247-0924-45ee-bd56-8ff0fb2ccc6d",
+      "8355befa-56c9-42bd-ada1-1dee4d6cd078",
+      "3fdb5fa3-51a4-4e2b-a23e-7245177b7dd7",
+      "5a81aebb-c7a8-4ccf-b80b-e6f7cf0c3586",
+      "d5aea95d-4743-49ea-ab26-40ea437995fb"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.data/rca/2026-04-08T16-48-42_rpr-e2e-rca/raas-rca-cluster-2.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.data/rca/2026-04-08T16-48-42_rpr-e2e-rca/kpifw-rca-group-4.json",
+      ".data/rca/2026-04-08T16-48-42_rpr-e2e-rca/rca-report-2026-04-08.md",
+      ".data/rca/2026-04-08T16-48-42_rpr-e2e-rca/rca-teams-2026-04-08.md",
+      ".data/rca/2026-04-08T16-48-42_rpr-e2e-rca/rca-contract-2026-04-08.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "1eafaabc-5197-4b94-b098-1cfdea19f44f",
+    "date": "2026-04-08",
+    "theme": "OKB Ingestion of RCA Findings via Direct API Path",
+    "summary": "The opencode and claude agents ingested the RCA findings into the OKB using Path B (Direct API Ingest) — chosen because the learn text was already synthesized in the JSON contract, making a full re-run redundant. The learn text was split into 11 paragraph-level chunks to avoid LLM token limit truncation, and batch-ingested individually. Later, claude agents triggered the ingest pipeline via HTTP POST to the local RCA API endpoint at `localhost:8090/api/rca/ingest` with `{\"pipeline\":\"e2e\"}`, targeting the 10 findings at `.data/rca/2026-04-08T16-48-42_rpr-e2e-rca`. Progress was monitored via status and SSE endpoints; at last check 1/10 findings had been processed (15 extracted, 1 merged, 14 stored), with the pipeline still running through LLM processing. The `lastUpdated` timestamp advanced to `17:03:11Z` confirming writes to the OKB (1,637 nodes, 15,101 edges).",
+    "observationIds": [
+      "c2842a30-9b8c-4198-8fbb-839ca879a920",
+      "eeb85cff-9bce-41cb-b26e-302c4ee6ae1e",
+      "c94473ca-a25a-4e69-a189-9701be2bbd72",
+      "f5531206-f332-4e9c-b156-74b016e41f59"
+    ],
+    "agents": [
+      "opencode",
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "0133cea8-f720-4199-8752-0aeb7eed2869",
+    "date": "2026-04-08",
+    "theme": "Tour Feature Refinement: Direct Neighbors, Preview Animation, Viewport Fix",
+    "summary": "Across several exchanges, the opencode agent overhauled the guided tour feature based on developer feedback that it was visiting unrelated nodes. The BFS multi-hop traversal was replaced with a direct-neighbor-only sequence using the existing edge-priority ordering. A pre-tour preview animation was added: a `tourPreviewKey` Redux state field cycles through neighbor keys on an interval, driving highlight rings in `GraphVisualization.tsx` and a pulsing animation on the Tour button in `NodeDetails.tsx`. Subsequent refinements made the preview cycle in computed tour sequence order (using `computeGuidedSequence`), enhanced CSS keyframes to include scale and wiggle transforms on both the preview ring and node shapes, made the invite button pulse more aggressively with a color-shifting glow, and suppressed zoom-to-neighborhood re-centering during active tour steps to keep the viewport stable. A deployment issue was also identified and resolved: no Vite dev server was running and the Docker container was serving a stale morning build; a rebuild was performed and assets written to `viewer/dist/`, which is bind-mounted read-only into the container.",
+    "observationIds": [
+      "aea553d5-43ba-49a2-9b79-66f79af726d2",
+      "90cd7fcd-b784-48ee-846a-d4e578920522",
+      "a06df621-3b0f-4720-880f-7069522017b9",
+      "96b59784-6588-4b8c-a566-d73a2072b491",
+      "17e77208-f3a3-4698-9893-739c6dd1cfbc"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "graph traversal utility (getDirectNeighborKeys)",
+      "navigation Redux slice (added tourPreviewKey",
+      "NodeDetails.tsx (import",
+      "GraphVisualization.tsx (preview ring rendering)",
+      "CSS (pulse animation)",
+      "src/features/graph/utils/guidedTour.ts",
+      "src/features/graph/components/NodeDetails.tsx",
+      "src/features/graph/slices/navigationSlice.ts",
+      "src/features/graph/components/GraphVisualization.tsx",
+      "src/features/graph/styles/graph.css",
+      "src/components/GraphVisualization.tsx",
+      "src/components/NodeDetails.tsx",
+      "src/styles/graph.css",
+      "src/viewer/src/components/NodeDetails.tsx",
+      "src/viewer/src/styles/graph.css",
+      "src/viewer/src/components/GraphVisualization.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "810c245f-29e8-47ee-a643-870f5448acba",
+    "date": "2026-04-08",
+    "theme": "Git Commits for Tour UX Changes",
+    "summary": "Two separate commit operations were performed. The opencode agent committed tour UX changes in the OKB submodule as `4c56f80` (direct-neighbors-only tour + pre-tour preview animation) and updated the submodule pointer in the parent repo as `032fdf1`; unrelated specstory logs and OKB data exports were left unstaged and changes were not pushed to remote. Later, the claude agent committed additional fixes as `2a57919`, staging changes to `viewer/src/utils/guidedTraversal.ts`, `viewer/src/components/GraphVisualization.tsx`, `viewer/src/components/NodeDetails.tsx`, `viewer/src/index.css`, `src/api/routes.ts`, and `scripts/backfill-evidence-links.ts` — excluding CORRELATED_WITH edges from tour traversal and recording the ingestion of 935 operational links across 94 entities.",
+    "observationIds": [
+      "80a150f3-a7e5-434a-9a51-de752abcf6e5",
+      "a1ef43d9-6d68-45dc-8783-89d3af98e799"
+    ],
+    "agents": [
+      "opencode",
+      "claude"
+    ],
+    "filesTouched": [
+      "viewer/src/utils/guidedTraversal.ts",
+      "src/api/routes.ts",
+      "scripts/backfill-evidence-links.ts",
+      "viewer/src/components/GraphVisualization.tsx",
+      "viewer/src/components/NodeDetails.tsx",
+      "viewer/src/index.css"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "a4adf45b-5116-44b1-92c0-bc023742a4a2",
+    "date": "2026-04-08",
+    "theme": "Tour Count Inflation and Missing Evidence Links Bug Investigation",
+    "summary": "The claude agent investigated two bugs visible in a developer-shared screenshot of the OKB viewer: the Tour count showing 181 nodes (expected ~16) and the Sources & Evidence panel missing operational links. Root causes were identified by reading the guided traversal utility: CORRELATED_WITH edges were incorrectly included in the tour neighbor computation, inflating the count by approximately 168 nodes; operational evidence links were absent from the graph data. No code changes were made during this exchange — the fixes were applied in the subsequent commit (observation 31).",
+    "observationIds": [
+      "e3230952-e63b-41c3-8a66-7b6c53576199"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:48:10.407Z"
+  },
+  {
+    "id": "fe68935c-4885-49a9-9fdf-cc65764b200f",
+    "date": "2026-04-09",
+    "theme": "Knowledge Graph Tour Starsign Visualization Iterative Refinement",
+    "summary": "A multi-session effort by the claude agent to enhance the graph tour feature in the operational knowledge management viewer across `GraphVisualization.tsx`, `NodeDetails.tsx`, and `index.css`. Work began with three targeted improvements: faster wiggle animations (CSS durations reduced, preview interval dropped from 1500ms to 900ms), a persistent star marker on the seed node, and half-opacity rendering of the active tour node's direct neighbors. A developer-submitted screenshot then introduced the concept of a \"starsign\" — the seed node plus all its direct neighbors and connecting edges — as a persistent fully-lit constellation anchored throughout the tour, replacing the literal star marker. Subsequent iterations fixed an opacity priority bug where `focusedKeys` fired before `tourNodeDependents` checks, causing secondary nodes to incorrectly render at full brightness; the fix enforces starsign membership as the highest priority, with secondary dependents rendering at 0.5 opacity and unrelated nodes at 0.15. A final round of changes scaled secondary (non-starsign) nodes to half size via CSS `transform: scale(0.5)` and changed the \"Next\" button on the last tour node to loop back to the seed's starsign (index 0) rather than ending the tour. All changes were committed as `db32d4c` with the message: \"tour starsign stays lit, secondary dependents half-dim, faster wiggles, tour end returns to seed.\"",
+    "observationIds": [
+      "b4c8591f-018b-49aa-b501-93e78cbca30d",
+      "fd4f515f-65d9-4db0-b843-4696aa502aaf",
+      "6f9f074a-5b29-4b39-8433-95a7faf76a37",
+      "dba8505b-1b9f-4d3d-a0e4-bb95b3508b92",
+      "a821629e-c8d0-4be9-9f54-b48962d3c76e",
+      "8460de4c-f61a-4d1e-978e-f0a4081234f4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "integrations/operational-knowledge-management/viewer/src/index.css",
+      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
+      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/index.css",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "viewer/src/components/KnowledgeGraph/NodeDetails (partial path)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:48:18.248Z"
+  },
+  {
+    "id": "35e8685d-f079-4a5e-9921-b85c9b03df58",
+    "date": "2026-04-11",
+    "theme": "Browser Tool Setup and OKB Frontend Screenshot",
+    "summary": "The session began with a tool preference correction — switching from Playwright MCP to the `gsd-browser` skill for all browser automation. An initial attempt to reach the OKB frontend at localhost:3000 failed because only port 8080 (Docker) was listening. Navigation was redirected to localhost:3002, where the gsd-browser skill successfully located the LLM button via a DOM snapshot, clicked it to open the LLM panel, and captured a full-page screenshot saved to `/tmp/okb-llm-panel.png`. Observations 3 and 4 are near-duplicate records of the same successful screenshot action.",
+    "observationIds": [
+      "52baa0e2-79ee-429b-b128-22f78a2c6d5f",
+      "13636524-dd17-4547-82e5-456450147341",
+      "a9dee0b4-80b1-42f2-a360-baef3cdb9924",
+      "60150322-add4-40a1-a833-7e4000d110a2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "68799d07-d4fd-419a-94f3-419285d8b6da",
+    "date": "2026-04-11",
+    "theme": "BMW SuccessFactors Brandschutz Training Navigation and Content Extraction",
+    "summary": "The primary goal was to navigate the BMW SuccessFactors LMS, launch the \"BRANDSCHUTZ FÜR BRANDSCHUTZHELFER [DE/EN]\" fire safety training course, and extract all training content. Authentication was initially blocked by a missing Company ID (obs 5), but BMW SSO succeeded with username `q284340` in obs 6. Navigation required multiple workarounds: UI5 shadow DOM click interception was bypassed via JavaScript events and direct deeplink URLs, new-tab link blocking was resolved via direct navigation, and cross-origin Articulate Rise iframe restrictions were overcome using frame-scoped JS evaluation. The training's interactive facility map (7 stations: Eingang, Büroräume, Produktionshalle, Werkstatt, Außenbereich, Abschlussquiz, Ausgang) was fully traversed across several session restarts (obs 16–18 resumed after \"Bad Request\" crashes). Station-specific interactive elements — tabs, hotspot buttons (fire classes A–F), slider inputs — were handled individually. The session produced `brandschutz-training-content.md` documenting all training content including fire triangle theory, extinguisher usage, electrical safety, evacuation protocols, and 10 quiz-prep topics. A `brandschutz-training.sh` batch script was also developed to encode the clean navigation path.",
+    "observationIds": [
+      "98f5776a-c1de-4491-ada3-324a83c2a074",
+      "dfdac119-c4a9-4959-8f30-25cd4343f924",
+      "f2cbe0f6-44e2-4a19-a103-6008ebf185d1",
+      "2e24fc92-8186-42b0-80d6-38289caec1c9",
+      "64be1773-9826-43e2-ae92-a8d0f791c143",
+      "48bde6c8-6141-4b8f-86d0-04e9f654e8e1",
+      "62654e4a-d7c5-49f0-8539-044d745334f6",
+      "847c3029-26c4-4b14-b9a0-7341a91672da",
+      "aab418a7-2852-4b3f-ae00-6b53a8688975",
+      "d2658ffd-7395-4f52-8987-273f0d884f66",
+      "4584eda6-3a30-4b72-a1ee-e7f8bc5f53cf",
+      "9d655e4a-d4f7-47ca-89ac-38a88cd9e390",
+      "fcfe6934-f448-4211-9aa5-40f3bcff82d1",
+      "fd1c7c84-8535-4c9e-9d3f-eb955e274222"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(path not confirmed)",
+      "(likely gsd-browser format)",
+      "in this exchange.",
+      "`brandschutz-training-content.md` with comprehensive training documentation."
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "1a9b807c-41b6-46dc-90a8-c40efab59e33",
+    "date": "2026-04-11",
+    "theme": "ETM and LSL Session Log Diagnosis, Recovery, and False-Positive Fix",
+    "summary": "Multiple sessions were spent diagnosing why the Enhanced Transcript Monitor (ETM) had stopped producing LSL files for the onboarding-repro project. Deep investigation (obs 20–21) mapped the full ETM architecture: a 5-step startup chain, 5-layer health monitoring hierarchy, and transcript-to-LSL pipeline from OpenCode SQLite/Claude JSONL sources. The root cause of ETM termination was identified as the Global LSL Coordinator aggressively killing monitor PID 4632 due to a tmux session liveness check firing during an OpenCode restart gap. A separate false-positive routing bug was found (obs 37): `coding-keywords.json` matched self-referential strings like `\"Live Session Logging\"` and `\".specstory/history/\"` present in every specstory file, causing fire safety quiz content to score 7 against a threshold of 1 and be routed to the coding project. The fix removed overly generic keywords, raised `minimum_score` to 4, added exclusion patterns with −5 penalty, and changed `determineTargetProject()` from early-exit to majority-vote logic in `enhanced-transcript-monitor.js`. Misdirected LSL files for the 1100–1200, 1200–1300, 1400–1500, and 1500–1600 windows were recovered from `coding/.specstory/history/` and restored or cross-referenced in the local onboarding-repro history, making the session timeline continuous from 0800 through 1600.",
+    "observationIds": [
+      "d7de0b99-683a-4501-9c09-087d9fd381a5",
+      "e08cfcdc-06c4-4f37-9013-d7809e1227b9",
+      "e40a1e5a-cf0f-4c87-a6a5-8a8a4862813e",
+      "afb3c0c5-c284-4ad3-b739-8be459e0080d",
+      "013b4c8e-5be5-4c93-9023-cde3a660dca2",
+      "f2b44493-aa8c-49f3-81bd-fc6582d78edc",
+      "eb6e7ba4-c17e-4261-8839-ad2c0922054d",
+      "0facb593-3361-4eb8-ab24-f93d9f8ab54f",
+      "c32c448b-b664-49d6-ba8c-16013da4b8a6",
+      "b84c4ebd-4784-4e14-8d85-0e408e1b7897",
+      "d60d453f-767c-4819-be77-dab29ca22a60",
+      "82a81d25-6938-4ebf-ac9e-69aae11f41ec",
+      "d52020c5-596c-4063-b521-d670f70c0f1d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "`.specstory/history/2026-04-11_1100-1200_c197ef.md`; read multiple LSL/JSONL files and brandschutz-training-content.md",
+      "local LSL file with PS1-PS3 content; modified redirected LSL file in coding project to remove non-coding content.",
+      ".specstory/history/2026-04-11_1100-1200_c197ef.md (header)",
+      "(removed self-referential keywords",
+      "(majority-vote routing in `determineTargetProject()`)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "81dad256-0840-491f-aefb-2e939a1114a5",
+    "date": "2026-04-11",
+    "theme": "Brandschutz Fire Safety Quiz Automation and Completion",
+    "summary": "After completing training content extraction, multiple sessions were spent automating the 14-question Abschlussquiz inside the Articulate Rise cross-origin iframe. Early attempts (obs 29–34) navigated shadow DOM and nested iframes to reach the quiz, identifying radio inputs with `id^=\"acc-\"` prefixes and an OK button pattern. Questions Q1–Q5 were answered correctly (fire triangle, assembly point rules, extinguisher techniques, fire door prohibitions). Q6 required JavaScript mouse-event simulation for drag-and-drop fire class matching (A=solids, B=liquids, C=gases, D=metals, F=cooking fats); Q8 used range input value manipulation for a 30% slider (obs 35). After completing all 14 questions, the quiz initially scored 12/14 with AUSSENBEREICH flagged (obs 36). Session recovery and review work (obs 60–63) reconstructed quiz state from history files. The quiz was ultimately retried and passed 14/14 (obs 65–66) after correcting Q2 — the option about directing people to evacuate was incorrectly included, as that is a Brandschutzhelfer responsibility, not a general employee's. Course completion was confirmed via \"Kursabschluss bestätigen.\" The working quiz automation approach used `gsd-browser eval` with `input[id^=\"acc-\"]` selectors inside the iframe (obs 64), replacing earlier Playwright-based attempts.",
+    "observationIds": [
+      "9128abba-e3c2-43d7-beb8-f45e1bde7fc9",
+      "74e53870-60cd-444a-b217-f3a9d1ead566",
+      "0e264a1f-b8b5-4fcd-af75-f080f2e83a1a",
+      "0426ca99-05bd-4a0a-b6ca-76d40752995f",
+      "8bba6560-8f66-4add-9b33-ebbc7ec860b7",
+      "acd6bb18-11d9-452a-b761-519fb7de6f27",
+      "697dd5ef-e69b-4965-adfa-a187865c035c",
+      "15690a4f-be25-426c-9ff7-eebb8d778ca2",
+      "413053bf-7e66-4db2-9412-c7a1893b2988",
+      "56981ea4-15d4-49b8-8ce8-2552c521c82d",
+      "4384489c-41d0-4451-bc05-fac9d2827e69",
+      "9cecc753-a5da-4648-8e3a-21d50256c399",
+      "be35884d-3f43-4f27-9b4d-664607f625f1",
+      "d4291e58-c790-4721-bf75-5c0c19494a80",
+      "66a00936-fb65-485e-910f-f803fe6365fa"
+    ],
+    "agents": [
+      "opencode",
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "79118f64-cfb5-4351-b6ab-28d6df2943dc",
+    "date": "2026-04-11",
+    "theme": "OpenCode Compaction Bad Request Root Cause Analysis and Plugin Fix",
+    "summary": "A recurring \"Bad Request\" error was crashing OpenCode sessions during compaction, correlating with the introduction of the ETM/observations system. Investigation (obs 40–45) traced the full error path: when message context grows large, the BMW Copilot API proxy triggers compaction; the compaction request itself is also oversized and returns HTTP 400 (not 413); OpenCode's `isOverflow()` function only matches against `OVERFLOW_PATTERNS` and `statusCode === 413`, so the 400 plain-text response is classified as non-retryable `api_error`, leaving the session unrecoverable. `copilot_cache_control` fields were ruled out as the trigger since they appear in all successful calls (obs 42–43). The fix was a new `compaction-guard.js` plugin registered in `opencode.json` that hooks `experimental.chat.messages.transform`, aggressively truncating oversized individual message parts before the compaction request fires (obs 55–56). The plugin registration required an absolute `file://` path. The `reserved` parameter debate (obs 51) confirmed that higher values trigger compaction earlier but don't reduce payload size; the plugin hook is the only way to pre-truncate the message array. The fix was propagated to the coding repo's `install.sh` and `uninstall.sh` (obs 47, 59) so the plugin deploys globally: `plugins/opencode/compaction-guard.js` is copied to `~/.opencode/plugins/` and the `\"plugin\"` array in `~/.config/opencode/opencode.json` is updated on install and cleaned up on uninstall.",
+    "observationIds": [
+      "e60d326d-4263-484f-b2be-9fe91ca5fe0a",
+      "c3a98131-e087-4925-97ee-8970076ae2cc",
+      "faeab63f-ca61-4964-bfde-19842a86c73b",
+      "a9f441a6-ed7a-4f65-b370-996989ee6602",
+      "67d89527-faf8-4916-981f-bbb17c78c38f",
+      "107ac9b5-7fa3-4e0f-8963-e71c7db157c1",
+      "dce9446d-31df-43d1-83de-79e0e48afa72",
+      "ed85c5a0-3242-4e7c-9fed-1bc794966a0e",
+      "a3ea5086-955d-4c32-8593-d65fcef52e29",
+      "683029cf-a776-4bb4-b131-fef9b14f9786",
+      "b1f32a13-1f82-43f2-b988-687a77fbb8ef",
+      "ee930ada-fee2-4f03-aa9c-9e1446a2fc28",
+      "b5c193ef-2561-4ab2-b5f3-3e45c3f0a1b9",
+      "97b34ee2-6fbb-4741-bcda-76ecd9740552",
+      "43b32877-0a3d-411c-841b-c954c0bb90bd",
+      "f98bb897-0060-4e1b-8847-1a608cbd2a37",
+      "9914f4ea-dd02-4d02-97d4-cee6a5e9bbea",
+      "88e20e2c-32c9-49de-99f5-e98ad2cf5519",
+      "d77fa448-d0de-47f6-9555-511e9092a62b",
+      "d89c66d5-147b-446e-8b46-252ed55bfec3"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "ef6c33fe-1796-495f-84d0-336e2a5140f5",
+    "date": "2026-04-11",
+    "theme": "Standalone Brandschutz Training Script Creation",
+    "summary": "The final deliverable was a fully self-contained rewrite of `brandschutz-training.sh` that can be run outside any coding agent session. Claude (agent) read the existing script and rewrote it to interactively prompt for staff number and password at runtime, drive the complete A-to-Z training flow using the `gsd-browser` CLI, and complete the quiz using the proven `input[id^=\"acc-\"]` click approach validated during earlier quiz automation sessions. The script is now a standalone executable requiring no external context or agent infrastructure.",
+    "observationIds": [
+      "47ba22db-ed90-4499-865f-a7e67675b5e4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/_work/onboarding-repro/brandschutz-training.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:49:21.721Z"
+  },
+  {
+    "id": "cd314b22-bb29-4a04-ac38-afb5d0217d85",
+    "date": "2026-04-12",
+    "theme": "Brandschutz Training Shell Script Browser Automation Fixes",
+    "summary": "A lengthy multi-agent debugging effort (claude and opencode) to fix `brandschutz-training.sh`, a browser automation script for completing a German fire safety e-learning course via `gsd-browser`. Early fixes addressed a staff number exposed in prompts, stale `SingletonLock` files from orphaned Chromium processes, and a missing URL confirmation prompt. Later work focused on a SAML SSO relay page blocking post-login navigation — fixed by detecting and submitting the SAML form before searching for the course start button. Phase 3 bugs were traced to `set -euo pipefail` silently killing the script on `grep` failures and cross-origin iframe access; fixes added `|| true` guards and replaced iframe content access with `gsd-browser select-frame --url-pattern`. The most persistent issue was \"Kurs fortsetzen\" navigating to `assignLearning` instead of the content player — root cause was that JS `.click()` on the visible DOM element does not trigger the JUIC/UI5 event chain; the fix used shadow DOM traversal to extract bounding rect coordinates and issue a real `gsd-browser click --x --y`. A gsd-browser Unicode panic on the 'Ü' character in \"FÜR\" blocked `click-ref` ref extraction; a multi-strategy workaround (JS focus + Enter keypress, scrollIntoView + click, act --intent) was applied. Late fixes corrected a false-negative URL success check that matched `viewCurriculumDetails` in a `returnLink=` query parameter of the new URL, and added handling for the Fortsetzen/Neustart resume screen shown when training was previously completed. The script grew from ~838 to 1002 lines across the day, passing `bash -n` clean throughout.",
+    "observationIds": [
+      "ddb1aa05-f502-485d-a2a9-9e6abc74122b",
+      "7b841fff-b23c-4a4b-8239-ed7813f51143",
+      "7ad4fd7e-0cb9-4153-a5d8-a0821ff413c1",
+      "bcd33364-f015-46bd-80b4-7eff7a788ef7",
+      "f985dc61-11d9-4679-b3b1-2bd8768d021c",
+      "46834fcb-de17-4853-8e86-521044d3b41a",
+      "aa6274f7-2c59-4907-ae62-47b611cc4752",
+      "03bc6eca-86b6-4d53-9870-a750c0276f3d",
+      "aa96f494-a80d-4ebc-a1e8-43180d14f745",
+      "d8ec0c0f-4de0-4945-8c22-d4c7a080288f",
+      "d7c8c3b5-46a3-41a4-a175-7bd45ae7e605",
+      "aae9bdc2-45c4-434d-98a4-79168906f48a",
+      "68411710-15ed-4c30-aa5a-4478a6bb619d",
+      "305aa45a-678d-4285-b793-b5a2cd45fdd0",
+      "db673da1-dcb1-49fd-bbd3-3241f080b42e",
+      "9d79d666-78d5-47ee-a592-62535420b61a",
+      "3135351c-9016-429a-9f8e-b2b5539ff5ad",
+      "6e526963-ebee-4b92-91ce-8e35dbc88561",
+      "d225863c-8a0e-43e9-a7a7-9590492a5765",
+      "2fd7554e-aba3-4ed7-bfc4-f4cafbb1a807",
+      "bcf5af42-a581-4902-839b-d3041227d480",
+      "29776fad-4180-4e5a-87b2-9d390d457ad4",
+      "250e8184-8735-4b51-87c9-93329f34d1a0",
+      "fb2be2be-4b89-4f84-a6f7-6ffd3c447af6",
+      "431bb9f4-565e-4f82-a919-8f07287cdd5d",
+      "7a0d7c63-055e-45ac-bb11-70c41504ede9",
+      "acd5e057-e5b3-4260-9817-78a69726f9f7",
+      "cf6813d9-f77c-4d74-9fde-d1f511067200",
+      "9ecbca78-192f-4b48-8086-17a75400d912",
+      "135b4be6-5545-4c04-9176-a3f7a31296e8"
+    ],
+    "agents": [
+      "claude",
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/_work/onboarding-repro/brandschutz-training.sh",
+      "(SAML relay page handling inserted at lines 379-391)",
+      "(SAML handshake section ~lines 384–413",
+      "(lines 405",
+      "(Kurs fortsetzen click logic replaced with shadow DOM coordinate extraction + gsd-browser click)",
+      "(course launch button logic"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "c096b406-1b7d-48b9-a6bf-9ff1cbee95cb",
+    "date": "2026-04-12",
+    "theme": "Raw Observations Backfill and ETM Pipeline Diagnosis",
+    "summary": "After noticing that observations stopped receiving LLM summaries after April 9th and began storing as \"[Raw]\", an investigation confirmed the proxy was healthy but the ETM processes were still producing raw entries. A SQLite query identified 326 raw observations needing reprocessing, and a backfill script (`/tmp/backfill-observations.js`) was written to re-summarize them via the LLM proxy — with a fix for a `LIKE '%[Raw]%'` query that was incorrectly matching already-summarized entries containing quoted raw text. Backfill ran at approximately 12 seconds per observation; by observation 24, 77 observations had been processed before hitting a Claude rate limit, with 253 remaining. The copilot provider was identified as an available alternative to complete the remaining work.",
+    "observationIds": [
+      "efac001b-077a-4cbc-b94b-5bb474dcb156",
+      "5393e0b4-3095-4e7e-8860-6724ae28e4de",
+      "97413df4-9a40-4be2-b4b5-9f3c24225477",
+      "01c65287-d541-4834-b941-ea17d2616c8c"
+    ],
+    "agents": [
+      "claude",
+      "opencode"
+    ],
+    "filesTouched": [
+      "/tmp/backfill-observations.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "6ccf5423-afad-4f07-b051-793cc914754f",
+    "date": "2026-04-12",
+    "theme": "Documentation Style Guide Applied to PlantUML and Markdown",
+    "summary": "An attempt was made to update all documentation and PlantUML diagram files to replace the old proxy port 8089 with the new port 12435, but no file changes were completed in that exchange due to the LSL being down. Subsequently, a documentation style guide skill was invoked and successfully applied to three files: `llm-cli-proxy-architecture.puml`, `observation-pipeline.puml`, and `observational-memory.md`. The PlantUML files were updated to use the standard-style include, correct stereotypes, and layout conventions; the markdown file was updated to match.",
+    "observationIds": [
+      "5ad8e5c7-1415-483f-85c6-c278770dc45b",
+      "1db88b49-7934-41ee-9d1e-0f104fd7b7e9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/coding/docs/puml/llm-cli-proxy-architecture.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/observation-pipeline.puml",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/observational-memory.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "b1609cb0-d6af-4dde-b5c1-759ab25122cf",
+    "date": "2026-04-12",
+    "theme": "LLM CLI Proxy Provider Health Tracking and Fallback",
+    "summary": "Multiple opencode agents converged on the same root cause for broken observation recording: the LLM CLI proxy's auto-select logic always chose `claude-code` (the first entry in `CLI_CONFIGS`) based solely on binary availability, with no tracking of actual completion failures and no fallback to the copilot provider. When `claude-code` hung (due to rate limiting), all ETM observations fell through to the \"[Raw]\" fallback. The fix added a `providerHealth` tracking map with `recordProviderResult()` and `selectBestProvider()` functions, rewrote the completion endpoint with a fallback loop across providers, and reduced per-provider timeout from 120s to 30s. The proxy was rebuilt and restarted; testing confirmed copilot successfully handled requests after claude-code timeout (~41s total). Changes were made to `integrations/llm-cli-proxy/src/index.ts` (and a parallel edit to `integrations/llm-proxy/src/proxy.js` in a duplicate agent thread).",
+    "observationIds": [
+      "b70f32de-0e8a-49b1-b697-565e8e8b6355",
+      "720f143b-ff96-435f-a25f-832b92700a6b",
+      "e33643e9-66b9-436d-81a6-f33592a78f7f",
+      "09cc5bcd-992d-4249-8ea3-2afa78cf8081",
+      "9b5496ba-6e17-484a-b54f-209fb1488ae4"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "— added `providerHealth` tracking map",
+      "(provider health tracking",
+      "LLM proxy server file (added provider health tracking",
+      "integrations/llm-proxy/src/proxy.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "a14a6c91-cc54-4d02-9a22-d21400ed6e50",
+    "date": "2026-04-12",
+    "theme": "ETM and LSL System Architecture Investigation",
+    "summary": "Several agents investigated why the LSL session log for April 11–12 was missing despite the health monitor and PSM being in place. A copilot agent performed the most thorough analysis, discovering and reading 12+ core scripts to map the full ETM architecture: startup chain from `bin/coding` → `agent-common-setup.sh` → `global-lsl-coordinator` → detached spawn with PSM registration; a 5-layer health hierarchy (Watchdog → GSC → LSL Coordinator → GPS → Health Verifier); and LSL flow from transcript sources through exchange extraction to `.specstory/history/` markdown output. Root cause was identified: the Global LSL Coordinator killed ETM (PID 4632) at 11:50 CEST during a 71-second gap between OpenCode sessions, as the health system cannot distinguish \"developer stopped working\" from a brief IDE session transition. Missing LSL data extraction was initiated but not completed.",
+    "observationIds": [
+      "25414fd1-98fa-41f7-98be-c179d35456ec",
+      "b5bb99af-eb89-416e-af9e-c9305cdc6df5",
+      "429e3965-e844-4f94-bd74-e26d8b9f1d18",
+      "3d60300a-4a77-4dbe-8271-ce5a4496ca69"
+    ],
+    "agents": [
+      "opencode",
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "a1dac8b8-da6b-44b7-bd8c-9a8db0a29a34",
+    "date": "2026-04-12",
+    "theme": "Nested Observation Meta-Summaries for Onboarding Repro Sessions",
+    "summary": "A cluster of claude-agent exchanges were meta-level observation summarization tasks rather than direct coding work. These included classifying a shell script debugging exchange as \"implementing\" trajectory (confidence 0.8), summarizing a browser-automated fire safety quiz session (Q1–Q5 answered correctly, Q6 drag-drop in progress), summarizing a UI5-BUTTON coordinate mismatch diagnosis, and unwrapping a triply-nested summarization chain. No code was written or modified in any of these exchanges; they represent the observation recording pipeline processing earlier sessions from the same day.",
+    "observationIds": [
+      "6ed3c07b-893d-4e5f-8951-5d2ebf9d972c",
+      "5ac20fca-8991-4912-90d9-3f7cb549e60c",
+      "1dab05d2-8939-487c-83a2-c26b43a89dfc",
+      "aa9c2717-48ed-480c-b428-e945ec113cb3",
+      "4eb9183d-538a-48f3-bb49-12f5e78381c6"
+    ],
+    "agents": [
+      "copilot",
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "f7cfd1cb-329c-42af-be4d-934df147a7b9",
+    "date": "2026-04-12",
+    "theme": "LSL Context Loading and Observation Backfill Completion",
+    "summary": "Late in the day, the developer loaded recent session logs via the `/sl` skill to re-establish context, confirming two open threads: committing the llm-cli-proxy provider health tracking changes and re-running the observations backfill for ~211 remaining raw entries. The proxy diff was reviewed and committed as `e6e5a20e`. The backfill script was re-executed and completed successfully — 210 observations updated, 0 failed, 1 skipped — bringing the total raw count down to 14 out of 794 (likely pre-existing malformed entries). The observation system was confirmed healthy with LLM summaries working on new observations going forward.",
+    "observationIds": [
+      "b0f00419-08d1-49ac-a84d-290de7134648",
+      "090b4af1-1dd0-4413-88ad-d111f34eb8ef",
+      "f545307c-9d3c-4d82-afc6-1a8d4e097e57",
+      "f1171d09-9ec9-4839-8bb5-af9fc2dd6c6f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:50:06.818Z"
+  },
+  {
+    "id": "49eb1880-84ca-452b-9965-aa617de5f511",
+    "date": "2026-04-13",
+    "theme": "AWS EC2 Cost Attribution Across Coder Workspace Owners",
+    "summary": "The agent performed a cross-referencing exercise to attribute March 2026 AWS EC2 spend to individual Coder workspace owners. It authenticated to Coder as admin, enumerated all 18 workspaces via CLI and API, and analyzed the underlying EKS architecture to map workspace templates to node pool instance families. EC2 costs were then proportionally distributed across owners based on node pool membership. The resulting attribution table covers 11 owners, with total spend of $4,040.33 — of which $3,600.82 (89%) originates from the GPU node pool (g6 family, 115 instances). The highest proportional spender was `krithi` at approximately $1,200. A notable finding was that all workspaces were in a stopped state yet nodes continued accruing costs, pointing to an auto-scaling gap where node pools are not scaling down when workspaces are idle.",
+    "observationIds": [
+      "d65467dd-0968-4243-a6be-33dd370a91b9"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:50:12.434Z"
+  },
+  {
+    "id": "228c32a3-ba19-4bc6-8523-33c3f3574dbb",
+    "date": "2026-04-14",
+    "theme": "Observation Viewer Documentation Screenshots and MkDocs Update",
+    "summary": "The agent set out to update the MkDocs documentation site with observation viewer screenshots. After exploring the existing docs/ and docs/lsl/ directory structure and MkDocs configuration, it confirmed that `docs-content/core-systems/observational-memory.md` was the correct target page. Screenshots were copied from `docs/images/` to `docs-content/images/` (observation-viewer.png and observation-viewer-it*.png variants) and the observational memory page was updated to embed them. Additional README and docs hub updates were noted as queued follow-on work.",
+    "observationIds": [
+      "f3c891d5-8933-4ea8-a49d-2cc9a9708f0f",
+      "8c5bba4d-90ad-411e-a1bf-7fcd1b38d5d6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "enhanced-transcript-monitor.js",
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "bffb004c-1d2b-43b0-98e4-0a01de63a0e4",
+    "date": "2026-04-14",
+    "theme": "ETM Observation Pipeline Debugging: Raw Summaries and Missing Artifacts",
+    "summary": "A sustained investigation into the Enhanced Transcript Monitor (ETM) uncovered multiple cascading failures across `enhanced-transcript-monitor.js`, `ObservationWriter.js`, `health-verifier.js`, `health-verification-rules.json`, `health-remediation-actions.js`, and `start-services-robust.js`. Key issues included: (1) observations being saved as `[Raw]` because LLM summarization was silently failing — confirmed by absent `llmModel`/`llmProvider` metadata — leading to a backfill task that corrected 804 of 805 historical entries; (2) ETM stalling observation generation despite processing exchanges (last DB write was 8 minutes stale while ETM showed active processing); (3) observations always reporting \"Artifacts: edited enhanced-transcript-monitor.js\" regardless of actual edits, traced to `extractToolCalls` only capturing tool_use blocks from the first assistant message per exchange and missing Edit/Write calls in subsequent streaming messages, leaving `modifiedFiles` as null; and (4) a retroactive-patching approach being investigated to correct already-logged observations when a full prompt set completes. Six systemic health pipeline failures were also catalogued. An ETM idle-timeout exit mid-investigation required a manual restart.",
+    "observationIds": [
+      "49c40830-bcd0-42b7-9275-7e8e77b88b6f",
+      "e9db62b0-549c-47f5-acad-dbaad7b8e1b7",
+      "01d7c407-ca38-4377-8664-4b96d2f6064a",
+      "02daad43-4b5a-49f4-9629-add693baf78c",
+      "aa017f2a-77b0-471d-985b-2388f4cf720b",
+      "a24cba34-39bf-4d2e-b564-57fe7ec492c1",
+      "416684c6-370a-42ab-863d-6c8433836baf",
+      "f1c0031f-6f4e-44d8-9e04-27b8eb96f712",
+      "19560355-843d-43e5-8f66-feb286f0d655",
+      "dedfed47-a958-4f21-98f5-7f6f5280201e",
+      "0e66182a-b1ae-4b1b-a76c-cb64d32e4dfa",
+      "64e2582b-175c-4b97-bbd5-2ee68db775ca"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "enhanced-transcript-monitor.js",
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "ObservationWriter.js",
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "16a024a2-3de5-40eb-8a96-dc0c97e9b74b",
+    "date": "2026-04-14",
+    "theme": "E2E Verification Mandate Encoded into Persistent Agent Memory",
+    "summary": "After the artifact-patching fix ironically produced a new observation with missing artifacts — proving no visual verification had occurred — the developer issued a firm rule: all UI/dashboard changes must be verified with `gsd-browser` or `playwright-cli` before being declared complete, and this must never be assumed from DB queries or code inspection alone. Two memory files were updated to enforce this across all coding agents: `memory/feedback_e2e_verify.md` and `memory/MEMORY.md`. A subsequent attempt to perform the mandated browser verification was blocked by a stale `gsd-browser` daemon singleton lock, and the Observations tab screenshot was not achieved in that exchange.",
+    "observationIds": [
+      "5c0ab78e-3284-4e6b-aaef-4713ba2a4787",
+      "5b4fda2f-6edf-44f3-b296-0e70a09b0842",
+      "73dee659-9c37-432a-bef7-6d50e7c9cbb3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_e2e_verify.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/MEMORY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "b44afba5-693d-487e-9b15-bb2d055fe886",
+    "date": "2026-04-14",
+    "theme": "Health Monitoring and Observation System Verified Complete",
+    "summary": "After the morning's fixes were committed, a verification pass confirmed all 8 observation system fixes across 4 commits were in place. The health monitoring system reported all 14 checks passing with 0 issues, including newly added LLM proxy and observation quality checks. Browser-based dashboard inspection confirmed that file edits from earlier exchanges (around 09:25 CEST) were captured with full artifact paths, while later exchanges (around 10:25) correctly showed no artifacts because they only involved bash commands for health checks with no file modifications — validating the end-to-end pipeline behavior.",
+    "observationIds": [
+      "7ceb0c47-1f70-43e7-9e11-51fd2548b6c7",
+      "64d22544-b91b-48cc-ab22-29e629553302",
+      "992bb1f3-9c8f-46cc-be69-ad5a4002b438"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "5852e0d9-c4ce-4c5a-ba1d-cc802fe11615",
+    "date": "2026-04-14",
+    "theme": "gsd-browser Skill CLI Commands Catalogued by opencode Agent",
+    "summary": "The opencode agent attempted to read and document the gsd-browser skill by loading `~/.claude/skills/gsd-browser/SKILL.md` and all referenced workflow and reference files in parallel. The first exchange failed to deliver content; the second successfully began cataloguing commands, reaching 63 entries before the response was truncated mid-table during the navigation/interaction command listing. Full documentation was not produced in these exchanges.",
+    "observationIds": [
+      "524c5c91-b55e-45d6-a86a-058a948d511a",
+      "59efc9b3-1f45-48d8-96d8-93bcb0d5c66b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "c460be96-5932-440f-bce7-fa5d4f2b7347",
+    "date": "2026-04-14",
+    "theme": "LLM Abstraction Layer and Mastra Framework Architecture Mapped",
+    "summary": "The opencode agent executed 50+ parallel glob/grep/read operations across the Agentic/coding project to map the complete LLM abstraction architecture. Key findings include: `UnifiedInferenceEngine` with subscription-first provider fallback logic supporting Copilot, Claude, OpenAI, and Groq; an LLM CLI proxy running on port 8089; `@mastra/*` framework dependencies; MCP tool definitions and agent adapter patterns; and Mastra integration points across provider configurations and agent definitions. The resulting map was deemed sufficient detail to replicate the patterns in a new agent.",
+    "observationIds": [
+      "fb21f9ff-faa3-40af-87e5-836552adb37a"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "46d0adc1-5b9e-4cb9-bed2-cae9ceb8b6c9",
+    "date": "2026-04-14",
+    "theme": "Brandschutz Fire Safety Training Multi-Agent System Scaffolded",
+    "summary": "The opencode agent built a TypeScript + Mastra multi-agent system in `brandschutz-agent/` to automate a fire safety training course, replacing a static shell script. The architecture comprises three specialized agents — navigator, form-filler, and quiz-taker — coordinated by an orchestrator agent, all using gsd-browser CLI commands wrapped as Mastra tools. An LLM provider abstraction layer (`src/llm/provider.ts`, `src/llm/models.ts`) was implemented with Copilot Enterprise OAuth as the primary provider and Azure/OpenAI as fallbacks. After `npm install` succeeded, a `.gitignore` update excluded `brandschutz-agent/node_modules/` and other build artifacts, reducing tracked changes from 9,077 to 11 files.",
+    "observationIds": [
+      "7086de79-2ceb-453d-b431-03c2a0b9e2c4",
+      "4ff96aa8-aab3-4955-ac8b-fface54fb48f"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "brandschutz-agent/package.json",
+      ".gitignore"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "6f40206a-8b2b-483d-af42-3fe39443e115",
+    "date": "2026-04-14",
+    "theme": "GitHub Copilot Token Exchange Flow Reverse Engineered",
+    "summary": "To understand how to authenticate the brandschutz agent against the GitHub Copilot API, the opencode agent reverse-engineered the OpenCode Go binary via string extraction, analyzed bundled JavaScript, and reviewed GitHub source repositories. The investigation found that OpenCode uses a standard GitHub OAuth device flow to obtain `gho_` tokens, which are then used directly against Copilot API endpoints (`https://api.githubcopilot.com/models` and `/chat/completions`) — with no intermediate `copilot_internal` token exchange, unlike VS Code's implementation. Zero references to `copilot_internal` were found anywhere in the codebase.",
+    "observationIds": [
+      "bdf8da5d-3ce4-4e0b-8033-c9a2d1766b5c"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "9fea13f8-7d69-444f-8f0d-fc3845f74532",
+    "date": "2026-04-14",
+    "theme": "Brandschutz Agent TypeScript Fixes, Proxy Configuration, and Preflight Validation",
+    "summary": "A multi-exchange debugging effort resolved a chain of runtime failures in the brandschutz-agent. TypeScript compilation was fixed by correcting the `LanguageModelV1` import to come from `@ai-sdk/provider` and removing explicit type annotations to allow `LanguageModelV2` inference after upgrading `@ai-sdk/openai-compatible` from v0.2.16 (AI SDK v4) to v1.0.35 (AI SDK v5) to satisfy Mastra v1.24's `AGENT_GENERATE_V1_MODEL_NOT_SUPPORTED` requirement. A `ConnectTimeoutError` to `copilot-api.bmw.ghe.com:443` was traced to Node.js's built-in `undici` fetch ignoring `HTTP_PROXY` environment variables; a `buildProxyFetch()` helper was added to `src/llm/provider.ts` that reads proxy env vars, creates an `undici.ProxyAgent`, and passes a custom fetch to all provider instances, routing traffic through the corporate proxy at `127.0.0.1:3128`. Further debugging confirmed that the proxy configuration itself was correct, and the root cause of intermittent timeouts was the local proxydetox process not running at agent launch time. Finally, a preflight validation call was integrated into the `main()` execution flow before browser startup, and temporary test artifacts were cleaned up.",
+    "observationIds": [
+      "98445b1b-ba15-4a78-8b5e-ad381b7d0775",
+      "9918e531-29ca-4a38-98d7-a10f93dcb975",
+      "9b81ae0d-23a9-431e-9514-76c2b2a6de9a",
+      "68be7a7e-bee0-4503-ab85-1fbebac9715c",
+      "b23f321b-e5c5-4879-b935-6df41a5e4f1c",
+      "291b6cda-c6e4-45b3-a77e-a86a1c1db7c8",
+      "bfb3a472-d4b0-47ae-a8df-dae75f64f9c8",
+      "7ce30985-6db9-4ae2-8a1f-713cac3feaaf"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "brandschutz-agent/src/llm/copilot-provider.ts",
+      "test-llm.ts (temporary smoke test).",
+      "package.json",
+      "src/llm/provider.ts",
+      "proxy configuration code (specific files not shown in exchange)",
+      "fetch configuration in agent code",
+      "(specific files not visible in truncated exchange)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:51:06.811Z"
+  },
+  {
+    "id": "47f2828a-b158-4686-bca2-851a27198ce5",
+    "date": "2026-04-15",
+    "theme": "Brandschutz-Agent HTTP 400 and Proxy Debugging",
+    "summary": "The session focused on diagnosing HTTP 400 errors from the Mastra-based brandschutz-agent when calling the BMW Copilot API through a corporate proxy. The approach involved isolating variables with curl, testing model names and tools independently, and adding structured logging across browser tool wrappers, orchestrator.ts, provider.ts, and index.ts to gain visibility into execution flow. A JS syntax error was identified and fixed by wrapping evalJs code in an async function (src/index.ts lines 126-130), and a Rust UTF-8 panic in gsd-browser was identified as an unmodifiable external binary issue that is non-fatal. The 400 error was traced to the agent's second loop iteration rather than the initial API call, suggesting state accumulation between steps. A separate copilot investigation confirmed the proxy and auth token work correctly in isolation using undici ProxyAgent, but traced the likely failure to the custom proxy-aware fetch not being propagated through the AI SDK's openai-compatible provider chain during actual agent execution.",
+    "observationIds": [
+      "083c54a1-a975-45dc-90de-e14748a743d8",
+      "9157cb80-d0e5-475b-bf41-b9dcbb1b9d29",
+      "de9b8115-4caf-40ab-b13d-2be1aee6d8a4",
+      "ce41de7c-fead-42e9-877a-292bd2bdf35c",
+      "8f6182eb-17c6-4963-a17b-0553eee8665a"
+    ],
+    "agents": [
+      "opencode",
+      "copilot"
+    ],
+    "filesTouched": [
+      "test files for API validation",
+      "request interceptor script",
+      "debugging code in brandschutz-agent",
+      "browser tool wrapper files"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "b6eece93-fb0d-4455-b2cd-26187fb423b0",
+    "date": "2026-04-15",
+    "theme": "GSM Health Warning Root Cause Investigation",
+    "summary": "Multiple parallel investigations traced the `[🏥⚠️]` degraded health icon appearing in the tmux statusline. The rendering logic was traced through config → status-line-fast.cjs → combined-status-line.js, where line 1682 triggers the warning when `violationCount > 0` OR `!gcmHealthy`. The root cause was identified as `violationCount: 1` in `/tmp/.../global-status.json` caused by observation_quality degradation: all 7 recent observations were tagged `[Raw]` instead of being LLM-enriched. This in turn was caused by the LLM proxy experiencing 30 consecutive failures on both the claude-code and copilot providers due to corporate proxy blocking external API calls — a transient infrastructure issue, not a code defect. GCM itself was healthy (reporting ✅).",
+    "observationIds": [
+      "907a851f-239f-4286-89a8-7f8165a33532",
+      "4ee38172-b41b-48a8-97c8-5718c91f3d23",
+      "faadde33-b0af-46bc-b0a7-66c553833bb7",
+      "c1635367-ba64-45cb-8a81-e1610aa17edc",
+      "7c7ff207-7118-4f2c-95f9-b2f30068551d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "0b9cc5fe-5cc8-4fb8-9e81-3f505c6f4610",
+    "date": "2026-04-15",
+    "theme": "OpenCode Compaction Crash Diagnosis and Stabilization",
+    "summary": "OpenCode was crashing during compaction operations due to an oversized SQLite conversation database at `~/.opencode/data/conversation-default.db` (1.3GB) with an active 21MB WAL file. Investigation found a pre-existing `compaction-guard.js` plugin with insufficient per-part limits. The plugin was hardened with 3-pass progressive truncation logic, a 30K per-part maximum, and total payload budgets of 800K/400K to prevent proxy rejections and OOM crashes. Data bloat was cleared by vacuuming the database and purging logs and session diffs, reclaiming 3.6GB and reducing total disk usage from 5.2GB to 1.6GB.",
+    "observationIds": [
+      "88ec4ea1-d0ff-4ea4-bcf9-726c5dd514fa",
+      "d4bbfed1-d521-4a67-9eeb-0b4634f6f866",
+      "a0f53228-c2c1-4562-8dfa-52e6bde1488d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "81ed116f-95ab-4503-915a-9653581d54a1",
+    "date": "2026-04-15",
+    "theme": "Observation System LLM Proxy Fix and Raw Observation Backfill",
+    "summary": "The observation system was failing to generate LLM summaries for all new observations, showing \"LLM summary unavailable\" across the board. Investigation mapped the full pipeline: transcript-monitor.sh → enhanced-transcript-monitor.ts → ObservationWriter.js → HTTP POST to localhost:12435/api/complete (llm-cli-proxy) → SQLite. Both providers (claude-code and copilot) had accumulated 145 consecutive failures, entering a permanent cooldown state. Three root causes were identified: (1) 30s per-provider timeout was too short for CLI connection overhead, (2) `getOrderedProviders` tried claude-code first despite copilot preference even when claude was unhealthy, and (3) the cooldown counter never reset, keeping providers permanently blocked. The copilot agent fixed the proxy by filtering unhealthy providers entirely during fallback, reducing per-provider timeout to 20s, and increasing ObservationWriter timeout to 60s (`src/llm-proxy/server.ts`, `src/observation-writer.ts`). After rebuild and restart, the proxy resumed completing requests via copilot in ~7s. A backfill operation then processed 132/133 raw observations using sequential requests (rate limiting forced abandonment of 5-concurrent strategy), leaving 1 unprocessed item.",
+    "observationIds": [
+      "bf243762-c6cc-4445-9c5c-60197d08d1d1",
+      "b27d69d9-743c-4657-ad4f-f666f250f3ba",
+      "7ba90241-3005-4807-9c2d-288ecc8677ce",
+      "967b98b0-60c4-4d9e-bf74-f3e3964ceb28",
+      "be3c79f9-6828-4184-98f1-3b32bf243aea",
+      "feafec55-8da9-4127-bad8-a7dd6f0bed56",
+      "9a8b6c1a-acfd-4b22-b4fb-7a513127a706",
+      "bdca2b7b-e0ef-41e7-82c6-d62f72d54a63",
+      "4189a69e-672b-4b7b-994c-9be2322153c6",
+      "2c8abd0f-6aa4-401d-9f6f-e4cbf92e853b",
+      "1868a9c9-4fbe-4f65-9e65-3a1eeaf64f1b",
+      "b9767c2f-35a8-486f-a011-e9807cd39429",
+      "b0e16a77-9d04-4b5f-ae52-e88eb3c52f97",
+      "50228bb2-86a7-44a6-a311-5d802a616107"
+    ],
+    "agents": [
+      "opencode",
+      "copilot"
+    ],
+    "filesTouched": [
+      "src/llm-proxy/server.ts",
+      "src/observation-writer.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "feafdda3-bca9-4b3a-bbac-a3d9b64782ce",
+    "date": "2026-04-15",
+    "theme": "Observations Dashboard Default Compact View Fix",
+    "summary": "The goal was to change the observations page default view from normal card mode to compact mode. Searches for Redux state management found no global observations view mode slice — the state was purely local component state. The fix was a one-line change in `integrations/system-health-dashboard/src/pages/observations.tsx` line 60, changing `useState(false)` to `useState(true)`. A post-fix investigation revealed the running Docker container was serving stale pre-built assets, so the change appeared not to work until the dashboard was rebuilt with `npm run build` and the container was restarted to pick up the updated `dist/` output.",
+    "observationIds": [
+      "68b4c643-f810-4daa-8d14-f06881db7249",
+      "1224af52-3467-496f-9c1a-e01f7a43ae13",
+      "17136c2d-bf22-4a8e-96e5-490b6e4268a6",
+      "adb8c0bc-3e1c-49b7-bf0c-112a4dce83ea",
+      "88823956-f411-47a8-b057-5feaa238c826",
+      "151cd573-d7e8-4f12-b369-31e5458d06eb",
+      "89d93747-e517-48e8-8847-eb32d3a49f67"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/system-health-dashboard/src/pages/observations.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "96a70e4a-405f-46f7-acf4-79430ce21b19",
+    "date": "2026-04-15",
+    "theme": "GSD Browser Skill CLI Command Catalog",
+    "summary": "The copilot agent attempted to produce a comprehensive catalog of all CLI commands available in the gsd-browser skill by reading the main SKILL.md and all referenced workflow and reference documentation files in parallel. The response was truncated mid-delivery while cataloging 63 browser automation commands across navigation (4 commands), interaction (12+), snapshots, and other categories from the Rust-based CLI tool. No artifacts were modified.",
+    "observationIds": [
+      "a44f2482-6955-45ec-8cdb-e0d2160930f0"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "59cf82e0-7ce5-48d0-8b2c-48c30be73947",
+    "date": "2026-04-15",
+    "theme": "OKB Snapshot Accidental Commit Investigation and Pre-commit Guard",
+    "summary": "An investigation was triggered by commit c607481 (\"fix: compact view is default\") which accidentally staged and committed `.data/exports/general.json`, `.data/exports/raas.json`, and `.data/llm-settings.json` from the operational-knowledge-management OKB submodule alongside an unrelated compact view fix. Extensive searches through git hooks, GraphKnowledgeExporter, GraphKnowledgeImporter, checkpoint managers, and auto-commit workflows traced how `.data/knowledge-export/*.json` files are auto-generated on entity changes and then swept into unrelated commits when staged. The CGR MCP server was discovered to be unconfigured in the current environment during a related search. The fix was a pre-commit hook (`integrations/operational-knowledge-management/.git/hooks/pre-commit` and `scripts/hooks/pre-commit-guard.sh`) that blocks commits containing `.data/` files unless the commit message explicitly starts with \"docs: update KB\" or a similar KB-intent prefix. As a parallel task in the same session, OpenCode's MCP configuration (`~/.config/opencode/opencode.json`) was populated with 8 servers including code-graph-rag, filesystem, sqlite, sequential-thinking, brave-search, fetch, memory, and git.",
+    "observationIds": [
+      "44c1f6ec-7df3-49f5-a829-3326846f3ffc",
+      "9c8d68c4-c27f-44d4-8173-762b41b4a0d8",
+      "00431748-161e-4bb0-9506-7f6284aa4dfd",
+      "a0d0a055-4d99-45b2-b186-2c234cfb889f",
+      "32d106d4-e2e5-481e-a6d0-4c3a02004970",
+      "311ff288-1e0d-4a3a-8075-e673461e26b1",
+      "46d19630-efd5-4a56-8d4a-e003017a61e0",
+      "1f76a084-b052-49c0-8fb2-715210239e46",
+      "af742f88-2dcc-44e6-b647-f9444a544924",
+      "6e6a91a3-2770-4270-98fe-309c80fa5020",
+      "6b2b68a9-598d-4b9f-8779-6ba686bc311a",
+      "1f751048-6762-489c-b5c9-8e0321c70cba",
+      "d6fa4431-9d82-472c-b253-02368e9ca93d",
+      "51e7d714-8472-405c-983f-e4fef0269343",
+      "ef7525cd-c071-4251-9d6b-f4be007eca2c"
+    ],
+    "agents": [
+      "opencode",
+      "copilot"
+    ],
+    "filesTouched": [
+      "integrations/operational-knowledge-management/.git/hooks/pre-commit",
+      "integrations/operational-knowledge-management/scripts/pre-commit-guard-data.sh",
+      "~/.config/opencode/opencode.json",
+      "integrations/operational-knowledge-management/scripts/hooks/pre-commit",
+      "Python script for MCP config merging",
+      "OpenCode MCP configuration",
+      ".git/hooks/pre-commit (in coding repo)",
+      "scripts/pre-commit-hook.sh (hook template)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "a2dc6854-1ed8-4903-acf4-3286e76071c4",
+    "date": "2026-04-15",
+    "theme": "MCP Server Configuration for Non-Claude Coding Agents",
+    "summary": "An extended investigation focused on extending `install.sh`'s `setup_mcp_config()` function — which currently only generates Claude configuration in `~/.claude.json` — to also configure MCP servers for OpenCode, GitHub Copilot, and Mastra. The primary OpenCode MCP documentation URL was blocked by VPN/CN, so an alternative Simplifier documentation URL was used. Format differences were mapped: OpenCode uses an `mcp` key with `type/command array/enabled/environment` fields in `~/.config/opencode/opencode.json`; Copilot uses a `servers` key with `type: stdio` in `.vscode/mcp.json`; Mastra has no native MCP support. The processed MCP template (`claude-code-mcp-processed.json`) contains API keys and must remain gitignored. By observation 70, `install.sh` was actively being edited to add the new MCP config generation functions for OpenCode and Copilot, with investigation of `GraphKnowledgeExporter.js` also started as a parallel thread.",
+    "observationIds": [
+      "baf681a6-cf82-4689-8e1d-d36257892571",
+      "7edb1b57-44a6-483e-8a34-1d314e0e4530",
+      "d87872a3-c93f-431c-9cd2-a6105c0a0630",
+      "43b5ea6d-484c-48d1-adae-1d7067b97c89",
+      "fc7cb05c-d781-4019-a1a2-736dd844e38c",
+      "40d074f5-b97a-4370-b3ea-2ae7c2c7d9b3",
+      "ae87e598-5880-4529-b8d0-71703540593e",
+      "6bef8933-059e-4ded-a09c-5a3905660000",
+      "c0e2864f-6108-4c4b-a60e-946f790edef3"
+    ],
+    "agents": [
+      "copilot",
+      "opencode"
+    ],
+    "filesTouched": [
+      "(MCP config functions for OpenCode/Copilot being added)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:52:47.752Z"
+  },
+  {
+    "id": "99ce3e7b-226f-46e3-8efc-b998e0c3ceae",
+    "date": "2026-04-15",
+    "theme": "Intent Classification and Trajectory Analysis of Agent Sessions",
+    "summary": "Throughout the day, the copilot agent repeatedly performed meta-classification tasks — analyzing conversation exchanges and returning structured JSON identifying intent category, confidence score, and reasoning, or classifying trajectory states of Claude Code sessions.\n\n**Intent classifications produced:**\n- \"debugging\" (0.75) — user discussing a recently fixed issue with unclear commit context\n- \"feature-dev\" (0.90) — cross-agent config file distribution via `install.sh`\n- \"exploration\" (0.75) — config-sharing without specific problem statement\n- \"learning\" (0.95) — explicit \"research and understand\" language about MCP config\n- \"debugging\" (0.75) — 200+ iterative bash commands suggesting config troubleshooting\n- \"exploration\" (0.95) — extensive config investigation with explicit understanding goal\n- \"exploration\" (0.90) — 170+ bash/grep/read ops triggered by a file path mention\n\n**Trajectory state classifications produced:**\n- \"blocked\" (0.90–0.95) — 80–200+ tool calls with zero writes, errors present, user asking \"stuck?\"\n- \"exploring\" (0.95) — 1000+ read/glob/bash ops with zero write/build/test actions\n\nThe classifications consistently used tool-call-type ratios (read vs. write), error presence, and user signal language (\"stuck?\") as primary signals.",
+    "observationIds": [
+      "b2a9a4b9-8a90-414d-8196-936652b17358",
+      "f6da4d35-bacf-4e79-81b6-198cc1b005d1",
+      "63311469-9534-4a4f-a638-eb4171af1b29",
+      "50e4cd04-6096-4bba-99dd-da143f4898dc",
+      "b84f4109-1a95-4f24-b7a4-5249e13c0605",
+      "5b05d09b-45d0-4c9c-9676-8599667db05a",
+      "aa45465d-ba79-498f-9083-e92a10f9d7be",
+      "2e03377d-4033-4724-b71a-cec1526ecc9b",
+      "fdffa99c-402a-44c3-8007-3a6568da41e4",
+      "2aae596e-341e-4cb7-80d9-24503114384c",
+      "703949a9-079c-4460-a145-a87d64c60f8a",
+      "54cbc2ec-2598-460d-9875-9cc7795019bc",
+      "79239e57-4d36-4fb2-b028-bcd398f61cb0"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:22:27.348Z"
+  },
+  {
+    "id": "85959867-464f-4f73-b3a2-f70c5c9ac7a2",
+    "date": "2026-04-15",
+    "theme": "Recursive Meta-Observation Summaries of Agent Exchanges",
+    "summary": "A recurring pattern throughout the day involved copilot being asked to produce structured 4-line observation summaries (Intent/Approach/Artifacts/Result) of prior exchanges — many of which were themselves summaries, creating recursive or nested meta-documentation chains.\n\n**Key nested layers documented:**\n- Summary of MCP server configuration investigation (obs 3)\n- Summary of a summary about recursive observation generation (obs 5)\n- Summary of a summary involving MCP config analysis with a \"stuck?\" check (obs 11)\n- Summary of a cross-agent unified skill management investigation (obs 12)\n- Summary of a trajectory state classification that itself analyzed a prior classification (obs 15)\n- Summary of an MCP configuration investigation noting a VPN-blocked documentation URL (obs 20)\n- Summaries (×3) of skill discovery exploration across Claude, Copilot, OpenCode, GSD, Mastra (obs 21, 24)\n- Summary of recursive intent classification on empty input data, yielding low-confidence \"exploration\" results at each nesting level (obs 29)\n\nNo artifacts were produced in any of these exchanges — all were pure analytical/documentation tasks.",
+    "observationIds": [
+      "f95bd249-d338-4444-a157-b9a8830b931f",
+      "29f66ff7-efea-4c3e-8422-0be42427bb45",
+      "0e0bb883-7a96-4b9a-abf3-3870c82e52e2",
+      "88c6b654-afee-401c-8064-35b5441585e9",
+      "293d1bd6-9fa5-4aad-a00b-8bf0a2cee545",
+      "56fcf407-3ada-49e5-a2d0-71cb70620b6b",
+      "6cc70e55-17e7-4a72-99b0-f3341872d767",
+      "dc0b6697-2673-4c4e-98cc-33d1c388fde5",
+      "487e7e71-c72e-4dc6-9925-d1a60aeb9852"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:22:27.348Z"
+  },
+  {
+    "id": "2aa564dd-df2f-4f34-ad27-d93037f5857c",
+    "date": "2026-04-15",
+    "theme": "Multi-Agent Skill Discovery Architecture Exploration and Mapping",
+    "summary": "A substantial investigation across opencode and copilot agents mapped the complete skill and command discovery ecosystem for all coding agents in the environment (Claude, OpenCode, Copilot, Mastra, GSD).\n\n**Key findings:**\n- `~/.claude/skills/` symlinks to `~/Agentic/resi-skills/` repo; a `link` script also distributes to `~/.copilot/skills/` and `~/.codex/skills/`\n- GSD skills installed as a VSCode extension under `~/.vscode/extensions/` and integrated via `~/.claude/get-shit-done/` with YAML workflows\n- OpenCode reads from `~/.claude/skills/` and `.opencode/skills/` project-level directories; configured GSD paths in opencode config were found to be non-existent\n- Claude uses `CLAUDE.md` + `.claude/commands/` (SKILL.md format); Copilot CLI uses `.github/copilot-instructions.md` generated by `generate-agent-instructions.sh` from CLAUDE.md + skills\n- `agent-common-setup.sh` and `launch-agent-common.sh` orchestrate cross-agent initialization\n- Custom skills (`codecraft-zuul-api`, `ddad-rpu`, `fix-vulnerabilities`, `get-codeowner`, `raas-api`, `s3-session-search`) located in resi-skills repo\n\nThe investigation revealed path inconsistencies in the opencode config and established the need for a unified skill management solution using symlink indirection to a single source-of-truth repository. No files were modified — the session remained in pure exploration/planning phase.",
+    "observationIds": [
+      "512ceca5-6f44-40f4-a1be-0208bff698a4",
+      "71be333a-b7f0-4b4d-a4ad-a09ee432eb47",
+      "924f2e9b-547a-466d-9496-eb3ae950bbe6",
+      "a7baef35-ccc0-4dff-b3c3-8bf2058f72e0",
+      "19659322-1999-4826-9069-b6619e972e5d",
+      "93edf80f-6190-4f1c-ad83-ac57ad5248f7",
+      "f8675de6-de34-491e-8159-cb38d5445e31",
+      "26631a39-140d-4bb8-af10-0c371f27d0b8"
+    ],
+    "agents": [
+      "opencode",
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:22:27.348Z"
+  },
+  {
+    "id": "e8ada8fe-d79b-43b7-9ed2-5790e1118d20",
+    "date": "2026-04-16",
+    "theme": "OKB Codebase Architecture Exploration and Trending Score Diagnosis",
+    "summary": "The opencode agent conducted an extensive exploration of the OKB (Operational Knowledge Base) codebase under `integrations/operational-knowledge-management/`, mapping its full architecture including the temporal scoring system, graph visualization web viewer, ontology-based graph store, and API routes. Key UI panels identified include NodeDetails, TrendingPanel, CorrelationPanel, RcaOperationsPanel, and HistorySidebar. The agent traced trending score calculation to `temporal.ts`, where occurrence frequency within a 7-day window is used — identifying that scores collapse to 0.0 when ingestion runs are more than 7 days stale because `recordOccurrence` is never called outside of ingestion. Three fix options were proposed: ingestion-independent signals, decay-based recency scores, or adaptive time windows. A UI redesign was also recommended, adding a primary \"Issue Resolver\" view to surface the issue→root cause→resolution causal chain as a first-class workflow rather than burying it behind graph exploration.",
+    "observationIds": [
+      "16f70a8a-bbde-4083-bba4-76546c17cf34",
+      "a041cd41-0c7d-4cae-a950-1dbecdc516db",
+      "32015468-2fc5-4ffc-b5a4-d3a818c0a95f",
+      "54ba7c1c-fdd5-47d5-b872-8859f2560cbb"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "e9b83828-d81c-4bfa-a2f5-fae7f08a7b57",
+    "date": "2026-04-16",
+    "theme": "Copilot Trajectory State Classification Meta-Analysis",
+    "summary": "The copilot agent performed a series of trajectory state classifications on Claude Code exchange metadata throughout the morning. Classifications produced included: \"exploring\" (0.7 confidence) for an exchange with no tool calls or file operations; \"off_track\" (0.75 confidence) for an exchange where the agent responded with a question instead of executing a retry and reported tool calls that never actually executed; \"implementing\" (0.7 confidence) for an exchange combining 7 reads, 1 edit, and 1 task spawn; and \"debugging\" (0.85 confidence) for a retry-triggered exchange with 17 reads, 6 greps, edits, and bash commands. One observation was a recursive meta-summary documenting the nested nature of these classification exercises. No artifacts were produced; all outputs were structured JSON or narrative summaries.",
+    "observationIds": [
+      "081489c0-8337-40b7-b3d7-246ebe52b0fa",
+      "e627225b-8690-49d1-b730-52c565b59531",
+      "1ec0166d-61c8-4f1c-a40c-fe2cc1cfd3bd",
+      "ee1f325b-9a85-479a-9eec-365e9556e34a",
+      "fe818701-b0ef-4cf8-a370-a154c71da6a0",
+      "30ba4ed9-df3b-4d76-a653-21e47422fe3b"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "b5516592-7188-4422-951e-f42796edbdc8",
+    "date": "2026-04-16",
+    "theme": "OKB Trending Score Retry Investigation and RCA API Verification",
+    "summary": "Following a retry command, the opencode agent re-investigated the trending score display issue and RCA lookup integration. The agent confirmed that adaptive window fallback logic already existed in `temporal.ts` server-side, and verified that relevant API endpoints were available: `POST /api/rca/lookup` for RCA chain retrieval and `GET /api/patterns/trending` for trending patterns. The root cause of 0.0 scores was narrowed further: the 7-day occurrence window was empty (all occurrences older than 7 days), while 30-day counts existed but were not being used in display. The viewer's `TrendingPanel` was identified as a potential source of filtering or formatting issues, with investigation ongoing at exchange end.",
+    "observationIds": [
+      "f15989fd-227a-46d2-a10f-c945774629b1",
+      "6b34d4e2-b488-4168-818b-178e0bad4bc2"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "f0165a22-5181-4ed7-87b8-96d9dd85481f",
+    "date": "2026-04-16",
+    "theme": "Pre-Commit Hook Fixed to Unblock KB File Commits",
+    "summary": "The opencode agent modified the pre-commit hook to allow commits containing only KB content files (e.g., `coding.json`) to pass through unconditionally, resolving a brittleness issue where the hook was blocking legitimate KB-only commits. Mixed commits containing both KB files and other artifacts still trigger the hook's warning behavior. This was a targeted surgical fix to the hook logic with no changes to other parts of the codebase.",
+    "observationIds": [
+      "4d9af0cd-955a-431c-81bf-30e1365cced6"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "e9f27d35-6bbf-49cb-97b8-69debcd28c5e",
+    "date": "2026-04-16",
+    "theme": "Stale Dist Rebuild Fixes Trending Scores; Issue Triage Dashboard Scaffolded",
+    "summary": "The opencode agent performed repeated investigations into the OKB viewer architecture and the trending patterns bug, ultimately tracing the 0.0 score display issue to a stale `dist/` directory compiled on March 31 that was missing the adaptive scoring fallback logic. Rebuilding the project restored correct trending scores (1.5 instead of 0.0). Following the fix, the agent began implementing an Issue Triage Dashboard UX improvement: `activeView` state was added to `uiSlice.ts`, new `IssueTriage` and `IssueDetail` components were created, and `KnowledgeGraph/index.tsx` was edited to add tab navigation switching between triage and graph views. The implementation was in progress but not fully complete at the end of these exchanges.",
+    "observationIds": [
+      "0b5514af-b110-4c03-9b31-312edf413c3c",
+      "8dbe9eee-4765-4f59-8f3a-5cd6223f0e5f",
+      "39c0adcf-06c6-4e33-872c-032529981dc7",
+      "ea443d71-f19c-4fda-acbd-edd2cba94671",
+      "4c5cc2ca-fb4e-4f3a-9796-adb19b0cf510",
+      "ba69dc86-9d2b-493b-9725-0b64edc3d44e",
+      "e866432e-922e-445d-b6a0-c330cdd746f1"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(verb: edited)",
+      "(verb: created/in-progress)",
+      "for tab navigation"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "0f68021f-de02-425d-b415-83c6dbb85499",
+    "date": "2026-04-16",
+    "theme": "Server Startup Hang Investigated but Unresolved",
+    "summary": "The opencode agent investigated a server startup failure where the process never bound to a port. Potential causes investigated included stale LevelDB lock files and an `isMain` ESM guard failing due to a relative-vs-absolute path mismatch between `import.meta.url` and `process.argv[1]`. The fix applied `path.resolve` and `pathToFileURL` to normalize the comparison, and `dist/index.js` was modified and rebuilt. After confirming the `isMain` check was working correctly, the server still hung before binding — root cause shifted to something blocking between LLM initialization and the `startServer()`/`app.listen` call. The issue remained unresolved at the end of both exchanges.",
+    "observationIds": [
+      "aacc6a80-da3f-4cbd-8785-2d70fb86bb1d",
+      "7a19ee2c-4cdc-49f6-b7ac-d92ca5efd54a"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "and rebuilt",
+      "(isMain fix)",
+      "(pathToFileURL/resolve fix)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "e2a9f147-9fc4-4412-b0d3-b58842ec53bb",
+    "date": "2026-04-16",
+    "theme": "Issue Triage Tab Rendering Bugs Fixed",
+    "summary": "The opencode agent resolved a series of rendering issues in the newly scaffolded Issue Triage tab. Duplicate React `key` prop warnings were addressed by adding index-based fallbacks and unique key prefixes to trending patterns and issues list items in the `IssueTriage` component. An overlapping \"Recent Entities\" right sidebar was fixed by adding conditional logic to hide it when `activeView` is in triage mode, editing the main layout file accordingly. Finally, trending pattern labels displaying as \"trend-undefined\" were fixed by correcting property access paths — the code was incorrectly reading `p.id` and `p.name` when the `TrendingPattern` type requires `p.entity.id` and `p.entity.name`. The project was rebuilt after each fix.",
+    "observationIds": [
+      "8d463f8e-5181-433e-9606-9ef22a4896e7",
+      "97183e83-a443-49e9-80c3-fe502d12fd91",
+      "5c6be546-f4cb-42e7-856e-3a754dd23155"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:53:21.257Z"
+  },
+  {
+    "id": "df7357b5-0488-4325-83cf-eecdaaac406c",
+    "date": "2026-04-17",
+    "theme": "IssueTriage Component Rewrite: RCA Chains and Graph Navigation",
+    "summary": "The Issue Triage view was initially displaying empty, disconnected nodes because it failed to use the 15,385 edges already in Redux state. The component was rewritten to walk a 2-hop BFS from Incident nodes through RCA chain edge types (`HAS_SYMPTOM`, `HAS_ROOT_CAUSE`, `CAUSED`, `MITIGATED_BY`, `ADDRESSES`), grouping results into Symptoms → Failure Patterns → Root Causes → Resolutions sections. A second bug was traced to entity ID mismatches — edges use prefixed keys (e.g., `evidence:uuid`) but the component used bare UUIDs, so `entityByKey` lookups and `handleViewInGraph` dispatches were all updated to use `entity.key`. Two navigation bugs were then addressed: zoom-on-first-click was failing because the D3 simulation positions nodes asynchronously; the fix stores a pending key in `pendingZoomKeyRef` so the tick-120 handler can execute deferred zoom. The stale sidebar state bug in `NodeDetails.tsx` was traced to `graphSlice.selectedEntityKey` taking priority over `navSlice.selectedEntityKey`. Files modified include `IssueTriage.tsx` and `GraphVisualization.tsx`.",
+    "observationIds": [
+      "1722388c-a139-405c-8b9c-eba73968e6ef",
+      "48dadea5-48b3-40aa-9c1c-a3d0ac2c0e3e",
+      "86296581-baea-4cc0-879c-7ed06ae2a0fd",
+      "1e4c19a6-c342-4f99-902b-792eac3870bb",
+      "882c476b-fa27-4fe3-8cda-f0b3b0c621ed",
+      "051f11d4-76bf-49e6-bb89-68d3ee61d440"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "extensively (entityMap→entityByKey",
+      "IssueTriage.tsx",
+      "GraphVisualization.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "d3f7eb0a-e657-4ba0-978b-2eefb3adbb53",
+    "date": "2026-04-17",
+    "theme": "Startup Script Bulletproofing Against Docker Port Conflicts",
+    "summary": "The `coding` CLI was failing health checks after Docker Desktop crashes because stale containers had unbound ports — specifically a local Next.js dev server (PID 56716) was occupying port 3030, preventing Docker from publishing container ports and causing the host-side health check at `localhost:8080` to time out after 60s. `scripts/launch-agent-common.sh` was rewritten to detect this scenario before entering the health-wait loop by adding `_container_has_unbound_ports()` and `_recover_stale_container()` helper functions, which force-recreate the container immediately. `_diagnose_unhealthy_services` was fixed to return exit codes instead of calling `exit 0`, and the health wait timeout was reduced from 60s to 30s. Changes were committed at `0f8e3ace`.",
+    "observationIds": [
+      "362fbb9d-5f73-45af-9ec3-df2af2909592",
+      "48c7875b-4bcc-4d83-ab62-590efa7775c1",
+      "732814d6-145f-499a-a8ab-be2b9cfebb9b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "d7d0311e-99b3-4250-ba6e-f205687a76a8",
+    "date": "2026-04-17",
+    "theme": "MCP Server Configuration Cleanup Across All Agent Configs",
+    "summary": "MCP server configurations across all agent configs (Claude, OpenCode, GitHub Copilot, Mastra) were pruned to retain only three servers: `mcp-server-semantic-analysis`, `code-graph-rag`, and `constraint-monitor`. Removed servers included browser-access, serena, serena-docs, spec-workflow, shadcn, context7, playwright, mcp-git-ingest, and MCP_DOCKER. Edited files included `claude-code-mcp.json`, `claude-code-mcp-processed.json`, `claude-code-mcp-docker.json`, `install.sh`, `uninstall.sh`, `scripts/test-coding.sh`, and `~/.claude/settings.local.json`. Dead installer functions (`install_browserbase`, `install_mcp_servers`, `install_serena`, `install_shadcn_mcp`) and related variables were removed from `install.sh`. The four agent JSON configs were already clean after the first pass and required no further changes in the second pass.",
+    "observationIds": [
+      "208c785a-69ea-40cc-8213-c5f43643eee0",
+      "fee8ccf7-5f6f-4d4b-a135-0c9566d28432"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/coding/claude-code-mcp.json",
+      "/Users/Q284340/Agentic/coding/claude-code-mcp-processed.json",
+      "/Users/Q284340/Agentic/coding/claude-code-mcp-docker.json",
+      "/Users/Q284340/Agentic/coding/install.sh",
+      "other agent config files (opencode",
+      "/Users/Q284340/Agentic/coding/integrations/llm-cli-proxy/../../../.claude/settings.local.json",
+      "/Users/Q284340/Agentic/coding/uninstall.sh",
+      "/Users/Q284340/Agentic/coding/scripts/test-coding.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "1727210e-fd45-4f4c-bdb2-19170fe3d0b4",
+    "date": "2026-04-17",
+    "theme": "Documentation Refresh After MCP Server Removals",
+    "summary": "All project documentation was updated to remove references to the six retired MCP servers (browser-access, serena, shadcn, context7, spec-workflow, browserbase). Affected files spanned `docs/README.md`, `docs/architecture/README.md`, `docs/getting-started.md`, `docs/system-overview.md`, `docs/integrations/README.md`, `docs/logging/README.md`, `docs/architecture-report.md`, `docs-content/getting-started/docker-mode.md`, `docs-content/integrations/index.md`, and `mkdocs.yml`. PlantUML sources (`complete-system-overview.puml`, `coding-system-architecture.puml`, `docker-architecture.puml`, `integration-architecture.puml`) were updated and regenerated as PNGs. The integration docs for browser-access and Serena (`docs/integrations/browser-access.md`, `docs/integrations/serena-ast-analysis.md`, and their `docs-content` counterparts) were deleted. MkDocs navigation was updated to match the current integration set and a build was verified clean.",
+    "observationIds": [
+      "cbf23694-55a5-4a00-9d3b-b107dccd768f",
+      "667e3c20-2c92-4523-af73-90d6b6e3835b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "docs/README.md",
+      "docs/integrations/browser-access.md",
+      "docs/integrations/serena-ast-analysis.md",
+      "docs-content/integrations/browser-access.md",
+      "docs-content/integrations/serena.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "64b12e86-be94-4343-96aa-f5ca5a914511",
+    "date": "2026-04-17",
+    "theme": "Trending Patterns: Limits, Entity Filtering, and Evidence Links",
+    "summary": "Three issues were found and fixed in the trending patterns feature. First, a hard-coded `.slice(0, 3)` was replaced with a default-5/show-all-10 expand-collapse pattern in `IssueTriage.tsx`. Second, the \"Sources & Evidence\" section present in `NodeDetails.tsx` had never been ported to `IssueTriage.tsx`; it was added by collecting `sourceRefs` from the incident and its full RCA chain and rendering them grouped by type with icon/label mappings for Argo, RaaS, Grafana, CloudWatch, and similar systems. Third, the trending algorithm in `temporal.ts:115` lacked entity-type filtering, causing documentation entities ingested into the `pattern` layer to appear as trending patterns; a whitelist of semantically valid types (`FailurePattern`, `Resolution`, `RootCause`, `Decision`, `Requirement`, `Risk`) was added to `getTrendingPatterns`.",
+    "observationIds": [
+      "29518614-a349-4234-8e54-22562aa0df83",
+      "1971157d-2958-4d41-a015-bc34fcbd0c09",
+      "bed05899-543b-4936-9834-566fe3981d1f",
+      "f0d70622-aef5-42d3-8446-312472a86635"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "IssueTriage.tsx",
+      "(file path not confirmed in exchange)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "a3e03272-0155-4a98-b798-e94a86b46912",
+    "date": "2026-04-17",
+    "theme": "Operational Evidence Links Investigation and Graph Traversal Expansion",
+    "summary": "An investigation was conducted to determine whether knowledge graph nodes contain operational URLs (Argo, Grafana, RaaS, S3, CloudWatch). It was confirmed that Argo workflow URLs, Grafana dashboard URLs, and RaaS job URLs exist in entity `sourceRefs[]` on RCA-ingested entities, while S3/CloudWatch links have schema support but no ingest builder. The triage UI was only showing documentation links because the selected incident's RCA chain connected only to doc-sourced entities. The fix extended evidence collection in `IssueTriage.tsx` to traverse the full graph beyond the direct RCA chain (3 hops), and sorted evidence groups to surface operational links before documentation links. All changes were committed.",
+    "observationIds": [
+      "859397a9-e612-4b7c-a808-a2c7abb9992a",
+      "4965099b-d6d8-4759-95a8-015190ba72e1",
+      "f713618c-299e-454c-b61d-c6fadbf3972d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/IssueTriage.ts (or similar triage component)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "b0317e37-aafe-40f6-9acb-b263085b3e21",
+    "date": "2026-04-17",
+    "theme": "OKB Export Domain Bucketing Cleanup and Submodule Commits",
+    "summary": "The `.data/exports` directory had accumulated 22 extraneous per-domain JSON files because `exportJson` created one file per unique domain found in node metadata, while `hydrate` only read three standard files (`raas.json`, `kpi-fw.json`, `general.json`). The fix bucketed all non-standard domains into `general` during export for both node and edge bucketing logic, so exactly three canonical output files are always produced. The 22 stale files were deleted (they were already gitignored). Related source changes to `src/index.ts`, `GraphVisualization.tsx`, `index.tsx` (KnowledgeGraph), and `uiSlice.ts` were committed as `57e6be9` in the OKB submodule with parent pointer updates, and KB exports were committed separately as `d83eeae`/`cbbe223`.",
+    "observationIds": [
+      "cfd84d15-b597-4a30-9ab6-0f36286799f1",
+      "69f917b2-c5bf-4bea-a832-7070424a4f8d",
+      "24613516-13d1-462a-9dec-463515a2c021",
+      "622079c4-ac38-4c99-b5a5-f54e3ced17f7",
+      "ab6ae755-02fa-49ab-9220-5b9a828219b1"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/index.ts",
+      "GraphVisualization.tsx",
+      "index.tsx (KnowledgeGraph)",
+      "uiSlice.ts",
+      "scripts/pre-commit-hook.sh",
+      "source file handling exportJson domain bucketing",
+      "edge bucketing logic to use the same standard domain mapping",
+      "export logic source file (domain bucketing for nodes and edges)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "24747a95-b65e-41ae-84dc-181cea4a7106",
+    "date": "2026-04-17",
+    "theme": "Git Repository Sync and Remote Push",
+    "summary": "Both the OKB submodule and parent repository were synchronized with their remotes via rebase-pull and push. Unstaged specstory log files were stashed to unblock the rebase operations. In the second sync pass, the OKB submodule was rebased (dropping one duplicate export commit) and pushed to `911e399`, while the parent repo rebased 10 local commits on top of remote changes and pushed to `e4d33ce`. Specstory logs were stashed again to resolve conflicts during rebase.",
+    "observationIds": [
+      "e1149e9c-2434-4332-9139-9c613ae737be",
+      "99d0bf14-4a5f-4390-9817-eaade6571b6c"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "b1094174-d13a-4dc1-8bca-671828007d5f",
+    "date": "2026-04-17",
+    "theme": "Git Large File Removal and LSL History File Splitting",
+    "summary": "A 164MB archive file (`specstory/archive/2026-04-15_1500-1600_c197ef.md`) was blocking GitHub pushes due to the 100MB file size limit. `git filter-repo` was used to rewrite history and remove the file from all commits, and `.specstory/archive/` was added to `.gitignore`. Beyond that, 636+ large session history files in `.specstory/history/` were identified as exceeding a 200KB threshold. A Python script was written to split all 1,400+ existing oversized files into numbered parts (inserting a part number between the time window and hash in the filename, e.g., `2026-04-17_1100-1200-1_c197ef.md`) at \"## Prompt Set\" boundaries, producing approximately 8,235 split parts. This complemented previously-committed logic that automatically splits new session log writes.",
+    "observationIds": [
+      "1e5c0c76-24dd-4d05-9d1e-3e3534721ff9",
+      "250cdaa2-66b9-4473-864a-4cc0d1c5e9ee",
+      "7891ef47-8eb6-4097-b94b-84ef90a1e2b1",
+      "155c7c67-376d-4d30-a5d5-7dee25e7c370"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      ".gitignore",
+      "history file splitting script",
+      "3306 split history file parts",
+      "(1478 files → 8235 parts)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "a5d013cb-288e-4747-a857-04084bbf3b4b",
+    "date": "2026-04-17",
+    "theme": "OKB Docker Container Security Fixes (Non-Root User, API Key Exposure)",
+    "summary": "Two high-severity security findings (H1 and H2) identified by LSL were resolved in the OKB Docker configuration. H1 (container running as root) was fixed by adding a `node_app` user (UID 1001) with owned app directories to `docker/Dockerfile` and switching to that user at runtime. H2 (API keys exposed via `docker inspect` through plaintext environment variables) was fixed by removing hardcoded API key references from `docker/docker-compose.yml` and `docker/supervisord.conf`, replacing them with an `env_file` directive. A previously-committed fix (C1: TLS verification) was already in place. The session resumed after a crash to confirm and finalize these changes, which were queued for commit.",
+    "observationIds": [
+      "550d9436-c515-40b3-afc5-3cb5488cd74f",
+      "51d94bf0-fd73-4355-af84-930e5d7fd877"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "a9786531-7480-48b9-b69c-36729b6518f2",
+    "date": "2026-04-17",
+    "theme": "OKB and Coding Project Documentation Updates for Recent Changes",
+    "summary": "MkDocs documentation in both English and German locales was updated to reflect three recent OKB behavioral changes: adaptive window fallback for trending scores, entity type whitelist filtering in `getTrendingPatterns`, and the standard-domains bucketing constraint in `exportJson`. Files updated included `docs/intelligence.md`, `docs/de/intelligence.md`, `docs/architecture.md`, and `docs/de/architecture.md`. The intelligence PlantUML diagram in the OKB submodule was also updated and its PNG regenerated. Separately, the architecture docs were corrected to reflect that the copilot LLM provider now uses direct HTTP POST calls with an OpenAI-compatible endpoint and OAuth token rather than the Copilot SDK/CLI, while the claude-code provider remains CLI-based. MkDocs was built successfully with EN and DE locales and served locally at `http://127.0.0.1:8000/`.",
+    "observationIds": [
+      "69a21e80-a93f-4f47-b473-e24f32f02a1e",
+      "a63b7399-36bf-45b2-b9ce-f83d068f0af4",
+      "ee5b626c-66f2-4be1-8ae1-8ba8fd58ef56",
+      "fd03ea73-6c1c-4f0b-8ed0-ab04212457cc"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "b32d1f9a-7662-49d0-a0c3-635fe2b48fc4",
+    "date": "2026-04-17",
+    "theme": "LLM Proxy Layer Research and Extraction Planning",
+    "summary": "A read-only audit was conducted across the OKB submodule and the coding project's `semantic-analysis` MCP server to map all LLM proxy/service files — identifying 26 source files (~4,467 lines) across providers, config, proxy bridge, and tests, confirming `src/llm/` is a domain-agnostic reusable layer. A comparison of the two implementations found overlapping provider logic and a unique `proxy-provider.ts` in the coding project. Based on this, a 6-phase refactoring plan was produced to extract the combined LLM abstraction into a standalone npm package (`rapid-llm-proxy`) under the `adpnext-apps` GitHub Enterprise organization, covering repo scaffolding, source canonicalization, consumer integration for both OKB and coding, documentation and PlantUML updates across all three repos, and cleanup. Execution was queued pending GitHub Enterprise account setup; no files were modified.",
+    "observationIds": [
+      "6d321081-f639-4cce-b090-3005127e55b6",
+      "a0d5d41e-a664-4bf7-bbf1-f4c2cc49bf34",
+      "00fbe8ac-cdea-4d5c-b90c-0fd2eac71497",
+      "ddd50db0-61f1-458a-88e8-fab80147e907"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "e51c2e29-63ed-4cd3-82a7-7c613c0c9ed2",
+    "date": "2026-04-17",
+    "theme": "Scaffolding the rapid-llm-proxy Standalone npm Package",
+    "summary": "The `rapid-llm-proxy` repository was created under `https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy` (later also referenced as `rapid-automations`). Source files were extracted from OKB (the superset) and merged with the unique `proxy-provider.ts` from the coding project. The scaffolded package includes TypeScript source under `src/` with all provider implementations, a `package.json`, `tsconfig.json`, barrel `index.ts`, a `bin/` CLI entry point, proxy bridge, config loading, test files, and `docs/` markdown with PlantUML architecture diagrams. TypeScript compilation errors around barrel exports and `ProviderName` references in `proxy-provider.ts` were actively being resolved across successive sessions; compilation reached a clean state by the final session, though PlantUML rendering hit a syntax issue at the last step.",
+    "observationIds": [
+      "7903f47c-9e6c-416f-93d9-b046706b0072",
+      "f156881e-6754-474a-8a44-f3fa7cc759a2",
+      "ae4f2e38-3951-47f7-9d9c-c6dfb414592f"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "in `rapid-llm-proxy` repo including `src/` source files",
+      "across `rapid-llm-proxy` repo including `src/` TypeScript sources"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:54:46.926Z"
+  },
+  {
+    "id": "996f5c69-2d96-4073-ba55-d19bb6d899d3",
+    "date": "2026-04-18",
+    "theme": "LLM Proxy Extraction into Standalone Shared Package",
+    "summary": "The goal was to extract the LLM service logic out of both the OKB and coding repositories into a single standalone `@rapid/llm-proxy` npm package shared across repos. Work began with documentation and diagram updates — OKB MkDocs (EN/DE), PUML architecture diagrams, and coding docs were all updated to reference `@rapid/llm-proxy` as an external dependency, with 5 PNGs regenerated. In the subsequent phase, the actual code extraction was performed: `src/llm/` was deleted from OKB, `lib/llm/` from coding, and all consumers (5 files in OKB, 9+ in coding) had their imports rewritten to the new package, with full proxy bridge implementations replaced by thin wrappers. The new package was published via git dependency and both repos confirmed to compile cleanly. A follow-up audit then corrected 7 stale MkDocs content files under `coding/docs-content/` to reflect the direct HTTP Copilot integration, accurate `@rapid/llm-proxy` import paths, and updated provider counts — observations 3 and 4 both describe this same documentation sweep.",
+    "observationIds": [
+      "bf6c43cc-106c-4345-81ac-ce924e445408",
+      "fa29b065-a687-40b8-ab8d-4ba710f45a44",
+      "b68cd90a-f430-4eb3-bc41-b930496124f1",
+      "56fde214-639d-447a-b6b0-d6d8ab8f112b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "with dist build; OKB `src/llm/` deleted",
+      "(llm-providers.md",
+      "(llm providers"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:55:08.628Z"
+  },
+  {
+    "id": "4ebd3003-41af-4abd-993b-c3240aeafdd3",
+    "date": "2026-04-18",
+    "theme": "OKB MkDocs Local Build and Serve",
+    "summary": "After the LLM proxy documentation updates, the OKB MkDocs site was rebuilt and served locally for manual deployment review. The initial serve attempt resulted in a non-responsive server at `http://127.0.0.1:8000/`, diagnosed as the process not staying alive due to timeout constraints. The server was relaunched as a background process and confirmed live with HTTP 200 responses.",
+    "observationIds": [
+      "4dd974b5-c36a-44d8-a72a-a8455c216373",
+      "c4303266-26bd-4da5-a280-6bf5db14d248"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:55:08.628Z"
+  },
+  {
+    "id": "ebd99e54-0918-42ed-9b39-82ec0a586d21",
+    "date": "2026-04-18",
+    "theme": "Docker Build Fix for Local Tarball Dependency",
+    "summary": "Docker builds for OKB began failing because the newly introduced `@rapid/llm-proxy` git URL dependency could not be fetched inside Docker due to authentication issues with `bmw.ghe.com`. The fix was to replace the git URL in `package.json` with a path to a local tarball, and add a `COPY` instruction in the Dockerfile to bring the tarball into the build context before `npm ci` runs. The Docker build context is the OKB root, making a `vendor/` directory accessible once the Dockerfile `COPY` step was added. Both `package.json` and the `Dockerfile` were modified to complete the fix.",
+    "observationIds": [
+      "42af813d-adec-4204-b1b8-af128298a73f",
+      "d66bba1f-98fe-4528-bcf9-9f490353fd77"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(swap git URL for local tarball path)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:55:08.628Z"
+  },
+  {
+    "id": "4ed8ab04-a0bc-467b-8091-e1d67a23d603",
+    "date": "2026-04-18",
+    "theme": "End-to-End Diagnosis of Missing Observations via MCP Server",
+    "summary": "An end-to-end test revealed that no observations were being generated, traced through a chain of failures: no LLM providers registered in the container, the proxy bridge not running on the host, and stale compiled JavaScript in the MCP server's `dist/` directory still referencing the deleted `../../../../lib/llm/dist/index.js` path. The proxy bridge was started and the MCP server was rebuilt to reference `@rapid/llm-proxy` correctly, but LLM calls from the MCP server continued to time out due to an unresolved issue with the MCP server discovering the proxy bridge URL across the host/container boundary.",
+    "observationIds": [
+      "fda843a1-9290-470c-a43e-6e02eec20dfd"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "`../../../../lib/llm/dist/index.js`)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:55:08.628Z"
+  },
+  {
+    "id": "5ef51d2f-d35c-4a15-b59f-512f848b8c64",
+    "date": "2026-04-18",
+    "theme": "GitHub Copilot Provider OAuth Session Token Exchange Fix",
+    "summary": "The Copilot provider was crashing because it sent raw OAuth tokens (`gho_...`) directly to the Copilot API rather than first exchanging them for short-lived session tokens. A `getSessionToken()` method was implemented in `rapid-llm-proxy/src/providers/copilot-provider.ts` to perform the exchange via `api.github.com/copilot_internal/v2/token`, with caching and a 5-minute expiry buffer. An initial edit attempt in observation 10 corrupted method boundaries in the TypeScript file, merging `getSessionToken()` with `completeDirectHTTP()`, necessitating a full file rewrite in observation 11. Additional fixes addressed enterprise token exchange always routing to `api.github.com` (not the GHE domain) and correcting undici `ProxyAgent` usage in `proxy-bridge/server.mjs` to call undici's `fetch` directly rather than `globalThis.fetch` with a `dispatcher`. The remaining blocker is an expired OAuth token in `~/.local/share/opencode/auth.json` returning 401, requiring user re-authentication via OpenCode.",
+    "observationIds": [
+      "96f6437c-5788-4094-b339-03b0a68a39fe",
+      "c5427169-c501-40c2-be8f-c27c026630bb"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:55:08.628Z"
+  },
+  {
+    "id": "8f848cf5-01f0-4bb1-8a07-049e2c17bfe3",
+    "date": "2026-04-19",
+    "theme": "Initial Diagnostic: Merge Conflicts and Stale Observations",
+    "summary": "A developer check-in prompted a diagnostic audit of the coding project. The assistant discovered a massive unresolved git merge conflict spanning 63+ files, with 31 conflict blocks in `server.js` alone, rendering the observations API unparseable. The SQLite database was confirmed intact with records through April 18 at 18:54, but the observation writer had stopped producing new entries. Two pending remediation tracks were identified: resolving the merge conflict and verifying the LLM proxy path.",
+    "observationIds": [
+      "63b801c8-91d5-45d5-bc92-fa5b7aa42947"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "5b696643-d199-437b-b109-156df11a79fb",
+    "date": "2026-04-19",
+    "theme": "Copilot LLM Proxy Auth and Auto-Route Fix",
+    "summary": "A series of investigations identified and fixed multiple bugs in the Copilot LLM proxy integration. The core auth bug was an incorrect token exchange: the bridge server was POSTing to `api.github.com/copilot_internal/v2/token` for enterprise tokens, which causes 401 errors — the correct approach is to use the OAuth refresh token directly as a Bearer against `copilot-api.${enterpriseUrl}/chat/completions` with no token exchange step. Additionally, the bridge server was ignoring the YAML config and hardcoding providers with the wrong priority order (anthropic first instead of copilot). A missing auto-route feature meant requests without a `provider` field were rejected outright; this was fixed and deployed to all three installed node_modules locations. For the OKB consumer, the `@rapid/llm-proxy` vendored package also lacked corporate proxy support, which was remediated by adding a zero-dependency CONNECT tunnel using Node.js built-in `http`/`https` modules since `fetch()` ignores `HTTPS_PROXY`. After fixes, Copilot reports `available: true` and responds in ~1–1.4 seconds using `claude-sonnet-4.6` as the default model (versioned names like `claude-sonnet-4-20250514` are unsupported on the enterprise endpoint). A 38-test mock suite was also written and confirmed passing.",
+    "observationIds": [
+      "bc559eff-76ea-4520-b10d-bcded026d665",
+      "c42b230c-eed0-40d8-b94b-772d91d5e95b",
+      "b9e9c618-1573-40a8-8eb6-5d16854dd7a2",
+      "64026d81-6f9c-495d-b997-8b27fa2d7b5a"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "bridge server file (copilot provider section — replaced `getCopilotSessionToken` with `getCopilotCredentials`",
+      "vendor/rapid-llm-proxy source copilot-provider.js",
+      "rapid-llm-proxy/src/proxy-bridge/server.mjs",
+      "integrations/operational-knowledge-management/node_modules/@anthropic/rapid-llm-proxy/dist/proxy-bridge/server.mjs",
+      "~/Agentic/coding/node_modules/@anthropic/rapid-llm-proxy/dist/proxy-bridge/server.mjs",
+      "rapid-llm-proxy/tests/integration-bridge.test.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "43ba3013-1c66-49c5-a1a6-337b13d21b52",
+    "date": "2026-04-19",
+    "theme": "Monitor Process Hangs on VPN-Blocked LLM Providers",
+    "summary": "The observation monitor repeatedly stopped producing entries due to processes stuck in SYN_SENT TCP connections attempting to reach external LLM APIs (Groq, OpenAI, Anthropic) that are firewall-blocked on VPN. The `SemanticAnalyzer` was identified as one culprit making direct API calls during initialization; its unused initialization was removed. The broader fix involved adding VPN-aware provider filtering to `ProviderRegistry` so non-VPN-compatible providers are skipped during initialization, plus `AbortController` timeouts to actually cancel hung TCP sockets rather than letting them stall indefinitely. A separate issue caused duplicate observations: the monitor's 2-second poll cycle fired `_firePromptSetObservation` on every transcript growth event, producing different content hashes each time and bypassing dedup logic; this was fixed by debouncing on user prompt content within a time window. After fixes, monitors resumed continuous writes via the Copilot provider only when on VPN.",
+    "observationIds": [
+      "3de1c0d0-f2b3-4d97-be45-bd43441bbe87",
+      "fe2d6c7c-b4c6-4bf3-838d-a957db257de2",
+      "4d2dd934-ca0e-4e5d-81f9-49f8c0d2a10d",
+      "5c46da7e-2c33-4cfb-980c-d162cf673dca",
+      "51f81d5a-a4d3-4ad0-903a-64e09ac9d997"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "SemanticAnalyzer.js or related monitor file to remove direct API initialization",
+      "monitor/observation_writer.py or similar monitor source file",
+      "rapid-automations monitor file",
+      "ProviderRegistry initialization code",
+      "LLMService provider filtering",
+      "provider-registry.js dist in multiple node_modules locations",
+      "TypeScript source for ProviderRegistry",
+      "provider-registry.js (multiple copies across projects)",
+      "unified-inference-engine.js (monitor files)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "b3c90a95-278c-489d-857f-e23783cdb03f",
+    "date": "2026-04-19",
+    "theme": "Observation Viewer Showing Stale and Missing Data",
+    "summary": "The observations viewer repeatedly appeared to show stale or incomplete data (nothing after April 17th, 457 entries with `[Raw]` / \"no LLM summary available\"). Investigation traced through the full pipeline — backfill completion status, SQLite WAL checkpointing, Docker container mount freshness, and API query logic. The backfill script (reprocessing `[Raw]` entries through Copilot) was confirmed running at ~222/457 and completed at 457/457 with zero errors. A key root cause for the viewer gap was the Docker health-dashboard service holding a stale read-only SQLite connection that could not see new WAL data; restarting the service forced a fresh connection, making all 250+ new entries through April 19th visible. A secondary cause was frontend caching, resolvable with a hard refresh. After remediation, broken/raw entry count dropped to 0 and 66 April 19th entries showed proper LLM summaries.",
+    "observationIds": [
+      "f3f875d7-ddca-465b-be66-94dd3725ff3e",
+      "8b7a8340-3048-470d-bd5f-29ba7ef53b13",
+      "8213f429-4944-4b8d-840a-b4968a42f26f",
+      "e950e196-ca8a-4e76-b4c1-5f400ccd296a"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "01beb715-dd4c-4f61-aac2-cec0a7a1d8d5",
+    "date": "2026-04-19",
+    "theme": "VPN Detection and Network-Aware Provider Overrides",
+    "summary": "VPN/CN network detection was implemented as a new feature in the LLM proxy. A new `src/vpn-detection.ts` module identifies BMW VPN interfaces by inspecting `utun` routes and DNS suffixes to determine whether the current network mode is `vpn` or `public`. The `network_overrides` key in the YAML config was wired through `src/types.ts` and `src/config-loader.ts`, and applied during `ProviderRegistry.initializeAll()` so per-network provider preferences take effect at startup. The bridge server's auto-route logic and `/health` endpoint were updated to reflect the detected network mode, and the todo list was updated to mark these items complete.",
+    "observationIds": [
+      "57fcb87d-8038-4a2a-bd7e-a34c4416ae74"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/vpn-detection.ts",
+      "src/types.ts",
+      "src/config-loader.ts",
+      "src/provider-registry.ts",
+      "src/bridge-server.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "b839192a-0a54-4485-a836-6c80e9a1b419",
+    "date": "2026-04-19",
+    "theme": "Corporate Proxy Activation Diagnostics — No Path Found",
+    "summary": "After the developer activated the corporate proxy, iterative diagnostics were run across multiple proxy endpoints to find a working path to the GitHub Copilot API (`api.individual.githubcopilot.com`). No working path was established: the corporate PAC proxy (proxydetox) blocks the Copilot endpoint, and direct access is firewall-blocked. Port mapping details were still being clarified at the end of the exchange.",
+    "observationIds": [
+      "2defd911-53b9-44d6-ae91-97d0d3cbae49"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "940f322b-56f6-4c8e-8cdf-eade3d62d6b3",
+    "date": "2026-04-19",
+    "theme": "LLM Proxy Documentation, CN-Neutral Cleanup, and MkDocs Integration",
+    "summary": "A documentation and neutralization effort was carried out to prepare the standalone `rapid-llm-proxy` package for public GitHub release. All BMW/company-specific references were systematically removed from source files (`copilot-provider.ts`, `network-detect.js`), YAML configs, compiled dist files, package.json, and test files, replacing hardcoded corporate values with generic configurable alternatives and example URLs. Six new documentation files were created under `~/Agentic/_work/rapid-llm-proxy/docs/`: `architecture.md`, `integration-guide.md`, `providers.md`, `proxy-bridge.md`, `configuration.md`, and `network-detection.md`, covering component topology, npm/HTTP bridge integration with curl and Docker examples, per-provider setup (Copilot OAuth, ClaudeCode CLI-only, API-key providers), full YAML config field reference, and VPN/network detection logic. PlantUML architecture diagrams were created illustrating the host-agent + sandboxed-Docker integration topology, and the MkDocs umbrella repo nav was updated with a new proxy documentation section. The standalone proxy README was also updated to reference diagrams, and German (`DE`) translation variants of documentation pages were created alongside English versions using a Fast Path / Full Details tab structure.",
+    "observationIds": [
+      "93cc4bb9-2530-442f-989e-df5bca05db5a",
+      "09ba936b-d922-4a7f-9023-b9559e468765",
+      "9f0308a0-3c6d-4871-ae05-0a41a2a1ec08",
+      "4ddbd278-9f31-40bc-9587-d8af7930af7a",
+      "ff9ca939-4a74-4086-876b-a2080700e52b",
+      "4b6f5b3e-b8c5-4506-b4b5-740c581945be",
+      "e9798f67-9cc4-412b-8265-29568dcef726"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "multiple source files (copilot-provider.ts",
+      "architecture .puml and .png diagram files",
+      "integration manual markdown",
+      "PlantUML diagram files and generated PNGs",
+      "MkDocs documentation pages (architecture",
+      "~/Agentic/_work/rapid-llm-proxy/docs/architecture.md",
+      "~/Agentic/_work/rapid-llm-proxy/docs/integration-guide.md",
+      "~/Agentic/_work/rapid-llm-proxy/docs/providers.md",
+      "~/Agentic/_work/rapid-llm-proxy/docs/proxy-bridge.md",
+      "~/Agentic/_work/rapid-llm-proxy/docs/configuration.md",
+      "~/Agentic/_work/rapid-llm-proxy/docs/network-detection.md",
+      "README.md (LLM proxy repo)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "d594ca13-3e65-4c4d-9009-81aeddae47bf",
+    "date": "2026-04-19",
+    "theme": "Architecture Diagram Color-Coding and Cleanup",
+    "summary": "The architecture diagrams for the LLM proxy were updated with a consistent 5-color scheme to improve readability: blue for host-local calls to the LLM proxy, orange for Docker-to-proxy-bridge connections, green for outbound calls to Copilot/LLM providers, red for corporate proxy tunnels, and purple for config/file reads. An initial attempt used direction hints (`-down-`, `-right-`) in PlantUML arrows that conflicted with color syntax; this was fixed by switching to plain `--` arrows. Four orphan PNG files without corresponding `.puml` sources (`architecture-overview.png`, `docker-integration.png`, `provider-routing.png`, `request-sequence.png`) were deleted and the overview page was updated to reference the already color-coded `component-model.png`. All four remaining diagrams (component model, deployment topology, request flow, network-adaptive routing) were regenerated with legends and deployed to both the MkDocs site and standalone proxy repo locations.",
+    "observationIds": [
+      "cd25f0d6-78ff-4bc7-887e-dd00e730554b",
+      "08053585-b6cb-4a02-b69c-97a477de06d5",
+      "8fca7e32-c34e-42b2-837c-8aa17949a4e9"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "docs/integrations/llm-proxy/index.md",
+      "docs/integrations/llm-proxy/architecture-overview.png",
+      "docs/integrations/llm-proxy/docker-integration.png",
+      "docs/integrations/llm-proxy/provider-routing.png",
+      "docs/integrations/llm-proxy/request-sequence.png",
+      "multiple diagram source files and regenerated PNG outputs in both the MkDocs site and standalone proxy repo locations."
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:03.221Z"
+  },
+  {
+    "id": "0a9297ee-018f-4e24-8c5f-aaaa6d7791e8",
+    "date": "2026-04-20",
+    "theme": "Initial Health Monitoring and Process Recovery Audit",
+    "summary": "An investigation was conducted into the ~/Agentic/coding project's health monitoring, watchdog systems, and process restart/recovery mechanisms. The analysis was cut off before conclusions could be delivered. A follow-up review of the todo list revealed it was incomplete, and it was updated to reflect remaining tasks — including merging with a diverged remote branch.",
+    "observationIds": [
+      "bf2a12c2-84c7-4b2c-97d4-19d8dc620aec",
+      "8814c626-c879-47be-9c9d-b751fe23bb18"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:19.952Z"
+  },
+  {
+    "id": "0010ee53-0885-44b0-a3f3-a522c10b9ab0",
+    "date": "2026-04-20",
+    "theme": "LLM Proxy Migration Audit and Documentation Cleanup",
+    "summary": "An audit was performed to confirm that the new `@rapid/llm-proxy` package had fully replaced the old `lib/llm/` library across the codebase. All 18 source imports were confirmed to use the new package with no legacy references remaining. Four stale documentation files still referencing deleted `lib/llm/providers/` paths and the removed `UnifiedInferenceEngine` class were updated: `docs/subscription-providers-implementation.md`, `docs/knowledge-management/README.md`, `docs/knowledge-management/continuous-learning-system.md`, and `docs/knowledge-management/system-comparison.md`. MkDocs nav, PUML diagrams, and PNGs were already current and required no changes.",
+    "observationIds": [
+      "9a5dc2d8-3df0-4bbc-9fa4-896415bac5e4"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "docs/subscription-providers-implementation.md",
+      "docs/knowledge-management/README.md",
+      "docs/knowledge-management/continuous-learning-system.md",
+      "docs/knowledge-management/system-comparison.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:19.952Z"
+  },
+  {
+    "id": "4841a243-662b-4340-85ff-e4e029e86fd1",
+    "date": "2026-04-20",
+    "theme": "Transcript Monitor Death Spiral Diagnosis and Fix",
+    "summary": "An extended multi-session investigation diagnosed why the observation/transcript monitor stopped recording after 6:42 and why the post-recording artifact patch was not functioning. The root cause was a cascading failure: `better-sqlite3` failed to load in the ESM context, falling back to a `sqlite3` CLI call that timed out on the 2GB OpenCode database, causing `hasNewContent()` to always return false, triggering idle timeout exits, and then coordinator restarts — creating a death spiral. Additional bugs discovered included an `ENOBUFS` pipe buffer overflow from ~27MB of sqlite3 subprocess output, a bare `execSync` reference that should have been `_execSync`, an `Object.entries` crash on an undefined PSM global registry, and 26+ duplicate monitor processes spawned by the coordinator. Fixes applied to `scripts/enhanced-transcript-monitor.js` replaced `better-sqlite3` with a corrected sqlite3 CLI fallback scoped to recent messages, patched the `_execSync` reference, and added a guard for the undefined PSM registry. Two bugs in `global-lsl-coordinator.js` and `process-state-manager.js` were also fixed: a duplicate `projectName` variable declaration syntax error and `readRegistry()` crashing on missing or empty registry files. After killing the 26 runaway processes and restarting cleanly, both the coding and rapid-automations monitors ran without duplicates and LSL files were confirmed writing to the correct `coding/.specstory/history/` location. All todo items were marked complete upon resolution.",
+    "observationIds": [
+      "9014d49b-787a-4f75-9c64-a427f3b787ff",
+      "0c097ef1-473c-4200-8140-0a2faeb6a01e",
+      "b79f4679-08d6-460f-8b30-70d64a74ed30",
+      "4fd8e4d7-c7e8-4246-a3ee-d3506124a6c4",
+      "caada135-1047-4bcd-b257-9f76b1fe76bb",
+      "5035656f-af4a-48a7-8b8d-75f632e5f3cf",
+      "738d4485-904c-4875-9f30-f8a5949d3056",
+      "6f8a22d9-7965-4c83-bee5-c12fef0fcacf",
+      "95bfccda-4b2a-4f0e-88c0-041097e088a6"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "monitor source files (classification logic",
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "scripts/enhanced-transcript-monitor.js",
+      "global-lsl-coordinator.js",
+      "process-state-manager.js",
+      "global-lsl-coordinator.js (removed duplicate variable declaration)",
+      "process-state-manager.js (fixed readRegistry to handle missing/empty registry file with proper error handling and structure validation)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:56:19.952Z"
+  },
+  {
+    "id": "0e439739-b9e3-41ed-a37b-a42d9e6ddf18",
+    "date": "2026-04-20",
+    "theme": "LSL Acronym and File Location Clarification",
+    "summary": "A clarification was made regarding the LSL (Live Session Logging) acronym and file storage conventions. LSL files are stored in `.specstory/history` (or `~/Agentic/coding/.specstory/history`) with filenames following a convention ending in `*_from-rapid-automation`. This corrected a prior misunderstanding about what LSL referred to.",
+    "observationIds": [
+      "4178f0c5-f63c-42b9-9693-e15cdfff0b62"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:56:19.952Z"
+  },
+  {
+    "id": "e9a1efa5-6150-4495-bfd5-5175e4ffda86",
+    "date": "2026-04-21",
+    "theme": "Root Cause Investigation of Stale ETM Registry Path",
+    "summary": "Investigated degraded tmux health status and missing observations since the previous day. Traced the root cause to the LSL coordinator registry mapping `rapid-automations` to the shadow directory `/Users/Q284340/Agentic/rapid-automations` instead of the real repo at `/Users/Q284340/Agentic/_work/rapid-automations`, causing ETM to find no matching OpenCode sessions. The health system failed to catch this because it only checks process liveness, not observation recency. Three fixes were proposed: path validation with `realpathSync` and `.git` check in `ensure()`, an observation-recency health check, and immediate registry correction with ETM restart — none yet implemented at this point.",
+    "observationIds": [
+      "6dddc8f2-c0b2-4025-913a-94b70c13f6bd"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:39:20.137Z"
+  },
+  {
+    "id": "261302bb-792a-4647-b0cf-b7155a5cba4f",
+    "date": "2026-04-21",
+    "theme": "ETM pollCount Hardening and Dead Code Removal",
+    "summary": "Across several overlapping continuation sessions, the ETM health writer was updated to emit a `pollCount` metric enabling coordinator phantom detection. Both the rapid-automations and coding ETMs were restarted to pick up the change. In parallel, dead code was removed from the coding project's `SemanticAnalyzer.js` (`mergeTrajectoryWithSession` and `parseTrajectoryResponse` methods, which referenced unset `this.baseURL` and `this.apiKey`) and from `trajectory-analyzer.js` (vestigial `getApiKeyForProvider`, `getBaseUrlForProvider`, `initializeFastInference`, and unused `apiKey`/`baseUrl` fields, all made redundant by the localhost proxy inference path). The global LSL coordinator (`global-lsl-coordinator.js`) was also hardened with path revalidation. A classification log audit confirmed the routing is correct at roughly 75% LOCAL and 25% CODING decisions, all resolved at the embedding layer or earlier.",
+    "observationIds": [
+      "34379a93-88b7-4e65-b12d-6ed628184ca1",
+      "7b0c7653-8d25-4533-a625-42a1be2f9344",
+      "9c33ba1a-33e1-47af-a18c-4699a9d9c934",
+      "80865e73-9c99-48f7-ae86-64962c94b87f",
+      "13ecd7c7-b58a-4be0-a9a6-a8661927be8d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "exchange-trajectory-monitor (pollCount property + health metrics)",
+      "SemanticAnalyzer (removed mergeTrajectoryWithSession and parseTrajectoryResponse dead methods)",
+      "exchange-trajectory-monitor.js",
+      "semantic-analyzer.js",
+      "trajectory-analyzer.js",
+      "coding/etm (pollCount addition)",
+      "SemanticAnalyzer (removed dead methods)",
+      "trajectory analyzer (removed dead provider URL/key logic)",
+      "rapid-automations ETM health writer to include pollCount metric",
+      "coding SemanticAnalyzer to remove mergeTrajectoryWithSession and parseTrajectoryResponse",
+      "coding trajectory analyzer to remove getApiKeyForProvider/getBaseUrlForProvider/initializeFastInference dead methods and unused apiKey/baseUrl fields",
+      "global-lsl-coordinator.js",
+      "SemanticAnalyzer.js",
+      "trajectory analyzer file"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:39:20.137Z"
+  },
+  {
+    "id": "5f6d098a-fc68-4d37-81bc-ad57c1c5c9a2",
+    "date": "2026-04-21",
+    "theme": "Read-Only Architecture Survey of Coding Project",
+    "summary": "Conducted a read-only investigation across the `~/Agentic/coding` project's docs, scripts, and src directories to build a comprehensive understanding of the system architecture. No files were modified. The survey covered observation generation, the 5-layer LSL classification pipeline, foreign prompt set redirection, ETM behavior, reclassification scripts, and health check mechanisms.",
+    "observationIds": [
+      "70efbd85-7125-40d0-be67-0ffc1732c913"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:39:20.137Z"
+  },
+  {
+    "id": "bb7b96b4-4aa6-4ea6-886e-5834d14b92bb",
+    "date": "2026-04-21",
+    "theme": "Shadow Folder Cleanup and LSL Reclassification Attempt",
+    "summary": "Investigated three issues: shadow folder removal, missing observations, and misclassified CODING LSLs in rapid-automations. The shadow folder was confirmed already deleted. Observations were verified working correctly with 1,197 entries in the central DB including fresh rapid-automations entries. The LSL reclassification effort stalled — the batch processor's foreign-only mode has a hardcoded September 2025 date filter blocking historical reprocessing, and a missing submodule caused ENOENT errors. After a crash, context was recovered by reading session logs, confirming shadow folder and observations tasks complete, but the batch reclassification of historically misclassified LOCAL LSLs remained unexecuted.",
+    "observationIds": [
+      "9fd4d169-055b-4fdf-8649-99424e7b9574",
+      "df1ab2b8-d975-44ab-8713-18f837cbc8ed"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-22T06:39:20.137Z"
+  },
+  {
+    "id": "43f616b2-1f91-4996-9e2b-e5b81d77862c",
+    "date": "2026-04-21",
+    "theme": "Frontend Dashboard Observations Display Debugging",
+    "summary": "Debugged observations not appearing in the frontend dashboard, which appeared to show data stopping at Apr 20. Investigation traced the full stack: the `.observations` directory was initially not mounted in the Docker container (later confirmed to be correctly populated with current data inside the container), the internal API correctly returns current entries (62 for Apr 21), CORS is fine, and the built dist is current. Two candidate root causes were identified but not fixed: a frontend field name mismatch (`timestamp` vs `created_at`) and a potential chart rendering limitation from using only the first 50 results. No fix was implemented by end of session.",
+    "observationIds": [
+      "c7facf96-7849-479f-9855-846e8f0417fb",
+      "3a94b29b-47a8-42d9-b060-ddd071d9f0a0"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-22T06:39:20.137Z"
+  },
+  {
+    "id": "0f5db830-4715-47ab-9512-635d8d1a257c",
+    "date": "2026-04-22",
+    "theme": "Session Initialization and GSD Tool Update",
+    "summary": "Session began by loading recent LSL files spanning March 29–April 22, 2026 to establish context continuity across the coding and rapid-automations projects. A GSD version check was then performed, detecting an upgrade from v1.34.2 to v1.38.3. After displaying the changelog (covering new skills, runtime support, and bug fixes across versions 1.35.0–1.38.3), the update was executed via clean install. `ObservationWriter.js` was touched as part of these startup steps.",
+    "observationIds": [
+      "2e83e6d5-c3c2-464c-b61e-f52d91d6c309",
+      "eb1a3a42-cac2-43cd-9d00-12c6eba98d8d",
+      "79081909-dad1-496d-91a3-4017fb97f4fa"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "b3bb590d-9285-4219-a50f-99960f8e2ca8",
+    "date": "2026-04-22",
+    "theme": "Duplicate Observations Investigation in ObservationWriter",
+    "summary": "Investigated duplicate entries appearing on the dashboard. Root cause identified in `ObservationWriter.js`: the deduplication logic uses Jaccard similarity at a 0.7 threshold over a 10-observation sliding window, but LLM re-phrasing of identical work produces sufficient lexical variation to bypass the check. This resulted in approximately 46 duplicate entries spread across 3–4 cognitive clusters.",
+    "observationIds": [
+      "3fa60be7-0ee9-4373-a3ec-ebdfd2b63a22"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "31fba63e-6319-41df-acc0-ac399fe78e95",
+    "date": "2026-04-22",
+    "theme": "ObservationConsolidator Design and Implementation",
+    "summary": "Researched Mastra's three-level memory compression hierarchy (messages → observations → reflections) to identify a gap in the coding ecosystem's single-level observation system. Proposed and then implemented a two-tier aggregation layer mirroring Mastra's Observer/Reflector pattern, but adapted to be time-triggered and cross-agent rather than token-threshold and per-thread:\n- **Digests** — daily thematic consolidation of raw observations\n- **Insights** — weekly persistent project knowledge synthesis\n- New DB tables, an `ObservationConsolidator` class, and dashboard server API endpoints were implemented in `/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js`, integrating with the existing live-logging system.",
+    "observationIds": [
+      "3a3b187c-ca3d-4652-9655-6595cb67c0fc",
+      "aef2da23-92b9-44ad-9eaf-0768edd81c66",
+      "2324ee21-99a3-4018-b76b-b9bd503f07ed",
+      "ba6741bf-8a55-45b6-b173-385ce5c804c3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationConsolidator.js",
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "9cf10c19-2572-4c2b-a5a1-9581086e5677",
+    "date": "2026-04-22",
+    "theme": "Digests and Insights Dashboard Pages and Verification",
+    "summary": "Built frontend pages for the two new aggregation tiers in the system health dashboard, following existing patterns from the observations page:\n- `integrations/system-health-dashboard/src/pages/digests.tsx`\n- `integrations/system-health-dashboard/src/pages/insights.tsx`\n\nAttempted to verify the Digests page at `http://localhost:3032/digests` using a Playwright Node.js script at `/tmp/pw-scripts/pw_digests.js`. Chromium was installed via `npx playwright install chromium`; the wait strategy was adjusted from `networkidle` to `domcontentloaded`, but final screenshot confirmation was not achieved within the session.",
+    "observationIds": [
+      "cdb91791-07e6-4103-acd5-923e225d7f8d",
+      "6faf05b1-17b0-4fb3-949a-89d9c70c3179",
+      "dc4bfbb7-5129-48eb-a43d-e38593ad040c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx",
+      "/tmp/pw-scripts/pw_digests.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "fd077132-fad0-4667-8b48-c32c2f77a128",
+    "date": "2026-04-22",
+    "theme": "Architecture Documentation Updates with PlantUML and MkDocs",
+    "summary": "Received a documentation style guide covering PlantUML, PNG, Mermaid, and Markdown conventions. Read existing style files and docs to understand current state before proceeding. Work targeted `observation-memory-hierarchy.puml` and `observational-memory.md`, with intent to rebuild MkDocs and serve locally with three screenshots included in the git changeset — but no concrete actions were completed or confirmed in these exchanges.",
+    "observationIds": [
+      "cbb738f4-03b7-42bd-b080-8fca6232ada8",
+      "722fa751-4248-455c-b37e-7de3ac16978f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/observation-memory-hierarchy.puml",
+      "observational-memory.md",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/observational-memory.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "3aa7dcc4-5bff-489d-9fa7-574b04afdd32",
+    "date": "2026-04-22",
+    "theme": "Git Divergence Discovery, Docs Deployment, and Broken Link Fixes",
+    "summary": "Discovered that local `main` and `origin/main` diverged approximately 3 months prior (January 19, 2026), with local main 1040 commits ahead and 741 behind — unrelated to current session work. Resolution was to push to a feature branch instead of main.\n\nSubsequent attempts to trigger the \"Deploy Documentation\" GitHub Actions workflow after a force-push were unsuccessful automatically; `gh` CLI lacked `github.com` authentication, requiring manual trigger via the browser Actions tab.\n\nSeparately, MkDocs `--strict` mode surfaced fatal build errors due to broken internal links in `docs-content/architecture/llm-architecture.md` referencing the non-existent `llm-proxy-bridge.md`. Fixed by updating all references to point to the correct existing file `llm-cli-proxy.md`, then committed to re-trigger the deploy workflow.",
+    "observationIds": [
+      "a355614b-8af2-4004-b08a-e5a5a0e9fdfc",
+      "7814cda2-0168-46ae-9492-bbb4da861145",
+      "6494d33e-abda-4191-a3d1-d7bc1c56282e",
+      "38ecfa22-49c0-43c5-9ec1-5ec53b6b946f",
+      "0638d285-832b-43ca-a8d0-15f7c401c3a0",
+      "311af66b-9edb-4673-b2ab-ade6e087fa1a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "llm-architecture.md",
+      "/Users/Q284340/Agentic/coding/docs-content/architecture/llm-architecture.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "de0aa866-3113-4b88-8c14-a4fd824a36f5",
+    "date": "2026-04-22",
+    "theme": "GitHub Submodule Access Issue and Copi Removal",
+    "summary": "Investigated a GitHub issue filed on February 22 reporting submodule access failures for external contributors. Root cause: submodule URLs use SSH (`git@github.com:`) and the `copi` repo is private, causing \"Repository not found\" errors; `mcp-constraint-monitor` and `memory-visualizer` appear to now be public.\n\nInvestigation into `copi` revealed it is a legacy GitHub Copilot CLI wrapper with session logging and tmux integration — no longer imported or used at runtime, as its functionality was extracted into `scripts/capture-monitor.js` and the ETM.\n\nThe `integrations/copi` submodule was removed via `git rm`, which also cleared its `.gitmodules` entry. Cleanup of `.git/config` and `.git/modules/integrations/copi` was initiated but the exchange ended before a final commit was made.",
+    "observationIds": [
+      "2c91643f-a297-4106-8f2b-fab6008ef749",
+      "5a0df2f5-2d65-455f-8e30-1a90c644c043",
+      "53b68e83-2a16-4bad-b6ba-10c40e18c3de",
+      "6df7e7e1-371b-46c7-80a7-474e2baa2587",
+      "37010e4f-3932-43c0-b987-c64904ca789b",
+      "0ded2d1e-0f87-47fd-9aa1-1f1043417ada"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-23T05:21:52.314Z"
+  },
+  {
+    "id": "7b369845-c5ed-4eed-b57e-1389ab99df9c",
+    "date": "2026-04-23",
+    "theme": "Session Context Load from Previous Day",
+    "summary": "Loaded recent session logs to establish continuity from prior work. Sessions from 2026-04-22 covered MkDocs documentation updates, fixing broken links, removing the unused `copi` submodule, and closing GitHub issue #1. Main branch is at commit `de91ba1a` with no uncommitted changes.",
+    "observationIds": [
+      "b149f108-103a-4bed-8270-385e54ec463c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "markdown-text.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T06:21:34.398Z"
+  },
+  {
+    "id": "6ec498f1-95f9-42a2-968e-eacd86357067",
+    "date": "2026-04-23",
+    "theme": "System Health Dashboard Bug Investigation and Fixes",
+    "summary": "Investigated and began fixing three bugs identified via a screenshot of the system health dashboard:\n- **Insights markdown not rendering**: bullet lists and code paths displayed as raw text\n- **Missing digests since Apr 21**: consolidation daemon not running automatically for recent dates\n- **Broken refresh button**: only re-fetches data without triggering consolidation\n\nA new reusable `MarkdownText` component was created in `markdown-text.tsx` to properly parse and render markdown in the insights view. A Playwright screenshot script was written to `/tmp/pw-scripts/pw_task.js` to verify the fix, but ran into issues locating the correct Playwright installation. Refresh button and consolidation fixes remained in progress.",
+    "observationIds": [
+      "8dbf1e45-f15c-402d-bc7a-6c713504e7ea",
+      "e070b5f8-58c3-41a9-8356-f3abc80ff105",
+      "9cc331ee-8e4b-4d58-ba44-265c2480ab11"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "markdown-text.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx",
+      "/tmp/pw-scripts/pw_task.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-23T06:21:34.398Z"
+  },
+  {
+    "id": "db195306-480f-48e6-9793-51fe4d75ae90",
+    "date": "2026-04-23",
+    "theme": "BMW Group Interview Guide Generation (Incomplete)",
+    "summary": "Two attempts (both via opencode) to generate a combined technical interview guide for two BMW Group Validation Engineer roles — *Context/Semantics/Memory* and *Multi-Agent AI Systems*. The approach was to fetch both job postings and mirror the structure of an existing PDF interview guide, using Minimum/Good/Expert evaluation tiers with role-specific sections. Both exchanges were cut off before producing any output file; source material was gathered but no document was written.",
+    "observationIds": [
+      "b1d811cb-59cd-479c-b73f-ec8aa98f42f9",
+      "2512829f-5362-4440-8c3b-27b339b26d38"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-23T06:21:34.398Z"
+  },
+  {
+    "id": "2d2866d3-f170-495d-b796-6b3a70f11756",
+    "date": "2026-04-23",
+    "theme": "Auto-Consolidation Daemon Design and Wiring Decision",
+    "summary": "Investigated whether a daemon should automatically trigger observation consolidation when a threshold of new observations accumulates. Key findings across the review:\n- Daemon logic exists inside `consolidate-observations.js` but is never started\n- No trigger hook exists where observations are written (`ObservationWriter`)\n- `docker-compose.yml` was referenced as an artifact in all three related observations\n\nOutcome: proposed adding auto-consolidation directly to the existing health API server — a periodic check every 30 minutes that triggers consolidation when undigested observation count for completed days exceeds a configured threshold. No implementation was committed.",
+    "observationIds": [
+      "0065524f-1f84-47ed-bed7-4175cb3f8115",
+      "000ac381-d606-4d3d-b5b8-f99dbf50aa6f",
+      "9e801297-7042-4c41-a947-c30cee4bcb4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "docker-compose.yml",
+      "/Users/Q284340/Agentic/coding/docker/docker-compose.yml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-23T06:21:34.398Z"
+  }
+]

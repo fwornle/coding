@@ -172,6 +172,7 @@ integrations/browser-access/logs/
 # Track knowledge exports (git-reviewable JSON)
 !.data/
 !.data/knowledge-export/
+!.data/observation-export/
 !.data/knowledge-config.json
 
 # PlantUML validation errors (transient, regenerated on diagram validation)

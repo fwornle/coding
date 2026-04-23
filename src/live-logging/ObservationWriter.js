@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ObservationExporter } from './ObservationExporter.js';
 
 const require = createRequire(import.meta.url);
 
@@ -106,6 +107,11 @@ export class ObservationWriter {
     this._walCheckpointInterval = setInterval(() => {
       try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* db may be closed */ }
     }, 15_000); // every 15 seconds
+
+    // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    this._exporter = new ObservationExporter({ db: this.db, projectRoot });
+    this._exportTimer = null;
 
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
   }
@@ -387,7 +393,24 @@ export class ObservationWriter {
       quality,
     );
 
+    // Debounced JSON export — coalesce rapid-fire writes into one export
+    this._scheduleExport();
+
     return id;
+  }
+
+  /**
+   * Schedule a debounced JSON export. Coalesces rapid writes (e.g. batch
+   * processing) into a single export 10s after the last write.
+   */
+  _scheduleExport() {
+    if (!this._exporter) return;
+    if (this._exportTimer) clearTimeout(this._exportTimer);
+    this._exportTimer = setTimeout(() => {
+      try { this._exporter.exportObservations(); } catch (err) {
+        process.stderr.write(`[ObservationWriter] Export error: ${err.message}\n`);
+      }
+    }, 10_000);
   }
 
   /** Stop words excluded from similarity comparisons */
@@ -605,6 +628,14 @@ export class ObservationWriter {
     if (this._walCheckpointInterval) {
       clearInterval(this._walCheckpointInterval);
       this._walCheckpointInterval = null;
+    }
+    // Flush any pending export before closing
+    if (this._exportTimer) {
+      clearTimeout(this._exportTimer);
+      this._exportTimer = null;
+    }
+    if (this._exporter && this.db) {
+      try { this._exporter.exportObservations(); } catch { /* best effort */ }
     }
     if (this.db) {
       try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }

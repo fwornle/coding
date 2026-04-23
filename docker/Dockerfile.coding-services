@@ -106,6 +106,14 @@ RUN cd lib/llm && npm install --ignore-scripts 2>/dev/null || true
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
 RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
 
+# Patch broken JSDoc comment in @rapid/llm-proxy network-detect.js
+# The comment contains "utun*/" which prematurely closes the /* block, breaking ESM parsing
+# Fix: replace everything before the first import statement with a clean comment
+RUN for f in $(find integrations/*/node_modules/@rapid/llm-proxy/dist -name "network-detect.js" 2>/dev/null); do \
+      sed -i '1,/^import/{ /^import/!d }' "$f" && \
+      sed -i '1i // Network Detection Module (patched: broken JSDoc removed)' "$f"; \
+    done 2>/dev/null || true
+
 # Rebuild native bindings for the container's architecture
 RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true
 

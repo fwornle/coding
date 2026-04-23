@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ObservationExporter } from './ObservationExporter.js';
 
 const require = createRequire(import.meta.url);
 
@@ -84,6 +85,10 @@ export class ObservationConsolidator {
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_obs_digested ON observations(digested_at)');
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_date ON digests(date)');
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_topic ON insights(topic)');
+
+    // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    this._exporter = new ObservationExporter({ db: this.db, projectRoot });
 
     process.stderr.write(`[Consolidator] Database initialized\n`);
   }
@@ -374,6 +379,13 @@ export class ObservationConsolidator {
 
     // Apply confidence decay to existing insights
     this._decayConfidence();
+
+    // Export all tiers to git-tracked JSON after consolidation
+    if (this._exporter) {
+      try { this._exporter.exportAll(); } catch (err) {
+        process.stderr.write(`[Consolidator] Export error: ${err.message}\n`);
+      }
+    }
 
     return { ...digestResult, ...insightResult };
   }
