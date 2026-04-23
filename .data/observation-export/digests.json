@@ -181,7 +181,7 @@
     "id": "34768617-c5a2-47c2-b582-cf9c8e27dc26",
     "date": "2026-04-06",
     "theme": "ObservationWriter.js Live Logging Module Edit",
-    "summary": "A direct source edit was made to `/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js` to modify observation writing logic. The specific nature of the changes was not detailed in the exchange, but the file was confirmed updated.",
+    "summary": "A direct source edit was made to `~/Agentic/coding/src/live-logging/ObservationWriter.js` to modify observation writing logic. The specific nature of the changes was not detailed in the exchange, but the file was confirmed updated.",
     "observationIds": [
       "55344574-b237-4f27-a79e-479ff8e7d470"
     ],
@@ -460,7 +460,7 @@
     "id": "6e34f879-8f10-4d22-a2c5-ab3fda10137f",
     "date": "2026-04-07",
     "theme": "ETM Classification Pipeline Analysis and observations.db Location",
-    "summary": "Deep analysis of the ETM's classification and observation-firing pipeline. Observation 19 located and read the main ETM script, `coding-keywords.json`, and `PathAnalyzer` to surface `determineTargetProject` return-null conditions, the `_firePromptSetObservation` mechanism, and the LSL-vs-observation-only flush decision path around lines 570–577. Observation 20 traced why `observations.db` in the `onboarding-repro` project directory remained 0 bytes: the real active database is at `/Users/<USER_ID_REDACTED>/Agentic/coding/.observations/observations.db` (360KB with active WAL). The `onboarding-repro` local database stays empty because the ETM's foreign mode logic for `rapid-automations` hits an early-return or guard condition when classification returns a LOCAL/null target, preventing `_firePromptSetObservation` from being called in that project context.",
+    "summary": "Deep analysis of the ETM's classification and observation-firing pipeline. Observation 19 located and read the main ETM script, `coding-keywords.json`, and `PathAnalyzer` to surface `determineTargetProject` return-null conditions, the `_firePromptSetObservation` mechanism, and the LSL-vs-observation-only flush decision path around lines 570–577. Observation 20 traced why `observations.db` in the `onboarding-repro` project directory remained 0 bytes: the real active database is at `~/Agentic/coding/.observations/observations.db` (360KB with active WAL). The `onboarding-repro` local database stays empty because the ETM's foreign mode logic for `rapid-automations` hits an early-return or guard condition when classification returns a LOCAL/null target, preventing `_firePromptSetObservation` from being called in that project context.",
     "observationIds": [
       "f4c5f140-4035-425d-afde-29fafa4eee7a",
       "98b8d210-1a0b-451e-9f8a-a0782d4e2445"
@@ -510,7 +510,7 @@
     "id": "ff9e4479-bf37-4669-b359-8bee737c76a0",
     "date": "2026-04-07",
     "theme": "Observation Logging System Code Mapping and Pipeline Trace",
-    "summary": "A broad codebase search to map the observation logging system's key components. Grep and glob searches across the project and linked directories traced from `onboarding-repro` symlinks into the actual source at `/Users/<USER_ID_REDACTED>/Agentic/coding/`. The ETM file (`enhanced-transcript-monitor.js`) was confirmed to host both `_firePromptSetObservation` and `processUserPromptSetCompletion`; the Artifacts field is populated via a summarization prompt within the same file; modified files tracking occurs through tool call inspection in the exchange processing logic; and specstory classification and observation recording are handled by a `SpecstoryBatchConverter` class in a related specstory file in the same directory.",
+    "summary": "A broad codebase search to map the observation logging system's key components. Grep and glob searches across the project and linked directories traced from `onboarding-repro` symlinks into the actual source at `~/Agentic/coding/`. The ETM file (`enhanced-transcript-monitor.js`) was confirmed to host both `_firePromptSetObservation` and `processUserPromptSetCompletion`; the Artifacts field is populated via a summarization prompt within the same file; modified files tracking occurs through tool call inspection in the exchange processing logic; and specstory classification and observation recording are handled by a `SpecstoryBatchConverter` class in a related specstory file in the same directory.",
     "observationIds": [
       "7913b69a-af28-4e51-ae20-870384d73029"
     ],
@@ -2357,7 +2357,7 @@
     "id": "e9a1efa5-6150-4495-bfd5-5175e4ffda86",
     "date": "2026-04-21",
     "theme": "Root Cause Investigation of Stale ETM Registry Path",
-    "summary": "Investigated degraded tmux health status and missing observations since the previous day. Traced the root cause to the LSL coordinator registry mapping `rapid-automations` to the shadow directory `/Users/<USER_ID_REDACTED>/Agentic/rapid-automations` instead of the real repo at `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations`, causing ETM to find no matching OpenCode sessions. The health system failed to catch this because it only checks process liveness, not observation recency. Three fixes were proposed: path validation with `realpathSync` and `.git` check in `ensure()`, an observation-recency health check, and immediate registry correction with ETM restart — none yet implemented at this point.",
+    "summary": "Investigated degraded tmux health status and missing observations since the previous day. Traced the root cause to the LSL coordinator registry mapping `rapid-automations` to the shadow directory `~/Agentic/rapid-automations` instead of the real repo at `~/Agentic/_work/rapid-automations`, causing ETM to find no matching OpenCode sessions. The health system failed to catch this because it only checks process liveness, not observation recency. Three fixes were proposed: path validation with `realpathSync` and `.git` check in `ensure()`, an observation-recency health check, and immediate registry correction with ETM restart — none yet implemented at this point.",
     "observationIds": [
       "6dddc8f2-c0b2-4025-913a-94b70c13f6bd"
     ],
@@ -2491,7 +2491,7 @@
     "id": "31fba63e-6319-41df-acc0-ac399fe78e95",
     "date": "2026-04-22",
     "theme": "ObservationConsolidator Design and Implementation",
-    "summary": "Researched Mastra's three-level memory compression hierarchy (messages → observations → reflections) to identify a gap in the coding ecosystem's single-level observation system. Proposed and then implemented a two-tier aggregation layer mirroring Mastra's Observer/Reflector pattern, but adapted to be time-triggered and cross-agent rather than token-threshold and per-thread:\n- **Digests** — daily thematic consolidation of raw observations\n- **Insights** — weekly persistent project knowledge synthesis\n- New DB tables, an `ObservationConsolidator` class, and dashboard server API endpoints were implemented in `/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js`, integrating with the existing live-logging system.",
+    "summary": "Researched Mastra's three-level memory compression hierarchy (messages → observations → reflections) to identify a gap in the coding ecosystem's single-level observation system. Proposed and then implemented a two-tier aggregation layer mirroring Mastra's Observer/Reflector pattern, but adapted to be time-triggered and cross-agent rather than token-threshold and per-thread:\n- **Digests** — daily thematic consolidation of raw observations\n- **Insights** — weekly persistent project knowledge synthesis\n- New DB tables, an `ObservationConsolidator` class, and dashboard server API endpoints were implemented in `~/Agentic/coding/src/live-logging/ObservationConsolidator.js`, integrating with the existing live-logging system.",
     "observationIds": [
       "3a3b187c-ca3d-4652-9655-6595cb67c0fc",
       "aef2da23-92b9-44ad-9eaf-0768edd81c66",
