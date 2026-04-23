@@ -281,9 +281,9 @@
     {
       "id": "corporate_user_ids",
       "name": "Corporate User IDs",
-      "description": "Corporate user identifiers (q + 6 characters)",
-      "pattern": "\\bq[0-9a-zA-Z]{6}\\b",
-      "flags": "gi",
+      "description": "Corporate user identifiers (Q + 6 digits, e.g. Q284340)",
+      "pattern": "\\bQ[0-9]{6}\\b",
+      "flags": "g",
       "replacementType": "user_id",
       "replacement": "<USER_ID_REDACTED>",
       "enabled": true,

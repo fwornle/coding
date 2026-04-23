@@ -65,7 +65,7 @@
   },
   {
     "id": "868b2010-7195-42e3-8a9c-c704b5dafc04",
-    "summary": "Based on the repository structure, here's what this project is about:\n\n---\n\n## **`onboarding-repro` — AI Coding Assistant Infrastructure Platform**\n\nThis is a **self-hosted agentic development environment** that wraps Claude (and other LLMs) with a rich layer of tooling and memory. Key capabilities:\n\n### 🧠 Knowledge Management\n- **UKB (Universal Knowledge Base)** — a graph-based knowledge store (Graphology + LevelDB + optional Qdrant vector search) that learns from coding sessions over time\n- Entities, relations, observations, and ontology classification stored and <USER_ID_REDACTED> via a semantic analysis server\n\n### 📜 Live Session Logging (LSL)\n- Real-time transcript monitoring and extraction from Claude/AI coding sessions\n- Trajectory analysis, exchange routing, semantic analysis of what the AI is doing\n- Session logs stored in `.specstory/history/`\n\n### 🔧 Integrations (in `integrations/`)\n| Integration | Purpose |\n|---|---|\n| `mcp-server-semantic-analysis` | Core UKB workflow engine (wave-analysis, batch-analysis) |\n| `mcp-constraint-monitor` | Enforces code <USER_ID_REDACTED> rules on every edit |\n| `code-graph-rag` | AST-based code graph (Memgraph) for codebase Q&A |\n| `system-health-dashboard` | Web UI at `localhost:3032` showing service health & workflow progress |\n| `browser-access` / `mcp-server-browserbase` | Browser automation via MCP |\n| `serena` | Code reading/search (read-only Serena MCP) |\n\n### 🏗️ Architecture\n- **Dockerized services** for the backend (`coding-services` container)\n- **MCP servers** expose tools to Claude via the MCP protocol\n- **Spec workflow** (`mcp__spec-workflow`) for structured feature development (Requirements → Design → Tasks → Implementation)\n- Dashboard at `localhost:3032`, health API at `localhost:3033`, SSE workflow server at `localhost:3848`\n\n### In short:\n> It's a **<COMPANY_NAME_REDACTED>-development platform** — an AI coding assistant that watches its own sessions, builds a knowledge graph of what it learns, enforces code <USER_ID_REDACTED> constraints, and provides structured workflows for feature development — all running locally via Docker + MCP.",
+    "summary": "Based on the repository structure, here's what this project is about:\n\n---\n\n## **`onboarding-repro` — AI Coding Assistant Infrastructure Platform**\n\nThis is a **self-hosted agentic development environment** that wraps Claude (and other LLMs) with a rich layer of tooling and memory. Key capabilities:\n\n### 🧠 Knowledge Management\n- **UKB (Universal Knowledge Base)** — a graph-based knowledge store (Graphology + LevelDB + optional Qdrant vector search) that learns from coding sessions over time\n- Entities, relations, observations, and ontology classification stored and queried via a semantic analysis server\n\n### 📜 Live Session Logging (LSL)\n- Real-time transcript monitoring and extraction from Claude/AI coding sessions\n- Trajectory analysis, exchange routing, semantic analysis of what the AI is doing\n- Session logs stored in `.specstory/history/`\n\n### 🔧 Integrations (in `integrations/`)\n| Integration | Purpose |\n|---|---|\n| `mcp-server-semantic-analysis` | Core UKB workflow engine (wave-analysis, batch-analysis) |\n| `mcp-constraint-monitor` | Enforces code quality rules on every edit |\n| `code-graph-rag` | AST-based code graph (Memgraph) for codebase Q&A |\n| `system-health-dashboard` | Web UI at `localhost:3032` showing service health & workflow progress |\n| `browser-access` / `mcp-server-browserbase` | Browser automation via MCP |\n| `serena` | Code reading/search (read-only Serena MCP) |\n\n### 🏗️ Architecture\n- **Dockerized services** for the backend (`coding-services` container)\n- **MCP servers** expose tools to Claude via the MCP protocol\n- **Spec workflow** (`mcp__spec-workflow`) for structured feature development (Requirements → Design → Tasks → Implementation)\n- Dashboard at `localhost:3032`, health API at `localhost:3033`, SSE workflow server at `localhost:3848`\n\n### In short:\n> It's a **<COMPANY_NAME_REDACTED>-development platform** — an AI coding assistant that watches its own sessions, builds a knowledge graph of what it learns, enforces code queried constraints, and provides structured workflows for feature development — all running locally via Docker + MCP.",
     "agent": "mastra",
     "project": "onboarding-repro",
     "quality": "normal",
@@ -359,7 +359,7 @@
   },
   {
     "id": "f4d6c4b7-f0d3-4834-ad84-e86c94a80b0d",
-    "summary": "Intent: Developer asked where the changes from the last user prompt are (tracking observation pipeline output)\nApproach: <USER_ID_REDACTED> the observations database, checked ETM process state, reviewed transcript monitor state file, and examined ETM stderr to diagnose why no new observation appeared yet.\nArtifacts: none\nOutcome: Determined that observations fire at the next user-prompt boundary, so the previous exchange's observation hadn't been written yet — it would appear once the next message was sent and the current prompt set completed.\nStatus: done",
+    "summary": "Intent: Developer asked where the changes from the last user prompt are (tracking observation pipeline output)\nApproach: Queried the observations database, checked ETM process state, reviewed transcript monitor state file, and examined ETM stderr to diagnose why no new observation appeared yet.\nArtifacts: none\nOutcome: Determined that observations fire at the next user-prompt boundary, so the previous exchange's observation hadn't been written yet — it would appear once the next message was sent and the current prompt set completed.\nStatus: done",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -569,7 +569,7 @@
   },
   {
     "id": "fdc27bc6-0183-469e-b30e-5af007a7e63c",
-    "summary": "Intent: Search git history and repo artifacts to reconstruct what went wrong during a recent multi-hour Confluence ingestion session into OKB.\nApproach: Used multiple parallel git log <USER_ID_REDACTED> scoped to specific directories, combined with glob searches for planning docs and scratch files, to gather all available traces of the session including commits, stash entries, and temporary files.\nArtifacts: none\nResult: Assistant found OKB ingestion documentation and a commit history with relevant activity; deeper investigation into specific artifacts and recent changes was initiated but full findings were not returned in this exchange.",
+    "summary": "Intent: Search git history and repo artifacts to reconstruct what went wrong during a recent multi-hour Confluence ingestion session into OKB.\nApproach: Used multiple parallel git log queries scoped to specific directories, combined with glob searches for planning docs and scratch files, to gather all available traces of the session including commits, stash entries, and temporary files.\nArtifacts: none\nResult: Assistant found OKB ingestion documentation and a commit history with relevant activity; deeper investigation into specific artifacts and recent changes was initiated but full findings were not returned in this exchange.",
     "agent": "opencode",
     "project": "rapid-automations",
     "quality": "normal",
@@ -765,7 +765,7 @@
   },
   {
     "id": "bf3ddc96-d94e-44ce-bb1c-78a6eceb7008",
-    "summary": "Intent: Check for GSD (get-shit-done) updates, install if available, and display what changed.\nApproach: Followed the update workflow defined in the referenced markdown file, which detects installed version, <USER_ID_REDACTED> npm for the latest version, fetches the changelog from GitHub, and guides the user through confirmation and update execution.\nArtifacts: none\nResult: The workflow detected an update is available for the get-shit-done-cc npm package and fetched the changelog from GitHub to display what changed before prompting the user for confirmation.",
+    "summary": "Intent: Check for GSD (get-shit-done) updates, install if available, and display what changed.\nApproach: Followed the update workflow defined in the referenced markdown file, which detects installed version, queries npm for the latest version, fetches the changelog from GitHub, and guides the user through confirmation and update execution.\nArtifacts: none\nResult: The workflow detected an update is available for the get-shit-done-cc npm package and fetched the changelog from GitHub to display what changed before prompting the user for confirmation.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -961,7 +961,7 @@
   },
   {
     "id": "5c47e247-0924-45ee-bd56-8ff0fb2ccc6d",
-    "summary": "Intent: Investigate KPI-FW pipeline failure group #4 (1052 failed jobs, failed step: kpi_metrics) and write structured findings to a specified RCA output file.\nApproach: Systematically <USER_ID_REDACTED> the KPI-FW API and Argo API for failed tasks, workflow metadata (including UIDs for report links), and logs across three sampled jobs, using grep filters to isolate error signals; correlated findings across samples to confirm a consistent root cause before writing the JSON report.\nArtifacts: created ~/Agentic/_work/rapid-automations/.data/rca/2026-04-08T16-48-42_rpr-e2e-rca/kpifw-rca-group-4.json\nResult: Root cause identified as a `KeyError: 'bdc_timestamp'` in `extract_mrtl_data.py:240`, consistent across all sampled jobs (workflow UIDs collected: 350581fc-c827-4328-99f6-cb71b363b40b and two others); findings written to the RCA JSON file with evidence links pointing to the KPI Argo UI prod environment.",
+    "summary": "Intent: Investigate KPI-FW pipeline failure group #4 (1052 failed jobs, failed step: kpi_metrics) and write structured findings to a specified RCA output file.\nApproach: Systematically queried the KPI-FW API and Argo API for failed tasks, workflow metadata (including UIDs for report links), and logs across three sampled jobs, using grep filters to isolate error signals; correlated findings across samples to confirm a consistent root cause before writing the JSON report.\nArtifacts: created ~/Agentic/_work/rapid-automations/.data/rca/2026-04-08T16-48-42_rpr-e2e-rca/kpifw-rca-group-4.json\nResult: Root cause identified as a `KeyError: 'bdc_timestamp'` in `extract_mrtl_data.py:240`, consistent across all sampled jobs (workflow UIDs collected: 350581fc-c827-4328-99f6-cb71b363b40b and two others); findings written to the RCA JSON file with evidence links pointing to the KPI Argo UI prod environment.",
     "agent": "opencode",
     "project": "rapid-automations",
     "quality": "high",
@@ -1351,7 +1351,7 @@
   },
   {
     "id": "98f5776a-c1de-4491-ada3-324a83c2a074",
-    "summary": "Intent: Automate browser navigation to <COMPANY_NAME_REDACTED> SuccessFactors, click \"Schulungen\", with authentication if needed.\nApproach: Used gsd-browser skill to drive a Playwright-based browser session. Navigated to the SuccessFactors URL, which redirected to a login page requiring a Company ID before credentials.\nArtifacts: none\nResult: Blocked at login — entered `<USER_ID_REDACTED>` as Company ID but received \"Invalid company ID\" error. The value provided is likely the username, not the Company ID; correct Company ID still unknown.",
+    "summary": "Intent: Automate browser navigation to <COMPANY_NAME_REDACTED> SuccessFactors, click \"Schulungen\", with authentication if needed.\nApproach: Used gsd-browser skill to drive a Playwright-based browser session. Navigated to the SuccessFactors URL, which redirected to a login page requiring a Company ID before credentials.\nArtifacts: none\nResult: Blocked at login — entered `Q-ID` as Company ID but received \"Invalid company ID\" error. The value provided is likely the username, not the Company ID; correct Company ID still unknown.",
     "agent": "opencode",
     "project": "onboarding-repro",
     "quality": "normal",
@@ -1365,7 +1365,7 @@
   },
   {
     "id": "dfdac119-c4a9-4959-8f30-25cd4343f924",
-    "summary": "Intent: Navigate to <COMPANY_NAME_REDACTED> SuccessFactors, authenticate, and click through to the Schulungen (training) section.\nApproach: Used gsd-browser skill to drive a Playwright-based browser session — loaded the SuccessFactors URL, handled <COMPANY_NAME_REDACTED> SSO authentication (username + password prompt), then clicked the \"Meine Schulungen anzeigen\" link to reach the Learning portal.\nArtifacts: none\nResult: Successfully authenticated as <USER_ID_REDACTED> and landed on the myTMS Learning (Schulungen) page at bmwag.plateau.com, with the training catalog visible and browser session still active.",
+    "summary": "Intent: Navigate to <COMPANY_NAME_REDACTED> SuccessFactors, authenticate, and click through to the Schulungen (training) section.\nApproach: Used gsd-browser skill to drive a Playwright-based browser session — loaded the SuccessFactors URL, handled <COMPANY_NAME_REDACTED> SSO authentication (username + password prompt), then clicked the \"Meine Schulungen anzeigen\" link to reach the Learning portal.\nArtifacts: none\nResult: Successfully authenticated as <REDACTED> and landed on the myTMS Learning (Schulungen) page at bmwag.plateau.com, with the training catalog visible and browser session still active.",
     "agent": "opencode",
     "project": "onboarding-repro",
     "quality": "normal",
@@ -1953,7 +1953,7 @@
   },
   {
     "id": "a3ea5086-955d-4c32-8593-d65fcef52e29",
-    "summary": "Intent: Investigate whether a recurring \"Bad Request\" compaction error in opencode persisted due to a missed restart after a prior fix.\nApproach: Read the referenced session log file to extract root cause analysis and fix details, then checked opencode logs and git history to determine current state.\nArtifacts: none\nResult: The session log was too large and repetitive (duplicated prompt sets) to surface a concrete fix — the prior session appears to have hit the Bad Request itself while analyzing it. Current opencode logs and git history were <USER_ID_REDACTED> to assess whether the fix is now in effect; a restart of opencode was identified as a likely missing step for the fix to take effect.",
+    "summary": "Intent: Investigate whether a recurring \"Bad Request\" compaction error in opencode persisted due to a missed restart after a prior fix.\nApproach: Read the referenced session log file to extract root cause analysis and fix details, then checked opencode logs and git history to determine current state.\nArtifacts: none\nResult: The session log was too large and repetitive (duplicated prompt sets) to surface a concrete fix — the prior session appears to have hit the Bad Request itself while analyzing it. Current opencode logs and git history were queried to assess whether the fix is now in effect; a restart of opencode was identified as a likely missing step for the fix to take effect.",
     "agent": "opencode",
     "project": "onboarding-repro",
     "quality": "normal",
@@ -2327,7 +2327,7 @@
   },
   {
     "id": "5393e0b4-3095-4e7e-8860-6724ae28e4de",
-    "summary": "Intent: Confirm proceeding with backfill of Raw observations in the SQLite observations database.\nApproach: <USER_ID_REDACTED> the observations database to count entries still tagged as [Raw], then wrote a backfill script to re-summarize them via the proxy. Fixed a query issue where LIKE '%[Raw]%' matched quoted text in already-summarized entries.\nArtifacts: edited /tmp/backfill-observations.js\nResult: Identified 326 Raw observations needing backfill and produced a script to re-summarize them through the LLM proxy.",
+    "summary": "Intent: Confirm proceeding with backfill of Raw observations in the SQLite observations database.\nApproach: Queried the observations database to count entries still tagged as [Raw], then wrote a backfill script to re-summarize them via the proxy. Fixed a query issue where LIKE '%[Raw]%' matched quoted text in already-summarized entries.\nArtifacts: edited /tmp/backfill-observations.js\nResult: Identified 326 Raw observations needing backfill and produced a script to re-summarize them through the LLM proxy.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -2343,7 +2343,7 @@
   },
   {
     "id": "97413df4-9a40-4be2-b4b5-9f3c24225477",
-    "summary": "Intent: Check progress of the background backfill command that just completed.\nApproach: <USER_ID_REDACTED> the SQLite observations database directly to count raw vs. processed records, then estimated remaining runtime based on observed processing rate.\nArtifacts: none\nResult: Backfill is in progress with 305 observations remaining; 21 processed so far (1 from current run, 20 from previous). Processing at ~12s/observation, estimated ~1 hour to completion.",
+    "summary": "Intent: Check progress of the background backfill command that just completed.\nApproach: queried the SQLite observations database directly to count raw vs. processed records, then estimated remaining runtime based on observed processing rate.\nArtifacts: none\nResult: Backfill is in progress with 305 observations remaining; 21 processed so far (1 from current run, 20 from previous). Processing at ~12s/observation, estimated ~1 hour to completion.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -2993,7 +2993,7 @@
   },
   {
     "id": "f1171d09-9ec9-4839-8bb5-af9fc2dd6c6f",
-    "summary": "Intent: Developer received a task completion notification for a background backfill job re-summarizing Raw observations.\nApproach: Checked backfill log output and <USER_ID_REDACTED> SQLite to verify counts, confirming the provider health tracking and fallback feature (committed in e6e5a20e) enabled zero failures on this final backfill run.\nArtifacts: none\nResult: Backfill completed with 210 updated, 0 failed, 1 skipped — only 14 Raw observations remain out of 794 total (likely pre-existing malformed entries). Observation system is healthy with LLM summaries working on new observations.",
+    "summary": "Intent: Developer received a task completion notification for a background backfill job re-summarizing Raw observations.\nApproach: Checked backfill log output and queried SQLite to verify counts, confirming the provider health tracking and fallback feature (committed in e6e5a20e) enabled zero failures on this final backfill run.\nArtifacts: none\nResult: Backfill completed with 210 updated, 0 failed, 1 skipped — only 14 Raw observations remain out of 794 total (likely pre-existing malformed entries). Observation system is healthy with LLM summaries working on new observations.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -3051,7 +3051,7 @@
   },
   {
     "id": "49c40830-bcd0-42b7-9275-7e8e77b88b6f",
-    "summary": "Intent: Developer shared a screenshot and asked why no observations have been recorded for the current session (Apr 14), given the latest observation is from Apr 12.\nApproach: Checked if the Enhanced Transcript Monitor (ETM) background process was running, inspected health state, <USER_ID_REDACTED> the observations database for recent entries, and listed recent session log files to diagnose why the current session's exchanges weren't being captured.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: ETM was confirmed running for both projects. The gap in observations (Apr 12 → Apr 14) was identified as a detection/firing issue, not a process outage — further investigation needed to determine why the current session's exchanges weren't triggering observation writes.",
+    "summary": "Intent: Developer shared a screenshot and asked why no observations have been recorded for the current session (Apr 14), given the latest observation is from Apr 12.\nApproach: Checked if the Enhanced Transcript Monitor (ETM) background process was running, inspected health state, queried the observations database for recent entries, and listed recent session log files to diagnose why the current session's exchanges weren't being captured.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: ETM was confirmed running for both projects. The gap in observations (Apr 12 → Apr 14) was identified as a detection/firing issue, not a process outage — further investigation needed to determine why the current session's exchanges weren't triggering observation writes.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -3115,7 +3115,7 @@
   },
   {
     "id": "aa017f2a-77b0-471d-985b-2388f4cf720b",
-    "summary": "Intent: Diagnose why no observations are appearing from the current session despite ETM running.\nApproach: Directly <USER_ID_REDACTED> the observations DB, ETM health file, ETM logs, and raw health data to identify the gap between ETM processing 63 exchanges and the last observation timestamp being 8 minutes stale.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: ETM (PID 66412) is running and processing exchanges, but observation generation has stalled — last DB entry was at 05:36 despite active transcript activity. Root cause not yet identified; investigation ongoing.",
+    "summary": "Intent: Diagnose why no observations are appearing from the current session despite ETM running.\nApproach: Directly queried the observations DB, ETM health file, ETM logs, and raw health data to identify the gap between ETM processing 63 exchanges and the last observation timestamp being 8 minutes stale.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: ETM (PID 66412) is running and processing exchanges, but observation generation has stalled — last DB entry was at 05:36 despite active transcript activity. Root cause not yet identified; investigation ongoing.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -3131,7 +3131,7 @@
   },
   {
     "id": "a24cba34-39bf-4d2e-b564-57fe7ec492c1",
-    "summary": "Intent: Check completion status of background backfill task for Raw observations.\nApproach: <USER_ID_REDACTED> the SQLite observations database directly to count remaining [Raw] observations after the background task completed, confirming the backfill succeeded.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Backfill completed with 804 of 805 observations now having proper LLM summaries; 1 [Raw] observation remains due to a malformed messages entry that was intentionally skipped.",
+    "summary": "Intent: Check completion status of background backfill task for Raw observations.\nApproach: queried the SQLite observations database directly to count remaining [Raw] observations after the background task completed, confirming the backfill succeeded.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Backfill completed with 804 of 805 observations now having proper LLM summaries; 1 [Raw] observation remains due to a malformed messages entry that was intentionally skipped.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -3163,7 +3163,7 @@
   },
   {
     "id": "f1c0031f-6f4e-44d8-9e04-27b8eb96f712",
-    "summary": "Intent: Developer shared a screenshot and investigated why observations show \"Artifacts: edited enhanced-transcript-monitor.js\" despite editing 6 files — diagnosing why the Enhanced Transcript Monitor (ETM) fails to capture Edit/Write tool calls.\nApproach: <USER_ID_REDACTED> observation database to inspect recent observation metadata, then grepped the ETM source to understand how tool calls are parsed, discovering that `modifiedFiles` is null while `readFiles` is populated — suggesting the ETM only captures some tool call types.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Root cause identified: the ETM is not capturing Edit/Write tool calls in its transcript parsing, leaving `modifiedFiles` as null in observation metadata. The fix would be in how `extractToolCalls` parses the Claude Code transcript format in `scripts/enhanced-transcript-monitor.js`.",
+    "summary": "Intent: Developer shared a screenshot and investigated why observations show \"Artifacts: edited enhanced-transcript-monitor.js\" despite editing 6 files — diagnosing why the Enhanced Transcript Monitor (ETM) fails to capture Edit/Write tool calls.\nApproach: queried observation database to inspect recent observation metadata, then grepped the ETM source to understand how tool calls are parsed, discovering that `modifiedFiles` is null while `readFiles` is populated — suggesting the ETM only captures some tool call types.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Root cause identified: the ETM is not capturing Edit/Write tool calls in its transcript parsing, leaving `modifiedFiles` as null in observation metadata. The fix would be in how `extractToolCalls` parses the Claude Code transcript format in `scripts/enhanced-transcript-monitor.js`.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -3228,7 +3228,7 @@
   },
   {
     "id": "64e2582b-175c-4b97-bbd5-2ee68db775ca",
-    "summary": "Intent: Identify and patch observations still showing \"Artifacts: edited enhanced-transcript-monitor.js\" in the dashboard, specifically the observation at 08:27 showing as unpatched.\nApproach: <USER_ID_REDACTED> the SQLite observations database to find duplicate observations at the same timestamp, determined the dashboard was displaying the unpatched record (824fcd8c) rather than the already-patched one (0e66182a), and planned to patch all remaining \"Artifacts: edited enhanced-transcript-monitor.js\" observations that have continuation exchanges with actual file edits.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Found two observations at 08:27 — the patched one was sorted below the unpatched one, causing the dashboard to display the wrong record. Decision made to patch observation 824fcd8c and audit all remaining \"Artifacts: edited enhanced-transcript-monitor.js\" observations for missed file edits.",
+    "summary": "Intent: Identify and patch observations still showing \"Artifacts: edited enhanced-transcript-monitor.js\" in the dashboard, specifically the observation at 08:27 showing as unpatched.\nApproach: queried the SQLite observations database to find duplicate observations at the same timestamp, determined the dashboard was displaying the unpatched record (824fcd8c) rather than the already-patched one (0e66182a), and planned to patch all remaining \"Artifacts: edited enhanced-transcript-monitor.js\" observations that have continuation exchanges with actual file edits.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Found two observations at 08:27 — the patched one was sorted below the unpatched one, causing the dashboard to display the wrong record. Decision made to patch observation 824fcd8c and audit all remaining \"Artifacts: edited enhanced-transcript-monitor.js\" observations for missed file edits.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -3260,7 +3260,7 @@
   },
   {
     "id": "5b4fda2f-6edf-44f3-b296-0e70a09b0842",
-    "summary": "Intent: Reprimand for not using gsd-browser skill to e2e verify changes, and demand that all coding agents always use it for UI/dashboard verification.\nApproach: User caught a <COMPANY_NAME_REDACTED>-irony: the fix for \"missing artifacts\" produced an entry with missing artifacts, proving no e2e verification was done. The feedback is to mandate /gsd-browser or /playwright-cli for visual verification and burn this into persistent memory so all agents remember it.\nArtifacts: edited ~/.claude/projects/-Users-<REDACTED>-Agentic-coding/memory/feedback_e2e_verify.md, edited ~/.claude/projects/-Users-<REDACTED>-Agentic-coding/memory/MEMORY.md\nResult: Memory updated to enforce that UI/dashboard changes MUST be verified with /gsd-browser or /playwright-cli before claiming success — never rely on DB <USER_ID_REDACTED> or code inspection alone. Rule applies to all supported coding agents.",
+    "summary": "Intent: Reprimand for not using gsd-browser skill to e2e verify changes, and demand that all coding agents always use it for UI/dashboard verification.\nApproach: User caught a <COMPANY_NAME_REDACTED>-irony: the fix for \"missing artifacts\" produced an entry with missing artifacts, proving no e2e verification was done. The feedback is to mandate /gsd-browser or /playwright-cli for visual verification and burn this into persistent memory so all agents remember it.\nArtifacts: edited ~/.claude/projects/-Users-<REDACTED>-Agentic-coding/memory/feedback_e2e_verify.md, edited ~/.claude/projects/-Users-<REDACTED>-Agentic-coding/memory/MEMORY.md\nResult: Memory updated to enforce that UI/dashboard changes MUST be verified with /gsd-browser or /playwright-cli before claiming success — never rely on DB queried or code inspection alone. Rule applies to all supported coding agents.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -3291,7 +3291,7 @@
   },
   {
     "id": "7ceb0c47-1f70-43e7-9e11-51fd2548b6c7",
-    "summary": "Intent: Continue with previous work (verification phase)\nApproach: Verified committed changes and validated health monitoring system functionality through API endpoints and verification reports\nArtifacts: none\nResult: Confirmed 8 observation system fixes across 4 commits are complete and committed. Health monitoring system shows all 14 checks passing with 0 issues, including new LLM proxy and observation <USER_ID_REDACTED> checks. Documentation updates and dashboard artifact display verified working.",
+    "summary": "Intent: Continue with previous work (verification phase)\nApproach: Verified committed changes and validated health monitoring system functionality through API endpoints and verification reports\nArtifacts: none\nResult: Confirmed 8 observation system fixes across 4 commits are complete and committed. Health monitoring system shows all 14 checks passing with 0 issues, including new LLM proxy and observation queried checks. Documentation updates and dashboard artifact display verified working.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -3305,7 +3305,7 @@
   },
   {
     "id": "64d22544-b91b-48cc-ab22-29e629553302",
-    "summary": "Intent: <USER_ID_REDACTED> about session observations or artifacts from a specific time period (via image)\nApproach: Investigated the observations database to cross-reference session periods and identify which exchanges contained file modifications versus tool-only operations.\nArtifacts: none\nResult: Identified that the 09:29 observation was a health-check exchange using curl/Bash with no file edits, with file modifications occurring in earlier exchanges. Investigation was incomplete.",
+    "summary": "Intent: queried about session observations or artifacts from a specific time period (via image)\nApproach: Investigated the observations database to cross-reference session periods and identify which exchanges contained file modifications versus tool-only operations.\nArtifacts: none\nResult: Identified that the 09:29 observation was a health-check exchange using curl/Bash with no file edits, with file modifications occurring in earlier exchanges. Investigation was incomplete.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -7247,7 +7247,7 @@
   },
   {
     "id": "e965e521-b16c-4566-8a6d-52de9547b3b5",
-    "summary": "Intent: [shared an image of observations database content for review]\nApproach: Assistant examined the image and <USER_ID_REDACTED> the database to investigate a malformed observation entry that contained raw template fields instead of a proper summary.\nArtifacts: edited ObservationWriter.js\nResult: Identified that one observation stored the raw template structure (Intent/Approach/Artifacts/Result labels) as content instead of a filled-in summary, indicating a bug in how the knowledge extraction observer processes or stores results.",
+    "summary": "Intent: [shared an image of observations database content for review]\nApproach: Assistant examined the image and queried the database to investigate a malformed observation entry that contained raw template fields instead of a proper summary.\nArtifacts: edited ObservationWriter.js\nResult: Identified that one observation stored the raw template structure (Intent/Approach/Artifacts/Result labels) as content instead of a filled-in summary, indicating a bug in how the knowledge extraction observer processes or stores results.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -7279,7 +7279,7 @@
   },
   {
     "id": "7acdce55-a789-4d69-a7cf-5fa6f4187a85",
-    "summary": "Intent: Developer shared two images for review, likely showing duplicate observations.\nApproach: Assistant read the images and <USER_ID_REDACTED> the observations database to investigate duplicate/unmerged observations from the same session.\nArtifacts: edited ObservationWriter.js\nResult: Identified two observations from the same session (same task, 5 minutes apart) that should have been merged, pointing to a gap in the dedup/merging logic.",
+    "summary": "Intent: Developer shared two images for review, likely showing duplicate observations.\nApproach: Assistant read the images and queried the observations database to investigate duplicate/unmerged observations from the same session.\nArtifacts: edited ObservationWriter.js\nResult: Identified two observations from the same session (same task, 5 minutes apart) that should have been merged, pointing to a gap in the dedup/merging logic.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -7491,7 +7491,7 @@
   },
   {
     "id": "f066b745-c80d-4ad4-a809-28dd02d66e91",
-    "summary": "Intent: Run a code review for phase 24 of the current project.\nApproach: Dispatched to the code-review workflow, which reads workflow config, resolves phase directory and SUMMARY.md, then attempts to scope files via git diff.\nArtifacts: edited temporal.ts, edited routes.ts\nResult: Workflow execution began but stalled during file scoping — git log <USER_ID_REDACTED> for phase 24 commits were too broad and the assistant noted needing a more targeted approach to identify changed files.",
+    "summary": "Intent: Run a code review for phase 24 of the current project.\nApproach: Dispatched to the code-review workflow, which reads workflow config, resolves phase directory and SUMMARY.md, then attempts to scope files via git diff.\nArtifacts: edited temporal.ts, edited routes.ts\nResult: Workflow execution began but stalled during file scoping — git log queried for phase 24 commits were too broad and the assistant noted needing a more targeted approach to identify changed files.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -7977,7 +7977,7 @@
   },
   {
     "id": "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
-    "summary": "Intent: [the user shared a screenshot for review, likely related to checking redaction in stored observations]\nApproach: [assistant checked the database for unredacted user IDs and interpreted what was visible in the screenshot]\nArtifacts: edited .env\nResult: [confirmed redaction is working correctly — raw user ID <USER_ID_REDACTED> and email references are fully replaced with `<USER_ID_REDACTED>` in all stored observations; the visible path in the screenshot is the already-redacted version]",
+    "summary": "Intent: [the user shared a screenshot for review, likely related to checking redaction in stored observations]\nApproach: [assistant checked the database for unredacted user IDs and interpreted what was visible in the screenshot]\nArtifacts: edited .env\nResult: [confirmed redaction is working correctly — raw user ID queried and email references are fully replaced with `<USER_ID_REDACTED>` in all stored observations; the visible path in the screenshot is the already-redacted version]",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
