@@ -13,13 +13,15 @@ rectangle "Coding Agents" <<agent>> {
 }
 
 rectangle "Enhanced Transcript Monitor\n(per project)" <<core>> as etm {
-  component "_fireObservation()" as fire
+  component "_firePromptSetObservation()" as fire
 }
 
 rectangle "ObservationWriter" <<core>> as ow {
   component "summarize()" as summarize
+  component "_sanitizeSummary()" as sanitize
+  component "_serializedWrite()" as serialize
   component "writeObservation()" as write
-  component "DB-level dedup" as dedup
+  component "Semantic dedup\n(Jaccard + containment)" as dedup
 }
 
 rectangle "LLM CLI Proxy\n(localhost:12435)" <<api>> as proxy {
@@ -32,11 +34,16 @@ rectangle "LLM Providers" <<external>> as providers {
   component "groq\n(API fallback)" as groq
 }
 
-database "SQLite\n.observations/\nobservations.db" <<storage>> as db
+database "SQLite WAL\n.observations/\nobservations.db" <<storage>> as db
+
+rectangle "Git-Tracked Export" <<storage>> as export {
+  component "ObservationExporter" as exporter
+  file ".data/observation-export/\nobservations.json\ndigests.json\ninsights.json" as json
+}
 
 rectangle "Health Dashboard\n(localhost:3032)" <<api>> as dash {
   component "REST API\n(port 3033)" as api
-  component "Observations\nUI" as ui
+  component "Dashboard UI" as ui
 }
 
 claude --> etm
@@ -52,11 +59,16 @@ llm --> cp : priority 2
 llm --> groq : priority 3
 
 summarize <-- proxy : summary +\nmodel/provider/tokens
-summarize --> dedup
+summarize --> sanitize : raw LLM output
+sanitize --> serialize : cleaned summary
+serialize --> dedup : write lock\n(TOCTOU prevention)
 dedup --> write : if unique
 write --> db
 
-api --> db : readonly
+write ASYNC_LINE exporter : debounced\n(10s coalesce)
+exporter DATA_LINE json
+
+api --> db : readonly\n(auto-reconnect\non corruption)
 ui --> api : fetch + poll
 
 @enduml

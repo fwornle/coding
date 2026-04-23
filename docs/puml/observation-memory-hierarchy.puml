@@ -20,6 +20,13 @@ rectangle "LLM Services" {
   component "LLM Proxy\n(port 12435)" as LLM <<agent>>
 }
 
+rectangle "Git-Tracked Export" {
+  component "ObservationExporter" as EXP <<core>>
+  file "observations.json" as EX_OBS <<storage>>
+  file "digests.json" as EX_DIG <<storage>>
+  file "insights.json" as EX_INS <<storage>>
+}
+
 rectangle "Dashboard (port 3032)" {
   component "/observations" as UI_OBS <<api>>
   component "/digests" as UI_DIG <<api>>
@@ -36,13 +43,24 @@ rectangle "API (port 3033)" {
 ' Real-time flow
 ETM SYNC_LINE OW : per exchange
 OW SYNC_LINE LLM : summarize()
-OW DATA_LINE OBS : writeObservation()
+OW DATA_LINE OBS : writeObservation()\n(serialized lock)
+
+' Export from writer (debounced)
+OW ASYNC_LINE EXP : debounced\n(10s coalesce)
 
 ' Consolidation flow
 OBS ASYNC_LINE OC : undigested\nobservations
 OC SYNC_LINE LLM : consolidateDay()\nsynthesizeInsights()
 OC DATA_LINE DIG : thematic\ndigests
 OC DATA_LINE INS : persistent\nknowledge
+
+' Export from consolidator (after run)
+OC ASYNC_LINE EXP : exportAll()
+
+' Exporter writes JSON
+EXP DATA_LINE EX_OBS
+EXP DATA_LINE EX_DIG
+EXP DATA_LINE EX_INS
 
 ' API reads
 OBS ..> API_OBS
@@ -54,6 +72,13 @@ API_OBS ..> UI_OBS
 API_DIG ..> UI_DIG
 API_INS ..> UI_INS
 
+note right of EXP
+  **.data/observation-export/**
+  Git-tracked JSON (no raw messages)
+  Mirrors UKB knowledge-export pattern
+  Skips write if content unchanged
+end note
+
 note right of OC
   **Triggers:**
   Daily cron (--daemon at 02:00)
@@ -61,15 +86,16 @@ note right of OC
   API: POST /api/consolidation/run
 
   **Thresholds:**
-  Digests: per day, skip today
+  Digests: per day, skip today (daemon)
   Insights: >= 5 unsynthesized digests
   Confidence decay: -0.05/week (floor 0.3)
 end note
 
 note bottom of OBS
-  **Dedup:** stemmed keyword
-  Jaccard + containment
-  4-hour sliding window
+  **Dedup:** serialized write lock
+  + stemmed keyword Jaccard/containment
+  + LLM summary sanitization
+  **WAL mode** for concurrent access
 end note
 
 @enduml

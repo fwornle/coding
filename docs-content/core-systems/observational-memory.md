@@ -12,7 +12,7 @@ Observational Memory implements a three-tier memory hierarchy:
 | **Digests** | Daily thematic work session summaries | End of day (cron or manual) | ~7/day |
 | **Insights** | Persistent project knowledge | Weekly or >= 5 new digests | ~10 total |
 
-The system stores everything in a single SQLite database (`.observations/observations.db`) and exposes all three tiers through the health dashboard at `http://localhost:3032`.
+The system uses SQLite (`.observations/observations.db`) as its runtime store and exports git-tracked JSON to `.data/observation-export/` for cross-machine portability — mirroring the UKB knowledge-export pattern.
 
 ![NavBar with all memory tiers](../images/memory-hierarchy-navbar.png)
 
@@ -26,7 +26,8 @@ The system stores everything in a single SQLite database (`.observations/observa
 |-----------|----------|------|
 | **ObservationWriter** | `src/live-logging/ObservationWriter.js` | Summarizes exchanges via LLM proxy, writes to SQLite with dedup |
 | **ObservationConsolidator** | `src/live-logging/ObservationConsolidator.js` | Consolidates observations into digests and insights via LLM |
-| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per exchange (fire-and-forget) |
+| **ObservationExporter** | `src/live-logging/ObservationExporter.js` | Git-friendly JSON export to `.data/observation-export/` |
+| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per prompt-set (fire-and-forget) |
 | **Consolidation CLI** | `scripts/consolidate-observations.js` | CLI/daemon for running the consolidation pipeline |
 | **Health API** | `integrations/system-health-dashboard/server.js` | REST endpoints for observations, digests, insights |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/` | Browsable views: observations, digests, insights |
@@ -34,12 +35,17 @@ The system stores everything in a single SQLite database (`.observations/observa
 
 ## Observation Pipeline
 
-1. **Exchange completed** -- the ETM detects a user-assistant exchange
-2. **Fire-and-forget** -- `_fireObservation()` sends messages to ObservationWriter (never awaited, never blocks LSL)
-3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a 1-3 sentence summary
-4. **Dedup check** -- DB-level dedup prevents storing duplicate summaries per agent
-5. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens)
-6. **Dashboard** -- REST API serves observations; dashboard polls every 30s
+![Observation Pipeline](../images/observation-pipeline.png)
+
+1. **Exchange completed** -- the ETM detects a completed prompt set (user + assistant exchanges)
+2. **Fire-and-forget** -- `_firePromptSetObservation()` sends messages to ObservationWriter (never awaited, never blocks LSL)
+3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a structured summary (Intent/Approach/Artifacts/Result)
+4. **Summary sanitization** -- `_sanitizeSummary()` strips unfilled template placeholders and LLM self-correction artifacts
+5. **Serialized write** -- `_serializedWrite()` acquires a promise-chain lock to prevent TOCTOU races between concurrent fire-and-forget calls
+6. **Dedup check** -- content hash + semantic keyword similarity (Jaccard + containment) against a 4-hour sliding window
+7. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens)
+8. **JSON export** -- debounced (10s coalesce) export to `.data/observation-export/observations.json`
+9. **Dashboard** -- REST API serves observations; dashboard polls every 30s
 
 ## Supported Agents
 
@@ -100,7 +106,7 @@ node scripts/convert-transcripts.js specstory
 
 ## Database
 
-SQLite database at `.observations/observations.db` with WAL mode enabled for concurrent access.
+SQLite database at `.observations/observations.db` with **WAL mode** and `busy_timeout=5000ms` for safe concurrent access across multiple ETM writers and the Docker-hosted API reader.
 
 **Observations table:**
 ```sql
@@ -149,6 +155,37 @@ CREATE TABLE insights (
 );
 ```
 
+## Git-Tracked JSON Export
+
+The observation system exports human-readable JSON to `.data/observation-export/` for git tracking, mirroring the UKB `knowledge-export` pattern. This provides cross-machine portability, backup, and diff-friendly change history.
+
+### Exported Files
+
+| File | Content | Excludes |
+|------|---------|----------|
+| `observations.json` | Structured summaries with agent, project, quality, LLM metadata, modified files | Raw `messages` column (bulk exchange data) |
+| `digests.json` | Daily thematic digests with observation IDs, agents, files touched | -- |
+| `insights.json` | Persistent project insights with confidence scores and digest IDs | -- |
+| `metadata.json` | Export timestamp and counts | -- |
+
+### Export Triggers
+
+| Trigger | When | What |
+|---------|------|------|
+| **ObservationWriter** | After each `writeObservation()` | Debounced 10s coalesce — exports `observations.json` only |
+| **ObservationWriter close** | On `close()` | Immediate flush of pending export |
+| **ObservationConsolidator** | After each `run()` | Full `exportAll()` — all three tiers + metadata |
+
+### Comparison with UKB Knowledge Export
+
+| Aspect | UKB (`knowledge-export/`) | Observations (`observation-export/`) |
+|--------|--------------------------|--------------------------------------|
+| **Runtime store** | Graphology + LevelDB | SQLite (WAL mode) |
+| **Export format** | `{team}.json` with entities + relations | Separate files per tier |
+| **Export trigger** | `entity:stored` event | After write (debounced) / after consolidation |
+| **Git location** | `.data/knowledge-export/` | `.data/observation-export/` |
+| **Skip unchanged** | Yes | Yes (content comparison before write) |
+
 ## Configuration
 
 ### ObservationWriter config
@@ -179,12 +216,14 @@ Mastracode has its own observational memory system (separate from ours). It can 
 
 ## Deduplication
 
-Observations are deduplicated at two levels before storage:
+Observations are deduplicated at multiple levels before storage:
 
+- **Write serialization**: A promise-chain lock (`_serializedWrite`) prevents concurrent fire-and-forget calls from racing past the dedup check (TOCTOU prevention). LLM summarization runs concurrently; only the dedup-check + DB-write is serialized.
 - **Content hash**: MD5 of `sessionId|userContent|assistantContent` -- identical exchanges are rejected
-- **Semantic dedup**: Stemmed keyword similarity (Jaccard + containment) against a 4-hour sliding window of the last 50 observations per agent. Synonymous verbs are canonicalized (debug/diagnose/investigate -> `debug`, showing/displaying/appearing -> `show`) and stop words stripped before comparison
+- **Semantic dedup**: Stemmed keyword similarity (Jaccard > 0.4 or containment > 0.7) against a 4-hour sliding window of the last 50 observations per agent. Synonymous verbs are canonicalized (debug/diagnose/investigate -> `debug`, showing/displaying/appearing -> `show`) and stop words stripped before comparison
+- **Summary sanitization**: `_sanitizeSummary()` detects unfilled LLM template placeholders (`[what the developer...]`) and self-correction artifacts (multiple `Intent:` blocks) -- discards or cleans the output before storage
 - **Trivial filter**: observations containing "trivial exchange" or "no actionable content" are skipped entirely
-- **WAL mode**: SQLite WAL mode prevents corruption from concurrent ETM writes
+- **WAL mode**: SQLite WAL mode + `busy_timeout=5000ms` prevents corruption from concurrent ETM writes and Docker bind-mount reads
 
 ## Consolidation Pipeline
 
@@ -194,7 +233,7 @@ The consolidation pipeline aggregates fine-grained observations into two higher-
 
 Digests group same-day observations by cognitive topic and produce consolidated narratives.
 
-**Trigger**: End of day via cron (`--daemon` mode at 02:00) or manual run. Today's observations are never consolidated (still being written).
+**Trigger**: End of day via cron (`--daemon` mode at 02:00), manual run, or dashboard "Consolidate" button. The daemon skips today's observations (still being written); manual triggers include today via `includeToday: true`.
 
 **Process**:
 
@@ -269,5 +308,13 @@ node scripts/consolidate-observations.js --daemon
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/consolidation/status` | GET | Counts: total obs, undigested, digests, insights |
-| `/api/consolidation/run` | POST | Trigger consolidation (optional `{ date }` body) |
+| `/api/consolidation/status` | GET | Counts: total obs, undigested, pending past/today, digests, insights |
+| `/api/consolidation/run` | POST | Trigger consolidation (optional `{ date }` body). Manual triggers include today's observations. |
+
+## Error Recovery
+
+The health API server (`server.js`) implements automatic error recovery for the observations database:
+
+- **Connection caching**: DB handle reopened every 30s to pick up schema changes
+- **Corruption recovery**: When a query fails with "malformed", "corrupt", or "disk I/O" errors, the cached connection is immediately invalidated via `_invalidateObservationsDb()` -- the next request gets a fresh handle instead of serving errors for 30s
+- **WAL checkpoint**: ObservationWriter runs `PRAGMA wal_checkpoint(PASSIVE)` every 15s so the readonly Docker reader sees fresh data
