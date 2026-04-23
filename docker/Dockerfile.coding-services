@@ -37,7 +37,10 @@ FROM base AS node-deps
 COPY package.json package-lock.json ./
 
 # Copy local dependency tarballs (referenced as file: in package.json)
+# Root package.json uses file:../_work/ (resolves to /_work/ from /coding/)
+# Submodule package.json uses file:../../_work/ (resolves to /coding/_work/ from /coding/integrations/xxx/)
 COPY _work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz /_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
+COPY _work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz /coding/_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
 
 # Install root dependencies first
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
@@ -97,6 +100,11 @@ RUN cd lib/vkb-server && npm install --ignore-scripts 2>/dev/null || true
 
 # Install LLM service dependencies
 RUN cd lib/llm && npm install --ignore-scripts 2>/dev/null || true
+
+# Re-install integration deps after source COPY (node-deps stage installs may
+# have been overwritten by COPY integrations/ since .dockerignore excludes node_modules)
+RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
+RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
 
 # Rebuild native bindings for the container's architecture
 RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true
