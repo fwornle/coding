@@ -170,7 +170,7 @@
     ],
     "filesTouched": [
       "viewer/src/api/okbClient.ts",
-      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "<AWS_SECRET_REDACTED>phVisualization.tsx",
       "src/intelligence/correlation.ts",
       "tests/unit/correlation.test.ts"
     ],
@@ -221,7 +221,7 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:44:59.370Z"
@@ -271,7 +271,7 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:44:59.370Z"
@@ -538,8 +538,8 @@
       "src/live-logging/ObservationWriter.js",
       "src/live-logging/SessionEventHandler.js (or equivalent `_firePromptSetObservation` host file in the coding project)",
       "src/ObservationHandler.js (or equivalent live-logging pipeline files in the coding project)",
-      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js",
-      "/Users/Q284340/Agentic/coding/src/session/SessionManager.js"
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "<AWS_SECRET_REDACTED>n/SessionManager.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T05:22:05.198Z"
@@ -592,8 +592,8 @@
       "viewer/src/utils/guidedTraversal.ts",
       "viewer/src/store/slices/navigationSlice.ts",
       "viewer/src/index.css",
-      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
-      "viewer/src/components/KnowledgeGraph/NodeDetails.tsx"
+      "<AWS_SECRET_REDACTED>phVisualization.tsx",
+      "<AWS_SECRET_REDACTED>eDetails.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:10.407Z"
@@ -716,16 +716,16 @@
       "GraphVisualization.tsx (preview ring rendering)",
       "CSS (pulse animation)",
       "src/features/graph/utils/guidedTour.ts",
-      "src/features/graph/components/NodeDetails.tsx",
-      "src/features/graph/slices/navigationSlice.ts",
-      "src/features/graph/components/GraphVisualization.tsx",
+      "<AWS_SECRET_REDACTED>s.tsx",
+      "<AWS_SECRET_REDACTED>e.ts",
+      "<AWS_SECRET_REDACTED>lization.tsx",
       "src/features/graph/styles/graph.css",
       "src/components/GraphVisualization.tsx",
       "src/components/NodeDetails.tsx",
       "src/styles/graph.css",
       "src/viewer/src/components/NodeDetails.tsx",
       "src/viewer/src/styles/graph.css",
-      "src/viewer/src/components/GraphVisualization.tsx"
+      "<AWS_SECRET_REDACTED>tion.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:10.407Z"
@@ -747,7 +747,7 @@
       "viewer/src/utils/guidedTraversal.ts",
       "src/api/routes.ts",
       "scripts/backfill-evidence-links.ts",
-      "viewer/src/components/GraphVisualization.tsx",
+      "<AWS_SECRET_REDACTED>.tsx",
       "viewer/src/components/NodeDetails.tsx",
       "viewer/src/index.css"
     ],
@@ -787,13 +787,13 @@
     ],
     "filesTouched": [
       "integrations/operational-knowledge-management/viewer/src/index.css",
-      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
-      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
-      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/index.css",
-      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
-      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
-      "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
-      "viewer/src/components/KnowledgeGraph/NodeDetails (partial path)"
+      "integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/NodeDetails.tsx",
+      "integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/GraphVisualization.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/index.css",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/NodeDetails.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/GraphVisualization.tsx",
+      "<AWS_SECRET_REDACTED>phVisualization.tsx",
+      "<AWS_SECRET_REDACTED>eDetails (partial path)"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:18.248Z"
@@ -958,7 +958,7 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/_work/onboarding-repro/brandschutz-training.sh"
+      "~/Agentic/_work/onboarding-repro/brandschutz-training.sh"
     ],
     "quality": "normal",
     "createdAt": "2026-04-22T06:49:21.721Z"
@@ -1005,7 +1005,7 @@
       "opencode"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/_work/onboarding-repro/brandschutz-training.sh",
+      "~/Agentic/_work/onboarding-repro/brandschutz-training.sh",
       "(SAML relay page handling inserted at lines 379-391)",
       "(SAML handshake section ~lines 384–413",
       "(lines 405",
@@ -1049,9 +1049,9 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/coding/docs/puml/llm-cli-proxy-architecture.puml",
-      "/Users/Q284340/Agentic/coding/docs/puml/observation-pipeline.puml",
-      "/Users/Q284340/Agentic/coding/docs-content/core-systems/observational-memory.md"
+      "<AWS_SECRET_REDACTED>llm-cli-proxy-architecture.puml",
+      "<AWS_SECRET_REDACTED>observation-pipeline.puml",
+      "~/Agentic/coding/docs-content/core-systems/observational-memory.md"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:50:06.818Z"
@@ -1166,7 +1166,7 @@
     ],
     "filesTouched": [
       "enhanced-transcript-monitor.js",
-      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:51:06.811Z"
@@ -1195,9 +1195,9 @@
     ],
     "filesTouched": [
       "enhanced-transcript-monitor.js",
-      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js",
       "ObservationWriter.js",
-      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:51:06.811Z"
@@ -1216,8 +1216,8 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_e2e_verify.md",
-      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/MEMORY.md"
+      "~/.claude/projects/Agentic-coding/memory/feedback_e2e_verify.md",
+      "~/.claude/projects/Agentic-coding/memory/MEMORY.md"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:51:06.811Z"
@@ -1788,14 +1788,14 @@
       "opencode"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/coding/claude-code-mcp.json",
-      "/Users/Q284340/Agentic/coding/claude-code-mcp-processed.json",
-      "/Users/Q284340/Agentic/coding/claude-code-mcp-docker.json",
-      "/Users/Q284340/Agentic/coding/install.sh",
+      "~/Agentic/coding/claude-code-mcp.json",
+      "~/Agentic/coding/claude-code-mcp-processed.json",
+      "~/Agentic/coding/claude-code-mcp-docker.json",
+      "~/Agentic/coding/install.sh",
       "other agent config files (opencode",
-      "/Users/Q284340/Agentic/coding/integrations/llm-cli-proxy/../../../.claude/settings.local.json",
-      "/Users/Q284340/Agentic/coding/uninstall.sh",
-      "/Users/Q284340/Agentic/coding/scripts/test-coding.sh"
+      "<AWS_SECRET_REDACTED>ns/llm-cli-proxy/../../../.claude/settings.local.json",
+      "~/Agentic/coding/uninstall.sh",
+      "<AWS_SECRET_REDACTED>st-coding.sh"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:54:46.926Z"
@@ -2328,7 +2328,7 @@
     ],
     "filesTouched": [
       "monitor source files (classification logic",
-      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js",
       "scripts/enhanced-transcript-monitor.js",
       "global-lsl-coordinator.js",
       "process-state-manager.js",
@@ -2394,7 +2394,7 @@
       "trajectory analyzer (removed dead provider URL/key logic)",
       "rapid-automations ETM health writer to include pollCount metric",
       "coding SemanticAnalyzer to remove mergeTrajectoryWithSession and parseTrajectoryResponse",
-      "coding trajectory analyzer to remove getApiKeyForProvider/getBaseUrlForProvider/initializeFastInference dead methods and unused apiKey/baseUrl fields",
+      "coding trajectory analyzer to remove <AWS_SECRET_REDACTED>er/initializeFastInference dead methods and unused apiKey/baseUrl fields",
       "global-lsl-coordinator.js",
       "SemanticAnalyzer.js",
       "trajectory analyzer file"
@@ -2464,7 +2464,7 @@
     ],
     "filesTouched": [
       "ObservationWriter.js",
-      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T05:21:52.314Z"
@@ -2482,7 +2482,7 @@
     ],
     "filesTouched": [
       "ObservationWriter.js",
-      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationWriter.js"
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
     ],
     "quality": "normal",
     "createdAt": "2026-04-23T05:21:52.314Z"
@@ -2503,7 +2503,7 @@
     ],
     "filesTouched": [
       "ObservationConsolidator.js",
-      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+      "~/Agentic/coding/src/live-logging/ObservationConsolidator.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T05:21:52.314Z"
@@ -2522,8 +2522,8 @@
       "claude"
     ],
     "filesTouched": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx",
+      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/pages/digests.tsx",
+      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/pages/insights.tsx",
       "/tmp/pw-scripts/pw_digests.js"
     ],
     "quality": "high",
@@ -2543,9 +2543,9 @@
     ],
     "filesTouched": [
       "observation-memory-hierarchy.puml",
-      "/Users/Q284340/Agentic/coding/docs/puml/observation-memory-hierarchy.puml",
+      "<AWS_SECRET_REDACTED>observation-memory-hierarchy.puml",
       "observational-memory.md",
-      "/Users/Q284340/Agentic/coding/docs-content/core-systems/observational-memory.md"
+      "~/Agentic/coding/docs-content/core-systems/observational-memory.md"
     ],
     "quality": "normal",
     "createdAt": "2026-04-23T05:21:52.314Z"
@@ -2568,7 +2568,7 @@
     ],
     "filesTouched": [
       "llm-architecture.md",
-      "/Users/Q284340/Agentic/coding/docs-content/architecture/llm-architecture.md"
+      "~/Agentic/coding/docs-content/architecture/llm-architecture.md"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T05:21:52.314Z"
@@ -2606,7 +2606,7 @@
     ],
     "filesTouched": [
       "markdown-text.tsx",
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/components/markdown-text.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T06:21:34.398Z"
@@ -2626,7 +2626,7 @@
     ],
     "filesTouched": [
       "markdown-text.tsx",
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx",
+      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/components/markdown-text.tsx",
       "/tmp/pw-scripts/pw_task.js"
     ],
     "quality": "high",
@@ -2663,7 +2663,7 @@
     ],
     "filesTouched": [
       "docker-compose.yml",
-      "/Users/Q284340/Agentic/coding/docker/docker-compose.yml"
+      "<AWS_SECRET_REDACTED>ker-compose.yml"
     ],
     "quality": "normal",
     "createdAt": "2026-04-23T06:21:34.398Z"
