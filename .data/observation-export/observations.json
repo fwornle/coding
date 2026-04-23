@@ -7470,6 +7470,432 @@
     ]
   },
   {
+    "id": "58db7853-e021-4e25-ae26-fd5eff559725",
+    "summary": "Intent: [shared a screenshot, likely showing UI bugs or issues in the knowledge graph viewer]\nApproach: Assistant analyzed the screenshot and identified entity key format inconsistency between edges using `layer:id` prefixed keys and IssueTriage component using bare `id` keys.\nArtifacts: edited Dockerfile.coding-services, edited package.json, edited package.json, edited health-verification-rules.json, edited system-health-dashboard.tsx\nResult: Root cause identified as key format mismatch causing silent lookup failures; no fixes were applied yet.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T12:09:06.526Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/package.json",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "f066b745-c80d-4ad4-a809-28dd02d66e91",
+    "summary": "Intent: Run a code review for phase 24 of the current project.\nApproach: Dispatched to the code-review workflow, which reads workflow config, resolves phase directory and SUMMARY.md, then attempts to scope files via git diff.\nArtifacts: edited temporal.ts, edited routes.ts\nResult: Workflow execution began but stalled during file scoping — git log queries for phase 24 commits were too broad and the assistant noted needing a more targeted approach to identify changed files.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-23T12:46:11.576Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ]
+  },
+  {
+    "id": "5d4ca76b-d4d1-44c5-bbb9-af07b6cefb8c",
+    "summary": "Intent: [user shared a screenshot, likely showing a dashboard or port-related error]\nApproach: Investigated port mapping between Docker container and host, and traced what processes were listening on which ports.\nArtifacts: edited temporal.ts, edited routes.ts\nResult: Determined that port 3030 is mapped from Docker container to host but nothing is listening on it inside the container; dashboard-server.js only serves on port 3031 (API), and no separate static file server exists for the UI on port 3030.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-23T12:53:47.023Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ]
+  },
+  {
+    "id": "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+    "summary": "Intent: [debugging why port 3030 is not serving the dashboard UI, based on a screenshot showing a connection error]\nApproach: Investigated docker-compose port mappings and the dashboard server source to identify what process should be listening on port 3030.\nArtifacts: edited temporal.ts, edited routes.ts\nResult: Identified that port 3030 is mapped in docker-compose but nothing listens on it inside the container — a Next.js app at `integrations/mcp-constraint-monitor/dashboard/` should serve on 3030, but supervisord only starts `dashboard-server.js` (the API on 3031), not the Next.js app.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-23T12:54:05.676Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ]
+  },
+  {
+    "id": "2d0f883d-2de1-4877-97bb-0488d2d65767",
+    "summary": "Intent: Fix the constraint monitor dashboard setup so it runs properly as separate frontend and backend services.\nApproach: Split the single supervisord process into two (Next.js frontend on 3030, API on 3031), add npm install and build steps to the Dockerfile for the dashboard, and update health verification to check both ports separately.\nArtifacts: edited /Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services, edited /Users/Q284340/Agentic/coding/docker/supervisord.conf, edited /Users/Q284340/Agentic/coding/config/health-verification-rules.json, edited /Users/Q284340/Agentic/coding/scripts/health-verifier.js\nResult: Dockerfile now builds the Next.js dashboard; supervisord runs `constraint-dashboard-api` (port 3031) and a new Next.js frontend process (port 3030); health-verifier checks both ports independently.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-23T12:57:47.498Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js"
+    ]
+  },
+  {
+    "id": "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+    "summary": "Intent: [shared a screenshot showing RCA chain and evidence link issues in a graph/cluster visualization]\nApproach: Assistant identified two distinct problems: missing RCA chain data for Cluster10_ArgoWorkflowStopped despite 45 connections, and over-broad BFS evidence collection pulling from 3 hops away across 900+ nodes.\nArtifacts: edited Dockerfile.coding-services, edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx\nResult: Diagnostic investigation initiated but no code changes made; problems identified as RCA chain not surfacing connected symptoms/root causes/resolutions, and BFS hop distance being too large for evidence collection.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T13:20:35.763Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+    "summary": "Intent: [sharing a screenshot to investigate two UI issues in the knowledge graph issue triage view]\nApproach: Assistant investigated why an entity showed no RCA chain and why it displayed 148 evidence sources by querying the API and reading the IssueTriage component source.\nArtifacts: edited IssueTriage.tsx\nResult: Diagnosed two bugs: the entity had 0 actual edges (isolated node), and the evidence collector's domain-based fuzzy matching pulls all entities in the \"general\" catch-all domain, inflating evidence sources to 148+.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T13:27:49.230Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ]
+  },
+  {
+    "id": "57446148-4c44-43ea-8664-51760c288844",
+    "summary": "Intent: Fix two UI issues visible in screenshot: missing RCA chain for Cluster10_ArgoWorkflowStopped and excessive evidence links (148 sources) in the IssueTriage component.\nApproach: Investigated root causes via API data inspection — RCA chain empty due to genuinely isolated node, evidence bloat caused by broad domain-based fuzzy matching pulling all \"general\" domain entities. Fixed by suppressing the domain sweep for the catch-all \"general\" domain.\nArtifacts: edited /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx\nResult: IssueTriage component updated to skip domain-based evidence collection when the entity's domain is \"general\", preventing hundreds of unrelated evidence links from appearing in the triage panel.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:28:02.032Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ]
+  },
+  {
+    "id": "65368278-419c-4d3a-9ef9-c7e85d398901",
+    "summary": "Intent: Fix broken supervisord configuration by reverting it to a previously working state from git history.\nApproach: Investigated git log to find the last known-good commit, compared process counts and configurations, then restored the original setup where constraint-dashboard ran dashboard-server.js on port 3031 and the Next.js frontend ran on the host machine rather than in Docker.\nArtifacts: edited /Users/Q284340/Agentic/coding/docker/supervisord.conf\nResult: Reverted supervisord.conf to match the original working configuration with 9 processes, where constraint-dashboard serves only the API on port 3031 and the Next.js frontend on port 3030 is expected to run on the host machine outside Docker.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:28:45.144Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf"
+    ]
+  },
+  {
+    "id": "f810254c-6a2a-4320-bc50-f3539d8ea522",
+    "summary": "Intent: Fix broken supervisord configuration and health verification rules by reverting to a previously working state shown in the screenshot.\nApproach: Used git history to identify the original working configuration where constraint-dashboard ran dashboard-server.js on port 3031 inside Docker, while the Next.js frontend on 3030 ran on the host machine — reverting changes that had incorrectly mixed these concerns.\nArtifacts: edited /Users/Q284340/Agentic/coding/docker/supervisord.conf, edited /Users/Q284340/Agentic/coding/config/health-verification-rules.json\nResult: Restored supervisord.conf to the original 9-process configuration with constraint-dashboard pointing to dashboard-server.js on port 3031, and updated health-verification-rules.json to check port 3031 only, removing the erroneous dashboard_api entry.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:29:03.106Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json"
+    ]
+  },
+  {
+    "id": "934da0c4-ea79-4f77-9e51-6efce5a168a3",
+    "summary": "Intent: [user shared a screenshot, likely showing a browser caching issue with JavaScript bundles]\nApproach: Investigated which JS bundle the Docker container serves by inspecting the built index.html inside the container to compare referenced vs deployed files.\nArtifacts: edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx, edited Dockerfile.coding-services\nResult: Investigation was in progress; assistant identified browser caching of old JS bundle as likely cause and began checking the container's dist/index.html for the current bundle filename.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:30:43.257Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services"
+    ]
+  },
+  {
+    "id": "0b735e70-341e-4632-ac17-d9ef53d79092",
+    "summary": "Intent: [debugging why a UI fix wasn't appearing in the browser — shared via screenshot]\nApproach: Investigated whether the issue was a stale JS bundle in Docker or browser-side caching by checking index.html bundle references, bundle contents, and cache headers.\nArtifacts: edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx, edited Dockerfile.coding-services\nResult: Determined the fix was present in the Docker-served JS bundle and the issue was browser caching; recommended a hard refresh (Cmd+Shift+R).",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T13:37:07.061Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services"
+    ]
+  },
+  {
+    "id": "98dbfba7-5af8-49cf-a914-045843940aaa",
+    "summary": "Intent: [user shared a screenshot, likely showing an error or status related to the running Docker environment]\nApproach: Restarted Docker Compose services and attempted to restore correct port mappings after a misconfiguration during restart.\nArtifacts: edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx, edited Dockerfile.coding-services, edited package.json, edited package.json, edited package.json\nResult: Docker Compose was restarted; port 3002 had been incorrectly remapped to 3022, and the assistant identified the need to restore both ports to their correct mappings.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T13:41:19.714Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/package.json"
+    ]
+  },
+  {
+    "id": "7af882f6-fa5b-47ff-988b-73f8679816ae",
+    "summary": "Intent: [shared a screenshot, likely showing a UI issue with domain links or port configuration]\nApproach: Investigated port 3022 serving an old cached build and attempted to remap Docker Compose to serve on that port.\nArtifacts: edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx, edited Dockerfile.coding-services, edited package.json, edited package.json, edited package.json, edited package.json\nResult: Identified that port 3022 was serving a stale cached version of the app; attempted to restart Docker Compose with VOKB_PORT=3022 to align the container with the browser's expected port.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T13:49:54.591Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/package.json",
+      "/tmp/package/package.json"
+    ]
+  },
+  {
+    "id": "af835e36-5fd0-4925-981d-f09a6bcde39b",
+    "summary": "Intent: [user shared a screenshot showing localhost:3022 with 242 links appearing incorrectly in the OKB Viewer]\nApproach: Identified that port 3022 was serving a stale cached bundle rather than the fixed version; remapped Docker to serve on port 3022 and persisted the setting in .env.\nArtifacts: edited /Users/Q284340/Agentic/_work/rapid-automations/.env\nResult: Docker now serves the fixed OKB Viewer bundle on port 3022 with the `domain!==\"general\"` filter applied; user advised to hard refresh to see Cluster10 display ~12 evidence links instead of 242.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:50:13.981Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "571e0a7b-4364-42c4-a306-cbc4e71cca28",
+    "summary": "Intent: Developer demanded the assistant stop using arbitrary ports and instead reference only the ports defined in the `.env.ports` file.\nApproach: Assistant located the `.env.ports` file to identify the correct port assignments rather than hardcoding or guessing port numbers.\nArtifacts: edited .env\nResult: The `.env.ports` file was read to determine correct port configuration; assistant acknowledged the error of using port 3022 and committed to using only ports defined in that file.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:53:10.709Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.env"
+    ]
+  },
+  {
+    "id": "951a1b9c-d3c9-44a4-ac81-5ef73085ad0b",
+    "summary": "Intent: Fix incorrect port usage — developer demanded the assistant use only ports defined in the shared .env.ports file instead of an arbitrary port (3022) it had introduced.\nApproach: Read the central .env.ports file to find the correct assigned port, then reverted the unauthorized VOKB_PORT entry from the project's .env file.\nArtifacts: edited /Users/Q284340/Agentic/_work/rapid-automations/.env\nResult: Removed the incorrectly added port (3022) from .env, restoring the port configuration to use only the centrally defined ports from the shared .env.ports file.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T13:53:29.347Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.env"
+    ]
+  },
+  {
+    "id": "2e6fc329-79fa-4a52-bd74-03b9c71a056d",
+    "summary": "Intent: [user shared a screenshot, likely showing a UI issue with domain sweep being too broad for isolated nodes in the knowledge graph]\nApproach: Investigated the IssueTriage component to understand how domain sweep collects evidence, identifying that isolated nodes with 0 edges incorrectly pull all entities from a domain rather than limiting scope.\nArtifacts: edited supervisord.conf, edited health-verification-rules.json, edited health-verifier.js, edited system-health-dashboard.tsx, edited Dockerfile.coding-services, edited package.json, edited package.json, edited package.json, edited package.json\nResult: Read-only investigation concluded that the domain sweep logic for isolated nodes is too permissive — a `raas` domain incident with 0 edges collects all raas entities with ops refs, requiring a stricter scoping fix beyond the prior `general` domain patch.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T14:00:06.859Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docker/supervisord.conf",
+      "/Users/Q284340/Agentic/coding/config/health-verification-rules.json",
+      "/Users/Q284340/Agentic/coding/scripts/health-verifier.js",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/Q284340/Agentic/coding/docker/Dockerfile.coding-services",
+      "/Users/Q284340/Agentic/coding/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/package.json",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/package.json",
+      "/tmp/package/package.json"
+    ]
+  },
+  {
+    "id": "f25ad7ce-0af9-4c72-a40c-679a6d69f091",
+    "summary": "Intent: Fix overly broad domain sweep in issue triage that pulls unrelated evidence for isolated nodes, and remove debug console.log spam.\nApproach: Removed the domain sweep logic entirely since BFS handles connected evidence and direct sourceRefs cover isolated nodes, eliminating noise from unrelated same-domain entities.\nArtifacts: edited /Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx\nResult: Domain sweep removed from evidence collection so isolated incident nodes no longer pull evidence from all same-domain entities; debug console.logs also cleaned up.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-04-23T14:00:23.263Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ]
+  },
+  {
+    "id": "71ad9211-4451-466c-a9f2-8d59238b32d2",
+    "summary": "Intent: [asking about architectural decision of whether constraint system should be Docker-based and what the criterion is for host vs Docker placement]\nApproach: Analyzed existing Docker vs host split to identify the implicit pattern: Docker for headless backend services/APIs, host for interactive tools and dev-mode UIs needing hot reload or host network access.\nArtifacts: edited constraint-dashboard.tsx\nResult: Recommendation is to move constraint dashboard into Docker since the criterion is \"anything that should just work after docker-compose up\" belongs in Docker; only tools needing genuine host resources (CLIs, host network) stay on host.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-23T14:05:38.670Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "ae911f5e-74eb-47d4-9952-89a403388574",
+    "summary": "Intent: [user shared a screenshot of an entity \"Job Failed — RPU Execution Error\" showing it has no operational refs (Argo/RaaS/Grafana links)]\nApproach: Assistant investigated why the entity lacked operational references, determining it was ingested from mkdocs documentation rather than RCA findings, so operational evidence was never linked to it.\nArtifacts: edited constraint-dashboard.tsx\nResult: Identified that the entity lacks ops refs because its source is documentation (mkdocs), not RCA findings; proposed solution is to find matching RCA findings and propagate ops refs to all RCA-relevant entities, not just cluster incidents.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T14:08:24.116Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "34e9df55-83dd-496c-b7c5-594cc8872266",
+    "summary": "Intent: [investigating why \"Job Failed — RPU Execution Error\" entity lacks operational references (Argo/RaaS/Grafana links) despite being RCA-derived]\nApproach: Explored the graph data to identify entities missing ops refs, finding that documentation-sourced entities don't inherit operational evidence links; proposed propagating ops refs through graph edges at the data level rather than display time.\nArtifacts: edited constraint-dashboard.tsx\nResult: Identified 109 RCA-relevant entities lacking ops refs; root cause is that mkdocs-ingested entities have no Argo/RaaS connections, and the fix requires BFS-based data-level propagation of ops refs through graph neighbors rather than runtime display logic.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T14:09:36.919Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "5eeccd15-ac60-4c1e-bdb4-a3090efdcdee",
+    "summary": "Intent: [debugging why \"Job Failed — RPU Execution Error\" entity lacks operational references/links in the graph view]\nApproach: Investigated the entity's data provenance (mkdocs ingestion) and attempted to propagate ops refs through graph neighborhood via BFS/multi-hop propagation rather than fixing display-time logic.\nArtifacts: edited constraint-dashboard.tsx\nResult: Determined the entity lacks ops refs because it was ingested from documentation without Argo/RaaS/Grafana links, and its neighbors also lack them; 109 RCA-relevant entities have the same gap, with only 1 having a direct neighbor with ops refs, prompting a 2-hop propagation attempt.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-04-23T14:11:04.564Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ]
+  },
+  {
+    "id": "63e2d310-ed41-4d5c-8f39-63408c42d983",
+    "summary": "Intent: Fix stale package-lock.json files in submodules that referenced wrong paths instead of GitHub tarball URLs.\nApproach: Regenerated lockfiles using npm to resolve dependencies from correct sources, then committed the updated lockfiles.\nArtifacts: edited integrations/mcp-server-semantic-analysis/package-lock.json\nResult: Package-lock.json updated to reference correct GitHub tarball URLs instead of stale local `file:../../_work/` paths, and changes committed to the submodule.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-23T14:11:09.530Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
     "id": "2d2866d3-f170-495d-b796-6b3a70f11756",
     "summary": "2026-04-23",
     "agent": "Investigated whether a daemon should automatically trigger observation consolidation when a threshold of new observations accumulates. Key findings across the review:\n- Daemon logic exists inside `consolidate-observations.js` but is never started\n- No trigger hook exists where observations are written (`ObservationWriter`)\n- `docker-compose.yml` was referenced as an artifact in all three related observations\n\nOutcome: proposed adding auto-consolidation directly to the existing health API server — a periodic check every 30 minutes that triggers consolidation when undigested observation count for completed days exceeds a configured threshold. No implementation was committed.",
