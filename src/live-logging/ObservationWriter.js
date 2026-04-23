@@ -424,7 +424,7 @@ export class ObservationWriter {
       metadata.sessionId || null,
       metadata.sourceFile || null,
       nowISO,
-      JSON.stringify(metadata),
+      this._redact(JSON.stringify(metadata)),
       contentHash,
       quality,
     );
