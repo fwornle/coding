@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.15.1",
-    "@rapid/llm-proxy": "file:../_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz",
+    "@rapid/llm-proxy": "https://github.com/fwornle/rapid-llm-proxy/releases/download/v1.0.0/rapid-llm-proxy-1.0.0.tgz",
     "@xenova/transformers": "^2.17.2",
     "axios": "^1.10.0",
     "better-sqlite3": "^11.7.0",

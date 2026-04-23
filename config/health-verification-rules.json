@@ -76,7 +76,7 @@
         "check_type": "port_listening",
         "port": 3031,
         "timeout_ms": 3000,
-        "description": "Constraint Dashboard API (port 3031) — process liveness check",
+        "description": "Constraint Dashboard API (port 3031)",
         "auto_heal": true,
         "auto_heal_action": "restart_dashboard_server"
       },

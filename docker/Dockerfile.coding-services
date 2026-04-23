@@ -36,13 +36,7 @@ FROM base AS node-deps
 # Copy root package files
 COPY package.json package-lock.json ./
 
-# Copy local dependency tarballs (referenced as file: in package.json)
-# Root package.json uses file:../_work/ (resolves to /_work/ from /coding/)
-# Submodule package.json uses file:../../_work/ (resolves to /coding/_work/ from /coding/integrations/xxx/)
-COPY _work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz /_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
-COPY _work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz /coding/_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
-
-# Install root dependencies first
+# Install root dependencies first (includes @rapid/llm-proxy from github:fwornle/rapid-llm-proxy)
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Copy and install each integration's dependencies separately
