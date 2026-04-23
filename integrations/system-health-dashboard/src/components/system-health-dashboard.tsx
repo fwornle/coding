@@ -402,7 +402,7 @@ export default function SystemHealthDashboard() {
   const getPortDetailItems = () => {
     const checks = getChecksByCategory('services')
     const portMap: Record<string, { name: string, port: number }> = {
-      'dashboard_server': { name: 'Constraint Dashboard', port: 3030 },
+      'dashboard_server': { name: 'Constraint Dashboard API', port: 3031 },
       'health_dashboard_frontend': { name: 'Health Dashboard UI', port: 3032 },
       'health_dashboard_api': { name: 'Health Dashboard API', port: 3033 },
       'semantic_analysis_sse': { name: 'Semantic Analysis SSE', port: 3848 },

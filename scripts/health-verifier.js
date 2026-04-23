@@ -1341,7 +1341,45 @@ class HealthVerifier extends EventEmitter {
    * Check if port is listening
    */
   async checkPortListening(serviceName, port, timeout) {
-    return this.checkHTTPHealth(serviceName, `http://localhost:${port}`, timeout);
+    const { createConnection } = await import('net');
+    return new Promise((resolve) => {
+      const socket = createConnection({ port, host: 'localhost' });
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve({
+          category: 'services',
+          check: serviceName,
+          status: 'failed',
+          message: `${serviceName} is unavailable (port ${port} connection timeout)`,
+          details: { port, error: 'connection timeout' },
+          timestamp: new Date().toISOString()
+        });
+      }, timeout || 3000);
+      socket.on('connect', () => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve({
+          category: 'services',
+          check: serviceName,
+          status: 'passed',
+          message: `${serviceName} is listening on port ${port}`,
+          details: { port },
+          timestamp: new Date().toISOString()
+        });
+      });
+      socket.on('error', (err) => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve({
+          category: 'services',
+          check: serviceName,
+          status: 'failed',
+          message: `${serviceName} is unavailable`,
+          details: { port, error: err.message },
+          timestamp: new Date().toISOString()
+        });
+      });
+    });
   }
 
   /**
