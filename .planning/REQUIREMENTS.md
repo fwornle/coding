@@ -1,83 +1,107 @@
-# Requirements: Coding Project v4.0
+# Requirements: Coding Project — Service Reliability
 
-**Defined:** 2026-03-29
-**Core Value:** Intelligent observational memory replacing verbatim logging -- mastra.ai integration across all coding agents
+**Defined:** 2026-04-23
+**Core Value:** If any service in the coding stack dies, the health system detects it within 60 seconds, shows it as unhealthy, and attempts auto-healing.
 
-## v4.0 Requirements
+## v5.0 Requirements
 
-Requirements for mastra integration milestone. Each maps to roadmap phases.
+Requirements for service reliability milestone. Each maps to roadmap phases.
 
-### OpenCode OM
+### Port Liveness
 
-- [x] **OCOM-01**: The mastra/opencode plugin is installed via `install.sh` (with corresponding uninstall in `uninstall.sh` and validation in `scripts/test-coding.sh`)
-- [x] **OCOM-02**: Observation storage uses LibSQL with configurable path and schema setup
-- [ ] **OCOM-03**: Observer/reflector agents use the coding LLM proxy (Docker to host agent SDK) instead of direct API keys
-- [ ] **OCOM-04**: Token budget limits are configurable per observer/reflector agent to control LLM costs
+- [ ] **PORT-01**: Health verifier checks all expected ports (3030, 3032, 3033, 3848, 8080, 12435) and reports unreachable ones as failures
+- [ ] **PORT-02**: Port check runs every 30 seconds with configurable timeout
+- [ ] **PORT-03**: Dashboard health card shows per-port status (green/red) with last-checked timestamp
+- [ ] **PORT-04**: Auto-restart triggered when a port is unreachable for 2 consecutive checks
 
-### Transcript Converters
+### Supervisord Integration
 
-- [x] **CONV-01**: User can convert Claude .jsonl transcript files to mastra observations via CLI command
-- [x] **CONV-02**: User can convert Copilot events.jsonl transcript files to mastra observations via CLI command
-- [x] **CONV-03**: User can batch-convert git-tracked .specstory/ LSL files to mastra observations
-- [x] **CONV-04**: Converters normalize all 3 transcript formats to MastraDBMessage format before observation
+- [ ] **SUPV-01**: Health verifier reads supervisord process status from inside the container
+- [ ] **SUPV-02**: FATAL or STOPPED processes are reported as critical health violations
+- [ ] **SUPV-03**: Auto-restart attempted for FATAL processes via supervisord API
+- [ ] **SUPV-04**: Dashboard shows supervisord process list with status (RUNNING/FATAL/STOPPED)
 
-### Mastracode Agent
+### Database Health
 
-- [x] **MSTR-01**: User can start mastracode via `coding --mastra` with proper tmux session setup
-- [x] **MSTR-02**: Mastracode sessions appear in tmux statusline with LSL indicator and health monitoring
-- [x] **MSTR-03**: Enhanced-transcript-monitor captures mastracode conversations for LSL logging
+- [ ] **DBHL-01**: SQLite integrity check runs periodically (PRAGMA integrity_check) and reports corruption
+- [ ] **DBHL-02**: Malformed JSON rows in observations DB detected and reported
+- [ ] **DBHL-03**: Auto-repair available: dump valid data, rebuild DB, restore (with user confirmation via dashboard)
+- [ ] **DBHL-04**: WAL checkpoint management prevents unbounded WAL growth
 
-### Live Observations
+### Process Lifecycle
 
-- [x] **LIVE-01**: Enhanced-transcript-monitor produces mastra observations in real-time alongside verbatim LSL (additive, not replacing)
-- [x] **LIVE-02**: Observations are browsable via REST endpoint on the health dashboard
+- [ ] **PROC-01**: Stale PID files detected — PID gone but status file says "running"
+- [ ] **PROC-02**: Host-side processes monitored (ETM, LLM proxy) with health checks
+- [ ] **PROC-03**: PSM (Process Supervisor Manager) coverage extended to all host-side services
+- [ ] **PROC-04**: Status file staleness check — if last_updated > 5 minutes and process not running, flag as stale
 
-## Future Requirements
+### Dashboard Accuracy
 
-Deferred to future milestones. Tracked but not in current roadmap.
+- [ ] **DASH-01**: Health status on dashboard reflects actual service state — no false greens
+- [ ] **DASH-02**: Statusline hook reports accurate health (matches dashboard)
+- [ ] **DASH-03**: Per-service health cards on dashboard with failure reason and last-seen timestamp
+- [ ] **DASH-04**: Failure history timeline — when services went down and came back
 
-### Cross-Agent Memory
+### Insight Validation
 
-- **XAGT-01**: Observations from different agents (Claude, Copilot, OpenCode, Mastra) are unified into a shared memory space
-- **XAGT-02**: Resource-scoped OM allows agents to share context about specific files/components
+- [ ] **IVAL-01**: Validate button on each insight card triggers codebase verification
+- [ ] **IVAL-02**: Validator extracts file paths and function names from insight text and checks they exist
+- [ ] **IVAL-03**: Stale claims flagged with specific details (file moved, function renamed, etc.)
+- [ ] **IVAL-04**: Validation results shown inline on insight card (verified/stale/unknown per claim)
 
-### Knowledge Graph Bridge
+## v6.0 Requirements
 
-- **KGBR-01**: Observations feed into Graphology knowledge graph as entities
-- **KGBR-02**: VKB viewer displays observation-derived entities alongside pipeline entities
+Deferred to future release.
+
+### Advanced Monitoring
+
+- **ADVM-01**: Metrics collection (uptime percentage, MTTR per service)
+- **ADVM-02**: Alert channels (Slack, email) for critical failures
+- **ADVM-03**: Dependency graph — which services depend on which, cascade failure prediction
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Cross-agent observation sharing (resource-scoped OM) | Marked experimental in mastra, defer until stable |
-| Replacing verbatim LSL with observations | Additive only -- LSL must continue unchanged |
-| KG bridge (observations to Graphology entities) | Future milestone after observations are proven |
-| Direct API key configuration for mastra LLM | Must use existing coding LLM proxy infrastructure |
+| External monitoring (Datadog, Grafana Cloud) | Overkill for local dev environment |
+| Multi-machine monitoring | Single-machine setup only |
+| Custom alerting rules UI | Fixed thresholds sufficient for v5.0 |
+| Load testing / performance monitoring | Not a reliability concern |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OCOM-01 | Phase 20 | Complete |
-| OCOM-02 | Phase 20 | Complete |
-| OCOM-03 | Phase 20 | Pending |
-| OCOM-04 | Phase 20 | Pending |
-| CONV-01 | Phase 22 | Complete |
-| CONV-02 | Phase 22 | Complete |
-| CONV-03 | Phase 22 | Complete |
-| CONV-04 | Phase 22 | Complete |
-| MSTR-01 | Phase 21 | Complete |
-| MSTR-02 | Phase 21 | Complete |
-| MSTR-03 | Phase 21 | Complete |
-| LIVE-01 | Phase 23 | Complete |
-| LIVE-02 | Phase 23 | Complete |
+| PORT-01 | TBD | Pending |
+| PORT-02 | TBD | Pending |
+| PORT-03 | TBD | Pending |
+| PORT-04 | TBD | Pending |
+| SUPV-01 | TBD | Pending |
+| SUPV-02 | TBD | Pending |
+| SUPV-03 | TBD | Pending |
+| SUPV-04 | TBD | Pending |
+| DBHL-01 | TBD | Pending |
+| DBHL-02 | TBD | Pending |
+| DBHL-03 | TBD | Pending |
+| DBHL-04 | TBD | Pending |
+| PROC-01 | TBD | Pending |
+| PROC-02 | TBD | Pending |
+| PROC-03 | TBD | Pending |
+| PROC-04 | TBD | Pending |
+| DASH-01 | TBD | Pending |
+| DASH-02 | TBD | Pending |
+| DASH-03 | TBD | Pending |
+| DASH-04 | TBD | Pending |
+| IVAL-01 | TBD | Pending |
+| IVAL-02 | TBD | Pending |
+| IVAL-03 | TBD | Pending |
+| IVAL-04 | TBD | Pending |
 
 **Coverage:**
-- v4.0 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0
+- v5.0 requirements: 24 total
+- Mapped to phases: 0
+- Unmapped: 24
 
 ---
-*Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 after roadmap creation*
+*Requirements defined: 2026-04-23*
+*Last updated: 2026-04-23 after initial definition*
