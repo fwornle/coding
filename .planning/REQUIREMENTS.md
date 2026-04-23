@@ -72,36 +72,36 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PORT-01 | TBD | Pending |
-| PORT-02 | TBD | Pending |
-| PORT-03 | TBD | Pending |
-| PORT-04 | TBD | Pending |
-| SUPV-01 | TBD | Pending |
-| SUPV-02 | TBD | Pending |
-| SUPV-03 | TBD | Pending |
-| SUPV-04 | TBD | Pending |
-| DBHL-01 | TBD | Pending |
-| DBHL-02 | TBD | Pending |
-| DBHL-03 | TBD | Pending |
-| DBHL-04 | TBD | Pending |
-| PROC-01 | TBD | Pending |
-| PROC-02 | TBD | Pending |
-| PROC-03 | TBD | Pending |
-| PROC-04 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| IVAL-01 | TBD | Pending |
-| IVAL-02 | TBD | Pending |
-| IVAL-03 | TBD | Pending |
-| IVAL-04 | TBD | Pending |
+| PORT-01 | Phase 24 | Pending |
+| PORT-02 | Phase 24 | Pending |
+| PORT-03 | Phase 24 | Pending |
+| PORT-04 | Phase 26 | Pending |
+| SUPV-01 | Phase 24 | Pending |
+| SUPV-02 | Phase 24 | Pending |
+| SUPV-03 | Phase 26 | Pending |
+| SUPV-04 | Phase 24 | Pending |
+| DBHL-01 | Phase 25 | Pending |
+| DBHL-02 | Phase 25 | Pending |
+| DBHL-03 | Phase 25 | Pending |
+| DBHL-04 | Phase 25 | Pending |
+| PROC-01 | Phase 25 | Pending |
+| PROC-02 | Phase 25 | Pending |
+| PROC-03 | Phase 25 | Pending |
+| PROC-04 | Phase 25 | Pending |
+| DASH-01 | Phase 26 | Pending |
+| DASH-02 | Phase 26 | Pending |
+| DASH-03 | Phase 26 | Pending |
+| DASH-04 | Phase 26 | Pending |
+| IVAL-01 | Phase 27 | Pending |
+| IVAL-02 | Phase 27 | Pending |
+| IVAL-03 | Phase 27 | Pending |
+| IVAL-04 | Phase 27 | Pending |
 
 **Coverage:**
 - v5.0 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-23 after initial definition*
+*Last updated: 2026-04-23 — traceability updated after roadmap creation*

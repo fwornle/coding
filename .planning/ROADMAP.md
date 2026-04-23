@@ -6,7 +6,8 @@
 - v2.0 -- Wave-Based Hierarchical Semantic Analysis (Phases 5-8, shipped 2026-03-07)
 - v2.1 -- Wave Pipeline Quality Restoration (Phases 9-14, shipped 2026-03-10)
 - v3.0 -- Workflow State Machine (Phases 15-19, in progress)
-- v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, planned)
+- v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
+- v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
 
 ---
 
@@ -54,93 +55,98 @@
 
 </details>
 
+<details>
+<summary>v4.0 Mastra Integration & LSL Observational Memory -- Phases 20-23, SHIPPED 2026-04-05</summary>
+
+- [ ] **Phase 20: Foundation & OpenCode OM** (1/2 plans) -- in progress
+- [x] **Phase 21: Mastracode Agent Integration** (4/4 plans) -- completed 2026-04-02
+- [x] **Phase 22: Transcript Converters** (3/3 plans) -- completed 2026-04-03
+- [x] **Phase 23: Live Observation Tap & Dashboard** (2/2 plans) -- completed 2026-04-05
+
+</details>
+
 ---
 
-## v4.0 -- Mastra Integration & LSL Observational Memory
+## v5.0 -- Service Reliability & Health System Overhaul
 
 ### Overview
 
-Four phases that integrate mastra.ai's observational memory into the coding infrastructure. Phase 20 lays the foundation: LibSQL observation storage, the OpenCode mastra plugin, LLM proxy routing, and token budget controls. Phase 21 adds mastracode as a third coding agent with full tmux/LSL infrastructure. Phase 22 builds transcript-to-observation converters for Claude JSONL, Copilot events, and historical .specstory files. Phase 23 (highest risk) taps the live enhanced-transcript-monitor to produce real-time observations alongside verbatim LSL, and surfaces observations via dashboard REST endpoint. The ordering respects dependencies: storage before consumers, additive integrations before modifying the existing LSL pipeline.
+Four phases that make the health system truthful and self-healing. Phase 24 builds the core detection layer: port liveness probes across all six service ports and supervisord process status integration — the minimal set needed to detect that something is wrong. Phase 25 adds deeper health checks for the data tier: SQLite integrity, malformed JSON detection, WAL management, and stale PID/status file detection for host-side processes. Phase 26 makes the dashboard reflect ground truth and adds auto-healing: auto-restart for crashed port-bound services and FATAL supervisord processes, accurate statusline, per-service failure cards, and a failure history timeline. Phase 27 closes the loop on insight quality by adding a codebase validator that checks whether file paths and function names cited in insights still exist.
 
 ### Phases
 
-- [ ] **Phase 20: Foundation & OpenCode OM** - LibSQL storage, mastra OpenCode plugin, LLM proxy routing, token budget controls
-- [x] **Phase 21: Mastracode Agent Integration** - `coding --mastra` launch, tmux statusline, LSL capture via observation hooks (gap closure in progress) (completed 2026-04-02)
-- [x] **Phase 22: Transcript Converters** - Claude JSONL, Copilot events, .specstory batch conversion, shared MastraDBMessage normalization (completed 2026-04-03)
-- [x] **Phase 23: Live Observation Tap & Dashboard** - Real-time observation generation in enhanced-transcript-monitor, REST browsing endpoint (completed 2026-04-05)
+- [ ] **Phase 24: Port Liveness & Supervisord Checks** - Core failure detection for all services and container processes
+- [ ] **Phase 25: Database Health & Process Lifecycle** - SQLite integrity, WAL management, stale PID detection, host process monitoring
+- [ ] **Phase 26: Dashboard Accuracy & Auto-Healing** - Truthful dashboard, auto-restart for crashed services, failure history timeline
+- [ ] **Phase 27: Insight Validation** - Verify insight claims against the codebase, flag stale references
 
 ### Phase Details
 
-#### Phase 20: Foundation & OpenCode OM
-**Goal**: Users running `coding --opencode` get live observational memory with cost-controlled LLM calls and persistent LibSQL storage
-**Depends on**: Nothing (foundation phase for v4.0)
-**Requirements**: OCOM-01, OCOM-02, OCOM-03, OCOM-04
+#### Phase 24: Port Liveness & Supervisord Checks
+**Goal**: The health system detects any crashed service within 60 seconds via port probes and supervisord status reads
+**Depends on**: Phase 23 (health verifier + dashboard exist)
+**Requirements**: PORT-01, PORT-02, PORT-03, SUPV-01, SUPV-02, SUPV-04
 **Success Criteria** (what must be TRUE):
-  1. Running `install.sh` installs the mastra/opencode plugin; `uninstall.sh` removes it; `scripts/test-coding.sh` validates the installation
-  2. Observations persist to a LibSQL database at a configurable path under `.observations/` and survive process restarts
-  3. Observer and reflector LLM calls route through the existing coding LLM proxy (Docker to host agent SDK) -- no direct API keys in mastra config
-  4. Token budget limits are configurable per observer/reflector agent and prevent runaway LLM costs during tool-heavy sessions
-**Plans:** 1/2 plans executed
+  1. Health verifier probes all six ports (3030, 3032, 3033, 3848, 8080, 12435) every 30 seconds and marks unreachable ports as failures
+  2. Killing any service makes the dashboard show that service as unhealthy within 60 seconds
+  3. Dashboard health card displays per-port green/red status with a last-checked timestamp for each port
+  4. Health verifier reads supervisord process status from inside the Docker container and exposes it to the API
+  5. FATAL or STOPPED supervisord processes appear as critical violations in the health report
+  6. Dashboard shows a supervisord process list with per-process status (RUNNING / FATAL / STOPPED)
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [ ] 20-01-PLAN.md -- Port LLM proxy bridge server and provider config from OKM
-- [x] 20-02-PLAN.md -- Plugin installation lifecycle, storage config, token budgets, smoke test
-
-#### Phase 21: Mastracode Agent Integration
-**Goal**: Users can launch mastracode as a fully integrated coding agent with tmux session management and LSL logging
-**Depends on**: Phase 20 (LibSQL storage pattern established)
-**Requirements**: MSTR-01, MSTR-02, MSTR-03
+#### Phase 25: Database Health & Process Lifecycle
+**Goal**: The health system detects data-tier corruption and stale host-side process state before they cause silent failures
+**Depends on**: Phase 24 (health verifier polling loop established)
+**Requirements**: DBHL-01, DBHL-02, DBHL-03, DBHL-04, PROC-01, PROC-02, PROC-03, PROC-04
 **Success Criteria** (what must be TRUE):
-  1. User can run `coding --mastra` and get a working mastracode session inside the standard tmux layout
-  2. The tmux statusline shows mastracode session status with LSL indicator and health monitoring (same pattern as claude/copilot/opencode)
-  3. Enhanced-transcript-monitor captures mastracode conversations for LSL logging (via mastra lifecycle hooks, not pipe-pane)
-**Plans:** 4/4 plans complete
+  1. SQLite PRAGMA integrity_check runs periodically and reports any corruption as a health failure
+  2. Malformed JSON rows in the observations DB are detected and surfaced in the health report
+  3. Dashboard offers a DB repair action (dump valid rows, rebuild, restore) that requires user confirmation before executing
+  4. WAL checkpoint runs automatically to prevent unbounded WAL file growth
+  5. Stale PID files are detected — if a status file says "running" but the PID is gone, the health system flags the discrepancy
+  6. Host-side processes (ETM, LLM proxy) are health-checked and included in the overall health report
+  7. PSM supervision coverage includes all host-side services, with status file staleness flagged after 5 minutes of inactivity
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [x] 21-01-PLAN.md -- Agent adapter, launch wrapper, and --mastra flag in main launcher
-- [x] 21-02-PLAN.md -- Statusline, health monitor, process supervisor, and remediation integration
-- [x] 21-03-PLAN.md -- MastraTranscriptReader and ETM integration for LSL capture
-- [x] 21-04-PLAN.md -- Gap closure: populate hooks.json with NDJSON-writing hook commands
-
-#### Phase 22: Transcript Converters
-**Goal**: Users can convert historical transcripts from all three agents into mastra observations via CLI
-**Depends on**: Phase 20 (LibSQL storage, observe() API proven)
-**Requirements**: CONV-01, CONV-02, CONV-03, CONV-04
+#### Phase 26: Dashboard Accuracy & Auto-Healing
+**Goal**: The dashboard shows true service state at all times and attempts automatic recovery when services crash
+**Depends on**: Phase 24 (detection data), Phase 25 (full health data available)
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, PORT-04, SUPV-03
 **Success Criteria** (what must be TRUE):
-  1. User can run a CLI command to convert Claude .jsonl transcript files into mastra observations stored in LibSQL
-  2. User can run a CLI command to convert Copilot events.jsonl transcript files into mastra observations stored in LibSQL
-  3. User can batch-convert git-tracked .specstory/ LSL files into mastra observations with manifest-based idempotency (no double-processing)
-  4. All three converters normalize their input format to MastraDBMessage before calling observe() -- shared normalization layer, not three separate implementations
-**Plans:** 3/3 plans complete
+  1. Killing any service causes the dashboard health card to turn red within 60 seconds -- no false greens remain
+  2. The statusline hook reports the same health state as the dashboard (no split-brain between terminal and browser)
+  3. Each service has its own health card showing failure reason and last-seen timestamp
+  4. A failure history timeline shows when services went down and came back, visible on the dashboard
+  5. A port unreachable for 2 consecutive checks triggers an auto-restart attempt, with outcome shown on the dashboard
+  6. A FATAL supervisord process triggers an auto-restart via supervisord API, with outcome shown on the dashboard
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [x] 22-01-PLAN.md -- Shared TranscriptNormalizer, ObservationWriter with LLM proxy, CLI skeleton
-- [x] 22-02-PLAN.md -- Claude JSONL and Copilot events converter handlers
-- [x] 22-03-PLAN.md -- Specstory batch converter with manifest idempotency
-
-#### Phase 23: Live Observation Tap & Dashboard
-**Goal**: Live coding sessions produce real-time observations alongside verbatim LSL, browsable from the health dashboard
-**Depends on**: Phase 20 (storage), Phase 21 (mastracode LSL pattern), Phase 22 (observe() API usage proven at scale)
-**Requirements**: LIVE-01, LIVE-02
+#### Phase 27: Insight Validation
+**Goal**: Users can verify whether insight claims still match the codebase and see stale references flagged inline
+**Depends on**: Phase 23 (insights exist and are browsable on dashboard)
+**Requirements**: IVAL-01, IVAL-02, IVAL-03, IVAL-04
 **Success Criteria** (what must be TRUE):
-  1. Enhanced-transcript-monitor produces mastra observations in real-time during `coding --claude` sessions without blocking or degrading verbatim LSL output
-  2. Observations are browsable via a REST endpoint on the health dashboard (port 3032) with agent filtering and time range
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 23-01-PLAN.md -- ETM observation tap and REST API endpoint with FTS5 search
-- [x] 23-02-PLAN.md -- Observations dashboard page with filters, cards, pagination
+  1. Each insight card on the dashboard has a Validate button the user can click
+  2. Clicking Validate triggers a codebase check that extracts file paths and function names from the insight text and verifies they exist
+  3. Stale claims show specific details (file moved, function renamed, line reference outdated) rather than a generic "stale" flag
+  4. Validation results appear inline on the insight card -- each claim is marked verified, stale, or unknown without a page reload
+**Plans**: TBD
+**UI hint**: yes
 
 ### Progress
 
-**Execution Order:** 20 -> 21 -> 22 -> 23
+**Execution Order:** 24 -> 25 -> 26 -> 27
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 20. Foundation & OpenCode OM | v4.0 | 1/2 | In Progress|  |
-| 21. Mastracode Agent Integration | v4.0 | 4/4 | Complete   | 2026-04-02 |
-| 22. Transcript Converters | v4.0 | 3/3 | Complete    | 2026-04-03 |
-| 23. Live Observation Tap & Dashboard | v4.0 | 2/2 | Complete    | 2026-04-05 |
+| 24. Port Liveness & Supervisord Checks | v5.0 | 0/TBD | Not started | - |
+| 25. Database Health & Process Lifecycle | v5.0 | 0/TBD | Not started | - |
+| 26. Dashboard Accuracy & Auto-Healing | v5.0 | 0/TBD | Not started | - |
+| 27. Insight Validation | v5.0 | 0/TBD | Not started | - |
 
 ---
 
