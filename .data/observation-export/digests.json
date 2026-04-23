@@ -170,7 +170,7 @@
     ],
     "filesTouched": [
       "viewer/src/api/okbClient.ts",
-      "<AWS_SECRET_REDACTED>phVisualization.tsx",
+      "GraphVisualization.tsx",
       "src/intelligence/correlation.ts",
       "tests/unit/correlation.test.ts"
     ],
@@ -221,7 +221,7 @@
       "claude"
     ],
     "filesTouched": [
-      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
+      "enhanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:44:59.370Z"
@@ -271,7 +271,7 @@
       "claude"
     ],
     "filesTouched": [
-      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
+      "enhanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:44:59.370Z"
@@ -539,7 +539,7 @@
       "src/live-logging/SessionEventHandler.js (or equivalent `_firePromptSetObservation` host file in the coding project)",
       "src/ObservationHandler.js (or equivalent live-logging pipeline files in the coding project)",
       "~/Agentic/coding/src/live-logging/ObservationWriter.js",
-      "<AWS_SECRET_REDACTED>n/SessionManager.js"
+      "session/SessionManager.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T05:22:05.198Z"
@@ -592,8 +592,8 @@
       "viewer/src/utils/guidedTraversal.ts",
       "viewer/src/store/slices/navigationSlice.ts",
       "viewer/src/index.css",
-      "<AWS_SECRET_REDACTED>phVisualization.tsx",
-      "<AWS_SECRET_REDACTED>eDetails.tsx"
+      "GraphVisualization.tsx",
+      "NodeDetails.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:10.407Z"
@@ -716,16 +716,16 @@
       "GraphVisualization.tsx (preview ring rendering)",
       "CSS (pulse animation)",
       "src/features/graph/utils/guidedTour.ts",
-      "<AWS_SECRET_REDACTED>s.tsx",
-      "<AWS_SECRET_REDACTED>e.ts",
-      "<AWS_SECRET_REDACTED>lization.tsx",
+      "NodeDetails.tsx",
+      "guidedTraversal.ts",
+      "GraphVisualization.tsx",
       "src/features/graph/styles/graph.css",
       "src/components/GraphVisualization.tsx",
       "src/components/NodeDetails.tsx",
       "src/styles/graph.css",
       "src/viewer/src/components/NodeDetails.tsx",
       "src/viewer/src/styles/graph.css",
-      "<AWS_SECRET_REDACTED>tion.tsx"
+      "GraphVisualization.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:10.407Z"
@@ -747,7 +747,7 @@
       "viewer/src/utils/guidedTraversal.ts",
       "src/api/routes.ts",
       "scripts/backfill-evidence-links.ts",
-      "<AWS_SECRET_REDACTED>.tsx",
+      "GraphVisualization.tsx",
       "viewer/src/components/NodeDetails.tsx",
       "viewer/src/index.css"
     ],
@@ -787,13 +787,13 @@
     ],
     "filesTouched": [
       "integrations/operational-knowledge-management/viewer/src/index.css",
-      "integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/NodeDetails.tsx",
-      "integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/GraphVisualization.tsx",
+      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
+      "integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
       "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/index.css",
-      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/NodeDetails.tsx",
-      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-<AWS_SECRET_REDACTED>geGraph/GraphVisualization.tsx",
-      "<AWS_SECRET_REDACTED>phVisualization.tsx",
-      "<AWS_SECRET_REDACTED>eDetails (partial path)"
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/NodeDetails.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+      "GraphVisualization.tsx",
+      "NodeDetails (partial path)"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:48:18.248Z"
@@ -1049,8 +1049,8 @@
       "claude"
     ],
     "filesTouched": [
-      "<AWS_SECRET_REDACTED>llm-cli-proxy-architecture.puml",
-      "<AWS_SECRET_REDACTED>observation-pipeline.puml",
+      "docs/puml/llm-cli-proxy-architecture.puml",
+      "docs/puml/observation-pipeline.puml",
       "~/Agentic/coding/docs-content/core-systems/observational-memory.md"
     ],
     "quality": "high",
@@ -1102,7 +1102,7 @@
   {
     "id": "a1dac8b8-da6b-44b7-bd8c-9a8db0a29a34",
     "date": "2026-04-12",
-    "theme": "Nested Observation <COMPANY_NAME_REDACTED>-Summaries for Onboarding Repro Sessions",
+    "theme": "Nested Observation Meta-Summaries for Onboarding Repro Sessions",
     "summary": "A cluster of claude-agent exchanges were <COMPANY_NAME_REDACTED>-level observation summarization tasks rather than direct coding work. These included classifying a shell script debugging exchange as \"implementing\" trajectory (confidence 0.8), summarizing a browser-automated fire safety quiz session (Q1–Q5 answered correctly, Q6 drag-drop in progress), summarizing a UI5-BUTTON coordinate mismatch diagnosis, and unwrapping a triply-nested summarization chain. No code was written or modified in any of these exchanges; they represent the observation recording pipeline processing earlier sessions from the same day.",
     "observationIds": [
       "6ed3c07b-893d-4e5f-8951-5d2ebf9d972c",
@@ -1166,7 +1166,7 @@
     ],
     "filesTouched": [
       "enhanced-transcript-monitor.js",
-      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js"
+      "enhanced-transcript-monitor.js"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:51:06.811Z"
@@ -1195,7 +1195,7 @@
     ],
     "filesTouched": [
       "enhanced-transcript-monitor.js",
-      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js",
+      "enhanced-transcript-monitor.js",
       "ObservationWriter.js",
       "~/Agentic/coding/src/live-logging/ObservationWriter.js"
     ],
@@ -1560,7 +1560,7 @@
   {
     "id": "85959867-464f-4f73-b3a2-f70c5c9ac7a2",
     "date": "2026-04-15",
-    "theme": "Recursive <COMPANY_NAME_REDACTED>-Observation Summaries of Agent Exchanges",
+    "theme": "Recursive Meta-Observation Summaries of Agent Exchanges",
     "summary": "A recurring pattern throughout the day involved copilot being asked to produce structured 4-line observation summaries (Intent/Approach/Artifacts/Result) of prior exchanges — many of which were themselves summaries, creating recursive or nested <COMPANY_NAME_REDACTED>-documentation chains.\n\n**Key nested layers documented:**\n- Summary of MCP server configuration investigation (obs 3)\n- Summary of a summary about recursive observation generation (obs 5)\n- Summary of a summary involving MCP config analysis with a \"stuck?\" check (obs 11)\n- Summary of a cross-agent unified skill management investigation (obs 12)\n- Summary of a trajectory state classification that itself analyzed a prior classification (obs 15)\n- Summary of an MCP configuration investigation noting a VPN-blocked documentation URL (obs 20)\n- Summaries (×3) of skill discovery exploration across Claude, Copilot, OpenCode, GSD, Mastra (obs 21, 24)\n- Summary of recursive intent classification on empty input data, yielding low-confidence \"exploration\" results at each nesting level (obs 29)\n\nNo artifacts were produced in any of these exchanges — all were pure analytical/documentation tasks.",
     "observationIds": [
       "f95bd249-d338-4444-a157-b9a8830b931f",
@@ -1624,7 +1624,7 @@
   {
     "id": "e9b83828-d81c-4bfa-a2f5-fae7f08a7b57",
     "date": "2026-04-16",
-    "theme": "Copilot Trajectory State Classification <COMPANY_NAME_REDACTED>-Analysis",
+    "theme": "Copilot Trajectory State Classification Meta-Analysis",
     "summary": "The copilot agent performed a series of trajectory state classifications on Claude Code exchange metadata throughout the morning. Classifications produced included: \"exploring\" (0.7 confidence) for an exchange with no tool calls or file operations; \"off_track\" (0.75 confidence) for an exchange where the agent responded with a question instead of executing a retry and reported tool calls that never actually executed; \"implementing\" (0.7 confidence) for an exchange combining 7 reads, 1 edit, and 1 task spawn; and \"debugging\" (0.85 confidence) for a retry-triggered exchange with 17 reads, 6 greps, edits, and bash commands. One observation was a recursive <COMPANY_NAME_REDACTED>-summary documenting the nested nature of these classification exercises. No artifacts were produced; all outputs were structured JSON or narrative summaries.",
     "observationIds": [
       "081489c0-8337-40b7-b3d7-246ebe52b0fa",
@@ -1793,9 +1793,9 @@
       "~/Agentic/coding/claude-code-mcp-docker.json",
       "~/Agentic/coding/install.sh",
       "other agent config files (opencode",
-      "<AWS_SECRET_REDACTED>ns/llm-cli-proxy/../../../.claude/settings.local.json",
+      "integrations/llm-cli-proxy/../../../.claude/settings.local.json",
       "~/Agentic/coding/uninstall.sh",
-      "<AWS_SECRET_REDACTED>st-coding.sh"
+      "test-coding.sh"
     ],
     "quality": "high",
     "createdAt": "2026-04-22T06:54:46.926Z"
@@ -2328,7 +2328,7 @@
     ],
     "filesTouched": [
       "monitor source files (classification logic",
-      "<AWS_SECRET_REDACTED>hanced-transcript-monitor.js",
+      "enhanced-transcript-monitor.js",
       "scripts/enhanced-transcript-monitor.js",
       "global-lsl-coordinator.js",
       "process-state-manager.js",
@@ -2394,7 +2394,7 @@
       "trajectory analyzer (removed dead provider URL/key logic)",
       "rapid-automations ETM health writer to include pollCount metric",
       "coding SemanticAnalyzer to remove mergeTrajectoryWithSession and parseTrajectoryResponse",
-      "coding trajectory analyzer to remove <AWS_SECRET_REDACTED>er/initializeFastInference dead methods and unused apiKey/baseUrl fields",
+      "coding trajectory analyzer to remove trajectory-analyzer/initializeFastInference dead methods and unused apiKey/baseUrl fields",
       "global-lsl-coordinator.js",
       "SemanticAnalyzer.js",
       "trajectory analyzer file"
@@ -2522,8 +2522,8 @@
       "claude"
     ],
     "filesTouched": [
-      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/pages/digests.tsx",
-      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/pages/insights.tsx",
+      "integrations/system-health-dashboard/src/pages/digests.tsx",
+      "integrations/system-health-dashboard/src/pages/insights.tsx",
       "/tmp/pw-scripts/pw_digests.js"
     ],
     "quality": "high",
@@ -2543,7 +2543,7 @@
     ],
     "filesTouched": [
       "observation-memory-hierarchy.puml",
-      "<AWS_SECRET_REDACTED>observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml",
       "observational-memory.md",
       "~/Agentic/coding/docs-content/core-systems/observational-memory.md"
     ],
@@ -2606,7 +2606,7 @@
     ],
     "filesTouched": [
       "markdown-text.tsx",
-      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/components/markdown-text.tsx"
+      "integrations/system-health-dashboard/src/components/markdown-text.tsx"
     ],
     "quality": "high",
     "createdAt": "2026-04-23T06:21:34.398Z"
@@ -2626,7 +2626,7 @@
     ],
     "filesTouched": [
       "markdown-text.tsx",
-      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/src/components/markdown-text.tsx",
+      "integrations/system-health-dashboard/src/components/markdown-text.tsx",
       "/tmp/pw-scripts/pw_task.js"
     ],
     "quality": "high",
@@ -2663,7 +2663,7 @@
     ],
     "filesTouched": [
       "docker-compose.yml",
-      "<AWS_SECRET_REDACTED>ker-compose.yml"
+      "docker/docker-compose.yml"
     ],
     "quality": "normal",
     "createdAt": "2026-04-23T06:21:34.398Z"
