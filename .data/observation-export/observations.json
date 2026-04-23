@@ -3244,7 +3244,7 @@
   },
   {
     "id": "5c0ab78e-3284-4e6b-aaef-4713ba2a4787",
-    "summary": "Intent: User called out that the artifact-patching fix produced an entry with missing artifacts, and demanded e2e verification using gsd-browser before claiming fixes work — and that this rule must be remembered across all coding agents.\nApproach: Save a feedback memory capturing the rule to always e2e-verify fixes using gsd-browser (or equivalent) rather than assuming correctness, so this expectation persists across future sessions.\nArtifacts: edited ~/.claude/projects/Agentic-coding/memory/feedback_e2e_verify.md\nResult: Feedback memory written requiring e2e browser verification via gsd-browser skill before declaring any UI/observation fix complete — applicable to all coding agents, not just the current session.",
+    "summary": "Intent: User called out that the artifact-patching fix produced an entry with missing artifacts, and demanded e2e verification using gsd-browser before claiming fixes work — and that this rule must be remembered across all coding agents.\nApproach: Save a feedback memory capturing the rule to always e2e-verify fixes using gsd-browser (or equivalent) rather than assuming correctness, so this expectation persists across future sessions.\nArtifacts: edited ~/.claude/projects/Agentic/coding/memory/feedback_e2e_verify.md\nResult: Feedback memory written requiring e2e browser verification via gsd-browser skill before declaring any UI/observation fix complete — applicable to all coding agents, not just the current session.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -3255,12 +3255,12 @@
       "provider": "claude-code"
     },
     "modifiedFiles": [
-      "~/.claude/projects/Agentic-coding/memory/feedback_e2e_verify.md"
+      "~/.claude/projects/Agentic/coding/memory/feedback_e2e_verify.md"
     ]
   },
   {
     "id": "5b4fda2f-6edf-44f3-b296-0e70a09b0842",
-    "summary": "Intent: Reprimand for not using gsd-browser skill to e2e verify changes, and demand that all coding agents always use it for UI/dashboard verification.\nApproach: User caught a <COMPANY_NAME_REDACTED>-irony: the fix for \"missing artifacts\" produced an entry with missing artifacts, proving no e2e verification was done. The feedback is to mandate /gsd-browser or /playwright-cli for visual verification and burn this into persistent memory so all agents remember it.\nArtifacts: edited ~/.claude/projects/Agentic-coding/memory/feedback_e2e_verify.md, edited ~/.claude/projects/Agentic-coding/memory/MEMORY.md\nResult: Memory updated to enforce that UI/dashboard changes MUST be verified with /gsd-browser or /playwright-cli before claiming success — never rely on DB queried or code inspection alone. Rule applies to all supported coding agents.",
+    "summary": "Intent: Reprimand for not using gsd-browser skill to e2e verify changes, and demand that all coding agents always use it for UI/dashboard verification.\nApproach: User caught a <COMPANY_NAME_REDACTED>-irony: the fix for \"missing artifacts\" produced an entry with missing artifacts, proving no e2e verification was done. The feedback is to mandate /gsd-browser or /playwright-cli for visual verification and burn this into persistent memory so all agents remember it.\nArtifacts: edited ~/.claude/projects/Agentic/coding/memory/feedback_e2e_verify.md, edited ~/.claude/projects/Agentic/coding/memory/MEMORY.md\nResult: Memory updated to enforce that UI/dashboard changes MUST be verified with /gsd-browser or /playwright-cli before claiming success — never rely on DB queried or code inspection alone. Rule applies to all supported coding agents.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -3271,8 +3271,8 @@
       "provider": "claude-code"
     },
     "modifiedFiles": [
-      "~/.claude/projects/Agentic-coding/memory/feedback_e2e_verify.md",
-      "~/.claude/projects/Agentic-coding/memory/MEMORY.md"
+      "~/.claude/projects/Agentic/coding/memory/feedback_e2e_verify.md",
+      "~/.claude/projects/Agentic/coding/memory/MEMORY.md"
     ]
   },
   {
@@ -7913,7 +7913,7 @@
   },
   {
     "id": "983d33ba-a002-49ae-9391-cb7ec5959ff3",
-    "summary": "Intent: [user submitted an image, likely showing feedback or a UI screenshot related to redaction observations]\nApproach: The assistant wrote to a memory file to capture observations about feedback redaction, suggesting it was logging or updating notes based on what was seen in the image.\nArtifacts: edited ~/.claude/projects/Agentic-coding/memory/feedback_redact_observations.md\nResult: Observations from the submitted image were recorded into the feedback redaction observations memory file for the agentic coding project.",
+    "summary": "Intent: [user submitted an image, likely showing feedback or a UI screenshot related to redaction observations]\nApproach: The assistant wrote to a memory file to capture observations about feedback redaction, suggesting it was logging or updating notes based on what was seen in the image.\nArtifacts: edited ~/.claude/projects/Agentic/coding/memory/feedback_redact_observations.md\nResult: Observations from the submitted image were recorded into the feedback redaction observations memory file for the agentic coding project.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -7924,12 +7924,12 @@
       "provider": "copilot"
     },
     "modifiedFiles": [
-      "~/.claude/projects/Agentic-coding/memory/feedback_redact_observations.md"
+      "~/.claude/projects/Agentic/coding/memory/feedback_redact_observations.md"
     ]
   },
   {
     "id": "2b399491-d123-4b7a-88be-f69fc979b692",
-    "summary": "Intent: [shared an image, likely showing feedback or a UI state related to redaction observations]\nApproach: Agent investigated the live-logging pipeline, reading ObservationWriter.js and ConfigurableRedactor.js to understand how to wire redaction into the observation write path.\nArtifacts: edited ~/.claude/projects/Agentic-coding/memory/feedback_redact_observations.md\nResult: Feedback or observations about redaction were recorded in the project memory file; full implementation wiring was still in progress at exchange end.",
+    "summary": "Intent: [shared an image, likely showing feedback or a UI state related to redaction observations]\nApproach: Agent investigated the live-logging pipeline, reading ObservationWriter.js and ConfigurableRedactor.js to understand how to wire redaction into the observation write path.\nArtifacts: edited ~/.claude/projects/Agentic/coding/memory/feedback_redact_observations.md\nResult: Feedback or observations about redaction were recorded in the project memory file; full implementation wiring was still in progress at exchange end.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -7940,7 +7940,7 @@
       "provider": "copilot"
     },
     "modifiedFiles": [
-      "~/.claude/projects/Agentic-coding/memory/feedback_redact_observations.md"
+      "~/.claude/projects/Agentic/coding/memory/feedback_redact_observations.md"
     ]
   },
   {
