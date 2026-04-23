@@ -59,6 +59,9 @@ export class ObservationWriter {
     /** @type {Map<string, number>} Recent content hashes → timestamp for dedup */
     this._recentHashes = new Map();
     this._dedupWindowMs = 60_000; // skip duplicates within 60s
+    /** Write lock: serializes DB writes so concurrent fire-and-forget calls
+     *  don't race past the semantic dedup check (TOCTOU prevention) */
+    this._writeLock = Promise.resolve();
   }
 
   /**
@@ -72,6 +75,12 @@ export class ObservationWriter {
 
     const Database = require('better-sqlite3');
     this.db = new Database(this.dbPath);
+
+    // WAL mode: allows concurrent readers (Docker health dashboard) while writing.
+    // busy_timeout: wait up to 5s for locks instead of failing immediately — prevents
+    // corruption when multiple ETM instances or the consolidator access the same DB.
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 5000');
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS observations (
@@ -198,7 +207,7 @@ export class ObservationWriter {
           }
 
           const result = await response.json();
-          const summary = result.content || this._fallbackSummary(messages);
+          const summary = this._sanitizeSummary(result.content) || this._fallbackSummary(messages);
           const llm = result.model && result.provider
             ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
             : undefined;
@@ -233,6 +242,50 @@ export class ObservationWriter {
     }, {});
     const roleSummary = Object.entries(roles).map(([r, c]) => `${c} ${r}`).join(', ');
     return `[Raw] ${messages.length} messages (${roleSummary}). LLM summary unavailable.`;
+  }
+
+  /**
+   * Sanitize LLM-generated summary: detect unfilled template placeholders,
+   * self-correction artifacts, and other quality issues.
+   * @param {string|undefined} raw - Raw LLM response
+   * @returns {string|null} Cleaned summary, or null if unusable
+   */
+  _sanitizeSummary(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+
+    let summary = raw.trim();
+
+    // Detect self-correction: LLM outputs template placeholders then corrects itself.
+    // Pattern: first attempt with brackets, then "Wait..." or "Let me...", then real content.
+    // Keep only the last valid Intent/Approach/Artifacts/Result block.
+    const intentBlocks = [...summary.matchAll(/^Intent:\s*.+$/gm)];
+    if (intentBlocks.length > 1) {
+      // Multiple Intent blocks — take the last complete one
+      const lastIntentIdx = summary.lastIndexOf('Intent:');
+      const candidate = summary.slice(lastIntentIdx).trim();
+      // Only use it if it has all 4 fields and no bracket placeholders
+      if (/^Intent:/m.test(candidate) && /^Result:/m.test(candidate) &&
+          !candidate.includes('[what the developer') && !candidate.includes('[architectural decisions')) {
+        summary = candidate;
+        process.stderr.write(`[ObservationWriter] Sanitized: stripped LLM self-correction preamble\n`);
+      }
+    }
+
+    // Detect unfilled template placeholders — the LLM echoed the instructions
+    const placeholderPatterns = [
+      '[what the developer actually asked',
+      '[architectural decisions, solution strategy',
+      '[key actions taken',
+      '[list each file modified/created/deleted with verb',
+      'base this ONLY on the <user> message content',
+    ];
+    const hasPlaceholders = placeholderPatterns.some(p => summary.includes(p));
+    if (hasPlaceholders) {
+      process.stderr.write(`[ObservationWriter] Sanitized: LLM returned unfilled template placeholders — discarding\n`);
+      return null;
+    }
+
+    return summary;
   }
 
   /**
@@ -512,11 +565,16 @@ export class ObservationWriter {
 
     for (const chunk of chunks) {
       try {
+        // LLM summarization runs outside the lock (slow, ~5-15s)
         const { summary, llm } = await this.summarize(chunk, metadata);
         const enrichedMeta = llm
           ? { ...metadata, llmModel: llm.model, llmProvider: llm.provider, llmTokens: llm.tokens, llmLatencyMs: llm.latencyMs }
           : metadata;
-        const obsId = await this.writeObservation(summary, chunk, enrichedMeta);
+
+        // DB write runs inside the lock to prevent TOCTOU races:
+        // two concurrent fire-and-forget calls could both pass the semantic
+        // dedup check before either writes, producing duplicates.
+        const obsId = await this._serializedWrite(summary, chunk, enrichedMeta);
         if (obsId) lastObservationId = obsId;
         observations++;
       } catch (err) {
@@ -526,6 +584,18 @@ export class ObservationWriter {
     }
 
     return { observations, errors, lastObservationId };
+  }
+
+  /**
+   * Serialize DB writes through a promise chain to prevent concurrent
+   * fire-and-forget calls from racing past the semantic dedup check.
+   */
+  _serializedWrite(summary, chunk, metadata) {
+    this._writeLock = this._writeLock.then(
+      () => this.writeObservation(summary, chunk, metadata),
+      () => this.writeObservation(summary, chunk, metadata), // continue even if prior write failed
+    );
+    return this._writeLock;
   }
 
   /**

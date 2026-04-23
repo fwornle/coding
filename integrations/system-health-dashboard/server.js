@@ -3882,6 +3882,18 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Invalidate the cached observations DB connection (e.g. after a query error).
+     * Next call to _getObservationsDb() will re-open a fresh connection.
+     */
+    _invalidateObservationsDb() {
+        if (this._obsDb) {
+            try { this._obsDb.close(); } catch { /* ignore */ }
+        }
+        this._obsDb = null;
+        this._obsDbOpenedAt = null;
+    }
+
+    /**
      * GET /api/observations — paginated observations with filtering and FTS5 search.
      * Query params: agent, from, to, project, q (full-text), limit, offset
      * Response: { data, total, limit, offset }
@@ -3976,6 +3988,10 @@ class SystemHealthAPIServer {
             res.json({ data, total, limit, offset });
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] Query error: ${err.message}\n`);
+            // Invalidate cached connection on corruption — next request gets a fresh handle
+            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
+                this._invalidateObservationsDb();
+            }
             res.status(500).json({ error: 'Failed to query observations' });
         }
     }
@@ -3995,6 +4011,9 @@ class SystemHealthAPIServer {
             res.json(rows.map(r => r.project).filter(Boolean));
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] Projects query error: ${err.message}\n`);
+            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
+                this._invalidateObservationsDb();
+            }
             res.status(500).json({ error: 'Failed to query projects' });
         }
     }
@@ -4063,6 +4082,9 @@ class SystemHealthAPIServer {
             res.json({ data, total, limit, offset });
         } catch (err) {
             process.stderr.write(`[DigestsAPI] Query error: ${err.message}\n`);
+            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
+                this._invalidateObservationsDb();
+            }
             res.status(500).json({ error: 'Failed to query digests' });
         }
     }
@@ -4114,6 +4136,9 @@ class SystemHealthAPIServer {
             res.json({ data, total: data.length });
         } catch (err) {
             process.stderr.write(`[InsightsAPI] Query error: ${err.message}\n`);
+            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
+                this._invalidateObservationsDb();
+            }
             res.status(500).json({ error: 'Failed to query insights' });
         }
     }
@@ -4152,6 +4177,9 @@ class SystemHealthAPIServer {
             res.json({ totalObs, undigested, lowQuality, pendingPast, pendingToday, digested: totalObs - undigested - lowQuality, totalDigests, totalInsights });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Status error: ${err.message}\n`);
+            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
+                this._invalidateObservationsDb();
+            }
             res.status(500).json({ error: 'Failed to get consolidation status' });
         }
     }

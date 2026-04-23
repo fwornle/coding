@@ -43,6 +43,10 @@ export class ObservationConsolidator {
     const Database = require('better-sqlite3');
     this.db = new Database(this.dbPath);
 
+    // WAL mode + busy_timeout for safe concurrent access with ETM writers and Docker reader
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 5000');
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS digests (
         id TEXT PRIMARY KEY,
