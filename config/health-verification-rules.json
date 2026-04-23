@@ -173,6 +173,24 @@
         "auto_heal": false,
         "recommendation": "Restart memory-intensive process or investigate leak"
       },
+      "supervisord_status": {
+        "enabled": true,
+        "severity": "critical",
+        "check_type": "supervisord_status",
+        "description": "Check all supervisord-managed processes for FATAL or STOPPED state",
+        "auto_heal": false,
+        "expected_processes": [
+          "semantic-analysis",
+          "browser-access",
+          "constraint-monitor",
+          "constraint-dashboard",
+          "code-graph-rag",
+          "vkb-server",
+          "health-dashboard",
+          "health-dashboard-frontend",
+          "health-verifier"
+        ]
+      },
       "zombie_processes": {
         "enabled": true,
         "severity": "error",

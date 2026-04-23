@@ -242,6 +242,11 @@ class HealthVerifier extends EventEmitter {
       const processChecks = await this.verifyProcesses();
       checks.push(...processChecks);
 
+      // Priority Check 3b: Supervisord Process Status
+      this.log('Checking supervisord process status...');
+      const supervisordChecks = await this.verifySupervisord();
+      checks.push(...supervisordChecks);
+
       // Priority Check 4: File Health
       this.log('Checking file health...');
       const fileChecks = await this.verifyFiles();
@@ -263,6 +268,7 @@ class HealthVerifier extends EventEmitter {
           recheckResults.push(...await this.verifyDatabases());
           recheckResults.push(...await this.verifyServices());
           recheckResults.push(...await this.verifyProcesses());
+          recheckResults.push(...await this.verifySupervisord());
           recheckResults.push(...await this.verifyFiles());
 
           // CRITICAL FIX: Replace old checks with recheck results instead of appending
@@ -935,6 +941,105 @@ class HealthVerifier extends EventEmitter {
           timestamp: new Date().toISOString()
         });
       }
+    }
+
+    return checks;
+  }
+
+  /**
+   * Verify supervisord process status
+   * Detects FATAL or STOPPED processes inside the Docker container
+   */
+  async verifySupervisord() {
+    const checks = [];
+    const rule = this.rules.rules.processes?.supervisord_status;
+
+    if (!rule?.enabled) return checks;
+
+    // Only run inside Docker — supervisord doesn't exist on host
+    if (!isDockerMode()) {
+      checks.push({
+        category: 'processes',
+        check: 'supervisord_status',
+        status: 'passed',
+        severity: 'info',
+        message: 'Supervisord check skipped (not in Docker mode)',
+        details: { skipped_reason: 'not_docker' },
+        timestamp: new Date().toISOString()
+      });
+      return checks;
+    }
+
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('supervisorctl status', {
+        encoding: 'utf-8',
+        timeout: 5000
+      });
+
+      const lines = output.trim().split('\n').filter(l => l.trim());
+      const processes = [];
+      const failures = [];
+
+      for (const line of lines) {
+        // Format: "group:name  STATUS  pid N, uptime H:MM:SS" or "group:name  FATAL  Exited too quickly"
+        const match = line.match(/^(\S+)\s+(RUNNING|STARTING|STOPPED|FATAL|BACKOFF|EXITED)\s+(.*)/);
+        if (match) {
+          const fullName = match[1];
+          const status = match[2];
+          const detail = match[3].trim();
+          // Strip group prefix (e.g., "mcp-servers:semantic-analysis" -> "semantic-analysis")
+          const name = fullName.includes(':') ? fullName.split(':')[1] : fullName;
+          processes.push({ name, fullName, status, detail });
+
+          if (status === 'FATAL' || status === 'STOPPED' || status === 'BACKOFF') {
+            failures.push({ name, fullName, status, detail });
+          }
+        }
+      }
+
+      if (failures.length > 0) {
+        // Report as critical violations but do NOT auto-restart (supervisord handles that)
+        checks.push({
+          category: 'processes',
+          check: 'supervisord_status',
+          status: 'failed',
+          severity: rule.severity,
+          message: `${failures.length} supervisord process(es) in failure state: ${failures.map(f => `${f.name}=${f.status}`).join(', ')}`,
+          details: {
+            total_processes: processes.length,
+            failures,
+            all_processes: processes
+          },
+          auto_heal: false,
+          recommendation: `Check Docker logs: docker logs coding-services. FATAL processes: ${failures.map(f => f.name).join(', ')}`,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        checks.push({
+          category: 'processes',
+          check: 'supervisord_status',
+          status: 'passed',
+          severity: 'info',
+          message: `All ${processes.length} supervisord processes running`,
+          details: {
+            total_processes: processes.length,
+            all_processes: processes
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      checks.push({
+        category: 'processes',
+        check: 'supervisord_status',
+        status: 'failed',
+        severity: 'error',
+        message: `Failed to read supervisord status: ${error.message}`,
+        details: { error: error.message },
+        auto_heal: false,
+        timestamp: new Date().toISOString()
+      });
     }
 
     return checks;
