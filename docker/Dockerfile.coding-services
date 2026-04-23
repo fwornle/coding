@@ -36,6 +36,9 @@ FROM base AS node-deps
 # Copy root package files
 COPY package.json package-lock.json ./
 
+# Copy local dependency tarballs (referenced as file: in package.json)
+COPY _work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz /_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
+
 # Install root dependencies first
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
 

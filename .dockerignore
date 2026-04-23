@@ -68,6 +68,7 @@ Thumbs.db
 *.tar
 *.tar.gz
 *.tgz
+!_work/rapid-llm-proxy/rapid-llm-proxy-1.0.0.tgz
 
 # Serena memories and cache
 .serena

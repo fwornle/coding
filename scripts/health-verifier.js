@@ -971,11 +971,21 @@ class HealthVerifier extends EventEmitter {
     }
 
     try {
-      const { execSync } = require('child_process');
-      const output = execSync('supervisorctl status', {
-        encoding: 'utf-8',
-        timeout: 5000
-      });
+      const { execSync } = await import('child_process');
+      let output;
+      try {
+        output = execSync('supervisorctl status', {
+          encoding: 'utf-8',
+          timeout: 5000
+        });
+      } catch (execErr) {
+        // supervisorctl exits non-zero when any process is FATAL/STOPPED — use stdout from error
+        if (execErr.stdout) {
+          output = execErr.stdout;
+        } else {
+          throw execErr;
+        }
+      }
 
       const lines = output.trim().split('\n').filter(l => l.trim());
       const processes = [];
