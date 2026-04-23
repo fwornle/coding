@@ -37,6 +37,7 @@ export default function SystemHealthDashboard() {
   const healthStatus = useAppSelector((state) => state.healthStatus)
   const [ukbModalOpen, setUkbModalOpen] = useState(false)
   const [loggingControlOpen, setLoggingControlOpen] = useState(false)
+  const [serviceDetailOpen, setServiceDetailOpen] = useState(false)
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
@@ -221,6 +222,17 @@ export default function SystemHealthDashboard() {
       })
     }
 
+    // Semantic Analysis SSE
+    const sseCheck = checks.find((c: any) => c.check === 'semantic_analysis_sse')
+    if (sseCheck) {
+      items.push({
+        name: 'Semantic Analysis',
+        status: mapCheckStatus(sseCheck),
+        description: 'Port 3848',
+        tooltip: sseCheck.message + (sseCheck.recommendation ? ` - ${sseCheck.recommendation}` : '')
+      })
+    }
+
     return items
   }
 
@@ -386,6 +398,66 @@ export default function SystemHealthDashboard() {
     return items
   }
 
+  // Build per-port detail items with timestamps
+  const getPortDetailItems = () => {
+    const checks = getChecksByCategory('services')
+    const portMap: Record<string, { name: string, port: number }> = {
+      'dashboard_server': { name: 'Constraint Dashboard', port: 3030 },
+      'health_dashboard_frontend': { name: 'Health Dashboard UI', port: 3032 },
+      'health_dashboard_api': { name: 'Health Dashboard API', port: 3033 },
+      'semantic_analysis_sse': { name: 'Semantic Analysis SSE', port: 3848 },
+      'vkb_server': { name: 'VKB Server', port: 8080 },
+      'llm_cli_proxy': { name: 'LLM CLI Proxy', port: 12435 },
+    }
+
+    return Object.entries(portMap).map(([checkName, info]) => {
+      const check = checks.find((c: any) => c.check === checkName)
+      const lastChecked = check?.timestamp
+        ? new Date(check.timestamp).toLocaleTimeString()
+        : 'never'
+      return {
+        name: `Port ${info.port}`,
+        status: check ? mapCheckStatus(check) : ('offline' as const),
+        description: info.name,
+        tooltip: check
+          ? `${check.message} | Last checked: ${lastChecked}`
+          : `${info.name} — no check data yet`
+      }
+    })
+  }
+
+  // Build supervisord process items
+  const getSupervisordItems = () => {
+    const checks = getChecksByCategory('processes')
+    const supervisordCheck = checks.find((c: any) => c.check === 'supervisord_status')
+
+    if (!supervisordCheck?.details?.all_processes) {
+      return [{
+        name: 'Supervisord',
+        status: 'offline' as const,
+        description: 'No data available',
+        tooltip: 'Supervisord status check has not run yet or is not available'
+      }]
+    }
+
+    const processes: Array<{ name: string, status: string, detail: string }> =
+      supervisordCheck.details.all_processes
+
+    return processes.map((proc) => {
+      const uiStatus: 'operational' | 'warning' | 'error' | 'offline' =
+        proc.status === 'RUNNING' ? 'operational' :
+        proc.status === 'STARTING' ? 'warning' :
+        proc.status === 'FATAL' || proc.status === 'BACKOFF' ? 'error' :
+        'offline'
+      return {
+        name: proc.name,
+        status: uiStatus,
+        description: proc.status,
+        tooltip: `${proc.name} (${proc.status}): ${proc.detail}`
+      }
+    })
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -519,6 +591,73 @@ export default function SystemHealthDashboard() {
           onClick={() => setUkbModalOpen(true)}
         />
       </div>
+
+      {/* Service Detail — expandable per-port and per-supervisord-process status */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer"
+          onClick={() => setServiceDetailOpen(!serviceDetailOpen)}
+        >
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Server className="h-5 w-5" />
+            Service Detail
+            <Badge variant="outline" className="ml-auto">
+              {serviceDetailOpen ? 'Collapse' : 'Expand'}
+            </Badge>
+          </CardTitle>
+          <CardDescription>Per-port status and supervisord process list</CardDescription>
+        </CardHeader>
+        {serviceDetailOpen && (
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-semibold mb-3">Port Liveness</h3>
+                <div className="space-y-2">
+                  {getPortDetailItems().map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between" title={item.tooltip}>
+                      <div className="flex items-center gap-2">
+                        {item.status === 'operational'
+                          ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          : <XCircle className="h-4 w-4 text-red-500" />}
+                        <span className="text-sm font-medium">{item.name}</span>
+                        <span className="text-xs text-muted-foreground">{item.description}</span>
+                      </div>
+                      <Badge variant={item.status === 'operational' ? 'outline' : 'destructive'}
+                             className={item.status === 'operational' ? 'bg-green-50 text-green-700 border-green-200' : ''}>
+                        {item.status === 'operational' ? 'OK' : 'Down'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-3">Supervisord Processes</h3>
+                <div className="space-y-2">
+                  {getSupervisordItems().map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between" title={item.tooltip}>
+                      <div className="flex items-center gap-2">
+                        {item.status === 'operational'
+                          ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          : item.status === 'warning'
+                            ? <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                            : <XCircle className="h-4 w-4 text-red-500" />}
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </div>
+                      <Badge variant={item.status === 'operational' ? 'outline' : item.status === 'error' ? 'destructive' : 'outline'}
+                             className={
+                               item.status === 'operational' ? 'bg-green-50 text-green-700 border-green-200' :
+                               item.status === 'warning' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : ''
+                             }>
+                        {item.description}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       <Separator />
 
