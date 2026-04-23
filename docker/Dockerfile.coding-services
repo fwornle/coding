@@ -46,6 +46,9 @@ RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts
 COPY integrations/mcp-constraint-monitor/package*.json ./integrations/mcp-constraint-monitor/
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
 
+COPY integrations/mcp-constraint-monitor/dashboard/package*.json ./integrations/mcp-constraint-monitor/dashboard/
+RUN cd integrations/mcp-constraint-monitor/dashboard && npm install 2>/dev/null || true
+
 COPY integrations/browser-access/package*.json ./integrations/browser-access/
 RUN cd integrations/browser-access && npm install --ignore-scripts 2>/dev/null || true
 
@@ -98,6 +101,7 @@ RUN cd lib/llm && npm install --ignore-scripts 2>/dev/null || true
 # Re-install integration deps after source COPY (node-deps stage installs may
 # have been overwritten by COPY integrations/ since .dockerignore excludes node_modules)
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
+RUN cd integrations/mcp-constraint-monitor/dashboard && npm install 2>/dev/null || true
 RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
 
 # Patch broken JSDoc comment in @rapid/llm-proxy network-detect.js
@@ -116,6 +120,11 @@ RUN cd lib/llm && npm run build 2>/dev/null || true
 RUN cd integrations/mcp-server-semantic-analysis && npm run build 2>/dev/null || true
 RUN cd integrations/browser-access && npm run build 2>/dev/null || true
 RUN cd integrations/system-health-dashboard && npm run build 2>/dev/null || true
+
+# Build Constraint Dashboard (Next.js on port 3030)
+RUN cd integrations/mcp-constraint-monitor/dashboard && \
+    CONSTRAINT_DASHBOARD_PORT=3030 CONSTRAINT_API_PORT=3031 \
+    ./node_modules/.bin/next build 2>/dev/null || true
 
 # ============================================================
 # Stage 5: Production image
