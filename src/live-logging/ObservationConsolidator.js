@@ -31,7 +31,7 @@ export class ObservationConsolidator {
   constructor(options = {}) {
     this.dbPath = options.dbPath || '.observations/observations.db';
     const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
-    this.proxyUrl = options.proxyUrl || `http://localhost:${proxyPort}`;
+    this.proxyUrl = options.proxyUrl || process.env.LLM_CLI_PROXY_URL || `http://localhost:${proxyPort}`;
     this.provider = options.provider || null;
     this.db = null;
   }
@@ -464,7 +464,7 @@ OUTPUT FORMAT — respond with one or more digest blocks, each in this exact for
 <theme>Short descriptive title (5-10 words)</theme>
 <observations>1,3,5,7</observations>
 <summary>
-Consolidated narrative of what happened: what was the goal, what approach was taken, what was achieved, what files were changed. 3-8 sentences. Include specific technical details that would help someone understand the work without reading the raw observations.
+Consolidated narrative of what happened: what was the goal, what approach was taken, what was achieved, what files were changed. Use markdown formatting: bullet lists (- item) for multiple changes/files/issues, \`backticks\` for file paths and code. 3-10 lines.
 </summary>
 </digest>
 
@@ -504,7 +504,8 @@ OUTPUT FORMAT — respond with one or more insight blocks:
 <topic>Component or area name (e.g. "Dashboard Observations System", "Docker Build Pipeline")</topic>
 <confidence>0.0-1.0 — how well-established this knowledge is</confidence>
 <summary>
-What we know about this topic. Written as reference documentation someone could consult to understand the current state. 3-10 sentences. Include specifics: file paths, architectural choices, known gotchas.
+What we know about this topic. Written as reference documentation someone could consult to understand the current state.
+Use markdown formatting: bullet lists (- item) for enumerating components/issues/steps, \`backticks\` for file paths and code. Structure long summaries with bullet lists rather than dense paragraphs. 3-15 lines.
 </summary>
 </insight>
 

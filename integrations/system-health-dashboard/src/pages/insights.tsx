@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { MarkdownText } from '@/components/markdown-text'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -63,7 +64,7 @@ function InsightCard({ insight }: { insight: Insight }) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{insight.summary}</p>
+        <MarkdownText text={insight.summary} />
       </CardContent>
     </Card>
   )
@@ -74,6 +75,7 @@ export function InsightsPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number } | null>(null)
+  const [consolidating, setConsolidating] = useState(false)
 
   const fetchInsights = useCallback(async (q = '') => {
     setLoading(true)
@@ -95,6 +97,28 @@ export function InsightsPage() {
       if (res.ok) setStatus(await res.json())
     } catch { /* ignore */ }
   }, [])
+
+  const [consolidationError, setConsolidationError] = useState<string | null>(null)
+
+  const runConsolidation = useCallback(async () => {
+    setConsolidating(true)
+    setConsolidationError(null)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/consolidation/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setConsolidationError(data.error || `HTTP ${res.status}`)
+      }
+    } catch (err) {
+      setConsolidationError(err instanceof Error ? err.message : 'Network error')
+    }
+    await fetchInsights(query)
+    await fetchStatus()
+    setConsolidating(false)
+  }, [fetchInsights, fetchStatus, query])
 
   useEffect(() => {
     fetchInsights()
@@ -121,10 +145,19 @@ export function InsightsPage() {
               <div>{status.totalInsights} insights from {status.totalDigests} digests</div>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => { fetchInsights(query); fetchStatus() }} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { fetchInsights(query); fetchStatus() }} disabled={loading || consolidating}>
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {status && status.undigested > 0 && (
+            <Button size="sm" onClick={runConsolidation} disabled={consolidating || loading}>
+              {consolidating ? (
+                <><RefreshCw className="w-4 h-4 mr-1 animate-spin" />Consolidating...</>
+              ) : (
+                <>Consolidate</>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -146,6 +179,12 @@ export function InsightsPage() {
           </Button>
         )}
       </div>
+
+      {consolidationError && (
+        <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+          Consolidation failed: {consolidationError}
+        </div>
+      )}
 
       {insights.length === 0 && !loading && (
         <Card className="p-8 text-center text-muted-foreground">

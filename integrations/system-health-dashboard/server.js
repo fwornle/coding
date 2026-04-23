@@ -75,6 +75,10 @@ class SystemHealthAPIServer {
         this.lastKnownState = null; // Last WorkflowState from SSE stream (for new WS clients)
         this.previousStatus = null; // Track previous status for legacy event mapping
 
+        // Auto-consolidation state
+        this.autoConsolidationInterval = null;
+        this.consolidationRunning = false;
+
         this.setupMiddleware();
         this.setupRoutes();
     }
@@ -3074,12 +3078,8 @@ class SystemHealthAPIServer {
                     console.error('❌ Failed to start System Health API server', { error: error.message, port: this.port });
                     reject(error);
                 } else {
-                    console.log('✅ System Health API server started', {
-                        port: this.port,
-                        dashboardUrl: `http://localhost:${this.dashboardPort}`,
-                        apiUrl: `http://localhost:${this.port}/api`,
-                        wsUrl: `ws://localhost:${this.port}/api/ukb/ws`
-                    });
+                    process.stderr.write(`✅ System Health API server started on port ${this.port}\n`);
+                    this.startAutoConsolidation();
                     resolve();
                 }
             });
@@ -3503,11 +3503,65 @@ class SystemHealthAPIServer {
         }
     }
 
+    /**
+     * Auto-consolidation daemon — checks every 30 min for undigested observations
+     * from completed days (not today). Triggers consolidation when threshold is met.
+     */
+    startAutoConsolidation() {
+        const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+        const UNDIGESTED_THRESHOLD = 10; // Minimum undigested obs to trigger
+
+        const check = async () => {
+            if (this.consolidationRunning) return;
+            try {
+                const db = this._getObservationsDb();
+                if (!db) return;
+
+                const today = new Date().toISOString().split('T')[0];
+                const row = db.prepare(
+                    "SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND date(created_at) < ?"
+                ).get(today);
+                const pastUndigested = row?.cnt || 0;
+
+                if (pastUndigested >= UNDIGESTED_THRESHOLD) {
+                    process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days — triggering consolidation\n`);
+                    this.consolidationRunning = true;
+                    try {
+                        const { ObservationConsolidator } = await import(
+                            join(codingRoot, 'src', 'live-logging', 'ObservationConsolidator.js')
+                        );
+                        const consolidator = new ObservationConsolidator({
+                            dbPath: join(codingRoot, '.observations', 'observations.db'),
+                        });
+                        await consolidator.init();
+                        const result = await consolidator.run();
+                        consolidator.close();
+                        process.stderr.write(`[AutoConsolidate] Done: ${result.digests} digests, ${result.created} insights created, ${result.updated} updated\n`);
+                    } catch (err) {
+                        process.stderr.write(`[AutoConsolidate] Failed: ${err.message}\n`);
+                    }
+                    this.consolidationRunning = false;
+                }
+            } catch (err) {
+                process.stderr.write(`[AutoConsolidate] Check error: ${err.message}\n`);
+            }
+        };
+
+        // Initial check after 2 minutes (let services settle)
+        setTimeout(check, 2 * 60 * 1000);
+        this.autoConsolidationInterval = setInterval(check, CHECK_INTERVAL_MS);
+        process.stderr.write(`[AutoConsolidate] Daemon started — checking every 30 min (threshold: ${UNDIGESTED_THRESHOLD} obs)\n`);
+    }
+
     async stop() {
+        if (this.autoConsolidationInterval) {
+            clearInterval(this.autoConsolidationInterval);
+            this.autoConsolidationInterval = null;
+        }
         return new Promise((resolve) => {
             if (this.server) {
                 this.server.close(() => {
-                    console.log('🛑 System Health API server stopped');
+                    process.stderr.write('System Health API server stopped\n');
                     resolve();
                 });
             } else {

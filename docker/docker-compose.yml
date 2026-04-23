@@ -85,6 +85,8 @@ services:
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/server.js:/coding/integrations/system-health-dashboard/server.js:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
+      # Observation consolidation (live-mounted for auto-consolidation daemon)
+      - ${CODING_REPO:-.}/src/live-logging/ObservationConsolidator.js:/coding/src/live-logging/ObservationConsolidator.js:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
       - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
     networks:
