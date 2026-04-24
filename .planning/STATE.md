@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
 status: executing
-stopped_at: Completed 28-01-PLAN.md (embedding foundation)
-last_updated: "2026-04-24T11:11:11.244Z"
-last_activity: 2026-04-24 -- Completed 28-01 (embedding foundation)
+stopped_at: Completed 28-02-PLAN.md (backfill)
+last_updated: "2026-04-24T11:19:32.743Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: --phase (28) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 28
-Last activity: 2026-04-24 -- Completed 28-01 (embedding foundation)
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-04-24
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [███░░░░░░░] 33%
 - [v6.0 roadmap]: fastembed with all-MiniLM-L6-v2 (384-dim) pinned as embedding model
 - [v6.0 roadmap]: Token budget default ~1000 tokens (research recommends 800-1000, not the 2K initially planned)
 - [28-01]: EmbeddingModel.AllMiniLML6V2 enum verified at runtime; queryEmbed returns Float32Array converted via Array.from()
+- Deterministic UUID from KG entity keys via MD5 hash for Qdrant point IDs
 
 ### Blockers/Concerns
 
@@ -65,8 +66,8 @@ Progress: [███░░░░░░░] 33%
 
 ## Session Continuity
 
-Last session: 2026-04-24T11:11:10.188Z
-Stopped at: Completed 28-01-PLAN.md (embedding foundation)
+Last session: 2026-04-24T11:19:32.737Z
+Stopped at: Completed 28-02-PLAN.md (backfill)
 Resume with: `/gsd-execute-phase 28-02`
 
 **Planned Phase:** 28 (Embedding Pipeline) — 3 plans — 2026-04-24T11:02:29.187Z

@@ -107,7 +107,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
 
 Plans:
 - [x] 28-01-PLAN.md -- Foundation: fastembed install, embedding config, service wrapper, Qdrant collections
-- [ ] 28-02-PLAN.md -- Backfill: one-shot CLI to embed all existing knowledge into Qdrant
+- [x] 28-02-PLAN.md -- Backfill: one-shot CLI to embed all existing knowledge into Qdrant
 - [ ] 28-03-PLAN.md -- Write-time hooks: Redis pub/sub listener + ObservationWriter integration
 
 #### Phase 29: Retrieval Service
@@ -173,7 +173,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 28. Embedding Pipeline | v6.0 | 1/3 | Executing | - |
+| 28. Embedding Pipeline | v6.0 | 2/3 | Executing | - |
 | 29. Retrieval Service | v6.0 | 0/TBD | Not started | - |
 | 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |

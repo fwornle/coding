@@ -9,10 +9,14 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Embedding Pipeline
 
-- [ ] **EMBED-01**: All existing observations (558) are embedded into Qdrant with metadata (agent, project, date, quality)
-- [ ] **EMBED-02**: All existing digests (132) are embedded into Qdrant with metadata (date, theme, agents, quality)
-- [ ] **EMBED-03**: All existing insights (12) are embedded into Qdrant with metadata (topic, confidence, digestIds)
-- [ ] **EMBED-04**: All existing KG entities (160+) are embedded into Qdrant with metadata (type, level, parentId)
+- [x] **EMBED-01
+**: All existing observations (558) are embedded into Qdrant with metadata (agent, project, date, quality)
+- [x] **EMBED-02
+**: All existing digests (132) are embedded into Qdrant with metadata (date, theme, agents, quality)
+- [x] **EMBED-03
+**: All existing insights (12) are embedded into Qdrant with metadata (topic, confidence, digestIds)
+- [x] **EMBED-04
+**: All existing KG entities (160+) are embedded into Qdrant with metadata (type, level, parentId)
 - [ ] **EMBED-05**: New observations/digests/insights are embedded automatically on creation (write-time hook)
 - [x] **EMBED-06
 **: Embedding model is pinned and versioned, using fastembed with all-MiniLM-L6-v2 (384-dim)
