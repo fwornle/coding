@@ -193,6 +193,7 @@ src/**/*.d.ts
 !src/**/*.test.js
 !src/**/*.spec.js
 !src/retrieval/**/*.js
+!src/hooks/**/*.js
 
 # Editor and IDE files
 .vscode/settings.json
