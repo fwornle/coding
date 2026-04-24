@@ -83,12 +83,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMBED-01 | Phase 28 | Pending |
-| EMBED-02 | Phase 28 | Pending |
-| EMBED-03 | Phase 28 | Pending |
-| EMBED-04 | Phase 28 | Pending |
-| EMBED-05 | Phase 28 | Pending |
-| EMBED-06 | Phase 28 | Pending |
+| EMBED-01 | Phase 28 | Complete |
+| EMBED-02 | Phase 28 | Complete |
+| EMBED-03 | Phase 28 | Complete |
+| EMBED-04 | Phase 28 | Complete |
+| EMBED-05 | Phase 28 | Complete |
+| EMBED-06 | Phase 28 | Complete |
 | RETR-01 | Phase 29 | Pending |
 | RETR-02 | Phase 29 | Pending |
 | RETR-03 | Phase 29 | Pending |

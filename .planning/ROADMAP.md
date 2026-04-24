@@ -103,7 +103,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
   2. Creating a new observation via ETM causes it to appear in Qdrant within 60 seconds without manual intervention
   3. Querying Qdrant with a semantic search for a known observation topic returns relevant results with correct metadata (agent, project, date, quality)
   4. The embedding model is pinned to all-MiniLM-L6-v2 (384-dim) in a single config location, and changing it requires updating only that one value
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 28-01-PLAN.md -- Foundation: fastembed install, embedding config, service wrapper, Qdrant collections
@@ -173,7 +173,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 28. Embedding Pipeline | v6.0 | 3/3 | Complete | 2026-04-24 |
+| 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 0/TBD | Not started | - |
 | 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |
