@@ -1,280 +1,205 @@
-# Stack Research
+# Technology Stack: Knowledge Context Injection Pipeline
 
-**Domain:** Mastra.ai integration for observational memory, mastracode agent, and LSL-to-observations conversion
-**Researched:** 2026-03-28
-**Confidence:** MEDIUM (packages verified via npm/docs, but standalone observe() API is new and less documented)
+**Project:** Coding v6.0 - Knowledge Context Injection
+**Researched:** 2026-04-24
+**Confidence:** HIGH (all packages verified via npm registry + Context7 docs)
 
-## Recommended Stack
+## Recommended Stack Additions
 
-### Core Technologies
+### 1. Qdrant Client (Vector Database Access)
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `@mastra/memory` | ^1.6.1 | Observational Memory engine (Observer + Reflector agents) | The core OM library. Provides standalone `observe()` API (since v1.4.0), token threshold management, and observation/reflection lifecycle. 95% on LongMemEval, 5-40x context compression vs raw message history. |
-| `@mastra/core` | ^1.10.0 | Mastra framework core (Agent class, model routing) | Required peer dependency for `@mastra/memory`. Provides model routing to 1800+ models, lifecycle hooks. |
-| `@mastra/libsql` | ^0.16.4 | LibSQL/SQLite storage adapter for observations | Local-first storage (no separate DB server needed). Stores threads, messages, token usage, and observations in SQLite. Already used by mastracode internally. Aligns with existing project preference for local storage (Graphology + LevelDB). |
-| `mastracode` | ^0.9.2 | TUI coding agent (built on pi-tui) | The `coding --mastra` agent. Includes built-in OM, LibSQL persistence, MCP server support, project-scoped threads via git remote or path. Install globally. |
-| `@mastra/opencode` | latest | OpenCode plugin for OM | Hooks into OpenCode lifecycle for auto-observe, context injection, and message filtering. Provides `memory_status` and `memory_observations` diagnostic tools. Merged in PR #12925 (Feb 2026). May need to be built from mastra monorepo source if not yet published to npm standalone. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `@qdrant/js-client-rest` | ^1.17.0 | TypeScript client for Qdrant vector DB | Official Qdrant JS SDK. Qdrant is already running in Docker (coding-qdrant, ports 6333/6334). No client is currently installed -- the existing `embedding_generator.py` generates vectors but nothing pushes them to Qdrant. REST client over gRPC because the existing Docker setup exposes port 6333 (REST) and the JS REST client has better TypeScript types than the gRPC alternative. |
 
-### Supporting Libraries
+**Integration point:** Connect to `http://qdrant:6333` inside Docker (env var `QDRANT_URL` already set in docker-compose.yml). From host, `http://localhost:6333`.
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `better-sqlite3` | ^11.x | Direct SQLite access for LSL batch converter | For reading OpenCode's SQLite transcript DB during batch conversion. Transitive dependency of libsql -- may already be available. |
+**Collection schema:** Use ONE collection named `knowledge` with 384-dim Cosine vectors and payload-based filtering for knowledge tiers. Payload fields: `tier` (observation/digest/insight/entity), `agent`, `project`, `createdAt`, `quality`. Single collection is simpler to query across tiers and Qdrant handles mixed-tier searches efficiently with payload indexes.
 
-### Development Tools
+### 2. Embedding Model (Vector Generation)
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `mastracode` (global) | TUI coding agent | `npm install -g mastracode`. Requires Node.js >= 22.13.0. Project uses Node 25.x -- compatible. |
-| `opencode` (Go binary) | Existing OpenCode agent | ALREADY INSTALLED. Plugin configured via `.opencode/mastra.json`. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `fastembed` | ^2.1.0 | Local ONNX-based embedding generation in Node.js | Replaces the existing Python `embedding_generator.py` (sentence-transformers, spawned as subprocess). Same model quality (supports `all-MiniLM-L6-v2`, 384-dim) but runs natively in Node.js via ONNX Runtime -- no Python dependency, no subprocess spawn overhead, no numpy/torch install issues in Docker. Built by Qdrant team, designed to pair with their vector DB. |
+
+**Why not keep the Python embedding generator:**
+- Current `embedding_generator.py` requires `sentence-transformers` + `numpy` + `torch` in Docker -- these were never successfully installed (noted in MEMORY.md as "non-fatal error")
+- Subprocess spawning adds ~2-5s cold start per batch
+- fastembed-js uses ONNX Runtime (C++ backend), runs in-process, no Python needed
+
+**Why not `@xenova/transformers` (now `@huggingface/transformers`):**
+- General-purpose ML library, much larger dependency surface
+- fastembed is purpose-built for embeddings, smaller footprint, same model support
+- fastembed is maintained by Qdrant team -- guaranteed compatibility with Qdrant vector format
+
+**Model choice:** `BAAI/bge-small-en-v1.5` (default in fastembed, 384-dim). Top of MTEB leaderboard for its size class. Compatible with existing `EmbeddingCache` (already expects 384-dim vectors). Alternatively `all-MiniLM-L6-v2` to match existing Python generator -- same dimensionality, slightly lower quality.
+
+### 3. HTTP Retrieval Service (Lightweight Server)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `express` | ^4.21.0 | HTTP server for retrieval endpoint | **Already installed** in mcp-server-semantic-analysis. The SSE server (`sse-server.ts`) already runs Express on port 3848. Add retrieval routes to the EXISTING Express app rather than spinning up a new service. Zero new dependencies. |
+
+**Architecture decision: Extend existing Express app, do NOT create a new service.**
+
+The SSE server at port 3848 already handles health checks, workflow SSE events, and MCP transport. Adding `/api/retrieve` and `/api/embed` routes is trivial and avoids another port to manage, another process in supervisord, another Docker port mapping, and another health check endpoint.
+
+Routes to add to `sse-server.ts`:
+- `POST /api/retrieve` -- Query text in, ranked knowledge chunks out
+- `POST /api/embed` -- Text in, embed and store in Qdrant
+- `GET /api/retrieve/health` -- Retrieval subsystem health
+
+**Why not Fastify, Hono, or a separate microservice:**
+- Express is already a dependency and running. Adding Fastify means two HTTP frameworks in one process.
+- A separate microservice adds Docker complexity for a single-developer project with ~700 knowledge items total.
+- The retrieval endpoint is lightweight (query Qdrant, format results, return JSON) -- not compute-heavy enough to justify isolation.
+
+### 4. Token Counting / Context Budget
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `gpt-tokenizer` | ^3.4.0 | Fast token counting for context window budgeting | Pure JS, zero native dependencies, synchronous API. Fastest tokenizer on npm (benchmarked). Supports cl100k_base encoding which gives a close-enough approximation for Claude's tokenizer (~5-10% variance). For context budgeting, exact counts are unnecessary -- we need "will this fit in 10K tokens?" not "exactly 9,847 tokens." |
+
+**Why not `@anthropic-ai/sdk` countTokens:**
+- Requires an API call to Anthropic's server -- adds latency (100-300ms) to every injection decision
+- The retrieval hook fires on every prompt submission -- must be fast (<50ms)
+- gpt-tokenizer runs locally, ~1ms for typical text
+
+**Why not `js-tiktoken`:**
+- gpt-tokenizer is a superset with better DX (synchronous API, `encodeChat`, smaller bundle)
+- js-tiktoken requires WASM initialization step
+
+**Why not exact Claude token counting:**
+- Context budgeting is fuzzy by nature -- we are deciding "inject top-K results that fit in N tokens"
+- A 5-10% approximation error means injecting one fewer/more observation -- acceptable
+- If exact counts become necessary later, add a calibration step that compares gpt-tokenizer output to Anthropic API counts and applies a multiplier
+
+**Budget strategy by agent:**
+- Claude Code: 8,000 tokens (200K context window, inject up to 8K)
+- Note: Claude hook stdout is capped at 10,000 characters (~2,500 tokens) -- this is the hard ceiling
+- Copilot: 4,000 tokens (instructions are more constrained)
+- OpenCode: 6,000 tokens (moderate context)
+- Mastra: 8,000 tokens (has OM built-in, generous budget)
+
+### 5. Agent Adapter Mechanisms (No New Dependencies)
+
+Each agent has a different injection mechanism. None require new npm packages.
+
+| Agent | Mechanism | How It Works | New Code Needed |
+|-------|-----------|--------------|-----------------|
+| **Claude Code** | `UserPromptSubmit` hook | Hook script calls retrieval API, writes to stdout (injected as context). Existing `pre-prompt-hook-wrapper.js` pattern. Claude Code caps hook output at 10,000 chars. | New hook script: `knowledge-injection-hook.js` |
+| **GitHub Copilot** | `.github/copilot-instructions.md` | Script regenerates this file periodically with top-K relevant knowledge items based on recent file changes. Static file, refreshed by daemon. | Extend `generate-agent-instructions.sh` or new daemon script |
+| **OpenCode** | `.opencode/agents/*.md` or context plugin | Agent markdown files in `.opencode/agents/` inject system prompt. Create a `knowledge.md` agent with dynamic context. Or use `@opencode-ai/plugin` (already installed at v1.3.17) to intercept chat turns. | New agent file or plugin hook |
+| **Mastra** | OM built-in + MCP tool | Mastra has observational memory natively. Expose retrieval as MCP tool so mastracode can call it explicitly. | MCP tool registration in existing server |
+
+**Claude Code hook details:**
+The hook reads the user prompt from stdin (JSON), POSTs prompt text to `http://localhost:3848/api/retrieve`, receives ranked knowledge chunks, formats as structured context block, and writes to stdout. Claude sees this as additional context. Total budget: 10,000 chars (Claude Code hook limit).
+
+**Key constraint:** Claude Code hook stdout is capped at 10,000 characters. At ~4 chars/token, that is roughly 2,500 tokens of injectable context. This is the hard ceiling for Claude injection. The retrieval service must respect this limit.
 
 ## What Already Exists (DO NOT ADD)
 
-These are already in the project and must NOT be re-added or replaced:
-
-| Existing | Where | Covers |
+| Existing | Where | Status |
 |----------|-------|--------|
-| `graphology` ^0.25.4 | mcp-server-semantic-analysis | Knowledge graph storage -- observations feed INTO this, not replaced by it |
-| `level` ^10.0.0 | mcp-server-semantic-analysis | LevelDB persistence for KG entities |
-| `@anthropic-ai/sdk` ^0.57.0 | mcp-server-semantic-analysis | LLM calls -- use for batch observation conversion too |
-| `openai` ^4.52.0 | mcp-server-semantic-analysis | Alternative LLM provider |
-| `zod` ^4.3.6 | mcp-server-semantic-analysis | Runtime validation (already added in v3.0) |
-| `enhanced-transcript-monitor.js` | scripts/ | LSL live logging pipeline -- extend with observation stage, don't replace |
-| `StreamingTranscriptReader` | src/live-logging/ | Reads Claude JSONL, Copilot events, OpenCode SQLite |
-| `AdaptiveExchangeExtractor` | src/live-logging/ | Exchange boundary detection |
-| `SemanticAnalyzer` | src/live-logging/ | 5-layer classification |
-| Agent adapter scripts | config/agents/*.sh | claude.sh, copilot.sh, opencode.sh -- add mastra.sh |
+| `express` ^4.21.0 | mcp-server-semantic-analysis | Running on port 3848 |
+| `EmbeddingCache` | `src/utils/embedding-cache.ts` | Disk-backed cache for 384-dim vectors, 7-day TTL |
+| `embedding_generator.py` | `src/utils/` | Python subprocess -- REPLACE with fastembed |
+| `better-sqlite3` ^11.x | observation store | SQLite with 558 observations, 132 digests |
+| `@anthropic-ai/sdk` ^0.57.0 | LLM calls | Keep for analysis pipeline, NOT for token counting |
+| Qdrant Docker container | docker-compose.yml | Running, ports 6333/6334 exposed, volume-persisted |
+| `.github/copilot-instructions.md` | repo root | Auto-generated from CLAUDE.md by existing script |
+| `.opencode/` with `@opencode-ai/plugin` | repo root | Plugin v1.3.17 installed |
+| Hook infrastructure | `.claude/settings.local.json` | UserPromptSubmit + PreToolUse hooks wired |
 
 ## Installation
 
 ```bash
-# Mastra packages (in mcp-server-semantic-analysis or a new observations submodule)
-npm install @mastra/memory@^1.6.1 @mastra/core@^1.10.0 @mastra/libsql@^0.16.4
+cd integrations/mcp-server-semantic-analysis
 
-# Mastracode -- install globally (TUI coding agent)
-npm install -g mastracode@^0.9.2
+# New dependencies (3 packages)
+npm install @qdrant/js-client-rest@^1.17.0 fastembed@^2.1.0 gpt-tokenizer@^3.4.0
 
-# @mastra/opencode plugin -- check npm availability first
-npm view @mastra/opencode version 2>/dev/null && npm install @mastra/opencode@latest
-# If not on npm, build from mastra monorepo (packages/opencode)
+# Verify versions
+npm ls @qdrant/js-client-rest fastembed gpt-tokenizer
 ```
 
-## Key API Surface
+**Docker note:** fastembed downloads ONNX model files (~25MB for bge-small-en-v1.5) on first use. In Docker, cache these in a volume or pre-download during build to avoid cold-start delay. Add to Dockerfile:
 
-### Standalone observe() -- for LSL-to-observations converter
-
-This is the critical API for the batch converter and live observation pipeline. It allows feeding external messages into the OM engine without using a Mastra Agent wrapper.
-
-```typescript
-import { ObservationalMemory, ModelByInputTokens } from '@mastra/memory';
-import { LibSQLStore } from '@mastra/libsql';
-
-const storage = new LibSQLStore({ url: 'file:.data/observations.db' });
-
-const om = new ObservationalMemory({
-  storage,
-  model: 'anthropic/claude-sonnet-4-20250514',
-  options: {
-    messageTokens: 30_000,      // trigger observation when messages exceed this
-    observationTokens: 40_000,  // trigger reflection when observations exceed this
-    bufferTokens: 0.2,          // keep 20% buffer ratio
-    blockAfter: 1.2,            // safety multiplier
-  },
-});
-
-// Standalone observe -- feed transcript messages directly
-await om.observe({
-  threadId: 'lsl-session-2026-03-28-0600',
-  resourceId: 'coding-project',
-  messages: convertedMessages,  // MastraDBMessage[] format
-  hooks: {
-    onObservationStart: () => { /* progress indicator */ },
-    onObservationEnd: (obs) => { /* bridge observations to KG */ },
-    onReflectionStart: () => { /* log */ },
-    onReflectionEnd: (ref) => { /* bridge reflections to KG */ },
-  },
-});
+```dockerfile
+# Pre-download embedding model during build
+RUN node -e "const { EmbeddingModel } = require('fastembed'); new EmbeddingModel({ model: 'BAAI/bge-small-en-v1.5' })"
 ```
-
-### Cost-Optimized Model Routing for Batch Processing
-
-```typescript
-import { ModelByInputTokens } from '@mastra/memory';
-
-const om = new ObservationalMemory({
-  storage,
-  options: {
-    observationalMemory: {
-      observation: {
-        model: new ModelByInputTokens({
-          upTo: {
-            5_000: 'anthropic/claude-haiku-3',        // small exchanges
-            20_000: 'anthropic/claude-sonnet-4-20250514',     // medium sessions
-            100_000: 'google/gemini-2.5-flash',       // large sessions (cost-effective)
-          },
-        }),
-      },
-    },
-  },
-});
-```
-
-### OpenCode Plugin Configuration
-
-```json
-// .opencode/mastra.json
-{
-  "model": "anthropic/claude-sonnet-4-20250514",
-  "scope": "thread"
-}
-```
-
-The plugin uses lazy credential resolution from OpenCode's provider store -- no hardcoded API keys needed.
-
-### Mastracode MCP Configuration
-
-```json
-// .mastracode/mcp.json
-{
-  "coding-services": {
-    "type": "stdio",
-    "command": "node",
-    "args": ["integrations/mcp-server-semantic-analysis/dist/index.js"]
-  }
-}
-```
-
-### New Agent Adapter: config/agents/mastra.sh
-
-```bash
-AGENT_NAME="mastra"
-AGENT_DISPLAY_NAME="Mastra Code"
-AGENT_COMMAND="mastracode"
-AGENT_SESSION_PREFIX="mastra"
-AGENT_SESSION_VAR="MASTRA_SESSION_ID"
-AGENT_TRANSCRIPT_FMT="mastra"  # new format -- LibSQL-based
-AGENT_ENABLE_PIPE_CAPTURE=true
-AGENT_REQUIRES_COMMANDS="mastracode"
-```
-
-Key environment variables for mastracode:
-- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` -- for API key auth
-- Or use `/login` in mastracode for OAuth with Claude Max / ChatGPT Plus
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `@mastra/libsql` (SQLite local) | `@mastra/pg` (PostgreSQL) | When sharing observations across multiple machines. Not needed for single-developer setup. |
-| `@mastra/memory` standalone observe() | Full Mastra Agent wrapper | When you want complete agent lifecycle (generate + observe in one call). We don't -- existing agent infrastructure handles generation. |
-| mastracode global install | npx mastracode | For one-off testing. Global install avoids npx startup delay for `coding --mastra`. |
-| LibSQL file storage for observations | Direct Graphology/LevelDB writes | When bypassing Mastra storage entirely. NOT recommended -- let Mastra manage observation lifecycle, bridge to KG via hooks. |
-| Text-based OM | Vector store RAG for memory | OM outperforms RAG on LongMemEval (95% vs lower). Add vector retrieval later as optional enhancement (`retrieval: { vector: true }`). |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Embedding | `fastembed` (JS, ONNX) | Keep `embedding_generator.py` (Python) | Python deps never installed successfully in Docker; subprocess overhead |
+| Embedding | `fastembed` | `@huggingface/transformers` | Larger footprint, general-purpose; fastembed is embedding-specific |
+| Embedding | `fastembed` | OpenAI embeddings API | Adds API dependency, latency, cost; local is free and fast |
+| HTTP server | Extend existing Express | New Fastify service | Two frameworks in one process; separate service adds Docker complexity |
+| HTTP server | Extend existing Express | Standalone Hono microservice | Over-engineering for ~700 knowledge items |
+| Token counting | `gpt-tokenizer` | `@anthropic-ai/sdk` countTokens | API call latency (100-300ms) unacceptable for per-prompt hook |
+| Token counting | `gpt-tokenizer` | `js-tiktoken` | WASM init step, worse DX, gpt-tokenizer is faster |
+| Token counting | `gpt-tokenizer` | Character-based estimation | Too inaccurate (3-5x variance); token counting is cheap enough to do properly |
+| Qdrant client | `@qdrant/js-client-rest` | Raw HTTP via `axios` | SDK provides TypeScript types, retry logic, proper error handling |
+| Qdrant client | `@qdrant/js-client-rest` | `@qdrant/qdrant-js` (gRPC) | REST is simpler, gRPC adds protobuf deps, REST port already exposed |
+| Claude injection | UserPromptSubmit hook | MCP tool | Hooks are automatic (every prompt); MCP tools require explicit invocation |
+| Copilot injection | Static `.md` file refresh | VS Code extension | Extension development is out of scope; static file works with existing infra |
 
-## What NOT to Use
+## What NOT to Add
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `@mastra/pg` | Adds PostgreSQL dependency to a local-first project. Unnecessary complexity for single-developer use. | `@mastra/libsql` -- zero-config SQLite |
-| `@mastra/mem0` | Separate memory system, not integrated with OM. Would create two competing memory layers. | `@mastra/memory` OM |
-| Vector store as primary memory | OM's text-based compression outperforms RAG on LongMemEval. Vector search is optional enhancement, not primary. | Text-based OM, add `retrieval: { vector: true }` later |
-| Custom memory compression | Mastra's Observer/Reflector is battle-tested (95% LongMemEval). Rolling your own would take months for inferior results. | `@mastra/memory` standalone observe() |
-| Replacing enhanced-transcript-monitor.js | Working system with 5-layer classification, exchange extraction, 3 transcript sources. Proven reliable. | Extend it: add observation output stage that feeds exchanges into `om.observe()` |
-| pi-tui/pi-mono directly | Low-level TUI framework. mastracode wraps it with OM, thread management, MCP support. | `mastracode` package which includes pi-tui |
+| `langchain` / `llamaindex` | Massive dependency trees, abstract away Qdrant/embedding details that we need to control directly | Direct Qdrant client + fastembed |
+| `chromadb` / `weaviate` client | Qdrant is already running in Docker with volume persistence | `@qdrant/js-client-rest` |
+| `@mastra/rag` or `@mastra/vector-store` | Adds Mastra framework dependency for a simple retrieve-and-format operation | Direct Qdrant queries |
+| OpenAI/Anthropic embedding APIs | Cost per call, latency, network dependency for a local-first project | `fastembed` local inference |
+| Separate retrieval microservice | Over-engineering; 700 items, single developer, Docker already has enough services | Routes on existing Express app |
+| `redis` for caching retrieval results | Already have `EmbeddingCache` on disk; retrieval is fast enough without caching | Direct Qdrant queries (sub-10ms for 1K vectors) |
+| Custom tokenizer trained on Claude data | Approximate counting is fine for budget decisions; training a tokenizer is weeks of work | `gpt-tokenizer` with cl100k_base |
 
-## Stack Patterns by Variant
+## Data Flow Summary
 
-**For live observation (coding --opencode with mastra plugin):**
-- Install `@mastra/opencode` plugin
-- Configure via `.opencode/mastra.json`
-- Observations happen automatically during OpenCode sessions
-- Existing LSL logging continues in parallel (defense in depth)
-
-**For live observation (coding --mastra):**
-- `mastracode` has OM built-in (LibSQL + auto-observe)
-- Create `config/agents/mastra.sh` adapter
-- MCP servers configured via `.mastracode/mcp.json`
-- LSL support via tmux pipe capture (same pattern as other agents)
-- Mastracode stores threads locally in LibSQL -- bridge to KG periodically
-
-**For batch conversion (historical LSL to observations):**
-- Use `@mastra/memory` standalone observe() API
-- Build converter: read LSL markdown files -> parse exchanges -> convert to MastraDBMessage[] -> feed to om.observe()
-- Three converter paths needed: Claude JSONL, Copilot events.jsonl, OpenCode SQLite
-- Bridge observation results into Graphology KG via onObservationEnd hook
-- Use ModelByInputTokens for cost control on large batch runs
-
-**For live LSL refactoring (observations alongside verbatim):**
-- Extend enhanced-transcript-monitor.js with observation output stage
-- After exchange extraction + classification, feed to om.observe()
-- Keep verbatim LSL output as fallback/audit trail (never remove)
-- Observations stored in LibSQL; periodically synced to KG
-
-## Architecture Integration Points
-
-```
-                     LIVE PATH                          BATCH PATH
-                     --------                           ----------
-  coding --opencode                                  .specstory/history/*.md
-       |                                                    |
-  @mastra/opencode plugin                     LSL batch converter (new script)
-       |                                                    |
-  auto-observe during session               parse exchanges -> MastraDBMessage[]
-       |                                                    |
-       v                                                    v
-  @mastra/memory observe()  <---------- standalone observe() API
-       |                                                    |
-  Observer agent (compress)                    Observer agent (compress)
-       |                                                    |
-  Reflector agent (condense)                   Reflector agent (condense)
-       |                                                    |
-  LibSQL storage (.data/observations.db)       LibSQL storage
-       |                                                    |
-  onObservationEnd hook  -----> Bridge to Graphology KG <-----
-                                        |
-                                  Existing VKB viewer
-                                  Existing wave-analysis pipeline
-```
+Knowledge tiers (558 observations, 132 digests, 12 insights, 160 KG entities) flow through fastembed (bge-small-en-v1.5, 384d) into the EmbeddingCache (disk, 7d TTL), then upsert into Qdrant's `knowledge` collection. On retrieval, user prompts are embedded via fastembed, searched against Qdrant (cosine similarity), ranked results are token-budgeted via gpt-tokenizer, then formatted per agent: Claude gets hook stdout, Copilot gets regenerated `.md` file, OpenCode gets agent/plugin context, Mastra gets MCP tool results.
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `@mastra/memory@^1.6.1` | `@mastra/core@^1.10.0` | Same monorepo, versions move in lockstep. Pin to same minor range. |
-| `@mastra/libsql@^0.16.4` | `@mastra/memory@^1.6.1` | Storage adapter interface stable since 1.0. |
-| `mastracode@^0.9.2` | Node.js >= 22.13.0 | Project uses Node 25.x -- compatible. Pre-1.0 so expect breaking changes between minor versions. |
-| `@mastra/opencode` | OpenCode 0.x (Go binary) | Plugin interface may change. Pin to exact version when available. |
-| `@mastra/memory` | Existing `@anthropic-ai/sdk@^0.57.0` | No conflict -- Mastra uses its own model routing layer. The SDK is only used by our existing pipeline. |
-| `@mastra/libsql` | Existing `level@^10.0.0` | No conflict -- separate storage for observations (LibSQL) vs KG entities (LevelDB). |
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `@qdrant/js-client-rest@^1.17.0` | Qdrant Docker image `latest` | Client auto-checks server compatibility. Pin Qdrant image to a specific version in production. |
+| `fastembed@^2.1.0` | Node.js 25.x | Uses ONNX Runtime native addon. Tested on macOS ARM64 + Linux x64. |
+| `fastembed@^2.1.0` | Existing `EmbeddingCache` | Both use 384-dim vectors. Cache hash-based invalidation works regardless of embedding source. |
+| `gpt-tokenizer@^3.4.0` | Node.js 25.x | Pure JS, no native deps, universal compatibility. |
+| All three | Docker Alpine/Debian | fastembed needs glibc (not musl) -- use Debian-based Node image, not Alpine. Check existing Dockerfile base image. |
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| @mastra/memory API + versions | HIGH | npm registry verified, official docs comprehensive |
-| @mastra/libsql as storage | HIGH | npm verified, default storage for mastracode, well-documented |
-| mastracode installation + requirements | HIGH | npm 0.9.2 verified, Node >= 22.13.0 confirmed from code.mastra.ai |
-| Standalone observe() API | MEDIUM | Confirmed in PR #12925 + changelog (v1.4.0), but limited standalone documentation |
-| @mastra/opencode plugin availability | LOW | PR merged but npm publication status unclear. May need monorepo build. |
-| OpenCode plugin config (.opencode/mastra.json) | LOW | Inferred from PR description. Format needs runtime validation. |
-| Mastracode MCP config (.mastracode/mcp.json) | MEDIUM | Documented on code.mastra.ai, stdio + HTTP transport confirmed |
-| MastraDBMessage format for converter | MEDIUM | Referenced in PR but exact type shape needs Context7 or source inspection |
+| `@qdrant/js-client-rest` API | HIGH | Context7 docs verified, npm v1.17.0 confirmed, TypeScript types checked |
+| `fastembed` JS capabilities | HIGH | npm v2.1.0 verified, supports bge-small-en-v1.5 and all-MiniLM-L6-v2 |
+| `gpt-tokenizer` accuracy for Claude | MEDIUM | cl100k_base is GPT-4 tokenizer, not Claude's; ~5-10% variance expected. Acceptable for budgeting. |
+| Claude hook injection mechanism | HIGH | Verified from official docs + existing working hook in project |
+| Claude hook 10K char limit | HIGH | Documented in official Claude Code hooks reference |
+| Copilot `.md` injection | HIGH | Official GitHub docs, existing auto-generated file in project |
+| OpenCode plugin injection | MEDIUM | `@opencode-ai/plugin` v1.3.17 installed but plugin API surface needs runtime validation |
+| Mastra MCP tool injection | HIGH | MCP server infrastructure already exists, tool registration is standard |
+| fastembed Docker compatibility | MEDIUM | Needs glibc (Debian), not Alpine. Must verify existing Dockerfile base image. |
 
 ## Sources
 
-- [Observational Memory Docs](https://mastra.ai/docs/memory/observational-memory) -- API, thresholds, storage backends, code examples (HIGH confidence)
-- [Memory Overview](https://mastra.ai/docs/memory/overview) -- Package requirements, quickstart (HIGH confidence)
-- [OM Research Paper](https://mastra.ai/research/observational-memory) -- 95% LongMemEval benchmark (HIGH confidence)
-- [Announcing Mastra Code](https://mastra.ai/blog/announcing-mastra-code) -- Architecture, pi-tui, LibSQL storage, Node >= 22.13.0 (MEDIUM confidence)
-- [PR #12925: @mastra/opencode plugin + standalone observe()](https://github.com/mastra-ai/mastra/pull/12925) -- Plugin API, hooks, observe() standalone (MEDIUM confidence)
-- [Mastra Code site](https://code.mastra.ai/) -- Installation, configuration capabilities (MEDIUM confidence)
-- [mastracode npm](https://www.npmjs.com/package/mastracode) -- Version 0.9.2 verified (HIGH confidence)
-- [@mastra/memory npm](https://www.npmjs.com/package/@mastra/memory) -- Version 1.6.1 verified (HIGH confidence)
-- [@mastra/core npm](https://www.npmjs.com/package/@mastra/core) -- Version 1.10.0 verified (HIGH confidence)
-- [@mastra/libsql npm](https://www.npmjs.com/package/@mastra/libsql) -- Version 0.16.4 verified (HIGH confidence)
-- [Mastra Changelog 2026-03-23](https://mastra.ai/blog/changelog-2026-03-23) -- Recent updates (MEDIUM confidence)
+- [@qdrant/js-client-rest npm](https://www.npmjs.com/package/@qdrant/js-client-rest) -- v1.17.0 verified (HIGH)
+- [Qdrant JS SDK docs via Context7](https://context7.com/qdrant/qdrant-js) -- TypeScript API, collection creation, search (HIGH)
+- [fastembed npm](https://www.npmjs.com/package/fastembed) -- v2.1.0 verified, model list (HIGH)
+- [fastembed-js GitHub](https://github.com/Anush008/fastembed-js) -- ONNX Runtime, batch support (HIGH)
+- [gpt-tokenizer npm](https://www.npmjs.com/package/gpt-tokenizer) -- v3.4.0 verified (HIGH)
+- [Token counting guide](https://www.propelcode.ai/blog/token-counting-tiktoken-anthropic-gemini-guide-2025) -- Anthropic tokenizer differences (MEDIUM)
+- [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) -- UserPromptSubmit, stdout injection, 10K char limit (HIGH)
+- [GitHub Copilot custom instructions](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot) -- `.github/copilot-instructions.md` (HIGH)
+- [OpenCode config docs](https://opencode.ai/docs/config/) -- Agent files, plugin system (MEDIUM)
+- [OpenCode context management](https://tuts.alexmercedcoder.dev/2026/2026-03-ctx-10-context-management-strategies-for-opencode-a-complete-guide/) -- Context injection patterns (MEDIUM)
 
 ---
-*Stack research for: Mastra.ai integration with coding infrastructure (v4.0)*
-*Researched: 2026-03-28*
+*Stack research for: Knowledge Context Injection Pipeline (v6.0)*
+*Researched: 2026-04-24*

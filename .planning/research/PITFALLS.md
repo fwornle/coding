@@ -1,257 +1,348 @@
-# Pitfalls Research
+# Domain Pitfalls: Knowledge Context Injection
 
-**Domain:** Mastra.ai integration into existing coding agent infrastructure (LSL, multi-agent, Docker services)
-**Researched:** 2026-03-28
-**Confidence:** MEDIUM-HIGH (combination of verified mastra docs, existing codebase analysis, and known TUI/tmux issues)
+**Domain:** Automated knowledge retrieval and injection into multi-agent coding conversations
+**Researched:** 2026-04-24
+**Confidence:** HIGH (verified via Claude Code hooks docs, Chroma context rot research, Qdrant production patterns, existing codebase analysis)
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Dual Storage Backend Divergence (Mastra Memory vs Graphology/LevelDB)
+Mistakes that cause rewrites, user frustration, or silent quality degradation.
+
+### Pitfall 1: Context Rot from Semantically Similar but Irrelevant Results
 
 **What goes wrong:**
-Mastra's observational memory requires one of three storage backends: `@mastra/pg`, `@mastra/libsql`, or `@mastra/mongodb`. The existing coding system uses Graphology + LevelDB for its knowledge graph. Adding mastra memory creates two parallel persistence layers that can drift out of sync, with observations in mastra's store and entities in Graphology having no referential integrity.
+Qdrant returns knowledge chunks that are semantically close to the query but factually irrelevant to the current task. For example, querying "Docker build timeout" retrieves observations about Docker networking, Docker volumes, and Docker compose syntax -- all semantically adjacent but useless for the specific problem. The LLM treats these as authoritative context and produces worse answers than it would with no injection at all.
 
 **Why it happens:**
-Mastra's storage is purpose-built for its thread/observation model and cannot use arbitrary backends. Developers naturally add mastra's storage alongside the existing one, intending to "bridge them later," but the bridge never gets built or breaks silently.
+Chroma's 2025 research across 18 major LLMs found that semantically similar but irrelevant content actively misleads models -- the degradation is worse than simply adding random filler tokens. Embedding similarity conflates topical relatedness with task relevance. The existing 558 observations span many overlapping topics (Docker, LSL, knowledge graph, agents) that share vocabulary and concepts.
 
-**How to avoid:**
-Use `@mastra/libsql` with a local file (e.g., `.data/mastra-memory/observations.db`) for mastra's storage -- it requires no additional server process and sits alongside the existing LevelDB. Define a clear boundary: mastra owns observations/reflections, the existing pipeline owns knowledge entities. Build a one-directional feed where mastra observations become inputs to the UKB wave-analysis pipeline, not bidirectional sync.
+**Consequences:**
+- Agent responses become confidently wrong, citing injected context as justification
+- Users lose trust in the system and disable injection
+- Debugging becomes harder because the error source (bad retrieval) is invisible in the conversation
 
 **Warning signs:**
-- Observations exist in mastra storage but never appear in the knowledge graph
-- UKB pipeline produces entities that contradict mastra's observations
-- Two different "memory status" endpoints with no shared view
+- Agent references knowledge that seems tangentially related but misses the point
+- Retrieval returns 5+ results from the same topic cluster with no diversity
+- User manually corrects the agent about something the injected context "told" it
 
-**Phase to address:**
-Phase 1 (foundation) -- storage architecture must be decided before any integration code is written.
+**Prevention:**
+1. Use hybrid retrieval: combine vector similarity with keyword/BM25 matching and recency weighting. Pure semantic search alone is insufficient.
+2. Set a hard similarity threshold (start at 0.75, tune empirically) -- return fewer results rather than padding with marginal matches.
+3. Implement result diversity: if top-5 results all come from the same entity/digest cluster, deduplicate to top-1 from that cluster and fill remaining slots from other clusters.
+4. Add a "relevance gate": after retrieval, run a fast scoring pass (keyword overlap between query and result) to filter out topically adjacent but task-irrelevant results.
+
+**Detection:**
+Log every retrieval alongside the query. Periodically sample 20 query-result pairs and manually score relevance (1-5). If average drops below 3.5, the retrieval pipeline needs tuning.
+
+**Phase to address:** Phase 1 (embedding pipeline) and Phase 2 (retrieval service). The embedding model and similarity threshold choices in Phase 1 directly determine retrieval quality in Phase 2.
 
 ---
 
-### Pitfall 2: LSL Verbatim-to-Observation Conversion Loses Actionable Detail
+### Pitfall 2: Token Budget Overshoot Degrades Agent Performance
 
 **What goes wrong:**
-Mastra's observer compresses messages at 5-40x ratios. When converting existing verbatim LSL transcripts (Claude JSONL, Copilot events.jsonl, OpenCode SQLite) to observations, the compression discards tool call details, file paths, error messages, and exact code snippets that the existing pipeline relies on for knowledge extraction. The UKB wave-analysis pipeline, which currently reads raw transcripts, silently produces shallower entities.
+Injecting 2K tokens of knowledge context sounds small, but it compounds with existing context: CLAUDE.md (~4K), MEMORY.md (~6K), system prompts, conversation history, and tool results. The injected knowledge lands in the prompt's "middle zone" where LLM attention is weakest. Research shows LLMs pay most attention to the beginning and end of input, with significant drop-off in the middle. Injected context gets buried and ignored -- or worse, confuses the model.
 
 **Why it happens:**
-Mastra's observer is optimized for conversational memory -- retaining decisions and key events -- not for code-level forensics. The existing pipeline extracts patterns from exact tool invocations and error traces. These details look "redundant" to the observer but are load-bearing for downstream analysis.
+The 2K budget was set in isolation without accounting for what else occupies the context window. Claude Code's UserPromptSubmit hook cap is 10,000 characters (~2,500 tokens), which tempts implementers to use the full budget. Additionally, different knowledge tiers (observations, digests, insights, KG entities) have different information densities -- 2K tokens of raw observations is far less useful than 2K tokens of curated digests.
 
-**How to avoid:**
-Never replace verbatim LSL with observations as a wholesale swap. Run observations in parallel: keep verbatim logs for the UKB pipeline and generate observations as a separate enrichment layer. For the batch converter (historical .specstory files), produce observations that supplement the original files rather than replacing them. Tag observations with source transcript references so the original can be retrieved.
+**Consequences:**
+- Agent ignores injected context entirely (wasted computation, no harm)
+- Agent gets confused by contradictory or redundant injected snippets
+- Performance degrades unpredictably -- some queries work fine, others break
 
 **Warning signs:**
-- Knowledge entities after conversion have fewer observations than before
-- Pattern extraction misses tool-use patterns that were previously detected
-- Batch converter output is dramatically smaller than input (expected compression) but downstream quality drops
+- Agent never references injected context in its responses
+- Agent responses become longer and less focused after enabling injection
+- Quality difference between injection-on and injection-off is negligible or negative
 
-**Phase to address:**
-Phase 2 (LSL refactoring) -- the converter must be built with dual-output from day one. Do NOT remove verbatim logging in the same phase as adding observations.
+**Prevention:**
+1. Start at 800-1000 tokens, not 2K. Measure impact before increasing.
+2. Prioritize information density: inject digests and insights first (pre-compressed), raw observations only as fallback.
+3. Place injected context at the top of the prompt (via `systemMessage` in hook output, not `additionalContext`) to avoid the "lost in the middle" problem.
+4. Structure as a labeled block: `## Relevant Project Knowledge\n- [item]\n- [item]` -- structured lists outperform prose dumps.
+5. Include a one-line instruction: "Use the following knowledge only if directly relevant to the current task. Ignore if not applicable."
+
+**Detection:**
+A/B test: run 20 identical prompts with and without injection. If injection-on produces equal or worse results, the budget is too high or retrieval quality is poor.
+
+**Phase to address:** Phase 2 (retrieval service) -- the token budget and formatting must be tuned during retrieval service design, not after agent integration.
 
 ---
 
-### Pitfall 3: Mastra Observer Blocks Conversation During Synchronous Observation
+### Pitfall 3: Hook Latency Makes Claude Code Unusable
 
 **What goes wrong:**
-When unobserved messages hit the token threshold (default 30,000 tokens), the observer compresses them synchronously, blocking the agent conversation. For coding sessions with large tool outputs (file reads, test results, build logs), this threshold is hit quickly and the pause can last 10-30 seconds. Users experience the agent "freezing" mid-conversation.
+The UserPromptSubmit hook runs synchronously before Claude processes the prompt. If the hook calls a retrieval service that queries Qdrant, generates an embedding for the query, and formats results, latency easily reaches 2-5 seconds. This adds a noticeable pause to every single prompt submission. At 95 hooks (as documented in one production setup), cumulative latency reached 18-21 seconds per prompt.
 
 **Why it happens:**
-Mastra shipped async buffering in Feb 2026, but it has known issues: in subagent contexts the async buffer reportedly still blocks, and in resource scope async buffering is automatically disabled. The default configuration runs synchronous observation.
+The hook spawns a new process for each invocation. That process must: (1) parse the prompt, (2) call an embedding API to vectorize the query, (3) query Qdrant, (4) format and rank results, (5) output JSON. Steps 2-3 involve network calls with cold-start overhead. Even with a local Qdrant, embedding generation requires an API call unless using a local model.
 
-**How to avoid:**
-Configure async buffering explicitly with conservative thresholds. For coding sessions (which are tool-heavy and generate large outputs), raise `messageTokens` to 50,000-60,000 and set `bufferTokens` to 0.3 to buffer more aggressively. Test with a real coding session that includes file operations, not just chat. If async buffering shows blocking behavior in the OpenCode plugin context, implement a wrapper that offloads observation to a background Node.js worker thread.
+**Consequences:**
+- Users experience a perceptible delay on every prompt (even when no relevant knowledge exists)
+- Users disable the hook entirely, negating all injection value
+- Claude Code issue #1530 documents this exact failure mode with 11 hooks causing ~20s delays
 
 **Warning signs:**
-- Agent pauses for several seconds after a burst of tool calls
-- Users report the agent "thinking" when they haven't asked a question
-- Dashboard shows observation runs taking >5 seconds
+- Time between pressing Enter and seeing Claude's "thinking" indicator increases
+- Users report Claude Code feels "sluggish" after enabling injection
+- Hook stderr logs show timeout warnings
 
-**Phase to address:**
-Phase 1 (mastra plugin integration) -- must be tuned during initial OpenCode plugin setup, not deferred.
+**Prevention:**
+1. Target sub-500ms total hook execution time. This is the budget for everything: process startup, embedding, retrieval, formatting.
+2. Use a local embedding model (e.g., sentence-transformers running in the Docker container) instead of API calls. Eliminates network latency for query embedding.
+3. Pre-compute a "session query cache": cache the last 10 query embeddings and results. If a new query is similar to a cached one, return cached results instantly.
+4. Make the retrieval service a persistent HTTP server (already running in Docker) rather than spawning a new process per hook invocation. The hook script becomes a simple `curl` call.
+5. Implement a fast-path: if the prompt is short (< 20 chars) or matches a known non-knowledge pattern (e.g., "yes", "continue", "/command"), skip retrieval entirely.
+
+**Detection:**
+Time the hook execution. Log `start` and `end` timestamps in the hook script. Alert if p95 exceeds 500ms.
+
+**Phase to address:** Phase 3 (agent adapters). The retrieval service must be designed as a persistent process in Phase 2, but the latency is experienced and measured during agent integration in Phase 3.
 
 ---
 
-### Pitfall 4: pi-tui Mouse/Keyboard Capture Conflicts with tmux Session Wrapper
+### Pitfall 4: Stale Embeddings Silently Serve Outdated Knowledge
 
 **What goes wrong:**
-Mastracode uses pi-tui for its TUI, which captures mouse events and uses extended keyboard protocols. The existing `coding` launcher runs agents inside tmux via `tmux_session_wrapper`. pi-tui's mouse capture conflicts with tmux's mouse handling -- scroll events get swallowed, copy/paste breaks, and tmux's pipe-pane capture (used for LSL) may receive garbled output or nothing at all from the alternate screen buffer.
+Knowledge evolves -- observations get new digests, entities get updated observations, insights get revised -- but their embeddings in Qdrant remain frozen at the time of initial embedding. The retrieval service returns results based on stale vectors that no longer represent the current knowledge state. Worse, the text payload in Qdrant may also be stale if not updated alongside the embedding.
 
 **Why it happens:**
-TUI frameworks that use the terminal alternate screen buffer (alt-screen) create a separate rendering context that tmux treats differently from the main buffer. When pi-tui requests mouse capture, tmux delivers mouse events to pi-tui instead of processing them as scroll/selection. The `AGENT_ENABLE_PIPE_CAPTURE=true` pattern used by OpenCode expects a simpler text stream, not alt-screen TUI output.
+The existing `EmbeddingCache` has a 7-day TTL, which is reasonable for the UKB batch pipeline but wrong for a live retrieval system. New observations are created per-exchange via ETM, but embedding them requires an explicit pipeline step. The "feedback loop" (auto-embed on creation) is a stated v6.0 goal but is the feature most likely to be deferred or implemented incompletely.
 
-**How to avoid:**
-Do NOT enable `AGENT_ENABLE_PIPE_CAPTURE` for mastracode. Instead, capture mastracode's conversation data through mastra's own observation API -- it already has lifecycle hooks (`onObservationStart`, `onObservationEnd`) that can feed the LSL system. For tmux integration, set `set -g mouse off` in the mastracode tmux session or configure pi-tui to disable mouse capture via env var or config flag (check pi-tui docs for `--no-mouse` or equivalent). Test the full flow: `coding --mastra` in tmux, scroll back, copy text, verify statusline updates.
+**Consequences:**
+- Agent receives outdated knowledge that contradicts recent work
+- User corrected an issue yesterday but the agent still warns about it today
+- Knowledge graph shows correct state, but retrieval returns the pre-correction version
 
 **Warning signs:**
-- Cannot scroll in the tmux pane running mastracode
-- Copy/paste produces garbage or captures TUI control characters
-- LSL pipe-pane capture file is empty or contains ANSI escape sequences instead of text
-- Statusline stops updating because it cannot read mastracode's output
+- Retrieved context references things the user fixed in recent sessions
+- Embedding count in Qdrant diverges from observation/entity count in LibSQL/Graphology
+- `entity-embeddings.json` last-modified date is days old despite active knowledge creation
 
-**Phase to address:**
-Phase 3 (mastracode agent integration) -- must be solved before the agent config (`config/agents/mastra.sh`) is considered complete.
+**Prevention:**
+1. Embed on write, not on read. When ETM creates an observation, immediately queue it for embedding. Use a lightweight async job queue (not the full UKB pipeline).
+2. Store a content hash alongside each Qdrant point. Before serving a result, compare the stored hash against the current knowledge item's hash. If they differ, mark the result as potentially stale and re-embed in background.
+3. Track a `lastEmbeddedAt` timestamp per knowledge item. The retrieval service should log warnings when serving items with embeddings older than 24 hours.
+4. Run a nightly reconciliation job: compare Qdrant point count against source-of-truth counts. Flag discrepancies.
+
+**Detection:**
+Add a `/health` endpoint to the retrieval service that reports: total Qdrant points, total source items, oldest embedding age, items pending re-embedding.
+
+**Phase to address:** Phase 1 (embedding pipeline) must include the embed-on-write mechanism. Phase 4 (feedback loop) formalizes it, but the architecture must support it from day one.
 
 ---
 
-### Pitfall 5: Transcript Format Mismatch -- Three Agent Formats Plus a Fourth
+## Moderate Pitfalls
+
+### Pitfall 5: Agent Format Assumptions Break Cross-Agent Injection
 
 **What goes wrong:**
-The system already handles three transcript formats (Claude JSONL with v1/v2 variants, Copilot events.jsonl, OpenCode SQLite) via `transcript-formats.json` and per-agent `AGENT_TRANSCRIPT_FMT`. Adding mastracode introduces a fourth format (mastra's own observation/thread storage), but the existing transcript-to-observation converter infrastructure assumes it will receive raw transcripts. Mastracode's output is already partially processed by mastra's memory system, creating a double-observation problem where the converter re-summarizes already-summarized content.
+Claude Code expects hook output as JSON with `additionalContext` or plain stdout. Copilot expects context in its system prompt via workspace configuration. OpenCode has its own plugin lifecycle. Mastra has an agent middleware pattern. Building one injection format and shoehorning it into all four agents produces either: (a) format errors that silently drop context, or (b) context that appears but is poorly structured for the specific agent's prompt template.
 
 **Why it happens:**
-The converter pipeline was designed for "raw transcript in, observations out." Mastracode's conversations are already being observed by mastra's built-in memory. Feeding mastracode's conversation data through the same converter pipeline applies observation twice, further compressing already-compressed content and losing the detail that the first observation pass preserved.
+Each agent has fundamentally different injection points:
+- **Claude Code**: UserPromptSubmit hook, 10,000 char cap, JSON or plain text stdout
+- **Copilot**: .github/copilot-instructions.md or VS Code settings, no dynamic per-prompt injection
+- **OpenCode**: Plugin lifecycle hooks (if available in the custom build)
+- **Mastra**: Agent middleware, memory integration, system prompt injection
 
-**How to avoid:**
-For mastracode, skip the transcript-to-observation converter entirely. Instead, tap mastra's observation API directly to extract the observation log and feed it to the UKB pipeline as pre-processed input. The `config/agents/mastra.sh` should set `AGENT_TRANSCRIPT_FMT="mastra-observations"` (a new format type) and the LSL coordinator should recognize this as "already observed, pass through." Add the format definition to `transcript-formats.json` with a flag like `"preObserved": true`.
+The temptation is to build a "universal adapter" that serves one format. But the injection mechanism (hook vs file vs middleware) and timing (per-prompt vs per-session vs static) differ fundamentally.
 
-**Warning signs:**
-- Mastracode observations are much shorter and vaguer than Claude/Copilot observations
-- Knowledge entities from mastracode sessions have fewer details than from other agents
-- Observation count doubles when running the batch converter on mastracode history
+**Prevention:**
+1. Build the retrieval service as agent-agnostic (HTTP API returning JSON). Build agent-specific adapter scripts that format the response for each agent.
+2. Start with Claude Code only (best-defined injection point via hooks). Add other agents in later phases.
+3. For Copilot, accept that injection is session-level (write to a file that Copilot reads), not per-prompt. This is a feature difference, not a bug.
+4. Define a minimal response schema from the retrieval service: `{ items: [{ title, content, relevance, source }], tokenCount, query }`. Each adapter formats `items` appropriately.
 
-**Phase to address:**
-Phase 2 (converters) -- must be designed into the converter architecture, not bolted on after.
+**Phase to address:** Phase 3 (agent adapters). Do NOT attempt a universal adapter in Phase 2.
 
 ---
 
-### Pitfall 6: Observer/Reflector Model Selection Causes Cost Explosion
+### Pitfall 6: Cold Start When Qdrant Is Down or Empty
 
 **What goes wrong:**
-Mastra's observer and reflector are background agents that make LLM calls. With the existing system already using multiple LLM providers (Groq, OpenAI, Anthropic, Google, xAI) tracked via BudgetTracker, adding two more background LLM consumers per active session can silently double the token spend. The observer processes every conversation, and for tool-heavy coding sessions it fires frequently.
+On first run (no embeddings yet), after Docker restart (Qdrant not ready), or during embedding migration (collection recreated), the retrieval service has no data to return. If the hook treats "no results" as an error, it blocks the agent. If it returns empty context, it wastes the hook invocation. If Qdrant is completely unreachable, the hook may hang until timeout (30 seconds by default).
 
 **Why it happens:**
-Mastra defaults to the agent's primary model for observation. If the coding agent uses Claude Opus, the observer also uses Opus at $15/M input tokens to summarize tool outputs that could be handled by a $0.10/M model. The cost is invisible because it happens in background agent calls that don't show up in the main conversation's token count. The existing BudgetTracker in `live-logging-config.json` has no awareness of mastra's internal LLM calls.
+The retrieval service is a new dependency in the critical path of every prompt. Unlike the existing knowledge graph (which is only accessed during UKB batch runs), the retrieval service is accessed on every user interaction. Any downtime directly impacts the user experience.
 
-**How to avoid:**
-Explicitly configure observer and reflector to use cheap, fast models. Use `ModelByInputTokens` to scale: Gemini Flash or GPT-4o-mini for observation, only stepping up to a more capable model for reflection. Add mastra's LLM calls to the BudgetTracker by implementing the lifecycle hooks to report token usage. Set `previousObserverTokens` budget cap (new in March 2026) to prevent observer context from growing unbounded.
+**Consequences:**
+- Agent startup blocked for 30 seconds waiting for Qdrant timeout
+- Users see hook error messages on every prompt until Qdrant is healthy
+- First-time setup requires running the full embedding pipeline before injection works at all
 
-**Warning signs:**
-- API bills spike after enabling mastra integration
-- BudgetTracker shows lower spend than actual provider dashboards
-- Observer context grows to dominate prompt size in long sessions
+**Prevention:**
+1. The hook script must have a sub-1-second timeout for the retrieval call. If the service is unreachable, return exit code 0 with no context (graceful degradation). Never exit code 2 (blocking error).
+2. Implement a circuit breaker: after 3 consecutive failures, stop calling the retrieval service for 60 seconds. This prevents 30-second hangs on every prompt.
+3. Cache the last successful retrieval results in a local file (`~/.cache/coding-knowledge/last-results.json`). Serve from cache when the service is down, with a staleness warning.
+4. On first run (empty Qdrant), the hook should detect this condition and skip injection silently -- no error, no warning, just no context. Log to stderr for debugging.
 
-**Phase to address:**
-Phase 1 (mastra plugin) -- model selection and cost tracking must be configured at setup, not optimized later.
+**Phase to address:** Phase 3 (agent adapters) must implement circuit breaker and graceful degradation. Phase 1 must include a "bootstrap embed" script for initial population.
 
 ---
 
-### Pitfall 7: Agent Config Adapter Pattern Breaks with Mastra's Auth Model
+### Pitfall 7: Embedding Model Mismatch Between Index and Query Time
 
 **What goes wrong:**
-Mastracode uses OAuth login for Anthropic and OpenAI (built into pi-tui), which conflicts with the existing `coding` launcher's API key management via `.env` files and `CODING_TRANSCRIPT_FORMAT`/`CODING_AGENT` environment variables. The existing `agent_pre_launch()` pattern (see `opencode.sh`) sets model config via environment variables, but mastracode manages its own credentials through mastra's credential store.
+Embeddings generated at indexing time use one model (e.g., `text-embedding-3-small` via OpenAI API). The query embedding at retrieval time uses a different model, a different version, or the same model with different parameters (e.g., different `dimensions` setting). Qdrant returns zero or garbage results because the vector spaces are incompatible.
 
 **Why it happens:**
-The `coding` launcher assumes agents accept configuration via environment variables (API keys, model selection, provider URLs). Mastracode's pi-tui handles auth internally with OAuth flows that open a browser. These two auth models collide: the launcher sets `ANTHROPIC_API_KEY` but mastracode ignores it in favor of its own OAuth token. VPN/corporate network detection (`INSIDE_CN`) that switches providers in `agent_pre_launch` has no effect on mastracode's internal provider selection.
+The existing `embedding-cache.ts` stores embeddings with a `contentHash` but does not store the model name/version used. If the embedding model is upgraded or the provider changes (e.g., switching from OpenAI to a local model for latency reasons), all existing embeddings become incompatible. The Qdrant collection's vector dimension is fixed at creation time -- inserting vectors of a different dimension causes hard errors.
 
-**How to avoid:**
-In `config/agents/mastra.sh`, implement `agent_pre_launch()` to detect whether mastracode already has cached credentials (check `~/.mastracode/` or equivalent). If credentials exist, skip OAuth. If not, warn the user that first run requires browser auth. For VPN/corporate network scenarios, pre-configure mastra's provider settings to use the corporate endpoint by writing/patching mastra's config file before launch rather than relying on environment variables. Document that `coding --mastra` requires initial interactive setup (cannot be fully headless on first run).
+**Consequences:**
+- Retrieval returns zero results despite Qdrant being full of embeddings
+- Retrieval returns low-quality results because similarity scores are meaningless across different vector spaces
+- Qdrant throws dimension mismatch errors that crash the retrieval service
 
 **Warning signs:**
-- `coding --mastra` opens a browser unexpectedly during tmux launch
-- VPN users connect to external Anthropic API instead of corporate endpoint
-- API key rotation in `.env` has no effect on mastracode sessions
+- All similarity scores are clustered near 0.5 (random) instead of showing a clear distribution
+- Retrieval quality drops after an "unrelated" change to the embedding configuration
+- Qdrant errors in logs mentioning dimension mismatch
 
-**Phase to address:**
-Phase 3 (mastracode integration) -- must be solved in the agent config, with a clear first-run vs subsequent-run flow.
+**Prevention:**
+1. Store the embedding model identifier (name + version + dimensions) in Qdrant collection metadata and in the embedding cache.
+2. At query time, verify the query embedding model matches the collection's model. If mismatched, return an error with a clear message ("Embedding model mismatch: collection uses X, query uses Y. Re-embed required.").
+3. If switching embedding models, create a new Qdrant collection (e.g., `knowledge_v2`) and re-embed everything. Do not overwrite the existing collection until the new one is fully populated.
+4. Pin the embedding model version in configuration, not in code. Make it a single config value referenced by both the indexing and query paths.
+
+**Phase to address:** Phase 1 (embedding pipeline). The model configuration must be centralized from the start.
 
 ---
 
-## Technical Debt Patterns
+### Pitfall 8: Over-Engineering the Pipeline Before Proving Value
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Run mastra storage as separate SQLite alongside LevelDB | Fast integration, no schema migration | Two truth sources, no unified query | Acceptable in Phase 1, must define bridge by Phase 2 |
-| Skip BudgetTracker integration for mastra LLM calls | Faster initial deployment | Hidden cost growth, budget overruns | Never -- even basic token counting should be in Phase 1 |
-| Disable pi-tui mouse capture globally | Quick tmux compatibility fix | Degrades mastracode UX for non-tmux users | Only as interim; make it conditional on tmux detection |
-| Keep verbatim LSL and add observations without linking them | Both systems work independently | No way to trace observation back to source | Acceptable in Phase 1 if observation records include source file references |
-| Use same model for observer as main agent | Simpler config | 10-50x cost for background summarization | Never for Opus/Sonnet-class models |
+**What goes wrong:**
+Teams build sophisticated multi-stage retrieval pipelines (query expansion, re-ranking, cross-encoder scoring, MMR diversity, reciprocal rank fusion) before validating that basic keyword search over 558 observations would already provide value. The pipeline becomes complex, fragile, and slow -- and delivers marginal improvement over a simple approach.
 
-## Integration Gotchas
+**Why it happens:**
+RAG literature emphasizes advanced techniques. Engineers read about hybrid search, re-ranking, and query decomposition and implement all of them simultaneously. With only 558 observations and 132 digests, the dataset is small enough that simple approaches work well. Sophisticated retrieval adds value at 100K+ documents, not at 700.
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| @mastra/opencode plugin | Assuming it works out-of-box with custom OpenCode builds | The plugin hooks into OpenCode's lifecycle -- verify hook points exist in the `coding --opencode` variant; may need patching if OpenCode is customized |
-| Mastra storage init | Forgetting to call `init()` on standalone storage | When using mastra storage outside the full Mastra framework, call `init()` explicitly on the store instance before any read/write |
-| Observer token thresholds | Using defaults (30k tokens) for coding sessions | Coding sessions hit 30k in minutes due to tool outputs; raise to 50-60k or enable aggressive async buffering |
-| Mastra thread scope | Not passing `threadId` to observe() | Missing threadId causes a hard error (by design, to prevent silent data sharing between threads) |
-| Resource scope for cross-session memory | Enabling resource scope without prompt engineering | Resource scope is experimental; threads can continue each other's work unless system prompt explicitly prevents this |
-| Claude 4.5 as observer model | Selecting Claude 4.5 Sonnet for observer/reflector | Claude 4.5 models reportedly don't work well as observer/reflector -- use GPT-4o-mini or Gemini Flash instead |
+**Consequences:**
+- Weeks of engineering on retrieval sophistication that could have been spent on proving the basic value proposition
+- Complex pipeline that is hard to debug when retrieval quality is poor
+- Latency increases from multi-stage processing, compounding Pitfall 3
+
+**Warning signs:**
+- More than 3 stages in the retrieval pipeline before any user testing
+- Retrieval service code exceeds 500 lines before a single agent has been connected
+- Discussion of re-ranking models before measuring baseline retrieval quality
+
+**Prevention:**
+1. Phase 1 MVP: embed everything with a single model, query with cosine similarity, return top-3 results. Measure whether agents find the results useful.
+2. Only add complexity when you can demonstrate (with examples) that the simple approach fails. "BM25 returns X but the user needed Y" is a valid motivation. "Best practices say to use re-ranking" is not.
+3. Set a complexity budget: the retrieval path from query to results should have at most 3 stages for v6.0. Re-ranking and query expansion are v7.0 concerns.
+
+**Phase to address:** Every phase. Resist complexity escalation throughout the milestone.
+
+---
+
+## Minor Pitfalls
+
+### Pitfall 9: Privacy Leakage Through Cross-Session Context Injection
+
+**What goes wrong:**
+Observations from one project or one user's session get injected into a different project's agent conversation. The existing observation store is project-scoped (`team: "coding"`) but the retrieval service may not enforce this boundary, especially if the Qdrant collection is shared across projects.
+
+**Prevention:**
+1. Tag every Qdrant point with a `project` metadata field. Filter by project at query time.
+2. Never embed secrets, API keys, or credentials into Qdrant. The existing redaction pipeline (`.specstory/config/redaction-patterns.json`) should be applied before embedding.
+3. The retrieval service must accept a `project` parameter and refuse to serve unscoped queries.
+
+**Phase to address:** Phase 1 (embedding pipeline) -- project tagging must be built into the embedding schema.
+
+---
+
+### Pitfall 10: Working Memory Template Becomes a Maintenance Burden
+
+**What goes wrong:**
+The "working memory template" (persistent structured project state document) sounds useful but becomes a manually maintained artifact that drifts from reality. If auto-updated, the update logic is complex and error-prone. If manually maintained, users stop updating it within a week.
+
+**Prevention:**
+1. Start with zero manual maintenance: the working memory template should be 100% auto-generated from knowledge graph state (active entities, recent observations, current project state).
+2. Keep it under 500 tokens. It is a "project snapshot," not a "project encyclopedia."
+3. Regenerate it on demand (when the hook fires) rather than maintaining a persistent file. This avoids staleness entirely.
+
+**Phase to address:** Phase 4 (working memory). Do NOT over-invest in this before the core retrieval loop is proven.
+
+---
+
+### Pitfall 11: Embedding All Knowledge Tiers Equally
+
+**What goes wrong:**
+Treating observations, digests, insights, and KG entities as equals in the embedding pipeline wastes compute and pollutes retrieval. Raw observations are noisy and repetitive (558 items, many overlapping). Digests are already compressed summaries. Insights are high-level patterns. Embedding all 700+ items with equal priority creates a retrieval pool dominated by low-value observations.
+
+**Prevention:**
+1. Embed in priority order: insights first, then digests, then KG entity summaries, then observations.
+2. Weight results by tier: an insight match at 0.70 similarity should rank above an observation match at 0.85 similarity.
+3. Consider not embedding raw observations at all in v6.0. Digests already compress 4-5 observations each -- embed the digest, not the sources.
+
+**Phase to address:** Phase 1 (embedding pipeline) -- tier prioritization is an embedding-time decision.
+
+---
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Embedding pipeline (Phase 1) | Embedding all 558 observations individually wastes compute and creates noise | Start with digests + insights only (~144 items). Add observations only if retrieval quality is insufficient |
+| Embedding pipeline (Phase 1) | Choosing an API-based embedding model adds latency and cost for every query | Use a local model (e.g., `all-MiniLM-L6-v2` via sentence-transformers in Docker) for query-time embedding. API model acceptable for batch indexing |
+| Retrieval service (Phase 2) | Building the service as a standalone process that must be separately started/monitored | Integrate into the existing coding-services Docker container. One more HTTP endpoint, not one more service |
+| Retrieval service (Phase 2) | Returning raw text without structure | Return structured JSON with title/content/source/relevance fields. Let agent adapters format |
+| Agent adapters (Phase 3) | Trying to support all 4 agents simultaneously | Ship Claude Code hook first. Other agents in subsequent phases |
+| Agent adapters (Phase 3) | Not testing with real conversations | Build a test harness: 10 real prompts from recent sessions, measure retrieval relevance and agent response quality with/without injection |
+| Feedback loop (Phase 4) | Embedding every new observation synchronously blocks ETM | Queue embeddings asynchronously. A 30-second delay between observation creation and embedding availability is acceptable |
+| Working memory (Phase 4) | Over-investing in a complex template system | Auto-generate from KG state. If it takes more than 50 lines of code, it is over-engineered |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Observer context unbounded growth | Long sessions get progressively slower; observer prompt dominates token usage | Set `previousObserverTokens` budget cap (March 2026 feature) | After 2-3 hours of active coding session |
-| Synchronous observation on large tool outputs | Agent freezes for 10-30s after file reads or test runs | Enable async buffering, raise messageTokens threshold | When tool outputs exceed 30k tokens in a burst |
-| Resource-scope observation across many threads | Observation runs process all threads together, causing multi-second delays | Use thread scope unless cross-session memory is specifically needed | At >10 threads per resource |
-| Batch converter processing all historical LSL at once | Memory exhaustion, hours-long processing | Process historical .specstory files in date-range batches; checkpoint progress | At >100 session files |
-| Double-observation of mastracode transcripts | Wasted LLM calls, degraded observation quality | Skip converter for mastra-native sessions (preObserved flag) | Immediately upon enabling both systems |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Mastra observations stored in unencrypted SQLite without .gitignore | Observations contain compressed summaries of code discussions including secrets mentioned in conversation | Add mastra storage path to .gitignore; store in `.data/` alongside existing knowledge graph data |
-| OAuth tokens cached in home directory | Mastracode's OAuth credentials persist at `~/.mastracode/` accessible to any process | Verify credential storage location; consider moving to system keychain |
-| Observer/reflector see full conversation including API keys pasted in chat | Observations may contain compressed but recoverable secrets | Add observation post-processing to redact known secret patterns before storage |
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| No visibility into observation status | User doesn't know if memory is working or failing silently | Integrate mastra's `memory_status` diagnostic into the existing statusline (tmux status bar shows observation health) |
-| Observer compression discards context user thought was remembered | "I told you about X earlier" fails because observer deemed it not important | Provide a `recall` tool that searches original messages, not just observations; document this limitation |
-| First-run OAuth flow breaks tmux automation | `coding --mastra` hangs waiting for browser auth in headless tmux | Detect first-run, prompt user before tmux launch, or support pre-auth via CLI flag |
-| Mixed agent sessions (switch from Claude to mastra mid-project) | Observations from one agent don't carry over; user repeats context | Use resource-scoped observations so all agents in the same project share memory (but beware experimental status) |
+| Hook process spawn overhead | 200-500ms added to every prompt just from process creation | Make hook a thin `curl` wrapper calling a persistent service | Immediately on first use |
+| Embedding API cold start | First query after idle period takes 3-5 seconds | Keep embedding model warm in Docker container; use local model | After container restart or 10+ minutes of inactivity |
+| Qdrant cold query | First vector search after restart is slow while index loads into memory | Pre-warm Qdrant on container start with a dummy query | After Docker restart |
+| Full-text search fallback storm | When vector search returns poor results, falling back to FTS on every query adds load | Cache FTS results; only fall back when vector similarity < threshold | Under heavy concurrent agent use (unlikely for single-user) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Mastra plugin installed:** Verify `.opencode/mastra.json` exists AND `init()` was called on storage -- missing init is a silent failure
-- [ ] **LSL still works after adding observations:** Run `coding --lsl-validate` to confirm verbatim logging is unchanged -- observations should add to, not replace
-- [ ] **BudgetTracker tracks mastra calls:** Check that observer/reflector LLM calls appear in the BudgetTracker totals, not just the main agent's calls
-- [ ] **Mastracode tmux scroll works:** In the tmux session, press `Ctrl+B [` and scroll up -- if you see garbage or can't scroll, pipe-pane/alt-screen conflict exists
-- [ ] **Batch converter handles all 3 formats:** Test converter with Claude JSONL (v1 AND v2), Copilot events.jsonl, AND OpenCode SQLite -- not just one format
-- [ ] **Observations survive Docker restart:** Kill coding-services, restart, verify observations persist (storage must be bind-mounted or in persistent volume)
-- [ ] **VPN detection works for mastracode:** Run `coding --mastra --dry-run` inside VPN to verify correct provider selection -- OAuth may bypass the env var provider switch
+- [ ] **Retrieval works without injection**: Verify the retrieval HTTP endpoint returns correct results via `curl` before connecting any agent hook
+- [ ] **Hook returns in < 500ms**: Time 20 consecutive hook invocations. p95 must be under 500ms
+- [ ] **Graceful degradation verified**: Kill Qdrant, submit a prompt to Claude Code. The agent must work normally (no error, no delay)
+- [ ] **Embedding model matches**: Query a known item. Verify similarity score is > 0.8, not clustered around 0.5
+- [ ] **Project scoping works**: If multiple projects exist, verify retrieval only returns items from the current project
+- [ ] **Token budget respected**: Measure the actual token count of injected context across 20 queries. Must stay under the budget
+- [ ] **Stale detection works**: Update an observation in LibSQL, verify the retrieval service eventually returns the updated version (not the old embedding's text)
+- [ ] **Agent actually uses the context**: In at least 5 of 10 test queries where relevant knowledge exists, the agent's response should reference or reflect the injected knowledge
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Storage divergence (mastra vs Graphology) | MEDIUM | Export mastra observations via API, re-import as UKB pipeline input; establish sync bridge going forward |
-| Verbatim LSL deleted during observation migration | HIGH | Restore from git (if .specstory is tracked) or backup; revert to dual-output mode |
-| Observer blocks causing user frustration | LOW | Raise `messageTokens` threshold immediately; switch to async buffering; restart session |
-| tmux/pi-tui incompatibility | LOW | Disable mouse capture in mastra agent config; fall back to non-tmux launch temporarily |
-| Double-observation quality degradation | MEDIUM | Add `preObserved` flag to mastra transcript format; rebuild affected knowledge entities from original transcripts |
-| Cost overrun from observer model | MEDIUM | Switch observer/reflector to Gemini Flash immediately; audit recent bills; set BudgetTracker alerts |
-| OAuth credential conflict | LOW | Clear mastra credential cache; reconfigure with env-var-based auth if available |
-
-## Pitfall-to-Phase Mapping
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Dual storage divergence | Phase 1 (foundation) | Both stores accessible from a single diagnostic endpoint; observations flow to UKB input |
-| Verbatim-to-observation data loss | Phase 2 (LSL refactoring) | A/B comparison: knowledge entities from verbatim vs observation input should not lose detail categories |
-| Observer blocking | Phase 1 (mastra plugin) | Timed test: 60s of tool-heavy conversation with <2s max pause |
-| pi-tui/tmux conflict | Phase 3 (mastracode) | Manual test: scroll, copy, paste, statusline update all work in tmux session |
-| Transcript format mismatch | Phase 2 (converters) | Converter correctly identifies and skips mastra-native sessions; no double-observation detected |
-| Cost explosion | Phase 1 (mastra plugin) | BudgetTracker reports match provider dashboard within 10% after 24h of usage |
-| Auth model conflict | Phase 3 (mastracode) | `coding --mastra --dry-run` succeeds in both VPN and public network without browser popup |
+| Context rot / irrelevant results | LOW | Raise similarity threshold, add keyword filter, re-test. No data loss |
+| Token budget overshoot | LOW | Reduce budget in hook config, switch to digest-only retrieval. Immediate effect |
+| Hook latency | MEDIUM | Refactor hook from process-per-call to persistent service + curl wrapper. Requires code change |
+| Stale embeddings | MEDIUM | Run full re-embedding job (batch process all knowledge items). Takes minutes, not hours at current scale |
+| Embedding model mismatch | HIGH | Recreate Qdrant collection, re-embed everything with consistent model. All existing embeddings are invalidated |
+| Over-engineered pipeline | HIGH | Simplify by removing stages. Difficult because each stage has its own tests, config, and dependencies |
 
 ## Sources
 
-- [Mastra Observational Memory Docs](https://mastra.ai/docs/memory/observational-memory) -- architecture, thresholds, limitations
-- [Mastra Memory Overview](https://mastra.ai/docs/memory/overview) -- storage backends, configuration patterns
-- [@mastra/opencode Plugin PR](https://github.com/mastra-ai/mastra/pull/12925) -- observe() API, lifecycle hooks, breaking changes
-- [Mastra Blog: Announcing Observational Memory](https://mastra.ai/blog/observational-memory) -- compression ratios, performance benchmarks
-- [Mastra Changelog 2026-03-13](https://mastra.ai/blog/changelog-2026-03-13) -- previousObserverTokens budget cap
-- [Mastra Changelog 2026-02-04](https://mastra.ai/blog/changelog-2026-02-04) -- async buffering ship
-- [GitHub Issue #14082: OM and AI SDK streaming](https://github.com/mastra-ai/mastra/issues/14082) -- async buffer blocking in subagent context
-- [OpenCode Issue #16967: TUI broken in tmux](https://github.com/anomalyco/opencode/issues/16967) -- TUI rendering failures in tmux
-- [OpenCode Issue #7926: Mouse capture in multiplexers](https://github.com/anomalyco/opencode/issues/7926) -- mouse capture disabling request
-- [Mastra Code Announcement](https://mastra.ai/blog/announcing-mastra-code) -- pi-tui architecture, feature set
-- [pi-mono GitHub](https://github.com/badlogic/pi-mono) -- pi-tui framework source
-- [Mastra Storage Docs](https://mastra.ai/docs/memory/storage) -- libSQL, pg, mongodb backend details
-- Existing codebase: `config/agents/opencode.sh`, `scripts/launch-agent-common.sh`, `config/live-logging-config.json`, `config/transcript-formats.json`
+- [Context Rot: How Increasing Input Tokens Impacts LLM Performance (Chroma, 2025)](https://research.trychroma.com/context-rot) -- empirical evidence that more context degrades quality
+- [Claude Code Hooks Reference](https://code.claude.com/docs/en/hooks) -- 10,000 char cap, timeout behavior, additionalContext format
+- [Hooks causing ~20s latency (ruflo #1530)](https://github.com/ruvnet/ruflo/issues/1530) -- real-world hook latency issue with 11+ hooks
+- [UserPromptSubmit hooks not firing in git worktree (claude-code #49989)](https://github.com/anthropics/claude-code/issues/49989) -- hook reliability issue
+- [RAG in Production: What Actually Breaks (Medium, 2025)](https://alwyns2508.medium.com/retrieval-augmented-generation-rag-in-production-what-actually-breaks-and-how-to-fix-it-5f76c94c0591)
+- [Common RAG Mistakes (ChatNexus)](https://articles.chatnexus.io/knowledge-base/common-retrieval-augmented-generation-rag-implementation-mistakes-and-how-to-avoid-them/)
+- [Seven RAG Pitfalls (Label Studio)](https://labelstud.io/blog/seven-ways-your-rag-system-could-be-failing-and-how-to-fix-them/)
+- [Why 72% of Enterprise RAG Implementations Fail](https://ragaboutit.com/why-72-of-enterprise-rag-implementations-fail-in-the-first-year-and-how-to-avoid-the-same-fate/)
+- [Context Engineering for Multi-Agent LLM Code Assistants (arXiv 2508.08322)](https://arxiv.org/abs/2508.08322)
+- [Context Engineering for Coding Agents (Martin Fowler)](https://martinfowler.com/articles/exploring-gen-ai/context-engineering-coding-agents.html)
+- [Qdrant Vector Search in Production](https://qdrant.tech/articles/vector-search-production/)
+- Existing codebase: `embedding-cache.ts` (7-day TTL, content hash), `.data/observation-export/metadata.json` (558 obs, 132 digests, 12 insights), `.data/entity-embeddings.json` (1553 lines)
 
 ---
-*Pitfalls research for: Mastra.ai integration into coding agent infrastructure*
-*Researched: 2026-03-28*
+*Pitfalls research for: Knowledge context injection in multi-agent coding environment (v6.0)*
+*Researched: 2026-04-24*

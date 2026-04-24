@@ -1,211 +1,193 @@
-# Feature Research
+# Feature Landscape: Knowledge Context Injection
 
-**Domain:** Mastra.ai Observational Memory Integration & Mastracode Agent for Coding Infrastructure
-**Researched:** 2026-03-28
-**Confidence:** MEDIUM (mastra OM docs are HIGH confidence; batch conversion of historical LSL is LOW confidence -- no official batch API exists yet)
+**Domain:** Knowledge context injection for multi-agent coding environment
+**Researched:** 2026-04-24
+**Confidence:** HIGH (well-established patterns from Mem0, Zep, Mastra, Anthropic context engineering guidance)
 
-## Feature Landscape
+## Table Stakes
 
-### Table Stakes (Users Expect These)
-
-Features required for a working mastra integration. Missing these = integration feels broken.
+Features users expect. Missing any of these = injection system is useless or actively harmful.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Mastra OpenCode plugin (`@mastra/opencode`) | Official plugin exists; `coding --opencode` must gain observational memory alongside existing LSL | MEDIUM | Plugin hooks into OpenCode lifecycle, injects observations into system prompt, discards already-observed messages. Needs `.opencode/mastra.json` config + credential resolution from OpenCode provider store. Storage: LibSQL (already used by OpenCode for SQLite). |
-| Mastracode agent launch (`coding --mastra`) | Third coding agent alongside Claude and OpenCode; must integrate with existing tmux-based launcher | MEDIUM | `npm install -g mastracode`, Node 22.13+. Needs tmux pane setup, statusline integration, coding-services Docker access. Config in `.mastracode/` dir. Mastracode uses LibSQL internally for threads/messages/OM. |
-| LSL capture for mastracode sessions | All three agents produce LSL logs; mastracode cannot be the exception | HIGH | Mastracode stores conversations in LibSQL (local SQLite). LSL must read from mastracode's SQLite DB (threads + messages tables) and produce `.specstory/history/` markdown files matching existing format. This is a new transcript source -- no existing parser exists. |
-| Observation generation from live sessions | Core value of mastra OM: compress verbose tool-call-heavy transcripts into dense observations | LOW | Already built into mastra Memory class. For OpenCode: `@mastra/opencode` plugin handles this. For mastracode: built-in OM. For Claude: requires standalone `observe()` API call with external messages. |
-| Transcript-to-observation converter for Claude JSONL | Claude Code produces `.specstory/history/*.md` files (JSONL-style). Must convert to mastra observations | HIGH | No official mastra batch API. Must: (1) parse Claude JSONL transcripts into MastraDBMessage format (user/assistant roles only), (2) call standalone `observe()` with external messages, (3) store observations in LibSQL. Custom converter needed. |
-| Transcript-to-observation converter for Copilot events.jsonl | Copilot produces `events.jsonl` event stream format | HIGH | Similar to Claude converter but different source format. Parse Copilot event stream, extract user/assistant exchanges, convert to MastraDBMessage, feed to `observe()`. Custom converter needed. |
-| Transcript-to-observation converter for OpenCode SQLite | OpenCode stores sessions in SQLite DB | MEDIUM | OpenCode already has `@mastra/opencode` plugin for live observation. Converter for historical sessions: read from SQLite, replay through `observe()`. Simpler than Claude/Copilot since messages are already structured. |
+| Embedding pipeline for all knowledge tiers | Cannot do semantic retrieval without embeddings. Observations, digests, insights, and KG entities must all be searchable. | MEDIUM | Qdrant already running in Docker stack. Embed on write (fire-and-forget) so retrieval is always current. Use a single embedding model (e.g., `all-MiniLM-L6-v2` or `nomic-embed-text`) for consistency. Separate Qdrant collections per tier for independent scoring. |
+| Hybrid retrieval (semantic + keyword + recency) | Semantic-only misses exact identifiers (error codes, file paths, config keys). Keyword-only misses conceptual matches. Recency matters because a fix from yesterday is more relevant than one from 3 months ago. | MEDIUM | Industry consensus: hybrid with RRF fusion hits 91% recall vs 78% for vector-only (Pinecone/Superlinked benchmarks). Qdrant supports payload filtering for recency. BM25 via SQLite FTS (already built for observation dashboard). |
+| Token budget enforcement | Injected context that exceeds available space causes truncation of the user's actual work, degrading agent performance. Must never blow the context window. | MEDIUM | Allocate a fixed token budget (e.g., 4K-8K tokens) for injected knowledge. Count tokens before assembly. Truncate or drop lowest-priority items to fit. Anthropic's guidance: "smallest possible set of high-signal tokens." |
+| Retrieval service (HTTP endpoint) | Agent adapters need a single, agent-agnostic API to call. Without this, every agent reimplements retrieval logic. | LOW | Simple HTTP endpoint: `POST /api/knowledge/retrieve` accepting `{query, budget, agent?, filters?}`, returning formatted context block. Runs inside existing coding-services container. |
+| Context formatting and assembly | Raw retrieval results are useless without assembly into a coherent, scannable block the LLM can parse. Must include source attribution so the agent knows where knowledge came from. | LOW | Render as structured markdown with headers per tier (Insights > Digests > Observations > KG Entities). Include metadata (date, source, confidence). Order by relevance score descending within each tier. |
+| Claude hook adapter (UserPromptSubmit) | Claude Code is the primary agent. If injection does not work with Claude, the system has zero users. | LOW | UserPromptSubmit hook fires before processing, stdout injected as context, 10K char cap. Hook script calls retrieval endpoint with user prompt as query, prints result to stdout. Deterministic (fires every time, unlike CLAUDE.md which is advisory). |
+| Incremental embedding (write-time) | Knowledge generated during a session (new observations, digests) must be retrievable within that same session. Batch-only embedding creates a stale knowledge problem. | MEDIUM | Hook into observation writer and consolidation daemon. On new observation/digest/insight creation, embed and upsert to Qdrant immediately. Idempotent upserts (use content hash as point ID). |
 
-### Differentiators (Competitive Advantage)
+## Differentiators
 
-Features that make this integration uniquely valuable beyond basic mastra usage.
+Features that set this apart from generic RAG. These leverage the unique multi-agent, multi-tier knowledge architecture.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Cross-agent observation unification | All 3 agents (Claude, Copilot, OpenCode) produce observations in identical mastra format, queryable from single store | MEDIUM | Use shared LibSQL database with resource-scoped observations. Each agent gets a resourceId (`coding-claude`, `coding-opencode`, `coding-mastra`), threads scoped per session. Enables cross-agent knowledge. |
-| Historical LSL batch converter | Convert existing `.specstory/history/` archive into observations -- retroactive knowledge extraction from months of sessions | HIGH | No official mastra batch API. Must build custom pipeline: (1) glob all historical LSL files, (2) parse per agent format, (3) chunk into token-budget-sized batches, (4) call `observe()` per batch, (5) call reflector on accumulated observations. LLM cost concern: months of transcripts = many LLM calls. |
-| Observation-enriched knowledge graph | Feed mastra observations into existing UKB pipeline as a new input source alongside code analysis | HIGH | Bridge between mastra LibSQL observations and existing Graphology+LevelDB knowledge graph. Observations become inputs to wave-analysis, producing entities like "UserPreferences", "RecurringPatterns", "ArchitecturalDecisions". |
-| Dual-write mode (LSL + observations) | Keep verbatim LSL for audit trail while simultaneously generating observations for AI consumption | LOW | Run both systems in parallel. LSL continues writing raw transcripts to `.specstory/`. Mastra OM generates compressed observations to LibSQL. No replacement, just augmentation. |
-| Memory status diagnostics | Dashboard showing observation accumulation, compression ratios, token budgets per agent | MEDIUM | Mastra provides `memory_status` and `memory_observations` diagnostic tools. Surface these in existing health dashboard (port 3032). |
+| Tier-weighted scoring | Not all knowledge is equal. An insight (distilled from many observations) is more valuable per token than a raw observation. Weight: insights > digests > KG entities > observations. | LOW | Simple multiplier on relevance scores per collection. Insights get 1.5x, digests 1.2x, KG entities 1.0x, observations 0.8x. Ensures the token budget is spent on the most distilled knowledge first. |
+| Working memory template | A persistent, structured document capturing current project state (active components, recent decisions, known issues, team conventions) that is always injected alongside semantic results. Like Mastra's working memory but project-scoped, not conversation-scoped. | MEDIUM | Stored as a markdown file (`.data/working-memory.md`), manually curated or auto-updated by consolidation daemon. Injected as a fixed prefix before semantic results. Budget: ~1K tokens. Updated when insights or KG entities change. Anthropic calls this "structured note-taking." |
+| Agent-specific relevance profiles | Different agents work on different tasks. Claude often does architecture work, Copilot does inline completions, OpenCode does refactoring. Each agent's injection should be biased toward its typical work patterns. | MEDIUM | Per-agent configuration with default topic weights and filter preferences. Claude: architectural patterns + pitfalls. Copilot: code conventions + API patterns. OpenCode: refactoring patterns + component structure. Not hard filtering, just soft scoring bias. |
+| Knowledge graph traversal augmentation | After semantic retrieval finds relevant entities, traverse KG relationships to pull in connected entities (parent components, related sub-components, dependent patterns). | HIGH | Query Graphology graph for 1-hop neighbors of retrieved KG entities. Include parent entity context for hierarchy awareness. Deduplicate against already-retrieved items. This is what Zep's Graphiti does -- graph traversal alongside vector search. |
+| Feedback signal collection | Track which injected knowledge the agent actually references in its response. Use this to improve future retrieval relevance (implicit relevance feedback). | HIGH | PostToolUse / response analysis hook. Detect when injected knowledge terms appear in agent output. Log (query, retrieved_items, referenced_items) tuples. Over time, use these signals to adjust scoring weights. Mem0 does this with their "memory reinforcement" system. |
+| Cross-agent knowledge continuity | When switching from Claude to OpenCode mid-task, inject a "handoff context" summarizing what the previous agent was working on, drawing from recent observations. | MEDIUM | On session start, detect last active agent session. Retrieve last N observations from previous agent. Format as "Previous session context" block. Prevents repeating context that was already established. |
+| Deduplication and conflict resolution | Multiple tiers may contain overlapping or contradictory information about the same topic (an observation says X, but a later insight says Y). Inject only the most authoritative version. | MEDIUM | During assembly, detect overlapping content via embedding similarity between retrieved items. When overlap > threshold, keep the higher-tier item (insight over observation). For contradictions, prefer the newer item. This is critical for preventing confused agent behavior. |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+## Anti-Features
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Replace LSL with observations entirely | "Observations are better, remove verbatim logging" | Observations are lossy by design (3-40x compression). Exact tool call arguments, error messages, timestamps lost. Audit trail destroyed. Cannot reproduce sessions. | Dual-write: keep LSL verbatim logs alongside observation generation. LSL = source of truth, observations = AI-consumable summary. |
-| Real-time cross-agent memory sharing | "When I switch from Claude to OpenCode, it should know what I did" | Resource-scoped OM is experimental in mastra. Cross-thread observation mixing risks context pollution -- observations from Claude's tool-call patterns confuse OpenCode's different interaction model. | Thread-scoped observations per agent. Build explicit "handoff" command that generates a session summary for the next agent, rather than sharing raw observation state. |
-| Auto-select LLM for observations based on content | "Use cheap models for simple stuff, expensive for complex" | ModelByInputTokens exists in mastra but adds configuration complexity and unpredictable costs. Observation quality varies across models -- cheap models produce low-quality observations that compound errors during reflection. | Use single model for all observations: `google/gemini-2.5-flash` (mastra's default, tested extensively). Fast, cheap, 128K context. Only switch if quality issues emerge. |
-| Observe every tool call result in detail | "Don't lose tool output details in compression" | Tool outputs are the noisiest part (5-40x compression ratio exists because tool outputs are verbose). Keeping them defeats OM's purpose and blows up context. | Use retrieval mode (`retrieval: true`) to keep observation-to-source-message links. Agents can call `recall` tool when they need exact tool output. |
-| Build custom OM from scratch instead of using mastra | "We already have LSL, just add summarization" | Mastra OM is SOTA (94.87% on LongMemEval). Custom implementation would need Observer + Reflector agents, token estimation, async buffering, three-tier memory structure, prompt caching optimization. Months of work to match mastra quality. | Use mastra as-is. Extend with custom converters for transcript formats. Focus engineering effort on integration, not reimplementation. |
+Features to explicitly NOT build. Each represents a common trap in knowledge injection systems.
+
+| Anti-Feature | Why Tempting | Why Avoid | What to Do Instead |
+|--------------|-------------|-----------|-------------------|
+| Always-on injection for every prompt | "More context is always better" | Anthropic's context engineering guidance is clear: context rot degrades model performance as context grows. Injecting irrelevant knowledge wastes tokens and confuses the agent. Simple prompts like "list files" do not need knowledge injection. | Relevance threshold: only inject when retrieval confidence exceeds a minimum score. Short prompts (under ~20 tokens) skip injection entirely. Let the agent pull knowledge via MCP tools when it needs more. |
+| LLM-based reranking at query time | "Use a cross-encoder for better relevance" | Adds 200-500ms latency per query. UserPromptSubmit hook has a timeout constraint. The latency is felt on every single prompt. Zep documents that cross-encoder reranking is their "highest computational cost" retrieval method. | Use lightweight scoring (cosine similarity + BM25 + recency decay) with static weights. Reserve LLM reranking for batch indexing, not real-time retrieval. |
+| Auto-updating working memory with LLM | "Let the LLM summarize the project state automatically" | Creates a feedback loop: LLM writes context that LLM reads, amplifying any hallucinations or drift. Working memory becomes unreliable. Manus blog explicitly warns about this. | Working memory is manually curated or updated by deterministic rules (new KG entity added = update component list). Human reviews changes. LLM can propose updates, but a human approves. |
+| Per-turn embedding of the user prompt | "Embed every user message for future retrieval" | User prompts are noisy, repetitive, and ephemeral ("fix the bug", "run tests", "try again"). Embedding them pollutes the vector space. The observation pipeline already distills sessions into meaningful content. | Rely on the existing observation pipeline for knowledge capture. Only embed the distilled outputs (observations, digests, insights), never raw prompts. |
+| Fine-grained access control per knowledge item | "Different agents should only see certain knowledge" | Massive implementation complexity for marginal benefit. All four agents work on the same codebase. Knowledge about the codebase is universally relevant. Access control is a multi-tenant concern, not a single-project concern. | Use soft agent-specific scoring biases (differentiator above) rather than hard access control. All agents can see all knowledge, but each agent's results are weighted toward its typical needs. |
+| Custom embedding model training | "Train embeddings on our codebase for better retrieval" | Requires significant training data, GPU infrastructure, ongoing retraining. Off-the-shelf models are good enough for a single-project knowledge base of ~200 entities. Premature optimization. | Use a proven general-purpose model (`all-MiniLM-L6-v2` for speed, `nomic-embed-text` for quality). Evaluate retrieval quality first. Only consider fine-tuning if retrieval quality is demonstrably poor after tuning scoring weights. |
+| Streaming injection (inject as retrieval completes) | "Start injecting results as they come back to reduce latency" | Hook mechanism requires complete output before the agent processes. Partial injection creates inconsistent context. The retrieval is fast enough (sub-100ms for Qdrant) that streaming is unnecessary. | Return complete, assembled context block from the retrieval endpoint. Total latency target: under 200ms including embedding the query, searching, scoring, and formatting. |
 
 ## Feature Dependencies
 
 ```
-[LibSQL Storage Setup]
+[Embedding Pipeline]
     |
-    +---> [Mastra OpenCode Plugin]
-    |         |--requires--> [@mastra/opencode package]
-    |         |--enhances--> [LSL dual-write]
+    +---> [Retrieval Service (HTTP)]
+    |         |--requires--> [Hybrid Scoring (semantic + keyword + recency)]
+    |         |--requires--> [Token Budget Enforcement]
+    |         |--requires--> [Context Assembly & Formatting]
+    |         |
+    |         +---> [Claude UserPromptSubmit Hook]
+    |         +---> [Copilot Adapter]
+    |         +---> [OpenCode Adapter]
+    |         +---> [Mastra Adapter]
     |
-    +---> [Mastracode Agent Launch]
-    |         |--requires--> [Node 22.13+, tmux integration]
-    |         |--enables---> [LSL Capture for Mastracode]
+    +---> [Incremental Embedding (write-time)]
+    |         |--requires--> [Observation Writer hook]
+    |         |--requires--> [Consolidation daemon hook]
     |
-    +---> [Transcript Converters (Claude/Copilot/OpenCode)]
-              |--requires--> [Standalone observe() API from @mastra/memory]
-              |--requires--> [Per-agent transcript parser]
-              |--enables---> [Historical Batch Converter]
-              |--enables---> [Cross-Agent Observation Unification]
-                                 |--enables--> [Observation-Enriched KG]
+    +---> [Tier-Weighted Scoring]
+    |         |--enhances--> [Retrieval Service]
+    |
+    +---> [KG Traversal Augmentation]
+              |--requires--> [Graphology graph loaded]
+              |--enhances--> [Retrieval Service]
+
+[Working Memory Template] --- independent, no retrieval dependency ---
+    |--injected alongside--> [Retrieval Results]
+
+[Agent-Specific Profiles]
+    |--configures--> [Retrieval Service]
+
+[Feedback Signal Collection]
+    |--requires--> [Claude PostToolUse hook or response analysis]
+    |--improves--> [Scoring Weights over time]
+
+[Cross-Agent Continuity]
+    |--requires--> [Observation store with agent metadata]
+    |--enhances--> [Session Start injection]
+
+[Deduplication & Conflict Resolution]
+    |--requires--> [Multi-tier retrieval working]
+    |--enhances--> [Context Assembly]
 ```
 
 ### Dependency Notes
 
-- **LibSQL storage setup is the foundational dependency:** Both mastracode and the OpenCode plugin use LibSQL. All converters write to it. Set this up first.
-- **Transcript converters are independent per agent:** Claude, Copilot, and OpenCode converters can be built in parallel. Each parses a different format but outputs to the same observe() API.
-- **Historical batch converter depends on live converters working:** The parsers are the same; batch just adds iteration over file archives and token budget management.
-- **Knowledge graph bridge is a stretch goal:** Requires observation store to be populated and stable before bridging to existing UKB pipeline.
-- **Mastracode launch and OpenCode plugin are independent:** Can be built in parallel since they use different agent runtimes.
+- **Embedding pipeline is the foundational dependency.** Nothing works without embeddings in Qdrant. Build this first.
+- **Retrieval service is the integration point.** All agent adapters depend on it. Build it second.
+- **Claude hook is the first adapter.** Claude is the primary agent. Prove value here before building other adapters.
+- **Working memory template is independent.** Can be built in parallel with embedding pipeline since it is a static file injection, not a retrieval feature.
+- **KG traversal augmentation requires a working retrieval baseline.** Add it as an enhancement after basic retrieval is proven.
+- **Feedback signals are a Phase 2+ concern.** Requires enough usage data to be meaningful. Do not build prematurely.
 
-## MVP Definition
+## MVP Recommendation
 
-### Launch With (v1)
+### Phase 1: Foundation (must ship together)
 
-Minimum viable integration -- prove mastra OM works with existing infrastructure.
+1. **Embedding pipeline** -- embed all existing observations, digests, insights, KG entities into Qdrant. Batch job + write-time hooks.
+2. **Retrieval service** -- HTTP endpoint with hybrid search (semantic + FTS + recency), token budgeting, tier-weighted scoring, context formatting.
+3. **Claude UserPromptSubmit hook** -- call retrieval service, inject results. This is the minimum to prove value.
+4. **Working memory template** -- static structured document injected as prefix. Manually maintained initially.
 
-- [ ] LibSQL storage setup shared across agents -- foundational; everything depends on it
-- [ ] Mastra OpenCode plugin (`@mastra/opencode`) for `coding --opencode` -- lowest friction, official plugin exists
-- [ ] Mastracode agent launch (`coding --mastra`) with tmux integration -- new agent, independent of OM
-- [ ] LSL capture for mastracode sessions (SQLite reader) -- maintains LSL contract for new agent
-- [ ] Dual-write mode: keep existing LSL + generate observations for OpenCode sessions -- proves value without risk
+### Phase 2: Polish and expand
 
-### Add After Validation (v1.x)
+5. **Agent-specific relevance profiles** -- configure per-agent scoring biases.
+6. **Other agent adapters** (Copilot, OpenCode, Mastra) -- same retrieval service, different injection mechanisms.
+7. **Deduplication and conflict resolution** -- clean up assembly when multi-tier results overlap.
+8. **Cross-agent continuity** -- handoff context on agent switch.
 
-Features to add once live observation is working.
+### Defer
 
-- [ ] Claude JSONL transcript converter -- when live OM is proven, convert Claude sessions
-- [ ] Copilot events.jsonl converter -- same pattern as Claude, different parser
-- [ ] OpenCode historical session converter -- replay old SQLite sessions through observe()
-- [ ] Memory status in health dashboard -- visibility into OM health
+- **KG traversal augmentation** -- high complexity, marginal benefit until KG has richer relationships.
+- **Feedback signal collection** -- requires usage volume to be meaningful. Revisit after 2-4 weeks of live injection.
+- **LLM-based reranking** -- only if lightweight scoring proves insufficient.
 
-### Future Consideration (v2+)
+## Framework Feature Comparison
 
-- [ ] Historical LSL batch converter (full archive) -- expensive (LLM calls per session), defer until ROI proven on recent sessions
-- [ ] Cross-agent observation unification -- resource-scoped OM is experimental in mastra; wait for stability
-- [ ] Observation-enriched knowledge graph -- bridge to UKB pipeline; requires mature observation store
-- [ ] Retrieval mode with semantic search -- `recall` tool for exact wording; nice-to-have, not critical
+How existing frameworks handle these features, informing our design.
 
-## Feature Prioritization Matrix
+| Feature | Mem0 | Zep/Graphiti | Mastra OM | LangChain Memory | Our Approach |
+|---------|------|-------------|-----------|-----------------|--------------|
+| **Retrieval** | Hybrid (vector + graph) | Hybrid (semantic + BM25 + graph traversal) | Semantic recall via embeddings | Deprecated (moved to LangGraph checkpoints) | Hybrid (semantic + FTS + recency) via Qdrant + SQLite FTS |
+| **Token budgeting** | Implicit (90% token savings claimed) | Not explicit | Token thresholds for observer/reflector triggers | ConversationSummaryBuffer with max_token_limit | Explicit budget allocation with tier-weighted priority |
+| **Context assembly** | API returns formatted memories | Returns ranked facts with temporal metadata | Observation block + message block in system prompt | History variable injection into prompt template | Structured markdown with tier headers, source attribution |
+| **Multi-agent** | Actor-aware memories (Group-Chat v2) | Single-agent focused | Resource-scoped observations | Per-agent memory instances | Agent-specific scoring profiles, shared retrieval service |
+| **Working memory** | User/agent/session scoping | Temporal knowledge graph | Working memory markdown in system prompt | ConversationBuffer (deprecated) | Static project-state document, manually curated |
+| **Feedback** | Memory reinforcement via usage | Temporal invalidation (facts expire) | None (append-only observations) | None | Implicit feedback via response analysis (deferred) |
+| **Write-time indexing** | Real-time extraction + embedding | Continuous graph updates | Observation on token threshold | Per-turn buffer append | Fire-and-forget embedding on observation/digest/insight creation |
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| LibSQL storage setup | HIGH | LOW | P1 |
-| Mastra OpenCode plugin | HIGH | MEDIUM | P1 |
-| Mastracode agent launch | HIGH | MEDIUM | P1 |
-| LSL capture for mastracode | HIGH | HIGH | P1 |
-| Dual-write mode (LSL + OM) | HIGH | LOW | P1 |
-| Claude transcript converter | MEDIUM | HIGH | P2 |
-| Copilot transcript converter | MEDIUM | HIGH | P2 |
-| OpenCode historical converter | MEDIUM | MEDIUM | P2 |
-| Memory status dashboard | MEDIUM | MEDIUM | P2 |
-| Historical batch converter | MEDIUM | HIGH | P3 |
-| Cross-agent unification | MEDIUM | HIGH | P3 |
-| Observation-enriched KG | LOW | HIGH | P3 |
-| Retrieval mode + recall tool | LOW | MEDIUM | P3 |
+### Key Takeaways from Competitors
 
-**Priority key:**
-- P1: Must have for launch -- proves integration works
-- P2: Should have -- completes the picture for all agents
-- P3: Nice to have -- advanced features for later
+1. **Mem0's insight:** Memory types matter. Episodic (what happened), semantic (what we know), procedural (how to do things). Our tiers map naturally: observations=episodic, digests=semantic, insights=procedural.
+2. **Zep's insight:** Temporal awareness is valuable. A fact that was true last week may not be true today. Our recency scoring serves this purpose without full temporal graph complexity.
+3. **Mastra's insight:** Compression is the key innovation. 5-40x compression with structured observations. We already have this via the observation pipeline. Injection is the missing piece.
+4. **Anthropic's insight:** Less is more. "Smallest possible set of high-signal tokens." Aggressive filtering and budgeting beats exhaustive retrieval every time.
+5. **LangChain's lesson:** Simple memory abstractions get deprecated. The industry is moving toward purpose-built retrieval systems, not generic memory wrappers.
 
-## Mastra OM Technical Reference
+## Multi-Agent Implications
 
-Key technical details that inform implementation:
+### Unique Challenges
 
-### Observer/Reflector Architecture
-- **Observer** activates at 30,000 token threshold (configurable via `messageTokens`)
-- **Reflector** activates at 40,000 observation tokens (configurable via `observationTokens`)
-- Async buffering: pre-computes observations at 20% intervals (`bufferTokens: 0.2`)
-- Three-tier memory: recent messages + observations + reflections
-- Token estimation via `tokenx` library (fast local estimation)
+| Challenge | Impact | Mitigation |
+|-----------|--------|------------|
+| Different hook mechanisms per agent | Claude uses UserPromptSubmit (stdout injection, 10K char cap). Copilot uses VS Code extension API. OpenCode uses plugin system. Mastra uses memory providers. | Single retrieval service, adapter pattern per agent. Adapters are thin -- just hook wiring + HTTP call + format output. |
+| Varying context window sizes | Claude Code: 200K tokens. Copilot: varies by model. OpenCode: varies. Mastra: configurable. | Token budget is a parameter to the retrieval service. Each adapter passes its agent's available budget. Default: 4K tokens. |
+| Agent switching mid-task | User switches from Claude to OpenCode. New agent has no context about current task. | Cross-agent continuity feature (Phase 2). Detect agent switch, inject recent observations from previous agent. |
+| Concurrent agent sessions | User might run Claude and Copilot simultaneously on different tasks. | Agent isolation by default. Each hook invocation is independent. No shared state between concurrent sessions. |
 
-### Observation Format
-```
-Date: 2026-01-15
-- [red] 12:10 User is building a Next.js app with Supabase auth
-  - [red] 12:10 App uses server components with client-side hydration
-  - [yellow] 12:12 User asked about middleware configuration
-```
-Emoji-based priority (red=high, yellow=medium, green=low). Timestamped. Hierarchical two-level bullets.
+### Agent-Specific Adapter Notes
 
-### Standalone observe() API (Key for Converters)
-```typescript
-await om.observe({
-  threadId,
-  resourceId?,
-  messages?,         // External messages (MastraDBMessage format)
-  hooks?: {          // Lifecycle callbacks
-    onObservationStart, onObservationEnd,
-    onReflectionStart, onReflectionEnd
-  }
-});
-```
-This is the critical API for transcript converters -- accepts external messages without requiring a live agent session. Messages must have `role: 'user' | 'assistant'` only.
-
-### Mastracode Configuration
-- Config dirs: `.mastracode/` (project) and `~/.mastracode/` (global)
-- Also reads `.claude/` dirs for Claude Code compatibility
-- Key files: `mcp.json`, `hooks.json`, `database.json`, `AGENTS.md`
-- Auth: API keys via env vars or OAuth via `/login`
-- Storage: LibSQL local SQLite (threads, messages, token usage, OM)
-- Custom commands in `commands/` dir, skills in `skills/` dir
-
-### Storage Requirements
-- Requires `@mastra/libsql` (SQLite-based, local, no data leaves machine)
-- Also supports `@mastra/pg` and `@mastra/mongodb` but LibSQL is best for local dev
-- Mastracode already uses LibSQL internally
-
-### Compression Ratios
-- Text-only: 3-6x compression
-- Tool-heavy (typical for coding agents): 5-40x compression
-- Average context window stays ~30K tokens regardless of session length
-
-## Competitor Feature Analysis
-
-| Feature | Claude Code (native) | Cursor | Mastra OM | Our Approach |
-|---------|---------------------|--------|-----------|--------------|
-| Session memory | Conversation compaction (lossy, no structure) | Tab-scoped, lost on close | Structured observations with reflections, persisted | Mastra OM for structured memory + LSL for verbatim audit trail |
-| Cross-session recall | CLAUDE.md manual notes | None | Thread-scoped or resource-scoped observations | Thread-scoped per session, explicit handoff between agents |
-| Context compression | Hard truncation at window limit | Summarization (proprietary) | 5-40x structured compression, prompt-cacheable | Mastra OM (proven SOTA on LongMemEval) |
-| Multi-agent support | Single agent | Single agent | Multi-agent via resource scoping | Three agents (Claude, OpenCode, Mastra) with shared observation store |
-| Historical analysis | None | None | Not built-in | Custom batch converter using standalone observe() API |
+| Agent | Injection Mechanism | Max Context | Latency Constraint | Notes |
+|-------|--------------------|----|-------|-------|
+| Claude Code | UserPromptSubmit hook (stdout to context) | 10,000 chars (~2,500 tokens) | Hook timeout (configurable) | Primary agent. Build first. Hook fires every prompt -- need relevance threshold to avoid noise. |
+| GitHub Copilot | VS Code extension API or custom LSP adapter | TBD (model-dependent) | Must not delay completion suggestions | Copilot context injection is less documented. May need workspace-level context file instead of per-prompt injection. |
+| OpenCode | Plugin system / custom middleware | TBD | Similar to Claude | OpenCode has `@mastra/opencode` plugin. May be able to inject via Mastra memory provider. |
+| Mastra/Mastracode | Memory provider + system prompt injection | Configurable | Built into Mastra lifecycle | Mastra already has working memory + semantic recall. Our retrieval service could serve as a custom memory provider. |
 
 ## Sources
 
-- [Observational Memory Docs](https://mastra.ai/docs/memory/observational-memory) -- HIGH confidence, official documentation
-- [Observational Memory Research](https://mastra.ai/research/observational-memory) -- HIGH confidence, benchmark results
-- [Announcing Mastra Code](https://mastra.ai/blog/announcing-mastra-code) -- HIGH confidence, official announcement
-- [@mastra/opencode Plugin PR #12925](https://github.com/mastra-ai/mastra/pull/12925) -- MEDIUM confidence, implementation details from merged PR
-- [Mastra Code Configuration](https://code.mastra.ai/configuration) -- HIGH confidence, official docs
-- [Memory Overview](https://mastra.ai/docs/memory/overview) -- HIGH confidence, official docs
-- [Mastra Code npm](https://www.npmjs.com/package/mastracode) -- HIGH confidence, package registry
-- [VentureBeat Coverage](https://venturebeat.com/data/observational-memory-cuts-ai-agent-costs-10x-and-outscores-rag-on-long) -- MEDIUM confidence, press coverage
+- [Anthropic: Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) -- HIGH confidence, official engineering guidance
+- [Mem0 Paper (arXiv)](https://arxiv.org/abs/2504.19413) -- HIGH confidence, peer-reviewed architecture
+- [Mem0 State of AI Agent Memory 2026](https://mem0.ai/blog/state-of-ai-agent-memory-2026) -- MEDIUM confidence, vendor perspective but well-sourced
+- [Zep/Graphiti Temporal Knowledge Graph (arXiv)](https://arxiv.org/html/2501.13956v1) -- HIGH confidence, peer-reviewed
+- [Mastra Observational Memory Research](https://mastra.ai/research/observational-memory) -- HIGH confidence, benchmarked (94.87% LongMemEval)
+- [Claude Code Hooks Reference](https://code.claude.com/docs/en/hooks) -- HIGH confidence, official documentation
+- [Superlinked/Pinecone: Hybrid Search + Reranking](https://superlinked.com/vectorhub/articles/optimizing-rag-with-hybrid-search-reranking) -- HIGH confidence, benchmarked
+- [Manus: Context Engineering Lessons](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus) -- MEDIUM confidence, practitioner report
+- [Agno: Context Engineering in Multi-Agent Systems](https://www.agno.com/blog/context-engineering-in-multi-agent-systems) -- MEDIUM confidence, framework vendor
+- [Best AI Agent Memory Frameworks 2026](https://atlan.com/know/best-ai-agent-memory-frameworks-2026/) -- MEDIUM confidence, survey article
 
 ### Confidence Notes
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Mastra OM architecture | HIGH | Official docs + research paper + benchmarks |
-| OpenCode plugin | HIGH | Official PR merged, documented API |
-| Mastracode setup | HIGH | Official docs, npm package, blog post |
-| Standalone observe() for batch use | MEDIUM | API exists (PR #12925) but not documented for batch/historical use cases. No examples of feeding archived transcripts. |
-| Historical batch conversion | LOW | No official support. Must be custom-built using observe() API. Token budget management and cost control are open questions. |
-| Cross-agent observation sharing | LOW | Resource-scoped OM is marked "experimental" in mastra docs. No production examples of multi-agent shared observations. |
+| Retrieval strategies (hybrid search) | HIGH | Well-benchmarked, production-proven across Qdrant, Pinecone, Zep |
+| Token budgeting | HIGH | Anthropic guidance + Mastra implementation + industry consensus |
+| Claude hook mechanism | HIGH | Official docs, 10K char cap documented, deterministic execution |
+| Multi-agent injection | MEDIUM | Claude hook is well-documented; Copilot/OpenCode injection mechanisms less clear |
+| Feedback signals | MEDIUM | Mem0 and Zep do this in production; our implementation would be custom |
+| Working memory patterns | HIGH | Anthropic + Mastra + OpenAI Agents SDK all converge on structured state documents |
 
 ---
-*Feature research for: Mastra.ai Observational Memory + Mastracode Integration*
-*Researched: 2026-03-28*
+*Feature research for: Knowledge Context Injection (v6.0)*
+*Researched: 2026-04-24*
