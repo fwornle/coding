@@ -87,6 +87,9 @@ services:
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
       # Observation consolidation (live-mounted for auto-consolidation daemon)
       - ${CODING_REPO:-.}/src/live-logging/ObservationConsolidator.js:/coding/src/live-logging/ObservationConsolidator.js:ro
+      # Embedding pipeline (live-mounted for development)
+      - ${CODING_REPO:-.}/dist/embedding:/coding/dist/embedding:ro
+      - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
       - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
     networks:
