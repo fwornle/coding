@@ -1,44 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.0
-milestone_name: -- Service Reliability & Health System Overhaul
-status: executing
-stopped_at: Completed 24-02-PLAN.md
-last_updated: "2026-04-23T09:58:34.563Z"
-last_activity: 2026-04-23
+milestone: v6.0
+milestone_name: Knowledge Context Injection
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-04-24T07:00:00.000Z"
+last_activity: 2026-04-24
 progress:
-  total_phases: 5
+  total_phases: 0
   completed_phases: 0
-  total_plans: 3
-  completed_plans: 2
-  percent: 67
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-23)
+See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable
-**Current focus:** Phase --phase — 24
+**Current focus:** Defining requirements for v6.0
 
 ## Current Position
 
-Phase: 24 — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-23
-
-Progress: [███████░░░] 67%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-24 — Milestone v6.0 started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1 (v5.0)
-- Average duration: 2 min
-- Total execution time: 0.03 hours
+- Total plans completed: 0 (v6.0)
+- Average duration: —
+- Total execution time: 0 hours
 
 *Updated after each plan completion*
 
@@ -46,20 +44,11 @@ Progress: [███████░░░] 67%
 
 ### Decisions
 
-- [v5.0 start]: Health verifier must check ALL services, not just databases and external APIs
-- [v5.0 start]: 60-second detection SLA for any service failure
-- [v5.0 start]: Auto-healing should attempt restart before alerting
-- [v5.0 roadmap]: Auto-healing (PORT-04, SUPV-03) deferred to Phase 26 — detection must exist before remediation
-- [24-01]: auto_heal false for supervisord checks -- report only, let supervisord handle restarts
-- [24-01]: verifySupervisord skips gracefully on host with passed status
-- Used inline Card expand/collapse pattern for Service Detail section
-
-### Known Issues Driving v5.0
-
-- Health dashboard reports "Healthy" while constraint dashboard (3030) and semantic analysis (3848) are down
-- Supervisord processes can be FATAL without health verifier detecting it
-- SQLite corruption from concurrent writes went undetected
-- Stale status files (PID gone, file says "running") not caught
+- [v6.0 start]: Agent-agnostic architecture — retrieval service is standalone HTTP API, each coding agent has its own adapter
+- [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
+- [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)
+- [v6.0 start]: Token budget cap ~2K for injected context
+- [v6.0 start]: Mastra-inspired but adapted — their Observer/Reflector pattern maps to our existing ETM/consolidation pipeline
 
 ### Blockers/Concerns
 
@@ -67,8 +56,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-23T09:58:34.556Z
-Stopped at: Completed 24-02-PLAN.md
-Resume with: `/gsd-plan-phase 24`
-
-**Planned Phase:** 24 (Port Liveness & Supervisord Checks) — 3 plans — 2026-04-23T09:47:22.451Z
+Last session: 2026-04-24
+Stopped at: Milestone initialization
+Resume with: Research → requirements → roadmap

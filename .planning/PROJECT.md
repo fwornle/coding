@@ -2,28 +2,26 @@
 
 ## What This Is
 
-An agentic coding environment with multi-agent support (Claude, Copilot, OpenCode, Mastracode), live session logging, real-time observational memory, semantic knowledge management, and a health dashboard. v1.0-v2.1 shipped the UKB analysis pipeline. v3.0 added workflow state machine. v4.0 integrated mastra.ai's observational memory alongside LSL, added mastracode as a fourth coding agent, and built transcript converters + a live observation dashboard.
+An agentic coding environment with multi-agent support (Claude, Copilot, OpenCode, Mastracode), live session logging, real-time observational memory, semantic knowledge management, and a health dashboard. v1.0-v2.1 shipped the UKB analysis pipeline. v3.0 added workflow state machine. v4.0 integrated mastra.ai's observational memory alongside LSL, added mastracode as a fourth coding agent, and built transcript converters + a live observation dashboard. v5.0 overhauled service reliability and health monitoring.
 
 ## Core Value
 
 A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable — across all AI coding agents.
 
-## Current Milestone: v5.0 Service Reliability & Health System Overhaul
+## Current Milestone: v6.0 Knowledge Context Injection
 
-**Goal:** Make the health system detect all failures — if any service dies, the dashboard shows unhealthy within 60 seconds and attempts auto-healing.
+**Goal:** Automatically surface relevant accumulated knowledge (observations, digests, insights, KG entities) into coding agent conversations via a Mastra-inspired retrieval-and-injection pipeline — agent-agnostic across Claude, Copilot, OpenCode, and Mastra.
 
 **Target features:**
-- Port liveness checks for all services (3030, 3032, 3033, 3848, 8080, 12435)
-- Supervisord status integration — detect FATAL/STOPPED processes inside Docker
-- Database integrity monitoring (SQLite WAL corruption, malformed JSON)
-- Stale status file detection (PID gone but status file says "running")
-- Auto-restart for crashed services (supervisord + host-side processes)
-- Statusline and dashboard accuracy — no green when services are down
-- Observation consolidation daemon reliability
+- Embedding pipeline — embed all knowledge tiers (observations, digests, insights, KG entities) into Qdrant
+- Retrieval service — standalone HTTP endpoint accepting a query, returning token-budgeted relevant knowledge via semantic search + recency + keyword matching
+- Agent-agnostic injection adapters — hook/middleware integration for Claude (UserPromptSubmit hook), GitHub Copilot, OpenCode, and Mastra
+- Working memory template — persistent structured project state document, auto-updated and injected alongside semantic results
+- Feedback loop — new observations/digests/insights automatically embedded as they're created
 
 ## Current State
 
-**v4.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon.
+**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring.
 
 ## Requirements
 
@@ -41,7 +39,7 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ### Active
 
-(Defined in REQUIREMENTS.md for v5.0)
+(Defined in REQUIREMENTS.md for v6.0)
 
 ### Shipped in v4.0
 
@@ -109,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-23 after v5.0 milestone start*
+*Last updated: 2026-04-24 after v6.0 milestone start*
