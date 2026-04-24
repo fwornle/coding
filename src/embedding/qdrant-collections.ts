@@ -19,8 +19,12 @@ interface EmbeddingConfig {
   collections: Record<string, CollectionConfig>;
 }
 
+// Config lives in src/embedding/ but this runs from dist/embedding/
+// Resolve relative to project root to work in both dev (tsx) and compiled (tsc) modes
+const projectRoot = join(__dirname, "..", "..");
+const configPath = join(projectRoot, "src", "embedding", "embedding-config.json");
 const config: EmbeddingConfig = JSON.parse(
-  readFileSync(join(__dirname, "embedding-config.json"), "utf-8")
+  readFileSync(configPath, "utf-8")
 );
 
 let client: QdrantClient | null = null;

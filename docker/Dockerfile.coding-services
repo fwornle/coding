@@ -39,6 +39,16 @@ COPY package.json package-lock.json ./
 # Install root dependencies first (includes @rapid/llm-proxy from github:fwornle/rapid-llm-proxy)
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
+# Install platform-specific native binaries for fastembed tokenizers
+# npm ci --ignore-scripts skips downloading the correct platform binary,
+# so we install it explicitly for the Docker build platform (linux-arm64 or linux-x64)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+      npm install @anush008/tokenizers-linux-arm64-gnu --no-save 2>/dev/null || true; \
+    else \
+      npm install @anush008/tokenizers-linux-x64-gnu --no-save 2>/dev/null || true; \
+    fi
+
 # Copy and install each integration's dependencies separately
 COPY integrations/mcp-server-semantic-analysis/package*.json ./integrations/mcp-server-semantic-analysis/
 RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
