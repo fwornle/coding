@@ -42,6 +42,9 @@ A self-learning coding environment that captures every session, builds knowledge
 - ✓ Embedding pipeline — all knowledge tiers (obs, digests, insights, KG) in Qdrant — Phase 28
 - ✓ Write-time auto-embedding via Redis pub/sub — Phase 28
 - ✓ One-shot backfill CLI with content-hash idempotency — Phase 28
+- ✓ Hybrid retrieval service (semantic + keyword + recency via RRF) — Phase 29
+- ✓ Token-budgeted markdown assembly with tier-weighted scoring — Phase 29
+- ✓ POST /api/retrieve on health API (port 3033), <500ms latency — Phase 29
 
 ### Active
 
