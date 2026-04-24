@@ -86,7 +86,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
 
 ### Phases
 
-- [ ] **Phase 28: Embedding Pipeline** - Embed all knowledge tiers into Qdrant with write-time hooks
+- [x] **Phase 28: Embedding Pipeline** - Embed all knowledge tiers into Qdrant with write-time hooks
 - [ ] **Phase 29: Retrieval Service** - Hybrid search endpoint with token-budgeted context assembly
 - [ ] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations
 - [ ] **Phase 31: Working Memory** - Persistent project state template injected as fixed prefix
@@ -108,7 +108,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
 Plans:
 - [x] 28-01-PLAN.md -- Foundation: fastembed install, embedding config, service wrapper, Qdrant collections
 - [x] 28-02-PLAN.md -- Backfill: one-shot CLI to embed all existing knowledge into Qdrant
-- [ ] 28-03-PLAN.md -- Write-time hooks: Redis pub/sub listener + ObservationWriter integration
+- [x] 28-03-PLAN.md -- Write-time hooks: Redis pub/sub listener + ObservationWriter integration
 
 #### Phase 29: Retrieval Service
 **Goal**: Any client can POST a query and receive a token-budgeted, relevance-scored markdown block of knowledge from all tiers
@@ -173,7 +173,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 28. Embedding Pipeline | v6.0 | 2/3 | Executing | - |
+| 28. Embedding Pipeline | v6.0 | 3/3 | Complete | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 0/TBD | Not started | - |
 | 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |

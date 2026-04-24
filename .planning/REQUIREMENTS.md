@@ -17,7 +17,8 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 **: All existing insights (12) are embedded into Qdrant with metadata (topic, confidence, digestIds)
 - [x] **EMBED-04
 **: All existing KG entities (160+) are embedded into Qdrant with metadata (type, level, parentId)
-- [ ] **EMBED-05**: New observations/digests/insights are embedded automatically on creation (write-time hook)
+- [x] **EMBED-05
+**: New observations/digests/insights are embedded automatically on creation (write-time hook)
 - [x] **EMBED-06
 **: Embedding model is pinned and versioned, using fastembed with all-MiniLM-L6-v2 (384-dim)
 
