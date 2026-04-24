@@ -8,6 +8,7 @@
 - v3.0 -- Workflow State Machine (Phases 15-19, in progress)
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
+- v6.0 -- Knowledge Context Injection (Phases 28-32, planned)
 
 ---
 
@@ -65,94 +66,117 @@
 
 </details>
 
----
-
-## v5.0 -- Service Reliability & Health System Overhaul
-
-### Overview
-
-Four phases that make the health system truthful and self-healing. Phase 24 builds the core detection layer: port liveness probes across all six service ports and supervisord process status integration — the minimal set needed to detect that something is wrong. Phase 25 adds deeper health checks for the data tier: SQLite integrity, malformed JSON detection, WAL management, and stale PID/status file detection for host-side processes. Phase 26 makes the dashboard reflect ground truth and adds auto-healing: auto-restart for crashed port-bound services and FATAL supervisord processes, accurate statusline, per-service failure cards, and a failure history timeline. Phase 27 closes the loop on insight quality by adding a codebase validator that checks whether file paths and function names cited in insights still exist.
-
-### Phases
+<details>
+<summary>v5.0 Service Reliability & Health System Overhaul -- Phases 24-27</summary>
 
 - [ ] **Phase 24: Port Liveness & Supervisord Checks** - Core failure detection for all services and container processes
 - [ ] **Phase 25: Database Health & Process Lifecycle** - SQLite integrity, WAL management, stale PID detection, host process monitoring
 - [ ] **Phase 26: Dashboard Accuracy & Auto-Healing** - Truthful dashboard, auto-restart for crashed services, failure history timeline
 - [ ] **Phase 27: Insight Validation** - Verify insight claims against the codebase, flag stale references
 
+</details>
+
+---
+
+## v6.0 -- Knowledge Context Injection
+
+### Overview
+
+Five phases that make accumulated knowledge actionable by injecting it into coding agent conversations. Phase 28 embeds all knowledge tiers (observations, digests, insights, KG entities) into Qdrant with write-time hooks for new items. Phase 29 builds the retrieval service -- a hybrid search endpoint combining semantic, keyword, and recency scoring with token budget enforcement. Phase 30 wires the Claude Code UserPromptSubmit hook as the primary injection adapter, proving end-to-end value. Phase 31 adds a persistent working memory template injected alongside retrieval results. Phase 32 extends to remaining agents (OpenCode, Copilot) and adds per-agent scoring profiles with cross-agent continuity.
+
+### Phases
+
+- [ ] **Phase 28: Embedding Pipeline** - Embed all knowledge tiers into Qdrant with write-time hooks
+- [ ] **Phase 29: Retrieval Service** - Hybrid search endpoint with token-budgeted context assembly
+- [ ] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations
+- [ ] **Phase 31: Working Memory** - Persistent project state template injected as fixed prefix
+- [ ] **Phase 32: Agent Profiles & Additional Adapters** - Per-agent scoring, OpenCode/Copilot adapters, cross-agent continuity
+
 ### Phase Details
 
-#### Phase 24: Port Liveness & Supervisord Checks
-**Goal**: The health system detects any crashed service within 60 seconds via port probes and supervisord status reads
-**Depends on**: Phase 23 (health verifier + dashboard exist)
-**Requirements**: PORT-01, PORT-02, PORT-03, SUPV-01, SUPV-02, SUPV-04
+#### Phase 28: Embedding Pipeline
+**Goal**: All accumulated knowledge exists as searchable vectors in Qdrant, and new knowledge is embedded automatically on creation
+**Depends on**: Nothing (first phase of v6.0)
+**Requirements**: EMBED-01, EMBED-02, EMBED-03, EMBED-04, EMBED-05, EMBED-06
 **Success Criteria** (what must be TRUE):
-  1. Health verifier probes all six ports (3030, 3032, 3033, 3848, 8080, 12435) every 30 seconds and marks unreachable ports as failures
-  2. Killing any service makes the dashboard show that service as unhealthy within 60 seconds
-  3. Dashboard health card displays per-port green/red status with a last-checked timestamp for each port
-  4. Health verifier reads supervisord process status from inside the Docker container and exposes it to the API
-  5. FATAL or STOPPED supervisord processes appear as critical violations in the health report
-  6. Dashboard shows a supervisord process list with per-process status (RUNNING / FATAL / STOPPED)
-**Plans**: 3 plans
+  1. Running a Qdrant collection listing shows 4 knowledge collections (observations, digests, insights, kg_entities) with point counts matching source data (558+ obs, 132+ digests, 12+ insights, 160+ entities)
+  2. Creating a new observation via ETM causes it to appear in Qdrant within 60 seconds without manual intervention
+  3. Querying Qdrant with a semantic search for a known observation topic returns relevant results with correct metadata (agent, project, date, quality)
+  4. The embedding model is pinned to all-MiniLM-L6-v2 (384-dim) in a single config location, and changing it requires updating only that one value
+**Plans**: TBD
 
 Plans:
-- [ ] 24-01-PLAN.md — Fix port 3030 disable, add port 3848 rule, implement supervisord integration
-- [ ] 24-02-PLAN.md — Dashboard Service Detail section with per-port and per-supervisord-process status
-- [ ] 24-03-PLAN.md — Docker rebuild and end-to-end visual verification
+- [ ] 28-01-PLAN.md -- TBD
+- [ ] 28-02-PLAN.md -- TBD
 
-**UI hint**: yes
-
-#### Phase 25: Database Health & Process Lifecycle
-**Goal**: The health system detects data-tier corruption and stale host-side process state before they cause silent failures
-**Depends on**: Phase 24 (health verifier polling loop established)
-**Requirements**: DBHL-01, DBHL-02, DBHL-03, DBHL-04, PROC-01, PROC-02, PROC-03, PROC-04
+#### Phase 29: Retrieval Service
+**Goal**: Any client can POST a query and receive a token-budgeted, relevance-scored markdown block of knowledge from all tiers
+**Depends on**: Phase 28 (vectors must exist in Qdrant)
+**Requirements**: RETR-01, RETR-02, RETR-03, RETR-04, RETR-05, RETR-06, RETR-07
 **Success Criteria** (what must be TRUE):
-  1. SQLite PRAGMA integrity_check runs periodically and reports any corruption as a health failure
-  2. Malformed JSON rows in the observations DB are detected and surfaced in the health report
-  3. Dashboard offers a DB repair action (dump valid rows, rebuild, restore) that requires user confirmation before executing
-  4. WAL checkpoint runs automatically to prevent unbounded WAL file growth
-  5. Stale PID files are detected — if a status file says "running" but the PID is gone, the health system flags the discrepancy
-  6. Host-side processes (ETM, LLM proxy) are health-checked and included in the overall health report
-  7. PSM supervision coverage includes all host-side services, with status file staleness flagged after 5 minutes of inactivity
+  1. POSTing a query to /api/retrieve returns a structured markdown block with tier headers (Insights, Digests, Entities, Observations) and source attribution per result
+  2. The returned context stays within the configured token budget (default ~1000 tokens) even when many results match
+  3. Insights and digests consistently rank above raw observations for the same topic (tier-weighted scoring works)
+  4. Queries with no relevant matches return an empty result rather than low-confidence noise (relevance threshold 0.75 enforced)
+  5. The endpoint responds in under 500ms at p95 measured over 20 consecutive queries
 **Plans**: TBD
-**UI hint**: yes
 
-#### Phase 26: Dashboard Accuracy & Auto-Healing
-**Goal**: The dashboard shows true service state at all times and attempts automatic recovery when services crash
-**Depends on**: Phase 24 (detection data), Phase 25 (full health data available)
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, PORT-04, SUPV-03
-**Success Criteria** (what must be TRUE):
-  1. Killing any service causes the dashboard health card to turn red within 60 seconds -- no false greens remain
-  2. The statusline hook reports the same health state as the dashboard (no split-brain between terminal and browser)
-  3. Each service has its own health card showing failure reason and last-seen timestamp
-  4. A failure history timeline shows when services went down and came back, visible on the dashboard
-  5. A port unreachable for 2 consecutive checks triggers an auto-restart attempt, with outcome shown on the dashboard
-  6. A FATAL supervisord process triggers an auto-restart via supervisord API, with outcome shown on the dashboard
-**Plans**: TBD
-**UI hint**: yes
+Plans:
+- [ ] 29-01-PLAN.md -- TBD
+- [ ] 29-02-PLAN.md -- TBD
 
-#### Phase 27: Insight Validation
-**Goal**: Users can verify whether insight claims still match the codebase and see stale references flagged inline
-**Depends on**: Phase 23 (insights exist and are browsable on dashboard)
-**Requirements**: IVAL-01, IVAL-02, IVAL-03, IVAL-04
+#### Phase 30: Claude Hook Adapter
+**Goal**: Claude Code conversations automatically receive relevant knowledge context on every prompt submission
+**Depends on**: Phase 29 (retrieval endpoint must exist)
+**Requirements**: HOOK-01, HOOK-02, HOOK-03
 **Success Criteria** (what must be TRUE):
-  1. Each insight card on the dashboard has a Validate button the user can click
-  2. Clicking Validate triggers a codebase check that extracts file paths and function names from the insight text and verifies they exist
-  3. Stale claims show specific details (file moved, function renamed, line reference outdated) rather than a generic "stale" flag
-  4. Validation results appear inline on the insight card -- each claim is marked verified, stale, or unknown without a page reload
+  1. Typing a substantive prompt in Claude Code causes injected knowledge to appear as system-reminder context visible in the conversation
+  2. If the retrieval service is stopped, Claude Code continues working normally with no errors or delays (fail-open behavior)
+  3. Short prompts like "yes", "continue", or single-word commands do not trigger knowledge injection
 **Plans**: TBD
-**UI hint**: yes
+
+Plans:
+- [ ] 30-01-PLAN.md -- TBD
+
+#### Phase 31: Working Memory
+**Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
+**Depends on**: Phase 29 (injected via retrieval service response)
+**Requirements**: WMEM-01, WMEM-02, WMEM-03
+**Success Criteria** (what must be TRUE):
+  1. The retrieval response includes a "Working Memory" section containing current project state, active conventions, and known issues
+  2. The working memory section stays under 500 tokens regardless of project complexity
+  3. Working memory content reflects actual KG state -- adding or removing a KG entity causes the working memory to update on next retrieval
+**Plans**: TBD
+
+Plans:
+- [ ] 31-01-PLAN.md -- TBD
+
+#### Phase 32: Agent Profiles & Additional Adapters
+**Goal**: All supported coding agents receive knowledge injection tailored to their work patterns, with continuity across agent switches
+**Depends on**: Phase 30 (Claude hook proves the pattern), Phase 29 (retrieval service)
+**Requirements**: HOOK-04, HOOK-05, PROF-01, PROF-02
+**Success Criteria** (what must be TRUE):
+  1. OpenCode receives injected knowledge context via its plugin system or agent configuration file
+  2. Copilot receives injected knowledge context via workspace context file or instructions mechanism
+  3. Switching from Claude to OpenCode mid-task causes the OpenCode session to include recent observations from the preceding Claude session
+  4. Different agents receive differently weighted results for the same query (e.g., Claude biased toward architecture pitfalls, Copilot toward code conventions)
+**Plans**: TBD
+
+Plans:
+- [ ] 32-01-PLAN.md -- TBD
+- [ ] 32-02-PLAN.md -- TBD
 
 ### Progress
 
-**Execution Order:** 24 -> 25 -> 26 -> 27
+**Execution Order:** 28 -> 29 -> 30 -> 31 -> 32
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 24. Port Liveness & Supervisord Checks | v5.0 | 0/3 | Planned | - |
-| 25. Database Health & Process Lifecycle | v5.0 | 0/TBD | Not started | - |
-| 26. Dashboard Accuracy & Auto-Healing | v5.0 | 0/TBD | Not started | - |
-| 27. Insight Validation | v5.0 | 0/TBD | Not started | - |
+| 28. Embedding Pipeline | v6.0 | 0/TBD | Not started | - |
+| 29. Retrieval Service | v6.0 | 0/TBD | Not started | - |
+| 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
+| 31. Working Memory | v6.0 | 0/TBD | Not started | - |
+| 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
 
 ---
 
@@ -160,7 +184,7 @@ Plans:
 
 ### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)
 
-**Goal:** Extract `lib/llm/` to a shared submodule used by coding and rapid-automations/OKB. Add direct HTTP path for Claude Max (OAuth token from keychain → Anthropic API, no CLI spawn) to eliminate 12-15s latency. Copilot provider already does direct HTTP (~2-5s) — same pattern for claude-code.
+**Goal:** Extract `lib/llm/` to a shared submodule used by coding and rapid-automations/OKB. Add direct HTTP path for Claude Max (OAuth token from keychain -> Anthropic API, no CLI spawn) to eliminate 12-15s latency. Copilot provider already does direct HTTP (~2-5s) -- same pattern for claude-code.
 **Requirements:** TBD
 **Plans:** 0 plans
 
