@@ -4,12 +4,12 @@ milestone: v6.0
 milestone_name: -- Knowledge Context Injection
 status: planning
 stopped_at: Phase 28 context gathered
-last_updated: "2026-04-24T10:25:02.467Z"
+last_updated: "2026-04-24T11:02:29.193Z"
 last_activity: 2026-04-24 -- Roadmap created for v6.0
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -67,3 +67,5 @@ Progress: [░░░░░░░░░░] 0%
 Last session: --stopped-at
 Stopped at: Phase 28 context gathered
 Resume with: `/gsd-plan-phase 28`
+
+**Planned Phase:** 28 (Embedding Pipeline) — 3 plans — 2026-04-24T11:02:29.187Z
