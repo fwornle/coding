@@ -120,11 +120,11 @@ Plans:
   3. Insights and digests consistently rank above raw observations for the same topic (tier-weighted scoring works)
   4. Queries with no relevant matches return an empty result rather than low-confidence noise (relevance threshold 0.75 enforced)
   5. The endpoint responds in under 500ms at p95 measured over 20 consecutive queries
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 29-01-PLAN.md -- TBD
-- [ ] 29-02-PLAN.md -- TBD
+- [ ] 29-01-PLAN.md -- Core retrieval module: RRF fusion, token budgeting, keyword search, RetrievalService orchestrator
+- [ ] 29-02-PLAN.md -- Wire POST /api/retrieve into server.js + end-to-end verification
 
 #### Phase 30: Claude Hook Adapter
 **Goal**: Claude Code conversations automatically receive relevant knowledge context on every prompt submission
@@ -174,7 +174,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
-| 29. Retrieval Service | v6.0 | 0/TBD | Not started | - |
+| 29. Retrieval Service | v6.0 | 0/2 | Not started | - |
 | 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |
 | 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
