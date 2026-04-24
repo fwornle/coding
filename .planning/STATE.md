@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
-status: executing
-stopped_at: Completed 29-01-PLAN.md
-last_updated: "2026-04-24T13:56:50.244Z"
-last_activity: 2026-04-24 -- Plan 29-01 executed (retrieval service core)
+status: verifying
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-04-24T14:11:21.988Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 Phase: 29-retrieval-service — EXECUTING
 Plan: 2 of 2
-Status: Plan 29-01 complete, ready for 29-02
-Last activity: 2026-04-24 -- Plan 29-01 executed (retrieval service core)
+Status: Phase complete — ready for verification
+Last activity: 2026-04-24
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -60,6 +60,9 @@ Progress: [████████░░] 80%
 - Fire-and-forget Redis publish with fail-fast retryStrategy ensures observation writes never block on embedding
 - Plain JS for src/retrieval/ modules to match server.js consumer and avoid TS compilation step
 - Import compiled dist/embedding/ outputs from retrieval modules (not raw src/embedding/ TS)
+- Added src/retrieval bind-mount to docker-compose.yml for retrieval modules in Docker
+- Set absolute cacheDir in FlagEmbedding.init() to prevent CWD-relative model loading
+- Reset _initPromise on failure for retry support in RetrievalService
 
 ### Blockers/Concerns
 
@@ -69,8 +72,8 @@ Progress: [████████░░] 80%
 
 ## Session Continuity
 
-Last session: 2026-04-24T13:56:50.237Z
-Stopped at: Completed 29-01-PLAN.md
+Last session: 2026-04-24T14:11:21.981Z
+Stopped at: Completed 29-02-PLAN.md
 Resume with: `/gsd-execute-phase 28-02`
 
 **Planned Phase:** 29 (Retrieval Service) — 2 plans — 2026-04-24T13:46:48.202Z

@@ -24,7 +24,8 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Retrieval Service
 
-- [ ] **RETR-01**: HTTP endpoint accepts query string and returns token-budgeted relevant knowledge
+- [x] **RETR-01
+**: HTTP endpoint accepts query string and returns token-budgeted relevant knowledge
 - [x] **RETR-02
 **: Hybrid retrieval combines semantic search (Qdrant) + keyword search (SQLite FTS) + recency weighting
 - [x] **RETR-03
@@ -35,7 +36,8 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 **: Context assembly formats results as structured markdown with source attribution
 - [x] **RETR-06
 **: Relevance threshold prevents injection of low-confidence results (configurable, default 0.75)
-- [ ] **RETR-07**: Service responds in <500ms p95 latency
+- [x] **RETR-07
+**: Service responds in <500ms p95 latency
 
 ### Agent Adapters
 
