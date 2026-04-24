@@ -1,0 +1,20 @@
+{
+  "model": "all-MiniLM-L6-v2",
+  "dimensions": 384,
+  "distance": "Cosine",
+  "version": "1.0.0",
+  "collections": {
+    "observations": {
+      "payloadIndexes": ["agent", "quality", "project", "date"]
+    },
+    "digests": {
+      "payloadIndexes": ["quality", "date"]
+    },
+    "insights": {
+      "payloadIndexes": ["topic", "confidence"]
+    },
+    "kg_entities": {
+      "payloadIndexes": ["entityType", "hierarchyLevel"]
+    }
+  }
+}
