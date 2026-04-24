@@ -8,7 +8,7 @@
 
 Phase 28 establishes the vector foundation for the entire v6.0 Knowledge Context Injection milestone. All four knowledge tiers (650 observations, 132 digests, 12 insights, 678 KG entities) must be embedded as 384-dim vectors in Qdrant, with new items embedded automatically via Redis pub/sub events. The existing Python subprocess embedding approach (`EmbeddingGenerator.cjs` spawning `embedding_generator.py`) is replaced by `fastembed` (Node.js ONNX runtime) running the same `all-MiniLM-L6-v2` model natively without Python dependencies.
 
-The codebase already has `@qdrant/js-client-rest` and `gpt-tokenizer` in root `package.json`. Qdrant is running in Docker at port 6333 with 5 existing collections (none for this pipeline). Redis is in Docker at port 6379 but is NOT reachable from the host -- the embedding listener must either run inside Docker or Redis must be port-forwarded. The Docker base image is `node:22-bookworm` (Debian/glibc), which is compatible with fastembed's ONNX runtime.
+The codebase already has `@qdrant/js-client-rest` and `gpt-tokenizer` in root `package.json`. Qdrant is running in Docker at port 6333 with 5 existing collections (none for this pipeline). Redis is in Docker at port 6379 and IS reachable from the host via Docker port-mapping (verified 2026-04-24: `nc -z localhost 6379` succeeds, `docker exec coding-redis redis-cli ping` returns PONG). The Docker base image is `node:22-bookworm` (Debian/glibc), which is compatible with fastembed's ONNX runtime.
 
 **Primary recommendation:** Install fastembed in root package.json, create 4 Qdrant collections, build a host-side backfill CLI script, and implement a Redis pub/sub listener as a new supervisord process in Docker for write-time embedding.
 
@@ -313,6 +313,7 @@ if (existingPoints.points.length > 0) {
 **Why it happens:** Redis is listed in docker-compose.yml with `ports: 6379:6379`, which should work. But corporate proxies, VPNs, or Docker networking issues can interfere.
 **How to avoid:** (1) Test Redis connectivity from host before implementing pub/sub: `redis-cli -h localhost -p 6379 ping`. (2) Make the publish call fire-and-forget with a try/catch -- observation writes must never fail because Redis is down. (3) The backfill script serves as a catch-all for missed events.
 **Warning signs:** `redis-cli ping` returns "Could not connect" from the host.
+**Status:** VERIFIED WORKING (2026-04-24) -- `nc -z localhost 6379` succeeds, `docker exec coding-redis redis-cli ping` returns PONG. Original research failure was due to Docker not running.
 
 ### Pitfall 2: Fastembed Model Download on First Use
 **What goes wrong:** fastembed downloads the ONNX model (~25MB for all-MiniLM-L6-v2) on first `FlagEmbedding.init()`. In Docker, this happens at container start. Behind a corporate proxy, the download may fail or hang. The listener process crashes on startup.
@@ -437,38 +438,35 @@ for (let i = 0; i < observations.length; i += BATCH_SIZE) {
 |---|-------|---------|---------------|
 | A1 | `ioredis` is the better choice over `redis` (node-redis v4) for pub/sub | Standard Stack | LOW -- either works; ioredis has simpler sub API but node-redis v4 is also capable. Could use either. |
 | A2 | fastembed's `EmbeddingModel.AllMiniLML6V2` enum exists for all-MiniLM-L6-v2 | Code Examples | MEDIUM -- the enum name is inferred from the npm README model list. May be different. Must verify at implementation time. |
-| A3 | Redis port 6379 is accessible from host via Docker port-mapping | Architecture | HIGH -- tested during research and got "Redis not reachable on host". Docker may not be running or port-mapping may be misconfigured. Must verify. |
+| A3 | Redis port 6379 is accessible from host via Docker port-mapping | Architecture | ~~HIGH~~ RESOLVED -- verified 2026-04-24: `nc -z localhost 6379` succeeds, `docker exec coding-redis redis-cli ping` returns PONG. Original failure was Docker not running. |
 | A4 | Optimal batch size for fastembed is 64 | Code Examples | LOW -- fastembed defaults to 256. 64 is conservative for ~900 items. Can adjust empirically. |
 | A5 | KG entities should be filtered (skip scaffold nodes) before embedding | Pitfalls | LOW -- scaffold nodes have minimal content but including them adds noise without harm except wasted compute. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Redis accessibility from host**
+1. **Redis accessibility from host** -- RESOLVED (2026-04-24)
    - What we know: `redis-cli ping` returned "Redis not reachable on host" during research. Docker may not have been running at research time.
-   - What's unclear: Is Redis consistently port-forwarded to localhost:6379? Does the corporate proxy/VPN interfere?
-   - Recommendation: Test with Docker running. If unreachable, the ObservationWriter (host-side) cannot publish directly. Alternative: publish via HTTP to a thin relay inside Docker, or add an `embedded_at IS NULL` polling fallback.
+   - **Resolution:** Verified with Docker running: `nc -z localhost 6379` succeeds and `docker exec coding-redis redis-cli ping` returns PONG. Redis IS reachable from the host at localhost:6379 via Docker port-mapping. The original failure was due to Docker not running at research time. ObservationWriter can publish directly to localhost:6379.
+   - **Fallback for Plan 03:** If Redis becomes unreachable at execution time (e.g., Docker restart), ObservationWriter's fire-and-forget pattern with `retryStrategy: () => null` and `connectTimeout: 2000` ensures observation writes never block. Missed events are caught by running the backfill script. Plan 03 Task 3 checkpoint includes a Redis connectivity test step.
 
-2. **fastembed model enum naming**
+2. **fastembed model enum naming** -- RESOLVED (2026-04-24)
    - What we know: npm README lists `EmbeddingModel.BGEBaseEN` as default. `all-MiniLM-L6-v2` is listed as supported.
-   - What's unclear: Exact enum value for all-MiniLM-L6-v2 (could be `AllMiniLML6V2` or a string constant).
-   - Recommendation: Check at implementation time with `console.log(EmbeddingModel)` to enumerate available values.
+   - **Resolution:** Plan 01 executor MUST verify the exact enum value at implementation time by running `npx -e "const { EmbeddingModel } = require('fastembed'); console.log(Object.keys(EmbeddingModel))"` after installing fastembed. If `AllMiniLML6V2` does not exist, use the string constant from the enum listing. The embedding-service.ts init step should log the resolved model name.
 
-3. **EmbeddingCache reuse vs. Qdrant-only**
+3. **EmbeddingCache reuse vs. Qdrant-only** -- RESOLVED (2026-04-24)
    - What we know: Existing `EmbeddingCache` (disk-backed, 7-day TTL) stores embeddings at `.data/entity-embeddings.json`. Qdrant also stores vectors persistently.
-   - What's unclear: Whether keeping the disk cache adds value or is redundant with Qdrant.
-   - Recommendation: Skip the EmbeddingCache. Qdrant is the source of truth for vectors. The cache was designed for the old batch-analysis pipeline. Adding a cache layer between fastembed and Qdrant is unnecessary complexity for ~900 items.
+   - **Resolution:** Do NOT reuse the EmbeddingCache. Qdrant is the sole vector store. The EmbeddingCache was designed for the old batch-analysis pipeline. Adding a cache layer between fastembed and Qdrant creates consistency problems and adds no benefit for ~900 items. Content-hash idempotency in Qdrant itself handles dedup.
 
-4. **Where to install fastembed: root vs. semantic-analysis submodule**
+4. **Where to install fastembed: root vs. semantic-analysis submodule** -- RESOLVED (2026-04-24)
    - What we know: STACK.md recommends installing in `integrations/mcp-server-semantic-analysis`. But the backfill script runs host-side from root.
-   - What's unclear: Whether fastembed should be a root dependency or submodule dependency.
-   - Recommendation: Install in root `package.json`. The backfill CLI and the embedding service both run from the project root. The submodule's Express server (Phase 29) will access the retrieval service via HTTP, not directly.
+   - **Resolution:** Install in root `package.json`. Both the backfill CLI (host-side) and the embedding service run from the project root. The Docker container accesses the compiled JS via bind-mount. The submodule's Express server (Phase 29) will access the retrieval service via HTTP, not by importing fastembed directly.
 
 ## Environment Availability
 
 | Dependency | Required By | Available | Version | Fallback |
 |------------|------------|-----------|---------|----------|
 | Qdrant | Vector storage | Yes | latest (Docker) | -- |
-| Redis | Pub/sub events | Partial | 7-alpine (Docker) | Port not reachable from host at research time; may need Docker restart |
+| Redis | Pub/sub events | Yes | 7-alpine (Docker) | Verified reachable from host at localhost:6379 (2026-04-24). Fire-and-forget if temporarily down. |
 | Node.js | All scripts | Yes | 22.x (host) / 22-bookworm (Docker) | -- |
 | better-sqlite3 | SQLite access | Yes | Installed in root deps | -- |
 | level | LevelDB access | Yes | Installed in root deps | -- |
@@ -480,7 +478,7 @@ for (let i = 0; i < observations.length; i += BATCH_SIZE) {
 - `ioredis` -- must install for Redis pub/sub (or use `redis` v4 from constraint-monitor)
 
 **Missing dependencies with fallback:**
-- Redis host access -- if port 6379 not reachable from host, ObservationWriter can write an `embedded_at IS NULL` marker and backfill script catches up
+- None -- Redis host access verified working (2026-04-24)
 
 ## Discretion Recommendations
 
@@ -513,6 +511,29 @@ for (let i = 0; i < observations.length; i += BATCH_SIZE) {
 ### ONNX Model Download Strategy
 **Recommendation:** Lazy download on first use (no Dockerfile change for now).
 **Rationale:** The backfill script runs on the host where internet access is available. The Docker listener will also have access. Pre-downloading in Dockerfile adds build complexity and a ~25MB layer. If corporate proxy issues arise, add a pre-download step later. The model is cached after first download (~`~/.cache/fastembed/`).
+
+## SQLite Schema Verification (2026-04-24)
+
+**Verified:** The digests and insights tables have ALL D-04 metadata columns:
+
+```sql
+-- digests table: has theme, agents, quality columns
+CREATE TABLE digests (
+  id TEXT PRIMARY KEY, date TEXT NOT NULL, theme TEXT NOT NULL,
+  summary TEXT NOT NULL, observation_ids TEXT NOT NULL,
+  agents TEXT, files_touched TEXT, quality TEXT DEFAULT 'normal',
+  created_at TEXT NOT NULL, metadata TEXT
+);
+
+-- insights table: has topic, confidence, digest_ids columns
+CREATE TABLE insights (
+  id TEXT PRIMARY KEY, topic TEXT NOT NULL, summary TEXT NOT NULL,
+  confidence REAL DEFAULT 0.8, digest_ids TEXT NOT NULL,
+  last_updated TEXT NOT NULL, created_at TEXT NOT NULL, metadata TEXT
+);
+```
+
+No fallback to JSON exports needed for D-04 metadata fields -- SQLite has them directly.
 
 ## Metadata
 
