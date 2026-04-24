@@ -37,6 +37,12 @@ A self-learning coding environment that captures every session, builds knowledge
 - ✓ Component manifest defines L1/L2 hierarchy as source of truth — v1.0
 - ✓ Ontology accepts Component/SubComponent entity types — v1.0
 
+### Shipped in v6.0
+
+- ✓ Embedding pipeline — all knowledge tiers (obs, digests, insights, KG) in Qdrant — Phase 28
+- ✓ Write-time auto-embedding via Redis pub/sub — Phase 28
+- ✓ One-shot backfill CLI with content-hash idempotency — Phase 28
+
 ### Active
 
 (Defined in REQUIREMENTS.md for v6.0)
