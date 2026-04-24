@@ -134,10 +134,10 @@ Plans:
   1. Typing a substantive prompt in Claude Code causes injected knowledge to appear as system-reminder context visible in the conversation
   2. If the retrieval service is stopped, Claude Code continues working normally with no errors or delays (fail-open behavior)
   3. Short prompts like "yes", "continue", or single-word commands do not trigger knowledge injection
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 30-01-PLAN.md -- TBD
+- [ ] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
 
 #### Phase 31: Working Memory
 **Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
@@ -175,7 +175,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
-| 30. Claude Hook Adapter | v6.0 | 0/TBD | Not started | - |
+| 30. Claude Hook Adapter | v6.0 | 0/1 | Planned | - |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |
 | 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
 
