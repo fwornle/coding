@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import Redis from 'ioredis';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 
@@ -64,6 +65,9 @@ export class ObservationWriter {
     /** Write lock: serializes DB writes so concurrent fire-and-forget calls
      *  don't race past the semantic dedup check (TOCTOU prevention) */
     this._writeLock = Promise.resolve();
+    /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
+    this._redisPub = null;
+    this._redisInitAttempted = false;
   }
 
   /**
@@ -142,6 +146,30 @@ export class ObservationWriter {
       return this._redactor.redact(text);
     } catch {
       return text;
+    }
+  }
+
+  /**
+   * Lazily initialize Redis publisher for embedding events.
+   * Fire-and-forget: if Redis is unreachable, observations still work.
+   */
+  _initRedis() {
+    if (this._redisInitAttempted) return;
+    this._redisInitAttempted = true;
+    try {
+      this._redisPub = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null, // Don't retry -- fail fast
+        lazyConnect: true,
+        connectTimeout: 2000,
+      });
+      this._redisPub.connect().catch((err) => {
+        process.stderr.write(`[ObservationWriter] Redis connect failed (non-fatal): ${err.message}\n`);
+        this._redisPub = null;
+      });
+    } catch (err) {
+      process.stderr.write(`[ObservationWriter] Redis init failed (non-fatal): ${err.message}\n`);
+      this._redisPub = null;
     }
   }
 
@@ -429,6 +457,20 @@ export class ObservationWriter {
       quality,
     );
 
+    // Fire-and-forget: publish embedding event to Redis (per D-05)
+    this._initRedis();
+    if (this._redisPub) {
+      this._redisPub.publish('embedding:new', JSON.stringify({
+        type: 'observation',
+        id,
+        content: redactedSummary,
+        metadata: { agent, quality, date: nowISO.slice(0, 10), project: 'coding' },
+        timestamp: nowISO,
+      })).catch((err) => {
+        process.stderr.write(`[ObservationWriter] Redis publish failed (non-fatal): ${err.message}\n`);
+      });
+    }
+
     // Debounced JSON export — coalesce rapid-fire writes into one export
     this._scheduleExport();
 
@@ -672,6 +714,11 @@ export class ObservationWriter {
     }
     if (this._exporter && this.db) {
       try { this._exporter.exportObservations(); } catch { /* best effort */ }
+    }
+    // Disconnect Redis publisher if active
+    if (this._redisPub) {
+      try { this._redisPub.disconnect(); } catch { /* best effort */ }
+      this._redisPub = null;
     }
     if (this.db) {
       try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
