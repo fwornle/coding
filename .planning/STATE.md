@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
-status: planning
-stopped_at: Phase 29 context gathered
-last_updated: "2026-04-24T13:46:48.210Z"
-last_activity: 2026-04-24
+status: executing
+stopped_at: Completed 29-01-PLAN.md
+last_updated: "2026-04-24T13:56:50.244Z"
+last_activity: 2026-04-24 -- Plan 29-01 executed (retrieval service core)
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase --phase — 28
+**Current focus:** Phase 29 — Retrieval Service
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-24
+Phase: 29-retrieval-service — EXECUTING
+Plan: 2 of 2
+Status: Plan 29-01 complete, ready for 29-02
+Last activity: 2026-04-24 -- Plan 29-01 executed (retrieval service core)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -58,6 +58,8 @@ Progress: [██████████] 100%
 - [28-01]: EmbeddingModel.AllMiniLML6V2 enum verified at runtime; queryEmbed returns Float32Array converted via Array.from()
 - Deterministic UUID from KG entity keys via MD5 hash for Qdrant point IDs
 - Fire-and-forget Redis publish with fail-fast retryStrategy ensures observation writes never block on embedding
+- Plain JS for src/retrieval/ modules to match server.js consumer and avoid TS compilation step
+- Import compiled dist/embedding/ outputs from retrieval modules (not raw src/embedding/ TS)
 
 ### Blockers/Concerns
 
@@ -67,8 +69,8 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 29 context gathered
+Last session: 2026-04-24T13:56:50.237Z
+Stopped at: Completed 29-01-PLAN.md
 Resume with: `/gsd-execute-phase 28-02`
 
 **Planned Phase:** 29 (Retrieval Service) — 2 plans — 2026-04-24T13:46:48.202Z
