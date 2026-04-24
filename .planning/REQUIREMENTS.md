@@ -1,113 +1,111 @@
-# Requirements: Coding Project — Service Reliability
+# Requirements: Knowledge Context Injection (v6.0)
 
-**Defined:** 2026-04-23
-**Core Value:** If any service in the coding stack dies, the health system detects it within 60 seconds, shows it as unhealthy, and attempts auto-healing.
+**Defined:** 2026-04-24
+**Core Value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable — across all AI coding agents.
 
-## v5.0 Requirements
+## v1 Requirements
 
-Requirements for service reliability milestone. Each maps to roadmap phases.
+Requirements for v6.0 milestone. Each maps to roadmap phases.
 
-### Port Liveness
+### Embedding Pipeline
 
-- [x] **PORT-01
-**: Health verifier checks all expected ports (3030, 3032, 3033, 3848, 8080, 12435) and reports unreachable ones as failures
-- [x] **PORT-02
-**: Port check runs every 30 seconds with configurable timeout
-- [x] **PORT-03
-**: Dashboard health card shows per-port status (green/red) with last-checked timestamp
-- [ ] **PORT-04**: Auto-restart triggered when a port is unreachable for 2 consecutive checks
+- [ ] **EMBED-01**: All existing observations (558) are embedded into Qdrant with metadata (agent, project, date, quality)
+- [ ] **EMBED-02**: All existing digests (132) are embedded into Qdrant with metadata (date, theme, agents, quality)
+- [ ] **EMBED-03**: All existing insights (12) are embedded into Qdrant with metadata (topic, confidence, digestIds)
+- [ ] **EMBED-04**: All existing KG entities (160+) are embedded into Qdrant with metadata (type, level, parentId)
+- [ ] **EMBED-05**: New observations/digests/insights are embedded automatically on creation (write-time hook)
+- [ ] **EMBED-06**: Embedding model is pinned and versioned, using fastembed with all-MiniLM-L6-v2 (384-dim)
 
-### Supervisord Integration
+### Retrieval Service
 
-- [x] **SUPV-01
-**: Health verifier reads supervisord process status from inside the container
-- [x] **SUPV-02
-**: FATAL or STOPPED processes are reported as critical health violations
-- [ ] **SUPV-03**: Auto-restart attempted for FATAL processes via supervisord API
-- [x] **SUPV-04
-**: Dashboard shows supervisord process list with status (RUNNING/FATAL/STOPPED)
+- [ ] **RETR-01**: HTTP endpoint accepts query string and returns token-budgeted relevant knowledge
+- [ ] **RETR-02**: Hybrid retrieval combines semantic search (Qdrant) + keyword search (SQLite FTS) + recency weighting
+- [ ] **RETR-03**: Tier-weighted scoring prioritizes insights > digests > KG entities > observations
+- [ ] **RETR-04**: Token budget enforcement caps injected context (configurable, default ~1000 tokens)
+- [ ] **RETR-05**: Context assembly formats results as structured markdown with source attribution
+- [ ] **RETR-06**: Relevance threshold prevents injection of low-confidence results (configurable, default 0.75)
+- [ ] **RETR-07**: Service responds in <500ms p95 latency
 
-### Database Health
+### Agent Adapters
 
-- [ ] **DBHL-01**: SQLite integrity check runs periodically (PRAGMA integrity_check) and reports corruption
-- [ ] **DBHL-02**: Malformed JSON rows in observations DB detected and reported
-- [ ] **DBHL-03**: Auto-repair available: dump valid data, rebuild DB, restore (with user confirmation via dashboard)
-- [ ] **DBHL-04**: WAL checkpoint management prevents unbounded WAL growth
+- [ ] **HOOK-01**: Claude Code UserPromptSubmit hook calls retrieval service and injects results as system-reminder context
+- [ ] **HOOK-02**: Claude hook fails open — if retrieval is down or slow, agent proceeds without injection
+- [ ] **HOOK-03**: Short prompts (<20 tokens) skip injection to avoid noise on simple commands
+- [ ] **HOOK-04**: OpenCode adapter injects knowledge via plugin system or config-based context
+- [ ] **HOOK-05**: Copilot adapter injects knowledge via workspace context file or VS Code extension
 
-### Process Lifecycle
+### Working Memory
 
-- [ ] **PROC-01**: Stale PID files detected — PID gone but status file says "running"
-- [ ] **PROC-02**: Host-side processes monitored (ETM, LLM proxy) with health checks
-- [ ] **PROC-03**: PSM (Process Supervisor Manager) coverage extended to all host-side services
-- [ ] **PROC-04**: Status file staleness check — if last_updated > 5 minutes and process not running, flag as stale
+- [ ] **WMEM-01**: Persistent working memory template captures current project state, conventions, known issues
+- [ ] **WMEM-02**: Working memory is injected as a fixed prefix alongside retrieval results
+- [ ] **WMEM-03**: Working memory stays under 500 tokens
 
-### Dashboard Accuracy
+### Agent Profiles & Continuity
 
-- [ ] **DASH-01**: Health status on dashboard reflects actual service state — no false greens
-- [ ] **DASH-02**: Statusline hook reports accurate health (matches dashboard)
-- [ ] **DASH-03**: Per-service health cards on dashboard with failure reason and last-seen timestamp
-- [ ] **DASH-04**: Failure history timeline — when services went down and came back
+- [ ] **PROF-01**: Per-agent scoring profiles bias retrieval toward each agent's typical work patterns
+- [ ] **PROF-02**: Cross-agent continuity injects recent observations from previous agent on agent switch
 
-### Insight Validation
+## v2 Requirements
 
-- [ ] **IVAL-01**: Validate button on each insight card triggers codebase verification
-- [ ] **IVAL-02**: Validator extracts file paths and function names from insight text and checks they exist
-- [ ] **IVAL-03**: Stale claims flagged with specific details (file moved, function renamed, etc.)
-- [ ] **IVAL-04**: Validation results shown inline on insight card (verified/stale/unknown per claim)
+Deferred to future milestone. Tracked but not in current roadmap.
 
-## v6.0 Requirements
+### Advanced Retrieval
 
-Deferred to future release.
+- **ADVR-01**: KG traversal augmentation — after semantic retrieval, traverse graph relationships to pull in connected entities
+- **ADVR-02**: Feedback signal collection — track which injected knowledge the agent actually references
+- **ADVR-03**: LLM-based reranking — cross-encoder reranking for higher retrieval precision
+- **ADVR-04**: Deduplication and conflict resolution across tiers
 
-### Advanced Monitoring
+### Additional Agents
 
-- **ADVM-01**: Metrics collection (uptime percentage, MTTR per service)
-- **ADVM-02**: Alert channels (Slack, email) for critical failures
-- **ADVM-03**: Dependency graph — which services depend on which, cascade failure prediction
+- **AGNT-01**: Mastra adapter — integrate with Mastra's native memory provider system
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| External monitoring (Datadog, Grafana Cloud) | Overkill for local dev environment |
-| Multi-machine monitoring | Single-machine setup only |
-| Custom alerting rules UI | Fixed thresholds sufficient for v5.0 |
-| Load testing / performance monitoring | Not a reliability concern |
+| Custom embedding model training | Premature optimization — off-the-shelf models sufficient for ~900 items |
+| Per-turn prompt embedding | Pollutes vector space — observation pipeline already distills sessions |
+| LLM-based auto-update of working memory | Feedback loop risk — hallucinations amplify over time |
+| Always-on injection for every prompt | Context rot — relevance threshold + short prompt skip handles this |
+| Fine-grained access control per knowledge item | Over-engineering — all agents work on same codebase |
+| Streaming injection | Hook requires complete output — retrieval is fast enough (<500ms) |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PORT-01 | Phase 24 | Pending |
-| PORT-02 | Phase 24 | Pending |
-| PORT-03 | Phase 24 | Pending |
-| PORT-04 | Phase 26 | Pending |
-| SUPV-01 | Phase 24 | Pending |
-| SUPV-02 | Phase 24 | Pending |
-| SUPV-03 | Phase 26 | Pending |
-| SUPV-04 | Phase 24 | Pending |
-| DBHL-01 | Phase 25 | Pending |
-| DBHL-02 | Phase 25 | Pending |
-| DBHL-03 | Phase 25 | Pending |
-| DBHL-04 | Phase 25 | Pending |
-| PROC-01 | Phase 25 | Pending |
-| PROC-02 | Phase 25 | Pending |
-| PROC-03 | Phase 25 | Pending |
-| PROC-04 | Phase 25 | Pending |
-| DASH-01 | Phase 26 | Pending |
-| DASH-02 | Phase 26 | Pending |
-| DASH-03 | Phase 26 | Pending |
-| DASH-04 | Phase 26 | Pending |
-| IVAL-01 | Phase 27 | Pending |
-| IVAL-02 | Phase 27 | Pending |
-| IVAL-03 | Phase 27 | Pending |
-| IVAL-04 | Phase 27 | Pending |
+| EMBED-01 | — | Pending |
+| EMBED-02 | — | Pending |
+| EMBED-03 | — | Pending |
+| EMBED-04 | — | Pending |
+| EMBED-05 | — | Pending |
+| EMBED-06 | — | Pending |
+| RETR-01 | — | Pending |
+| RETR-02 | — | Pending |
+| RETR-03 | — | Pending |
+| RETR-04 | — | Pending |
+| RETR-05 | — | Pending |
+| RETR-06 | — | Pending |
+| RETR-07 | — | Pending |
+| HOOK-01 | — | Pending |
+| HOOK-02 | — | Pending |
+| HOOK-03 | — | Pending |
+| HOOK-04 | — | Pending |
+| HOOK-05 | — | Pending |
+| WMEM-01 | — | Pending |
+| WMEM-02 | — | Pending |
+| WMEM-03 | — | Pending |
+| PROF-01 | — | Pending |
+| PROF-02 | — | Pending |
 
 **Coverage:**
-- v5.0 requirements: 24 total
-- Mapped to phases: 24
-- Unmapped: 0
+- v1 requirements: 23 total
+- Mapped to phases: 0
+- Unmapped: 23 ⚠️
 
 ---
-*Requirements defined: 2026-04-23*
-*Last updated: 2026-04-23 — traceability updated after roadmap creation*
+*Requirements defined: 2026-04-24*
+*Last updated: 2026-04-24 after initial definition*
