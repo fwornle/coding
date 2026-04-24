@@ -18,6 +18,7 @@ import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
+import { RetrievalService } from '../../src/retrieval/retrieval-service.js';
 
 const require_cjs = createRequire(import.meta.url);
 
@@ -81,6 +82,14 @@ class SystemHealthAPIServer {
 
         this.setupMiddleware();
         this.setupRoutes();
+
+        // Eagerly initialize retrieval service (warms fastembed model to avoid cold-start on first request)
+        this.retrievalService = new RetrievalService({
+            dbGetter: () => this._getObservationsDb(),
+        });
+        this.retrievalService.initialize().catch(err => {
+            process.stderr.write(`[RetrievalService] Eager init failed: ${err.message}\n`);
+        });
     }
 
     setupMiddleware() {
@@ -172,6 +181,9 @@ class SystemHealthAPIServer {
         this.app.get('/api/insights', this.handleGetInsights.bind(this));
         this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
         this.app.post('/api/consolidation/run', this.handleRunConsolidation.bind(this));
+
+        // Retrieval API (Phase 29)
+        this.app.post('/api/retrieve', this.handleRetrieve.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -4214,6 +4226,43 @@ class SystemHealthAPIServer {
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
             res.status(500).json({ error: `Consolidation failed: ${err.message}` });
+        }
+    }
+
+    /**
+     * POST /api/retrieve — retrieve relevant knowledge for a query.
+     * Body: { query: string, budget?: number (100-5000), threshold?: number }
+     * Returns: { markdown: string, meta: { query, budget, results_count, latency_ms } }
+     */
+    async handleRetrieve(req, res) {
+        const startMs = Date.now();
+        const { query, budget = 1000, threshold = 0.75 } = req.body;
+
+        if (!query || typeof query !== 'string' || query.trim().length === 0) {
+            return res.status(400).json({ error: 'query (string) is required' });
+        }
+
+        // Cap query length to prevent abuse (T-29-05)
+        if (query.length > 500) {
+            return res.status(400).json({ error: 'query must be 500 characters or less' });
+        }
+
+        // Validate budget is a reasonable number
+        const parsedBudget = Number(budget);
+        if (isNaN(parsedBudget) || parsedBudget < 100 || parsedBudget > 5000) {
+            return res.status(400).json({ error: 'budget must be between 100 and 5000' });
+        }
+
+        try {
+            const result = await this.retrievalService.retrieve(query, {
+                budget: parsedBudget,
+                threshold: Number(threshold) || 0.75,
+            });
+            result.meta.latency_ms = Date.now() - startMs;
+            res.json(result);
+        } catch (err) {
+            process.stderr.write(`[RetrievalAPI] Error: ${err.message}\n`);
+            res.status(500).json({ error: 'Retrieval failed' });
         }
     }
 }
