@@ -50,6 +50,7 @@ export class EmbeddingService {
       );
       this.model = await FlagEmbedding.init({
         model: EmbeddingModel.AllMiniLML6V2,
+        cacheDir: join(projectRoot, "local_cache"),
       });
       process.stderr.write(
         `[EmbeddingService] Model initialized successfully (v${config.version})\n`

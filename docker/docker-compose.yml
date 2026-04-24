@@ -90,6 +90,8 @@ services:
       # Embedding pipeline (live-mounted for development)
       - ${CODING_REPO:-.}/dist/embedding:/coding/dist/embedding:ro
       - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro
+      # Retrieval service modules (Phase 29 — plain JS, live-mounted)
+      - ${CODING_REPO:-.}/src/retrieval:/coding/src/retrieval:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
       - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
     networks:

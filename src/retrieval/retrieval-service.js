@@ -63,6 +63,8 @@ export class RetrievalService {
         this._initialized = true;
         process.stderr.write('[RetrievalService] Initialized (fastembed warm, Qdrant connected)\n');
       } catch (err) {
+        // Reset so next call retries instead of re-awaiting the rejected promise
+        this._initPromise = null;
         process.stderr.write(`[RetrievalService] Initialization failed: ${err.message}\n`);
         throw err;
       }
