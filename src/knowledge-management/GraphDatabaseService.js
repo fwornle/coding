@@ -1097,8 +1097,11 @@ export class GraphDatabaseService extends EventEmitter {
         return;
       }
 
-      // Project nodes are handled in second pass (only if referenced)
-      if (isProject) return;
+      // Project nodes are handled in second pass (only if referenced),
+      // unless the caller explicitly asked for them via types filter — in
+      // that case fall through to the regular filter path so Projects can
+      // be retrieved directly (e.g. by Working Memory assembly).
+      if (isProject && !(types && types.length > 0 && types.includes('Project'))) return;
 
       // Apply source filter to regular insight nodes
       if (source && attributes.source !== source) return;
@@ -1149,6 +1152,11 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Second pass: Add Project nodes that are referenced by filtered INSIGHT nodes (not System nodes)
     const referencedProjectIds = new Set();
+    // Track Projects already pushed in the first pass (when caller used types=Project)
+    // so we don't duplicate them here.
+    const alreadyAddedProjectIds = new Set(
+      results.filter((r) => r.entity_type === 'Project').map((r) => r.id)
+    );
 
     // ONLY check for Project nodes referenced by insight nodes, NOT by System nodes
     filteredInsightNodeIds.forEach(nodeId => {
@@ -1171,6 +1179,9 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Add referenced Project nodes to results
     referencedProjectIds.forEach(projectId => {
+      // Skip if first pass already added this Project (types filter included Project)
+      if (alreadyAddedProjectIds.has(projectId)) return;
+
       const attributes = this.graph.getNodeAttributes(projectId);
 
       // Apply team filter

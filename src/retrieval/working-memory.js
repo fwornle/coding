@@ -77,9 +77,16 @@ async function fetchKGStructure() {
     const projectData = await projectRes.json();
     const componentData = await componentRes.json();
 
+    // Filter components to true Components — the type filter currently still
+    // pulls in referenced Projects (second-pass) and always-included System
+    // nodes, which we don't want shown in the component list.
+    const components = (componentData.entities || []).filter(
+      (e) => e.entity_type === 'Component'
+    );
+
     return {
       project: pickCanonicalProject(projectData.entities, TEAM),
-      components: componentData.entities || [],
+      components,
     };
   } catch (err) {
     process.stderr.write(`[WorkingMemory] VKB fetch failed: ${err.message}\n`);
