@@ -52,8 +52,10 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Cross-Project Agent-Agnostic Injection
 
-- [ ] **XPROJ-01**: Hook works in every project session started via coding/bin/coding (not just the coding project)
-- [ ] **XAGT-01**: Knowledge injection adapters for all four agents (Claude, Copilot, OpenCode, Mastra)
+- [x] **XPROJ-01
+**: Hook works in every project session started via coding/bin/coding (not just the coding project)
+- [x] **XAGT-01
+**: Knowledge injection adapters for all four agents (Claude, Copilot, OpenCode, Mastra)
 - [x] **XREL-01
 **: Injected knowledge is focused on current work context (project, prompt, active files) not random insights
 
