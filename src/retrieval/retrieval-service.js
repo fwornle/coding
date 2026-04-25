@@ -90,7 +90,7 @@ export class RetrievalService {
    * @returns {Promise<{ markdown: string, meta: { query: string, budget: number, results_count: number, latency_ms: number } }>}
    */
   async retrieve(query, options = {}) {
-    const { budget = this.defaultBudget, threshold = this.scoreThreshold } = options;
+    const { budget = this.defaultBudget, threshold = this.scoreThreshold, context = null } = options;
 
     // Ensure initialized
     if (!this._initialized) {
@@ -111,6 +111,12 @@ export class RetrievalService {
 
     // Step 4: RRF fusion
     const fused = rrfFuse([semanticResults, keywordHits, recencyResults]);
+
+    // Step 4.5: Context-aware relevance boosting (D-09)
+    if (context) {
+      this._applyContextBoost(fused, context);
+      fused.sort((a, b) => b.rrfScore - a.rrfScore);
+    }
 
     // Step 5: Token-budgeted markdown assembly
     const { markdown, tokensUsed } = assembleBudgetedMarkdown(fused, budget);
@@ -169,6 +175,86 @@ export class RetrievalService {
       )
     );
     return results.flat();
+  }
+
+  /**
+   * Apply context-based score boosting to fused results.
+   *
+   * Boosts are cumulative:
+   * - project match: 1.15x
+   * - cwd path segment match: 1.10x
+   * - recent_files basename match: 1.20x
+   *
+   * @param {Array<object>} results - Fused results with rrfScore
+   * @param {object} context - { project, cwd, recent_files }
+   */
+  _applyContextBoost(results, context) {
+    if (!context || typeof context !== 'object') return;
+
+    const project = context.project ? context.project.toLowerCase() : null;
+
+    // Extract last 2 path components from cwd (e.g. "/Users/x/Agentic/coding" -> "agentic/coding")
+    let cwdSegment = null;
+    if (context.cwd && typeof context.cwd === 'string') {
+      const parts = context.cwd.split('/').filter(Boolean);
+      cwdSegment = parts.slice(-2).join('/').toLowerCase();
+    }
+
+    // Extract basenames from recent_files
+    const recentBasenames = Array.isArray(context.recent_files)
+      ? context.recent_files.map((f) => {
+          const segments = f.split('/');
+          return segments[segments.length - 1].toLowerCase();
+        })
+      : [];
+
+    for (const result of results) {
+      if (!result.rrfScore) continue;
+
+      const text = this._extractSearchableText(result).toLowerCase();
+
+      // Project match: check payload.project, payload.source, or text
+      if (project) {
+        const payloadProject = (result.payload?.project || '').toLowerCase();
+        const payloadSource = (result.payload?.source || '').toLowerCase();
+        if (payloadProject.includes(project) || payloadSource.includes(project) || text.includes(project)) {
+          result.rrfScore *= 1.15;
+        }
+      }
+
+      // CWD path segment match
+      if (cwdSegment && text.includes(cwdSegment)) {
+        result.rrfScore *= 1.10;
+      }
+
+      // Recent files basename match
+      if (recentBasenames.length > 0) {
+        for (const basename of recentBasenames) {
+          if (basename && text.includes(basename)) {
+            result.rrfScore *= 1.20;
+            break; // Only boost once for recent_files
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract searchable text from a result's payload for context matching.
+   *
+   * @param {object} result - A fused result with payload
+   * @returns {string} Concatenated searchable text
+   */
+  _extractSearchableText(result) {
+    const payload = result.payload || {};
+    const parts = [
+      payload.text || '',
+      payload.title || '',
+      payload.content || '',
+      payload.source || '',
+      payload.project || '',
+    ];
+    return parts.join(' ');
   }
 
   /**

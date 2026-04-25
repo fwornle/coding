@@ -4236,7 +4236,7 @@ class SystemHealthAPIServer {
      */
     async handleRetrieve(req, res) {
         const startMs = Date.now();
-        const { query, budget = 1000, threshold = 0.75 } = req.body;
+        const { query, budget = 1000, threshold = 0.75, context = null } = req.body;
 
         if (!query || typeof query !== 'string' || query.trim().length === 0) {
             return res.status(400).json({ error: 'query (string) is required' });
@@ -4257,6 +4257,7 @@ class SystemHealthAPIServer {
             const result = await this.retrievalService.retrieve(query, {
                 budget: parsedBudget,
                 threshold: Number(threshold) || 0.75,
+                context: context || null,
             });
             result.meta.latency_ms = Date.now() - startMs;
             res.json(result);
