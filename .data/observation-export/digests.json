@@ -2450,6 +2450,21 @@
     "createdAt": "2026-04-22T06:39:20.137Z"
   },
   {
+    "id": "62b6e23f-1117-4fb6-9e3a-b0719be7c924",
+    "date": "2026-04-21",
+    "theme": "Fix Observations Dashboard Auto-Refresh Date Window",
+    "summary": "The observations dashboard was failing to display current data when the page remained open past midnight, because the `to` date filter was computed once at page load and never updated.\n\n- **Root cause:** Auto-refresh interval reused a stale `to` date, excluding any observations after the initial page load timestamp\n- **Fix:** Modified `observations.tsx` to recompute `to` as the current date on every 30-second polling cycle\n- Rebuilt the frontend dist and restarted the static server to deploy the change\n\nThe dashboard now correctly extends its query window to the current time on each refresh, ensuring today's observations always appear without a manual reload.",
+    "observationIds": [
+      "9f0f49fd-2c30-4bcb-9c43-cf4e7df48827"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T06:06:19.782Z"
+  },
+  {
     "id": "0f5db830-4715-47ab-9512-635d8d1a257c",
     "date": "2026-04-22",
     "theme": "Session Initialization and GSD Tool Update",
@@ -2667,5 +2682,3435 @@
     ],
     "quality": "normal",
     "createdAt": "2026-04-23T06:21:34.398Z"
+  },
+  {
+    "id": "4a0d669f-47da-40b6-94c8-243541202774",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued from a prior task to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Output in Markdown: `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Exported to HTML: `~/Desktop/Validation_Engineer_Interview_Guide.html` (browser-printable to PDF)\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML was offered as a workaround via browser Cmd+P save.",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "96e95086-5f20-4659-8ceb-c3d42da5d437",
+    "date": "2026-04-23",
+    "theme": "OAuth Token Redaction and Git History Rewrite",
+    "summary": "A leaked GitHub OAuth token found in committed specstory files was scrubbed from both the working tree and full git history.\n- Added `gho_`, `ghp_`, and `github_pat_` patterns to `~/Agentic/coding/.specstory/config/redaction-patterns.json`\n- Redacted 23 specstory history files in the working tree via `sed`\n- Used `git-filter-repo` with a replacements file to rewrite all commits, replacing `gho_` tokens\n- Verified no matches remained in history post-rewrite\n- Force-pushed clean history to `fwornle/coding.git` on `main`; a second push attempt appeared to fail but was a false alarm — the first push had already succeeded\n- `PROJECT.md` and `STATE.md` were updated as side effects of the workflow",
+    "observationIds": [
+      "9d550e3c-29a8-4f26-b447-16b7bf75cb98",
+      "704b7901-1e72-49ec-b347-786b241ff8ff",
+      "a12b2d73-447c-4da4-b839-89ecff68052e",
+      "719b0a81-e41e-4c8d-99cf-b373caf95083"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json",
+      "PROJECT.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "STATE.md",
+      "~/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "3fa1d31c-429c-4c01-b5e1-2169b4aca630",
+    "date": "2026-04-23",
+    "theme": "Observations Database Corruption Recovery and API Debugging",
+    "summary": "A corrupted SQLite observations store was diagnosed and recovered, but the API continued returning 0 results, leading to further service-level investigation.\n- Recovered 586 (later confirmed 598) observations by dumping and reimporting the SQLite DB, rebuilding FTS virtual tables, and removing stale WAL/SHM files\n- Restarted the `coding-services` container; API on port 3033 confirmed healthy and returning data\n- Ports 3030, 3032, 3033, 3848, 8080, and 12435 were audited — port 3030 (constraint-dashboard) appeared down despite the process showing `RUNNING`, indicating a mismatch between process state and actual port binding\n- Root cause of the dashboard \"Failed to load\" error ultimately attributed to the frontend UI needing a rebuild after recent code changes, not a data or API problem\n- `ObservationWriter.js` and `ObservationConsolidator.js` were edited during this investigation",
+    "observationIds": [
+      "9d366d02-9e3f-4700-b45d-82cca556fbd3",
+      "b1e4afef-b00b-4467-b529-bd80175953b6",
+      "d4c535d5-9303-4148-be29-63b0c61a6a0b",
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "b375d397-2b25-48c7-82e7-ac1bdf8c8bba"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json",
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "ObservationConsolidator.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "1269f507-2df8-46a2-8b23-b3126975bd81",
+    "date": "2026-04-23",
+    "theme": "gsd-browser CLI Documentation in UI-Template Project",
+    "summary": "Attempted to add `gsd-browser` CLI and Skill references alongside existing Playwright CLI mentions in the `ui-template` project's instruction files so the coding agent prefers the faster tool.\n- Read `CLAUDE.md` and `copilot-instructions.md` to understand existing Playwright documentation\n- Could not locate `gsd-browser` skill/CLI definitions in the searched paths\n- No edits were made; investigation remained incomplete pending finding the skill definitions",
+    "observationIds": [
+      "33bb581a-3852-460e-bee4-17000ff2d386"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "aae2d93f-a997-4815-b25a-db8c452ecc68",
+    "date": "2026-04-23",
+    "theme": "Malformed and Duplicate Observations Investigation",
+    "summary": "Several data-<USER_ID_REDACTED> issues were identified in the observations database through image-prompted investigations.\n- One observation stored raw template structure (literal `Intent/Approach/Artifacts/Result` labels) instead of filled-in content, indicating a bug in the knowledge extraction observer's template-filling step; 573 of 602 observations use the structured format correctly\n- Two near-identical observations about adding `gsd-browser` references to `ui-template` were found from the same session — both had empty `session_id` fields and different content hashes, defeating hash-based dedup; Jaccard/containment keyword comparison also failed to catch them\n- The context window `remaining_percentage` display disappeared from the GSD statusline; hook code was confirmed intact, but Claude Code appeared to have stopped passing the field in the stdin JSON — no fix applied\n- `ObservationWriter.js` was edited across multiple of these investigations",
+    "observationIds": [
+      "e965e521-b16c-4566-8a6d-52de9547b3b5",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f",
+      "7acdce55-a789-4d69-a7cf-5fa6f4187a85",
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1",
+      "54b509c5-1d8d-46a3-b22b-d7f4be9aa1d3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "18240291-fd87-4ed9-a299-8b96a41b3748",
+    "date": "2026-04-23",
+    "theme": "ObservationExporter Shared Module Implementation",
+    "summary": "A shared export layer was added to the live-logging system to avoid duplicated logic between the writer and consolidator.\n- Reviewed existing `ObservationWriter.js` and `ObservationConsolidator.js` to understand structure before building the shared layer\n- Created `~/Agentic/coding/src/live-logging/ObservationExporter.js` as a new shared export module\n- Intended to be wired into both `ObservationWriter` and `ObservationConsolidator` in subsequent steps",
+    "observationIds": [
+      "f8a51d9b-9c00-4815-a3aa-2a090d575f5b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "~/Agentic/coding/src/live-logging/ObservationExporter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "7bf90965-c2c7-43f4-9c7f-9fa61e4d4cf8",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port Liveness and Supervisord Checks Implementation",
+    "summary": "A new \"Service Reliability\" milestone and phase 24 (`port-liveness-supervisord-checks`) were initiated and driven through the full GSD workflow lifecycle — discuss, plan, and execute phases.\n- Milestone goal: health system detects all failures within 60 seconds and attempts auto-healing\n- Discuss phase (obs 13): scouted codebase for health verifier code; no prior `CONTEXT.md` found\n- Plan phase (obs 19, 20): skipped research as inappropriate for a fix/audit phase; produced 3 plans covering all 6 requirements\n- Execute phase (obs 22): orchestrator initialized with 3 plans but fell back to sequential execution after detecting git submodules that prevented parallel worktree-based execution\n- Code review (obs 29): workflow stalled during file scoping — git log <USER_ID_REDACTED> were too broad to isolate phase 24 changes\n- `Dockerfile.coding-services` was a primary artifact across execution steps",
+    "observationIds": [
+      "41b7fb56-2ef3-4fba-bd42-ac7a097d6161",
+      "a36026f1-f151-4e96-90c1-9a9b44204d29",
+      "cc2969fa-4dfb-4f28-9406-d7daec36f357",
+      "4c64303d-49ac-4967-bb83-a4ff6b817c2b",
+      "05fde2d0-6a66-4733-b834-0fc5648ee346",
+      "f066b745-c80d-4ad4-a809-28dd02d66e91"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "ObservationWriter.js",
+      "ObservationConsolidator.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationConsolidator.js",
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services",
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "52d74c1f-494f-4f88-b252-27cf6611732d",
+    "date": "2026-04-23",
+    "theme": "MkDocs Documentation Directory Mismatch and Local Server",
+    "summary": "Investigated why new screenshots pushed to GitHub didn't appear in the MkDocs-built documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` — images need to be in `docs-content/images/` to be picked up\n- Fix and local serve were not completed in the investigation exchange\n- MkDocs local server was subsequently stopped via `pkill` (obs 23)",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd",
+      "96252dbc-5af7-4359-8294-44b89e8f692b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "0537b1b3-ca25-4161-a4d9-b4005f116e3b",
+    "date": "2026-04-23",
+    "theme": "Constraint Dashboard and FATAL Service Crash Diagnosis and Fix",
+    "summary": "Three FATAL supervisord processes (`constraint-monitor`, `semantic-analysis`, `constraint-dashboard`) were diagnosed and the dashboard's port 3030 serving problem was fully resolved.\n- Confirmed `constraint-dashboard` was mapped on port 3030 in docker-compose but nothing was listening inside the container — `dashboard-server.js` only serves the API on port 3031\n- Root cause: `supervisord` only started `dashboard-server.js`, not the Next.js frontend app located at `integrations/mcp-constraint-monitor/dashboard/`\n- **Fix (obs 32):**\n  - `docker/Dockerfile.coding-services`: added `npm install` and Next.js build steps for the dashboard\n  - `docker/supervisord.conf`: split into two processes — `constraint-dashboard-api` (port 3031) and a new Next.js frontend process (port 3030)\n  - `config/health-verification-rules.json` and `config/health-verifier.js`: updated to check both ports independently\n- No stderr logs were found for the crashing services; stdout logs were the next investigation target",
+    "observationIds": [
+      "6ca77045-d942-4cd5-bc8a-5687729c44ab",
+      "e6b7b8da-d402-48ed-b745-00fdb0f5e40e",
+      "5d4ca76b-d4d1-44c5-bbb9-af07b6cefb8c",
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "2d0f883d-2de1-4877-97bb-0488d2d65767"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services",
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "config/healthh-verifier.js",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "c24f4ffb-7225-4851-838e-376089704820",
+    "date": "2026-04-23",
+    "theme": "PlantUML Observation Memory Hierarchy Documentation Review",
+    "summary": "Two existing PlantUML diagram files were reviewed against the documentation style guide to assess whether updates were needed.\n- Read `observation-memory-hierarchy.puml` and a second PlantUML file to evaluate current state\n- No modifications were made during the exchange; assessment only",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "9b566d28-5273-47e5-9fd3-3605cc5053c8",
+    "date": "2026-04-23",
+    "theme": "Knowledge Graph IssueTriage UI Bug Fixes",
+    "summary": "Two distinct bugs in the knowledge graph viewer's `IssueTriage` component were investigated and one was fixed.\n- **Entity key format mismatch (obs 28):** edges used `layer:id` prefixed keys while `IssueTriage` looked up bare `id` keys, causing silent lookup failures; identified but not yet fixed\n- **Missing RCA chain (obs 34, 35):** `Cluster10_ArgoWorkflowStopped` showed 0 RCA chain entries because it was a genuinely isolated node with 0 actual edges despite appearing to have 45 connections\n- **Evidence bloat (obs 33, 34, 35):** BFS hop distance set too large (3 hops across 900+ nodes) combined with domain-based fuzzy matching pulling all entities in the catch-all `\"general\"` domain inflated evidence sources to 148+\n- **Fix applied:** `IssueTriage.tsx` updated to skip domain-based evidence collection when the entity's domain is `\"general\"`, preventing hundreds of unrelated evidence links\n- Primary artifact: `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx`",
+    "observationIds": [
+      "58db7853-e021-4e25-ae26-fd5eff559725",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "57446148-4c44-43ea-8664-51760c288844"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "package.json",
+      "health-verification-rules.json",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "integrations/mcp-constraint-monitor/package.json",
+      "integrations/mcp-server-semantic-analysis/package.json",
+      "config/health-verification-rules.json",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "supervisord.conf",
+      "health-verifier.js",
+      "docker/supervisord.conf",
+      "scripts/health-verifier.js",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "e69657dc-0fb5-42e0-b9e0-35c34f6797f7",
+    "date": "2026-04-23",
+    "theme": "Supervisord Config Reverted to Known-Good State",
+    "summary": "Goal was to fix a broken supervisord configuration by reverting to the last known-good state from git history.\n\n- Restored `docker/supervisord.conf` to the original 9-process configuration where `constraint-dashboard` runs `dashboard-server.js` on port 3031 inside Docker, while the Next.js frontend on port 3030 runs on the host machine\n- Updated `config/health-verification-rules.json` to check port 3031 only, removing the erroneous `dashboard_api` entry\n- Key architectural distinction re-established: Docker handles the API backend; host handles the interactive Next.js dev UI",
+    "observationIds": [
+      "65368278-419c-4d3a-9ef9-c7e85d398901",
+      "f810254c-6a2a-4320-bc50-f3539d8ea522"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "docker/supervisord.conf",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "config/health-verification-rules.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "085aa09b-5f97-426e-abf3-969729f148d3",
+    "date": "2026-04-23",
+    "theme": "Stale JS Bundle and Browser Caching Diagnosis",
+    "summary": "Investigated why a UI fix was not appearing in the browser after deployment.\n\n- Inspected the built `dist/index.html` inside the Docker container to compare referenced bundle filenames against deployed files\n- Confirmed the fix (`domain !== \"general\"` filter) was present in the Docker-served JS bundle\n- Root cause identified as browser-side caching of the old bundle; resolution was a hard refresh (`Cmd+Shift+R`)\n- Files touched during investigation: `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "934da0c4-ea79-4f77-9e51-6efce5a168a3",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "93b54e07-950a-46bd-abf0-45878804a4d4",
+    "date": "2026-04-23",
+    "theme": "Docker Port Misconfiguration and Unauthorized Port Cleanup",
+    "summary": "A Docker Compose restart introduced port mapping errors, leading to a cascade of incorrect port choices.\n\n- Port 3002 was incorrectly remapped to 3022 during restart; initial response was to serve on 3022 and persist `VOKB_PORT=3022` in `~/Agentic/_work/rapid-automations/.env`\n- Developer intervened, requiring all ports to be sourced exclusively from the shared `.env.ports` file rather than hardcoded or invented\n- The unauthorized `VOKB_PORT=3022` entry was removed from `.env`, restoring central port governance\n- Multiple `package.json` files and `supervisord.conf` were touched during the churn; lesson recorded: no port values outside `.env.ports`",
+    "observationIds": [
+      "98dbfba7-5af8-49cf-a914-045843940aaa",
+      "7af882f6-fa5b-47ff-988b-73f8679816ae",
+      "af835e36-5fd0-4925-981d-f09a6bcde39b",
+      "571e0a7b-4364-42c4-a306-cbc4e71cca28",
+      "951a1b9c-d3c9-44a4-ac81-5ef73085ad0b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "Dockerfile.coding-services",
+      "package.json",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "~/Agentic/coding/package.json",
+      "integrations/mcp-constraint-monitor/package.json",
+      "integrations/mcp-server-semantic-analysis/package.json",
+      "/tmp/package/package.json",
+      "~/Agentic/_work/rapid-automations/.env",
+      ".env"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "e417d1fc-bd5c-440a-94e3-087f73aaa922",
+    "date": "2026-04-23",
+    "theme": "IssueTriage Domain Sweep Over-Scoping Fixed",
+    "summary": "Investigated and fixed the `IssueTriage` component pulling excessively broad evidence for isolated knowledge graph nodes.\n\n- A `raas` domain incident with 0 edges was collecting all `raas`-domain entities with ops refs — far beyond the prior `general` domain patch\n- Root cause: domain sweep logic was too permissive for isolated nodes; BFS already handles connected evidence and `sourceRefs` cover isolated nodes directly\n- Fix: removed domain sweep logic entirely from `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx`\n- Debug `console.log` spam also cleaned up in the same pass",
+    "observationIds": [
+      "2e6fc329-79fa-4a52-bd74-03b9c71a056d",
+      "f25ad7ce-0af9-4c72-a40c-679a6d69f091"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "Dockerfile.coding-services",
+      "package.json",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "~/Agentic/coding/package.json",
+      "integrations/mcp-constraint-monitor/package.json",
+      "integrations/mcp-server-semantic-analysis/package.json",
+      "/tmp/package/package.json",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/viewer/src/components/KnowledgeGraph/IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "9ef7b188-9ac3-460a-84cb-298c3e3f9a6c",
+    "date": "2026-04-23",
+    "theme": "Constraint Dashboard Docker vs Host Placement Decision",
+    "summary": "Addressed architectural question of whether the constraint dashboard should run in Docker or on the host.\n\n- Analyzed the existing Docker/host split to surface the implicit criterion: Docker for headless backend services and APIs; host only for tools requiring genuine host resources (CLIs, host networking) or hot-reload dev UIs\n- Recommendation: move constraint dashboard into Docker so it works automatically after `docker-compose up`\n- `constraint-dashboard.tsx` was touched as part of the investigation",
+    "observationIds": [
+      "71ad9211-4451-466c-a9f2-8d59238b32d2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "constraint-dashboard.tsx",
+      "integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "e1a88217-9370-4919-baa9-1732b7f96d25",
+    "date": "2026-04-23",
+    "theme": "Ops Refs Propagation for Documentation-Sourced RCA Entities",
+    "summary": "Investigated why entities like \"Job Failed — RPU Execution Error\" show no operational references (Argo/RaaS/Grafana links) in the graph viewer.\n\n- Root cause: these entities were ingested from mkdocs documentation rather than RCA findings, so no operational evidence was ever linked at ingest time\n- 109 RCA-relevant entities share this gap; only 1 has a direct neighbor with ops refs, making single-hop propagation insufficient\n- Proposed fix: BFS-based data-level propagation of ops refs through graph neighbors (2-hop) rather than patching display-time logic\n- Investigation was read-only across these observations; `constraint-dashboard.tsx` was the primary artifact examined",
+    "observationIds": [
+      "ae911f5e-74eb-47d4-9952-89a403388574",
+      "34e9df55-83dd-496c-b7c5-594cc8872266",
+      "5eeccd15-ac60-4c1e-bdb4-a3090efdcdee"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "constraint-dashboard.tsx",
+      "integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "9104d094-7dd1-4499-8aed-8a3cbe164d4a",
+    "date": "2026-04-23",
+    "theme": "Package-Lock Stale Path References Fixed in Submodule",
+    "summary": "Fixed stale `package-lock.json` in the `mcp-server-semantic-analysis` submodule that referenced wrong local `file:../../_work/` paths.\n\n- Regenerated `integrations/mcp-server-semantic-analysis/package-lock.json` using npm so dependencies resolve from correct GitHub tarball URLs\n- Changes committed to the submodule",
+    "observationIds": [
+      "63e2d310-ed41-4d5c-8f39-63408c42d983"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "integrations/mcp-server-semantic-analysis/package-lock.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "f9b2d958-25e2-45ce-aaab-de364feb4ac7",
+    "date": "2026-04-23",
+    "theme": "Documentation Style Guide Enforcement in Coding README",
+    "summary": "Applied the project documentation style guide to coding project artifacts.\n\n- Audited existing documentation files for compliance before making edits\n- `~/Agentic/coding/README.md` updated to conform to style guide standards",
+    "observationIds": [
+      "9cb7ea5f-3f22-487a-b5ed-af9ae50dd69e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "~/Agentic/coding/README.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "f76d8d1b-db49-47ec-95f6-506d9004c190",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Pipeline Investigation and Cleanup",
+    "summary": "Multi-step investigation and fix of user ID leakage in stored observations, culminating in retroactive database cleanup.\n\n- Initial observations recorded to `~/.specstory/feedback_redact_observations.md`\n- Investigated `ObservationWriter.js` and `ConfigurableRedactor.js` to understand the write path; found `redaction-patterns.json` did not reliably cover absolute file paths containing user IDs\n- Confirmed `ConfigurableRedactor` does replace user IDs with `<USER_ID_REDACTED>` — but the database `messages` column held stale unredacted data\n- Retroactive cleanup redacted 245 observations; subsequent <USER_ID_REDACTED> confirmed no raw user ID or email references remain\n- Verified that path structure is preserved after substitution (only the username segment replaced); offered optional `~` home-directory shortening as a follow-up\n- Key files changed: `ObservationWriter.js`, `redaction-patterns.json`, `.env`",
+    "observationIds": [
+      "983d33ba-a002-49ae-9391-cb7ec5959ff3",
+      "2b399491-d123-4b7a-88be-f69fc979b692",
+      "42a07f44-a03c-4dbc-9655-86ca4fa57589",
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "95ee0eaa-7ea8-45c8-a734-edcfcf6b5ea2",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "~/.claude/projects/Agentic/coding/memory/feedback_redact_observations.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "8001c7b9-8c19-4b7f-9574-86a5e66f4ac4",
+    "date": "2026-04-23",
+    "theme": "Pre-Commit Hook Conflict Resolution for KB Export Files",
+    "summary": "User encountered a pre-commit hook error blocking a commit that mixed KB export files with other changes.\n\n- Hook rule requires KB export files to be committed separately from other changes\n- Two resolution paths offered: unstage KB files before committing, or split into two sequential commits\n- `redaction-patterns.json` was among the staged files at the time",
+    "observationIds": [
+      "9ca4a234-07d8-454c-a1c0-a1b74f6721ac"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "98dd177f-530d-43bb-920b-e642c7fcd9bd",
+    "date": "2026-04-23",
+    "theme": "Final Commit of Pending Changes",
+    "summary": "Staged and committed all remaining pending changes in a single pass.\n\n- Used `git add .` followed by a descriptive commit message\n- Commit `2626729` captured 12 files, covering LSL and classification log documentation updates\n- `redaction-patterns.json` was among the committed files",
+    "observationIds": [
+      "d6923f4d-25a5-4f44-b624-6f7347a3b7ec"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:32:39.313Z"
+  },
+  {
+    "id": "da6460d7-30c1-4656-8d04-67d6ca4e2bdf",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Continued from a prior task to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md` and `~/Desktop/Validation_Engineer_Interview_Guide.html`\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML was produced as a workaround (openable in browser for Cmd+P save)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "3bac52ca-e8d8-40a2-9a44-99471ba54ce3",
+    "date": "2026-04-23",
+    "theme": "Observations Database Template Placeholder Bug Investigation",
+    "summary": "Investigated a dashboard UI issue and underlying data <USER_ID_REDACTED> problem in the observations database.\n- API confirmed healthy on port 3033; database had 598–602 observations passing integrity checks\n- Root cause of dashboard issue: UI needed a rebuild after recent changes\n- Separately found that at least one observation contained unfilled template placeholder text instead of real content — 573 of 602 observations use the structured template format by design, but the template-filling step failed for some entries\n- `ObservationWriter.js` was edited as part of the investigation",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "a17ee663-9115-4cb2-85e0-d61cb47da952",
+    "date": "2026-04-23",
+    "theme": "Context Window Display Disappearing from GSD Statusline",
+    "summary": "Investigated why the context window percentage display vanished from the GSD toolbar/statusline.\n- Hook code in the statusline configuration was confirmed intact and correct\n- Suspected cause: Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook at runtime\n- No fix was applied; identified as a Claude Code runtime change outside the codebase",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "5eff811d-54f1-47a2-a214-96f60d58a54a",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub weren't appearing in the MkDocs-generated documentation.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` instead of `docs-content/images/`\n- `Dockerfile.coding-services` was edited during the session\n- Fix (copying images to the correct directory or updating links) and local serve were not completed in this exchange",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "0477739a-f214-4245-a2e3-715d69403310",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Parallel Execution Orchestration and Submodule Fallback",
+    "summary": "Initiated execution of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow.\n- Orchestrator loaded 3 plans and performed dependency analysis and wave grouping\n- Git submodules detected in the repo caused fallback from parallel worktree-based execution to sequential mode\n- `Dockerfile.coding-services` was edited during setup",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "ab7e071f-d1cd-4ef7-833f-c7129e3af332",
+    "date": "2026-04-23",
+    "theme": "PlantUML Documentation Style Assessment",
+    "summary": "Reviewed two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their state against a documentation style guide.\n- No modifications were made during the exchange; the session was read-only assessment",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "5e14e34a-3c09-434d-97f6-a71191d86cab",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 and Knowledge Graph UI Bug Fixes",
+    "summary": "Multi-session investigation into a port 3030 connection failure and two knowledge graph visualization bugs in the issue triage UI.\n- **Port 3030**: `docker-compose` maps port 3030 but nothing listens on it — `supervisord` only starts `dashboard-server.js` (API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/` that should serve on 3030\n- **RCA chain missing**: Entity `Cluster10_ArgoWorkflowStopped` appeared to have 45 connections but 0 actual edges (isolated node), so no RCA chain could surface\n- **Inflated evidence sources**: BFS hop distance set too large (3 hops across 900+ nodes); domain-based fuzzy matching in the evidence collector pulled all entities in the \"general\" catch-all domain, inflating sources to 148+\n- A browser caching issue masked an already-deployed fix; hard refresh (Cmd+Shift+R) was the resolution\n- Files changed: `temporal.ts`, `routes.ts`, `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "9911ba89-2b9f-4e81-9ec4-a2598b3287c1",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Cleanup and Pattern Configuration",
+    "summary": "Investigated and resolved a redaction failure where raw user IDs appeared in stored observation paths.\n- `ConfigurableRedactor` correctly replaces the user ID with `<USER_ID_REDACTED>`, but the `messages` column in the database contained stale unredacted data from before the redactor was in place\n- A retroactive cleanup was run, redacting 245 observations and zeroing out remaining references; confirmed via query that all email and path references are now fully replaced\n- Subsequently reviewed `redaction-patterns.json` to assess existing patterns before adding path-shortening rules — no changes made in that exchange\n- Files changed: `ObservationWriter.js`, `.env`, `redaction-patterns.json`",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:39:39.654Z"
+  },
+  {
+    "id": "c4361c8b-1698-43e8-984e-34702a022410",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued from a prior session to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Output produced in both Markdown (`~/Desktop/Validation_Engineer_Interview_Guide.md`) and HTML (`~/Desktop/Validation_Engineer_Interview_Guide.html`)\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML file was provided as a workaround for browser-based Cmd+P PDF export.",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "fea33ed8-a6f9-47da-a5d2-3ad1603d6f3e",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Diagnosis and Template Placeholder Bug",
+    "summary": "Investigated dashboard and observations database issues following a screenshot report of UI problems.\n- Confirmed the database held 598–602 observations with passing integrity checks, and the API was healthy on port 3033\n- Root cause of the dashboard display issue: UI needed a rebuild after recent changes\n- Additionally found that 573/602 observations correctly use the structured template format, but at least one entry contained unfilled literal placeholder text, indicating a failure in the template-filling step within `ObservationWriter.js`\n- Artifacts edited: `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md`, `ObservationWriter.js`",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "cce111d0-cc9c-476d-831a-37e2dd5f8e9b",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Disappearing from GSD Statusline",
+    "summary": "Investigated why the context window display vanished from the GSD toolbar/statusline.\n- Hook code in the statusline configuration was confirmed intact and correct\n- Likely cause: Claude Code stopped passing the `context_window.remaining_percentage` field in the stdin JSON provided to the hook at runtime\n- No fix applied; identified as an external Claude Code runtime behavior change; `ObservationWriter.js` was edited as part of the investigation session.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "f58be458-6e07-41c3-843b-3ac61bb66e11",
+    "date": "2026-04-23",
+    "theme": "MkDocs Screenshot Not Appearing After GitHub Push",
+    "summary": "Diagnosed why new screenshots were not appearing in the MkDocs-generated documentation after a GitHub push.\n- `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` — a mismatched directory\n- Fix requires copying images to `docs-content/images/` or updating image references accordingly\n- Local rebuild and serve were not completed in this exchange; `Dockerfile.coding-services` was edited during the session",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "fa8bd1bb-f1af-4068-93c3-54048b30d352",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port Liveness Supervisord Checks Execution",
+    "summary": "Initiated orchestrated execution of Phase 24 (`port-liveness-supervisord-checks`) using a wave-based parallel workflow.\n- Loaded the execute-phase workflow with brand/UI references and performed dependency analysis across 3 plans\n- Git submodules were detected, causing automatic fallback from parallel worktree-based execution to sequential mode\n- `Dockerfile.coding-services` was edited as part of this phase's work",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "73d585d3-cad1-40ec-979f-5a0b8b641d81",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review Against Documentation Guide",
+    "summary": "Reviewed two existing PlantUML files — including `observation-memory-hierarchy.puml` — against the project's documentation style guide.\n- Assistant read both files to assess their current state; no modifications were made during this exchange.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "879a9efb-42b6-4715-b109-4b8f4d18e3c2",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 and Knowledge Graph UI Debugging",
+    "summary": "Extended debugging session across the dashboard UI, port configuration, knowledge graph RCA chains, and evidence display — prompted by multiple screenshots showing connection errors and visualization issues.\n\n**Port 3030 (obs 8):**\n- `docker-compose` maps port 3030, but nothing listens inside the container — a Next.js app at `integrations/mcp-constraint-monitor/dashboard/` should serve there, but `supervisord` only starts `dashboard-server.js` (API on 3031)\n- Artifacts: `temporal.ts`, `routes.ts`\n\n**RCA chain & evidence over-collection (obs 9, 10):**\n- `Cluster10_ArgoWorkflowStopped` showed 45 connections but no surfaced RCA chain; BFS hop distance was too large (3 hops, 900+ nodes), over-broadening evidence collection\n- A separate entity had 0 actual edges (isolated node), and the evidence collector's domain-based fuzzy matching defaulted to the \"general\" catch-all domain, inflating evidence sources to 148+\n- Artifacts: `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `IssueTriage.tsx`\n\n**Stale bundle / browser cache (obs 11):**\n- UI fix was confirmed present in the Docker-served JS bundle; issue was browser caching — resolved by hard refresh (Cmd+Shift+R)\n- Artifacts: same set as obs 9 plus `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "55ab18c6-6540-450a-b1f5-c53673188ea9",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction Audit, Retroactive Cleanup, and Pattern Review",
+    "summary": "Investigated and resolved user ID leaking into stored observation paths, then reviewed redaction configuration for further improvements.\n\n- `ConfigurableRedactor` correctly replaces the user ID with `<USER_ID_REDACTED>` in new data, but the database `messages` column held stale unredacted entries — a retroactive cleanup redacted **245 observations** and zeroed remaining references (obs 12)\n- Confirmed via screenshot review that all stored observations now show the redacted form; email references also fully replaced (obs 13); `.env` edited\n- `redaction-patterns.json` was read to assess existing patterns before adding path-shortening rules, but no changes were made in the final exchange (obs 14)\n- Artifacts: `ObservationWriter.js`, `.env`, `redaction-patterns.json`",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T11:47:49.150Z"
+  },
+  {
+    "id": "71ae85e6-1f28-40f7-a94c-fea614952345",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continuing from a prior session, the assistant finalized a 37-question interview guide for two redacted Validation Engineer roles.\n- Output produced in both Markdown (`~/Desktop/Validation_Engineer_Interview_Guide.md`) and HTML (`~/Desktop/Validation_Engineer_Interview_Guide.html`)\n- Direct PDF generation was blocked by missing LaTeX dependencies; the HTML file can be opened in a browser and saved as PDF via Cmd+P",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "1603664d-f64f-4565-95bf-c6f139dbe395",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Port 3030 Not Serving, Rebuild and Cache Issues",
+    "summary": "A recurring dashboard UI problem was investigated across three sessions, progressively narrowing the root cause.\n- Obs 2: Database confirmed healthy (598–602 observations, integrity checks passed), API responding on port 3033; root cause identified as the dashboard needing a rebuild after recent changes. `PROJECT.md`, `STATE.md`, and `REQUIREMENTS.md` updated.\n- Obs 8: Deeper investigation into port 3030 revealed nothing is actually listening on it inside the container — `docker-compose` maps the port, but `supervisord` only starts `dashboard-server.js` (the API on 3031), not the Next.js app located at `integrations/mcp-constraint-monitor/dashboard/`. Changes made to `temporal.ts` and `routes.ts`.\n- Obs 11: After a fix was applied, the UI still appeared broken due to browser caching of the old JS bundle; confirmed the fix was present in the Docker-served bundle and recommended a hard refresh (Cmd+Shift+R). Artifacts: `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "5b551564-90a3-4866-b451-e0c10e50ea2f",
+    "date": "2026-04-23",
+    "theme": "Observation Template Placeholders and Redaction Data <USER_ID_REDACTED>",
+    "summary": "Multiple sessions investigated data <USER_ID_REDACTED> issues in stored observations, covering both unfilled template content and insufficient redaction of user IDs.\n- Obs 3: Found that 573/602 observations correctly use the structured template format, but at least one contained literal placeholder text rather than filled-in content, indicating a failure in the template-filling step. `ObservationWriter.js` edited.\n- Obs 12: Confirmed `ConfigurableRedactor` correctly replaces the user ID with `<USER_ID_REDACTED>`, but stale unredacted data existed in the `messages` column; retroactive cleanup redacted 245 observations. `ObservationWriter.js` edited.\n- Obs 13: Verified post-cleanup that redaction is fully working — raw user ID and email references are replaced in all stored observations. `.env` edited.\n- Obs 14: Reviewed `redaction-patterns.json` in preparation for adding path-shortening rules; no changes made in this exchange.",
+    "observationIds": [
+      "022e195f-51b8-44a1-b3f2-acee85235a4f",
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "dd4921e1-cb58-4e01-86bc-68c301e51e84",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Missing from GSD Statusline",
+    "summary": "Investigated why the context window display disappeared from the GSD toolbar/statusline. The hook code in the statusline configuration was confirmed intact and correct. The likely cause is that Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook — identified as a Claude Code runtime change with no fix applied. `ObservationWriter.js` was edited as part of the session.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "cd27e430-7fcf-49bc-b750-87e643db0787",
+    "date": "2026-04-23",
+    "theme": "MkDocs Screenshots Not Picked Up After GitHub Push",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` instead of `docs-content/images/`. Images need to be moved or symlinked to `docs-content/images/` for MkDocs to include them. Fix and local serve were not completed in this exchange. `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "2517fd18-919d-4daf-9b40-0d58d1e7f437",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "The orchestrator initialized phase 24 (`port-liveness-supervisord-checks`) with 3 plans using the wave-based parallel execution workflow. Git submodules were detected in the repository, causing a fallback from parallel worktree-based execution to sequential execution mode. `Dockerfile.coding-services` was edited during this session.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "816fd45b-ae11-4833-b4c4-bfae269b9305",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Guide Review",
+    "summary": "Two existing PlantUML files were read and assessed against the documentation style guide, including `observation-memory-hierarchy.puml`. No modifications were made during this exchange; the session was purely investigative/diagnostic.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "4dbc3697-d5bc-4bba-804c-d2caaa8e5d98",
+    "date": "2026-04-23",
+    "theme": "Knowledge Graph RCA Chain and Evidence Source Over-Inflation Bugs",
+    "summary": "Two related bugs in the knowledge graph issue triage view were identified across consecutive sessions.\n- Obs 9: `Cluster10_ArgoWorkflowStopped` showed no RCA chain despite 45 connections, and evidence collection was pulling from 3 BFS hops across 900+ nodes — too broad. No code changes made; artifacts touched include `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`.\n- Obs 10: Further diagnosis via API <USER_ID_REDACTED> and reading `IssueTriage.tsx` revealed the entity had 0 actual edges (isolated node, explaining the empty RCA chain), and the evidence collector's domain-based fuzzy matching routes all unmatched entities to a `\"general\"` catch-all domain, inflating evidence sources to 148+. `IssueTriage.tsx` edited.",
+    "observationIds": [
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:15:51.728Z"
+  },
+  {
+    "id": "a6f427d5-a8c4-4254-9cb8-066b81a4415d",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continuing from a prior task, the assistant finalized a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md` as the primary artifact\n- Exported to `~/Desktop/Validation_Engineer_Interview_Guide.html` as a browser-printable fallback\n- Direct PDF generation was blocked by missing LaTeX dependencies; workaround is to open the HTML in a browser and use Cmd+P to save as PDF",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "de8aeae7-7a71-45d1-96fa-e7f547bbd43f",
+    "date": "2026-04-23",
+    "theme": "Observations Dashboard UI Diagnosis and Template Placeholder Bug",
+    "summary": "Two sequential investigations into the observations system triggered by developer-shared screenshots of the dashboard UI.\n- Observation 2: Confirmed the database holds 598–602 observations and passes integrity checks, API is healthy on port 3033; root cause of the UI issue was the dashboard needing a rebuild after recent changes. Edited `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md`.\n- Observation 3: Discovered that while 573 of 602 observations correctly use the structured template format, at least one entry contains unfilled literal placeholder text, indicating a failure in the template-filling step of `ObservationWriter.js`.\n- `ObservationWriter.js` was edited as part of the template-placeholder investigation.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "699856ac-7bca-41b1-b0c9-2a127f5c68f3",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Disappearing from GSD Statusline",
+    "summary": "Developer noticed the context window display had vanished from the GSD toolbar/statusline. Investigation confirmed the hook code in `ObservationWriter.js` is intact and correctly structured, but Claude Code appears to have stopped supplying the `context_window.remaining_percentage` field in the stdin JSON passed to the hook. No fix was applied; root cause identified as a Claude Code runtime behavior change rather than a local code defect.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "0b626588-f71a-48c1-a10c-8b41fc823510",
+    "date": "2026-04-23",
+    "theme": "MkDocs Documentation Not Picking Up New Screenshots",
+    "summary": "Investigated why a GitHub push did not trigger a MkDocs documentation update with newly added screenshots. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but the new images were placed in `docs/images/` instead of `docs-content/images/`. `Dockerfile.coding-services` was edited during this session. The fix (copying images to the correct directory or updating references) and local serve were not completed within this exchange.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "7e38a184-bf09-4e81-ae48-856a183225d9",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Orchestrator initialized execution of phase 24 (`port-liveness-supervisord-checks`) covering 3 plans using the wave-based parallel execution workflow. Git submodule detection caused an automatic fallback from parallel worktree-based execution to sequential mode. `Dockerfile.coding-services` was edited. Full execution outcome was not reported within this exchange.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "cc7d5627-5ade-42c1-b73a-bdf9b0d82957",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Review Against Documentation Style Guide",
+    "summary": "The assistant read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against a documentation style guide. No modifications were made during this exchange; the session appears to have been exploratory/preparatory.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "96426ed6-df83-46ab-8dd3-4ae75400b5a1",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 Outage and Knowledge Graph RCA/Evidence Bugs",
+    "summary": "A series of investigations triggered by developer screenshots covering two interrelated problem areas: the dashboard not serving on port 3030, and UI bugs in the knowledge graph issue triage view.\n\n**Port 3030 outage (obs 8):**\n- `docker-compose` maps port 3030, but nothing inside the container listens on it; `supervisord` only starts `dashboard-server.js` (the API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/`\n- Edited `temporal.ts`, `routes.ts`\n\n**RCA chain and evidence bugs (obs 9, 10):**\n- `Cluster10_ArgoWorkflowStopped` showed no RCA chain despite 45 connections — later confirmed the entity was actually an isolated node with 0 real edges\n- Evidence collector's domain-based fuzzy matching falls back to a \"general\" catch-all domain, pulling 900+ nodes across 3 BFS hops and inflating evidence source counts to 148+\n- Edited `IssueTriage.tsx`; `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx` also touched\n\n**Stale bundle / caching (obs 11):**\n- Verified the UI fix was present in the Docker-served JS bundle; root cause of apparent non-appearance was browser caching — resolved by hard refresh (Cmd+Shift+R)",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "8033a8e8-f1da-4c6f-9e33-d0986954b1ec",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Cleanup and Pattern Configuration",
+    "summary": "Three consecutive sessions addressing user ID redaction in stored observations.\n\n- **Obs 12:** Confirmed `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>` in new data, but the database held stale unredacted content in the `messages` column. A retroactive cleanup redacted 245 observations and zeroed remaining references. Edited `ObservationWriter.js`.\n- **Obs 13:** Verified via screenshot review and direct database query that redaction is now fully effective — raw user ID and email references are all replaced in stored observations. Edited `.env`.\n- **Obs 14:** Developer requested shortening (likely of redaction patterns or path representations). Assistant read `redaction-patterns.json` to understand existing patterns before making changes, but no edits were committed in this exchange.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T12:45:49.082Z"
+  },
+  {
+    "id": "c5c30e8c-65f2-4c96-a9f8-2638fb121321",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Continued from a prior task to finalize a 37-question interview guide for two Validation Engineer roles. The guide was completed in Markdown and exported to HTML as a workaround after direct PDF generation was blocked by missing LaTeX dependencies.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.html` (openable in browser for Cmd+P PDF save)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "566a051c-2697-477c-b2f5-1b288356093d",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Rebuild and Unfilled Template Placeholders in Observations",
+    "summary": "Two consecutive investigations into the observations database and dashboard UI health. The database was confirmed intact (598–602 observations, passing integrity checks) and the API responsive on port 3033, but the dashboard UI required a rebuild after recent changes.\n\nA secondary issue was found in the observations data: while 573 entries correctly use the structured template format, at least one entry contained literal unfilled placeholder text, indicating a failure in the template-filling step within `ObservationWriter.js`.\n- Edited `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md` (dashboard status documentation)\n- Edited `ObservationWriter.js` (template-filling bug identification)",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "27fca29c-41c0-4124-99b8-4ac6e31a01bf",
+    "date": "2026-04-23",
+    "theme": "Context Window Display Disappearing from GSD Statusline",
+    "summary": "Investigated why the context window percentage stopped appearing in the GSD toolbar/statusline. The hook code was confirmed intact and correct; the root cause was identified as Claude Code likely no longer passing the `context_window.remaining_percentage` field in the stdin JSON to the hook. No fix was applied — treated as a Claude Code runtime behavior change requiring no code modification.\n- Edited `ObservationWriter.js` (investigation only)",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "8323a1c1-6324-4219-927a-cd843e9cb560",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-built documentation. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but screenshots were placed in `docs/images/` instead of `docs-content/images/`. The fix (copying images to the correct directory or updating links) and local serve were not yet completed in this exchange.\n- Edited `Dockerfile.coding-services`",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "b21f9d62-65aa-4617-897a-04adc5af5484",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow. Three plans were loaded, but git submodule detection caused the orchestrator to fall back from parallel worktree-based execution to sequential execution mode.\n- Edited `Dockerfile.coding-services`",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "41e36ac2-6f10-42e6-83bb-18d2e60aaabd",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Review Against Documentation Style Guide",
+    "summary": "Read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against the documentation style guide. No modifications were made during the exchange — assessment only.\n- Edited (reviewed) `observation-memory-hierarchy.puml`",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "7cd6a364-a30e-4ee1-a1cf-48cca2626d7d",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 Connectivity, RCA Chain, and Evidence Display Bugs",
+    "summary": "A series of investigations into the dashboard UI spanning connection errors, graph visualization issues, and a stale bundle cache problem.\n\n**Port 3030 (obs 8):** Nothing was listening on port 3030 inside the container — a Next.js app at `integrations/mcp-constraint-monitor/dashboard/` should serve there, but `supervisord` only starts `dashboard-server.js` (the API on 3031), leaving 3030 unmapped.\n\n**RCA chain & evidence (obs 9, 10):** Two bugs identified in the knowledge graph issue triage view:\n- `Cluster10_ArgoWorkflowStopped` showed no RCA chain despite 45 connections; investigation revealed it was actually an isolated node (0 real edges)\n- Evidence collector's domain-based fuzzy matching used a \"general\" catch-all domain, inflating evidence sources to 148+ entries by pulling from 900+ nodes via overly broad BFS (3-hop distance)\n\n**Stale bundle cache (obs 11):** After a UI fix, changes weren't visible in the browser. Confirmed the fix was present in the Docker-served JS bundle; root cause was browser caching — resolved with a hard refresh (Cmd+Shift+R).\n\nFiles changed: `temporal.ts`, `routes.ts`, `IssueTriage.tsx`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "bb2f1820-f72e-4f3f-86b5-d02cb4795f6a",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction Cleanup and Patterns Configuration Review",
+    "summary": "Investigated and resolved a redaction issue where raw user IDs were appearing in observation paths stored in the database.\n\n- Confirmed `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>` in live processing\n- Found stale unredacted data in the database `messages` column from prior to the fix; a retroactive cleanup redacted **245 observations** and zeroed out remaining references\n- Verified post-cleanup: all stored observations now show the redacted form; email references also fully replaced\n- A follow-up to shorten redaction patterns was initiated but only `redaction-patterns.json` was read — no changes made\n\nFiles changed: `ObservationWriter.js`, `.env`, `redaction-patterns.json`",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:19:43.409Z"
+  },
+  {
+    "id": "215a3f4a-c9f4-484e-b416-332d6f1ee940",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continuing from a prior task, the assistant finalized a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Output produced in both Markdown (`~/Desktop/Validation_Engineer_Interview_Guide.md`) and HTML (`~/Desktop/Validation_Engineer_Interview_Guide.html`)\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML export was offered as a workaround (open in browser, use Cmd+P to save as PDF)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "fd921457-9ace-4b96-a4d5-fcae7506972d",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Diagnosis and Template Placeholder Bug",
+    "summary": "Two consecutive sessions investigated dashboard and data <USER_ID_REDACTED> issues after a screenshot was shared showing a broken UI state.\n- API confirmed healthy on port 3033 with 598–602 observations passing integrity checks; root cause of the UI issue was the dashboard needing a rebuild after recent changes (`PROJECT.md`, `STATE.md`, `REQUIREMENTS.md` updated)\n- A secondary data <USER_ID_REDACTED> issue was found: at least one observation contained unfilled template placeholder text instead of real content, indicating a failure in the template-filling step inside `ObservationWriter.js`\n- 573 of 602 observations correctly use the structured template format by design",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "a47d1c4a-0dcc-43e9-ad79-a4d8347d8b7b",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Missing From GSD Statusline",
+    "summary": "Investigated why the context window display disappeared from the GSD toolbar/statusline. The hook-based statusline code in `ObservationWriter.js` was confirmed intact and correct. The likely cause is that the Claude Code runtime stopped passing `context_window.remaining_percentage` in the stdin JSON provided to the hook — no fix was applied, as this appears to be an external runtime change.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "f817fa64-9d2c-49e2-babc-dd3e2523aed3",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-built documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` instead of `docs-content/images/`\n- `Dockerfile.coding-services` was edited as part of the investigation\n- Fix (copying images to the correct directory or updating links) and local serve were not completed within the exchange",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "be63a27c-465a-4d81-97ab-2502fd864895",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow. The orchestrator loaded 3 plans but detected git submodules, causing a fallback to sequential execution mode rather than parallel worktree-based execution. `Dockerfile.coding-services` was edited during this session.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "8978e8b8-a048-4506-a635-1ac352575071",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review Against Documentation Guide",
+    "summary": "The assistant read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against a documentation style guide. No modifications were made during the exchange; the session ended at the assessment stage.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "9f6f983f-0177-4cd8-9c8b-15a3cfe25cf6",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 Outage, RCA Chain, Evidence Inflation, and Cache Bugs",
+    "summary": "A series of investigations into the knowledge graph dashboard and issue triage UI, triggered by multiple screenshots showing connection errors, missing RCA chains, and inflated evidence counts.\n- **Port 3030 (obs 8):** Nothing was listening inside the container — docker-compose maps port 3030, but supervisord only starts `dashboard-server.js` (API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/`; `temporal.ts` and `routes.ts` were edited\n- **RCA chain & evidence (obs 9,10):** `Cluster10_ArgoWorkflowStopped` showed no RCA chain because it was an isolated node with 0 actual edges; separately, the evidence collector's domain-based fuzzy matching fell back to a \"general\" catch-all domain, inflating evidence sources to 148+; BFS hop distance was also identified as too large (3 hops across 900+ nodes); `IssueTriage.tsx` and several config/service files edited\n- **Browser cache (obs 11):** The UI fix was confirmed present in the Docker-served JS bundle; the symptom was browser caching, resolved by hard refresh (Cmd+Shift+R); `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, and `Dockerfile.coding-services` were edited",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "290a3fcf-4dc6-4814-825a-da3846bad564",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction Cleanup, Verification, and Pattern Review",
+    "summary": "Three consecutive sessions addressed unredacted user IDs appearing in stored observation paths, confirmed via shared screenshots.\n- **Cleanup (obs 12):** `ConfigurableRedactor` was confirmed to correctly replace the user ID with `<USER_ID_REDACTED>`, but the database held stale unredacted data in the `messages` column; a retroactive cleanup redacted 245 observations; `ObservationWriter.js` edited\n- **Verification (obs 13):** Post-cleanup query confirmed full redaction — raw user ID and email references are replaced in all stored observations; `.env` edited\n- **Pattern review (obs 14):** `redaction-patterns.json` was read to understand existing patterns before adding path-shortening rules; no changes were made in this exchange",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T13:49:43.951Z"
+  },
+  {
+    "id": "37bd819b-41ad-4922-839f-62297bef2230",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued from a prior task to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Output produced in both Markdown (`~/Desktop/Validation_Engineer_Interview_Guide.md`) and HTML (`~/Desktop/Validation_Engineer_Interview_Guide.html`)\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML export was offered as a workaround (open in browser, use Cmd+P to save as PDF)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "cc86a049-5ef0-4ee6-b755-20a7487b475e",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Diagnosis and Template Placeholder Bug",
+    "summary": "Two consecutive sessions investigated issues surfaced via dashboard screenshots.\n- Observation 2: Confirmed the database holds 598–602 observations with passing integrity checks, API healthy on port 3033; root cause of dashboard display issue was the UI needing a rebuild after recent changes. Updated `PROJECT.md`, `STATE.md`, and `REQUIREMENTS.md`.\n- Observation 3: Inspected observation content and found that while 573/602 entries use the structured template format by design, at least one entry contains unfilled literal placeholder text, indicating a failure in the template-filling step. `ObservationWriter.js` was edited.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "f7ae48df-00d1-48d4-873f-32d0cdd8961e",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Missing from GSD Statusline",
+    "summary": "Investigated why the context window display disappeared from the GSD toolbar/statusline.\n- The hook-based statusline code was confirmed intact and correct.\n- Root cause identified as Claude Code likely no longer passing the `context_window.remaining_percentage` field in the stdin JSON to the hook — a runtime behavioral change, not a code bug.\n- No fix applied; `ObservationWriter.js` was edited as a side effect.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "da9398b0-36a7-4232-86a2-007e1ce0eccf",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but screenshots were placed in `docs/images/` instead of `docs-content/images/`.\n- Fix (copying images to the correct directory or updating links) and local rebuild were not yet completed in this exchange.\n- `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "541a15e3-fda5-47e9-85e2-e4cc7153cb42",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow.\n- Three plans were loaded for the phase.\n- Git submodules were detected, causing the orchestrator to fall back from parallel worktree-based execution to sequential execution mode.\n- `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "8540fcb1-7faa-4880-8089-61374d0195b8",
+    "date": "2026-04-23",
+    "theme": "PlantUML Architecture Diagram Style Review",
+    "summary": "Reviewed two existing PlantUML files (including `observation-memory-hierarchy.puml`) against the documentation style guide.\n- No modifications were made; the exchange was purely diagnostic/read-only.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "4c9f1aa1-6e58-4298-ac4d-5754e5706259",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Port 3030 Debugging, RCA Chain, Evidence, and Caching Issues",
+    "summary": "A sustained debugging session across four observations addressed multiple interconnected dashboard UI problems.\n- **Port 3030 not serving (obs 8):** `docker-compose` maps port 3030, but nothing listens on it inside the container — `supervisord` only starts `dashboard-server.js` (the API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/`. Edited `temporal.ts`, `routes.ts`.\n- **RCA chain and evidence over-collection (obs 9):** Identified that `Cluster10_ArgoWorkflowStopped` had no surfacing RCA chain despite 45 connections, and BFS evidence collection was spanning 3 hops across 900+ nodes. No code changes made. Edited `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`.\n- **Isolated node and domain fuzzy matching bug (obs 10):** <USER_ID_REDACTED> API and read `IssueTriage.tsx` to confirm the entity had 0 actual edges (isolated node), and the evidence collector's \"general\" catch-all domain match inflated evidence sources to 148+. Edited `IssueTriage.tsx`.\n- **Stale browser cache (obs 11):** Confirmed the UI fix was present in the Docker-served JS bundle; issue was browser-side caching. Recommended hard refresh (Cmd+Shift+R). Edited `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`.",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "6ace3dfa-8770-47b3-bd6e-e0c510efaf5d",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction Audit, Retroactive Cleanup, and Pattern Review",
+    "summary": "Three observations addressed redaction of user IDs in stored observations.\n- **Retroactive cleanup (obs 12):** Confirmed `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>`, but the database `messages` column held stale unredacted data. A retroactive cleanup redacted 245 observations and zeroed remaining references. Edited `ObservationWriter.js`.\n- **Redaction verification (obs 13):** <USER_ID_REDACTED> the database to confirm all user ID and email references are now fully replaced; the path visible in the shared screenshot was already the redacted version. Edited `.env`.\n- **Pattern config review (obs 14):** Read `redaction-patterns.json` to understand existing patterns before adding path-shortening rules; no changes were made in this exchange.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:06:02.307Z"
+  },
+  {
+    "id": "84f59aae-a3f2-41d9-b958-d1444869693c",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Completed a 37-question interview guide for two Validation Engineer roles at a redacted company. The guide was finalized in Markdown and exported to HTML as a fallback because LaTeX dependencies required for direct PDF generation were absent.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.html` (browser-openable for Cmd+P PDF save)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "220f0394-1afd-4fff-a356-d7cd63ee49bd",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Rebuild, Port 3030, and Caching Debugging",
+    "summary": "A series of investigations into why the dashboard UI was not rendering correctly. The session spanned from initial triage to identifying a stale browser cache as the final blocker.\n- Obs 2: Confirmed API healthy on port 3033 with 598 observations in DB; root cause was the dashboard needing a rebuild after recent changes. Updated `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md`.\n- Obs 8: Discovered port 3030 is mapped in docker-compose but nothing listens on it — `supervisord` starts only `dashboard-server.js` (API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/`. Edited `temporal.ts` and `routes.ts`.\n- Obs 11: Confirmed the JS fix was present in the Docker-served bundle; the issue was browser caching. Recommended hard refresh (Cmd+Shift+R). Edited `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "3d0df468-c3c5-46e0-ad6a-1df5348ada52",
+    "date": "2026-04-23",
+    "theme": "Unfilled Template Placeholders in Observations Database",
+    "summary": "Investigated why some observation entries contained literal template placeholder text instead of real content. Found that 573 of 602 observations use the structured template format by design, but at least one entry had unfilled placeholders, pointing to a failure in the template-filling step upstream. `ObservationWriter.js` was edited as part of the investigation.",
+    "observationIds": [
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "ec806fc9-2082-4ad6-9e76-d5912c56c7a2",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Disappearing from GSD Statusline",
+    "summary": "Investigated the disappearance of the context window display from the GSD toolbar/statusline. The hook-based statusline code was confirmed intact and correct. The likely cause is that Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook — identified as a Claude Code runtime change with no fix applied. `ObservationWriter.js` was incidentally edited.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "4da6e645-ce5c-4fe9-b22b-57b1544a9262",
+    "date": "2026-04-23",
+    "theme": "MkDocs Misconfigured Docs Directory Causing Missing Screenshots",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/`. Images need to be moved or symlinked to `docs-content/images/` for MkDocs to pick them up. Fix and local serve were not completed in this exchange. `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "436f3567-a925-4f36-8fac-5483a6249905",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Execution",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) containing 3 plans. The executor loaded wave-based parallel execution workflows but detected git submodules and fell back to sequential execution mode instead of parallel worktree-based execution. `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "b384e4c3-8e03-4a55-af1c-210a35765083",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review, No Changes Made",
+    "summary": "Read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against the documentation style guide. No modifications were made during this exchange.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "f502e5a7-300d-454e-9839-f129cc33e4ef",
+    "date": "2026-04-23",
+    "theme": "RCA Chain and Evidence Inflation Bugs in Knowledge Graph UI",
+    "summary": "Two related bugs in the knowledge graph issue triage view were diagnosed across consecutive sessions.\n- Obs 9: Identified that `Cluster10_ArgoWorkflowStopped` had no RCA chain surfaced despite 45 connections, and that BFS evidence collection was pulling from 3 hops away across 900+ nodes — too broad. No code changes made. Edited `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`.\n- Obs 10: Deeper investigation via API <USER_ID_REDACTED> and reading `IssueTriage.tsx` revealed the entity was actually an isolated node (0 real edges), and the evidence collector's domain-based fuzzy matching assigns all entities to a \"general\" catch-all domain, inflating evidence sources to 148+. `IssueTriage.tsx` edited.",
+    "observationIds": [
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "07af1502-393e-48c4-b639-d23f381f03c1",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Cleanup and Pattern Configuration",
+    "summary": "A sequence of work ensuring user IDs are properly redacted in stored observations and tightening the redaction pattern configuration.\n- Obs 12: Confirmed `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>`, but the database held stale unredacted data in the `messages` column. A retroactive cleanup redacted 245 observations. `ObservationWriter.js` edited.\n- Obs 13: Verified via database query that redaction is fully working — email and path references are all replaced; the path visible in the screenshot was already the redacted form. `.env` edited.\n- Obs 14: Reviewed `redaction-patterns.json` to understand existing patterns before adding path-shortening rules; no changes made in this exchange.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T14:10:34.898Z"
+  },
+  {
+    "id": "3a8d341b-7bc7-4106-9555-ec97728ef216",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued from a prior session to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Output produced in both Markdown (`~/Desktop/Validation_Engineer_Interview_Guide.md`) and HTML (`~/Desktop/Validation_Engineer_Interview_Guide.html`)\n- Direct PDF export was blocked due to missing LaTeX dependencies; HTML was provided as a workaround for browser-based PDF printing via Cmd+P.",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "1b28e418-0222-4213-9b67-d9e0b66d7bae",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Diagnosis and Template Placeholder Bug",
+    "summary": "Two back-to-back sessions investigated dashboard and observations database health after a developer shared screenshots of apparent UI issues.\n- Confirmed the database holds 598–602 observations and passes integrity checks; API is healthy on port 3033\n- Root cause of dashboard display issue traced to the UI needing a rebuild after recent changes\n- A secondary bug was found in `ObservationWriter.js`: at least one observation contained unfilled template placeholder text rather than real content, despite 573 of 602 entries correctly using the structured template format — indicating a failure in the template-filling step",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "19364882-3d86-42b7-9e21-5355728daf57",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Disappearing from GSD Statusline",
+    "summary": "Investigated why the context window display vanished from the GSD toolbar/statusline. The hook code reading `context_window.remaining_percentage` from stdin JSON was confirmed intact and correct. The likely cause is that Claude Code stopped passing that field in its hook payload — identified as a runtime change with no fix applied.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "5829e679-14fd-4e06-91ce-ac665314414c",
+    "date": "2026-04-23",
+    "theme": "MkDocs Documentation Directory Misconfiguration",
+    "summary": "Investigated why new screenshots pushed to GitHub did not appear in the MkDocs-generated documentation site. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but screenshots were placed in `docs/images/` instead of `docs-content/images/`. Updated `Dockerfile.coding-services` as part of the investigation; the actual image path fix and local rebuild were not completed in this exchange.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "7d03f9b3-ef5b-4ace-b8e3-da0335cca84e",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port Liveness Supervisord Checks Execution",
+    "summary": "Initiated orchestration of Phase 24 (`port-liveness-supervisord-checks`) using a wave-based parallel execution workflow. Three plans were loaded, but the presence of git submodules caused the orchestrator to fall back from parallel worktree-based execution to sequential execution mode. Modified `Dockerfile.coding-services` during this process.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "7762a49c-f1b1-4384-a2ec-8c64207b5554",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review",
+    "summary": "Read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against a documentation style guide. No modifications were made during this exchange; the session was purely diagnostic/preparatory.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "96e5900a-0f49-43e8-87b2-54d361bd1af8",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 and Knowledge Graph UI Bug Fixes",
+    "summary": "A multi-session debugging effort addressed two interrelated problems: port 3030 serving nothing, and several UI bugs in the knowledge graph issue triage view.\n\n**Port / service issue:**\n- Port 3030 is mapped in docker-compose but nothing listens on it; the Next.js dashboard at `integrations/mcp-constraint-monitor/dashboard/` should serve there, but `supervisord` only starts `dashboard-server.js` (the API on 3031)\n- Fixed `supervisord.conf` and `Dockerfile.coding-services` to address the gap\n\n**Knowledge graph UI bugs (observations 9–11):**\n- `IssueTriage.tsx` diagnosed with two bugs: an entity with 0 actual edges incorrectly showed no RCA chain, and the evidence collector's domain-based fuzzy matching used a \"general\" catch-all domain, inflating evidence counts to 148+\n- BFS hop distance for evidence collection was identified as too large (3 hops across 900+ nodes)\n- After fixes were applied, a browser caching issue masked the update; hard refresh (Cmd+Shift+R) resolved the visible discrepancy\n\nFiles changed: `temporal.ts`, `routes.ts`, `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "7e580fa4-7bbf-4c99-a9ac-2198bb4f603d",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Audit, Cleanup, and Pattern Review",
+    "summary": "Three consecutive sessions addressed user ID leakage in stored observations and redaction configuration.\n- `ConfigurableRedactor` was confirmed to replace user IDs with `<USER_ID_REDACTED>`, but the `messages` column in the database held stale unredacted data — a retroactive cleanup redacted 245 observations and zeroed remaining references (`ObservationWriter.js`)\n- A follow-up screenshot review confirmed redaction is now working correctly end-to-end; `.env` was updated\n- A third session reviewed `redaction-patterns.json` in preparation for adding path-shortening rules, but no changes were committed in that exchange",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:10:39.379Z"
+  },
+  {
+    "id": "3c06e3b7-72d3-4123-a92b-3b0b2f1900af",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Completed a 37-question interview guide for two Validation Engineer roles at a redacted company. The guide was finalized in Markdown and exported to HTML as a fallback because direct PDF generation was blocked by absent LaTeX dependencies.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.html`\n- HTML file can be opened in a browser and saved as PDF via Cmd+P.",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "b3788502-41d3-4e07-9b6a-6e91c2df59b1",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Rebuild and Observations Template Placeholder Bug",
+    "summary": "Two sequential investigations into the observations dashboard and database integrity. The dashboard was confirmed broken due to needing a rebuild after recent changes — not a database or API issue (598/602 observations present, API healthy on port 3033). A secondary investigation found that at least one observation contains unfilled template placeholder text rather than actual content, indicating a failure in the template-filling step within `ObservationWriter.js`. Supporting project docs (`PROJECT.md`, `STATE.md`, `REQUIREMENTS.md`) were also updated.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "e12e1ff3-ce14-4838-9590-8b56a49deaa9",
+    "date": "2026-04-23",
+    "theme": "Context Window Display Disappeared from GSD Statusline",
+    "summary": "Investigated why the context window percentage disappeared from the GSD toolbar/statusline. The hook code was confirmed intact and correct; the root cause was identified as Claude Code likely stopping the provision of the `context_window.remaining_percentage` field in the stdin JSON passed to the hook. No fix was applied — treated as a Claude Code runtime change outside the codebase.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "faca413b-e815-448c-86b8-6e9d1c94d74f",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` instead of `docs-content/images/`. Fix (copying images to the correct directory) and local serve were not completed within the exchange. `Dockerfile.coding-services` was touched during the session.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "d9033933-89ad-4f37-8587-195cd808e8c4",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow. Three plans were loaded, but git submodule detection caused the executor to fall back from parallel worktree-based execution to sequential mode. `Dockerfile.coding-services` was edited as part of this phase.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "138aed73-08ff-4277-9e2c-3c07eb1f6c94",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review with No Changes",
+    "summary": "Read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against the documentation style guide. No modifications were made during the exchange; the session was purely investigative.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "181c123b-316c-4d39-bd9a-4fb5bb10cc5e",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030, RCA Chain, and Evidence Source Bugs",
+    "summary": "A series of interconnected investigations into the dashboard UI and knowledge graph triage view, spanning port connectivity, RCA chain rendering, and evidence collection inflation.\n\n- **Port 3030 (obs 8):** Nothing listens on port 3030 inside the container — `supervisord` only starts `dashboard-server.js` (API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/`. Files edited: `temporal.ts`, `routes.ts`.\n- **RCA chain & evidence inflation (obs 9, 10):** `Cluster10_ArgoWorkflowStopped` showed no RCA chain despite 45 connections (later found to be an isolated node with 0 actual edges). Evidence collector's domain-based fuzzy matching pulls all entities in a \"general\" catch-all domain, inflating sources to 148+. Files edited: `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, `Dockerfile.coding-services`.\n- **Stale bundle / browser cache (obs 11):** UI fix was confirmed present in the Docker-served JS bundle; the issue was browser caching, resolved by hard refresh (Cmd+Shift+R).",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "6488d04e-9165-4cf0-876a-c989d1de6625",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Audit, Retroactive Cleanup, and Path Shortening",
+    "summary": "Three consecutive sessions addressing redaction of user IDs in stored observations and related path representations.\n\n- **Retroactive cleanup (obs 12):** `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>`, but the database held stale unredacted data in the `messages` column. A cleanup script redacted 245 observations and zeroed remaining references. `ObservationWriter.js` was edited.\n- **Verification (obs 13):** Confirmed via screenshot review and database query that redaction is fully working — all user ID and email references replaced. `.env` was touched.\n- **Path shortening prep (obs 14):** Read `redaction-patterns.json` to understand existing patterns before adding path-shortening rules. No changes were made in this exchange.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T16:40:38.346Z"
+  },
+  {
+    "id": "2e0a4592-90e0-4fb8-b76f-0e5a9d870e42",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Completed a 37-question interview guide for two Validation Engineer roles at a redacted company. The guide was finalized in Markdown and exported to HTML as a fallback because direct PDF generation was blocked by absent LaTeX dependencies.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.html` (openable in browser for Cmd+P PDF save)",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "38fe2c0f-69de-43a6-932a-f91de7c147fa",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Integrity and Template Placeholder Bug",
+    "summary": "Investigated a dashboard UI issue reported via screenshot. The database was confirmed healthy (598–602 observations, passing integrity checks) and the API was responding on port 3033; the root cause of the visual issue was the dashboard needing a rebuild after recent changes. A secondary finding in `ObservationWriter.js` revealed that while 573 of 602 observations correctly use the structured template format, at least one entry contains unfilled literal placeholder text, pointing to a failure in the template-filling step.\n- Edited `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md` during triage\n- Edited `ObservationWriter.js` to address template-filling logic",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "523f4bfc-18e3-4b0f-a011-f6522f763e15",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Missing from GSD Statusline",
+    "summary": "Investigated why the context window display disappeared from the GSD toolbar/statusline. The hook-based statusline code was confirmed intact and correct. The likely cause is that Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook — identified as a Claude Code runtime change with no fix applied.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "14320155-c3bb-4139-929e-90ff29d84d41",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/`. Images must be moved to `docs-content/images/` (or links updated) for MkDocs to pick them up. A fix and local serve were not completed within this exchange.\n- Edited `Dockerfile.coding-services`",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "226a5d2a-be12-475c-9375-a1c044cc93a5",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestration of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow. Three plans were loaded, but git submodule detection caused the orchestrator to fall back from parallel worktree-based execution to sequential execution mode.\n- Edited `Dockerfile.coding-services`",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "078d1825-3e08-46d4-b040-d2de9006d02b",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review Against Documentation Guide",
+    "summary": "Reviewed two existing PlantUML files — including `observation-memory-hierarchy.puml` — against the documentation style guide to assess their current state. No modifications were made during the exchange; the session was purely investigative.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "a7ad1367-6835-42bd-b6d5-bc8cd8ec009f",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 Not Serving UI and Knowledge Graph Bug Fixes",
+    "summary": "A multi-session investigation into dashboard and knowledge graph visualization issues. Port 3030 was mapped in docker-compose but nothing was listening — `supervisord` only starts `dashboard-server.js` (the API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/` that should serve on 3030. Separately, the knowledge graph triage view had two bugs diagnosed:\n- `Cluster10_ArgoWorkflowStopped` appeared to have no RCA chain despite 45 connections — confirmed as an isolated node with 0 actual edges\n- Evidence collector's domain-based fuzzy matching pulls all entities in the `general` catch-all domain, inflating evidence sources to 148+\n- BFS hop distance was too large (3 hops, 900+ nodes), over-broadening evidence collection\n- A UI fix that wasn't appearing was traced to browser caching; a hard refresh (Cmd+Shift+R) was recommended\n- Files edited: `temporal.ts`, `routes.ts`, `IssueTriage.tsx`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "1a442e14-837e-48c3-97d5-002b026a0c30",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction Cleanup and Pattern Configuration Review",
+    "summary": "Investigated and resolved a redaction issue where user IDs were appearing unredacted in observation paths stored in the database. The `ConfigurableRedactor` was confirmed to replace user IDs with `<USER_ID_REDACTED>`, but the database held stale unredacted data in the `messages` column — a retroactive cleanup redacted 245 observations and zeroed remaining references. Follow-up checks confirmed email references are also fully redacted. A final exchange reviewed `redaction-patterns.json` to explore adding path-shortening rules, but no changes were made.\n- Edited `ObservationWriter.js` (redaction logic)\n- Edited `.env`\n- Edited `redaction-patterns.json` (read-only review)",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:10:37.996Z"
+  },
+  {
+    "id": "216b1e83-6295-4808-84cb-2011f98f4ec6",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Workaround",
+    "summary": "Completed a 37-question interview guide for two Validation Engineer roles, finalizing output in both Markdown and HTML formats.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md` and `~/Desktop/Validation_Engineer_Interview_Guide.html`\n- Direct PDF generation was blocked by missing LaTeX dependencies; HTML export was provided as a workaround (browser Cmd+P to save as PDF).",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "b5436b4e-3ecb-4bf4-9bde-a2c45f38e906",
+    "date": "2026-04-23",
+    "theme": "Dashboard UI Diagnosis and Port 3030 Service Gap",
+    "summary": "Two related investigations into why the dashboard UI was not rendering correctly.\n- Observation 2: Confirmed database has 598 observations and API is healthy on port 3033; root cause was the dashboard UI needing a rebuild after recent changes. Updated `PROJECT.md`, `STATE.md`, and `REQUIREMENTS.md`.\n- Observation 8: Deeper investigation revealed port 3030 is mapped in docker-compose but nothing listens on it — a Next.js app at `integrations/mcp-constraint-monitor/dashboard/` should serve on 3030, but `supervisord` only starts `dashboard-server.js` (the API on 3031), not the Next.js frontend.\n- Artifacts edited: `temporal.ts`, `routes.ts`.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "42b9fa5e-f4f2-40d5-abd3-ddd4e7808f54",
+    "date": "2026-04-23",
+    "theme": "Observations Database Template Placeholder Bug",
+    "summary": "Investigated why some entries in the observations database contained unfilled template placeholder text instead of actual content.\n- 573 of 602 observations correctly use the structured template format; at least one entry contains literal placeholder text, indicating a failure in the template-filling step upstream.\n- `ObservationWriter.js` was edited as part of the investigation.",
+    "observationIds": [
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "fae41929-0002-4fa3-96d1-13a5fddb0804",
+    "date": "2026-04-23",
+    "theme": "Context Window Display Disappearing from GSD Statusline",
+    "summary": "Investigated the disappearance of the context window percentage from the GSD toolbar/statusline.\n- The hook-based statusline code is intact and correct; the likely cause is that Claude Code stopped passing the `context_window.remaining_percentage` field in the stdin JSON provided to the hook.\n- Identified as a Claude Code runtime change; no fix was applied. `ObservationWriter.js` was edited.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "ae9e18d6-f874-4983-9057-665923bec233",
+    "date": "2026-04-23",
+    "theme": "MkDocs Screenshots Not Appearing After GitHub Push",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` instead of `docs-content/images/`.\n- Fix (copying images to correct directory or updating links) and local rebuild were not yet completed in this exchange.\n- `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "fe4f246c-0b65-4ae6-b367-1c6d17fb7ac5",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated orchestrated execution of phase 24 (`port-liveness-supervisord-checks`) using a wave-based parallel workflow.\n- Loaded 3 plans for the phase; git submodule detection caused fallback from parallel worktree-based execution to sequential execution mode.\n- `Dockerfile.coding-services` was edited.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "778a5b49-a49f-4a0f-9a62-95a21558a775",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Review Against Style Guide",
+    "summary": "Read two existing PlantUML files (including `observation-memory-hierarchy.puml`) to assess their current state against the documentation style guide.\n- No modifications were made during this exchange; outcome was purely diagnostic/review.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "f6972a0c-fb1e-4147-89d2-2e91eed59fa6",
+    "date": "2026-04-23",
+    "theme": "Knowledge Graph RCA Chain and Evidence Link Bugs",
+    "summary": "Three consecutive investigations into UI issues in the knowledge graph issue triage view, involving RCA chain display and evidence source inflation.\n- Observation 9: Identified two problems — RCA chain not surfacing connected symptoms/root causes/resolutions for `Cluster10_ArgoWorkflowStopped`, and BFS hop distance too large (3 hops across 900+ nodes) for evidence collection. No code changes made.\n- Observation 10: <USER_ID_REDACTED> the API and read `IssueTriage.tsx`; confirmed the entity had 0 actual edges (isolated node), and domain-based fuzzy matching was pulling all entities in the \"general\" catch-all domain, inflating evidence sources to 148+.\n- Observation 11: Determined a UI fix was already present in the Docker-served JS bundle; the display issue was browser caching. Recommended hard refresh (Cmd+Shift+R).\n- Files edited across the group: `Dockerfile.coding-services`, `supervisord.conf`, `health-verification-rules.json`, `health-verifier.js`, `system-health-dashboard.tsx`, `IssueTriage.tsx`.",
+    "observationIds": [
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "da62e8d4-07ea-4d90-a094-92cdf49e1b2d",
+    "date": "2026-04-23",
+    "theme": "User ID Redaction in Stored Observations Cleanup",
+    "summary": "Investigated and resolved user ID leaking into stored observation data, then reviewed redaction pattern config for potential path-shortening additions.\n- Observation 12: Confirmed `ConfigurableRedactor` correctly replaces the user ID with `<USER_ID_REDACTED>`, but the database held stale unredacted data in the `messages` column; a retroactive cleanup redacted 245 observations. `ObservationWriter.js` edited.\n- Observation 13: Verified redaction is fully working in current data — raw user ID and email references are replaced in all stored observations; the path visible in the shared screenshot was already the redacted version. `.env` edited.\n- Observation 14: Reviewed `redaction-patterns.json` to understand existing patterns before adding path-shortening rules; no changes made in this exchange.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-24T17:40:43.034Z"
+  },
+  {
+    "id": "0c131769-0ad2-4d70-b76d-c00571d63af3",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued from a prior session to finalize a 37-question interview guide for two <COMPANY_NAME_REDACTED> Validation Engineer roles.\n- Completed guide authored in Markdown at `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Exported to `~/Desktop/Validation_Engineer_Interview_Guide.html` as a fallback for browser-based PDF printing (Cmd+P)\n- Direct PDF generation was blocked by missing LaTeX dependencies on the system",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "26a16358-bc7f-4c9c-90fb-d293dc89b6bf",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI Placeholder and Template Failures",
+    "summary": "Investigated dashboard and observations database issues reported via screenshots. The API was healthy on port 3033 with 598–602 observations and passing integrity checks, but the dashboard UI required a rebuild after recent changes.\n- `ObservationWriter.js` was edited in both sessions\n- 573 of 602 observations correctly use the structured template format, but at least one entry contained unfilled literal placeholder text, indicating a failure in the template-filling step\n- Root cause of dashboard display issue: UI needs a rebuild; root cause of placeholder issue: template-filling step not executing for some entries",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "dd5a3d89-443a-46df-bc24-8aa5233ae823",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Disappearing from GSD Statusline",
+    "summary": "Investigated why the context window display vanished from the GSD toolbar/statusline. The hook-based statusline code in `ObservationWriter.js` was confirmed intact and correct. The likely cause is that Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook — identified as a Claude Code runtime change with no fix applied.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "441d4a3b-772e-4dd6-9b28-5aacea54a179",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub were not appearing in the MkDocs-generated documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but new screenshots were placed in `docs/images/` — the wrong directory\n- Images must be moved or copied to `docs-content/images/` (or internal links updated) to be picked up by MkDocs\n- `Dockerfile.coding-services` was edited; local serve/rebuild was not completed in this exchange",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "c880ef24-0714-4cba-aab1-4108cacc6950",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated execution of phase 24 (`port-liveness-supervisord-checks`) via the wave-based parallel execution workflow. The orchestrator loaded 3 plans and performed dependency analysis and wave grouping, but detected git submodules and fell back to sequential execution mode rather than parallel worktree-based execution. `Dockerfile.coding-services` was edited during this session.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "da1f85c1-64fb-49c0-b13d-47a4796c7a6a",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Review Against Documentation Guide",
+    "summary": "Reviewed two existing PlantUML files, including `observation-memory-hierarchy.puml`, to assess their current state against the documentation style guide. No modifications were made during this exchange — the session was diagnostic/read-only.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "8c80ae93-4073-41ab-88ac-e27f0ec48bbc",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 Connectivity, RCA Chain, Evidence and Cache Bugs",
+    "summary": "A series of related UI debugging sessions investigated the knowledge graph issue triage dashboard, progressing from connectivity to logic bugs to browser caching.\n- **Port 3030 (obs 8):** Nothing was listening inside the container — `supervisord` only starts `dashboard-server.js` (API on 3031), not the Next.js app at `integrations/mcp-constraint-monitor/dashboard/` that should serve on 3030; `temporal.ts` and `routes.ts` edited\n- **RCA chain / evidence (obs 9, 10):** `Cluster10_ArgoWorkflowStopped` showed no RCA chain due to being an isolated node (0 actual edges despite appearing connected); evidence collector's domain-based fuzzy matching used a \"general\" catch-all domain, inflating sources to 148+; BFS hop distance set too large (3 hops across 900+ nodes); `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, and `Dockerfile.coding-services` edited\n- **Stale bundle / caching (obs 11):** The UI fix was confirmed present in the Docker-served JS bundle; the issue was browser caching, resolved by hard refresh (Cmd+Shift+R)",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "3c703291-a42b-41d2-a502-b31ffdbb67cc",
+    "date": "2026-04-23",
+    "theme": "Observation Path Redaction Cleanup and Pattern Configuration",
+    "summary": "Addressed a user ID redaction issue where absolute paths containing the user ID were appearing unredacted in stored observations.\n- `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>`, but the `messages` column in the database held stale unredacted data\n- A retroactive cleanup redacted 245 observations and zeroed out remaining references; confirmed via screenshot that stored observations now show only the redacted form\n- Follow-up session (obs 13) verified full redaction coverage including email references; `.env` edited\n- Final session (obs 14) reviewed `redaction-patterns.json` to understand existing patterns before adding path-shortening rules — no changes made; `ObservationWriter.js` was edited across obs 12 and 13",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T00:54:28.766Z"
+  },
+  {
+    "id": "fbf7077e-c30e-4f51-814f-100c91b59b9a",
+    "date": "2026-04-23",
+    "theme": "Validation Engineer Interview Guide Creation and Export",
+    "summary": "Continued a prior task to finalize a 37-question interview guide for two Validation Engineer roles at a redacted company.\n- Completed guide authoring in Markdown at `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Exported to HTML at `~/Desktop/Validation_Engineer_Interview_Guide.html` as a fallback for browser-based PDF printing\n- Direct PDF generation was blocked by missing LaTeX dependencies on the system",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "3be620eb-e2c1-4e04-a568-a4814a69033b",
+    "date": "2026-04-23",
+    "theme": "Observations Database UI: Template Placeholders and Integrity Check",
+    "summary": "Investigated a dashboard UI issue (shared via screenshot) and the <USER_ID_REDACTED> of stored observation data.\n- API confirmed healthy on port 3033; database holds 598–602 observations and passes integrity checks\n- Root cause of dashboard display issue: UI needed a rebuild after recent changes\n- Separately, discovered at least one observation entry contains unfilled template placeholder text rather than actual content, indicating a failure in the template-filling step within `ObservationWriter.js`\n- 573 of 602 observations correctly use the structured template format by design\n- Artifacts edited: `PROJECT.md`, `STATE.md`, `REQUIREMENTS.md`, `ObservationWriter.js`",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "9b158f86-5001-48a7-9a46-ee686c5fb3b5",
+    "date": "2026-04-23",
+    "theme": "GSD Toolbar Context Window Display Disappearance",
+    "summary": "Investigated why the context window percentage disappeared from the GSD toolbar/statusline.\n- Hook-based statusline code was confirmed intact and correct\n- Suspected cause: Claude Code runtime stopped passing the `context_window.remaining_percentage` field in the stdin JSON to the hook\n- No fix applied; identified as an external Claude Code runtime change rather than a local code regression\n- Artifact edited: `ObservationWriter.js`",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "9e10cc84-0d8e-4ccd-b560-d22c6f7462d6",
+    "date": "2026-04-23",
+    "theme": "MkDocs Docs Directory Misconfiguration Blocking Screenshot Updates",
+    "summary": "Investigated why new screenshots pushed to GitHub did not appear in the MkDocs-generated documentation site.\n- Root cause: `mkdocs.yml` sets `docs_dir: docs-content`, but screenshots were added to `docs/images/` instead of `docs-content/images/`\n- Fix requires either moving images to `docs-content/images/` or updating references accordingly\n- Local rebuild and serve was not completed within this exchange\n- Artifact edited: `Dockerfile.coding-services`",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "c933b051-4235-4fce-8c43-0ec4ddc0a987",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated execution of phase 24 (\"port-liveness-supervisord-checks\") using the wave-based parallel execution workflow.\n- Orchestrator loaded phase plans and brand/UI references; 3 plans identified for the phase\n- Git submodules detected in the repository, causing fallback from parallel worktree-based execution to sequential mode\n- Artifact edited: `Dockerfile.coding-services`",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "108b760f-f2a5-4bca-b54f-136ec12468c8",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Guide Assessment",
+    "summary": "Reviewed existing PlantUML diagram files against the documentation style guide.\n- Assistant read two PlantUML files including `observation-memory-hierarchy.puml` to assess their current state\n- No modifications were made during the exchange; assessment only",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "e53c6efe-0f9a-48c0-bf4a-2d5996479e00",
+    "date": "2026-04-23",
+    "theme": "Dashboard Port 3030 and Knowledge Graph UI Bug Investigation",
+    "summary": "Extended investigation across multiple sessions into why port 3030 was not serving the dashboard UI and two separate UI bugs in the knowledge graph issue triage view.\n- Port 3030 is mapped in docker-compose but nothing listens on it: `supervisord` only starts `dashboard-server.js` (API on 3031), not the Next.js app located at `integrations/mcp-constraint-monitor/dashboard/`\n- Knowledge graph bug 1: entity `Cluster10_ArgoWorkflowStopped` showed no RCA chain despite 45 connections — root cause was 0 actual graph edges (isolated node)\n- Knowledge graph bug 2: evidence collector's domain-based fuzzy matching used a \"general\" catch-all domain, inflating evidence sources to 148+; BFS hop distance also identified as too large (3 hops across 900+ nodes)\n- A browser caching issue masked a deployed JS bundle fix; resolved with hard refresh (Cmd+Shift+R)\n- Artifacts edited: `temporal.ts`, `routes.ts`, `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, `Dockerfile.coding-services`",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f",
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts",
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "6d2cd66d-41fd-4876-8804-aa2e60abe63a",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction: Cleanup, Verification, and Pattern Review",
+    "summary": "Investigated and resolved unredacted user IDs appearing in stored observation paths across three related sessions.\n- `ConfigurableRedactor` was confirmed to correctly replace user IDs with `<USER_ID_REDACTED>`, but the database contained stale unredacted data in the `messages` column\n- Retroactive cleanup redacted 245 observations and zeroed out remaining unredacted references\n- Follow-up screenshot review confirmed redaction is fully working: email references and raw user ID paths are replaced in all stored observations\n- Final session read `redaction-patterns.json` to review existing patterns before adding path-shortening rules — no changes made\n- Artifacts edited: `ObservationWriter.js`, `.env`, `redaction-patterns.json`",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T04:36:37.674Z"
+  },
+  {
+    "id": "e994eb83-a672-47ac-bb1e-c98c089fcabd",
+    "date": "2026-04-23",
+    "theme": "Interview Guide Creation and PDF Export Fallback",
+    "summary": "Completed a 37-question interview guide for two Validation Engineer roles at a redacted company. The guide was finalized in Markdown and exported to HTML as a workaround for missing LaTeX dependencies that blocked direct PDF generation.\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.md`\n- Created `~/Desktop/Validation_Engineer_Interview_Guide.html`\n- Users can open the HTML in a browser and use Cmd+P to save as PDF.",
+    "observationIds": [
+      "16680401-a0dc-4041-b083-5f96a75448ac"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "~/Desktop/Validation_Engineer_Interview_Guide.md",
+      "~/Desktop/Validation_Engineer_Interview_Guide.html"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "9a34fa72-581f-4936-9790-18acb88f3ae9",
+    "date": "2026-04-23",
+    "theme": "Observations Dashboard UI Diagnosis and Template Placeholder Bug",
+    "summary": "Two successive investigations into the observations database and dashboard UI. The first confirmed the database holds 598–602 observations with passing integrity checks and the API responding on port 3033, with the root cause of a UI display issue traced to the dashboard needing a rebuild after recent changes. The second investigation found that while 573 observations correctly use the structured template format, at least one entry contains unfilled literal placeholder text, indicating a failure in the template-filling step upstream.\n- Edited `ObservationWriter.js` to address template-filling logic.\n- Updated `PROJECT.md`, `STATE.md`, and `REQUIREMENTS.md` during diagnosis.",
+    "observationIds": [
+      "027f9e1e-723b-4631-b1a1-4befae923033",
+      "022e195f-51b8-44a1-b3f2-acee85235a4f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "PROJECT.md",
+      "STATE.md",
+      "REQUIREMENTS.md",
+      "~/Agentic/coding/.planning/PROJECT.md",
+      "~/Agentic/coding/.planning/STATE.md",
+      "~/Agentic/coding/.planning/REQUIREMENTS.md",
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "f6eb0a6a-b66a-4a32-a10d-fb2f8bb2f08b",
+    "date": "2026-04-23",
+    "theme": "Context Window Percentage Missing from GSD Statusline",
+    "summary": "Investigated why the context window display disappeared from the GSD toolbar/statusline. The hook code was confirmed intact and correct; the likely cause is that Claude Code stopped providing the `context_window.remaining_percentage` field in the stdin JSON passed to the hook. No fix was applied — identified as a Claude Code runtime behavioral change requiring no code correction on the project side. `ObservationWriter.js` was edited as part of the session.",
+    "observationIds": [
+      "0dfe12bf-4347-4bde-aabf-5664e3b039e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "d147c508-c7e8-4c58-a351-1453e5682cd7",
+    "date": "2026-04-23",
+    "theme": "MkDocs Documentation Directory Misconfiguration",
+    "summary": "Investigated why new screenshots pushed to GitHub did not appear in the MkDocs-generated documentation site. Root cause identified: `mkdocs.yml` sets `docs_dir: docs-content`, but the new screenshots were placed in `docs/images/` instead of `docs-content/images/`. Fix (copying images to the correct directory or updating links) and local serve were not yet completed within this exchange. `Dockerfile.coding-services` was edited during the session.",
+    "observationIds": [
+      "122d6b65-a334-4bd4-b1e8-d918752e0dbd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "a42058eb-0f4e-460d-9465-9508e79ffd2a",
+    "date": "2026-04-23",
+    "theme": "Phase 24 Port-Liveness Supervisord Checks Orchestration",
+    "summary": "Initiated execution of phase 24 (`port-liveness-supervisord-checks`) using the wave-based parallel execution workflow. The orchestrator loaded 3 plans but detected git submodules, causing a fallback to sequential execution mode instead of the preferred parallel worktree-based approach. `Dockerfile.coding-services` was edited during the session.",
+    "observationIds": [
+      "05fde2d0-6a66-4733-b834-0fc5648ee346"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "docker/Dockerfile.coding-services"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "336aad83-a520-42e0-8eea-92f82960ef04",
+    "date": "2026-04-23",
+    "theme": "PlantUML Diagram Style Guide Assessment",
+    "summary": "Reviewed two existing PlantUML files against a documentation style guide to assess their current state. No modifications were made; the exchange was purely diagnostic. `observation-memory-hierarchy.puml` was read as part of the review.",
+    "observationIds": [
+      "2076bc9f-a31d-47fc-bfdc-0612e341ae05"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "observation-memory-hierarchy.puml",
+      "docs/puml/observation-memory-hierarchy.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "e99d4050-24e1-4f05-80a8-e3ce1a5bbb6e",
+    "date": "2026-04-23",
+    "theme": "Port 3030 Dashboard Not Serving — Missing Next.js Process",
+    "summary": "Debugged a connection error on port 3030 where the dashboard UI was unreachable. Investigation of docker-compose port mappings and dashboard source revealed that while port 3030 is correctly mapped, no process inside the container listens on it. The Next.js app at `integrations/mcp-constraint-monitor/dashboard/` should serve on 3030, but `supervisord` only starts `dashboard-server.js` (the API on 3031) — the Next.js app is never launched.\n- Edited `temporal.ts` and `routes.ts` during investigation.",
+    "observationIds": [
+      "00a1f0a3-01ec-4063-8a0a-1023e6c3c60f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "temporal.ts",
+      "routes.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/intelligence/temporal.ts",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/api/routes.ts"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "5b8f1677-8f7c-4400-9c36-2875b5975041",
+    "date": "2026-04-23",
+    "theme": "Knowledge Graph RCA Chain and Evidence Source UI Bugs",
+    "summary": "Three consecutive sessions investigating visual bugs in the knowledge graph issue triage view. Two root causes were identified and one resolved:\n- **RCA chain missing**: `Cluster10_ArgoWorkflowStopped` appeared to have 45 connections but was actually an isolated node with 0 real edges, so no RCA chain could be surfaced.\n- **Inflated evidence sources**: The BFS evidence collector uses domain-based fuzzy matching with a 3-hop radius across 900+ nodes; entities falling into the \"general\" catch-all domain pull 148+ unrelated evidence sources.\n- **Stale JS bundle / browser cache**: A UI fix was present in the Docker-served bundle but was masked by browser caching; resolved by recommending a hard refresh (Cmd+Shift+R).\n- Files edited: `IssueTriage.tsx`, `system-health-dashboard.tsx`, `health-verifier.js`, `health-verification-rules.json`, `supervisord.conf`, `Dockerfile.coding-services`.",
+    "observationIds": [
+      "10b0d194-4f9d-4235-9671-4cbbd9f118c7",
+      "12bf6407-b1f6-488b-9f76-081fc8d1ed25",
+      "0b735e70-341e-4632-ac17-d9ef53d79092"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "Dockerfile.coding-services",
+      "supervisord.conf",
+      "health-verification-rules.json",
+      "health-verifier.js",
+      "system-health-dashboard.tsx",
+      "docker/Dockerfile.coding-services",
+      "docker/supervisord.conf",
+      "config/health-verification-rules.json",
+      "scripts/health-verifier.js",
+      "integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "IssueTriage.tsx",
+      "~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "bc70e6c7-8282-4c2d-9a53-cba6283518c3",
+    "date": "2026-04-23",
+    "theme": "Observation Redaction Cleanup and Pattern Review",
+    "summary": "Three sessions addressing user ID redaction in stored observations. A retroactive cleanup was performed after confirming that while `ConfigurableRedactor` correctly replaces user IDs with `<USER_ID_REDACTED>`, the database `messages` column contained stale unredacted data — 245 observations were retroactively cleaned and remaining references zeroed out. A follow-up screenshot review confirmed redaction is now fully working. A final session reviewed `redaction-patterns.json` to explore path-shortening rules, but no changes were made.\n- Edited `ObservationWriter.js` for redaction logic.\n- Edited `.env` during the verification session.\n- Read `redaction-patterns.json`; no modifications applied.",
+    "observationIds": [
+      "0d7f8c73-ebfc-4158-826b-d6791592a955",
+      "00dcef5a-f4ba-4f44-83dd-b49e422950e0",
+      "057c02cf-34e7-4604-b8c3-9fe3fa5c756c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "~/Agentic/coding/src/live-logging/ObservationWriter.js",
+      ".env",
+      "~/Agentic/_work/rapid-automations/.env",
+      "redaction-patterns.json",
+      "~/Agentic/coding/.specstory/config/redaction-patterns.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:06:48.335Z"
+  },
+  {
+    "id": "39bd0bf0-a492-4385-ac85-33dac1e70259",
+    "date": "2026-04-23",
+    "theme": "Diagnosing and Resolving Pre-commit Hook Blocking Commits",
+    "summary": "The developer was blocked from committing due to a pre-commit hook called \"OKB BASELINE GUARD\" enforcing that `.data/exports/knowledge-export/` (or `.data/knowledge-export/`) KB export files must not be staged alongside other changes.\n\n- Root cause: pre-commit hook in the `operational-knowledge-management` submodule rejecting mixed staged changes\n- Initial fix provided: unstage KB files and commit them independently via two command sequences\n- Longer-term strategy decided: revise the hook logic to **allow** commits where only KB files are staged, and **block** only when KB files are mixed with non-KB changes — eliminating any commit message convention requirement\n- No code changes were applied to the hook itself during these observations",
+    "observationIds": [
+      "ab05945d-9944-4206-9b2e-b50f49ab780d",
+      "6c812ea3-0d86-46bc-a373-6932622a1201",
+      "6a13fd67-debc-4d84-a047-e0d58019343d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:36:24.583Z"
+  },
+  {
+    "id": "d042caba-3198-4aa3-876f-0c0824894e43",
+    "date": "2026-04-23",
+    "theme": "Committing Pending Files Across Repo and Submodule",
+    "summary": "All pending modified and untracked files were staged and committed in a single sweep as commit `2626729`.\n\n- 12 files covered: specstory history logs, classification logs, and the `integrations/operational-knowledge-management` submodule pointer update\n- Approach was to use a broad `git add` rather than committing only the already-staged subset",
+    "observationIds": [
+      "e3643b3b-af1a-43fb-948b-dd2a77825a85"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:36:24.583Z"
+  },
+  {
+    "id": "accd05f7-7f2e-4d82-9fad-b3aa8ace7b95",
+    "date": "2026-04-23",
+    "theme": "Resolving Divergent Branches and Syncing Submodule with Remote",
+    "summary": "The `operational-knowledge-management` subrepo had diverged from its remote, with 3 local commits and 3 remote commits branching from `12e30f3`.\n\n- Resolution strategy: `git pull --rebase origin main` to replay local commits cleanly on top of remote history, avoiding a merge commit\n- Submodule was successfully synced by end of observation 6\n- Parent repository synchronization was still in progress at the close of the session",
+    "observationIds": [
+      "862832eb-a75c-4bf8-8003-ea3a7e02f9bd",
+      "a316ba35-00a8-4e33-a2f0-b21da3c45de0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:36:24.583Z"
+  },
+  {
+    "id": "8558dee5-c1f6-44cc-8891-42010bb38911",
+    "date": "2026-04-24",
+    "theme": "Session Continuity Load at Day Start",
+    "summary": "The session began with a `/sl` command to load and summarize recent session logs for continuity context. The command was initiated but produced no completed output within the exchange.",
+    "observationIds": [
+      "069e157b-0eb6-4174-998c-4e0e83569e01"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:36:41.616Z"
+  },
+  {
+    "id": "120270c9-c910-427c-ba2a-89ccfc35d12d",
+    "date": "2026-04-24",
+    "theme": "Knowledge Context Injection Architecture Research and Design",
+    "summary": "The session opened with parallel research into how Mastra implements Observation and LongTerm memory for context injection, with the goal of proposing an integration plan.\n\nKey architectural decisions made:\n- The retrieval/injection layer will be a **standalone HTTP service** (port 3848) rather than coupling to any single agent's hook system\n- Separate adapter layers will be built for each agent: Claude hooks, Copilot extensions, OpenCode config, Mastra middleware\n- A hybrid retrieval strategy was selected using 3 packages\n- The multi-phase GSD pipeline (research → synthesize → requirements → roadmap) was completed through to requirements definition, advancing toward milestone v6.0",
+    "observationIds": [
+      "a08e0f6d-fe13-486f-bf69-5f89bdc87820",
+      "3c2e575c-db2e-4e8b-8fe1-7b8e0c0ff090",
+      "7e682ea7-40b5-43c9-bf7e-758964dbc58f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:36:41.616Z"
+  },
+  {
+    "id": "4aee5b55-388d-4481-b833-a9183334c383",
+    "date": "2026-04-24",
+    "theme": "Phase 28 Embedding Pipeline Implementation and Debugging",
+    "summary": "Phase 28 of the Knowledge Context Injection milestone was discussed, planned, and fully executed — delivering a fastembed-based vector embedding pipeline with Qdrant storage.\n\n**Files created:**\n- `embedding-config.json` — embedding configuration\n- `src/embedding-service.ts` — core embedding service\n- `src/content-hash.ts` — SHA-256 idempotency hashing\n- `src/qdrant-collections.ts` — Qdrant collection definitions\n- Backfill CLI script — for existing data ingestion\n- Redis pub/sub listener — write-time hook for new items\n- `supervisord` and `docker-compose` config files\n\n**Results:**\n- 1,464 items backfilled across 4 Qdrant collections: `observations=645`, `digests=132`, `insights=12`, `kg_entities=675`\n- Write-time hooks auto-embed new observations via Redis pub/sub events\n\n**Post-execution debugging** identified two Docker startup failures: fastembed's platform-specific tokenizer binaries were blocked by `--ignore-scripts` during install, and `embedding-config.json` path resolution broke at runtime because `__dirname` pointed to `dist/embedding/` rather than `src/embedding/`. Fixes were in progress but not finalized.\n\nA manual end-to-end verification procedure was also provided: check Qdrant `observations` point count, trigger a new Claude session to generate an observation, then recheck the count to confirm the write-time hook fires correctly.",
+    "observationIds": [
+      "e1117512-e0ee-43f7-87f3-3b4886ee9d46",
+      "3fddbe7d-6b07-45e2-9e4d-954fa8df3a08",
+      "c34ffdad-4b14-4f76-aaae-025d41d6d188",
+      "eaa56a2d-a58d-42ad-9ffc-39ef32ec037a",
+      "e08b0590-e496-4989-bc7f-46816e55d28b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "embedding-config.json",
+      "src/embedding-service.ts",
+      "src/content-hash.ts",
+      "src/qdrant-collections.ts",
+      "backfill CLI script",
+      "Redis pub/sub listener",
+      "supervisord and docker-compose config files"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:36:41.616Z"
+  },
+  {
+    "id": "16d2aa5a-0aa2-4ebb-bbfd-c970a247ba6b",
+    "date": "2026-04-24",
+    "theme": "Phase 29 Retrieval Service Discussion, Planning, and Execution",
+    "summary": "The GSD workflow was advanced through the full discuss → plan → execute cycle for Phase 29, which builds the HTTP retrieval service on top of the embedding pipeline.\n\nKey decisions captured in `CONTEXT.md`:\n- Hybrid **RRF (Reciprocal Rank Fusion)** scoring combining vector and keyword results\n- Token budgeting to fit context within agent prompt limits\n- Defined response format for the retrieval endpoint\n\n**Execution (Wave-based):**\n- Wave 1 spawned a subagent to build `rrf-fusion.js`, `token-budget.js`, `keyword-search.js`, and `retrieval-service.js`\n- Wave 2 (wiring the API endpoint) was pending at exchange end\n\nNote: git submodules are present in the repo, so worktree parallelism was disabled and execution fell back to sequential mode on the main working tree.",
+    "observationIds": [
+      "4c6d0aed-ef35-43eb-8f2b-9ea6a4cbdb4f",
+      "394e864f-87b7-4ee7-8ed8-ae4fecfa2ce3",
+      "f8e0ba37-3b33-4223-a229-f33830a09ec3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:36:41.616Z"
+  },
+  {
+    "id": "5049fa7c-dce5-488e-b9ce-d5747c7e3e79",
+    "date": "2026-04-24",
+    "theme": "Phase 30 Claude Hook Adapter Discussion Initiated",
+    "summary": "The `/gsd-discuss-phase` workflow was started for Phase 30, which covers the Claude hook adapter — the per-agent integration layer connecting Claude's hook system to the standalone retrieval service.\n\nThe assistant began loading context and noted that existing hook infrastructure is already present: a `UserPromptSubmit` hook running a constraint monitor script. Investigation into how it currently outputs context to the prompt was underway at exchange end; no files were modified.",
+    "observationIds": [
+      "b11f3a3f-4f37-4c17-ad9e-b7ae7b83963d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:36:41.616Z"
+  },
+  {
+    "id": "dbb4c7cd-d50a-4fbf-a9ac-4dcd0fba8712",
+    "date": "2026-04-24",
+    "theme": "Phase 28 Embedding Pipeline Architecture Design",
+    "summary": "Planned the embedding pipeline (phase 28) for a knowledge system, resolving key architecture decisions:\n\n- **Embedding runtime**: fastembed/ONNX chosen over Python subprocess for performance/simplicity\n- **Qdrant structure**: 4 separate collections rather than a unified one\n- **Write-time hooks**: Redis pub/sub for triggering embedding on new content\n- **Batch backfill**: CLI tool with content-hash idempotency to avoid reprocessing\n\nDesign decisions captured in `.planning/phases/28-embedding-pipeline/28-CONTEXT.md`; phase is ready to move into planning/implementation.",
+    "observationIds": [
+      "d8efb420-058d-46d0-81e4-bec112ef45d2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-25T06:06:23.686Z"
+  },
+  {
+    "id": "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
+    "date": "2026-04-25",
+    "theme": "Debugging Knowledge Injection Hook Silent Failures",
+    "summary": "Investigated why the knowledge injection hook was silently skipping context injection in new sessions. Two bugs were found and fixed in `knowledge-injection-hook.js` and `pre-prompt-hook-wrapper.js`:\n- `process.stdin.isTTY === false` strict equality never matched because piped stdin yields `undefined`, not `false` — changed to a truthy check\n- `MIN_TOKENS` threshold of 20 was too high for real questions to pass — replaced with `MIN_WORDS = 4` to filter only trivial inputs like \"yes\" or \"ok\"",
+    "observationIds": [
+      "a2ac909c-a11b-4269-9b46-4d9da4499d00"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/hooks/knowledge-injection-hook.js",
+      "integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:39:43.258Z"
+  },
+  {
+    "id": "a7ccf015-2b86-43d6-bdd5-f6286c01a03f",
+    "date": "2026-04-25",
+    "theme": "Fixing Observation Timestamps, Classification, and Duplicate LSL Entries",
+    "summary": "Addressed three distinct bugs in the live-logging and transcript monitoring pipeline, then attempted a follow-up cleanup and verification pass that remained incomplete.\n\n**Fixes applied** (observation 2) across `ObservationWriter.js` and `enhanced-transcript-monitor.js`:\n- Backfilled observations were using `Date.now()` instead of original message timestamps — corrected to preserve historical accuracy\n- Project classification was reading only the first exchange (`[0]` hardcoded) instead of the full prompt set, defeating majority-vote logic — all 11 `determineTargetProject` call sites updated\n- Stale flush paths were not updating `lastProcessedUuid`, causing duplicate LSL prompt set writes on re-processing — update now applied in all flush paths\n\n**Verification attempt** (observation 3) to clean up incorrect LSL files, confirm dashboard visibility, and check Qdrant digest/insight sync ended mid-investigation with no corrective actions completed. Dashboard was tentatively located at port 3031 (Docker); LSL state, observations, digests, and Qdrant sync all remain unconfirmed.",
+    "observationIds": [
+      "b7961c5b-5d59-4472-888f-64a90a7f2af5",
+      "209d72da-a9e2-4afa-9707-7363422daf02"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T05:39:43.258Z"
+  },
+  {
+    "id": "93c144ab-3caa-4ba0-a56b-2e292beb25f4",
+    "date": "2026-04-25",
+    "theme": "FTS5 Index Desync Breaks Observation Search Results",
+    "summary": "Both observations address the same issue: a screenshot showing \"No matching observations\" in the search UI prompted investigation into why backfilled observations weren't appearing in search results.\n\n- Root cause: `ObservationWriter.js` never populates the FTS5 table, and no triggers exist to auto-sync it with the main `observations` table\n- Symptom: FTS5 index row count was out of sync (675 vs 674 rows), causing backfilled observations to be invisible to search\n- Immediate fix: manually rebuilt the FTS5 index in `observations.db` to restore search results\n- Follow-up identified: `ObservationWriter.init()` needs FTS sync logic added to prevent future desyncs on backfill or any write path that bypasses the index",
+    "observationIds": [
+      "dd2fe742-898c-48da-b0cc-c0acfe26764f",
+      "a0862ecc-a4ce-4020-a786-13d99ccd0951"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationWriter.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-25T05:48:52.840Z"
+  },
+  {
+    "id": "1c08f170-97a7-4c8c-bbdb-78410aff6bf0",
+    "date": "2026-04-25",
+    "theme": "Fix SQLite Corruption in observations.db Permanently",
+    "summary": "The goal was to permanently resolve database corruption issues in `observations.db`. The agent (claude) began with an investigative phase, auditing all code paths that open the database to understand concurrent access patterns.\n\n- Root cause identified: 6 different consumers opening the same DB with inconsistent settings — missing WAL mode, no `busy_timeout`, no integrity checks\n- Solution: a single shared `SafeDatabase.js` module that enforces consistent configuration for all consumers\n- `SafeDatabase.js` now enforces WAL mode, `busy_timeout`, integrity checks, and SHM recovery on every connection to `observations.db`\n- Artifact: `/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/SafeDatabase.js`",
+    "observationIds": [
+      "c95a5c96-7b09-458c-a3d3-f4ccd8c8dc77",
+      "99e82a84-d544-44e0-9cf9-fbfee2cd64b3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "SafeDatabase.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/SafeDatabase.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/SafeDatabase.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-25T06:09:35.750Z"
   }
 ]
