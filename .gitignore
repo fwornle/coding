@@ -250,3 +250,6 @@ logs/
 
 # OpenCode plugin local state
 .opencode/
+
+# fastembed ONNX model cache
+local_cache/

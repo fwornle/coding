@@ -288,7 +288,8 @@
       "Skill(gsd-execute-phase)",
       "Skill(gsd-plan-phase)",
       "Skill(gsd-code-review)",
-      "Skill(gsd-insert-phase)"
+      "Skill(gsd-insert-phase)",
+      "Skill(gsd-complete-milestone)"
     ],
     "deny": [],
     "ask": []
