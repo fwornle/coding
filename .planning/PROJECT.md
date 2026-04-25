@@ -21,7 +21,7 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ## Current State
 
-**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring.
+**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring. Phase 30 complete — Claude Code UserPromptSubmit hook injects knowledge context (insights, digests, entities, observations) from the retrieval service into conversations via `additionalContext`.
 
 ## Requirements
 
