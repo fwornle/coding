@@ -358,6 +358,38 @@ _set_agent_env_vars() {
   export CODING_TRANSCRIPT_FORMAT="${AGENT_TRANSCRIPT_FMT:-$AGENT_NAME}"
 }
 
+# Inject knowledge context for non-Claude agents (D-06)
+# Claude uses a per-prompt UserPromptSubmit hook (registered globally).
+# Other agents get a session-start context file written before launch.
+_inject_knowledge_context() {
+  local agent="$AGENT_NAME"
+  local hooks_dir="$CODING_REPO/src/hooks"
+
+  # Claude uses per-prompt hook (registered in ~/.claude/settings.json) -- skip here
+  if [ "$agent" = "claude" ]; then
+    return 0
+  fi
+
+  local adapter="$hooks_dir/knowledge-injection-${agent}.js"
+  if [ ! -f "$adapter" ]; then
+    _agent_log "No knowledge injection adapter for ${agent} -- skipping"
+    return 0
+  fi
+
+  _agent_log "Injecting knowledge context for ${AGENT_DISPLAY_NAME}..."
+
+  # Export target project dir for the adapter to use
+  export TARGET_PROJECT_DIR="${TARGET_PROJECT_DIR}"
+  export CODING_PROJECT_DIR="${TARGET_PROJECT_DIR}"
+
+  # Run adapter with timeout (fail-open -- never block agent startup)
+  if timeout 10 node "$adapter" 2>/dev/null; then
+    _agent_log "Knowledge context injected for ${AGENT_DISPLAY_NAME}"
+  else
+    _agent_log "Knowledge injection skipped (service unavailable or timeout)"
+  fi
+}
+
 # ============================================
 # Main Entry Point
 # ============================================
@@ -451,6 +483,9 @@ launch_agent() {
 
   # 12. Verify monitoring
   _verify_monitoring "$TARGET_PROJECT_DIR"
+
+  # 12.5. Inject knowledge context (session-start adapters)
+  _inject_knowledge_context
 
   # 13. Agent-specific requirements check (with auto-install)
   if type agent_check_requirements &>/dev/null; then
