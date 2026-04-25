@@ -17,7 +17,7 @@ const SAFETY_TIMEOUT_MS = 5000;
 const safetyTimer = setTimeout(() => process.exit(0), SAFETY_TIMEOUT_MS);
 safetyTimer.unref();
 
-const MIN_TOKENS = 20;
+const MIN_WORDS = 4;
 const HTTP_TIMEOUT_MS = 2000;
 const RETRIEVAL_PORT = 3033;
 const MAX_QUERY_CHARS = 500;
@@ -27,7 +27,7 @@ async function main() {
   try {
     // 1. Read stdin (Claude Code pipes JSON to hook process)
     const chunks = [];
-    if (process.stdin.isTTY === false) {
+    if (!process.stdin.isTTY) {
       for await (const chunk of process.stdin) {
         chunks.push(chunk);
       }
@@ -51,9 +51,9 @@ async function main() {
     // 4. Filter: slash commands
     if (prompt.startsWith('/')) return;
 
-    // 5. Filter: short prompts (< MIN_TOKENS words)
-    const tokenEstimate = prompt.split(/\s+/).length;
-    if (tokenEstimate < MIN_TOKENS) return;
+    // 5. Filter: short prompts (< MIN_WORDS words)
+    const wordCount = prompt.split(/\s+/).length;
+    if (wordCount < MIN_WORDS) return;
 
     // 6. Truncate query for retrieval (server rejects > 500 chars)
     const query = prompt.slice(0, MAX_QUERY_CHARS);
