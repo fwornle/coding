@@ -161,10 +161,10 @@ Plans:
   1. The retrieval response includes a "Working Memory" section containing current project state, active conventions, and known issues
   2. The working memory section stays under 500 tokens regardless of project complexity
   3. Working memory content reflects actual KG state -- adding or removing a KG entity causes the working memory to update on next retrieval
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 31-01-PLAN.md -- TBD
+- [ ] 31-01-PLAN.md -- Working memory module + retrieval integration: KG structure + STATE.md state, 300/700 budget split
 
 #### Phase 32: Agent Profiles & Additional Adapters
 **Goal**: All supported coding agents receive knowledge injection tailored to their work patterns, with continuity across agent switches
@@ -190,7 +190,7 @@ Plans:
 | 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
 | 30. Claude Hook Adapter | v6.0 | 1/1 | Complete    | 2026-04-25 |
-| 31. Working Memory | v6.0 | 0/TBD | Not started | - |
+| 31. Working Memory | v6.0 | 0/1 | Not started | - |
 | 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
 
 ---
