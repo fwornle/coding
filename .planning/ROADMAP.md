@@ -147,10 +147,11 @@ Plans:
   1. Starting a coding session in any project via `coding --claude` causes knowledge injection to fire on substantive prompts
   2. Each supported agent (Claude, Copilot, OpenCode, Mastra) has its own adapter that injects knowledge via its native hook/plugin mechanism
   3. Injected knowledge is relevant to the current prompt and project context, not random insights from the knowledge base
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 30.1-01-PLAN.md -- TBD
+- [ ] 30.1-01-PLAN.md -- Shared retrieval client + context-aware relevance boosting in retrieval service
+- [ ] 30.1-02-PLAN.md -- Cross-project Claude hook migration + OpenCode/Copilot/Mastra adapters + launch integration
 
 #### Phase 31: Working Memory
 **Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
