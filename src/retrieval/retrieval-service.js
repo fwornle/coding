@@ -30,12 +30,12 @@ const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
 export class RetrievalService {
   /**
    * @param {object} options
-   * @param {number} [options.scoreThreshold=0.75] - Minimum Qdrant similarity score (D-04)
+   * @param {number} [options.scoreThreshold=0.82] - Minimum Qdrant similarity score (D-04)
    * @param {number} [options.defaultBudget=1000] - Default token budget (D-08)
    * @param {function} [options.dbGetter] - Function returning a better-sqlite3 db instance
    */
   constructor(options = {}) {
-    this.scoreThreshold = options.scoreThreshold ?? 0.75;
+    this.scoreThreshold = options.scoreThreshold ?? 0.82;
     this.defaultBudget = options.defaultBudget ?? 1000;
     this.embeddingService = null;
     this.qdrantClient = null;
@@ -130,8 +130,14 @@ export class RetrievalService {
     // Step 4.5: Context-aware relevance boosting (D-09)
     if (context) {
       this._applyContextBoost(fused, context);
-      fused.sort((a, b) => b.rrfScore - a.rrfScore);
     }
+
+    // Step 4.6: Topic-relevance demotion — penalize results whose topic/theme
+    // doesn't overlap with query keywords. MiniLM-L6-v2 cosine similarities
+    // cluster at 0.75-0.82 for single-project docs, so vector similarity alone
+    // cannot discriminate topics. This step uses keyword overlap as a proxy.
+    this._applyTopicRelevance(fused, query);
+    fused.sort((a, b) => b.rrfScore - a.rrfScore);
 
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM)
     const { markdown, tokensUsed } = assembleBudgetedMarkdown(fused, effectiveSemanticBudget);
@@ -274,6 +280,73 @@ export class RetrievalService {
       payload.project || '',
     ];
     return parts.join(' ');
+  }
+
+  /**
+   * Demote results whose topic/theme has no keyword overlap with the query.
+   *
+   * Extracts significant words (3+ chars, lowercased) from the query, then
+   * checks each result's topic/theme/summary_preview for overlap. Results
+   * with zero overlap are demoted by 0.4x; partial overlap gets no change;
+   * strong overlap (3+ words) gets a 1.3x boost.
+   *
+   * This compensates for MiniLM-L6-v2's inability to discriminate topics
+   * within a single-project corpus (cosine similarities cluster 0.75-0.82).
+   *
+   * @param {Array<object>} results - Fused results with rrfScore
+   * @param {string} query - Original search query (may include [context: ...])
+   */
+  _applyTopicRelevance(results, query) {
+    if (!query || !results.length) return;
+
+    // Stop words that appear everywhere and carry no topic signal
+    const STOP_WORDS = new Set([
+      'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was',
+      'were', 'been', 'have', 'has', 'had', 'not', 'but', 'what', 'how',
+      'why', 'when', 'where', 'which', 'who', 'will', 'can', 'does', 'did',
+      'should', 'would', 'could', 'may', 'about', 'into', 'out', 'all',
+      'also', 'just', 'than', 'then', 'very', 'some', 'any', 'each',
+      'use', 'using', 'used', 'make', 'like', 'need', 'know', 'here',
+      'context', 'you', 'your', 'our', 'its', 'their', 'they', 'she',
+      'coding', 'project', 'file', 'files', 'system', 'service',
+    ]);
+
+    // Extract meaningful words from query (3+ chars, not stop words)
+    const queryWords = new Set(
+      query.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
+    );
+
+    if (queryWords.size === 0) return;
+
+    for (const result of results) {
+      if (!result.rrfScore) continue;
+
+      const p = result.payload || {};
+      // Build text to match against: topic, theme, summary
+      const topicText = [
+        p.topic || '',
+        p.theme || '',
+        p.summary_preview || '',
+      ].join(' ').toLowerCase();
+
+      // Count overlapping words
+      let overlap = 0;
+      for (const word of queryWords) {
+        if (topicText.includes(word)) overlap++;
+      }
+
+      if (overlap === 0) {
+        // No keyword overlap at all — strong demotion
+        result.rrfScore *= 0.4;
+      } else if (overlap >= 3) {
+        // Strong overlap — boost
+        result.rrfScore *= 1.3;
+      }
+      // 1-2 word overlap: neutral (no change)
+    }
   }
 
   /**

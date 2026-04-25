@@ -162,6 +162,28 @@ export class ObservationConsolidator {
   }
 
   /**
+   * Path-safe redaction: only applies user-ID and home-directory patterns.
+   * The full _redact() has broad patterns (e.g. 40-char alphanum → AWS secret)
+   * that corrupt file paths and JSON-stringified metadata. This method is safe
+   * for structured data like files_touched and metadata fields.
+   * @param {string} text
+   * @returns {string}
+   */
+  _redactPaths(text) {
+    if (!text) return text;
+    try {
+      // Replace corporate user IDs (same pattern as ConfigurableRedactor)
+      let result = text.replace(/\bq[0-9a-zA-Z]{6}\b/gi, '<USER_ID_REDACTED>');
+      // Normalize home directory paths
+      const home = process.env.HOME || process.env.USERPROFILE || '';
+      if (home) {
+        result = result.split(home).join('<HOME>');
+      }
+      return result;
+    } catch { return text; }
+  }
+
+  /**
    * Consolidate a single day's observations into thematic digests.
    * @param {string} date - YYYY-MM-DD
    * @returns {Promise<{digests: number, observations: number}>}
@@ -239,8 +261,8 @@ export class ObservationConsolidator {
           d.id, d.date, this._redact(d.theme), this._redact(d.summary),
           JSON.stringify(d.observationIds),
           JSON.stringify(d.agents),
-          JSON.stringify(d.filesTouched),
-          d.quality, now, JSON.stringify(d.metadata || {})
+          this._redactPaths(JSON.stringify(d.filesTouched)),
+          d.quality, now, this._redactPaths(JSON.stringify(d.metadata || {}))
         );
         for (const obsId of d.observationIds) {
           digestedObsIds.add(obsId);
@@ -423,7 +445,7 @@ export class ObservationConsolidator {
           `).run(
             id, this._redact(entry.topic), this._redact(entry.summary),
             entry.confidence, JSON.stringify(newDigestIds),
-            now, now, JSON.stringify(entry.metadata || {})
+            now, now, this._redactPaths(JSON.stringify(entry.metadata || {}))
           );
           embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence });
           created++;

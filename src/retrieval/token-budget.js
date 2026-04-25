@@ -13,6 +13,19 @@ import { countTokens } from 'gpt-tokenizer';
 /** Tier fill order per D-08: insights first, observations last. */
 export const TIER_ORDER = ['insights', 'digests', 'kg_entities', 'observations'];
 
+/**
+ * Max results per tier to prevent low-precision flooding.
+ * MiniLM-L6-v2 cosine similarities cluster high (0.75-0.82) across all
+ * project documents, so the Qdrant threshold alone cannot filter irrelevant
+ * results. Per-tier caps ensure budget is shared across tiers.
+ */
+const TIER_MAX_RESULTS = {
+  insights: 4,
+  digests: 3,
+  kg_entities: 3,
+  observations: 3,
+};
+
 /** Tier section headers for markdown output (D-05). */
 const TIER_HEADERS = {
   insights: '## Insights',
@@ -101,7 +114,13 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
   const buckets = Object.fromEntries(TIER_ORDER.map((t) => [t, []]));
   let tokensUsed = 0;
 
+  const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0]));
+
   for (const result of sortedResults) {
+    // Skip if this tier has reached its cap
+    const cap = TIER_MAX_RESULTS[result.tier] ?? 5;
+    if ((tierCounts[result.tier] ?? 0) >= cap) continue;
+
     const formatted = formatResult(result);
     const tokens = countTokens(formatted);
 
@@ -113,6 +132,7 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
           const tf = formatResult(truncated);
           if (buckets[result.tier]) {
             buckets[result.tier].push(tf);
+            tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
           }
           tokensUsed += countTokens(tf);
         }
@@ -122,6 +142,7 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
 
     if (buckets[result.tier]) {
       buckets[result.tier].push(formatted);
+      tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
     }
     tokensUsed += tokens;
   }

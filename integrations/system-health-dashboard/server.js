@@ -19,6 +19,7 @@ import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 import { RetrievalService } from '../../src/retrieval/retrieval-service.js';
+import { openDatabase } from '../../src/live-logging/SafeDatabase.js';
 
 const require_cjs = createRequire(import.meta.url);
 
@@ -3879,7 +3880,6 @@ class SystemHealthAPIServer {
         }
 
         try {
-            const { openDatabase } = await import('/coding/src/live-logging/SafeDatabase.js');
             const dbPath = join(codingRoot, '.observations', 'observations.db');
             if (!existsSync(dbPath)) {
                 return null;
