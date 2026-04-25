@@ -139,6 +139,19 @@ Plans:
 Plans:
 - [x] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
 
+#### Phase 30.1: Cross-Project Agent-Agnostic Knowledge Injection (INSERTED)
+**Goal**: Knowledge injection works in every project started via coding, across all agents (Claude, Copilot, OpenCode, Mastra), with focused relevance based on current work context
+**Depends on**: Phase 30 (hook script and retrieval service must exist)
+**Requirements**: XPROJ-01, XAGT-01, XREL-01
+**Success Criteria** (what must be TRUE):
+  1. Starting a coding session in any project via `coding --claude` causes knowledge injection to fire on substantive prompts
+  2. Each supported agent (Claude, Copilot, OpenCode, Mastra) has its own adapter that injects knowledge via its native hook/plugin mechanism
+  3. Injected knowledge is relevant to the current prompt and project context, not random insights from the knowledge base
+**Plans**: TBD
+
+Plans:
+- [ ] 30.1-01-PLAN.md -- TBD
+
 #### Phase 31: Working Memory
 **Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
 **Depends on**: Phase 29 (injected via retrieval service response)

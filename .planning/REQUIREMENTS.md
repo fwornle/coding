@@ -50,6 +50,12 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 - [ ] **HOOK-04**: OpenCode adapter injects knowledge via plugin system or config-based context
 - [ ] **HOOK-05**: Copilot adapter injects knowledge via workspace context file or VS Code extension
 
+### Cross-Project Agent-Agnostic Injection
+
+- [ ] **XPROJ-01**: Hook works in every project session started via coding/bin/coding (not just the coding project)
+- [ ] **XAGT-01**: Knowledge injection adapters for all four agents (Claude, Copilot, OpenCode, Mastra)
+- [ ] **XREL-01**: Injected knowledge is focused on current work context (project, prompt, active files) not random insights
+
 ### Working Memory
 
 - [ ] **WMEM-01**: Persistent working memory template captures current project state, conventions, known issues

@@ -44,6 +44,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 30.1 inserted after Phase 30: Cross-Project Agent-Agnostic Knowledge Injection (URGENT) — make injection work across all projects and agents with focused relevance
+
 ### Decisions
 
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
