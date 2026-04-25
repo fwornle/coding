@@ -1,9 +1,9 @@
 {
-  "exportedAt": "2026-04-25T09:41:40.078Z",
+  "exportedAt": "2026-04-25T18:17:25.865Z",
   "counts": {
-    "observations": 626,
-    "digests": 290,
-    "insights": 16
+    "observations": 664,
+    "digests": 312,
+    "insights": 19
   },
   "source": "observations.db"
 }

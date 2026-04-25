@@ -8328,7 +8328,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-24T16:45:57.876Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:53:47.769Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8342,7 +8342,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-24T17:08:55.105Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:53:47.769Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8438,7 +8438,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-04-25T05:51:58.191Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8454,7 +8454,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-04-25T05:51:58.191Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8470,7 +8470,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-04-25T05:51:58.191Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8490,7 +8490,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:07:50.213Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8506,7 +8506,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:07:50.213Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8522,7 +8522,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:12:51.448Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8538,7 +8538,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-04-25T06:16:31.646Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8554,7 +8554,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:16:31.646Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8570,7 +8570,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:20:43.781Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8586,7 +8586,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:20:43.781Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8602,7 +8602,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:20:43.781Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8618,7 +8618,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:23:59.472Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8634,7 +8634,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:23:59.472Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8650,7 +8650,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:27:40.943Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8667,7 +8667,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:27:40.943Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8683,7 +8683,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-04-25T06:27:40.943Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8699,7 +8699,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T06:28:35.426Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8715,7 +8715,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-04-25T06:42:45.901Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8731,7 +8731,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T06:55:21.645Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8748,7 +8748,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T06:57:20.969Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8764,13 +8764,29 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T06:58:51.145Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
     },
     "modifiedFiles": [
       "/Users/Q284340/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
+    "id": "4438196a-6be6-4e99-b749-d506414727cf",
+    "summary": "Intent: Redesign the knowledge injection system to work across all projects, all coding agents, and with context-focused relevance.\nApproach: The assistant analyzed the three requirements separately, identifying a quick fix for cross-project support (global settings), per-agent adapter work for cross-agent support, and richer context passing for focused relevance.\nArtifacts: edited PROJECT.md\nResult: Decision point reached: move hook to global ~/.claude/settings.json for immediate cross-project support, then create new phases for cross-agent adapters and context-aware relevance improvements.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T07:01:59.175Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
     ]
   },
   {
@@ -8780,7 +8796,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:01:59.175Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8790,13 +8806,29 @@
     ]
   },
   {
+    "id": "01277d6c-8ca6-45ea-b327-f0937bab6bc8",
+    "summary": "Intent: Complete task 30, add requested content to task 31, then execute task 31.\nApproach: Sequential task execution using the gsd-sdk workflow tooling with code review and verification steps.\nArtifacts: edited 30.1-CONTEXT.md\nResult: Phase 30 plan marked complete; continuation agent spawned to finish code review and verification; task 31 queued for execution with additions.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T07:04:15.713Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/30.1-cross-project-agent-agnostic-knowledge-injection/30.1-CONTEXT.md"
+    ]
+  },
+  {
     "id": "be9c7f11-cbc1-4a4f-8722-d2975971176f",
     "summary": "Intent: Complete task 30 and add requested content to task 31, then execute it.\nApproach: Sequential task execution across two plan items.\nArtifacts: edited PROJECT.md\nResult: Agent was spawned to continue plan 30-01 and proceed to task 31 with user-specified additions.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:04:15.713Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8812,7 +8844,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:04:15.713Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8822,13 +8854,79 @@
     ]
   },
   {
+    "id": "84a56167-aeed-476d-b4aa-d6b3a58df6bc",
+    "summary": "Intent: Run a code review for phase 30 of the coding project.\nApproach: Dispatched the code-review workflow which scoped files from the phase SUMMARY, spawned a reviewer agent, then completed the phase including verification and PROJECT.md update.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md\nResult: Phase 30 code review produced 0 critical/2 warnings/4 info findings; verification passed 3/3 must-haves; phase marked complete and PROJECT.md updated to reflect current state.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T07:09:02.062Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
+    "id": "13fc9d48-76ed-4a10-b378-79fafcf966a3",
+    "summary": "Intent: Insert decimal phase 30.1 \"Cross-Project Agent-Agnostic Knowledge Injection\" after phase 30 in the coding project roadmap.\nApproach: Used the insert-phase workflow with decimal numbering to slot urgent work between existing integer phases without renumbering, adding goal, requirements (XPROJ-01, XAGT-01, XREL-01), and success criteria.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md, edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/REQUIREMENTS.md, edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md\nResult: Phase 30.1 inserted covering cross-project, agent-agnostic knowledge injection (Claude, Copilot, OpenCode, Mastra) with three requirements tracked and STATE.md updated with roadmap evolution note.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T07:17:31.223Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/REQUIREMENTS.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ]
+  },
+  {
+    "id": "81656859-77e4-4c92-b093-ad3ea073f815",
+    "summary": "Intent: Run the discuss-phase workflow for phase 30.1 in auto mode to capture implementation decisions into a CONTEXT.md file.\nApproach: Auto mode was used, so the workflow skipped interactive gray-area discussion and instead scouted the codebase for agent launch patterns, hooks, and settings injection mechanisms to derive decisions autonomously.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/30.1-cross-project-agent-agnostic-knowledge-injection/30.1-CONTEXT.md\nResult: CONTEXT.md was created for phase 30.1 (cross-project agent-agnostic knowledge injection) with decisions derived from codebase analysis of agent launch scripts, hooks, and settings configuration patterns; workflow then auto-advanced to plan-phase.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T07:18:42.583Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/30.1-cross-project-agent-agnostic-knowledge-injection/30.1-CONTEXT.md"
+    ]
+  },
+  {
+    "id": "6395c350-d070-41b1-b586-a5ad7fa6e9cc",
+    "summary": "Intent: Run the plan-phase workflow for phase 30.1 with --auto flag to create executable PLAN.md files.\nApproach: Used GSD SDK orchestration to initialize, plan, and auto-advance through the workflow, skipping research and verification due to --auto mode.\nArtifacts: edited 32-CONTEXT.md\nResult: Phase 30.1 (Cross-Project Agent-Agnostic Knowledge Injection) planning completed with PLAN.md files generated under `.planning/phases/30.1-cross-project-agent-agnostic-knowledge-injection/`, state recorded, and changes committed; workflow auto-advanced to execute phase.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T07:21:06.244Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/32-agent-profiles-additional-adapters/32-CONTEXT.md"
+    ]
+  },
+  {
     "id": "a52b7ead-2e58-48bd-ac39-29b885df18cb",
     "summary": "Intent: Run the GSD plan-phase skill for phase 30.1 with --auto flag to create executable PLAN.md files.\nApproach: Execute the plan-phase workflow end-to-end using the GSD orchestrator, which auto-detects the next unplanned phase, skips research in auto mode, spawns the planner, and runs verification.\nArtifacts: edited PROJECT.md\nResult: Workflow initiated for phase 30.1 in auto mode with research skipped; planner agent was spawned but no final output was captured in the exchange.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:21:06.244Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8844,7 +8942,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T07:21:06.244Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8854,13 +8952,29 @@
     ]
   },
   {
+    "id": "82692688-9bea-45ce-9c3c-a7f609fc9a42",
+    "summary": "Intent: Execute phase 30.1 with --auto flag for cross-project agent-agnostic knowledge injection.\nApproach: Wave-based parallel execution with subagents handling individual plans; orchestrator managed dependency ordering across 2 waves, then ran verification and phase completion.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md\nResult: Phase 30.1 completed with shared retrieval client, context-aware relevance boosting, and session-start adapters for Claude/OpenCode/Copilot/Mastra all wired into launch system; 9/9 must-haves verified with 3 human verification items remaining.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T07:28:53.568Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
     "id": "4e49c7a8-7261-4eac-b552-b1bb33a750ec",
     "summary": "Intent: Execute all plans in phase 30.1 with auto flag using wave-based parallel execution.\nApproach: Workflow reads the execute-phase orchestration logic, checks for active flags (none beyond --auto), discovers 2 plans across 2 waves, and spawns subagents sequentially per wave.\nArtifacts: edited PROJECT.md\nResult: Phase 30.1 execution initiated with Wave 1 targeting plan 30.1-01 (shared retrieval client + context-aware relevance boosting); Wave 2 queued for 30.1-02 (Claude global migration + agent adapters).",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:28:53.568Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8876,7 +8990,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T07:28:53.568Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8892,7 +9006,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T07:28:53.568Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8908,7 +9022,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T08:04:09.295Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8918,13 +9032,29 @@
     ]
   },
   {
+    "id": "6b76a650-d0cd-4a7b-80d9-b6155798be1a",
+    "summary": "Intent: Run the plan-phase workflow for phase 31 (Working Memory) to generate executable PLAN.md files with research and verification.\nApproach: Executed the full gsd plan-phase workflow: researched the domain, mapped patterns, spawned the planner to create one plan, then ran the plan checker and fixed a blocker (missing formal marker on open questions in RESEARCH.md).\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/31-working-memory/31-RESEARCH.md\nResult: Phase 31 (Working Memory) planning completed with 1 plan in 1 wave covering a working memory module with retrieval integration (300/700 token split, live KG query, fail-open); verification passed after fixing one blocker.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T08:26:37.616Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/31-working-memory/31-RESEARCH.md"
+    ]
+  },
+  {
     "id": "870b0221-a921-4259-97c5-c5fb81f91b06",
     "summary": "Intent: Run the plan-phase workflow for phase 31 of the roadmap.\nApproach: Execute the gsd-plan-phase skill end-to-end, auto-detecting context from phase 31's directory, then prompting user about research before proceeding to planning and verification.\nArtifacts: edited 31-RESEARCH.md\nResult: Workflow initialized for phase 31, context loaded from `.planning/phases/31-working-memory/31-CONTEXT.md`, and user was asked whether to run research (since no RESEARCH.md exists and `--skip-research` was not passed).",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T08:26:37.616Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8940,7 +9070,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T08:26:37.616Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8956,7 +9086,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T08:26:37.616Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8972,7 +9102,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T08:26:37.616Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8988,7 +9118,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T08:26:37.616Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8998,13 +9128,29 @@
     ]
   },
   {
+    "id": "e2346da8-d0fd-4f88-ae8b-4c08e8fd1601",
+    "summary": "Intent: Execute phase 31 (Working Memory) using the GSD execute-phase workflow.\nApproach: Standard full-phase execution with no optional flags active; single wave containing one plan was discovered, executed via subagent, code-reviewed, verified, and committed.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md\nResult: Phase 31 completed successfully — working memory module (`src/retrieval/working-memory.js`) built and integrated into `RetrievalService.retrieve()` with a 300/700 token split; 7/7 must-haves verified; PROJECT.md, ROADMAP.md, and STATE.md updated and committed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T08:46:04.445Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
     "id": "d58f6e07-7d73-4d85-9c26-3a288dad29b4",
     "summary": "Intent: Execute all plans in phase 31 using the wave-based parallel execution workflow.\nApproach: Invoked the execute-phase workflow which discovers plans, analyzes dependencies, groups into waves, and spawns subagents; phase 31 had one plan in one wave so a single subagent was spawned.\nArtifacts: edited PROJECT.md\nResult: Wave 1 executed plan 31-01 to create a working memory module (`src/retrieval/working-memory.js`) that <USER_ID_REDACTED> the VKB API and STATE.md, integrated into `RetrievalService.retrieve()` as a 300-token prefix with fail-open degradation.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T08:46:04.445Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9020,7 +9166,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T08:46:04.445Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9030,13 +9176,29 @@
     ]
   },
   {
+    "id": "83ecea89-f369-45ec-839e-201d59d61b16",
+    "summary": "Intent: Run the discuss-phase workflow for phase 32 to identify and lock in implementation decisions for agent profiles and additional adapters.\nApproach: Loaded prior context to discover phase 30.1 already completed adapter work, narrowing phase 32 scope to per-agent scoring profiles and cross-agent continuity only; discussed both remaining areas interactively to reach concrete decisions.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/32-agent-profiles-additional-adapters/32-CONTEXT.md\nResult: CONTEXT.md captures two decisions: per-agent scoring profiles via a config-driven `agent-profiles.json` with each adapter passing an `agent` field, and cross-agent continuity via a `.coding/session-state.json` session file injected as \"Previous Session\" context when a different agent picks up within 2 hours.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T08:56:23.423Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/32-agent-profiles-additional-adapters/32-CONTEXT.md"
+    ]
+  },
+  {
     "id": "2a65bcfe-7c29-4504-9504-f66f75b0d60f",
     "summary": "Intent: Run the GSD discuss-phase workflow for phase 32 to extract implementation decisions into a CONTEXT.md file.\nApproach: The workflow loaded prior context, scouted completed work, and identified that Phase 30.1 already completed most of Phase 32's original scope, leaving only cross-agent continuity and per-agent scoring profiles as remaining gray areas.\nArtifacts: edited 32-CONTEXT.md\nResult: The discussion phase surfaced that SC1 and SC2 adapters are already built; remaining work is SC3 (cross-agent continuity) and SC4 (per-agent scoring profiles / PROF-01, PROF-02). No CONTEXT.md was written yet — the exchange was cut off before user selected areas to discuss.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T08:56:23.423Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9046,13 +9208,29 @@
     ]
   },
   {
+    "id": "9c36e9dc-529f-44f2-b35b-0d43909ee19b",
+    "summary": "Intent: Run the GSD plan-phase workflow for phase 32 (Agent Profiles & Additional Adapters) to generate executable PLAN.md files.\nApproach: Executed the plan-phase orchestration workflow, skipping research since no existing plans or indicators were found, then spawned the planner and verification checker in sequence.\nArtifacts: edited PROJECT.md\nResult: Phase 32 planned successfully with 2 plans (32-01, 32-02) in 1 wave covering per-agent scoring profiles and cross-agent session continuity; verification passed on first iteration.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T09:09:41.020Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
     "id": "5ddc731b-6d6c-4c54-9c04-86467769aff0",
     "summary": "Intent: Run the plan-phase skill for phase 32 to generate a PLAN.md with research and verification.\nApproach: Execute the gsd plan-phase workflow end-to-end using the existing phase 32 context directory, following the default Research → Plan → Verify flow.\nArtifacts: edited PROJECT.md\nResult: Workflow initialized and loaded phase 32 context from `.planning/phases/32-agent-profiles-additional-adapters/32-CONTEXT.md`; awaiting user input at questioning gate.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T09:09:41.020Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9068,7 +9246,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T09:09:41.020Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9078,13 +9256,29 @@
     ]
   },
   {
+    "id": "05b1e1a7-4118-4907-80df-363b7140de68",
+    "summary": "Intent: Execute phase 32 (Agent Profiles & Additional Adapters) using the GSD execute-phase workflow.\nApproach: Sequential execution was chosen over parallel due to detected intra-wave file conflicts across the two plans sharing adapter files. Both plans ran in Wave 1, followed by code review and verification gates.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md\nResult: Phase 32 completed with both plans delivered: per-agent scoring profiles in `config/agent-profiles.json` with RRF fusion integration, and cross-agent session continuity via `scripts/write-session-state.js` and working memory injection. Verification passed 12/12 must-haves, completing the v6.0 Knowledge Context Injection milestone across all 6 phases.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T09:28:24.757Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ]
+  },
+  {
     "id": "7c54b631-0761-43d1-96a7-3fffe0d54b62",
     "summary": "Intent: Execute phase 32 plans using the GSD execute-phase workflow.\nApproach: The orchestrator initialized phase 32, detected submodules, and chose sequential execution over parallel subagents to avoid file conflicts since both Wave 1 plans share modified adapter files.\nArtifacts: edited PROJECT.md\nResult: Phase 32 (\"Agent Profiles & Additional Adapters\") execution began with 2 plans queued for sequential Wave 1 execution due to submodule constraints.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T09:28:24.757Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9100,7 +9294,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T09:28:24.757Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9116,7 +9310,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-04-25T09:28:24.757Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9132,7 +9326,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-25T09:28:24.757Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-25T15:54:41.122Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9140,5 +9334,422 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
     ]
+  },
+  {
+    "id": "98b3137c-0d14-41e0-8d78-ea8a1f06765d",
+    "summary": "Intent: Run the complete-milestone workflow to archive a milestone, update planning docs, and create a git tag.\nApproach: Load the complete-milestone workflow file first, then run a pre-flight audit check before proceeding with archival steps.\nArtifacts: edited STATE.md\nResult: Pre-flight check surfaced 8 open items (3 debug sessions, 3 verification gaps, 2 pending todos); workflow paused awaiting user decision on how to proceed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T14:33:03.425Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ]
+  },
+  {
+    "id": "ee90ec49-5e57-42f7-a751-4ee008f83ba2",
+    "summary": "Intent: Load and execute the complete-milestone workflow to archive a milestone version.\nApproach: Read the complete-milestone workflow file first, then run pre-flight checks and gather stats from the project's planning directory.\nArtifacts: edited STATE.md\nResult: Workflow file loaded, pre-flight audit found 8 open items (debug sessions, verification gaps, todos), and confirmed all 11 plan summaries present across 6 phases — ready to proceed with milestone completion steps.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T14:33:03.425Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ]
+  },
+  {
+    "id": "1462e47d-e923-4fed-8881-bb83e8cdc05c",
+    "summary": "Intent: Update documentation and MkDocs configuration, including architecture diagrams in PlantUML/PNG format showing system usage.\nApproach: No actual work was performed in the exchange — the assistant only made a tool call with no visible output or file changes.\nArtifacts: edited knowledge-context-injection.puml, edited retrieval-service-pipeline.puml, edited knowledge-injection.md, edited mkdocs.yml, edited knowledge-architecture.puml\nResult: No changes were completed; the exchange ended without any documentation updates or diagram creation.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T14:52:07.705Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/knowledge-context-injection.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/retrieval-service-pipeline.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/knowledge-injection.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/knowledge-architecture.puml"
+    ]
+  },
+  {
+    "id": "9ba5b04d-b95f-49dc-a802-a11b784b2e08",
+    "summary": "Intent: Enforce consistent documentation styling guidelines for PlantUML diagrams in the coding project.\nApproach: Applied the documentation style guide by creating new PlantUML diagrams following kebab-case naming, including the standard style file, and using defined stereotypes and arrow macros.\nArtifacts: edited <AWS_SECRET_REDACTED>knowledge-context-injection.puml, edited <AWS_SECRET_REDACTED>retrieval-service-pipeline.puml\nResult: Created two new PlantUML diagrams — one for knowledge context injection architecture and one for the retrieval service pipeline — both following the standard style guide with proper includes, stereotypes, and layout conventions.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T14:52:12.319Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "<AWS_SECRET_REDACTED>knowledge-context-injection.puml",
+      "<AWS_SECRET_REDACTED>retrieval-service-pipeline.puml"
+    ]
+  },
+  {
+    "id": "f9e16868-d093-4bbf-88ca-40d59aac35cb",
+    "summary": "Intent: [developer asked to commit current work]\nApproach: Checked git status, diff, and log to assess what needed committing.\nArtifacts: edited STATE.md, edited PROJECT.md, edited ROADMAP.md\nResult: No commit was needed; all session work was already committed across 20+ prior commits, with only gitignored or previously-migrated files remaining unstaged.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T14:57:40.936Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ]
+  },
+  {
+    "id": "3d2c4204-5996-408c-b730-c05ca6a68bbd",
+    "summary": "Intent: [user shared a screenshot, likely showing git status or uncommitted changes, implicitly requesting they be handled]\nApproach: Identified local_cache/ as fastembed ONNX model cache that shouldn't be tracked, added it to .gitignore, then staged meaningful files for commit.\nArtifacts: edited .gitignore\nResult: Added `local_cache/` directory (fastembed ONNX model cache) to .gitignore and staged relevant changed files for commit.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T15:01:04.271Z",
+    "digestedAt": "2026-04-25T15:07:28.736Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "e0a92fc7-eee3-4711-8be3-0f482fdbdd8e",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions.\nApproach: Read the most recent LSL files from the coding project history directory, loading multiple files due to short content length.\nArtifacts: edited ObservationConsolidator.js\nResult: Session continuity summary was produced covering activity from 2026-04-25 1600-1800, focused on the coding project; key issue identified was 0 digests/insights showing on dashboard despite 18 observations existing in storage.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:07:28.410Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "9548e620-4a49-4e92-a4e9-e978beaf83ce",
+    "summary": "Intent: [shared an image, likely showing a bug or output related to path redaction behavior]\nApproach: Investigated redaction patterns to understand why running full redaction on file paths causes false positives with hex strings and tokens matching legitimate path components.\nArtifacts: edited ObservationConsolidator.js\nResult: Identified that applying the full `_redact()` function to file paths is incorrect because redaction patterns for hex strings and tokens collide with valid path components; next step is to fix the LSL system's path handling.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:15:06.433Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "e80f1208-5f3e-4796-a284-e50eab69653f",
+    "summary": "Intent: [shared a screenshot, likely showing a bug or issue with path redaction behavior]\nApproach: Investigated why running full `_redact()` on file paths was breaking them, identifying that a broad AWS Secret regex pattern matching 40-char alphanumeric strings was corrupting path components in structured data.\nArtifacts: edited ObservationConsolidator.js\nResult: Root cause identified — the full redactor should not be applied to structured metadata like file paths; only targeted user ID normalization should be used for paths, consistent with how the LSL system handles redaction.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:15:06.433Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "268db2af-65ad-401b-81bb-17a6ab3ff2c5",
+    "summary": "Intent: Revert the observations database back to having hundreds of observations instead of only 22.\nApproach: Identified that the SQLite database has only 22 records while the export JSON files contain the full 626 observations, suggesting the DB needs to be restored from the exports.\nArtifacts: edited token-budget.js\nResult: Investigation found the discrepancy — SQLite DB at `.observations/observations.db` has 22 records but `.data/observation-export/observations.json` contains 626 observations; restoration from exports was identified as the path forward but not yet completed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:38:25.335Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "fc713a92-b530-4058-b934-50b616f89a95",
+    "summary": "Intent: Revert observation count back to hundreds after it dropped to only 22 observations.\nApproach: Investigated the SQLite DB vs JSON export files to find the source of truth, discovering the export JSON had been overwritten with only 22 records after a git checkout triggered the exporter again before safety guards were added.\nArtifacts: edited token-budget.js\nResult: Root cause identified: the observation exporter ran after a git checkout and overwrote the export JSON (which previously had 626 observations) with only 22 records; the committed git history needs to be checked to recover the original data.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T15:38:25.335Z",
+    "digestedAt": "2026-04-25T15:54:41.122Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "e468232c-fcca-45af-b17a-5e57dfe94214",
+    "summary": "Intent: [asked what knowledge context was injected into the current conversation]\nApproach: [inspecting system-reminder blocks to enumerate injected insights, digests, and session-start context]\nArtifacts: edited token-budget.js\nResult: [assistant enumerated 11 injected insights with confidence scores, 2 digests, and session-start context including CLAUDE.md, MEMORY.md, git status, skills list, and MCP instructions; noted a duplicate OKB insight and low-relevance injections as retrieval <USER_ID_REDACTED> issues]",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:55:22.828Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "d93e54fe-779c-4228-a48e-c2e83c0240c5",
+    "summary": "Intent: Understand why irrelevant projects (OKB, Brandschutz, rapid-llm-proxy) were being selected for context injection instead of relevant observation/digest/insights content.\nApproach: Investigated the retrieval/embedding system to diagnose why context selection was returning unrelated projects.\nArtifacts: edited token-budget.js\nResult: The developer identified a bug or misconfiguration in the embedding-based retrieval system that causes wrong projects to be selected for context injection; root cause investigation was initiated but not resolved in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T15:57:06.831Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "ea95c0cf-f3e7-439b-8ab6-4526f3ff52c0",
+    "summary": "Intent: Understand why irrelevant knowledge entries (OKB, Brandschutz, rapid-llm-proxy) are being retrieved instead of relevant ones about observations/digests/insights.\nApproach: Investigated the retrieval pipeline to diagnose incorrect knowledge selection, focusing on how embeddings and similarity search are used to match injected knowledge to the prompt.\nArtifacts: edited token-budget.js\nResult: The assistant identified a potential bug in the knowledge injection/retrieval logic but no fix was implemented yet; the investigation revealed the need to examine how embeddings are computed and compared in the retrieval client.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T15:57:06.831Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "b7e90108-d2c5-480b-9dea-aca6ead1ce3d",
+    "summary": "Intent: Developer questioned why irrelevant projects (OKB, Brandschutz, rapid-llm-proxy) were being retrieved for a query about observations/digests/insights, suspecting a problem with the embedding-based retrieval selection.\nApproach: Investigated the retrieval pipeline by tracing the flow from knowledge-injection-hook through retrieval-client to the retrieval-service, checking whether Qdrant vector search or fallback keyword search was responsible for the bad results.\nArtifacts: edited token-budget.js\nResult: Root cause not yet fully determined in this exchange, but the retrieval system uses POST /api/retrieve on port 3033 with a 0.75 similarity threshold; suspicion fell on Qdrant being non-functional and keyword search producing irrelevant matches.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T15:57:06.831Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/token-budget.js"
+    ]
+  },
+  {
+    "id": "248492fb-ed54-4865-b2e0-8807b77d59e7",
+    "summary": "Intent: Asked what knowledge context was injected into the current conversation.\nApproach: Assistant analyzed the injected context by auditing insights and digests for count, relevance, and noise, identifying remaining issues with deduplication and per-tier caps not yet active.\nArtifacts: edited knowledge-injection-hook.js\nResult: 4 insights and 10 digests were injected; 2 insights and ~3 digests were relevant. Remaining issues: duplicate OKB insight, no digest cap applied (needs Docker rebuild of token-budget.js), and low-relevance digest matches due to keyword search.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T16:13:16.670Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/hooks/knowledge-injection-hook.js"
+    ]
+  },
+  {
+    "id": "885e636a-e65e-4133-9034-9cea405ebde8",
+    "summary": "Intent: Investigate why topic retrieval is selecting irrelevant results and explore better approaches like GraphRAG (vector embeddings + graph hops) and ontologies to ground retrieval in the prompt and recent observations.\nApproach: The developer wants a root-cause analysis of the retrieval pipeline, questioning whether combining recent observations with the prompt embedding, using GraphRAG-style graph traversal, and/or ontologies would yield more contextually relevant topic selection.\nArtifacts: edited knowledge-injection-hook.js\nResult: No concrete changes were made; the exchange ended with the assistant acknowledging the problem and beginning investigation into available retrieval infrastructure.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T16:16:23.346Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/hooks/knowledge-injection-hook.js"
+    ]
+  },
+  {
+    "id": "e9bb7876-298e-41bd-9f4e-54bbf743dda7",
+    "summary": "Intent: Investigate why semantic retrieval is selecting irrelevant topics and explore better approaches including GraphRAG, ontologies, and conversation-aware query enrichment.\nApproach: Analyzed existing retrieval infrastructure to find root cause (MiniLM embedding scores cluster too tightly), then evaluated GraphRAG, Qdrant payload filtering, ontologies, and conversation-aware query enrichment as alternatives.\nArtifacts: edited knowledge-injection-hook.js\nResult: Identified that embedding scores are too compressed (0.75-0.82 range) to distinguish topics, and that existing infrastructure (Qdrant topic/theme filters, Memgraph graph traversal, ontologies) is unused in the retrieval pipeline. Recommended combining conversation-context query enrichment with Qdrant pre-filtering as the highest-impact, lowest-effort fix.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T16:16:23.346Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/hooks/knowledge-injection-hook.js"
+    ]
+  },
+  {
+    "id": "e62e95e8-2a17-4ec9-97bb-f28f75e8f88e",
+    "summary": "Intent: [the user said \"yes\" to confirm proceeding with a plan]\nApproach: Enhanced knowledge injection by enriching <USER_ID_REDACTED> with conversation context from transcript and adding topic pre-filtering on the Qdrant side.\nArtifacts: edited <AWS_SECRET_REDACTED>knowledge-injection-hook.js\nResult: Hook updated to extract topics from conversation transcript and pass them to the retrieval service for topic-filtered Qdrant searches to improve retrieval relevance.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T16:28:33.755Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "<AWS_SECRET_REDACTED>knowledge-injection-hook.js"
+    ]
+  },
+  {
+    "id": "bf9e63aa-9442-4c0e-8b77-34193a8d06b2",
+    "summary": "Intent: Confirm and proceed with fixing the server crash\nApproach: Fixed a SyntaxError caused by top-level await in a non-async method by making the method async.\nArtifacts: edited <AWS_SECRET_REDACTED>ns/system-health-dashboard/server.js\nResult: Made `_getObservationsDb()` an async method to resolve the `SyntaxError: Unexpected reserved word` crash occurring at runtime in the Docker container.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T17:15:52.559Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "<AWS_SECRET_REDACTED>ns/system-health-dashboard/server.js"
+    ]
+  },
+  {
+    "id": "d7bb87d7-4a3b-480a-9374-c5216100f2df",
+    "summary": "Intent: Asked what knowledge context was injected into the conversation.\nApproach: The assistant analyzed the injected context tiers (working memory, insights, digests, entities, observations) and compared results before/after recent retrieval tuning changes.\nArtifacts: edited knowledge-injection-hook.js\nResult: Injected context included 3 insights (OKB Architecture x2, Knowledge Context Injection Service), 3 digests (hook debugging, embedding pipeline, pre-commit hook), 3 KG entities, and 3 observations. Noise reduced from ~80% to ~40% irrelevant; remaining issues are duplicate OKB insight, junk entity name \"PromiseHandlesAsynchronousOperations\", and false-positive \"knowledge\" keyword matches.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T17:45:44.043Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/hooks/knowledge-injection-hook.js"
+    ]
+  },
+  {
+    "id": "d7da5b6b-6666-4dd4-bdb1-d22830d64eb5",
+    "summary": "Intent: [the developer asked what knowledge context was injected into the conversation]\nApproach: Auditing injected context by inspecting working memory, insights, digests, entities, and observations surfaced by the knowledge injection system.\nArtifacts: edited working-memory.js\nResult: The audit revealed persistent issues: stale working memory entity name, duplicate OKB insights due to broken dedup, and three recursive <COMPANY_NAME_REDACTED>-observations. A pending fix to filter system-reminder content from transcripts exists but was never committed, built, or restarted.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T17:59:44.772Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/working-memory.js"
+    ]
+  },
+  {
+    "id": "3fbe2280-74c7-497f-8f6a-f12cfbe97560",
+    "summary": "Intent: [user approved a pending action with \"y\"]\nApproach: Committed a previously staged fix to the knowledge-injection hook.\nArtifacts: edited src/hooks/knowledge-injection-hook.js\nResult: Fix committed (800d0fdc) to skip system-reminder blocks when extracting transcript topics, breaking a feedback loop where injected content was re-read as user context.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T18:01:42.341Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "326c230d-ead3-4280-9461-23ce6fb40755",
+    "summary": "Intent: Developer asked what knowledge context was injected into the current conversation.\nApproach: The assistant performed an audit of the enrichment payload for the current turn, tracing why OKB content persisted despite a prior hook fix.\nArtifacts: edited working-memory.js\nResult: Audit revealed OKB-dominated context payload with three issues: duplicate \"OKB Architecture\" insight at both 0.85 and 0.90 confidence (broken dedup), a malformed entity name `PromiseHandlesAsynchronousOperations`, and recursive observations from the user's own <COMPANY_NAME_REDACTED>-questions being re-injected.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T18:04:10.485Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/retrieval/working-memory.js"
+    ]
+  },
+  {
+    "id": "22a41384-717e-46f1-8d12-c66d770657ae",
+    "summary": "Intent: Apply two fixes (both confirmed by user) to working memory and deduplication issues.\nApproach: Diagnosed that working memory was picking the first of 673 misclassified \"Project\" entities; fix targets canonical project name selection instead of naive array indexing.\nArtifacts: edited <AWS_SECRET_REDACTED>val/working-memory.js\nResult: Working memory updated to prefer the canonical \"Coding\" project entity rather than defaulting to the first result from an oversaturated KG query returning 673 misclassified Project entities.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-25T18:05:29.785Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "<AWS_SECRET_REDACTED>val/working-memory.js"
+    ]
+  },
+  {
+    "id": "a6e3ae15-c7bb-4083-922a-991a111dcf93",
+    "summary": "Intent: Get a cleanup plan for making the knowledge graph reliable.\nApproach: Proposed a 6-phase milestone plan (Audit, Stop the bleed, Cleanup, Qdrant resync, Guards, Acceptance test) prioritizing measurement before action and addressing both existing garbage data and upstream producer fixes.\nArtifacts: none\nResult: A structured plan was produced covering audit scripting, producer-side fixes to prevent misclassification, one-shot cleanup with dry-run, Qdrant resync, regression guards, and acceptance criteria — with key decisions identified around aggressiveness of cleanup and whether to delete or reclassify misclassified Project entities.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T18:16:13.078Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
   }
 ]
