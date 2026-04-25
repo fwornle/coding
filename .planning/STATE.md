@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
-status: ready_to_plan
+status: planning
 stopped_at: Completed 32-02-PLAN.md
-last_updated: "2026-04-25T09:36:13.812Z"
-last_activity: 2026-04-25 -- Phase --phase execution started
+last_updated: "2026-04-25T14:37:31.825Z"
+last_activity: 2026-04-25
 progress:
   total_phases: 7
-  completed_phases: 7
+  completed_phases: 6
   total_plans: 11
   completed_plans: 11
   percent: 100
@@ -80,10 +80,23 @@ Progress: [██████████] 100%
 - [Phase 32]: OpenCode plugin injection API needs runtime validation before implementation
 - [Phase 32]: Copilot per-prompt injection may not be supported -- may need refresh daemon approach
 
+## Deferred Items
+
+Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
+
+| Category | Item | Status |
+|----------|------|--------|
+| debug | entity-naming-paths | unknown |
+| debug | llm-synthesis-failures | diagnosed |
+| debug | pattern-extraction-data-loss | investigating |
+| verification | Phase 28 (28-VERIFICATION.md) | human_needed |
+| verification | Phase 30 (30-VERIFICATION.md) | human_needed |
+| verification | Phase 30.1 (30.1-VERIFICATION.md) | human_needed |
+| todo | llm-based-semantic-deduplication | pending |
+| todo | replace-console-log-with-proper-logging | pending |
+
 ## Session Continuity
 
-Last session: 2026-04-25T09:36:13.804Z
-Stopped at: Completed 32-02-PLAN.md
-Resume with: `/gsd-execute-phase` (Phase 31 next)
-
-**Planned Phase:** 32 (Agent Profiles & Additional Adapters) — 2 plans — 2026-04-25T09:19:13.144Z
+Last session: 2026-04-25
+Stopped at: v6.0 milestone complete
+Resume with: `/gsd-new-milestone`

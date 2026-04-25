@@ -8,7 +8,7 @@
 - v3.0 -- Workflow State Machine (Phases 15-19, in progress)
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
-- v6.0 -- Knowledge Context Injection (Phases 28-32, planned)
+- v6.0 -- Knowledge Context Injection (Phases 28-32, shipped 2026-04-25) -> [archive](milestones/v6.0-ROADMAP.md)
 
 ---
 
@@ -78,120 +78,17 @@
 
 ---
 
-## v6.0 -- Knowledge Context Injection
+<details>
+<summary>v6.0 Knowledge Context Injection -- Phases 28-32, SHIPPED 2026-04-25</summary>
 
-### Overview
+- [x] **Phase 28: Embedding Pipeline** (3/3 plans) -- completed 2026-04-24
+- [x] **Phase 29: Retrieval Service** (2/2 plans) -- completed 2026-04-24
+- [x] **Phase 30: Claude Hook Adapter** (1/1 plan) -- completed 2026-04-25
+- [x] **Phase 30.1: Cross-Project Agent-Agnostic Injection** (2/2 plans) -- completed 2026-04-25
+- [x] **Phase 31: Working Memory** (1/1 plan) -- completed 2026-04-25
+- [x] **Phase 32: Agent Profiles & Additional Adapters** (2/2 plans) -- completed 2026-04-25
 
-Five phases that make accumulated knowledge actionable by injecting it into coding agent conversations. Phase 28 embeds all knowledge tiers (observations, digests, insights, KG entities) into Qdrant with write-time hooks for new items. Phase 29 builds the retrieval service -- a hybrid search endpoint combining semantic, keyword, and recency scoring with token budget enforcement. Phase 30 wires the Claude Code UserPromptSubmit hook as the primary injection adapter, proving end-to-end value. Phase 31 adds a persistent working memory template injected alongside retrieval results. Phase 32 extends to remaining agents (OpenCode, Copilot) and adds per-agent scoring profiles with cross-agent continuity.
-
-### Phases
-
-- [x] **Phase 28: Embedding Pipeline** - Embed all knowledge tiers into Qdrant with write-time hooks
-- [x] **Phase 29: Retrieval Service** - Hybrid search endpoint with token-budgeted context assembly (completed 2026-04-24)
-- [x] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations (completed 2026-04-25)
-- [x] **Phase 31: Working Memory** - Persistent project state template injected as fixed prefix (completed 2026-04-25)
-- [x] **Phase 32: Agent Profiles & Additional Adapters** - Per-agent scoring, OpenCode/Copilot adapters, cross-agent continuity (completed 2026-04-25)
-
-### Phase Details
-
-#### Phase 28: Embedding Pipeline
-**Goal**: All accumulated knowledge exists as searchable vectors in Qdrant, and new knowledge is embedded automatically on creation
-**Depends on**: Nothing (first phase of v6.0)
-**Requirements**: EMBED-01, EMBED-02, EMBED-03, EMBED-04, EMBED-05, EMBED-06
-**Success Criteria** (what must be TRUE):
-  1. Running a Qdrant collection listing shows 4 knowledge collections (observations, digests, insights, kg_entities) with point counts matching source data (558+ obs, 132+ digests, 12+ insights, 160+ entities)
-  2. Creating a new observation via ETM causes it to appear in Qdrant within 60 seconds without manual intervention
-  3. Querying Qdrant with a semantic search for a known observation topic returns relevant results with correct metadata (agent, project, date, quality)
-  4. The embedding model is pinned to all-MiniLM-L6-v2 (384-dim) in a single config location, and changing it requires updating only that one value
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 28-01-PLAN.md -- Foundation: fastembed install, embedding config, service wrapper, Qdrant collections
-- [x] 28-02-PLAN.md -- Backfill: one-shot CLI to embed all existing knowledge into Qdrant
-- [x] 28-03-PLAN.md -- Write-time hooks: Redis pub/sub listener + ObservationWriter integration
-
-#### Phase 29: Retrieval Service
-**Goal**: Any client can POST a query and receive a token-budgeted, relevance-scored markdown block of knowledge from all tiers
-**Depends on**: Phase 28 (vectors must exist in Qdrant)
-**Requirements**: RETR-01, RETR-02, RETR-03, RETR-04, RETR-05, RETR-06, RETR-07
-**Success Criteria** (what must be TRUE):
-  1. POSTing a query to /api/retrieve returns a structured markdown block with tier headers (Insights, Digests, Entities, Observations) and source attribution per result
-  2. The returned context stays within the configured token budget (default ~1000 tokens) even when many results match
-  3. Insights and digests consistently rank above raw observations for the same topic (tier-weighted scoring works)
-  4. Queries with no relevant matches return an empty result rather than low-confidence noise (relevance threshold 0.75 enforced)
-  5. The endpoint responds in under 500ms at p95 measured over 20 consecutive queries
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 29-01-PLAN.md -- Core retrieval module: RRF fusion, token budgeting, keyword search, RetrievalService orchestrator
-- [x] 29-02-PLAN.md -- Wire POST /api/retrieve into server.js + end-to-end verification
-
-#### Phase 30: Claude Hook Adapter
-**Goal**: Claude Code conversations automatically receive relevant knowledge context on every prompt submission
-**Depends on**: Phase 29 (retrieval endpoint must exist)
-**Requirements**: HOOK-01, HOOK-02, HOOK-03
-**Success Criteria** (what must be TRUE):
-  1. Typing a substantive prompt in Claude Code causes injected knowledge to appear as system-reminder context visible in the conversation
-  2. If the retrieval service is stopped, Claude Code continues working normally with no errors or delays (fail-open behavior)
-  3. Short prompts like "yes", "continue", or single-word commands do not trigger knowledge injection
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
-
-#### Phase 30.1: Cross-Project Agent-Agnostic Knowledge Injection (INSERTED)
-**Goal**: Knowledge injection works in every project started via coding, across all agents (Claude, Copilot, OpenCode, Mastra), with focused relevance based on current work context
-**Depends on**: Phase 30 (hook script and retrieval service must exist)
-**Requirements**: XPROJ-01, XAGT-01, XREL-01
-**Success Criteria** (what must be TRUE):
-  1. Starting a coding session in any project via `coding --claude` causes knowledge injection to fire on substantive prompts
-  2. Each supported agent (Claude, Copilot, OpenCode, Mastra) has its own adapter that injects knowledge via its native hook/plugin mechanism
-  3. Injected knowledge is relevant to the current prompt and project context, not random insights from the knowledge base
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 30.1-01-PLAN.md -- Shared retrieval client + context-aware relevance boosting in retrieval service
-- [x] 30.1-02-PLAN.md -- Cross-project Claude hook migration + OpenCode/Copilot/Mastra adapters + launch integration
-
-#### Phase 31: Working Memory
-**Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
-**Depends on**: Phase 29 (injected via retrieval service response)
-**Requirements**: WMEM-01, WMEM-02, WMEM-03
-**Success Criteria** (what must be TRUE):
-  1. The retrieval response includes a "Working Memory" section containing current project state, active conventions, and known issues
-  2. The working memory section stays under 500 tokens regardless of project complexity
-  3. Working memory content reflects actual KG state -- adding or removing a KG entity causes the working memory to update on next retrieval
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 31-01-PLAN.md -- Working memory module + retrieval integration: KG structure + STATE.md state, 300/700 budget split
-
-#### Phase 32: Agent Profiles & Additional Adapters
-**Goal**: All supported coding agents receive knowledge injection tailored to their work patterns, with continuity across agent switches
-**Depends on**: Phase 30 (Claude hook proves the pattern), Phase 29 (retrieval service)
-**Requirements**: HOOK-04, HOOK-05, PROF-01, PROF-02
-**Success Criteria** (what must be TRUE):
-  1. OpenCode receives injected knowledge context via its plugin system or agent configuration file
-  2. Copilot receives injected knowledge context via workspace context file or instructions mechanism
-  3. Switching from Claude to OpenCode mid-task causes the OpenCode session to include recent observations from the preceding Claude session
-  4. Different agents receive differently weighted results for the same query (e.g., Claude biased toward architecture pitfalls, Copilot toward code conventions)
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 32-01-PLAN.md -- Per-agent scoring profiles: config, RRF fusion integration, adapter agent identity
-- [x] 32-02-PLAN.md -- Cross-agent continuity: session state writer, working memory injection
-
-### Progress
-
-**Execution Order:** 28 -> 29 -> 30 -> 31 -> 32
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
-| 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
-| 30. Claude Hook Adapter | v6.0 | 1/1 | Complete    | 2026-04-25 |
-| 31. Working Memory | v6.0 | 1/1 | Complete    | 2026-04-25 |
-| 32. Agent Profiles & Additional Adapters | v6.0 | 2/2 | Complete    | 2026-04-25 |
+</details>
 
 ---
 

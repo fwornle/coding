@@ -8,20 +8,11 @@ An agentic coding environment with multi-agent support (Claude, Copilot, OpenCod
 
 A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable — across all AI coding agents.
 
-## Current Milestone: v6.0 Knowledge Context Injection
-
-**Goal:** Automatically surface relevant accumulated knowledge (observations, digests, insights, KG entities) into coding agent conversations via a Mastra-inspired retrieval-and-injection pipeline — agent-agnostic across Claude, Copilot, OpenCode, and Mastra.
-
-**Target features:**
-- Embedding pipeline — embed all knowledge tiers (observations, digests, insights, KG entities) into Qdrant
-- Retrieval service — standalone HTTP endpoint accepting a query, returning token-budgeted relevant knowledge via semantic search + recency + keyword matching
-- Agent-agnostic injection adapters — hook/middleware integration for Claude (UserPromptSubmit hook), GitHub Copilot, OpenCode, and Mastra
-- Working memory template — persistent structured project state document, auto-updated and injected alongside semantic results
-- Feedback loop — new observations/digests/insights automatically embedded as they're created
-
 ## Current State
 
-**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring. Phase 30 complete — Claude Code UserPromptSubmit hook injects knowledge context from the retrieval service. Phase 30.1 complete — knowledge injection extended to all four agents across all projects with relevance boosting. Phase 31 complete — working memory module adds project state summary as 300-token prefix. Phase 32 complete — per-agent scoring profiles and cross-agent session continuity. **v6.0 milestone complete** — all 5 phases (28-32) shipped.
+**v6.0 shipped.** Knowledge context injection is live across all four coding agents. Every `coding` session automatically receives relevant knowledge from the accumulated observation/digest/insight/KG database via Qdrant semantic search, with per-agent scoring profiles and cross-agent session continuity. Working memory provides a 300-token project state prefix on every retrieval response.
+
+Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), live ETM observations, Qdrant vector search, hybrid retrieval (semantic + keyword + recency), Redis pub/sub for write-time embedding, per-agent adapters, session state handoff.
 
 ## Requirements
 
@@ -46,9 +37,18 @@ A self-learning coding environment that captures every session, builds knowledge
 - ✓ Token-budgeted markdown assembly with tier-weighted scoring — Phase 29
 - ✓ POST /api/retrieve on health API (port 3033), <500ms latency — Phase 29
 
+### Shipped in v6.0 (continued)
+
+- ✓ Claude UserPromptSubmit hook with fail-open design — Phase 30
+- ✓ Cross-project hook (global settings), all 4 agent adapters — Phase 30.1
+- ✓ Context-aware relevance boosting (project, cwd, recent files) — Phase 30.1
+- ✓ Working memory (KG structure + STATE.md, 300-token budget) — Phase 31
+- ✓ Per-agent scoring profiles (tier weight multipliers) — Phase 32
+- ✓ Cross-agent session continuity (session state file, 2-hour window) — Phase 32
+
 ### Active
 
-(Defined in REQUIREMENTS.md for v6.0)
+(Next milestone not yet defined — run `/gsd-new-milestone`)
 
 ### Shipped in v4.0
 

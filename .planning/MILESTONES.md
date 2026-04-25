@@ -1,5 +1,25 @@
 # Milestones
 
+## v6.0 v6.0 (Shipped: 2026-04-25)
+
+**Phases completed:** 7 phases, 11 plans, 25 tasks
+
+**Key accomplishments:**
+
+- fastembed ONNX embedding service with all-MiniLM-L6-v2 (384-dim), content hashing for idempotency, and Qdrant collection management for 4 knowledge tiers
+- One-shot CLI backfill of 1464 knowledge items (645 observations, 132 digests, 12 insights, 675 KG entities) into 4 Qdrant collections with content-hash idempotency
+- Redis pub/sub event bus wiring ObservationWriter to embedding listener for automatic Qdrant upserts within seconds of observation creation
+- Hybrid retrieval engine combining RRF-fused semantic (Qdrant) + keyword (FTS5/LIKE) + recency search with tier-weighted scoring and gpt-tokenizer budget enforcement
+- POST /api/retrieve endpoint wired into health API server with input validation, latency tracking, and Docker bind-mount for retrieval modules
+- UserPromptSubmit hook injecting Qdrant-retrieved knowledge (insights, digests, entities, observations) as system-reminder context into Claude Code conversations with fail-open design
+- Shared fail-open HTTP retrieval client with context-aware scoring (project 1.15x, cwd 1.10x, recent_files 1.20x cumulative boosts)
+- Migrated Claude hook to global settings with shared retrieval client; created OpenCode/Copilot/Mastra session-start adapters; wired all into agent launch pipeline with fail-open timeout
+- Live working memory from VKB KG entities + STATE.md frontmatter, token-budgeted to 300 tokens, prepended to every retrieval response
+- Per-agent RRF scoring profiles with tier weight multipliers flowing from all four adapters through retrieval service to fusion layer
+- Session state writer on agent exit with cross-agent injection via working memory using 2-hour staleness window and fail-open design
+
+---
+
 ## v4.0 Mastra Integration & LSL Observational Memory (Shipped: 2026-04-05)
 
 **Phases completed:** 4 phases, 11 plans, 22 tasks
