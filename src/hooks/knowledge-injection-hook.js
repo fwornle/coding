@@ -59,6 +59,7 @@ async function main() {
         ? process.env.CODING_PROJECT_DIR.split('/').pop()
         : process.cwd().split('/').pop(),
       cwd: process.env.CODING_PROJECT_DIR || process.cwd(),
+      agent: 'claude',
     };
 
     // 7. Truncate query for retrieval (server rejects > 500 chars)

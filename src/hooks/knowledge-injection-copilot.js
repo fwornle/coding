@@ -35,7 +35,7 @@ async function main() {
       query: `project context for ${project}`,
       budget: 1000,
       threshold: 0.65,
-      context: { project, cwd, recent_files: recentFiles },
+      context: { project, cwd, recent_files: recentFiles, agent: 'copilot' },
       timeout: 3000,
     });
 
