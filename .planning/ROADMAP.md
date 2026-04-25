@@ -88,7 +88,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
 
 - [x] **Phase 28: Embedding Pipeline** - Embed all knowledge tiers into Qdrant with write-time hooks
 - [x] **Phase 29: Retrieval Service** - Hybrid search endpoint with token-budgeted context assembly (completed 2026-04-24)
-- [ ] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations
+- [x] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations (completed 2026-04-25)
 - [ ] **Phase 31: Working Memory** - Persistent project state template injected as fixed prefix
 - [ ] **Phase 32: Agent Profiles & Additional Adapters** - Per-agent scoring, OpenCode/Copilot adapters, cross-agent continuity
 
@@ -134,7 +134,7 @@ Plans:
   1. Typing a substantive prompt in Claude Code causes injected knowledge to appear as system-reminder context visible in the conversation
   2. If the retrieval service is stopped, Claude Code continues working normally with no errors or delays (fail-open behavior)
   3. Short prompts like "yes", "continue", or single-word commands do not trigger knowledge injection
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
@@ -175,7 +175,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
-| 30. Claude Hook Adapter | v6.0 | 1/1 | Complete | 2026-04-24 |
+| 30. Claude Hook Adapter | v6.0 | 1/1 | Complete    | 2026-04-25 |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |
 | 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
 

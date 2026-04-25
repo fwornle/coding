@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RETR-05 | Phase 29 | Complete |
 | RETR-06 | Phase 29 | Complete |
 | RETR-07 | Phase 29 | Complete |
-| HOOK-01 | Phase 30 | Pending |
-| HOOK-02 | Phase 30 | Pending |
-| HOOK-03 | Phase 30 | Pending |
+| HOOK-01 | Phase 30 | Complete |
+| HOOK-02 | Phase 30 | Complete |
+| HOOK-03 | Phase 30 | Complete |
 | HOOK-04 | Phase 32 | Pending |
 | HOOK-05 | Phase 32 | Pending |
 | WMEM-01 | Phase 31 | Pending |
