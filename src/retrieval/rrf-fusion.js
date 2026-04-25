@@ -3,10 +3,15 @@
  *
  * Combines multiple ranked lists into a single fused ranking using the
  * standard RRF formula (Cormack et al., 2009). Tier weights are applied
- * after fusion per D-03.
+ * after fusion per D-03. Optional per-agent profile multipliers (D-04)
+ * are applied as a second pass when an agent identity is provided.
  *
  * @module rrf-fusion
  */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
 
 /** Tier weight multipliers applied after RRF fusion (D-03). */
 export const TIER_WEIGHTS = {
@@ -16,19 +21,46 @@ export const TIER_WEIGHTS = {
   observations: 0.8,
 };
 
+/** Cached agent profiles (loaded once, fail-open). */
+let _agentProfilesCache = null;
+
+/**
+ * Load per-agent tier weight profiles from config/agent-profiles.json.
+ *
+ * Reads the file once and caches the result. Returns {} on any error
+ * (missing file, parse error) so callers always get a safe object.
+ *
+ * @returns {Record<string, Record<string, number>>} Agent profiles keyed by agent name
+ */
+export function loadAgentProfiles() {
+  if (_agentProfilesCache !== null) return _agentProfilesCache;
+  try {
+    const thisDir = dirname(fileURLToPath(import.meta.url));
+    const configPath = resolve(thisDir, '../../config/agent-profiles.json');
+    const raw = readFileSync(configPath, 'utf8');
+    _agentProfilesCache = JSON.parse(raw);
+  } catch {
+    _agentProfilesCache = {};
+  }
+  return _agentProfilesCache;
+}
+
 /**
  * Reciprocal Rank Fusion.
  *
  * For each ranked list, score items as 1 / (k + rank + 1).
  * Accumulate scores per item ID across all lists.
  * After fusion, multiply each item's score by its tierWeight (D-03).
+ * If an agentProfile is provided (D-04), apply per-agent tier multipliers
+ * as a second pass on top of the base tier weights.
  * Sort descending by final score.
  *
  * @param {Array<Array<{id: string, tier: string, tierWeight: number, payload: object}>>} rankedLists
  * @param {number} k - RRF damping constant (default 60, per original paper)
+ * @param {Record<string, number>|null} agentProfile - Optional per-agent tier multipliers
  * @returns {Array<object>} Fused results sorted by rrfScore descending
  */
-export function rrfFuse(rankedLists, k = 60) {
+export function rrfFuse(rankedLists, k = 60, agentProfile = null) {
   const scores = new Map(); // id -> { score, item }
 
   for (const list of rankedLists) {
@@ -42,6 +74,13 @@ export function rrfFuse(rankedLists, k = 60) {
   // Apply tier weights after fusion (D-03)
   for (const [, entry] of scores) {
     entry.score *= TIER_WEIGHTS[entry.item.tier] ?? 1.0;
+  }
+
+  // Apply per-agent profile multipliers (D-04)
+  if (agentProfile) {
+    for (const [, entry] of scores) {
+      entry.score *= agentProfile[entry.item.tier] ?? 1.0;
+    }
   }
 
   return [...scores.values()]

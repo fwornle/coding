@@ -16,7 +16,7 @@
 import { getEmbeddingService } from '../../dist/embedding/embedding-service.js';
 import { getQdrantClient } from '../../dist/embedding/qdrant-collections.js';
 import { KeywordSearch } from './keyword-search.js';
-import { rrfFuse, buildRecencyList, TIER_WEIGHTS } from './rrf-fusion.js';
+import { rrfFuse, buildRecencyList, TIER_WEIGHTS, loadAgentProfiles } from './rrf-fusion.js';
 import { assembleBudgetedMarkdown } from './token-budget.js';
 import { buildWorkingMemory } from './working-memory.js';
 
@@ -119,8 +119,13 @@ export class RetrievalService {
     // Step 3: Build recency list from combined unique results
     const recencyResults = buildRecencyList([...semanticResults, ...keywordHits]);
 
-    // Step 4: RRF fusion
-    const fused = rrfFuse([semanticResults, keywordHits, recencyResults]);
+    // Step 4: RRF fusion (with optional per-agent profile multipliers, D-04)
+    let agentProfile = null;
+    if (context?.agent) {
+      const profiles = loadAgentProfiles();
+      agentProfile = profiles[context.agent] || null;
+    }
+    const fused = rrfFuse([semanticResults, keywordHits, recencyResults], 60, agentProfile);
 
     // Step 4.5: Context-aware relevance boosting (D-09)
     if (context) {
