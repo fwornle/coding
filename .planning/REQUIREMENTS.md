@@ -61,9 +61,12 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Working Memory
 
-- [ ] **WMEM-01**: Persistent working memory template captures current project state, conventions, known issues
-- [ ] **WMEM-02**: Working memory is injected as a fixed prefix alongside retrieval results
-- [ ] **WMEM-03**: Working memory stays under 500 tokens
+- [x] **WMEM-01
+**: Persistent working memory template captures current project state, conventions, known issues
+- [x] **WMEM-02
+**: Working memory is injected as a fixed prefix alongside retrieval results
+- [x] **WMEM-03
+**: Working memory stays under 500 tokens
 
 ### Agent Profiles & Continuity
 
