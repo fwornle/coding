@@ -110,16 +110,42 @@ export function truncateResult(item, tokenBudget) {
  * @param {number} budget - Token budget (default 1000 per D-08)
  * @returns {{ markdown: string, tokensUsed: number }}
  */
+/**
+ * Compute a content fingerprint for dedup.
+ *
+ * Insights/digests with near-identical summaries (e.g. "OKB Architecture"
+ * vs "Operational Knowledge Base (OKB) Architecture") were appearing as
+ * separate results because their topic strings differed slightly. We
+ * dedup on the first ~120 chars of the summary preview, lowercased and
+ * stripped of non-alphanumerics, which collapses these duplicates.
+ *
+ * @param {object} item - Result item with tier and payload
+ * @returns {string|null} Fingerprint string, or null if unfingerprintable
+ */
+function contentSignature(item) {
+  const p = item.payload || {};
+  const preview = (p.summary_preview || p.text || p.content || '').toLowerCase();
+  if (!preview) return null;
+  const normalized = preview.replace(/[^a-z0-9]/g, '').slice(0, 120);
+  if (normalized.length < 20) return null;
+  return `${item.tier}:${normalized}`;
+}
+
 export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
   const buckets = Object.fromEntries(TIER_ORDER.map((t) => [t, []]));
   let tokensUsed = 0;
 
   const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0]));
+  const seenSignatures = new Set();
 
   for (const result of sortedResults) {
     // Skip if this tier has reached its cap
     const cap = TIER_MAX_RESULTS[result.tier] ?? 5;
     if ((tierCounts[result.tier] ?? 0) >= cap) continue;
+
+    // Skip if we've already included a near-identical result (content dedup)
+    const sig = contentSignature(result);
+    if (sig && seenSignatures.has(sig)) continue;
 
     const formatted = formatResult(result);
     const tokens = countTokens(formatted);
@@ -143,6 +169,7 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
     if (buckets[result.tier]) {
       buckets[result.tier].push(formatted);
       tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
+      if (sig) seenSignatures.add(sig);
     }
     tokensUsed += tokens;
   }

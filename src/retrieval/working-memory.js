@@ -29,6 +29,28 @@ const VKB_TIMEOUT = 2000;
 /** VKB API base URL. */
 const VKB_BASE = 'http://localhost:8080';
 
+/** Team identifier used for both VKB queries and canonical project name match. */
+const TEAM = 'coding';
+
+/**
+ * Pick the canonical Project entity from a list.
+ *
+ * The KG has been polluted by misclassified concept descriptions (e.g.
+ * `PromiseHandlesAsynchronousOperations`) being stored as Project entities,
+ * so `entities[0]` is unreliable. Prefer an exact case-insensitive match
+ * to the team name (e.g. `Coding`); if none exists, return null rather
+ * than show a misleading entry.
+ *
+ * @param {Array<object>} entities
+ * @param {string} team
+ * @returns {object|null}
+ */
+function pickCanonicalProject(entities, team) {
+  if (!Array.isArray(entities) || entities.length === 0) return null;
+  const target = team.toLowerCase();
+  return entities.find((e) => (e.entity_name || '').toLowerCase() === target) || null;
+}
+
 /**
  * Fetch Project and Component entities from the VKB API.
  *
@@ -39,7 +61,7 @@ const VKB_BASE = 'http://localhost:8080';
  */
 async function fetchKGStructure() {
   try {
-    const base = `${VKB_BASE}/api/entities?team=coding`;
+    const base = `${VKB_BASE}/api/entities?team=${TEAM}`;
     const [projectRes, componentRes] = await Promise.all([
       fetch(`${base}&type=Project`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),
       fetch(`${base}&type=Component`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),
@@ -56,7 +78,7 @@ async function fetchKGStructure() {
     const componentData = await componentRes.json();
 
     return {
-      project: projectData.entities?.[0] || null,
+      project: pickCanonicalProject(projectData.entities, TEAM),
       components: componentData.entities || [],
     };
   } catch (err) {
