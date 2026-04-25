@@ -47,8 +47,10 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 **: Claude hook fails open -- if retrieval is down or slow, agent proceeds without injection
 - [x] **HOOK-03
 **: Short prompts (<20 tokens) skip injection to avoid noise on simple commands
-- [ ] **HOOK-04**: OpenCode adapter injects knowledge via plugin system or config-based context
-- [ ] **HOOK-05**: Copilot adapter injects knowledge via workspace context file or VS Code extension
+- [x] **HOOK-04
+**: OpenCode adapter injects knowledge via plugin system or config-based context
+- [x] **HOOK-05
+**: Copilot adapter injects knowledge via workspace context file or VS Code extension
 
 ### Cross-Project Agent-Agnostic Injection
 
@@ -70,7 +72,8 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Agent Profiles & Continuity
 
-- [ ] **PROF-01**: Per-agent scoring profiles bias retrieval toward each agent's typical work patterns
+- [x] **PROF-01
+**: Per-agent scoring profiles bias retrieval toward each agent's typical work patterns
 - [ ] **PROF-02**: Cross-agent continuity injects recent observations from previous agent on agent switch
 
 ## v2 Requirements

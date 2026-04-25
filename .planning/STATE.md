@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
-status: planning
-stopped_at: Phase 32 context gathered
-last_updated: "2026-04-25T09:01:50.422Z"
-last_activity: 2026-04-25
+status: executing
+stopped_at: Completed 32-01-PLAN.md
+last_updated: "2026-04-25T09:32:21.258Z"
+last_activity: 2026-04-25 -- Phase --phase execution started
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_plans: 11
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase --phase — 31
+**Current focus:** Phase --phase — 32
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-25
+Phase: --phase (32) — EXECUTING
+Plan: 1 of --name
+Status: Executing Phase --phase
+Last activity: 2026-04-25 -- Phase --phase execution started
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [██████████] 100%
 - Cumulative context boost factors (1.15 project, 1.10 cwd, 1.20 recent_files) for relevance scoring
 - Claude hook moved to global settings for cross-project firing; Copilot adapter uses AUTO-KNOWLEDGE markers for safe file merging
 - Working memory (300-token KG+state prefix) integrated into retrieve() pipeline with fail-open VKB fetch and STATE.md parsing
+- Per-agent RRF scoring profiles: agent identity flows from adapters through context.agent to rrf-fusion for two-pass tier weighting
 
 ### Blockers/Concerns
 
@@ -80,8 +81,8 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 32 context gathered
+Last session: 2026-04-25T09:32:21.250Z
+Stopped at: Completed 32-01-PLAN.md
 Resume with: `/gsd-execute-phase` (Phase 31 next)
 
-**Planned Phase:** 31 (Working Memory) — 1 plans — 2026-04-25T08:45:29.438Z
+**Planned Phase:** 32 (Agent Profiles & Additional Adapters) — 2 plans — 2026-04-25T09:19:13.144Z
