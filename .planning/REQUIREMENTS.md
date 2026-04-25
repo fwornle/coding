@@ -74,7 +74,8 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 - [x] **PROF-01
 **: Per-agent scoring profiles bias retrieval toward each agent's typical work patterns
-- [ ] **PROF-02**: Cross-agent continuity injects recent observations from previous agent on agent switch
+- [x] **PROF-02
+**: Cross-agent continuity injects recent observations from previous agent on agent switch
 
 ## v2 Requirements
 
