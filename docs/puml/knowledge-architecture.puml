@@ -18,7 +18,7 @@ skinparam cloud {
     BorderColor Orange
 }
 
-title Knowledge Management System Architecture v2.0\nGraphDB + Ontology Integration
+title Knowledge Management System Architecture v6.0\nGraphDB + Ontology + Context Injection
 
 rectangle "Knowledge Sources" as SOURCES {
     [Live Sessions\n(Transcripts)]
@@ -70,6 +70,18 @@ rectangle "Knowledge Access" as ACCESS {
     [Export to JSON\n(optional)] as EXPORT
 }
 
+rectangle "Context Injection (v6.0)" as INJECTION {
+    [Retrieval Service\n(Hybrid Search + RRF)] as RETR_SVC
+    [Agent Adapters\n(Claude/Copilot/OpenCode/Mastra)] as ADAPT
+    [Working Memory\n(KG + STATE.md)] as WMEM
+
+    note right of RETR_SVC
+      POST /api/retrieve on :3033
+      Token-budgeted markdown
+      Per-agent scoring profiles
+    end note
+}
+
 ' === Online Learning Flow ===
 [Live Sessions\n(Transcripts)] --> MONITOR : File changes
 MONITOR --> EXTRACTOR : New exchanges
@@ -93,6 +105,14 @@ QDRANT --> RETRIEVER : Semantic\nsearch
 SQLITE --> RETRIEVER : Metadata\nfiltering
 
 VKB --> [Web Browser] : Interactive\nvisualization
+
+' === Context Injection (v6.0) ===
+QDRANT --> RETR_SVC : Semantic search\n(4 collections)
+SQLITE --> RETR_SVC : Keyword search\n(FTS5)
+GRAPHDB --> WMEM : Project + Component\nentities
+RETR_SVC --> ADAPT : Token-budgeted\nmarkdown
+WMEM --> RETR_SVC : 300-token\nprefix
+ADAPT --> [Coding Agents] : Injected context\n(per-prompt or session)
 
 note right of GRAPHDB
   **Central Knowledge Store**
@@ -125,6 +145,15 @@ note bottom of ACCESS
   • Default: --online (GraphDB)
   • Legacy: --with-batch (JSON files)
   • Distinguishes online vs manual
+end note
+
+note bottom of INJECTION
+  **Context Injection (v6.0)**
+  • Hybrid retrieval: semantic + keyword + recency
+  • Per-agent scoring profiles
+  • Working memory: KG structure + project state
+  • Cross-agent session continuity
+  • 1000 token budget (300 WM + 700 semantic)
 end note
 
 @enduml

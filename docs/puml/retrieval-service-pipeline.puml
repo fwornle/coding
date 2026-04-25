@@ -1,0 +1,79 @@
+@startuml retrieval-service-pipeline
+!include _standard-style.puml
+
+title Retrieval Service Pipeline\nPOST /api/retrieve Request Flow
+
+top to bottom direction
+
+actor "Agent Adapter" as CALLER
+
+rectangle "POST /api/retrieve" <<api>> as ENDPOINT {
+  component "Input Validation\n{query, budget, threshold, context}" <<api>> as INPUT
+}
+
+rectangle "RetrievalService.retrieve()" as SERVICE {
+
+  rectangle "Step 0: Working Memory" as STEP0 {
+    component "buildWorkingMemory()" <<core>> as BUILD_WM
+    component "fetchKGStructure()\nVKB :8080" <<core>> as FETCH_KG
+    component "parseStateFrontmatter()\nSTATE.md" <<core>> as PARSE_STATE
+    component "readSessionState()\ncross-agent" <<core>> as READ_SESSION
+  }
+
+  rectangle "Step 1: Parallel Search" as STEP1 {
+    component "Qdrant Semantic\n(4 collections)" <<core>> as SEMANTIC
+    component "SQLite FTS5\n(keyword)" <<core>> as KEYWORD
+    component "Recency\n(time decay)" <<core>> as RECENCY
+  }
+
+  rectangle "Step 2: Fusion" as STEP2 {
+    component "RRF Fusion\n(Reciprocal Rank)" <<core>> as RRF
+    component "Agent Profile\n(tier multipliers)" <<core>> as PROFILE
+    component "Context Boost\n(project/cwd/files)" <<core>> as BOOST
+  }
+
+  rectangle "Step 3: Assembly" as STEP3 {
+    component "Token Budget\n(300 WM + 700 semantic)" <<core>> as BUDGET
+    component "Markdown Assembly\n(tier headers)" <<core>> as MARKDOWN
+  }
+}
+
+rectangle "Response" as RESPONSE {
+  component "{ markdown, meta }" <<api>> as OUTPUT
+
+  note right of OUTPUT
+    markdown: "## Working Memory\n...\n## Insights\n...\n## Digests\n..."
+    meta: { query, budget, results_count,
+            tokens_used, working_memory_tokens,
+            latency_ms }
+  end note
+}
+
+' === Flow ===
+CALLER SYNC_LINE INPUT
+INPUT SYNC_LINE BUILD_WM
+
+BUILD_WM SYNC_LINE FETCH_KG : Project + Component\nentities
+BUILD_WM SYNC_LINE PARSE_STATE : milestone, phase,\nblockers
+BUILD_WM SYNC_LINE READ_SESSION : previous agent\nsession (if any)
+
+INPUT SYNC_LINE SEMANTIC : query embedding\n→ cosine similarity
+INPUT SYNC_LINE KEYWORD : FTS5 / LIKE
+INPUT SYNC_LINE RECENCY : time-decay scores
+
+SEMANTIC DATA_LINE RRF
+KEYWORD DATA_LINE RRF
+RECENCY DATA_LINE RRF
+PROFILE DATA_LINE RRF : per-agent\ntier weights
+
+RRF DATA_LINE BOOST : fused scores
+BOOST DATA_LINE BUDGET : boosted results
+
+BUILD_WM DATA_LINE BUDGET : WM markdown\n(300 tokens)
+
+BUDGET DATA_LINE MARKDOWN
+MARKDOWN DATA_LINE OUTPUT
+
+OUTPUT SYNC_LINE CALLER
+
+@enduml

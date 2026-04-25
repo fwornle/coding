@@ -1,0 +1,106 @@
+@startuml knowledge-context-injection
+!include _standard-style.puml
+
+title Knowledge Context Injection Pipeline (v6.0)\nAutomatic Knowledge Surfacing Across All Coding Agents
+
+top to bottom direction
+
+rectangle "Coding Agents" as AGENTS {
+  [Claude Code] <<agent>> as CLAUDE
+  [OpenCode] <<agent>> as OPENCODE
+  [GitHub Copilot] <<agent>> as COPILOT
+  [Mastracode] <<agent>> as MASTRA
+}
+
+rectangle "Agent Adapters" as ADAPTERS {
+  component "Claude Hook\n(UserPromptSubmit)" <<core>> as CLAUDE_HOOK
+  component "OpenCode Adapter\n(session-start)" <<core>> as OC_ADAPTER
+  component "Copilot Adapter\n(session-start)" <<core>> as CP_ADAPTER
+  component "Mastra Adapter\n(session-start)" <<core>> as MA_ADAPTER
+
+  note right of CLAUDE_HOOK
+    Per-prompt injection via
+    additionalContext stdout.
+    Registered in global
+    ~/.claude/settings.json
+  end note
+}
+
+rectangle "Shared Infrastructure" as SHARED {
+  component "Retrieval Client\n(retrieval-client.js)" <<core>> as CLIENT
+  component "Agent Profiles\n(agent-profiles.json)" <<util>> as PROFILES
+}
+
+rectangle "Retrieval Service (port 3033)" as RETRIEVAL {
+  component "Working Memory\n(KG + STATE.md)" <<core>> as WM
+  component "Hybrid Search\n(Semantic + Keyword + Recency)" <<core>> as SEARCH
+  component "RRF Fusion\n(Per-Agent Weights)" <<core>> as FUSION
+  component "Token Budget\n(300 WM + 700 Semantic)" <<core>> as BUDGET
+  component "Context Boost\n(project/cwd/files)" <<core>> as BOOST
+}
+
+database "Qdrant\n(Vector DB)" <<storage>> as QDRANT {
+  [observations\n(645 vectors)]
+  [digests\n(132 vectors)]
+  [insights\n(12 vectors)]
+  [kg_entities\n(675 vectors)]
+}
+
+database "SQLite\n(FTS5)" <<storage>> as SQLITE
+
+database "VKB / KG\n(Graphology)" <<storage>> as KG
+
+rectangle "Write-Time Pipeline" as WRITE {
+  component "ETM\n(Observation Writer)" <<core>> as ETM
+  component "Redis Pub/Sub\n(Event Bus)" <<infra>> as REDIS
+  component "Embedding Listener\n(fastembed ONNX)" <<core>> as EMBEDDER
+}
+
+rectangle "Cross-Agent Continuity" as CONTINUITY {
+  component "Session State Writer\n(agent exit hook)" <<core>> as STATE_WRITER
+  component ".coding/session-state.json" <<storage>> as STATE_FILE
+
+  note right of STATE_FILE
+    Written on agent exit.
+    Read by next agent if
+    different agent within
+    2-hour window.
+  end note
+}
+
+' === Agent to Adapter ===
+CLAUDE SYNC_LINE CLAUDE_HOOK : every prompt
+OPENCODE SYNC_LINE OC_ADAPTER : session start
+COPILOT SYNC_LINE CP_ADAPTER : session start
+MASTRA SYNC_LINE MA_ADAPTER : session start
+
+' === Adapter to Shared Client ===
+CLAUDE_HOOK SYNC_LINE CLIENT : callRetrieval()
+OC_ADAPTER SYNC_LINE CLIENT : callRetrieval()
+CP_ADAPTER SYNC_LINE CLIENT : callRetrieval()
+MA_ADAPTER SYNC_LINE CLIENT : callRetrieval()
+
+' === Client sends agent identity ===
+CLIENT SYNC_LINE RETRIEVAL : POST /api/retrieve\n{query, context, agent}
+PROFILES DATA_LINE FUSION : tier weight\nmultipliers
+
+' === Retrieval pipeline ===
+WM SYNC_LINE KG : fetch Project +\nComponent entities
+WM SYNC_LINE BUDGET : 300 tokens\n(prefix)
+SEARCH SYNC_LINE QDRANT : semantic search
+SEARCH SYNC_LINE SQLITE : keyword search
+SEARCH DATA_LINE FUSION : scored results
+FUSION DATA_LINE BOOST : context-boosted\nresults
+BOOST DATA_LINE BUDGET : 700 tokens\n(semantic)
+
+' === Write-time embedding ===
+ETM ASYNC_LINE REDIS : new observation\nevent
+REDIS ASYNC_LINE EMBEDDER : subscribe
+EMBEDDER DATA_LINE QDRANT : upsert vectors\n(all-MiniLM-L6-v2)
+
+' === Session continuity ===
+AGENTS -[#757575,thickness=1,dotted]-> STATE_WRITER : agent exit
+STATE_WRITER DATA_LINE STATE_FILE : write
+STATE_FILE OPTIONAL_LINE WM : "Previous Session"\nsection (if different agent)
+
+@enduml

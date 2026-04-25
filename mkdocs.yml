@@ -84,6 +84,7 @@ nav:
     - Observational Memory: core-systems/observational-memory.md
   - Architecture:
     - Overview: architecture/index.md
+    - Knowledge Injection: architecture/knowledge-injection.md
     - LLM Architecture: architecture/llm-architecture.md
     - Health Monitoring: architecture/health-monitoring.md
     - Data Flow: architecture/data-flow.md
