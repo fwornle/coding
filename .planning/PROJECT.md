@@ -21,7 +21,7 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ## Current State
 
-**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring. Phase 30 complete — Claude Code UserPromptSubmit hook injects knowledge context from the retrieval service. Phase 30.1 complete — knowledge injection extended to all four agents (Claude, Copilot, OpenCode, Mastra) across all projects, with context-aware relevance boosting.
+**v5.0 shipped.** Four coding agents supported (`coding --claude/--copilot/--opencode/--mastra`). Live observations generated per-exchange via ETM, stored in LibSQL, browsable at http://localhost:3032/observations. Historical transcript conversion via CLI for Claude JSONL, Copilot events, and .specstory files. v4.0+ added observation digests, insights, and auto-consolidation daemon. v5.0 added port liveness checks, supervisord integration, and service health monitoring. Phase 30 complete — Claude Code UserPromptSubmit hook injects knowledge context from the retrieval service. Phase 30.1 complete — knowledge injection extended to all four agents across all projects with relevance boosting. Phase 31 complete — working memory module adds auto-generated project state summary (KG structure + STATE.md) as 300-token prefix in every retrieval response.
 
 ## Requirements
 
