@@ -105,6 +105,11 @@ _cleanup_session() {
     agent_cleanup
   fi
 
+  # Write session state for cross-agent continuity (D-07, PROF-02)
+  node "$SCRIPT_DIR/write-session-state.js" "$AGENT_NAME" "$TARGET_PROJECT_DIR" 2>/dev/null || {
+    _agent_log "Warning: Session state write failed"
+  }
+
   node "$SCRIPT_DIR/psm-session-cleanup.js" "$SESSION_ID" 2>/dev/null || {
     _agent_log "Warning: Session cleanup failed"
   }

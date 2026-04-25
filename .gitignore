@@ -85,6 +85,9 @@ integrations/vscode-km-copilot/*.vsix
 # CoPilot fallback service runtime data
 .coding-tools/
 
+# Cross-agent session state (runtime, per-project)
+.coding/
+
 # Version tracking files (synchronization agent backups)
 .versions/
 
