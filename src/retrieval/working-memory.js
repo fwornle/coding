@@ -17,6 +17,12 @@ import { countTokens } from 'gpt-tokenizer';
 /** Firm 300-token ceiling for working memory (D-05). */
 const WM_BUDGET = 300;
 
+/** Maximum age for cross-agent session state (2 hours in ms). */
+const SESSION_STATE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+/** Token budget for Previous Session section. */
+const SESSION_STATE_TOKEN_BUDGET = 100;
+
 /** 2-second abort timeout for VKB API calls (pitfall 1). */
 const VKB_TIMEOUT = 2000;
 
@@ -244,11 +250,127 @@ function truncateToFit(fullMarkdown, kgData, stateData, maxTokens) {
 }
 
 /**
+ * Format a relative time string from a timestamp.
+ *
+ * @param {string} isoTimestamp - ISO 8601 timestamp
+ * @returns {string} Human-readable relative time (e.g., "23 minutes ago")
+ */
+function formatRelativeTime(isoTimestamp) {
+  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+}
+
+/**
+ * Read and validate cross-agent session state from project directory.
+ *
+ * Reads .coding/session-state.json, validates schema, and applies
+ * D-10 filtering rules (same-agent skip, staleness check).
+ *
+ * Fail-open: returns null on any error or when injection is not needed.
+ *
+ * @param {string} projectDir - Project directory path
+ * @returns {object|null} Session state object, or null if not applicable
+ */
+function readSessionState(projectDir) {
+  try {
+    const statePath = `${projectDir}/.coding/session-state.json`;
+    const raw = readFileSync(statePath, 'utf8');
+    const state = JSON.parse(raw);
+
+    // Validate required fields
+    if (!state.agent || !state.timestamp || !state.project) {
+      return null;
+    }
+
+    // D-10: Skip if same agent restarting
+    const currentAgent = process.env.CODING_AGENT || 'unknown';
+    if (state.agent === currentAgent) {
+      return null;
+    }
+
+    // D-10: Skip if older than 2 hours
+    const age = Date.now() - new Date(state.timestamp).getTime();
+    if (age > SESSION_STATE_MAX_AGE_MS) {
+      return null;
+    }
+
+    return state;
+  } catch {
+    // Fail-open: missing, corrupt, or unreadable file
+    return null;
+  }
+}
+
+/**
+ * Build the "Previous Session" markdown section from session state.
+ *
+ * Keeps the section within SESSION_STATE_TOKEN_BUDGET tokens by
+ * truncating recent_files and key_decisions lists.
+ *
+ * @param {object} sessionState - Validated session state object
+ * @returns {string} Markdown section for injection
+ */
+function buildPreviousSessionSection(sessionState) {
+  const relativeTime = formatRelativeTime(sessionState.timestamp);
+  const parts = [
+    '\n## Previous Session',
+    `**Agent:** ${sessionState.agent} | **Project:** ${sessionState.project} | **When:** ${relativeTime}`,
+    sessionState.summary || '',
+  ];
+
+  // Recent files (max 10)
+  const files = (sessionState.recent_files || []).slice(0, 10);
+  if (files.length > 0) {
+    parts.push(`**Recent files:** ${files.join(', ')}`);
+  }
+
+  // Key decisions (max 5)
+  const decisions = (sessionState.key_decisions || []).slice(0, 5);
+  if (decisions.length > 0) {
+    parts.push('**Key decisions:**');
+    for (const d of decisions) {
+      parts.push(`- ${d}`);
+    }
+  }
+
+  let section = parts.join('\n');
+
+  // Truncate to fit token budget
+  while (countTokens(section) > SESSION_STATE_TOKEN_BUDGET && decisions.length > 0) {
+    decisions.pop();
+    const rebuilt = [
+      '\n## Previous Session',
+      `**Agent:** ${sessionState.agent} | **Project:** ${sessionState.project} | **When:** ${relativeTime}`,
+      sessionState.summary || '',
+    ];
+    if (files.length > 0) {
+      rebuilt.push(`**Recent files:** ${files.slice(0, 5).join(', ')}`);
+    }
+    if (decisions.length > 0) {
+      rebuilt.push('**Key decisions:**');
+      for (const d of decisions) {
+        rebuilt.push(`- ${d}`);
+      }
+    }
+    section = rebuilt.join('\n');
+  }
+
+  return section;
+}
+
+/**
  * Build working memory section from KG structure and STATE.md.
  *
  * Fetches Project + Component entities from the VKB API and parses
  * STATE.md frontmatter for current milestone/phase/status. Assembles
  * a token-budgeted markdown section (<=300 tokens per D-05).
+ *
+ * Also reads cross-agent session state (D-10) and appends a "Previous
+ * Session" section when a different agent's session is recent enough.
  *
  * Fail-open: returns { markdown: '', tokens: 0 } on any error (D-03).
  * No caching -- every call queries live data (D-03, D-04).
@@ -273,6 +395,19 @@ export async function buildWorkingMemory(codingRoot) {
 
     if (tokens > WM_BUDGET) {
       markdown = truncateToFit(markdown, kgData, stateData, WM_BUDGET);
+      tokens = countTokens(markdown);
+    }
+
+    // Cross-agent continuity (D-10): inject Previous Session if applicable
+    const projectDir = process.env.CODING_PROJECT_DIR || process.env.TARGET_PROJECT_DIR || codingRoot;
+    const sessionState = readSessionState(projectDir);
+    if (sessionState) {
+      const relativeTime = formatRelativeTime(sessionState.timestamp);
+      process.stderr.write(
+        `[working-memory] Injecting cross-agent continuity from ${sessionState.agent} (${relativeTime})\n`
+      );
+      const sessionSection = buildPreviousSessionSection(sessionState);
+      markdown += sessionSection;
       tokens = countTokens(markdown);
     }
 
