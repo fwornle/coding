@@ -90,7 +90,7 @@ Five phases that make accumulated knowledge actionable by injecting it into codi
 - [x] **Phase 29: Retrieval Service** - Hybrid search endpoint with token-budgeted context assembly (completed 2026-04-24)
 - [x] **Phase 30: Claude Hook Adapter** - UserPromptSubmit hook injecting retrieved knowledge into Claude conversations (completed 2026-04-25)
 - [x] **Phase 31: Working Memory** - Persistent project state template injected as fixed prefix (completed 2026-04-25)
-- [ ] **Phase 32: Agent Profiles & Additional Adapters** - Per-agent scoring, OpenCode/Copilot adapters, cross-agent continuity
+- [x] **Phase 32: Agent Profiles & Additional Adapters** - Per-agent scoring, OpenCode/Copilot adapters, cross-agent continuity (completed 2026-04-25)
 
 ### Phase Details
 
@@ -175,11 +175,11 @@ Plans:
   2. Copilot receives injected knowledge context via workspace context file or instructions mechanism
   3. Switching from Claude to OpenCode mid-task causes the OpenCode session to include recent observations from the preceding Claude session
   4. Different agents receive differently weighted results for the same query (e.g., Claude biased toward architecture pitfalls, Copilot toward code conventions)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 32-01-PLAN.md -- Per-agent scoring profiles: config, RRF fusion integration, adapter agent identity
-- [ ] 32-02-PLAN.md -- Cross-agent continuity: session state writer, working memory injection
+- [x] 32-01-PLAN.md -- Per-agent scoring profiles: config, RRF fusion integration, adapter agent identity
+- [x] 32-02-PLAN.md -- Cross-agent continuity: session state writer, working memory injection
 
 ### Progress
 
@@ -191,7 +191,7 @@ Plans:
 | 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
 | 30. Claude Hook Adapter | v6.0 | 1/1 | Complete    | 2026-04-25 |
 | 31. Working Memory | v6.0 | 1/1 | Complete    | 2026-04-25 |
-| 32. Agent Profiles & Additional Adapters | v6.0 | 0/2 | Not started | - |
+| 32. Agent Profiles & Additional Adapters | v6.0 | 2/2 | Complete    | 2026-04-25 |
 
 ---
 

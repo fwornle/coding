@@ -125,13 +125,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOOK-01 | Phase 30 | Complete |
 | HOOK-02 | Phase 30 | Complete |
 | HOOK-03 | Phase 30 | Complete |
-| HOOK-04 | Phase 32 | Pending |
-| HOOK-05 | Phase 32 | Pending |
+| HOOK-04 | Phase 32 | Complete |
+| HOOK-05 | Phase 32 | Complete |
 | WMEM-01 | Phase 31 | Complete |
 | WMEM-02 | Phase 31 | Complete |
 | WMEM-03 | Phase 31 | Complete |
-| PROF-01 | Phase 32 | Pending |
-| PROF-02 | Phase 32 | Pending |
+| PROF-01 | Phase 32 | Complete |
+| PROF-02 | Phase 32 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
