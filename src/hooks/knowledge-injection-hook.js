@@ -53,30 +53,39 @@ function extractConversationTopics(transcriptPath) {
     const lines = tail.split('\n');
     if (start > 0) lines.shift();
 
-    // Parse JSONL lines, collect recent human/assistant text
+    // Parse JSONL lines, collect recent human/assistant text.
+    // IMPORTANT: Skip system-reminder content to avoid feedback loops —
+    // previously injected insights/digests would contaminate the query
+    // context, causing the same results to be re-retrieved every turn.
     const snippets = [];
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
         const msg = JSON.parse(line);
-        // Claude Code transcript format: { role, content, ... }
-        if (msg.role === 'user' && typeof msg.content === 'string') {
-          snippets.push(msg.content.slice(0, 200));
-        } else if (msg.role === 'user' && Array.isArray(msg.content)) {
-          // content blocks: [{ type: "text", text: "..." }, ...]
-          for (const block of msg.content) {
-            if (block.type === 'text' && block.text) {
-              snippets.push(block.text.slice(0, 200));
-            }
+
+        // Helper: extract text, filtering out system-reminder blocks
+        const extractText = (content) => {
+          if (typeof content === 'string') {
+            // Skip if it's a system-reminder injection
+            if (content.includes('<system-reminder>') || content.includes('## Insights') || content.includes('## Digests')) return null;
+            return content.slice(0, 200);
           }
-        } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
-          snippets.push(msg.content.slice(0, 200));
-        } else if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === 'text' && block.text) {
-              snippets.push(block.text.slice(0, 200));
+          if (Array.isArray(content)) {
+            const parts = [];
+            for (const block of content) {
+              if (block.type !== 'text' || !block.text) continue;
+              // Skip system-reminder content blocks
+              if (block.text.includes('<system-reminder>') || block.text.includes('## Insights') || block.text.includes('## Digests')) continue;
+              parts.push(block.text.slice(0, 200));
             }
+            return parts.length > 0 ? parts.join(' ') : null;
           }
+          return null;
+        };
+
+        if (msg.role === 'user' || msg.role === 'assistant') {
+          const text = extractText(msg.content);
+          if (text) snippets.push(text);
         }
       } catch {
         // Skip unparseable lines
