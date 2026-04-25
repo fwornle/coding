@@ -137,7 +137,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
+- [x] 30-01-PLAN.md -- Hook script + settings registration: create knowledge-injection-hook.js, register in settings.local.json, verify filtering and fail-open
 
 #### Phase 31: Working Memory
 **Goal**: Every agent conversation starts with a concise, auto-generated project state summary alongside semantic results
@@ -175,7 +175,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 28. Embedding Pipeline | v6.0 | 3/3 | Complete    | 2026-04-24 |
 | 29. Retrieval Service | v6.0 | 2/2 | Complete    | 2026-04-24 |
-| 30. Claude Hook Adapter | v6.0 | 0/1 | Planned | - |
+| 30. Claude Hook Adapter | v6.0 | 1/1 | Complete | 2026-04-24 |
 | 31. Working Memory | v6.0 | 0/TBD | Not started | - |
 | 32. Agent Profiles & Additional Adapters | v6.0 | 0/TBD | Not started | - |
 

@@ -41,9 +41,12 @@ Requirements for v6.0 milestone. Each maps to roadmap phases.
 
 ### Agent Adapters
 
-- [ ] **HOOK-01**: Claude Code UserPromptSubmit hook calls retrieval service and injects results as system-reminder context
-- [ ] **HOOK-02**: Claude hook fails open -- if retrieval is down or slow, agent proceeds without injection
-- [ ] **HOOK-03**: Short prompts (<20 tokens) skip injection to avoid noise on simple commands
+- [x] **HOOK-01
+**: Claude Code UserPromptSubmit hook calls retrieval service and injects results as system-reminder context
+- [x] **HOOK-02
+**: Claude hook fails open -- if retrieval is down or slow, agent proceeds without injection
+- [x] **HOOK-03
+**: Short prompts (<20 tokens) skip injection to avoid noise on simple commands
 - [ ] **HOOK-04**: OpenCode adapter injects knowledge via plugin system or config-based context
 - [ ] **HOOK-05**: Copilot adapter injects knowledge via workspace context file or VS Code extension
 
