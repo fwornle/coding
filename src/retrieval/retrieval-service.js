@@ -18,6 +18,7 @@ import { getQdrantClient } from '../../dist/embedding/qdrant-collections.js';
 import { KeywordSearch } from './keyword-search.js';
 import { rrfFuse, buildRecencyList, TIER_WEIGHTS } from './rrf-fusion.js';
 import { assembleBudgetedMarkdown } from './token-budget.js';
+import { buildWorkingMemory } from './working-memory.js';
 
 /** Qdrant collection names matching embedding-config.json. */
 const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
@@ -40,6 +41,9 @@ export class RetrievalService {
     this.qdrantClient = null;
     this.keywordSearch = new KeywordSearch();
     this.dbGetter = options.dbGetter ?? null;
+    this.codingRoot = options.codingRoot
+      || process.env.CODING_REPO
+      || new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
     this._initialized = false;
     this._initPromise = null;
   }
@@ -97,6 +101,12 @@ export class RetrievalService {
       await this.initialize();
     }
 
+    // Step 0: Build working memory (fail-open, per D-03)
+    const wm = await buildWorkingMemory(this.codingRoot);
+    const semanticBudget = Math.min(budget - wm.tokens, 700);
+    // Ensure at least 100 tokens for semantic results even if WM overshoots
+    const effectiveSemanticBudget = Math.max(semanticBudget, 100);
+
     // Step 1: Embed query
     const vector = await this.embeddingService.embedOne(query);
 
@@ -118,17 +128,21 @@ export class RetrievalService {
       fused.sort((a, b) => b.rrfScore - a.rrfScore);
     }
 
-    // Step 5: Token-budgeted markdown assembly
-    const { markdown, tokensUsed } = assembleBudgetedMarkdown(fused, budget);
+    // Step 5: Token-budgeted markdown assembly (semantic budget after WM)
+    const { markdown, tokensUsed } = assembleBudgetedMarkdown(fused, effectiveSemanticBudget);
+
+    // Combine: working memory prefix + semantic results
+    const finalMarkdown = wm.markdown ? wm.markdown + '\n\n' + markdown : markdown;
 
     // Return D-06 response shape (latency_ms set by caller)
     return {
-      markdown,
+      markdown: finalMarkdown,
       meta: {
         query,
         budget,
         results_count: fused.length,
-        tokens_used: tokensUsed,
+        tokens_used: wm.tokens + tokensUsed,
+        working_memory_tokens: wm.tokens,
         latency_ms: 0,
       },
     };
