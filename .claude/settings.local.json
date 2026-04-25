@@ -286,7 +286,9 @@
       "Skill(gsd-new-project)",
       "WebFetch(domain:www.anthropic.com)",
       "Skill(gsd-execute-phase)",
-      "Skill(gsd-plan-phase)"
+      "Skill(gsd-plan-phase)",
+      "Skill(gsd-code-review)",
+      "Skill(gsd-insert-phase)"
     ],
     "deny": [],
     "ask": []
@@ -298,14 +300,6 @@
           {
             "type": "command",
             "command": "node /Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node /Users/Q284340/Agentic/coding/src/hooks/knowledge-injection-hook.js"
           }
         ]
       }

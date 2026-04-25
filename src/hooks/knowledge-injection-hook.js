@@ -7,10 +7,10 @@
  * returned knowledge as system-reminder context via additionalContext.
  *
  * Fail-open: any error or timeout exits 0 with no stdout.
- * Zero npm dependencies -- uses only Node.js built-in http module.
+ * Uses shared retrieval-client.js for HTTP calls.
  */
 
-import http from 'node:http';
+import { callRetrieval } from './retrieval-client.js';
 
 // Absolute safety ceiling -- never let the hook hang Claude Code
 const SAFETY_TIMEOUT_MS = 5000;
@@ -18,8 +18,6 @@ const safetyTimer = setTimeout(() => process.exit(0), SAFETY_TIMEOUT_MS);
 safetyTimer.unref();
 
 const MIN_WORDS = 4;
-const HTTP_TIMEOUT_MS = 2000;
-const RETRIEVAL_PORT = 3033;
 const MAX_QUERY_CHARS = 500;
 const MAX_OUTPUT_CHARS = 9500;
 
@@ -55,20 +53,33 @@ async function main() {
     const wordCount = prompt.split(/\s+/).length;
     if (wordCount < MIN_WORDS) return;
 
-    // 6. Truncate query for retrieval (server rejects > 500 chars)
+    // 6. Build project context for relevance boosting (D-10)
+    const context = {
+      project: process.env.CODING_PROJECT_DIR
+        ? process.env.CODING_PROJECT_DIR.split('/').pop()
+        : process.cwd().split('/').pop(),
+      cwd: process.env.CODING_PROJECT_DIR || process.cwd(),
+    };
+
+    // 7. Truncate query for retrieval (server rejects > 500 chars)
     const query = prompt.slice(0, MAX_QUERY_CHARS);
 
-    // 7. Call retrieval service
-    const result = await callRetrieval(query);
+    // 8. Call retrieval service with context
+    const result = await callRetrieval({
+      query,
+      budget: 1000,
+      threshold: 0.75,
+      context,
+    });
     if (!result || !result.markdown || result.meta?.results_count === 0) return;
 
-    // 8. Safety truncation (stay under 10K char hook output limit)
+    // 9. Safety truncation (stay under 10K char hook output limit)
     let markdown = result.markdown;
     if (markdown.length > MAX_OUTPUT_CHARS) {
       markdown = markdown.slice(0, MAX_OUTPUT_CHARS) + '\n\n[truncated]';
     }
 
-    // 9. Write JSON to stdout for Claude Code context injection
+    // 10. Write JSON to stdout for Claude Code context injection
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'UserPromptSubmit',
@@ -78,44 +89,6 @@ async function main() {
   } catch (err) {
     process.stderr.write('[knowledge-hook] Error: ' + err.message + '\n');
   }
-}
-
-/**
- * POST to retrieval service. ALWAYS resolves (never rejects) -- fail-open.
- * Returns parsed response JSON or null on any error/timeout.
- */
-function callRetrieval(query) {
-  return new Promise((resolve) => {
-    const body = JSON.stringify({ query, budget: 1000, threshold: 0.75 });
-    const req = http.request(
-      {
-        hostname: '127.0.0.1',
-        port: RETRIEVAL_PORT,
-        path: '/api/retrieve',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-        timeout: HTTP_TIMEOUT_MS,
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString()));
-          } catch {
-            resolve(null);
-          }
-        });
-      }
-    );
-    req.on('timeout', () => { req.destroy(); resolve(null); });
-    req.on('error', () => resolve(null));
-    req.write(body);
-    req.end();
-  });
 }
 
 main().then(() => process.exit(0));
