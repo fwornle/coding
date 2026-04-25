@@ -338,17 +338,17 @@ async retrieve(query, options = {}) {
 
 All critical claims verified. A1 confirmed via live VKB API call. A2 confirmed via reading STATE.md. A3 is a rough heuristic only used for reasoning, not in code.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Component description extraction from observations**
    - What we know: Each Component entity has an `observations` array. The first observation typically starts with `[LLM]` and contains a prose description. [VERIFIED: live API]
    - What's unclear: Should we use the first observation as the "description", or extract a shorter form?
-   - Recommendation: Use first observation's `content` field, truncated to ~50 chars per component. This keeps descriptions concise within the 300-token budget.
+   - RESOLVED: Use first observation's `content` field, truncated to ~50 chars per component. This keeps descriptions concise within the 300-token budget. Implemented in plan 31-01 Task 1 `assembleMarkdown()`.
 
 2. **Known issues from STATE.md**
    - What we know: STATE.md has a `### Blockers/Concerns` section in the body (not frontmatter).
    - What's unclear: D-01 mentions "known issues from STATE.md" but the frontmatter doesn't have a dedicated field for issues.
-   - Recommendation: Parse `### Blockers/Concerns` section from the body (simple regex for lines starting with `- `). If absent, omit the issues subsection. This is within Claude's discretion per CONTEXT.md.
+   - RESOLVED: Parse `### Blockers/Concerns` section from the body (simple regex for lines starting with `- `). If absent, omit the issues subsection. This is within Claude's discretion per CONTEXT.md. Implemented in plan 31-01 Task 1 `parseStateFrontmatter()`.
 
 ## Environment Availability
 
