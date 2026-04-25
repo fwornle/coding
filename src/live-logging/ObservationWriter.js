@@ -74,19 +74,11 @@ export class ObservationWriter {
    * Initialize the database connection and ensure the observations table exists.
    */
   async init() {
-    const dbDir = path.dirname(this.dbPath);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-
-    const Database = require('better-sqlite3');
-    this.db = new Database(this.dbPath);
-
-    // WAL mode: allows concurrent readers (Docker health dashboard) while writing.
-    // busy_timeout: wait up to 5s for locks instead of failing immediately — prevents
-    // corruption when multiple ETM instances or the consolidator access the same DB.
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 5000');
+    // Use SafeDatabase for crash-safe open with integrity check, WAL enforcement,
+    // auto-recovery, and shutdown handlers. All consumers of observations.db
+    // MUST use SafeDatabase to prevent corruption from concurrent/crashed writers.
+    const { openDatabase } = await import('./SafeDatabase.js');
+    this.db = openDatabase(this.dbPath);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS observations (
@@ -107,6 +99,28 @@ export class ObservationWriter {
     }
     // Index for fast dedup lookups
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)`);
+
+    // FTS5 full-text search table (content-sync with observations).
+    // Ensure triggers exist so every INSERT/UPDATE/DELETE keeps the index in sync.
+    try {
+      this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(summary, content='observations', content_rowid='rowid')`);
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS observations_ai AFTER INSERT ON observations BEGIN
+          INSERT INTO observations_fts(rowid, summary) VALUES (new.rowid, new.summary);
+        END
+      `);
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS observations_ad AFTER DELETE ON observations BEGIN
+          INSERT INTO observations_fts(observations_fts, rowid, summary) VALUES('delete', old.rowid, old.summary);
+        END
+      `);
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS observations_au AFTER UPDATE ON observations BEGIN
+          INSERT INTO observations_fts(observations_fts, rowid, summary) VALUES('delete', old.rowid, old.summary);
+          INSERT INTO observations_fts(rowid, summary) VALUES (new.rowid, new.summary);
+        END
+      `);
+    } catch { /* FTS5 not available in this SQLite build — search falls back to LIKE */ }
 
     // Periodic WAL checkpoint so readonly connections (e.g. Docker health dashboard) see fresh data
     this._walCheckpointInterval = setInterval(() => {
@@ -130,6 +144,8 @@ export class ObservationWriter {
       process.stderr.write(`[ObservationWriter] Redactor init failed (observations will be stored unredacted): ${err.message}\n`);
       this._redactor = null;
     }
+
+    // Shutdown handlers are registered by SafeDatabase — no need to duplicate here.
 
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
   }
@@ -437,7 +453,10 @@ export class ObservationWriter {
     }));
 
     const id = crypto.randomUUID();
-    const nowISO = new Date().toISOString();
+    // Use the earliest message timestamp for created_at when backfilling,
+    // falling back to current time for live observations.
+    const messageTimestamp = messages.find(m => m.createdAt)?.createdAt;
+    const nowISO = messageTimestamp || new Date().toISOString();
 
     const stmt = this.db.prepare(`
       INSERT INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata, content_hash, quality)

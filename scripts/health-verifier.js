@@ -582,8 +582,8 @@ class HealthVerifier extends EventEmitter {
         check: 'observation_quality',
         check_id: `observation_quality_${Date.now()}`,
         timestamp: new Date().toISOString(),
-        status: isHealthy ? 'healthy' : 'degraded',
-        details: isHealthy
+        status: isHealthy ? 'passed' : 'failed',
+        message: isHealthy
           ? `Observations healthy: ${recentTotalCount} recent observations, 0 [Raw]`
           : isNetworkBlocked
             ? `Observation enrichment unavailable: LLM API endpoints blocked by corporate network (${recentRawCount}/${recentTotalCount} [Raw])`
@@ -974,9 +974,13 @@ class HealthVerifier extends EventEmitter {
       const { execSync } = await import('child_process');
       let output;
       try {
-        output = execSync('supervisorctl status', {
+        // Use docker exec when running on the host, direct supervisorctl when inside container
+        const cmd = fsSync.existsSync('/.dockerenv')
+          ? 'supervisorctl status'
+          : 'docker exec coding-services supervisorctl status';
+        output = execSync(cmd, {
           encoding: 'utf-8',
-          timeout: 5000
+          timeout: 10000
         });
       } catch (execErr) {
         // supervisorctl exits non-zero when any process is FATAL/STOPPED — use stdout from error

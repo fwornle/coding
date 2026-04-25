@@ -3,9 +3,9 @@
  * Backfill [Raw] observations by re-summarizing them through the LLM CLI proxy.
  * Run from the coding project root: node scripts/backfill-raw-observations.js
  */
-import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { openDatabase } from '../src/live-logging/SafeDatabase.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../.observations/observations.db');
@@ -13,7 +13,7 @@ const PROXY_PORT = process.env.LLM_CLI_PROXY_PORT || '12435';
 const PROXY_URL = `http://localhost:${PROXY_PORT}/api/complete`;
 const BATCH_DELAY_MS = 2000;
 
-const db = new Database(DB_PATH);
+const db = openDatabase(DB_PATH);
 
 const rawObs = db.prepare(`
   SELECT id, summary, messages, metadata, created_at

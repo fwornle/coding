@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
+import Redis from 'ioredis';
 
 const require = createRequire(import.meta.url);
 
@@ -36,18 +37,62 @@ export class ObservationConsolidator {
     this.proxyUrl = options.proxyUrl || process.env.LLM_CLI_PROXY_URL || `http://localhost:${proxyPort}`;
     this.provider = options.provider || null;
     this.db = null;
+    /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
+    this._redisPub = null;
+    this._redisInitAttempted = false;
+  }
+
+  /**
+   * Lazy-init Redis publisher for embedding events (fire-and-forget, non-fatal).
+   */
+  _initRedis() {
+    if (this._redisInitAttempted) return;
+    this._redisInitAttempted = true;
+    try {
+      this._redisPub = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null,
+        lazyConnect: true,
+        connectTimeout: 2000,
+      });
+      this._redisPub.connect().catch((err) => {
+        process.stderr.write(`[Consolidator] Redis connect failed (non-fatal): ${err.message}\n`);
+        this._redisPub = null;
+      });
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Redis init failed (non-fatal): ${err.message}\n`);
+      this._redisPub = null;
+    }
+  }
+
+  /**
+   * Publish an embedding event to Redis (fire-and-forget).
+   * @param {'digest'|'insight'} type
+   * @param {string} id
+   * @param {string} content
+   * @param {Record<string, unknown>} metadata
+   */
+  _publishEmbeddingEvent(type, id, content, metadata) {
+    this._initRedis();
+    if (this._redisPub) {
+      this._redisPub.publish('embedding:new', JSON.stringify({
+        type,
+        id,
+        content,
+        metadata,
+        timestamp: new Date().toISOString(),
+      })).catch((err) => {
+        process.stderr.write(`[Consolidator] Redis publish failed (non-fatal): ${err.message}\n`);
+      });
+    }
   }
 
   /**
    * Initialize DB connection and ensure digest/insight tables exist.
    */
   async init() {
-    const Database = require('better-sqlite3');
-    this.db = new Database(this.dbPath);
-
-    // WAL mode + busy_timeout for safe concurrent access with ETM writers and Docker reader
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 5000');
+    const { openDatabase } = await import('./SafeDatabase.js');
+    this.db = openDatabase(this.dbPath);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS digests (
@@ -207,6 +252,16 @@ export class ObservationConsolidator {
     });
     transaction();
 
+    // Fire-and-forget: publish embedding events for new digests
+    for (const d of digestEntries) {
+      this._publishEmbeddingEvent('digest', d.id, d.summary, {
+        date: now.slice(0, 10),
+        theme: d.theme,
+        agents: JSON.stringify(d.agents),
+        quality: d.quality || 'normal',
+      });
+    }
+
     // WAL checkpoint for readonly readers
     try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
 
@@ -339,6 +394,7 @@ export class ObservationConsolidator {
     const newDigestIds = digests.map(d => d.id);
     let created = 0;
     let updated = 0;
+    const embeddingQueue = [];
 
     const transaction = this.db.transaction(() => {
       for (const entry of insightEntries) {
@@ -357,21 +413,32 @@ export class ObservationConsolidator {
             UPDATE insights SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?
             WHERE id = ?
           `).run(this._redact(entry.summary), JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
+          embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence });
           updated++;
         } else {
+          const id = crypto.randomUUID();
           this.db.prepare(`
             INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
-            crypto.randomUUID(), this._redact(entry.topic), this._redact(entry.summary),
+            id, this._redact(entry.topic), this._redact(entry.summary),
             entry.confidence, JSON.stringify(newDigestIds),
             now, now, JSON.stringify(entry.metadata || {})
           );
+          embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence });
           created++;
         }
       }
     });
     transaction();
+
+    // Fire-and-forget: publish embedding events for new/updated insights
+    for (const item of embeddingQueue) {
+      this._publishEmbeddingEvent('insight', item.id, item.summary, {
+        topic: item.topic,
+        confidence: item.confidence,
+      });
+    }
 
     try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
 

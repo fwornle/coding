@@ -356,7 +356,9 @@ async function main(): Promise<void> {
   await ensureCollections(qdrant);
 
   const dbPath = join(projectRoot, ".observations/observations.db");
-  const db = new Database(dbPath, { readonly: true });
+  // Use SafeDatabase for crash-safe open with integrity check and WAL enforcement
+  const { openDatabase } = await import("../live-logging/SafeDatabase.js");
+  const db = openDatabase(dbPath, { readonly: true });
 
   const levelPath = join(projectRoot, ".data/knowledge-graph");
 

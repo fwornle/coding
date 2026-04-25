@@ -240,6 +240,10 @@ logs/
 .observations/*.db
 .observations/*.db-shm
 .observations/*.db-wal
+.observations/*.db.corrupted*
+.observations/*.db.recovered*
+.observations/*.db.partial*
+.observations/*.db.empty*
 
 # OpenCode plugin local state
 .opencode/

@@ -479,15 +479,20 @@ class EnhancedTranscriptMonitor {
               this.agentType = tracker.agentType;
 
               const setTranche = this.getCurrentTimetranche(tracker.currentUserPromptSet[0].timestamp);
-              const target = await this.determineTargetProject(tracker.currentUserPromptSet[0]);
+              const target = await this.determineTargetProject(tracker.currentUserPromptSet);
               this.debug(`⏰ Flushing stale prompt set (no new content, ${Math.round(setAge/1000)}s old): ${tracker.currentUserPromptSet.length} exchanges from ${path.basename(tPath)}`);
               if (target !== null) {
                 await this.processUserPromptSetCompletion(tracker.currentUserPromptSet, target, setTranche);
               } else {
                 this._firePromptSetObservation(tracker.currentUserPromptSet);
               }
+              // Update lastProcessedUuid BEFORE clearing the set — prevents
+              // re-reading the same exchanges on the next poll cycle (duplication fix)
+              const lastFlushedExch = tracker.currentUserPromptSet[tracker.currentUserPromptSet.length - 1];
+              if (lastFlushedExch && (lastFlushedExch.id || lastFlushedExch.uuid)) {
+                this.lastProcessedUuid = lastFlushedExch.id || lastFlushedExch.uuid;
+              }
               tracker.currentUserPromptSet = [];
-              // Update lastProcessedUuid from the flushed set
               tracker.lastProcessedUuid = this.lastProcessedUuid;
               this._saveMultiTranscriptState();
 
@@ -510,7 +515,7 @@ class EnhancedTranscriptMonitor {
         // first exchange, causing cross-transcript contamination and wrong file targets.
         if (this.currentUserPromptSet.length > 0) {
           const flushTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-          const flushTarget = await this.determineTargetProject(this.currentUserPromptSet[0]);
+          const flushTarget = await this.determineTargetProject(this.currentUserPromptSet);
           if (flushTarget !== null) {
             await this.processUserPromptSetCompletion(this.currentUserPromptSet, flushTarget, flushTranche);
           } else {
@@ -579,7 +584,7 @@ class EnhancedTranscriptMonitor {
                   this.debug(`⚠️ Force-flushing per-transcript set after ${Math.round(setDuration/60000)}min despite: ${completionState.reason}`);
                 }
                 const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-                const target = await this.determineTargetProject(this.currentUserPromptSet[0]);
+                const target = await this.determineTargetProject(this.currentUserPromptSet);
                 const reason = isLongRunning ? `long-running (${Math.round(setDuration/60000)}min)` : `stale (${Math.round(setAge/1000)}s), ${completionState.reason}`;
                 if (target !== null) {
                   this.debug(`⏰ Flushing per-transcript prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
@@ -587,6 +592,12 @@ class EnhancedTranscriptMonitor {
                 } else {
                   // Not coding-related — skip LSL but still fire observation
                   this._firePromptSetObservation(this.currentUserPromptSet);
+                }
+                // Update lastProcessedUuid BEFORE clearing — prevents re-reading
+                // the same exchanges on next poll (duplication fix)
+                const lastFlushed = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+                if (lastFlushed && (lastFlushed.id || lastFlushed.uuid)) {
+                  this.lastProcessedUuid = lastFlushed.id || lastFlushed.uuid;
                 }
                 this.currentUserPromptSet = [];
               }
@@ -1403,7 +1414,7 @@ class EnhancedTranscriptMonitor {
               if (this.isNewSessionBoundary(currentTranche, this.lastTranche)) {
                 // Complete previous user prompt set if exists
                 if (this.currentUserPromptSet.length > 0) {
-                  const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+                  const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
                   if (targetProject !== null) {
                     // FIX: Use tranche from the FIRST exchange in the set being written
                     const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
@@ -1421,7 +1432,7 @@ class EnhancedTranscriptMonitor {
               } else {
                 // Same session - complete current user prompt set before starting new one
                 if (this.currentUserPromptSet.length > 0) {
-                  const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+                  const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
                   if (targetProject !== null) {
                     // FIX: Use tranche from the FIRST exchange in the set being written
                     const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
@@ -3633,7 +3644,7 @@ ORDER BY m.time_created ASC;`;
 
             // Complete previous user prompt set if exists
             if (this.currentUserPromptSet.length > 0) {
-              const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
               if (targetProject !== null) {
                 // FIX: Use tranche from the FIRST exchange in the set being written
                 const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
@@ -3657,7 +3668,7 @@ ORDER BY m.time_created ASC;`;
           } else {
             // Same session - complete current user prompt set
             if (this.currentUserPromptSet.length > 0) {
-              const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
               if (targetProject !== null) {
                 // FIX: Use tranche from the FIRST exchange in the set being written
                 const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
@@ -3735,7 +3746,7 @@ ORDER BY m.time_created ASC;`;
         
         // Also write to LSL if possible
         try {
-          const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+          const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
           if (targetProject !== null) {
             const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
             await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
@@ -4025,7 +4036,7 @@ ORDER BY m.time_created ASC;`;
                 ? `long-running (${Math.round(setDuration/60000)}min, ${this.currentUserPromptSet.length} exchanges)`
                 : `complete (${Math.round(setAge/1000)}s), ${completionState.reason}`;
             this.debug(`⏰ Flushing held prompt set: ${this.currentUserPromptSet.length} exchanges, reason: ${reason}`);
-            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+            const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
             if (targetProject !== null) {
               const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
               if (wasWritten) {
@@ -4114,7 +4125,7 @@ ORDER BY m.time_created ASC;`;
       // Complete any pending user prompt set
       if (this.currentUserPromptSet.length > 0) {
         const currentTranche = this.getCurrentTimetranche();
-        const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+        const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
 
         if (targetProject !== null) {
           // On shutdown, try to write even if incomplete (we're about to exit anyway)

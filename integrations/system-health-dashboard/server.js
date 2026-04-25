@@ -3879,12 +3879,12 @@ class SystemHealthAPIServer {
         }
 
         try {
-            const Database = require_cjs('better-sqlite3');
+            const { openDatabase } = await import('/coding/src/live-logging/SafeDatabase.js');
             const dbPath = join(codingRoot, '.observations', 'observations.db');
             if (!existsSync(dbPath)) {
                 return null;
             }
-            this._obsDb = new Database(dbPath, { readonly: true });
+            this._obsDb = openDatabase(dbPath, { readonly: true });
             this._obsDbOpenedAt = now;
             return this._obsDb;
         } catch (err) {

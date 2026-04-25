@@ -1034,16 +1034,38 @@ class BatchLSLProcessor {
         fs.mkdirSync(targetDir, { recursive: true });
       }
       
-      const filePath = path.join(targetDir, filename);
-      
-      // Write the file
+      // File size control: split into part files when exceeding 200KB
+      // (matches live ETM behavior via getActiveSessionFilePath)
+      const maxSizeBytes = 200 * 1024;
+      let finalFilename = filename;
+      let filePath = path.join(targetDir, finalFilename);
+
+      if (fs.existsSync(filePath)) {
+        const existingSize = fs.statSync(filePath).size;
+        if (existingSize + Buffer.byteLength(markdownContent) > maxSizeBytes) {
+          let partNum = 1;
+          while (true) {
+            finalFilename = generateLSLFilename(timestamp, projectName, targetProject, actualSourceProject, { partNumber: partNum });
+            filePath = path.join(targetDir, finalFilename);
+            if (!fs.existsSync(filePath)) break;
+            const partSize = fs.statSync(filePath).size;
+            if (partSize + Buffer.byteLength(markdownContent) <= maxSizeBytes) break;
+            partNum++;
+          }
+        } else {
+          fs.appendFileSync(filePath, '\n' + markdownContent);
+          process.stderr.write(`✅ Appended to ${fileType} file: ${finalFilename} (${markdownContent.length} chars)\n`);
+          return { path: filePath, filename: finalFilename, type: fileType, timeWindow, promptSetCount: promptSets.length, size: markdownContent.length };
+        }
+      }
+
+      // Write the file (new base or new part)
       fs.writeFileSync(filePath, markdownContent);
-      
-      console.log(`✅ Created ${fileType} file: ${filename} (${markdownContent.length} chars)`);
-      
+      process.stderr.write(`✅ Created ${fileType} file: ${finalFilename} (${markdownContent.length} chars)\n`);
+
       return {
         path: filePath,
-        filename: filename,
+        filename: finalFilename,
         type: fileType,
         timeWindow: timeWindow,
         promptSetCount: promptSets.length,
@@ -1532,15 +1554,45 @@ class BatchLSLProcessor {
     const projectName = this.projectPath.split('/').pop();
     const targetProject = foreignOnly && classification.isCoding ? 'coding' : projectName;
     const sourceProject = projectName;
-    const filename = generateLSLFilename(timestamp, projectName, targetProject, sourceProject);
-    const filePath = path.join(targetDir, filename);
 
     // Generate LSL content
     const content = this.generateLSLContent(conversation, classification, timeWindow, foreignOnly);
 
-    // Write file
+    // File size control: match live monitor behavior (default 200KB per file).
+    // If the base file already exists and would exceed the limit, split into
+    // part files (-1_, -2_, ...) using the same generateLSLFilename partNumber
+    // parameter that the live ETM uses.
+    const maxSizeKB = 200;
+    const maxSizeBytes = maxSizeKB * 1024;
+
+    let partNumber = null;
+    let filename = generateLSLFilename(timestamp, projectName, targetProject, sourceProject);
+    let filePath = path.join(targetDir, filename);
+
+    if (fs.existsSync(filePath)) {
+      const existingSize = fs.statSync(filePath).size;
+      if (existingSize + Buffer.byteLength(content) > maxSizeBytes) {
+        // Find the next available part number
+        partNumber = 1;
+        while (true) {
+          filename = generateLSLFilename(timestamp, projectName, targetProject, sourceProject, { partNumber });
+          filePath = path.join(targetDir, filename);
+          if (!fs.existsSync(filePath)) break;
+          const partSize = fs.statSync(filePath).size;
+          if (partSize + Buffer.byteLength(content) <= maxSizeBytes) break;
+          partNumber++;
+        }
+      } else {
+        // Append to existing file
+        fs.appendFileSync(filePath, '\n' + content, 'utf8');
+        process.stderr.write(`✅ Appended to: ${filename} (${content.length} chars)\n`);
+        return { path: filePath, filename, timeWindow };
+      }
+    }
+
+    // Write the file (new base or new part)
     fs.writeFileSync(filePath, content, 'utf8');
-    console.log(`✅ Created: ${filename}`);
+    process.stderr.write(`✅ Created: ${filename} (${content.length} chars${partNumber ? `, part ${partNumber}` : ''})\n`);
 
     return {
       path: filePath,

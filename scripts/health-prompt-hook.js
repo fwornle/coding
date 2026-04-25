@@ -14,7 +14,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
@@ -163,10 +163,15 @@ function outputBlockedResponse(healthStatus) {
  * Checks whether the transcript monitor is actively producing session logs.
  * If LSL is down, attempts auto-recovery before reporting.
  * Returns a warning string if LSL is down, empty string if healthy.
+ *
+ * Project-aware: derives the health file name from the current working
+ * directory so it checks the correct project's transcript monitor, not
+ * just the coding project.
  */
 function checkLSLHealth() {
     try {
-        const healthFile = join(codingRoot, '.health', 'coding-transcript-monitor-health.json');
+        const projectName = basename(process.cwd());
+        const healthFile = join(codingRoot, '.health', `${projectName}-transcript-monitor-health.json`);
         const isDown = !existsSync(healthFile);
         let isStopped = false;
         let isStale = false;
