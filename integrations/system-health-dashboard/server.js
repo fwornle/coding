@@ -80,6 +80,15 @@ class SystemHealthAPIServer {
         // Auto-consolidation state
         this.autoConsolidationInterval = null;
         this.consolidationRunning = false;
+        // Tracks the in-flight consolidation Promise so shutdown can await
+        // it instead of letting supervisor SIGKILL the process mid-write.
+        this._activeConsolidation = null;
+        // True once SIGTERM/SIGINT begins draining — gates new consolidation
+        // triggers and returns 503 from /api/consolidation/run.
+        this._shuttingDown = false;
+        // Tracks open HTTP sockets so shutdown can drain idle connections
+        // without waiting for a slow long-poll to time out naturally.
+        this._openSockets = new Set();
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -3086,7 +3095,14 @@ class SystemHealthAPIServer {
         return new Promise((resolve, reject) => {
             this.server = createServer(this.app);
 
-            // Setup WebSocket server for bidirectional workflow events
+            // Track open sockets so graceful shutdown can drain idle
+            // keep-alive connections instead of waiting for them to close
+            // on their own — supervisor's SIGKILL grace is finite.
+            this.server.on('connection', (socket) => {
+                this._openSockets.add(socket);
+                socket.once('close', () => this._openSockets.delete(socket));
+            });
+
             this.setupWebSocketServer();
 
             this.server.listen(this.port, (error) => {
@@ -3520,6 +3536,68 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Run the consolidation pipeline as a detached child process.
+     *
+     * The dashboard used to import ObservationConsolidator and run it
+     * in-process. That meant any dashboard restart (auto-heal, supervisor
+     * SIGKILL) cut the consolidator off mid-LLM-call, leaving the SQLite
+     * WAL inconsistent for the next consumer. By spawning a child:
+     *
+     *   - The child holds its own DB handle and SIGTERM handler.
+     *   - A dashboard SIGTERM does not propagate to the child (it spawns
+     *     in its own process group).
+     *   - The dashboard still awaits the child to surface results to
+     *     callers, but if the dashboard is killed the child finishes
+     *     independently and exits cleanly.
+     *
+     * @param {string[]} flags - extra CLI flags for consolidate-observations.js
+     * @param {object} [opts]
+     * @param {AbortSignal} [opts.signal] - cancels the wait, not the child
+     * @returns {Promise<{ok:boolean, [k:string]: any}>}
+     */
+    _spawnConsolidator(flags = [], opts = {}) {
+        return new Promise((resolve, reject) => {
+            const script = join(codingRoot, 'scripts', 'consolidate-observations.js');
+            const child = spawn(process.execPath, [script, '--json', ...flags], {
+                cwd: codingRoot,
+                detached: true,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            // Detach from the dashboard's process group so a SIGTERM
+            // delivered to the dashboard doesn't propagate here.
+            try { child.unref(); } catch { /* ignore */ }
+
+            let stdout = '';
+            let stderr = '';
+            child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+            child.stderr.on('data', (chunk) => {
+                stderr += chunk.toString();
+                process.stderr.write(`[Consolidate-child] ${chunk}`);
+            });
+            const onAbort = () => {
+                resolve({ ok: false, aborted: true });
+            };
+            if (opts.signal) opts.signal.addEventListener('abort', onAbort, { once: true });
+            child.on('error', (err) => reject(err));
+            child.on('close', (code) => {
+                if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
+                if (code !== 0) {
+                    return reject(new Error(`consolidate-observations exited with code ${code}: ${stderr.slice(-500)}`));
+                }
+                // The CLI prints the final result struct as the last line of
+                // stdout in --json mode. Parse it; ignore everything else.
+                const lines = stdout.trim().split('\n').filter(Boolean);
+                try {
+                    const parsed = JSON.parse(lines[lines.length - 1] || '{}');
+                    resolve(parsed);
+                } catch (err) {
+                    reject(new Error(`Failed to parse consolidator JSON output: ${err.message}`));
+                }
+            });
+        });
+    }
+
+    /**
      * Auto-consolidation daemon — checks every 30 min for undigested observations
      * from completed days (not today). Triggers consolidation when threshold is met.
      */
@@ -3529,6 +3607,8 @@ class SystemHealthAPIServer {
 
         const check = async () => {
             if (this.consolidationRunning) return;
+            // Skip new runs once shutdown begins so SIGTERM can drain.
+            if (this._shuttingDown) return;
             try {
                 const db = this._getObservationsDb();
                 if (!db) return;
@@ -3542,21 +3622,21 @@ class SystemHealthAPIServer {
                 if (pastUndigested >= UNDIGESTED_THRESHOLD) {
                     process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days — triggering consolidation\n`);
                     this.consolidationRunning = true;
-                    try {
-                        const { ObservationConsolidator } = await import(
-                            join(codingRoot, 'src', 'live-logging', 'ObservationConsolidator.js')
-                        );
-                        const consolidator = new ObservationConsolidator({
-                            dbPath: join(codingRoot, '.observations', 'observations.db'),
-                        });
-                        await consolidator.init();
-                        const result = await consolidator.run();
-                        consolidator.close();
-                        process.stderr.write(`[AutoConsolidate] Done: ${result.digests} digests, ${result.created} insights created, ${result.updated} updated\n`);
-                    } catch (err) {
-                        process.stderr.write(`[AutoConsolidate] Failed: ${err.message}\n`);
+                    // The child holds its own DB handle. We still await the
+                    // wait Promise so stop() can drain — but if the
+                    // dashboard is killed mid-wait, the child carries on.
+                    this._activeConsolidation = (async () => {
+                        try {
+                            const result = await this._spawnConsolidator([]);
+                            process.stderr.write(`[AutoConsolidate] Done: ${result.digests || 0} digests, ${result.created || 0} insights created, ${result.updated || 0} updated\n`);
+                        } catch (err) {
+                            process.stderr.write(`[AutoConsolidate] Failed: ${err.message}\n`);
+                        }
+                    })();
+                    try { await this._activeConsolidation; } finally {
+                        this._activeConsolidation = null;
+                        this.consolidationRunning = false;
                     }
-                    this.consolidationRunning = false;
                 }
             } catch (err) {
                 process.stderr.write(`[AutoConsolidate] Check error: ${err.message}\n`);
@@ -3569,20 +3649,62 @@ class SystemHealthAPIServer {
         process.stderr.write(`[AutoConsolidate] Daemon started — checking every 30 min (threshold: ${UNDIGESTED_THRESHOLD} obs)\n`);
     }
 
-    async stop() {
+    async stop({ deadlineMs = 25000 } = {}) {
+        // Mark draining so the auto-consolidation tick and the
+        // /api/consolidation/run endpoint stop accepting new work.
+        this._shuttingDown = true;
+
         if (this.autoConsolidationInterval) {
             clearInterval(this.autoConsolidationInterval);
             this.autoConsolidationInterval = null;
         }
-        return new Promise((resolve) => {
-            if (this.server) {
-                this.server.close(() => {
-                    process.stderr.write('System Health API server stopped\n');
-                    resolve();
-                });
-            } else {
-                resolve();
+
+        // Wait for any in-flight consolidation. SQLite WAL stays consistent
+        // as long as the writer's `db.close()` runs to completion — which
+        // is what the consolidator's transaction + close path guarantees.
+        // Bound this wait so a stuck LLM call can't hold supervisor past
+        // its SIGKILL grace.
+        if (this._activeConsolidation) {
+            const drainDeadline = Math.max(1000, deadlineMs - 5000);
+            process.stderr.write(`[Shutdown] Waiting up to ${drainDeadline}ms for in-flight consolidation\n`);
+            await Promise.race([
+                this._activeConsolidation.catch(() => { /* surfaced in handler */ }),
+                new Promise((r) => setTimeout(r, drainDeadline)),
+            ]);
+            if (this._activeConsolidation) {
+                process.stderr.write('[Shutdown] Drain deadline hit — proceeding with shutdown\n');
             }
+        }
+
+        // Checkpoint and close the cached observations DB handle so the
+        // WAL is flushed before the process exits. The handle is readonly,
+        // but the consolidator may have left WAL frames a checkpoint can
+        // safely fold back into the main DB.
+        if (this._obsDb) {
+            try { this._obsDb.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
+            try { this._obsDb.close(); } catch { /* ignore */ }
+            this._obsDb = null;
+            this._obsDbOpenedAt = null;
+        }
+
+        // Close HTTP server with a hard deadline. server.close() waits for
+        // active sockets to drain, so destroy them after a short grace —
+        // otherwise a hung keep-alive connection can outlast supervisor's
+        // SIGKILL window.
+        await new Promise((resolve) => {
+            if (!this.server) return resolve();
+            const closeDeadline = Math.min(deadlineMs, 5000);
+            const forceTimer = setTimeout(() => {
+                process.stderr.write(`[Shutdown] HTTP close deadline hit, destroying ${this._openSockets.size} open sockets\n`);
+                for (const s of this._openSockets) {
+                    try { s.destroy(); } catch { /* ignore */ }
+                }
+            }, closeDeadline);
+            this.server.close(() => {
+                clearTimeout(forceTimer);
+                process.stderr.write('System Health API server stopped\n');
+                resolve();
+            });
         });
     }
 
@@ -4284,31 +4406,22 @@ class SystemHealthAPIServer {
      * Body: { date?: string } — optional specific date to consolidate
      */
     async handleRunConsolidation(req, res) {
+        if (this._shuttingDown) {
+            return res.status(503).json({ error: 'Server is shutting down' });
+        }
+        const flags = req.body?.date
+            ? ['--date', String(req.body.date)]
+            : ['--include-today'];
+        const run = this._spawnConsolidator(flags);
+        this._activeConsolidation = run;
         try {
-            // Dynamic import — consolidator lives on host, not in container
-            // This endpoint is called from host-side scripts
-            const { ObservationConsolidator } = await import(
-                join(codingRoot, 'src', 'live-logging', 'ObservationConsolidator.js')
-            );
-            const consolidator = new ObservationConsolidator({
-                dbPath: join(codingRoot, '.observations', 'observations.db'),
-            });
-            await consolidator.init();
-
-            let result;
-            if (req.body?.date) {
-                const digestResult = await consolidator.consolidateDay(req.body.date);
-                result = { ...digestResult, created: 0, updated: 0 };
-            } else {
-                // Manual trigger includes today's observations
-                result = await consolidator.run({ includeToday: true });
-            }
-
-            consolidator.close();
+            const result = await run;
             res.json({ success: true, ...result });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
             res.status(500).json({ error: `Consolidation failed: ${err.message}` });
+        } finally {
+            if (this._activeConsolidation === run) this._activeConsolidation = null;
         }
     }
 
@@ -4361,12 +4474,31 @@ runIfMain(import.meta.url, () => {
         process.exit(1);
     });
 
-    // Handle shutdown signals
+    // Handle shutdown signals. supervisord's stopwaitsecs (default 10s)
+    // sets the SIGKILL clock — our stop() bounds itself well under that.
+    let shuttingDown = false;
+    const SHUTDOWN_DEADLINE_MS = 25000;
     const shutdown = (signal) => {
-        console.log(`Received ${signal}, shutting down System Health API server...`);
-        server.stop().then(() => {
-            console.log('System Health API server shutdown complete');
+        if (shuttingDown) return;
+        shuttingDown = true;
+        process.stderr.write(`Received ${signal}, shutting down System Health API server...\n`);
+
+        // Hard ceiling: if stop() hangs past the deadline, exit anyway.
+        // Better a forced exit with WAL flushed by stop()'s prelude than
+        // a SIGKILL-induced WAL corruption from supervisor.
+        const fail = setTimeout(() => {
+            process.stderr.write('[Shutdown] Deadline exceeded — forcing exit\n');
+            process.exit(1);
+        }, SHUTDOWN_DEADLINE_MS).unref();
+
+        server.stop({ deadlineMs: SHUTDOWN_DEADLINE_MS - 2000 }).then(() => {
+            clearTimeout(fail);
+            process.stderr.write('System Health API server shutdown complete\n');
             process.exit(0);
+        }, (err) => {
+            clearTimeout(fail);
+            process.stderr.write(`[Shutdown] stop() rejected: ${err?.message || err}\n`);
+            process.exit(1);
         });
     };
 

@@ -407,13 +407,25 @@ export class HealthRemediationActions {
         return await this.supervisorctlRestart('restart_dashboard_server', `http://localhost:${port}`);
       }
 
-      // Find and kill existing process
+      // Find and kill existing process. The dashboard's SIGTERM handler
+      // drains in-flight consolidation and checkpoints the SQLite WAL
+      // before exiting — give it room. Without this grace the previous
+      // 1s sleep let supervisor SIGKILL land mid-write and corrupt WAL.
       try {
         const { stdout } = await execAsync('lsof -ti:3030');
         const pid = parseInt(stdout.trim());
         if (pid) {
           process.kill(pid, 'SIGTERM');
-          await this.sleep(1000);
+          // Poll for exit so we don't wait the full deadline when the
+          // process drains quickly.
+          const SHUTDOWN_DEADLINE_MS = 12000;
+          const POLL_MS = 500;
+          let waited = 0;
+          while (waited < SHUTDOWN_DEADLINE_MS) {
+            await this.sleep(POLL_MS);
+            waited += POLL_MS;
+            try { process.kill(pid, 0); } catch { break; /* exited */ }
+          }
         }
       } catch (error) {
         // Port not in use, that's fine
