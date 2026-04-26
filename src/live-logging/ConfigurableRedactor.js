@@ -263,8 +263,8 @@ class ConfigurableRedactor {
         {
           id: "aws_secret_standalone",
           name: "AWS Secret Access Key (Standalone)",
-          description: "Standalone AWS Secret Access Keys (40 char base64-like with + and /)",
-          pattern: "[a-zA-Z0-9+/]{40}",
+          description: "Standalone AWS Secret Access Keys (40 char base64-like with + and /). Lookarounds require it to be a whole token — without them the regex chews prefixes of long paths like /Users/<id>/Agentic/coding/scripts/mig and produces <AWS_SECRET_REDACTED>rate-add-project-column.js artifacts.",
+          pattern: "(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/])",
           flags: "g",
           replacementType: "generic",
           replacement: "<AWS_SECRET_REDACTED>",
