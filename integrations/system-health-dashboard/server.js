@@ -179,7 +179,10 @@ class SystemHealthAPIServer {
 
         // Digests & Insights API (observation consolidation)
         this.app.get('/api/digests', this.handleGetDigests.bind(this));
+        this.app.get('/api/digests/projects', this.handleGetDigestProjects.bind(this));
         this.app.get('/api/insights', this.handleGetInsights.bind(this));
+        this.app.get('/api/insights/projects', this.handleGetInsightProjects.bind(this));
+        this.app.get('/api/projects', this.handleGetAllProjects.bind(this));
         this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
         this.app.post('/api/consolidation/run', this.handleRunConsolidation.bind(this));
 
@@ -4031,8 +4034,79 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * GET /api/digests/projects — distinct project names for the digests filter dropdown.
+     */
+    handleGetDigestProjects(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+        try {
+            try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch { return res.json([]); }
+            const rows = db.prepare(
+                'SELECT DISTINCT project FROM digests WHERE project IS NOT NULL ORDER BY project'
+            ).all();
+            res.json(rows.map(r => r.project).filter(Boolean));
+        } catch (err) {
+            process.stderr.write(`[DigestsAPI] Projects query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query digest projects' });
+        }
+    }
+
+    /**
+     * GET /api/insights/projects — distinct project names for the insights filter dropdown.
+     */
+    handleGetInsightProjects(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+        try {
+            try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch { return res.json([]); }
+            const rows = db.prepare(
+                'SELECT DISTINCT project FROM insights WHERE project IS NOT NULL ORDER BY project'
+            ).all();
+            res.json(rows.map(r => r.project).filter(Boolean));
+        } catch (err) {
+            process.stderr.write(`[InsightsAPI] Projects query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query insight projects' });
+        }
+    }
+
+    /**
+     * GET /api/projects — union of distinct projects across observations,
+     * digests, and insights. Used by any UI surface that wants the global
+     * project list (e.g. a top-level filter affecting all three pages).
+     */
+    handleGetAllProjects(req, res) {
+        const db = this._getObservationsDb();
+        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+        try {
+            const all = new Set();
+            try {
+                const obs = db.prepare(
+                    "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL"
+                ).all();
+                for (const r of obs) if (r.project) all.add(r.project);
+            } catch { /* table may be missing */ }
+            try {
+                const digs = db.prepare(
+                    'SELECT DISTINCT project FROM digests WHERE project IS NOT NULL'
+                ).all();
+                for (const r of digs) if (r.project) all.add(r.project);
+            } catch { /* table may be missing */ }
+            try {
+                const ins = db.prepare(
+                    'SELECT DISTINCT project FROM insights WHERE project IS NOT NULL'
+                ).all();
+                for (const r of ins) if (r.project) all.add(r.project);
+            } catch { /* table may be missing */ }
+            res.json([...all].sort());
+        } catch (err) {
+            process.stderr.write(`[API] All-projects query error: ${err.message}\n`);
+            res.status(500).json({ error: 'Failed to query projects' });
+        }
+    }
+
+    /**
      * GET /api/digests — paginated daily digests with filtering.
-     * Query params: date, from, to, q, limit, offset
+     * Query params: date, from, to, q, project, limit, offset
      */
     handleGetDigests(req, res) {
         const db = this._getObservationsDb();
@@ -4040,7 +4114,7 @@ class SystemHealthAPIServer {
             return res.status(503).json({ error: 'Observations database unavailable' });
         }
 
-        const { date, from, to, q, limit: limitStr, offset: offsetStr } = req.query;
+        const { date, from, to, q, project, limit: limitStr, offset: offsetStr } = req.query;
         const limit = Math.min(parseInt(limitStr) || 50, 200);
         const offset = parseInt(offsetStr) || 0;
 
@@ -4069,6 +4143,10 @@ class SystemHealthAPIServer {
                 where.push('(theme LIKE @q OR summary LIKE @q)');
                 params.q = `%${q}%`;
             }
+            if (project) {
+                where.push('project = @project');
+                params.project = project;
+            }
 
             const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
@@ -4078,7 +4156,8 @@ class SystemHealthAPIServer {
             params.offset = offset;
             const rows = db.prepare(`
                 SELECT id, date, theme, summary, observation_ids as observationIds,
-                       agents, files_touched as filesTouched, quality, created_at as createdAt
+                       agents, files_touched as filesTouched, quality, created_at as createdAt,
+                       project
                 FROM digests ${whereClause}
                 ORDER BY date DESC, created_at DESC
                 LIMIT @limit OFFSET @offset
@@ -4111,7 +4190,7 @@ class SystemHealthAPIServer {
             return res.status(503).json({ error: 'Observations database unavailable' });
         }
 
-        const { topic, q } = req.query;
+        const { topic, q, project } = req.query;
 
         try {
             // Check if insights table exists
@@ -4130,12 +4209,16 @@ class SystemHealthAPIServer {
                 where.push('(topic LIKE @q OR summary LIKE @q)');
                 params.q = `%${q}%`;
             }
+            if (project) {
+                where.push('project = @project');
+                params.project = project;
+            }
 
             const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
             const rows = db.prepare(`
                 SELECT id, topic, summary, confidence, digest_ids as digestIds,
-                       last_updated as lastUpdated, created_at as createdAt
+                       last_updated as lastUpdated, created_at as createdAt, project
                 FROM insights ${whereClause}
                 ORDER BY confidence DESC, last_updated DESC
             `).all(params);

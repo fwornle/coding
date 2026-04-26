@@ -18,6 +18,7 @@ interface Insight {
   digestIds: string[]
   lastUpdated: string
   createdAt: string
+  project?: string | null
 }
 
 interface InsightResponse {
@@ -77,12 +78,24 @@ export function InsightsPage() {
   const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
+  const [projects, setProjects] = useState<string[]>([])
+  const [projectFilter, setProjectFilter] = useState<string>('')
 
-  const fetchInsights = useCallback(async (q = '') => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/insights/projects`)
+      if (res.ok) setProjects(await res.json())
+    } catch { /* ignore */ }
+  }, [])
+
+  const fetchInsights = useCallback(async (q = '', project = '') => {
     setLoading(true)
     try {
-      const params = q ? `?q=${encodeURIComponent(q)}` : ''
-      const res = await fetch(`${API_BASE_URL}/api/insights${params}`)
+      const qs = new URLSearchParams()
+      if (q) qs.set('q', q)
+      if (project) qs.set('project', project)
+      const queryStr = qs.toString()
+      const res = await fetch(`${API_BASE_URL}/api/insights${queryStr ? `?${queryStr}` : ''}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: InsightResponse = await res.json()
       setInsights(data.data || [])
@@ -123,17 +136,21 @@ export function InsightsPage() {
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
     }
-    await fetchInsights(query)
+    await fetchInsights(query, projectFilter)
     await fetchStatus()
     setConsolidating(false)
-  }, [fetchInsights, fetchStatus, query])
+  }, [fetchInsights, fetchStatus, query, projectFilter])
 
   useEffect(() => {
-    fetchInsights()
-    fetchStatus()
-  }, [fetchInsights, fetchStatus])
+    fetchInsights('', projectFilter)
+  }, [fetchInsights, projectFilter])
 
-  const handleSearch = () => fetchInsights(query)
+  useEffect(() => {
+    fetchProjects()
+    fetchStatus()
+  }, [fetchProjects, fetchStatus])
+
+  const handleSearch = () => fetchInsights(query, projectFilter)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -148,6 +165,19 @@ export function InsightsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {projects.length > 0 && (
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="text-sm rounded border border-border bg-background px-2 py-1"
+              aria-label="Filter by project"
+            >
+              <option value="">All projects ({insights.length})</option>
+              {projects.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          )}
           {status && (
             <div className="text-xs text-muted-foreground text-right">
               <div>{status.totalInsights} insights from {status.totalDigests} digests</div>

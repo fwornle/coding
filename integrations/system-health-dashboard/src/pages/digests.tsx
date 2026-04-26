@@ -19,6 +19,7 @@ interface Digest {
   filesTouched: string[]
   quality: string
   createdAt: string
+  project?: string | null
 }
 
 interface DigestResponse {
@@ -83,11 +84,22 @@ export function DigestsPage() {
   const [status, setStatus] = useState<{ totalDigests: number; undigested: number; pendingPast?: number; pendingToday?: number; totalInsights: number } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
+  const [projects, setProjects] = useState<string[]>([])
+  const [projectFilter, setProjectFilter] = useState<string>('')
 
-  const fetchDigests = useCallback(async () => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/digests/projects`)
+      if (res.ok) setProjects(await res.json())
+    } catch { /* ignore */ }
+  }, [])
+
+  const fetchDigests = useCallback(async (project: string = '') => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/digests?limit=200`)
+      const qs = new URLSearchParams({ limit: '200' })
+      if (project) qs.set('project', project)
+      const res = await fetch(`${API_BASE_URL}/api/digests?${qs.toString()}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: DigestResponse = await res.json()
       setDigests(data.data || [])
@@ -128,15 +140,19 @@ export function DigestsPage() {
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
     }
-    await fetchDigests()
+    await fetchDigests(projectFilter)
     await fetchStatus()
     setConsolidating(false)
-  }, [fetchDigests, fetchStatus])
+  }, [fetchDigests, fetchStatus, projectFilter])
 
   useEffect(() => {
-    fetchDigests()
+    fetchDigests(projectFilter)
+  }, [fetchDigests, projectFilter])
+
+  useEffect(() => {
+    fetchProjects()
     fetchStatus()
-  }, [fetchDigests, fetchStatus])
+  }, [fetchProjects, fetchStatus])
 
   // Group digests by date
   const byDate = digests.reduce<Record<string, Digest[]>>((acc, d) => {
@@ -156,6 +172,19 @@ export function DigestsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {projects.length > 0 && (
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="text-sm rounded border border-border bg-background px-2 py-1"
+              aria-label="Filter by project"
+            >
+              <option value="">All projects ({total})</option>
+              {projects.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          )}
           {status && (
             <div className="text-xs text-muted-foreground text-right">
               <div>{status.totalDigests} digests</div>
