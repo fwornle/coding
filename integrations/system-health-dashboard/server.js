@@ -3556,6 +3556,11 @@ class SystemHealthAPIServer {
      * @returns {Promise<{ok:boolean, [k:string]: any}>}
      */
     _spawnConsolidator(flags = [], opts = {}) {
+        // Hard cap so a stuck LLM call can't hang the dashboard endpoint
+        // forever. The CLI's per-LLM-call timeout is 3 min and a typical
+        // 2-obs run completes in seconds, so 6 min is generous.
+        const HARD_TIMEOUT_MS = opts.timeoutMs ?? 6 * 60 * 1000;
+
         return new Promise((resolve, reject) => {
             const script = join(codingRoot, 'scripts', 'consolidate-observations.js');
             const child = spawn(process.execPath, [script, '--json', ...flags], {
@@ -3569,30 +3574,56 @@ class SystemHealthAPIServer {
 
             let stdout = '';
             let stderr = '';
+            let settled = false;
             child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
             child.stderr.on('data', (chunk) => {
                 stderr += chunk.toString();
                 process.stderr.write(`[Consolidate-child] ${chunk}`);
             });
-            const onAbort = () => {
-                resolve({ ok: false, aborted: true });
-            };
-            if (opts.signal) opts.signal.addEventListener('abort', onAbort, { once: true });
-            child.on('error', (err) => reject(err));
-            child.on('close', (code) => {
+
+            const settle = (fn) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(killTimer);
                 if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
-                if (code !== 0) {
-                    return reject(new Error(`consolidate-observations exited with code ${code}: ${stderr.slice(-500)}`));
-                }
-                // The CLI prints the final result struct as the last line of
-                // stdout in --json mode. Parse it; ignore everything else.
+                fn();
+            };
+
+            // Timeout: SIGTERM first, escalate to SIGKILL after a grace,
+            // then reject so the caller can surface a clear error.
+            const killTimer = setTimeout(() => {
+                process.stderr.write(`[Consolidate-child] timeout after ${HARD_TIMEOUT_MS}ms — sending SIGTERM\n`);
+                try { child.kill('SIGTERM'); } catch { /* ignore */ }
+                setTimeout(() => {
+                    try { child.kill('SIGKILL'); } catch { /* ignore */ }
+                }, 5000).unref();
+            }, HARD_TIMEOUT_MS);
+
+            const onAbort = () => settle(() => resolve({ ok: false, aborted: true }));
+            if (opts.signal) opts.signal.addEventListener('abort', onAbort, { once: true });
+
+            child.on('error', (err) => settle(() => reject(err)));
+            child.on('close', (code, signal) => {
+                // Honor the result JSON whenever the child managed to write
+                // it — even if a signal killed it post-success. The earlier
+                // policy of rejecting on any non-zero exit caused
+                // "Consolidation failed" UI errors after work that had
+                // actually completed. The CLI prints exactly one final
+                // result struct as the last non-empty stdout line in
+                // --json mode.
                 const lines = stdout.trim().split('\n').filter(Boolean);
-                try {
-                    const parsed = JSON.parse(lines[lines.length - 1] || '{}');
-                    resolve(parsed);
-                } catch (err) {
-                    reject(new Error(`Failed to parse consolidator JSON output: ${err.message}`));
+                let parsed = null;
+                if (lines.length > 0) {
+                    try { parsed = JSON.parse(lines[lines.length - 1]); } catch { /* not JSON */ }
                 }
+                if (parsed && parsed.ok) {
+                    return settle(() => resolve(parsed));
+                }
+                if (code === 0) {
+                    return settle(() => resolve(parsed || { ok: true }));
+                }
+                const reason = signal ? `killed by ${signal}` : `exit code ${code}`;
+                settle(() => reject(new Error(`consolidate-observations ${reason}: ${stderr.slice(-500)}`)));
             });
         });
     }
@@ -4409,6 +4440,20 @@ class SystemHealthAPIServer {
         if (this._shuttingDown) {
             return res.status(503).json({ error: 'Server is shutting down' });
         }
+        // Coalesce concurrent triggers. The frontend disables the button
+        // while consolidating, but a stale tab or a polling refresh can
+        // still POST again. Fork two children fighting for the SQLite
+        // write lock and one will appear to hang for several minutes.
+        // Instead, attach to the in-flight run so all callers see the
+        // same outcome.
+        if (this._activeConsolidation) {
+            try {
+                const result = await this._activeConsolidation;
+                return res.json({ success: true, attached: true, ...result });
+            } catch (err) {
+                return res.status(500).json({ error: err.message || 'Unknown error' });
+            }
+        }
         const flags = req.body?.date
             ? ['--date', String(req.body.date)]
             : ['--include-today'];
@@ -4419,9 +4464,6 @@ class SystemHealthAPIServer {
             res.json({ success: true, ...result });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
-            // The frontend already prefixes "Consolidation failed: " — keep
-            // the body to the bare reason so the user doesn't see the
-            // prefix doubled.
             res.status(500).json({ error: err.message || 'Unknown error' });
         } finally {
             if (this._activeConsolidation === run) this._activeConsolidation = null;
