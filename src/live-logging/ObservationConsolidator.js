@@ -29,6 +29,15 @@ import Redis from 'ioredis';
  */
 const INSIGHT_DEDUP_THRESHOLD = 0.93;
 
+/**
+ * Cosine threshold for treating two same-date digests as a near-duplicate.
+ * Higher than the insight threshold because digests share more project
+ * vocabulary (toolchain, paths, agents) and so cluster at higher floors.
+ * 0.97 isolates genuine LLM-rewording duplicates without merging genuinely
+ * different work performed on the same day.
+ */
+const DIGEST_DEDUP_THRESHOLD = 0.97;
+
 const require = createRequire(import.meta.url);
 
 export class ObservationConsolidator {
@@ -106,6 +115,28 @@ export class ObservationConsolidator {
    * @returns {Promise<string|null>}
    */
   async _findSimilarInsightId(entry) {
+    const tools = await this._getEmbedder();
+    if (!tools) return null;
+    const text = `${entry.topic ?? ''}\n\n${entry.summary ?? ''}`.trim();
+    if (!text) return null;
+    const vector = await tools.embed(text);
+    const results = await tools.qdrant.search('insights', {
+      vector,
+      limit: 1,
+      score_threshold: INSIGHT_DEDUP_THRESHOLD,
+      with_payload: false,
+      with_vector: false,
+    });
+    if (!results || results.length === 0) return null;
+    return String(results[0].id);
+  }
+
+  /**
+   * Lazily-initialized fastembed + Qdrant client (shared with insight path).
+   * Returns null if either resource is unavailable; callers must fail open.
+   * @returns {Promise<{embed: (text: string) => Promise<number[]>, qdrant: any}|null>}
+   */
+  async _getEmbedder() {
     if (!this._embeddingService) {
       try {
         const mod = await import('../../dist/embedding/embedding-service.js');
@@ -125,18 +156,105 @@ export class ObservationConsolidator {
         return null;
       }
     }
-    const text = `${entry.topic ?? ''}\n\n${entry.summary ?? ''}`.trim();
-    if (!text) return null;
-    const vector = await this._embeddingService.embedOne(text);
-    const results = await this._qdrantClient.search('insights', {
-      vector,
-      limit: 1,
-      score_threshold: INSIGHT_DEDUP_THRESHOLD,
-      with_payload: false,
-      with_vector: false,
-    });
-    if (!results || results.length === 0) return null;
-    return String(results[0].id);
+    return {
+      embed: (text) => this._embeddingService.embedOne(text),
+      qdrant: this._qdrantClient,
+    };
+  }
+
+  /**
+   * Build a merge plan for a batch of new digests against same-date duplicates.
+   *
+   * Returns an array parallel to digestEntries. Each element is either:
+   *   { action: 'insert' }                       — write a new row
+   *   { action: 'merge', targetId: string }      — merge into existing/earlier id
+   *
+   * Cross-batch resolution: query Qdrant `digests` collection filtered by
+   * date == entry.date for any score >= DIGEST_DEDUP_THRESHOLD.
+   *
+   * Within-batch resolution: pairwise cosine on this batch's freshly-embedded
+   * vectors, greedy from highest sim down. The first occurrence wins; later
+   * entries that match it are folded into it.
+   *
+   * Fails open: returns all 'insert' if embedding/Qdrant are unavailable.
+   *
+   * @param {Array<object>} digestEntries
+   * @param {string} date
+   * @returns {Promise<Array<{action: 'insert'|'merge', targetId?: string}>>}
+   */
+  async _buildDigestMergePlan(digestEntries, date) {
+    const fallback = digestEntries.map(() => ({ action: 'insert' }));
+    if (!digestEntries || digestEntries.length === 0) return fallback;
+
+    const tools = await this._getEmbedder();
+    if (!tools) return fallback;
+
+    const vectors = [];
+    for (const entry of digestEntries) {
+      const text = `${entry.theme ?? ''}\n\n${entry.summary ?? ''}`.trim();
+      if (!text) {
+        vectors.push(null);
+        continue;
+      }
+      try {
+        vectors.push(await tools.embed(text));
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Digest embed failed: ${err.message}\n`);
+        vectors.push(null);
+      }
+    }
+
+    const plan = digestEntries.map(() => ({ action: 'insert' }));
+
+    // Cross-batch: search Qdrant for an existing same-date digest above threshold.
+    for (let i = 0; i < digestEntries.length; i++) {
+      if (!vectors[i]) continue;
+      try {
+        const hits = await tools.qdrant.search('digests', {
+          vector: vectors[i],
+          limit: 1,
+          score_threshold: DIGEST_DEDUP_THRESHOLD,
+          with_payload: true,
+          with_vector: false,
+          filter: { must: [{ key: 'date', match: { value: date } }] },
+        });
+        if (hits && hits.length > 0) {
+          plan[i] = { action: 'merge', targetId: String(hits[0].id) };
+        }
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Digest Qdrant search failed (non-fatal): ${err.message}\n`);
+      }
+    }
+
+    // Within-batch: greedy pairwise. Earlier entries (or the cross-batch
+    // target the entry already merges into) absorb later ones.
+    const cosine = (a, b) => {
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+      return na && nb ? dot / Math.sqrt(na * nb) : 0;
+    };
+    for (let i = 1; i < digestEntries.length; i++) {
+      if (!vectors[i] || plan[i].action === 'merge') continue;
+      let bestJ = -1, bestSim = 0;
+      for (let j = 0; j < i; j++) {
+        if (!vectors[j]) continue;
+        const sim = cosine(vectors[i], vectors[j]);
+        if (sim >= DIGEST_DEDUP_THRESHOLD && sim > bestSim) {
+          bestSim = sim;
+          bestJ = j;
+        }
+      }
+      if (bestJ >= 0) {
+        // Merge into entry j's eventual target — either j's pre-existing
+        // merge target or j's own id (still being inserted as new).
+        const target = plan[bestJ].action === 'merge'
+          ? plan[bestJ].targetId
+          : digestEntries[bestJ].id;
+        plan[i] = { action: 'merge', targetId: target };
+      }
+    }
+
+    return plan;
   }
 
   /**
@@ -302,13 +420,70 @@ export class ObservationConsolidator {
       INSERT INTO digests (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const getDigest = this.db.prepare(
+      'SELECT id, observation_ids, agents, files_touched, summary, quality FROM digests WHERE id = ?'
+    );
+    const updateDigest = this.db.prepare(`
+      UPDATE digests
+      SET observation_ids = ?, agents = ?, files_touched = ?, summary = ?, quality = ?, created_at = ?
+      WHERE id = ?
+    `);
     const markDigested = this.db.prepare(
       'UPDATE observations SET digested_at = ? WHERE id = ?'
     );
 
+    // Build merge plan via embedding similarity (async, pre-transaction).
+    const mergePlan = await this._buildDigestMergePlan(digestEntries, date);
+    const QUALITY_RANK = { high: 3, normal: 2, low: 1 };
+    const mergedTargets = new Set();
+    let createdCount = 0;
+    let mergedCount = 0;
+
     const digestedObsIds = new Set();
     const transaction = this.db.transaction(() => {
-      for (const d of digestEntries) {
+      for (let i = 0; i < digestEntries.length; i++) {
+        const d = digestEntries[i];
+        const decision = mergePlan[i] ?? { action: 'insert' };
+
+        if (decision.action === 'merge' && decision.targetId) {
+          const target = getDigest.get(decision.targetId);
+          if (target) {
+            const oidUnion = new Set();
+            for (const oid of (() => { try { return JSON.parse(target.observation_ids || '[]'); } catch { return []; } })()) oidUnion.add(oid);
+            for (const oid of (d.observationIds || [])) oidUnion.add(oid);
+
+            const agentUnion = new Set();
+            for (const a of (() => { try { return JSON.parse(target.agents || '[]'); } catch { return []; } })()) agentUnion.add(a);
+            for (const a of (d.agents || [])) agentUnion.add(a);
+
+            const fileUnion = new Set();
+            for (const f of (() => { try { return JSON.parse(target.files_touched || '[]'); } catch { return []; } })()) fileUnion.add(f);
+            for (const f of (d.filesTouched || [])) fileUnion.add(f);
+
+            const winnerSummary = (target.summary?.length ?? 0) >= (d.summary?.length ?? 0)
+              ? target.summary
+              : this._redact(d.summary);
+            const bestQuality = (QUALITY_RANK[d.quality] ?? 0) > (QUALITY_RANK[target.quality] ?? 0)
+              ? d.quality
+              : target.quality;
+
+            updateDigest.run(
+              JSON.stringify([...oidUnion]),
+              JSON.stringify([...agentUnion]),
+              this._redactPaths(JSON.stringify([...fileUnion])),
+              winnerSummary,
+              bestQuality,
+              now,
+              decision.targetId
+            );
+            mergedTargets.add(decision.targetId);
+            mergedCount++;
+            for (const obsId of d.observationIds || []) digestedObsIds.add(obsId);
+            continue;
+          }
+          // target row missing — fall through to insert
+        }
+
         insertDigest.run(
           d.id, d.date, this._redact(d.theme), this._redact(d.summary),
           JSON.stringify(d.observationIds),
@@ -316,9 +491,8 @@ export class ObservationConsolidator {
           this._redactPaths(JSON.stringify(d.filesTouched)),
           d.quality, now, this._redactPaths(JSON.stringify(d.metadata || {}))
         );
-        for (const obsId of d.observationIds) {
-          digestedObsIds.add(obsId);
-        }
+        createdCount++;
+        for (const obsId of d.observationIds) digestedObsIds.add(obsId);
       }
       for (const obsId of digestedObsIds) {
         markDigested.run(now, obsId);
@@ -326,9 +500,16 @@ export class ObservationConsolidator {
     });
     transaction();
 
-    // Fire-and-forget: publish embedding events for new digests
-    for (const d of digestEntries) {
-      this._publishEmbeddingEvent('digest', d.id, d.summary, {
+    if (mergedCount > 0) {
+      process.stderr.write(`[Consolidator] Digest dedup: ${mergedCount} merged into existing/earlier rows, ${createdCount} new\n`);
+    }
+
+    // Fire-and-forget: publish embedding events for new (and updated) digests
+    for (let i = 0; i < digestEntries.length; i++) {
+      const d = digestEntries[i];
+      const decision = mergePlan[i] ?? { action: 'insert' };
+      const id = decision.action === 'merge' && decision.targetId ? decision.targetId : d.id;
+      this._publishEmbeddingEvent('digest', id, d.summary, {
         date: now.slice(0, 10),
         theme: d.theme,
         agents: JSON.stringify(d.agents),
