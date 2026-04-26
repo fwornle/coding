@@ -167,30 +167,51 @@ function _restoreFromExportIfPossible(dbPath) {
         id TEXT PRIMARY KEY, date TEXT NOT NULL, theme TEXT NOT NULL,
         summary TEXT NOT NULL, observation_ids TEXT NOT NULL, agents TEXT,
         files_touched TEXT, quality TEXT DEFAULT 'normal',
-        created_at TEXT NOT NULL, metadata TEXT
+        created_at TEXT NOT NULL, metadata TEXT, project TEXT
       );
       CREATE TABLE IF NOT EXISTS insights (
         id TEXT PRIMARY KEY, topic TEXT NOT NULL, summary TEXT NOT NULL,
         confidence REAL DEFAULT 0.8, digest_ids TEXT NOT NULL,
-        last_updated TEXT NOT NULL, created_at TEXT NOT NULL, metadata TEXT
+        last_updated TEXT NOT NULL, created_at TEXT NOT NULL, metadata TEXT,
+        project TEXT
       );
     `);
 
     const observations = JSON.parse(fs.readFileSync(obsExport, 'utf8'));
     const obsStmt = db.prepare(`
-      INSERT OR REPLACE INTO observations (id, summary, agent, created_at, digested_at, quality, metadata)
-      VALUES (@id, @summary, @agent, @createdAt, @digestedAt, @quality, @metadata)
+      INSERT OR REPLACE INTO observations
+        (id, summary, agent, session_id, source_file, content_hash,
+         created_at, digested_at, quality, metadata)
+      VALUES (@id, @summary, @agent, @sessionId, @sourceFile, @contentHash,
+              @createdAt, @digestedAt, @quality, @metadata)
     `);
     db.transaction((rows) => {
       for (const r of rows) {
+        // Preserve the export's full metadata blob if present so fields
+        // like project, llmModel, agent provenance survive the round
+        // trip. Add a restoredFromExport flag without overwriting other
+        // keys. Older exports may have only a `project` scalar at the
+        // top level — fold it into metadata.project as a fallback.
+        let metaObj = {};
+        if (r.metadata && typeof r.metadata === 'object') {
+          metaObj = { ...r.metadata };
+        } else if (typeof r.metadata === 'string') {
+          try { metaObj = JSON.parse(r.metadata) || {}; } catch { metaObj = {}; }
+        }
+        if (!metaObj.project && r.project) metaObj.project = r.project;
+        metaObj.restoredFromExport = true;
+
         obsStmt.run({
           id: r.id,
           summary: r.summary ?? '',
           agent: r.agent ?? null,
+          sessionId: r.sessionId ?? metaObj.sessionId ?? null,
+          sourceFile: r.sourceFile ?? metaObj.sourceFile ?? null,
+          contentHash: r.contentHash ?? null,
           createdAt: r.createdAt ?? null,
           digestedAt: r.digestedAt ?? null,
           quality: r.quality ?? 'normal',
-          metadata: JSON.stringify({ restoredFromExport: true, project: r.project ?? null }),
+          metadata: JSON.stringify(metaObj),
         });
       }
     })(observations);
@@ -199,8 +220,8 @@ function _restoreFromExportIfPossible(dbPath) {
       const digests = JSON.parse(fs.readFileSync(digExport, 'utf8'));
       const digStmt = db.prepare(`
         INSERT OR REPLACE INTO digests
-          (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at)
-        VALUES (@id, @date, @theme, @summary, @oids, @agents, @files, @quality, @createdAt)
+          (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata, project)
+        VALUES (@id, @date, @theme, @summary, @oids, @agents, @files, @quality, @createdAt, @metadata, @project)
       `);
       db.transaction((rows) => {
         for (const r of rows) {
@@ -214,6 +235,8 @@ function _restoreFromExportIfPossible(dbPath) {
             files: JSON.stringify(r.filesTouched ?? []),
             quality: r.quality ?? 'normal',
             createdAt: r.createdAt ?? new Date().toISOString(),
+            metadata: typeof r.metadata === 'string' ? r.metadata : JSON.stringify(r.metadata ?? {}),
+            project: r.project ?? 'unknown',
           });
         }
       })(digests);
@@ -223,8 +246,8 @@ function _restoreFromExportIfPossible(dbPath) {
       const insights = JSON.parse(fs.readFileSync(insExport, 'utf8'));
       const insStmt = db.prepare(`
         INSERT OR REPLACE INTO insights
-          (id, topic, summary, confidence, digest_ids, last_updated, created_at)
-        VALUES (@id, @topic, @summary, @confidence, @digestIds, @lastUpdated, @createdAt)
+          (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
+        VALUES (@id, @topic, @summary, @confidence, @digestIds, @lastUpdated, @createdAt, @metadata, @project)
       `);
       db.transaction((rows) => {
         for (const r of rows) {
@@ -236,6 +259,8 @@ function _restoreFromExportIfPossible(dbPath) {
             digestIds: JSON.stringify(r.digestIds ?? []),
             lastUpdated: r.lastUpdated ?? r.createdAt ?? new Date().toISOString(),
             createdAt: r.createdAt ?? new Date().toISOString(),
+            metadata: typeof r.metadata === 'string' ? r.metadata : JSON.stringify(r.metadata ?? {}),
+            project: r.project ?? 'unknown',
           });
         }
       })(insights);

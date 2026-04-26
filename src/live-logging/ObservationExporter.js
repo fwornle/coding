@@ -20,6 +20,11 @@ import path from 'node:path';
 /** Default export directory relative to project root */
 const DEFAULT_EXPORT_DIR = '.data/observation-export';
 
+/** Parse JSON, returning {} on any failure. */
+function safeParseJson(s) {
+  try { return JSON.parse(s); } catch { return {}; }
+}
+
 export class ObservationExporter {
   /**
    * @param {Object} options
@@ -163,9 +168,15 @@ export class ObservationExporter {
       return []; // table doesn't exist yet
     }
 
+    // Project may be missing from older DBs that pre-date Phase A — fall
+    // back to NULL via COALESCE in the projection so the column read
+    // doesn't fail before the schema is upgraded.
+    const hasProject = this._tableHasColumn('digests', 'project');
+    const projectExpr = hasProject ? 'project' : 'NULL AS project';
     const rows = this.db.prepare(`
       SELECT id, date, theme, summary, observation_ids, agents,
-             files_touched, quality, created_at
+             files_touched, quality, created_at, metadata,
+             ${projectExpr}
       FROM digests
       ORDER BY date ASC, created_at ASC
     `).all();
@@ -180,6 +191,8 @@ export class ObservationExporter {
       filesTouched: JSON.parse(r.files_touched || '[]'),
       quality: r.quality,
       createdAt: r.created_at,
+      metadata: r.metadata ? safeParseJson(r.metadata) : {},
+      project: r.project || 'unknown',
     }));
   }
 
@@ -190,9 +203,12 @@ export class ObservationExporter {
       return []; // table doesn't exist yet
     }
 
+    const hasProject = this._tableHasColumn('insights', 'project');
+    const projectExpr = hasProject ? 'project' : 'NULL AS project';
     const rows = this.db.prepare(`
       SELECT id, topic, summary, confidence, digest_ids,
-             last_updated, created_at
+             last_updated, created_at, metadata,
+             ${projectExpr}
       FROM insights
       ORDER BY confidence DESC, last_updated DESC
     `).all();
@@ -205,7 +221,22 @@ export class ObservationExporter {
       digestIds: JSON.parse(r.digest_ids || '[]'),
       lastUpdated: r.last_updated,
       createdAt: r.created_at,
+      metadata: r.metadata ? safeParseJson(r.metadata) : {},
+      project: r.project || 'unknown',
     }));
+  }
+
+  /**
+   * Probe a table for a column. Used to keep the exporter compatible
+   * with DBs created before Phase A added the project column.
+   */
+  _tableHasColumn(table, column) {
+    try {
+      const cols = this.db.prepare(`PRAGMA table_info(${table})`).all();
+      return cols.some(c => c.name === column);
+    } catch {
+      return false;
+    }
   }
 
   _updateMetadataCounts() {

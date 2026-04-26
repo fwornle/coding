@@ -78,7 +78,8 @@ function ensureSchema(db) {
       files_touched TEXT,
       quality TEXT DEFAULT 'normal',
       created_at TEXT NOT NULL,
-      metadata TEXT
+      metadata TEXT,
+      project TEXT
     )
   `);
 
@@ -91,37 +92,59 @@ function ensureSchema(db) {
       digest_ids TEXT NOT NULL,
       last_updated TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      metadata TEXT
+      metadata TEXT,
+      project TEXT
     )
   `);
+
+  // Idempotent ALTERs handle the case where the table pre-existed from
+  // an older restore that didn't include the project column.
+  try { db.exec('ALTER TABLE digests ADD COLUMN project TEXT'); } catch { /* exists */ }
+  try { db.exec('ALTER TABLE insights ADD COLUMN project TEXT'); } catch { /* exists */ }
 
   db.exec('CREATE INDEX IF NOT EXISTS idx_obs_digested ON observations(digested_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_digests_date ON digests(date)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_insights_topic ON insights(topic)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_digests_project ON digests(project)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_insights_project ON insights(project)');
 }
 
 function restoreObservations(db, rows) {
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO observations
-      (id, summary, agent, created_at, digested_at, quality, metadata)
-    VALUES (@id, @summary, @agent, @createdAt, @digestedAt, @quality, @metadata)
+      (id, summary, agent, session_id, source_file, content_hash,
+       created_at, digested_at, quality, metadata)
+    VALUES (@id, @summary, @agent, @sessionId, @sourceFile, @contentHash,
+            @createdAt, @digestedAt, @quality, @metadata)
   `);
   const insertMany = db.transaction((items) => {
     for (const r of items) {
+      // Preserve the export's full metadata blob when present, only
+      // synthesizing top-level export fields as fallbacks. Older
+      // exports may carry `project` at the row level.
+      let metaObj = {};
+      if (r.metadata && typeof r.metadata === 'object') {
+        metaObj = { ...r.metadata };
+      } else if (typeof r.metadata === 'string') {
+        try { metaObj = JSON.parse(r.metadata) || {}; } catch { metaObj = {}; }
+      }
+      if (!metaObj.project && r.project) metaObj.project = r.project;
+      if (!metaObj.llm && r.llm) metaObj.llm = r.llm;
+      if (!metaObj.modifiedFiles && r.modifiedFiles) metaObj.modifiedFiles = r.modifiedFiles;
+      metaObj.restoredFromExport = true;
+
       stmt.run({
         id: r.id,
         summary: r.summary ?? '',
         agent: r.agent ?? null,
+        sessionId: r.sessionId ?? metaObj.sessionId ?? null,
+        sourceFile: r.sourceFile ?? metaObj.sourceFile ?? null,
+        contentHash: r.contentHash ?? null,
         createdAt: r.createdAt ?? null,
         digestedAt: r.digestedAt ?? null,
         quality: r.quality ?? 'normal',
-        metadata: JSON.stringify({
-          project: r.project ?? null,
-          llm: r.llm ?? null,
-          modifiedFiles: r.modifiedFiles ?? null,
-          restoredFromExport: true,
-        }),
+        metadata: JSON.stringify(metaObj),
       });
     }
   });
@@ -131,8 +154,8 @@ function restoreObservations(db, rows) {
 function restoreDigests(db, rows) {
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO digests
-      (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at)
-    VALUES (@id, @date, @theme, @summary, @observation_ids, @agents, @files_touched, @quality, @created_at)
+      (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata, project)
+    VALUES (@id, @date, @theme, @summary, @observation_ids, @agents, @files_touched, @quality, @created_at, @metadata, @project)
   `);
   const insertMany = db.transaction((items) => {
     for (const r of items) {
@@ -146,6 +169,8 @@ function restoreDigests(db, rows) {
         files_touched: JSON.stringify(r.filesTouched ?? []),
         quality: r.quality ?? 'normal',
         created_at: r.createdAt ?? new Date().toISOString(),
+        metadata: typeof r.metadata === 'string' ? r.metadata : JSON.stringify(r.metadata ?? {}),
+        project: r.project ?? 'unknown',
       });
     }
   });
@@ -155,8 +180,8 @@ function restoreDigests(db, rows) {
 function restoreInsights(db, rows) {
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO insights
-      (id, topic, summary, confidence, digest_ids, last_updated, created_at)
-    VALUES (@id, @topic, @summary, @confidence, @digest_ids, @last_updated, @created_at)
+      (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
+    VALUES (@id, @topic, @summary, @confidence, @digest_ids, @last_updated, @created_at, @metadata, @project)
   `);
   const insertMany = db.transaction((items) => {
     for (const r of items) {
@@ -168,6 +193,8 @@ function restoreInsights(db, rows) {
         digest_ids: JSON.stringify(r.digestIds ?? []),
         last_updated: r.lastUpdated ?? r.createdAt ?? new Date().toISOString(),
         created_at: r.createdAt ?? new Date().toISOString(),
+        metadata: typeof r.metadata === 'string' ? r.metadata : JSON.stringify(r.metadata ?? {}),
+        project: r.project ?? 'unknown',
       });
     }
   });
