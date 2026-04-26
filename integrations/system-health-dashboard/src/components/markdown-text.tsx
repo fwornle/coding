@@ -47,9 +47,9 @@ export function MarkdownText({ text, className = '' }: { text: string; className
   function flushList() {
     if (listItems.length === 0) return
     elements.push(
-      <ul key={`list-${listKey}`} className="list-disc list-inside space-y-0.5 my-1">
+      <ul key={`list-${listKey}`} className="list-disc list-outside pl-5 space-y-0.5 my-1">
         {listItems.map((item, i) => (
-          <li key={i} className="text-sm text-muted-foreground leading-relaxed">
+          <li key={i} className="text-sm text-muted-foreground leading-relaxed pl-1">
             {renderInline(item)}
           </li>
         ))}
