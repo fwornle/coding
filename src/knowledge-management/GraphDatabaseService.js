@@ -597,15 +597,20 @@ export class GraphDatabaseService extends EventEmitter {
    */
   async storeRelationship(fromEntity, toEntity, type, metadata = {}) {
     const team = metadata.team || 'default';
-    const fromId = `${team}:${fromEntity}`;
-    const toId = `${team}:${toEntity}`;
+    // Cross-team relations: callers can pass fromTeam/toTeam to anchor
+    // each endpoint in its own team scope. Used for the central
+    // CollectiveKnowledge → <Project> includes-edges that span teams.
+    const fromTeam = metadata.fromTeam || team;
+    const toTeam = metadata.toTeam || team;
+    const fromId = `${fromTeam}:${fromEntity}`;
+    const toId = `${toTeam}:${toEntity}`;
 
     // Validate both entities exist
     if (!this.graph.hasNode(fromId)) {
-      throw new Error(`Source entity not found: ${fromEntity} (team: ${team})`);
+      throw new Error(`Source entity not found: ${fromEntity} (team: ${fromTeam})`);
     }
     if (!this.graph.hasNode(toId)) {
-      throw new Error(`Target entity not found: ${toEntity} (team: ${team})`);
+      throw new Error(`Target entity not found: ${toEntity} (team: ${toTeam})`);
     }
 
     // NORMALIZE relation type: convert spaces to underscores for consistency

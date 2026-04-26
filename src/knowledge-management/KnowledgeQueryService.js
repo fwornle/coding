@@ -544,6 +544,8 @@ export class KnowledgeQueryService {
         relationType,
         confidence = 1.0,
         team = 'coding',
+        fromTeam,
+        toTeam,
         metadata = {}
       } = relation;
 
@@ -557,6 +559,11 @@ export class KnowledgeQueryService {
 
       await graphDB.storeRelationship(fromName, toName, relationType, {
         team,
+        // Forward optional cross-team scope for relations whose
+        // endpoints live in different teams (e.g. the central
+        // CollectiveKnowledge linking out to per-team Project nodes).
+        ...(fromTeam ? { fromTeam } : {}),
+        ...(toTeam ? { toTeam } : {}),
         confidence,
         metadata
       });

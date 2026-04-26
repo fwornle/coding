@@ -393,6 +393,28 @@ export class ObservationConsolidator {
         return null;
       }
       this._projectAnchorCache.set(team, name);
+      // Link the new Project to the central CollectiveKnowledge
+      // (which lives in the coding team) so projects from any team
+      // hang off the same root node in the viewer instead of forming
+      // disconnected sub-graphs. Idempotent — repeat POSTs are
+      // tolerated server-side.
+      try {
+        await fetch(`${vkbUrl}/api/relations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'CollectiveKnowledge',
+            to: name,
+            type: 'includes',
+            team: 'coding',
+            fromTeam: 'coding',
+            toTeam: team,
+            confidence: 1.0,
+          }),
+        });
+      } catch (err) {
+        process.stderr.write(`[Consolidator→KG] CollectiveKnowledge → ${name} failed: ${err.message}\n`);
+      }
       return name;
     } catch (err) {
       process.stderr.write(`[Consolidator→KG] project anchor ${name} failed: ${err.message}\n`);
