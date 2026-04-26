@@ -85,8 +85,12 @@ services:
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/server.js:/coding/integrations/system-health-dashboard/server.js:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
-      # Observation consolidation (live-mounted for auto-consolidation daemon)
-      - ${CODING_REPO:-.}/src/live-logging/ObservationConsolidator.js:/coding/src/live-logging/ObservationConsolidator.js:ro
+      # Observation pipeline (live-mounted as a directory so new files like
+      # ObservationSanitizer.js are picked up without rebuilding the image).
+      - ${CODING_REPO:-.}/src/live-logging:/coding/src/live-logging:ro
+      # Consolidator CLI used by the dashboard's spawn-based consolidation
+      # endpoint (decoupled from the dashboard PID for WAL safety).
+      - ${CODING_REPO:-.}/scripts/consolidate-observations.js:/coding/scripts/consolidate-observations.js:ro
       # Embedding pipeline (live-mounted for development)
       - ${CODING_REPO:-.}/dist/embedding:/coding/dist/embedding:ro
       - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro

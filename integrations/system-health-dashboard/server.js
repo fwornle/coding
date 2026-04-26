@@ -4419,7 +4419,10 @@ class SystemHealthAPIServer {
             res.json({ success: true, ...result });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
-            res.status(500).json({ error: `Consolidation failed: ${err.message}` });
+            // The frontend already prefixes "Consolidation failed: " — keep
+            // the body to the bare reason so the user doesn't see the
+            // prefix doubled.
+            res.status(500).json({ error: err.message || 'Unknown error' });
         } finally {
             if (this._activeConsolidation === run) this._activeConsolidation = null;
         }
