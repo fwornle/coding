@@ -281,6 +281,12 @@ export class ObservationConsolidator {
     const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
     const project = entry.project || 'coding';
     const { entityClass, confidence: classConf } = this._classifyInsightByOntology(entry.topic, entry.summary || '');
+
+    // Ensure a Project anchor exists for this team. Without it, the
+    // online insights float disconnected from the rest of the graph
+    // because no other entity references them.
+    const projectName = await this._ensureProjectAnchor(vkbUrl, project);
+
     const body = {
       entityType: entityClass,
       observations: [entry.summary || entry.topic],
@@ -305,11 +311,93 @@ export class ObservationConsolidator {
       if (!res.ok) {
         const txt = await res.text();
         process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed ${res.status}: ${txt.slice(0, 200)}\n`);
-      } else if (this._kgPushDebug) {
+        return;
+      }
+      if (this._kgPushDebug) {
         process.stderr.write(`[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project}\n`);
+      }
+
+      // Link the insight back to the project anchor so the viewer
+      // shows it inside the project's cluster instead of floating.
+      // The relation is idempotent on the server side (POST returns
+      // success even if it already exists), so re-synthesis is safe.
+      if (projectName) {
+        try {
+          await fetch(`${vkbUrl}/api/relations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: projectName,
+              to: entry.topic,
+              type: 'has_insight',
+              team: project,
+              confidence: 1.0,
+            }),
+          });
+        } catch (err) {
+          process.stderr.write(`[Consolidator→KG] relation ${projectName} → ${entry.topic} failed: ${err.message}\n`);
+        }
       }
     } catch (err) {
       process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed: ${err.message}\n`);
+    }
+  }
+
+  /**
+   * Cache of resolved project anchor names keyed by team slug, so the
+   * insight push doesn't make a `/api/entities` round-trip per call.
+   * Cleared between runs by leaving it as an instance field.
+   */
+  _projectAnchorCache = new Map();
+
+  /**
+   * Return the canonical Project entity name for a team, creating one
+   * if missing. Maps slug-style team names (rapid-automations,
+   * onboarding-repro) to PascalCase entity names (RapidAutomations,
+   * OnboardingRepro) so they can serve as the anchor inside the
+   * viewer's hierarchy.
+   *
+   * Returns null if the VKB is unavailable; the caller skips the
+   * relation step in that case.
+   */
+  async _ensureProjectAnchor(vkbUrl, team) {
+    if (this._projectAnchorCache.has(team)) return this._projectAnchorCache.get(team);
+    const name = team
+      .split(/[-_]/)
+      .filter(Boolean)
+      .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase())
+      .join('');
+    if (!name) return null;
+    try {
+      // Idempotent PUT — if the entity already exists this just
+      // refreshes last_modified; if not, it creates a Project entity
+      // for the team. We preserve any prior source by NOT passing
+      // `source` (the writer falls back to 'manual' for true new
+      // entities, which is correct for a project anchor).
+      const r = await fetch(
+        `${vkbUrl}/api/entities/${encodeURIComponent(name)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            entityType: 'Project',
+            observations: [`Project anchor for the ${team} team — auto-created by the observation consolidator so online-learned insights have a parent in the graph.`],
+            significance: 8,
+            team,
+          }),
+        }
+      );
+      if (!r.ok) {
+        process.stderr.write(`[Consolidator→KG] project anchor ${name} failed ${r.status}\n`);
+        this._projectAnchorCache.set(team, null);
+        return null;
+      }
+      this._projectAnchorCache.set(team, name);
+      return name;
+    } catch (err) {
+      process.stderr.write(`[Consolidator→KG] project anchor ${name} failed: ${err.message}\n`);
+      this._projectAnchorCache.set(team, null);
+      return null;
     }
   }
 
