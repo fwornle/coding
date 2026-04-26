@@ -96,6 +96,9 @@ services:
       - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro
       # Retrieval service modules (Phase 29 — plain JS, live-mounted)
       - ${CODING_REPO:-.}/src/retrieval:/coding/src/retrieval:ro
+      # Knowledge management writers (UKBDatabaseWriter and friends —
+      # live-mounted so VKB API changes don't require an image rebuild).
+      - ${CODING_REPO:-.}/src/knowledge-management:/coding/src/knowledge-management:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
       - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
     networks:

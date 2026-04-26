@@ -49,7 +49,10 @@ export class UKBDatabaseWriter {
       extractionType: entity.entityType || 'Pattern',
       classification: this.team,
       confidence: (entity.significance || 5) / 10, // Convert 0-10 to 0-1
-      source: 'manual', // UKB creates manual knowledge
+      // Default to 'manual' for UKB writes; explicit `entity.source`
+      // wins so the consolidator's online-learning path can mark its
+      // entities as 'online' (rendered red/pink in the viewer).
+      source: entity.source || 'manual',
       team: this.team,
       sessionId: null, // No session for batch knowledge
       embeddingId: null, // Will be set if embeddings are generated
@@ -60,6 +63,10 @@ export class UKBDatabaseWriter {
         ...(entity.metadata?.ontology ? { ontology: entity.metadata.ontology } : {})
       }
     };
+    // Preserve original creation timestamp when updating an existing
+    // entity (the GraphDB merge already does this, but pass it through
+    // explicitly so the SQLite fallback path doesn't reset it).
+    if (entity.created_at) entityData.created_at = entity.created_at;
 
     // Forward hierarchy fields if present
     if (entity.parentEntityName !== undefined) entityData.parentEntityName = entity.parentEntityName;

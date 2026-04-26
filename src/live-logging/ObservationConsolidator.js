@@ -187,6 +187,133 @@ export class ObservationConsolidator {
   }
 
   /**
+   * Lazily load the upper ontology so insights can be classified into
+   * the same entity classes the KG already understands. Returns the
+   * parsed entities map (name → definition) or null if unavailable.
+   * Failure here is non-fatal — callers fall back to a generic class.
+   */
+  _getOntologyClasses() {
+    if (this._ontologyClasses !== undefined) return this._ontologyClasses;
+    this._ontologyClasses = null;
+    try {
+      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+      const ontPath = path.join(projectRoot, '.data/ontologies/upper/development-knowledge-ontology.json');
+      const raw = JSON.parse(fs.readFileSync(ontPath, 'utf8'));
+      const entities = raw.entities || {};
+      // Drop the JSON's `_comment_*` placeholders. Build the search
+      // tokens once (lowercased name + description words) so per-insight
+      // matching stays cheap.
+      const out = {};
+      for (const [name, def] of Object.entries(entities)) {
+        if (name.startsWith('_') || !def || typeof def !== 'object') continue;
+        const desc = (def.description || '').toLowerCase();
+        out[name] = {
+          name,
+          description: def.description || '',
+          tokens: this._tokenize(`${name} ${desc}`),
+        };
+      }
+      this._ontologyClasses = out;
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Ontology unavailable (non-fatal): ${err.message}\n`);
+    }
+    return this._ontologyClasses;
+  }
+
+  _tokenize(text) {
+    return new Set(
+      (text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 4)
+    );
+  }
+
+  /**
+   * Classify an insight (topic + summary) into the best-matching upper
+   * ontology entity class via token overlap. Returns the chosen class
+   * name + a confidence score in [0,1]. Falls back to 'Knowledge' for
+   * insights that don't strongly match any ontology class — better
+   * than mis-classifying as e.g. 'File' just because the word appeared
+   * once.
+   */
+  _classifyInsightByOntology(topic, summary) {
+    const classes = this._getOntologyClasses();
+    if (!classes) return { entityClass: 'Knowledge', confidence: 0 };
+
+    const insightTokens = this._tokenize(`${topic} ${summary}`);
+    if (insightTokens.size === 0) return { entityClass: 'Knowledge', confidence: 0 };
+
+    let best = null;
+    for (const def of Object.values(classes)) {
+      let overlap = 0;
+      for (const t of def.tokens) if (insightTokens.has(t)) overlap++;
+      if (overlap === 0) continue;
+      // Normalize against the smaller of the two token sets so a long
+      // summary against a tight class definition still scores well.
+      const denom = Math.max(1, Math.min(def.tokens.size, insightTokens.size));
+      const score = overlap / denom;
+      if (!best || score > best.score) best = { name: def.name, score };
+    }
+    if (!best || best.score < 0.15) return { entityClass: 'Knowledge', confidence: 0 };
+    return { entityClass: best.name, confidence: Math.min(1, best.score) };
+  }
+
+  /**
+   * Push a synthesized insight into the KG as an online-learned entity.
+   * The viewer renders these red/pink so the user can distinguish
+   * auto-learned knowledge from the manual UKB pipeline output.
+   *
+   * Each call replaces the entity's observations with the freshly
+   * synthesized summary — re-synthesis intentionally supersedes the
+   * older narrative rather than appending. Provenance is preserved
+   * across cleanup writes by the underlying writer (see
+   * UKBDatabaseWriter.updateEntity).
+   *
+   * Failure is non-fatal so a VKB outage cannot block the SQLite
+   * insight pipeline.
+   *
+   * @param {{topic:string, summary:string, project:string, confidence:number, _digestIds?:string[]}} entry
+   */
+  async _pushInsightToKG(entry) {
+    if (!entry?.topic) return;
+    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
+    const project = entry.project || 'coding';
+    const { entityClass, confidence: classConf } = this._classifyInsightByOntology(entry.topic, entry.summary || '');
+    const body = {
+      entityType: entityClass,
+      observations: [entry.summary || entry.topic],
+      significance: Math.round(((entry.confidence ?? 0.6) * 10)),
+      team: project,
+      source: 'online',
+      metadata: {
+        confidence: entry.confidence,
+        digest_ids: entry._digestIds || [],
+        ontology: {
+          ontologyName: 'development-knowledge-ontology',
+          classificationMethod: 'heuristic-token-overlap',
+          classificationConfidence: classConf,
+        },
+      },
+    };
+    try {
+      const res = await fetch(
+        `${vkbUrl}/api/entities/${encodeURIComponent(entry.topic)}`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+      if (!res.ok) {
+        const txt = await res.text();
+        process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed ${res.status}: ${txt.slice(0, 200)}\n`);
+      } else if (this._kgPushDebug) {
+        process.stderr.write(`[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project}\n`);
+      }
+    } catch (err) {
+      process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed: ${err.message}\n`);
+    }
+  }
+
+  /**
    * Extract the project label from an observation's metadata JSON.
    * Returns 'unknown' for missing/malformed metadata so partitioning is total.
    */
@@ -973,9 +1100,27 @@ export class ObservationConsolidator {
       });
     }
 
+    // Mirror each insight into the KG as an online-learned entity. The
+    // call replaces observations on existing entities (intentional —
+    // re-synthesis supersedes older narrative) and tags them
+    // source='online' so the viewer renders them in the auto-learned
+    // tier instead of the manual UKB tier. Done sequentially because
+    // the VKB writer doesn't support batch PUT, but kept off the hot
+    // path of the SQLite write and not awaited beyond a best-effort
+    // fire so a VKB outage can't block the consolidator.
+    const KG_PUSH_TIMEOUT_MS = 15000;
+    await Promise.race([
+      (async () => {
+        for (const entry of insightEntries) {
+          try { await this._pushInsightToKG(entry); } catch { /* swallowed */ }
+        }
+      })(),
+      new Promise((r) => setTimeout(r, KG_PUSH_TIMEOUT_MS)),
+    ]);
+
     try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
 
-    process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated\n`);
+    process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated (mirrored to KG as 'online' entities)\n`);
     return { created, updated };
   }
 
