@@ -470,6 +470,23 @@ class HealthVerifier extends EventEmitter {
       });
     }
 
+    // Check Health Dashboard Frontend (port_listening rule was previously
+    // never dispatched — the dashboard rendered the missing check as "Down")
+    if (serviceRules.health_dashboard_frontend?.enabled) {
+      const rule = serviceRules.health_dashboard_frontend;
+      const frontendCheck = await this.checkPortListening(
+        'health_dashboard_frontend',
+        rule.port,
+        rule.timeout_ms
+      );
+      checks.push({
+        ...frontendCheck,
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
+      });
+    }
+
     // Check LLM CLI Proxy (required for observation summarization)
     if (serviceRules.llm_cli_proxy?.enabled) {
       const rule = serviceRules.llm_cli_proxy;
@@ -563,7 +580,10 @@ class HealthVerifier extends EventEmitter {
       let isNetworkBlocked = false;
       if (!isHealthy) {
         try {
-          const proxyHealth = await (await fetch('http://localhost:12435/health', {
+          // Proxy runs on host; use host.docker.internal so the check works
+          // from inside the Docker container too (container localhost is the
+          // container itself, not the host).
+          const proxyHealth = await (await fetch('http://host.docker.internal:12435/health', {
             signal: AbortSignal.timeout(3000)
           })).json();
           // If proxy is healthy but ALL providers have high consecutive failures,

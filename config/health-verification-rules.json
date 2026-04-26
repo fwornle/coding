@@ -116,11 +116,12 @@
         "enabled": true,
         "severity": "warning",
         "check_type": "http_health",
-        "endpoint": "http://localhost:12435/health",
+        "endpoint": "http://host.docker.internal:12435/health",
         "timeout_ms": 3000,
-        "description": "LLM CLI Proxy - required for observation summarization",
-        "auto_heal": true,
+        "description": "LLM CLI Proxy - runs on host, reached via host.docker.internal from container. Required for observation summarization.",
+        "auto_heal": false,
         "auto_heal_action": "restart_llm_cli_proxy",
+        "auto_heal_note": "Proxy runs on host, not in supervisord. Auto-heal disabled — manual start: cd integrations/llm-cli-proxy && npm start",
         "expected_status": "required"
       },
       "enhanced_transcript_monitor": {
