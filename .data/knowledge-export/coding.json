@@ -1110,12 +1110,15 @@
       "observations": [
         "The DAG-based execution model is implemented using topological sort in batch-analysis.yaml steps, as seen in the parent context of the Pipeline sub-component.",
         "Each step in the batch-analysis.yaml declares explicit depends_on edges, defining the dependencies between tasks in the pipeline.",
-        "The BatchScheduler class, mentioned in the parent context, is likely responsible for managing the execution of tasks in the pipeline, although its exact implementation is not visible without source files."
+        "The BatchScheduler class, mentioned in the parent context, is likely responsible for managing the execution of tasks in the pipeline, although its exact implementation is not visible without source files.",
+        "The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges, as described in the parent context.",
+        "The use of a DAG-based execution model allows for efficient execution of steps with complex dependencies, as each step only needs to declare its dependencies and the model will handle the ordering.",
+        "The topological sort algorithm is used to order the steps in a way that ensures that each step is executed only after all its dependencies have been executed."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:38.629Z",
-        "last_updated": "2026-03-07T12:41:27.339Z"
+        "last_updated": "2026-04-26T08:33:42.048Z"
       },
       "id": "mc4flkg2tgbjy2"
     },
@@ -1708,12 +1711,18 @@
         "The manager could be responsible for routing requests to appropriate services based on the mode of operation, such as development or production.",
         "It may also be involved in monitoring service health and triggering retries or fallbacks as necessary, although specific implementations details are not provided.",
         "The LLMServiceManager's operation could be influenced by configuration files or environment variables, such as those mentioned in the project documentation (e.g., BROWSER_ACCESS_PORT, ANTHROPIC_API_KEY).",
-        "Its functionality might be extended or modified through hooks or plugins, as suggested by the presence of hook functions in the integrations/copi/docs/hooks.md documentation."
+        "Its functionality might be extended or modified through hooks or plugins, as suggested by the presence of hook functions in the integrations/copi/docs/hooks.md documentation.",
+        "LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.",
+        "It probably utilizes specific modules or files for managing LLM operations and providing a standardized interface.",
+        "LlmServiceManager could employ mechanisms for efficient and scalable LLM usage, such as caching or batching.",
+        "It might involve the VkbApiClientManager for VKB API interactions related to LLM operations.",
+        "LlmServiceManager probably relies on the GraphDatabaseAdapter for persisting LLM-related data.",
+        "LlmServiceManager may utilize concurrency mechanisms for managing multiple LLM operations"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T14:29:36.214Z",
-        "last_updated": "2026-03-18T17:36:21.747Z"
+        "last_updated": "2026-04-26T08:33:41.962Z"
       },
       "id": "mc4flkgubmtt1"
     },
@@ -2764,21 +2773,6 @@
       "id": "mc4flkg3hneej7"
     },
     {
-      "name": "HttpConnectionHandler",
-      "entityType": "Detail",
-      "observations": [
-        "The ConnectionManager sub-component utilizes the SpecstoryAdapter's connectViaHTTP method, indicating a strong reliance on HTTP connections to the Specstory extension.",
-        "Given the parent context, it is likely that the HttpConnectionHandler would be responsible for implementing connection establishment, data transfer, and error handling for HTTP connections.",
-        "The absence of source files limits the ability to provide more specific observations, but the parent context suggests that the HttpConnectionHandler would play a crucial role in the ConnectionManager's functionality."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-08T06:28:51.285Z",
-        "last_updated": "2026-03-08T06:31:24.000Z"
-      },
-      "id": "mc4flkg4wec890"
-    },
-    {
       "name": "RetryPolicy",
       "entityType": "Detail",
       "observations": [
@@ -3705,12 +3699,15 @@
       "observations": [
         "The ConnectionManager uses a retry-with-backoff pattern in connectViaHTTP to establish a connection to the Specstory extension, as implemented in lib/integrations/specstory-adapter.js.",
         "The HTTPConnectionHandler is expected to handle HTTP connections, including implementing the retry-with-backoff pattern, although the exact implementation details are not visible in the provided context.",
-        "The connection to the Specstory extension is established via the connectViaHTTP method, which is likely to be part of the HTTPConnectionHandler's responsibilities."
+        "The connection to the Specstory extension is established via the connectViaHTTP method, which is likely to be part of the HTTPConnectionHandler's responsibilities.",
+        "The ConnectionManager sub-component utilizes the SpecstoryAdapter's connectViaHTTP method, indicating a strong reliance on HTTP connections to the Specstory extension.",
+        "Given the parent context, it is likely that the HttpConnectionHandler would be responsible for implementing connection establishment, data transfer, and error handling for HTTP connections.",
+        "The absence of source files limits the ability to provide more specific observations, but the parent context suggests that the HttpConnectionHandler would play a crucial role in the ConnectionManager's functionality."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T08:17:01.056Z",
-        "last_updated": "2026-03-09T09:49:23.395Z"
+        "last_updated": "2026-04-26T08:33:42.026Z"
       },
       "id": "mc4flkghr5rs4"
     },
@@ -4396,21 +4393,6 @@
       "id": "mc4flkg1zke3ll"
     },
     {
-      "name": "DagBasedExecutionModel",
-      "entityType": "Detail",
-      "observations": [
-        "The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges, as described in the parent context.",
-        "The use of a DAG-based execution model allows for efficient execution of steps with complex dependencies, as each step only needs to declare its dependencies and the model will handle the ordering.",
-        "The topological sort algorithm is used to order the steps in a way that ensures that each step is executed only after all its dependencies have been executed."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-08T10:26:15.051Z",
-        "last_updated": "2026-03-08T10:29:09.793Z"
-      },
-      "id": "mc4flkg31xoau"
-    },
-    {
       "name": "ModelRunnerClient",
       "entityType": "Detail",
       "observations": [
@@ -4602,12 +4584,18 @@
         "UKBTraceReportGenerator relies on the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.",
         "UKBTraceReportGenerator's report generation process involves using the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to analyze the code graph and generate a report.",
         "UKBTraceReportGenerator's reports involve detailed information about the knowledge management process, as seen in the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts).",
-        "The CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to retrieve information from the graph database."
+        "The CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to retrieve information from the graph database.",
+        "UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.",
+        "It probably utilizes the LlmServiceManager for LLM operations during trace report generation.",
+        "UkbTraceReportGenerator could employ the VkbApiClientManager for VKB API interactions during report generation.",
+        "It might involve specific modules or files for defining the structure and content of trace reports.",
+        "UkbTraceReportGenerator probably relies on the WaveAgentController for information about Wave agent execution and workflows.",
+        "UkbTraceReportGenerator may use the GraphDatabaseAdapter for accessing relevant data"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T13:27:08.459Z",
-        "last_updated": "2026-03-12T05:58:01.288Z"
+        "last_updated": "2026-04-26T08:33:41.980Z"
       },
       "id": "mc4flkg1azuxza"
     },
@@ -5127,12 +5115,15 @@
         "The LSLConverter supports multiple agent-specific transcript formats, including JSON and XML, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file",
         "The LSLConverter has a built-in validation mechanism to ensure converted transcript integrity, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file",
         "The LSLConverter uses a caching mechanism to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file",
-        "The LSLConverter provides a configurable conversion pipeline, allowing for flexible conversion workflows, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file"
+        "The LSLConverter provides a configurable conversion pipeline, allowing for flexible conversion workflows, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file",
+        "LslConverter uses a specific conversion algorithm to transform transcripts into LSL format.",
+        "The LSL converter is a separate module, allowing for updates and maintenance without affecting the logging or transcript processing functionality.",
+        "The LslConverter, located in the lib/agent-api/transcripts/lsl-converter.js file, utilizes the convertTranscriptToLsl() function to transform raw transcripts into the required LSL format for further processing within the LiveLoggingSystem."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-08T15:11:22.639Z",
-        "last_updated": "2026-03-18T05:48:38.893Z"
+        "last_updated": "2026-04-26T08:33:42.002Z"
       },
       "id": "mc4flkg30yo2h1"
     },
@@ -6622,21 +6613,6 @@
       "id": "mc4flkg19ryh4u"
     },
     {
-      "name": "LslConverter",
-      "entityType": "SubComponent",
-      "observations": [
-        "LslConverter uses a specific conversion algorithm to transform transcripts into LSL format.",
-        "The LSL converter is a separate module, allowing for updates and maintenance without affecting the logging or transcript processing functionality.",
-        "The LslConverter, located in the lib/agent-api/transcripts/lsl-converter.js file, utilizes the convertTranscriptToLsl() function to transform raw transcripts into the required LSL format for further processing within the LiveLoggingSystem."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-11T14:49:45.203Z",
-        "last_updated": "2026-03-11T14:50:28.531Z"
-      },
-      "id": "mc4flkgrgb1j9"
-    },
-    {
       "name": "CircuitBreaker",
       "entityType": "SubComponent",
       "observations": [
@@ -6956,12 +6932,17 @@
         "The CodeGraphRAG provides an API for querying the code graph, allowing other sub-components to retrieve code graph information, as referenced in the integrations/code-graph-rag/README.md file.",
         "The CodeGraphRAG utilizes a versioning system to track changes to the code graph, as seen in the integrations/code-graph-rag/docs/claude-code-setup.md file.",
         "The CodeGraphRAG uses a logging mechanism to track changes to the code graph, as seen in the integrations/code-graph-rag/README.md file.",
-        "The CodeGraphRAG provides a mechanism for updating the code graph, allowing for dynamic changes to the code graph, as implemented in the integrations/code-graph-rag/docs/claude-code-setup.md file."
+        "The CodeGraphRAG provides a mechanism for updating the code graph, allowing for dynamic changes to the code graph, as implemented in the integrations/code-graph-rag/docs/claude-code-setup.md file.",
+        "CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.",
+        "The CodeGraphRag sub-component is responsible for handling code analysis.",
+        "CodeGraphRag ensures that the system can handle complex codebases, providing a robust foundation for the project's functionality.",
+        "CodeGraphRag enables the system to handle complex codebases with ease.",
+        "The graph-based approach used by CodeGraphRag simplifies the analysis process."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-17T10:41:59.637Z",
-        "last_updated": "2026-03-21T06:36:55.049Z"
+        "last_updated": "2026-04-26T08:33:41.922Z"
       },
       "id": "mc4flkg11sfod3"
     },
@@ -7533,12 +7514,15 @@
       "observations": [
         "The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system as a graph-based RAG system for any codebases.",
         "The integrations/code-graph-rag/CONTRIBUTING.md file provides guidelines for contributing to the Code Graph RAG system, indicating its importance in the OnlineLearning sub-component.",
-        "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT variables are mentioned in the project documentation as key components of the Code Graph RAG system integration."
+        "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT variables are mentioned in the project documentation as key components of the Code Graph RAG system integration.",
+        "The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system, which is used for analyzing codebases and extracting knowledge entities and relationships.",
+        "The integrations/code-graph-rag/docs/claude-code-setup.md file provides setup instructions for Claude Code with the Graph-Code MCP Server, indicating a connection between the Code Graph RAG system and the OnlineLearning sub-component.",
+        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the project documentation suggests that the Code Graph RAG system is integrated with the OnlineLearning sub-component through specific ports and URLs."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-17T15:38:04.367Z",
-        "last_updated": "2026-03-21T06:37:27.919Z"
+        "last_updated": "2026-04-26T08:33:41.901Z"
       },
       "id": "mc4flkg5twx19"
     },
@@ -7939,21 +7923,6 @@
         "last_updated": "2026-03-18T18:26:36.903Z"
       },
       "id": "mc4flkg17ld0jz"
-    },
-    {
-      "name": "CodeGraphRagIntegration",
-      "entityType": "Detail",
-      "observations": [
-        "The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system, which is used for analyzing codebases and extracting knowledge entities and relationships.",
-        "The integrations/code-graph-rag/docs/claude-code-setup.md file provides setup instructions for Claude Code with the Graph-Code MCP Server, indicating a connection between the Code Graph RAG system and the OnlineLearning sub-component.",
-        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the project documentation suggests that the Code Graph RAG system is integrated with the OnlineLearning sub-component through specific ports and URLs."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-18T05:47:22.163Z",
-        "last_updated": "2026-03-19T08:48:53.544Z"
-      },
-      "id": "mc4flkg294pm0z"
     },
     {
       "name": "TmuxIntegration",
@@ -8374,21 +8343,6 @@
       "id": "mc4flkg1j7u1db"
     },
     {
-      "name": "GraphCodeRagIntegration",
-      "entityType": "Detail",
-      "observations": [
-        "The Code Graph RAG system is described in integrations/code-graph-rag/README.md, which outlines its graph-based approach to code analysis.",
-        "The Claude Code Setup for Graph-Code MCP Server is detailed in integrations/code-graph-rag/docs/claude-code-setup.md, indicating a specific integration point.",
-        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the key documented components suggests a defined interface for interacting with the Code Graph RAG system."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-18T06:33:14.822Z",
-        "last_updated": "2026-03-18T06:36:19.845Z"
-      },
-      "id": "mc4flkgrz86yx"
-    },
-    {
       "name": "NaturalLanguageProcessor",
       "entityType": "Detail",
       "observations": [
@@ -8741,12 +8695,15 @@
         "The integrations/code-graph-rag/CONTRIBUTING.md file implies that CodeGraphRAGConfiguration may have guidelines for contributing to the CodeGraphRAG sub-component, including its configuration settings.",
         "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT are defined as configuration settings in the integrations/code-graph-rag/README.md file.",
         "The CONTAINS_PACKAGE configuration setting is mentioned in the project documentation, indicating its importance in the CodeGraphRAG sub-component.",
-        "The ANTHROPIC_API_KEY and BROWSERBASE_API_KEY are listed as key documented components, suggesting their role in the configuration of the CodeGraphRAG system."
+        "The ANTHROPIC_API_KEY and BROWSERBASE_API_KEY are listed as key documented components, suggesting their role in the configuration of the CodeGraphRAG system.",
+        "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT are defined as part of the CodeGraphRag configuration, as mentioned in the project documentation (integrations/code-graph-rag/README.md).",
+        "The ANTHROPIC_API_KEY and BROWSERBASE_API_KEY are referenced in the project documentation (integrations/code-graph-rag/README.md) as essential configuration settings for the CodeGraphRag system.",
+        "The MEMGRAPH_BATCH_SIZE is mentioned in the project documentation (integrations/code-graph-rag/README.md) as a configuration setting that affects the performance of the CodeGraphRag system."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-18T18:26:33.152Z",
-        "last_updated": "2026-03-19T08:39:46.811Z"
+        "last_updated": "2026-04-26T08:33:41.942Z"
       },
       "id": "mc4flkgrzulep"
     },
@@ -10246,23 +10203,6 @@
       "id": "mc4flkg1cg0bfy"
     },
     {
-      "name": "CodeGraphRag",
-      "entityType": "SubComponent",
-      "observations": [
-        "CodeGraphRag uses a graph-based approach to analyze code, providing a robust foundation for the project's functionality.",
-        "The CodeGraphRag sub-component is responsible for handling code analysis.",
-        "CodeGraphRag ensures that the system can handle complex codebases, providing a robust foundation for the project's functionality.",
-        "CodeGraphRag enables the system to handle complex codebases with ease.",
-        "The graph-based approach used by CodeGraphRag simplifies the analysis process."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-19T07:21:21.041Z",
-        "last_updated": "2026-03-19T08:47:57.783Z"
-      },
-      "id": "mc4flkg11sfp5j"
-    },
-    {
       "name": "GraphDatabaseManagerInterface",
       "entityType": "SubComponent",
       "observations": [
@@ -10785,21 +10725,6 @@
       "id": "mc4flkg2j1mqph"
     },
     {
-      "name": "CodeGraphRagSystem",
-      "entityType": "Detail",
-      "observations": [
-        "The CodeGraphRagSystem is mentioned in the integrations/code-graph-rag/README.md file, which suggests its significance in the code graph construction process.",
-        "The CodeGraphRagSystem is also referenced in the integrations/code-graph-rag/docs/claude-code-setup.md file, indicating its connection to the Claude Code setup.",
-        "The presence of CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT in the key documented components implies that the CodeGraphRagSystem has specific configuration points for port and SSE port settings."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-19T08:40:12.436Z",
-        "last_updated": "2026-03-19T08:49:08.980Z"
-      },
-      "id": "mc4flkg1oppnvq"
-    },
-    {
       "name": "GraphBasedPatternIdentification",
       "entityType": "Detail",
       "observations": [
@@ -11039,39 +10964,6 @@
       "id": "mc4flkguywuqj"
     },
     {
-      "name": "CodeGraphRagConfiguration",
-      "entityType": "Detail",
-      "observations": [
-        "The CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT are defined as part of the CodeGraphRag configuration, as mentioned in the project documentation (integrations/code-graph-rag/README.md).",
-        "The ANTHROPIC_API_KEY and BROWSERBASE_API_KEY are referenced in the project documentation (integrations/code-graph-rag/README.md) as essential configuration settings for the CodeGraphRag system.",
-        "The MEMGRAPH_BATCH_SIZE is mentioned in the project documentation (integrations/code-graph-rag/README.md) as a configuration setting that affects the performance of the CodeGraphRag system."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-19T08:45:59.163Z",
-        "last_updated": "2026-03-19T08:49:17.198Z"
-      },
-      "id": "mc4flkg1tyswrl"
-    },
-    {
-      "name": "UkbTraceReportGenerator",
-      "entityType": "SubComponent",
-      "observations": [
-        "UkbTraceReportGenerator likely interacts with the GraphDatabaseManager to retrieve data for trace reports.",
-        "It probably utilizes the LlmServiceManager for LLM operations during trace report generation.",
-        "UkbTraceReportGenerator could employ the VkbApiClientManager for VKB API interactions during report generation.",
-        "It might involve specific modules or files for defining the structure and content of trace reports.",
-        "UkbTraceReportGenerator probably relies on the WaveAgentController for information about Wave agent execution and workflows.",
-        "UkbTraceReportGenerator may use the GraphDatabaseAdapter for accessing relevant data"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-19T08:47:23.039Z",
-        "last_updated": "2026-03-19T08:47:23.039Z"
-      },
-      "id": "mc4flkg1vd4qre"
-    },
-    {
       "name": "WaveAgentController",
       "entityType": "SubComponent",
       "observations": [
@@ -11106,24 +10998,6 @@
         "last_updated": "2026-03-19T08:47:30.754Z"
       },
       "id": "mc4flkg3mbnj5h"
-    },
-    {
-      "name": "LlmServiceManager",
-      "entityType": "SubComponent",
-      "observations": [
-        "LlmServiceManager likely interacts with other components for LLM-related tasks, such as the GraphDatabaseManager and WaveAgentController.",
-        "It probably utilizes specific modules or files for managing LLM operations and providing a standardized interface.",
-        "LlmServiceManager could employ mechanisms for efficient and scalable LLM usage, such as caching or batching.",
-        "It might involve the VkbApiClientManager for VKB API interactions related to LLM operations.",
-        "LlmServiceManager probably relies on the GraphDatabaseAdapter for persisting LLM-related data.",
-        "LlmServiceManager may utilize concurrency mechanisms for managing multiple LLM operations"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-19T08:47:31.002Z",
-        "last_updated": "2026-03-19T08:47:31.002Z"
-      },
-      "id": "mc4flkg48cc6mz"
     },
     {
       "name": "GraphManagement",
@@ -11504,12 +11378,15 @@
       "observations": [
         "The Graph-Code RAG system is described in integrations/code-graph-rag/README.md, which outlines its capabilities and usage.",
         "The integration of Graph-Code RAG is mentioned in the context of the CodeAnalysisPatterns sub-component, indicating its importance in the overall analysis process.",
-        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the documented components suggests that the Graph-Code RAG system is configured and used within the CodeAnalysisPatterns sub-component."
+        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the documented components suggests that the Graph-Code RAG system is configured and used within the CodeAnalysisPatterns sub-component.",
+        "The Code Graph RAG system is described in integrations/code-graph-rag/README.md, which outlines its graph-based approach to code analysis.",
+        "The Claude Code Setup for Graph-Code MCP Server is detailed in integrations/code-graph-rag/docs/claude-code-setup.md, indicating a specific integration point.",
+        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the key documented components suggests a defined interface for interacting with the Code Graph RAG system."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-21T06:31:53.201Z",
-        "last_updated": "2026-03-21T06:37:40.512Z"
+        "last_updated": "2026-04-26T08:33:41.877Z"
       },
       "id": "mc4flkg1mzec3b"
     },
@@ -11519,12 +11396,15 @@
       "observations": [
         "The CodeGraphRAGSystem is mentioned in the integrations/code-graph-rag/README.md file as a Graph-Code RAG system for any codebases.",
         "The integrations/code-graph-rag/CONTRIBUTING.md file provides guidelines for contributing to the Code Graph RAG system, indicating an open-source and collaborative approach.",
-        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the key documented components suggests that the system uses ports for communication and data exchange."
+        "The presence of CODE_GRAPH_RAG_SSE_PORT and CODE_GRAPH_RAG_PORT in the key documented components suggests that the system uses ports for communication and data exchange.",
+        "The CodeGraphRagSystem is mentioned in the integrations/code-graph-rag/README.md file, which suggests its significance in the code graph construction process.",
+        "The CodeGraphRagSystem is also referenced in the integrations/code-graph-rag/docs/claude-code-setup.md file, indicating its connection to the Claude Code setup.",
+        "The presence of CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT in the key documented components implies that the CodeGraphRagSystem has specific configuration points for port and SSE port settings."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-21T06:31:53.206Z",
-        "last_updated": "2026-03-21T06:37:47.056Z"
+        "last_updated": "2026-04-26T08:33:41.848Z"
       },
       "id": "mc4flkgia6gbq"
     },
@@ -13205,12 +13085,6 @@
       "metadata": {}
     },
     {
-      "from": "ConnectionManager",
-      "to": "HttpConnectionHandler",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "RetryMechanism",
       "to": "RetryPolicy",
       "relationType": "contains",
@@ -14287,12 +14161,6 @@
     {
       "from": "ArchitectureGuidelines",
       "to": "GraphDatabaseAdapter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Pipeline",
-      "to": "DagBasedExecutionModel",
       "relationType": "contains",
       "metadata": {}
     },
@@ -15743,12 +15611,6 @@
       "metadata": {}
     },
     {
-      "from": "LiveLoggingSystem",
-      "to": "LslConverter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "LLMAbstraction",
       "to": "CircuitBreaker",
       "relationType": "contains",
@@ -16535,12 +16397,6 @@
       "metadata": {}
     },
     {
-      "from": "CodeGraphRAGHandler",
-      "to": "CodeGraphRagIntegration",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
       "from": "BrowserAccessConfig",
       "to": "BrowserAccessMcpServer",
       "relationType": "related_to",
@@ -16961,12 +16817,6 @@
       "metadata": {}
     },
     {
-      "from": "OnlineLearning",
-      "to": "CodeGraphRagIntegration",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "OntologySystem",
       "to": "SemanticConstraintDetector",
       "relationType": "contains",
@@ -17369,12 +17219,6 @@
       "metadata": {}
     },
     {
-      "from": "CodeGraphRagIntegration",
-      "to": "CodeGraphConstructor",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
       "from": "LiveLoggingSystem",
       "to": "TranscriptProcessing",
       "relationType": "contains",
@@ -17585,12 +17429,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "CodeGraphRag",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "GraphDatabaseManagerInterface",
       "relationType": "contains",
@@ -17711,12 +17549,6 @@
       "metadata": {}
     },
     {
-      "from": "CodeGraphRAGService",
-      "to": "CodeGraphRag",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
       "from": "ConstraintMonitor",
       "to": "ConstraintConfiguration",
       "relationType": "related_to",
@@ -17738,12 +17570,6 @@
       "from": "ConstraintConfiguration",
       "to": "ConstraintExecutionPattern",
       "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "DockerizedServices",
-      "to": "CodeGraphRag",
-      "relationType": "contains",
       "metadata": {}
     },
     {
@@ -17785,12 +17611,6 @@
     {
       "from": "BrowserAccess",
       "to": "McpServerIntegration",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CodeGraphRag",
-      "to": "RagSystem",
       "relationType": "contains",
       "metadata": {}
     },
@@ -17885,18 +17705,6 @@
       "metadata": {}
     },
     {
-      "from": "CodeGraphRag",
-      "to": "CodeGraphRAG",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "CodeGraphRag",
-      "to": "CodeGraphRagSystem",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
       "from": "OntologyManagementSystem",
       "to": "GraphDatabaseManagement",
       "relationType": "related_to",
@@ -17911,12 +17719,6 @@
     {
       "from": "LogWriter",
       "to": "LoggerConfiguration",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "RagSystem",
-      "to": "CodeGraphRagSystem",
       "relationType": "related_to",
       "metadata": {}
     },
@@ -18371,12 +18173,6 @@
       "metadata": {}
     },
     {
-      "from": "GraphCodeRAG",
-      "to": "GraphCodeRagIntegration",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "Coding",
       "to": "NaturalLanguageProcessor",
       "relationType": "contains",
@@ -18629,18 +18425,6 @@
       "metadata": {}
     },
     {
-      "from": "CodeGraphRAG",
-      "to": "CodeGraphRagConfiguration",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "UKBTraceReportGenerator",
-      "to": "UkbTraceReportGenerator",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "WaveAgentController",
       "to": "WaveAgentController",
       "relationType": "contains",
@@ -18649,12 +18433,6 @@
     {
       "from": "VkbApiClientManager",
       "to": "VkbApiClientManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "LLMServiceManager",
-      "to": "LlmServiceManager",
       "relationType": "contains",
       "metadata": {}
     },
@@ -18926,9 +18704,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-04-18T08:59:24.612Z",
-    "total_entities": 673,
-    "total_relations": 1125,
+    "exported_at": "2026-04-26T08:33:47.104Z",
+    "total_entities": 663,
+    "total_relations": 1108,
     "description": "Coding project infrastructure and patterns"
   }
 }

@@ -1,21 +1,6 @@
 {
   "entities": [
     {
-      "name": "CollectiveKnowledge",
-      "entityType": "System",
-      "observations": [
-        "Central hub for high-value, transferable programming patterns",
-        "Contains only proven solutions applicable across multiple projects",
-        "Focus: architectural decisions, performance patterns, reusable designs"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-18T10:47:26.809Z",
-        "last_updated": "2025-11-18T10:47:26.809Z"
-      },
-      "id": "mc4flkg1qr4h9s"
-    },
-    {
       "name": "Timeline",
       "entityType": "Project",
       "observations": [
@@ -100,26 +85,13 @@
       "id": "mc4flkg8djycx"
     }
   ],
-  "relations": [
-    {
-      "from": "CollectiveKnowledge",
-      "to": "Timeline",
-      "relationType": "includes",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "DynArch",
-      "relationType": "includes",
-      "metadata": {}
-    }
-  ],
+  "relations": [],
   "metadata": {
     "version": "1.0.0",
     "team": "ui",
-    "exported_at": "2026-03-07T07:21:36.583Z",
-    "total_entities": 3,
-    "total_relations": 2,
+    "exported_at": "2026-04-26T08:41:23.434Z",
+    "total_entities": 2,
+    "total_relations": 0,
     "description": "UI/frontend patterns"
   }
 }
