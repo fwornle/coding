@@ -169,15 +169,118 @@ export class ObservationConsolidator {
     const text = `${entry.topic ?? ''}\n\n${entry.summary ?? ''}`.trim();
     if (!text) return null;
     const vector = await tools.embed(text);
-    const results = await tools.qdrant.search('insights', {
+    // Scope candidate matches to the same project so that "Coding Patterns"
+    // in project A cannot absorb a same-named topic from project B just
+    // because the embedding cosine clears the threshold.
+    const project = entry.project || 'unknown';
+    const search = {
       vector,
       limit: 1,
       score_threshold: INSIGHT_DEDUP_THRESHOLD,
       with_payload: false,
       with_vector: false,
-    });
+      filter: { must: [{ key: 'project', match: { value: project } }] },
+    };
+    const results = await tools.qdrant.search('insights', search);
     if (!results || results.length === 0) return null;
     return String(results[0].id);
+  }
+
+  /**
+   * Extract the project label from an observation's metadata JSON.
+   * Returns 'unknown' for missing/malformed metadata so partitioning is total.
+   */
+  _extractProject(metadataJson) {
+    if (!metadataJson) return 'unknown';
+    try {
+      const m = JSON.parse(metadataJson);
+      return (m && typeof m.project === 'string' && m.project) || 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Lazily-initialized ReliableCodingClassifier. Only the isCoding signal
+   * is consumed: per Phase A design we promote null-project rows to
+   * 'coding' when classified positive, or leave them as 'unknown'.
+   * Returns null if init fails — callers must fail open.
+   */
+  async _getClassifier() {
+    if (this._classifierInitAttempted) return this._classifier;
+    this._classifierInitAttempted = true;
+    try {
+      const Mod = await import('./ReliableCodingClassifier.js');
+      const Cls = Mod.default || Mod.ReliableCodingClassifier;
+      this._classifier = new Cls();
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Classifier unavailable (non-fatal): ${err.message}\n`);
+      this._classifier = null;
+    }
+    return this._classifier;
+  }
+
+  /**
+   * Backfill `metadata.project` for any null-project observations in the
+   * batch. Mutates in-place. The classifier only signals coding-vs-other,
+   * so positive results promote to 'coding'; everything else stays
+   * 'unknown'. Persists the resolved project back to the DB so future
+   * passes don't re-classify the same row.
+   */
+  async _backfillProjectsInBatch(observations) {
+    const nulls = observations.filter(o => this._extractProject(o.metadata) === 'unknown'
+      && !this._isMetadataExplicitUnknown(o.metadata));
+    if (nulls.length === 0) return;
+
+    const classifier = await this._getClassifier();
+    if (!classifier) {
+      process.stderr.write(`[Consolidator] Skipping classifier backfill — classifier unavailable\n`);
+      return;
+    }
+
+    const update = this.db.prepare(`
+      UPDATE observations
+      SET metadata = json_set(COALESCE(metadata, '{}'), '$.project', ?)
+      WHERE id = ?
+    `);
+    let promoted = 0;
+    for (const o of nulls) {
+      let project = 'unknown';
+      try {
+        const r = await classifier.classify({
+          userMessage: o.summary,
+          timestamp: o.created_at || new Date().toISOString(),
+        });
+        if (r?.isCoding) {
+          project = 'coding';
+          promoted++;
+        }
+      } catch { /* leave as unknown */ }
+      try { update.run(project, o.id); } catch { /* ok */ }
+      // Reflect the resolved project back into the in-memory row so the
+      // partition step that follows sees the new label.
+      try {
+        const m = o.metadata ? JSON.parse(o.metadata) : {};
+        m.project = project;
+        o.metadata = JSON.stringify(m);
+      } catch { /* keep original metadata; partitioning will fall back to 'unknown' */ }
+    }
+    if (promoted > 0) {
+      process.stderr.write(`[Consolidator] Classifier backfill promoted ${promoted}/${nulls.length} null-project obs to 'coding'\n`);
+    }
+  }
+
+  /**
+   * True when metadata explicitly carries project='unknown' (i.e. has been
+   * classified before). Used to avoid re-running the classifier on rows
+   * a previous pass already decided about.
+   */
+  _isMetadataExplicitUnknown(metadataJson) {
+    if (!metadataJson) return false;
+    try {
+      const m = JSON.parse(metadataJson);
+      return m && m.project === 'unknown';
+    } catch { return false; }
   }
 
   /**
@@ -255,9 +358,12 @@ export class ObservationConsolidator {
 
     const plan = digestEntries.map(() => ({ action: 'insert' }));
 
-    // Cross-batch: search Qdrant for an existing same-date digest above threshold.
+    // Cross-batch: search Qdrant for an existing same-date AND same-project
+    // digest above threshold. Same-day work in two separate projects must
+    // never collapse into a single digest row.
     for (let i = 0; i < digestEntries.length; i++) {
       if (!vectors[i]) continue;
+      const project = digestEntries[i].project || 'unknown';
       try {
         const hits = await tools.qdrant.search('digests', {
           vector: vectors[i],
@@ -265,7 +371,12 @@ export class ObservationConsolidator {
           score_threshold: DIGEST_DEDUP_THRESHOLD,
           with_payload: true,
           with_vector: false,
-          filter: { must: [{ key: 'date', match: { value: date } }] },
+          filter: {
+            must: [
+              { key: 'date', match: { value: date } },
+              { key: 'project', match: { value: project } },
+            ],
+          },
         });
         if (hits && hits.length > 0) {
           plan[i] = { action: 'merge', targetId: String(hits[0].id) };
@@ -276,7 +387,8 @@ export class ObservationConsolidator {
     }
 
     // Within-batch: greedy pairwise. Earlier entries (or the cross-batch
-    // target the entry already merges into) absorb later ones.
+    // target the entry already merges into) absorb later ones — but only
+    // when they share the same project label.
     const cosine = (a, b) => {
       let dot = 0, na = 0, nb = 0;
       for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
@@ -284,9 +396,12 @@ export class ObservationConsolidator {
     };
     for (let i = 1; i < digestEntries.length; i++) {
       if (!vectors[i] || plan[i].action === 'merge') continue;
+      const projectI = digestEntries[i].project || 'unknown';
       let bestJ = -1, bestSim = 0;
       for (let j = 0; j < i; j++) {
         if (!vectors[j]) continue;
+        const projectJ = digestEntries[j].project || 'unknown';
+        if (projectJ !== projectI) continue;
         const sim = cosine(vectors[i], vectors[j]);
         if (sim >= DIGEST_DEDUP_THRESHOLD && sim > bestSim) {
           bestSim = sim;
@@ -346,10 +461,17 @@ export class ObservationConsolidator {
       this.db.exec('ALTER TABLE observations ADD COLUMN digested_at TEXT');
     } catch { /* column exists */ }
 
+    // Project-attribution columns (Phase A added via migration script —
+    // mirrored here so a fresh DB still has them).
+    try { this.db.exec('ALTER TABLE digests ADD COLUMN project TEXT'); } catch { /* exists */ }
+    try { this.db.exec('ALTER TABLE insights ADD COLUMN project TEXT'); } catch { /* exists */ }
+
     // Index for efficient undigested lookups
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_obs_digested ON observations(digested_at)');
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_date ON digests(date)');
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_topic ON insights(topic)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_project ON digests(project)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_project ON insights(project)');
 
     // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
@@ -425,36 +547,60 @@ export class ObservationConsolidator {
       return { digests: 0, observations: 0 };
     }
 
-    process.stderr.write(`[Consolidator] Consolidating ${observations.length} observations for ${date}\n`);
+    // Resolve any null-project observations via the classifier before
+    // partitioning. Phase A handled the historical backlog; this catches
+    // any new rows that arrive without metadata.project populated.
+    await this._backfillProjectsInBatch(observations);
 
-    // Chunk large days to avoid LLM timeouts (max ~35 observations per call)
-    const CHUNK_SIZE = 35;
-    const chunks = [];
-    for (let i = 0; i < observations.length; i += CHUNK_SIZE) {
-      chunks.push(observations.slice(i, i + CHUNK_SIZE));
+    // Partition by project so each LLM run sees a single project's
+    // narrative. Without this, mixed-project days produce digests that
+    // lump unrelated work under the wrong project label and break the
+    // downstream per-project filter.
+    const byProject = new Map();
+    for (const o of observations) {
+      const p = this._extractProject(o.metadata);
+      if (!byProject.has(p)) byProject.set(p, []);
+      byProject.get(p).push(o);
     }
 
+    const breakdown = [...byProject.entries()]
+      .map(([p, list]) => `${p}=${list.length}`).join(', ');
+    process.stderr.write(`[Consolidator] Consolidating ${observations.length} observations for ${date} (${breakdown})\n`);
+
+    // Chunk large groups to avoid LLM timeouts (max ~35 observations per call)
+    const CHUNK_SIZE = 35;
     const allDigestEntries = [];
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const chunk = chunks[ci];
-      const globalOffset = ci * CHUNK_SIZE;
 
-      const obsBlock = chunk.map((o, i) => {
-        const time = o.created_at.split('T')[1]?.slice(0, 5) || '??:??';
-        return `[${globalOffset + i + 1}] ${time} (${o.agent || 'unknown'}) ${o.summary}`;
-      }).join('\n\n');
-
-      const prompt = this._buildConsolidationPrompt(date, obsBlock, chunk.length);
-      const result = await this._callLLM(prompt);
-
-      if (!result) {
-        process.stderr.write(`[Consolidator] LLM call failed for ${date} chunk ${ci + 1}/${chunks.length}, skipping chunk\n`);
-        continue;
+    for (const [project, projObs] of byProject) {
+      const chunks = [];
+      for (let i = 0; i < projObs.length; i += CHUNK_SIZE) {
+        chunks.push(projObs.slice(i, i + CHUNK_SIZE));
       }
 
-      // Parse with the chunk's observations but map indices relative to global offset
-      const chunkDigests = this._parseDigests(result, date, chunk, globalOffset);
-      allDigestEntries.push(...chunkDigests);
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunk = chunks[ci];
+        const globalOffset = ci * CHUNK_SIZE;
+
+        const obsBlock = chunk.map((o, i) => {
+          const time = o.created_at.split('T')[1]?.slice(0, 5) || '??:??';
+          return `[${globalOffset + i + 1}] ${time} (${o.agent || 'unknown'}) ${o.summary}`;
+        }).join('\n\n');
+
+        const prompt = this._buildConsolidationPrompt(date, obsBlock, chunk.length);
+        const result = await this._callLLM(prompt);
+
+        if (!result) {
+          process.stderr.write(`[Consolidator] LLM call failed for ${date}/${project} chunk ${ci + 1}/${chunks.length}, skipping chunk\n`);
+          continue;
+        }
+
+        // Parse with the chunk's observations but map indices relative to global offset
+        const chunkDigests = this._parseDigests(result, date, chunk, globalOffset);
+        // Tag every digest with the project so downstream merge planning
+        // and INSERT both have access to it.
+        for (const d of chunkDigests) d.project = project;
+        allDigestEntries.push(...chunkDigests);
+      }
     }
 
     const digestEntries = allDigestEntries;
@@ -466,11 +612,11 @@ export class ObservationConsolidator {
     // Write digests and mark observations as digested
     const now = new Date().toISOString();
     const insertDigest = this.db.prepare(`
-      INSERT INTO digests (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO digests (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata, project)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const getDigest = this.db.prepare(
-      'SELECT id, observation_ids, agents, files_touched, summary, quality FROM digests WHERE id = ?'
+      'SELECT id, observation_ids, agents, files_touched, summary, quality, project FROM digests WHERE id = ?'
     );
     const updateDigest = this.db.prepare(`
       UPDATE digests
@@ -547,7 +693,8 @@ export class ObservationConsolidator {
           JSON.stringify(d.observationIds),
           JSON.stringify(d.agents),
           this._redactPaths(JSON.stringify(d.filesTouched)),
-          d.quality, now, this._redactPaths(JSON.stringify(d.metadata || {}))
+          d.quality, now, this._redactPaths(JSON.stringify(d.metadata || {})),
+          d.project || 'unknown'
         );
         createdCount++;
         for (const obsId of d.observationIds) digestedObsIds.add(obsId);
@@ -572,6 +719,7 @@ export class ObservationConsolidator {
         theme: d.theme,
         agents: JSON.stringify(d.agents),
         quality: d.quality || 'normal',
+        project: d.project || 'unknown',
       });
     }
 
@@ -627,9 +775,11 @@ export class ObservationConsolidator {
   async synthesizeInsights() {
     if (!this.db) throw new Error('Not initialized');
 
-    // Get unsynthesized digests
+    // Get unsynthesized digests, including their project label so the
+    // synthesis pass can partition by project. A digest has been
+    // synthesized once any insight links to its id.
     const digests = this.db.prepare(`
-      SELECT d.id, d.date, d.theme, d.summary, d.agents, d.files_touched, d.metadata
+      SELECT d.id, d.date, d.theme, d.summary, d.agents, d.files_touched, d.metadata, d.project
       FROM digests d
       LEFT JOIN insights i ON d.id IN (
         SELECT value FROM json_each(i.digest_ids)
@@ -643,58 +793,88 @@ export class ObservationConsolidator {
       return { created: 0, updated: 0 };
     }
 
-    // Also load existing insights for context
-    const existingInsights = this.db.prepare(
-      'SELECT id, topic, summary, digest_ids FROM insights ORDER BY last_updated DESC'
-    ).all();
-
-    process.stderr.write(`[Consolidator] Synthesizing ${digests.length} digests into insights (${existingInsights.length} existing)\n`);
-
-    // Chunk digests to avoid LLM timeouts (max ~30 digests per call)
-    const DIGEST_CHUNK_SIZE = 30;
-    const digestChunks = [];
-    for (let i = 0; i < digests.length; i += DIGEST_CHUNK_SIZE) {
-      digestChunks.push(digests.slice(i, i + DIGEST_CHUNK_SIZE));
+    // Partition digests by project. Cross-project synthesis would let an
+    // unrelated insight from project B contaminate project A's narrative,
+    // and the produced insight would still get a single project label,
+    // dropping the other on the floor.
+    const digestsByProject = new Map();
+    for (const d of digests) {
+      const p = d.project || 'unknown';
+      if (!digestsByProject.has(p)) digestsByProject.set(p, []);
+      digestsByProject.get(p).push(d);
     }
 
-    // Process each chunk, building insights incrementally
-    let allInsightEntries = [];
-    for (let ci = 0; ci < digestChunks.length; ci++) {
-      const chunk = digestChunks[ci];
+    // Existing insights are loaded once and filtered per project so each
+    // synthesis run only sees in-domain prior knowledge.
+    const allExistingInsights = this.db.prepare(
+      'SELECT id, topic, summary, digest_ids, project FROM insights ORDER BY last_updated DESC'
+    ).all();
 
-      const digestBlock = chunk.map(d =>
-        `[${d.date}] ${d.theme}\n${d.summary}`
-      ).join('\n\n---\n\n');
+    const breakdown = [...digestsByProject.entries()]
+      .map(([p, list]) => `${p}=${list.length}`).join(', ');
+    process.stderr.write(`[Consolidator] Synthesizing ${digests.length} digests into insights — projects: ${breakdown} (${allExistingInsights.length} existing total)\n`);
 
-      // Include both DB insights and insights from previous chunks
-      const currentInsights = [
-        ...existingInsights.map(i => ({ topic: i.topic, summary: i.summary })),
-        ...allInsightEntries,
-      ];
-      const existingBlock = currentInsights.length > 0
-        ? currentInsights.map(i => `## ${i.topic}\n${i.summary}`).join('\n\n')
-        : 'None yet.';
+    const DIGEST_CHUNK_SIZE = 30;
+    const allInsightEntries = [];
 
-      process.stderr.write(`[Consolidator] Insight synthesis chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
+    for (const [project, projDigests] of digestsByProject) {
+      const existingForProject = allExistingInsights.filter(
+        i => (i.project || 'unknown') === project
+      );
 
-      const prompt = this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
-      const result = await this._callLLM(prompt);
-
-      if (!result) {
-        process.stderr.write(`[Consolidator] LLM call failed for insight chunk ${ci + 1}, skipping\n`);
-        continue;
+      const digestChunks = [];
+      for (let i = 0; i < projDigests.length; i += DIGEST_CHUNK_SIZE) {
+        digestChunks.push(projDigests.slice(i, i + DIGEST_CHUNK_SIZE));
       }
 
-      const chunkInsights = this._parseInsights(result, chunk);
-      // Merge with existing entries (update topics we've already seen)
-      for (const newInsight of chunkInsights) {
-        const existingIdx = allInsightEntries.findIndex(e => e.topic === newInsight.topic);
-        if (existingIdx >= 0) {
-          allInsightEntries[existingIdx] = newInsight; // overwrite with updated version
-        } else {
-          allInsightEntries.push(newInsight);
+      let projectInsightEntries = [];
+      for (let ci = 0; ci < digestChunks.length; ci++) {
+        const chunk = digestChunks[ci];
+
+        const digestBlock = chunk.map(d =>
+          `[${d.date}] ${d.theme}\n${d.summary}`
+        ).join('\n\n---\n\n');
+
+        // Combine DB insights for this project with insights produced in
+        // earlier chunks of the same project run, so the LLM keeps merging
+        // duplicates instead of restating them.
+        const currentInsights = [
+          ...existingForProject.map(i => ({ topic: i.topic, summary: i.summary })),
+          ...projectInsightEntries,
+        ];
+        const existingBlock = currentInsights.length > 0
+          ? currentInsights.map(i => `## ${i.topic}\n${i.summary}`).join('\n\n')
+          : 'None yet.';
+
+        process.stderr.write(`[Consolidator] Insight synthesis ${project} chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
+
+        const prompt = this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
+        const result = await this._callLLM(prompt);
+
+        if (!result) {
+          process.stderr.write(`[Consolidator] LLM call failed for ${project} insight chunk ${ci + 1}, skipping\n`);
+          continue;
+        }
+
+        const chunkInsights = this._parseInsights(result, chunk);
+        for (const newInsight of chunkInsights) {
+          newInsight.project = project;
+          newInsight._digestIds = chunk.map(d => d.id);
+          const existingIdx = projectInsightEntries.findIndex(e => e.topic === newInsight.topic);
+          if (existingIdx >= 0) {
+            // Preserve digest-id provenance across chunks so a topic
+            // touched twice within the same project run still records
+            // every contributing digest.
+            const prior = projectInsightEntries[existingIdx]._digestIds || [];
+            newInsight._digestIds = [...new Set([...prior, ...newInsight._digestIds])];
+            projectInsightEntries[existingIdx] = newInsight;
+          } else {
+            projectInsightEntries.push(newInsight);
+          }
         }
       }
+
+      allInsightEntries.push(...projectInsightEntries);
     }
 
     const insightEntries = allInsightEntries;
@@ -704,7 +884,6 @@ export class ObservationConsolidator {
     }
 
     const now = new Date().toISOString();
-    const newDigestIds = digests.map(d => d.id);
     let created = 0;
     let updated = 0;
     const embeddingQueue = [];
@@ -734,43 +913,51 @@ export class ObservationConsolidator {
 
     const transaction = this.db.transaction(() => {
       for (const entry of insightEntries) {
+        const project = entry.project || 'unknown';
+        const entryDigestIds = entry._digestIds || [];
+
         // Prefer embedding-based merge target (catches "Service" vs "System"
-        // type rewordings). Fall back to exact topic match.
+        // type rewordings). Fall back to exact topic match — but scope by
+        // project so a same-named topic from another project can't capture
+        // this one.
         let existing = null;
         if (entry._mergeTargetId) {
           existing = this.db.prepare(
-            'SELECT id, digest_ids FROM insights WHERE id = ?'
+            'SELECT id, digest_ids, project FROM insights WHERE id = ?'
           ).get(entry._mergeTargetId);
+          // Defense-in-depth: if the matched row's project disagrees,
+          // refuse the merge and fall back to insert.
+          if (existing && (existing.project || 'unknown') !== project) existing = null;
         }
         if (!existing) {
           existing = this.db.prepare(
-            'SELECT id, digest_ids FROM insights WHERE topic = ?'
-          ).get(entry.topic);
+            'SELECT id, digest_ids, project FROM insights WHERE topic = ? AND project = ?'
+          ).get(entry.topic, project);
         }
 
         if (existing) {
-          // Merge digest_ids and update summary
           let existingDigestIds = [];
           try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
-          const mergedDigestIds = [...new Set([...existingDigestIds, ...newDigestIds])];
+          const mergedDigestIds = [...new Set([...existingDigestIds, ...entryDigestIds])];
 
           this.db.prepare(`
             UPDATE insights SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?
             WHERE id = ?
           `).run(this._redact(entry.summary), JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
-          embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence });
+          embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
           updated++;
         } else {
           const id = crypto.randomUUID();
           this.db.prepare(`
-            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             id, this._redact(entry.topic), this._redact(entry.summary),
-            entry.confidence, JSON.stringify(newDigestIds),
-            now, now, this._redactPaths(JSON.stringify(entry.metadata || {}))
+            entry.confidence, JSON.stringify(entryDigestIds),
+            now, now, this._redactPaths(JSON.stringify(entry.metadata || {})),
+            project
           );
-          embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence });
+          embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
           created++;
         }
       }
@@ -782,6 +969,7 @@ export class ObservationConsolidator {
       this._publishEmbeddingEvent('insight', item.id, item.summary, {
         topic: item.topic,
         confidence: item.confidence,
+        project: item.project || 'unknown',
       });
     }
 

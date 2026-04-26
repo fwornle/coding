@@ -238,12 +238,30 @@ export class RetrievalService {
 
       const text = this._extractSearchableText(result).toLowerCase();
 
-      // Project match: check payload.project, payload.source, or text
+      // Project filtering. Three signals, in decreasing trust:
+      //   1. payload.project — populated by the consolidator; an exact label.
+      //   2. payload.source — older signal that often contains the project name.
+      //   3. plain-text match — fuzziest, only used as a tiebreaker.
+      // When payload.project is present, treat it as authoritative:
+      //   - same project  → +1.15x
+      //   - 'unknown'     → no change (could belong to either)
+      //   - other project → 0.5x (still visible but heavily demoted)
+      // When the payload has no project label at all we fall back to the
+      // older soft-match path so legacy rows still benefit from a small
+      // boost on substring matches.
       if (project) {
-        const payloadProject = (result.payload?.project || '').toLowerCase();
-        const payloadSource = (result.payload?.source || '').toLowerCase();
-        if (payloadProject.includes(project) || payloadSource.includes(project) || text.includes(project)) {
-          result.rrfScore *= 1.15;
+        const payloadProjectRaw = (result.payload?.project || '').toLowerCase();
+        if (payloadProjectRaw) {
+          if (payloadProjectRaw === project) {
+            result.rrfScore *= 1.15;
+          } else if (payloadProjectRaw !== 'unknown') {
+            result.rrfScore *= 0.5;
+          }
+        } else {
+          const payloadSource = (result.payload?.source || '').toLowerCase();
+          if (payloadSource.includes(project) || text.includes(project)) {
+            result.rrfScore *= 1.15;
+          }
         }
       }
 
