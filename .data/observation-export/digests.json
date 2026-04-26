@@ -7329,5 +7329,27 @@
     "createdAt": "2026-04-26T09:31:15.123Z",
     "metadata": {},
     "project": "coding"
+  },
+  {
+    "id": "7f331bc3-8857-425e-8af0-1371e9a9665c",
+    "date": "2026-04-26",
+    "theme": "Markdown Text Component Debugging and Style Fix",
+    "summary": "Two quick successive sessions (claude) addressed issues in `markdown-text.tsx` within the system health dashboard:\n\n- **Template-expression error**: Investigated and confirmed already resolved in a prior commit via directory mount promotion that restored a missing `ObservationSanitizer.js`; consolidation API verified working.\n- **Bullet point wrapping alignment**: Switched CSS list style from `list-inside` to `list-outside` with left padding in the `MarkdownText` component, so wrapped lines align under the first text character rather than the bullet symbol.\n\nBoth changes touched `system-health-dashboard/src/components/markdown-text.tsx`.",
+    "observationIds": [
+      "e8685ada-17b1-44fd-9c4d-0773c0dc8639",
+      "005fba6c-3161-4a6e-949a-726ce812ec36"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-26T09:40:38.139Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
   }
 ]
