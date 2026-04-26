@@ -22,6 +22,13 @@ import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import Redis from 'ioredis';
 
+/**
+ * Cosine threshold for treating a new insight as a near-duplicate of an
+ * existing one. MiniLM-L6-v2 cosines for "any two project documents" floor
+ * around 0.89-0.92, so genuine same-topic duplicates only emerge above ~0.93.
+ */
+const INSIGHT_DEDUP_THRESHOLD = 0.93;
+
 const require = createRequire(import.meta.url);
 
 export class ObservationConsolidator {
@@ -85,6 +92,51 @@ export class ObservationConsolidator {
         process.stderr.write(`[Consolidator] Redis publish failed (non-fatal): ${err.message}\n`);
       });
     }
+  }
+
+  /**
+   * Find an existing insight whose embedding is similar enough to the new
+   * entry that they should be treated as the same topic (entity resolution).
+   *
+   * Embeds the entry's topic + summary via fastembed, queries the Qdrant
+   * `insights` collection, returns the top hit's id if cosine score is at
+   * or above INSIGHT_DEDUP_THRESHOLD. Returns null on any error or miss.
+   *
+   * @param {{ topic: string, summary: string }} entry
+   * @returns {Promise<string|null>}
+   */
+  async _findSimilarInsightId(entry) {
+    if (!this._embeddingService) {
+      try {
+        const mod = await import('../../dist/embedding/embedding-service.js');
+        this._embeddingService = mod.getEmbeddingService();
+        await this._embeddingService.initialize();
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Embedding service unavailable: ${err.message}\n`);
+        return null;
+      }
+    }
+    if (!this._qdrantClient) {
+      try {
+        const mod = await import('../../dist/embedding/qdrant-collections.js');
+        this._qdrantClient = mod.getQdrantClient();
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Qdrant client unavailable: ${err.message}\n`);
+        return null;
+      }
+    }
+    const text = `${entry.topic ?? ''}\n\n${entry.summary ?? ''}`.trim();
+    if (!text) return null;
+    const vector = await this._embeddingService.embedOne(text);
+    const results = await this._qdrantClient.search('insights', {
+      vector,
+      limit: 1,
+      score_threshold: INSIGHT_DEDUP_THRESHOLD,
+      with_payload: false,
+      with_vector: false,
+    });
+    if (!results || results.length === 0) return null;
+    return String(results[0].id);
   }
 
   /**
@@ -418,12 +470,34 @@ export class ObservationConsolidator {
     let updated = 0;
     const embeddingQueue = [];
 
+    // Phase 1 (async, pre-transaction): resolve each new entry to an
+    // existing insight via embedding similarity. The transaction itself
+    // must stay synchronous — better-sqlite3 transactions don't support
+    // awaits — so we precompute the merge targets here.
+    for (const entry of insightEntries) {
+      try {
+        entry._mergeTargetId = await this._findSimilarInsightId(entry);
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Similarity check failed (non-fatal): ${err.message}\n`);
+        entry._mergeTargetId = null;
+      }
+    }
+
     const transaction = this.db.transaction(() => {
       for (const entry of insightEntries) {
-        // Check if an existing insight matches this topic
-        const existing = this.db.prepare(
-          'SELECT id, digest_ids FROM insights WHERE topic = ?'
-        ).get(entry.topic);
+        // Prefer embedding-based merge target (catches "Service" vs "System"
+        // type rewordings). Fall back to exact topic match.
+        let existing = null;
+        if (entry._mergeTargetId) {
+          existing = this.db.prepare(
+            'SELECT id, digest_ids FROM insights WHERE id = ?'
+          ).get(entry._mergeTargetId);
+        }
+        if (!existing) {
+          existing = this.db.prepare(
+            'SELECT id, digest_ids FROM insights WHERE topic = ?'
+          ).get(entry.topic);
+        }
 
         if (existing) {
           // Merge digest_ids and update summary
