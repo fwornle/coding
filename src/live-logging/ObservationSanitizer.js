@@ -47,11 +47,25 @@ export class ObservationSanitizer {
    * directories so the suffix lookup stays focused on real source files.
    */
   static loadRepoPaths(repoRoot) {
-    const out = execSync('git ls-files', {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-    });
+    // Include submodule files. Without --recurse-submodules the
+    // integrations/mcp-* trees are invisible, so any redaction fragment
+    // whose canonical path lives inside a submodule fails to recover.
+    let out;
+    try {
+      out = execSync('git ls-files --recurse-submodules', {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+      });
+    } catch {
+      // Fall back if the git binary doesn't support the flag (older
+      // installs) — better a smaller corpus than nothing.
+      out = execSync('git ls-files', {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+      });
+    }
     return out.split('\n').filter((p) => {
       if (!p) return false;
       if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
@@ -97,12 +111,28 @@ export class ObservationSanitizer {
   }
 
   /**
-   * Repo-wide fallback: find a unique repo file whose path ends with the
-   * fragment (or a `/`-trimmed shorter suffix). Returns the canonical
-   * absolute path if exactly one match, else null.
+   * Repo-wide fallback. Two passes, increasing in tolerance:
+   *
+   *   1. Strict suffix match. The fragment is treated as a path tail
+   *      (`/<frag>`) and we require exactly one repo path that ends with
+   *      it. The fragment is also progressively `/`-trimmed so that a
+   *      partial leading directory still matches.
+   *
+   *   2. Mid-identifier basename match. The 40-char redaction often eats
+   *      into the middle of a basename (e.g. the leading "de" of
+   *      "dedup-insights-by-embedding.js" is gone, leaving "dup-..."),
+   *      so a path-level `endsWith` never finds the file. Pass 2 looks
+   *      for any repo path whose BASENAME ends with the fragment AND is
+   *      at most a few characters longer. Specificity comes from
+   *      requiring exactly one such candidate; if multiple, we bail.
+   *
+   * Returns the canonical absolute path if exactly one match in either
+   * pass, else null.
    */
   _recoverFromRepo(frag) {
     if (!this.repoPaths || !frag) return null;
+
+    // Pass 1: strict suffix match, optionally trimming leading dirs.
     const candidates = [frag];
     let cur = frag;
     while (cur.includes('/')) {
@@ -114,6 +144,45 @@ export class ObservationSanitizer {
       const matches = this.repoPaths.filter((p) => ('/' + p).endsWith(target));
       if (matches.length === 1) return `${this.codingRoot}/${matches[0]}`;
     }
+
+    // Pass 2: mid-identifier basename match. Only viable when the
+    // fragment looks like a single basename (no slashes) and is long
+    // enough to be specific.
+    if (!frag.includes('/') && frag.length >= 8) {
+      const MAX_EXTRA = 12;
+      const matches = this.repoPaths.filter((p) => {
+        const base = p.slice(p.lastIndexOf('/') + 1);
+        if (base === frag) return true; // already covered, but cheap
+        return base.length > frag.length
+          && base.length - frag.length <= MAX_EXTRA
+          && base.endsWith(frag);
+      });
+      if (matches.length === 1) return `${this.codingRoot}/${matches[0]}`;
+    }
+
+    // Pass 3: when the fragment carries a path tail like
+    // "ns/mcp-constraint-monitor/src/...", treat it as a mid-segment
+    // tail. Find repo paths whose tail ends with `<rest-of-frag>` where
+    // the first segment of the fragment is allowed to be a partial
+    // identifier match (the leading "tio" of "integrations" got eaten).
+    if (frag.includes('/')) {
+      const firstSlash = frag.indexOf('/');
+      const partialFirst = frag.slice(0, firstSlash);
+      const remainder = frag.slice(firstSlash); // includes leading '/'
+      if (partialFirst.length >= 2 && remainder.length >= 8) {
+        const matches = this.repoPaths.filter((p) => {
+          const idx = p.indexOf(remainder);
+          if (idx <= 0) return false;
+          // The segment before `remainder` must end with `partialFirst`,
+          // i.e. partialFirst is a real tail of the segment that the
+          // redaction trimmed into.
+          const before = p.slice(0, idx);
+          return before.endsWith(partialFirst);
+        });
+        if (matches.length === 1) return `${this.codingRoot}/${matches[0]}`;
+      }
+    }
+
     return null;
   }
 
