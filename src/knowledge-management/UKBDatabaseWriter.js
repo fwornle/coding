@@ -121,8 +121,29 @@ export class UKBDatabaseWriter {
     if (updates.role !== undefined) entityData.role = updates.role;
     if (updates.enrichedContext !== undefined) entityData.enrichedContext = updates.enrichedContext;
 
+    // Preserve provenance fields when an entity already exists. Without
+    // this, every cleanup-style PUT (e.g. dedup, re-export, casing
+    // canonicalization) would relabel an entity that was originally
+    // online-extracted as `manual`. Read the existing record from
+    // GraphDB and forward its source + created_at so the merge in
+    // GraphDatabaseService.storeEntity preserves the original tier.
+    const graphDB = this.databaseManager?.graphDB;
+    if (graphDB?.graph) {
+      const nodeId = `${this.team}:${entityName}`;
+      if (graphDB.graph.hasNode(nodeId)) {
+        const existing = graphDB.graph.getNodeAttributes(nodeId);
+        if (existing.source && updates.source === undefined) {
+          entityData.source = existing.source;
+        }
+        if (existing.created_at) {
+          entityData.created_at = existing.created_at;
+        }
+      }
+    }
+    if (updates.source !== undefined) entityData.source = updates.source;
+
     if (this.debug) {
-      console.log(`[UKBDatabaseWriter] Updating entity: ${entityName}`);
+      process.stderr.write(`[UKBDatabaseWriter] Updating entity: ${entityName}\n`);
     }
 
     return await this.storeEntity(entityData);
