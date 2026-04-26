@@ -15,6 +15,7 @@ import path from 'node:path';
 import Redis from 'ioredis';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
+import { openDatabase, closeDatabase } from './SafeDatabase.js';
 
 const require = createRequire(import.meta.url);
 
@@ -77,8 +78,13 @@ export class ObservationWriter {
     // Use SafeDatabase for crash-safe open with integrity check, WAL enforcement,
     // auto-recovery, and shutdown handlers. All consumers of observations.db
     // MUST use SafeDatabase to prevent corruption from concurrent/crashed writers.
-    const { openDatabase } = await import('./SafeDatabase.js');
     this.db = openDatabase(this.dbPath);
+    // Snapshot the inode so the periodic checkpoint can detect external
+    // rotation (e.g. another process running SafeDatabase recovery and
+    // renaming the file to .corrupted-<ts>). Without this, a long-lived
+    // writer keeps its handle on the orphaned inode and silently writes
+    // into the rotated-out file while readers see the new fresh DB.
+    try { this._dbInode = fs.statSync(this.dbPath).ino; } catch { this._dbInode = null; }
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS observations (
@@ -122,9 +128,21 @@ export class ObservationWriter {
       `);
     } catch { /* FTS5 not available in this SQLite build — search falls back to LIKE */ }
 
-    // Periodic WAL checkpoint so readonly connections (e.g. Docker health dashboard) see fresh data
+    // Periodic WAL checkpoint so readonly connections (e.g. Docker health dashboard) see fresh data.
+    // Also detects external DB rotation (SafeDatabase recovery on a different process)
+    // and reopens the handle — otherwise this process keeps writing to the orphaned
+    // inode while readers see the freshly restored file.
     this._walCheckpointInterval = setInterval(() => {
-      try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* db may be closed */ }
+      try {
+        let currentInode = null;
+        try { currentInode = fs.statSync(this.dbPath).ino; } catch { /* file missing */ }
+        if (currentInode !== null && this._dbInode !== null && currentInode !== this._dbInode) {
+          process.stderr.write(`[ObservationWriter] DB rotated externally (inode ${this._dbInode} → ${currentInode}) — reopening\n`);
+          this._reopenDb();
+          return;
+        }
+        this.db.pragma('wal_checkpoint(PASSIVE)');
+      } catch { /* db may be closed */ }
     }, 15_000); // every 15 seconds
 
     // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
@@ -148,6 +166,21 @@ export class ObservationWriter {
     // Shutdown handlers are registered by SafeDatabase — no need to duplicate here.
 
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
+  }
+
+  /**
+   * Reopen the DB handle after external rotation (e.g. SafeDatabase
+   * corruption recovery in a sibling process renamed the file to
+   * .corrupted-<ts>). Refreshes the exporter's `db` reference and
+   * snapshots the new inode. Schema/index/trigger CREATE statements
+   * are all IF NOT EXISTS so idempotent against the freshly-restored DB.
+   */
+  _reopenDb() {
+    try { closeDatabase(this.db); } catch { /* best effort */ }
+    this.db = openDatabase(this.dbPath);
+    try { this._dbInode = fs.statSync(this.dbPath).ino; } catch { this._dbInode = null; }
+    if (this._exporter) this._exporter.db = this.db;
+    process.stderr.write(`[ObservationWriter] Reopened DB (inode=${this._dbInode})\n`);
   }
 
   /**
