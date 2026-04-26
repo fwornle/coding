@@ -504,6 +504,15 @@ class GlobalLSLCoordinator {
       }
     }
     
+    // Stamp the coordinator's own heartbeat so observers in different
+    // PID namespaces (e.g. the constraint-monitor dashboard inside
+    // coding-services) can detect liveness without probing the host
+    // PID. The registry is bind-mounted into the container, so an
+    // mtime + lastHealthCheck check works across the namespace.
+    if (!this.registry.coordinator) this.registry.coordinator = {};
+    this.registry.coordinator.lastHealthCheck = Date.now();
+    this.registry.coordinator.healthCheckInterval = this.healthCheckInterval || this.registry.coordinator.healthCheckInterval || 30000;
+
     this.log(`Health check complete: ${healthyCount} healthy, ${recoveredCount} recovered, ${prunedCount} pruned`);
     this.saveRegistry();
   }

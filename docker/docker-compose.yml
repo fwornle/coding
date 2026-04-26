@@ -83,6 +83,14 @@ services:
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
       # Dashboard server (live-mounted to avoid Docker rebuild for API changes)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/server.js:/coding/integrations/system-health-dashboard/server.js:ro
+      # Constraint monitor source (live-mounted so dashboard-server changes
+      # don't require an image rebuild).
+      - ${CODING_REPO:-.}/integrations/mcp-constraint-monitor/src:/coding/integrations/mcp-constraint-monitor/src:ro
+      # LSL coordinator registry — bind-mounted so the constraint-monitor
+      # dashboard inside the container can read coordinator/project
+      # heartbeat timestamps. Without this, system-health always
+      # reports "coordinator: unknown" because the file isn't visible.
+      - ${CODING_REPO:-.}/.global-lsl-registry.json:/coding/.global-lsl-registry.json:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
       # Observation pipeline (live-mounted as a directory so new files like
