@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
+import { ObservationSanitizer } from './ObservationSanitizer.js';
 import Redis from 'ioredis';
 
 /**
@@ -101,6 +102,54 @@ export class ObservationConsolidator {
         process.stderr.write(`[Consolidator] Redis publish failed (non-fatal): ${err.message}\n`);
       });
     }
+  }
+
+  /**
+   * Lazily-initialized ObservationSanitizer. Repo path corpus is loaded
+   * once and reused for every dedup/repair call. Falls back to no
+   * repo-wide recovery if `git ls-files` is unavailable here.
+   */
+  _getSanitizer() {
+    if (this._sanitizer) return this._sanitizer;
+    let repoPaths = null;
+    try {
+      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+      repoPaths = ObservationSanitizer.loadRepoPaths(projectRoot);
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Sanitizer repo-paths unavailable (non-fatal): ${err.message}\n`);
+    }
+    this._sanitizer = new ObservationSanitizer({ repoPaths });
+    return this._sanitizer;
+  }
+
+  /**
+   * Pre-write sanitization for a digest entry: dedupes the files_touched
+   * list (drops bare basenames whose full path is also present) and
+   * recovers any `<AWS_SECRET_REDACTED>` corruption using sibling fields
+   * as the recovery oracle.
+   *
+   * @param {{ theme: string, summary: string, filesTouched: string[], metadata?: object }} d
+   * @returns {{ theme, summary, filesTouched, metadata }}
+   */
+  _sanitizeDigestEntry(d) {
+    const sanitizer = this._getSanitizer();
+    const ctx = [d.summary || '', d.theme || ''];
+    const filesOut = sanitizer.sanitizeFileList(d.filesTouched || [], ctx);
+    const summaryOut = sanitizer.sanitizeText(d.summary || '', [
+      Array.isArray(filesOut.result) ? filesOut.result.join(' ') : filesOut.result,
+      d.theme || '',
+    ]);
+    const metaOut = sanitizer.sanitizeMetadata(d.metadata || {}, ctx);
+    return {
+      theme: d.theme,
+      summary: summaryOut.text,
+      filesTouched: Array.isArray(filesOut.result)
+        ? filesOut.result
+        : (() => { try { return JSON.parse(filesOut.result); } catch { return d.filesTouched; } })(),
+      metadata: typeof metaOut.result === 'object' ? metaOut.result : (() => {
+        try { return JSON.parse(metaOut.result); } catch { return d.metadata || {}; }
+      })(),
+    };
   }
 
   /**
@@ -434,6 +483,15 @@ export class ObservationConsolidator {
 
     // Build merge plan via embedding similarity (async, pre-transaction).
     const mergePlan = await this._buildDigestMergePlan(digestEntries, date);
+
+    // Sanitize each entry: dedupe files_touched (drop bare basenames
+    // when the full path is also present), recover any redaction
+    // corruption from in-context sibling fields.
+    for (let i = 0; i < digestEntries.length; i++) {
+      const cleaned = this._sanitizeDigestEntry(digestEntries[i]);
+      digestEntries[i] = { ...digestEntries[i], ...cleaned };
+    }
+
     const QUALITY_RANK = { high: 3, normal: 2, low: 1 };
     const mergedTargets = new Set();
     let createdCount = 0;
@@ -662,6 +720,16 @@ export class ObservationConsolidator {
         process.stderr.write(`[Consolidator] Similarity check failed (non-fatal): ${err.message}\n`);
         entry._mergeTargetId = null;
       }
+
+      // Sanitize summary against any in-row corruption. Insights have no
+      // explicit files_touched field, so the only context is the topic
+      // line — but a clean reference to the same path elsewhere in the
+      // summary itself can still recover via in-context match.
+      try {
+        const sanitizer = this._getSanitizer();
+        const out = sanitizer.sanitizeText(entry.summary || '', [entry.topic || '']);
+        if (out.text !== entry.summary) entry.summary = out.text;
+      } catch { /* fail open */ }
     }
 
     const transaction = this.db.transaction(() => {
