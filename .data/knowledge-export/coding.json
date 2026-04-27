@@ -23,13 +23,12 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration ; LLMAbstraction: [LLM] The LLMAbstraction component uses a provider-agnostic approach, allowing for easy switching between different LLM providers. This is achieved th; DockerizedServices: [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evi; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and ev; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-sema; CodingPatterns: [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts fi; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAge.",
-        "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
+        "Project anchor for the coding team — auto-created by the observation consolidator so online-learned insights have a parent in the graph."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T12:38:08.270Z",
-        "last_updated": "2026-03-21T06:33:45.689Z"
+        "last_updated": "2026-04-26T10:54:16.112Z"
       },
       "id": "mc4flkgxgvxje"
     },
@@ -12049,6 +12048,188 @@
         "last_updated": "2026-04-18T08:58:39.713Z"
       },
       "id": "mc4flkg1rv4k1f"
+    },
+    {
+      "name": "Knowledge Context Injection Service (v6.0 Milestone)",
+      "entityType": "Config",
+      "observations": [
+        "A standalone HTTP retrieval/injection service (port 3848) built as milestone v6.0. Architecture decided April 24 via GSD multi-phase pipeline.\n\n**Architecture decisions:**\n- Standalone HTTP service rather than coupling to any single agent's hook system\n- Separate adapter layers per agent: Claude hooks, Copilot extensions, OpenCode config, Mastra middleware\n- Hybrid **RRF (Reciprocal Rank Fusion)** scoring combining vector + keyword results with token budgeting\n\n**Phase 28 — Embedding pipeline (complete):**\n- `embedding-config.json`, `src/embedding-service.ts`, `src/content-hash.ts` (SHA-256 idempotency), `src/qdrant-collections.ts`\n- 4 separate Qdrant collections (not unified); Redis pub/sub write-time hooks for new content\n- Backfill CLI with content-hash idempotency; 1,464 items backfilled: `observations=645`, `digests=132`, `insights=12`, `kg_entities=675`\n- **Known bugs:** fastembed tokenizer binaries blocked by `--ignore-scripts`; `embedding-config.json` path resolution broken at runtime (`__dirname` points to `dist/embedding/` not `src/embedding/`)\n- Qdrant point counts lag SQLite source counts after April 25 DB fixes — backfill needs re-run\n\n**Phase 29 — Retrieval service:** `rrf-fusion.js`, `token-budget.js`, `keyword-search.js`, `retrieval-service.js` built; API endpoint wiring completed.\n\n**Phase 30+ — Hook adapter:** See \"Knowledge Context Injection System\" insight for details."
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.814Z",
+        "last_updated": "2026-04-26T10:37:59.935Z"
+      },
+      "id": "mc4flkg2vwx0ja"
+    },
+    {
+      "name": "Operational Knowledge Base (OKB) Architecture and Known Issues",
+      "entityType": "Port",
+      "observations": [
+        "The OKB lives under `integrations/operational-knowledge-management/` and uses Graphology + LevelDB + optional Qdrant for graph-based knowledge storage. The web viewer is a React/sigma.js app under `viewer/` served via Docker on port 8080, with `viewer/dist/` bind-mounted read-only — always requires `npm run build` after source changes. Key components: `src/intelligence/correlation.ts`, `src/intelligence/temporal.ts`, `GraphKnowledgeExporter.js` (exports to exactly 3 files: `raas.json`, `kpi-fw.json`, `general.json`).\n\n**IssueTriage component (`IssueTriage.tsx`) bugs and fixes:**\n- **Entity key format mismatch**: edges use `layer:id` prefixed keys while `IssueTriage` looked up bare `id` keys — identified, not yet fixed\n- **Evidence bloat**: BFS hop distance too large (3 hops, 900+ nodes) + domain-based fuzzy matching defaulting to `\"general\"` catch-all; **domain sweep removed entirely** from `IssueTriage.tsx`\n- **Isolated nodes**: nodes with 0 actual edges legitimately show 0 RCA chain entries; `sourceRefs` cover isolated nodes directly\n- **Documentation-sourced entities**: 109 RCA-relevant entities from mkdocs have no operational refs; proposed fix is BFS-based 2-hop propagation of ops refs at ingest\n- **Stale bundle cache**: always hard refresh (`Cmd+Shift+R`) before debugging display issues\n\n**Other known issues:**\n- Critical data loss: full graph purge wiped 2,122 operational evidence links — re-ingest via RCA pipeline is recovery path\n- `mergeEvidenceMetadata` skipped without `context` object, allowing silent sourceRef overwrites\n- Docker security: non-root `node_app` user (UID 1001), API keys via `env_file`\n- `package-lock.json` in `mcp-server-semantic-analysis` submodule had stale `file:../../_work/` paths — regenerated April 23\n- 1,464 OKB entities now embedded in Qdrant as part of v6.0 milestone (Phase 28)"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.825Z",
+        "last_updated": "2026-04-26T10:37:59.945Z"
+      },
+      "id": "mc4flkg221ooav"
+    },
+    {
+      "name": "Observations Pipeline: Recording, Storage, and Viewer",
+      "entityType": "Container",
+      "observations": [
+        "Observations written by `src/live-logging/ObservationWriter.js` to `~/Agentic/coding/.observations/observations.db`, displayed at `localhost:3032`. Full pipeline: `transcript-monitor.sh` → `enhanced-transcript-monitor.js` → `ObservationWriter.js` → HTTP POST to `localhost:12435/api/complete` → SQLite.\n\n**Known issues and fixes:**\n- **Dedup hash collision**: fixed by incorporating session ID and assistant content into hash; root cause was hashing empty `userContent`, causing every exchange in a session to collide to the same hash (`6d37c4ec`) and silently discard summaries\n- **Stale file handle / inode rotation**: `ObservationWriter.js` now detects inode changes and reopens the DB connection automatically when the underlying file rotates or is replaced — prevents split-brain between writer and reader\n- **Semantic dedup suppression**: 0.7 Jaccard threshold over 10-observation sliding window silently suppresses repetitive observations\n- **Artifacts field omission**: fixed by extracting file paths from Edit/Write tool calls\n- **`[Raw]` fallback**: observations fall back to `[Raw]` prefix when LLM summarization fails\n- **Docker stale connections**: health-dashboard container holds stale SQLite connections — restart required\n- **DB corruption (permanent fix)**: `SafeDatabase.js` enforces WAL mode, `busy_timeout`, integrity checks, and SHM recovery; all 6 consumers migrated; `_restoreFromExportIfPossible()` now auto-called after any future corruption-rotation event\n- **DB corruption recovery (April 25)**: `restore-observations-from-export.js` reimports JSON exports; 670 observations, 312 digests, and 19 insights restored\n- **False-positive redaction corruption**: `[a-zA-Z0-9+/]{40}` AWS secret pattern too broad — fix pending in `redaction-patterns.json` and `ConfigurableRedactor.js`\n- **Redaction corruption repair (April 26)**: `repair-redaction-corruption.js` executed — 41 rows repaired, 57 fragments reconstructed, 74 ambiguous rows left unchanged\n- **ObservationSanitizer**: `src/live-logging/ObservationSanitizer.js` + `scripts/sanitize-observations.js` CLI for ongoing fragmented-path recovery\n- **ObservationSanitizer missing file (resolved)**: template-expression error in consolidator was caused by missing `ObservationSanitizer.js`; fixed via directory mount promotion in a prior commit; consolidation API confirmed working\n- **FTS5 index desync**: `ObservationWriter.js` never populates FTS5 table; manually rebuilt April 25; `ObservationWriter.init()` needs FTS sync logic added\n- **Backfill timestamps**: were incorrectly using `Date.now()` — fixed April 25\n- **Project classification**: `determineTargetProject` was reading only first exchange — all 11 call sites updated April 25\n- **Context window % missing**: Claude Code stopped passing `context_window.remaining_percentage` — external change, no fix available\n- **Auto-refresh stale date**: `observations.tsx` now recomputes `to` date on every 30-second polling cycle\n- **Current DB state (April 26)**: 698 observations, 234 digests, 16 insights\n\n**Two-tier aggregation layer (ObservationConsolidator):**\n- **Digests** — daily thematic consolidation; **Insights** — weekly persistent knowledge synthesis\n- `src/live-logging/ObservationConsolidator.js`; shared export at `src/live-logging/ObservationExporter.js`\n- Consolidation daemon `consolidate-observations.js` is never auto-started — proposed 30-minute periodic check in health API server not yet implemented\n- **Phase B** (planned): rewrite `consolidateDay()` to group observations by `(date, project)` instead of date alone\n- Qdrant backfill must be re-run after April 25 DB fixes; point counts lag SQLite source counts\n\n**System health dashboard server fix (April 25):** top-level `await` in non-async `_getObservationsDb()` caused `SyntaxError` crash — fixed by making method `async` in `system-health-dashboard/server.js`\n\n**Markdown rendering fix (April 26):** bullet point wrapping alignment fixed in `system-health-dashboard/src/components/markdown-text.tsx` — switched CSS list style from `list-inside` to `list-outside` with left padding so wrapped lines align under first text character"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.842Z",
+        "last_updated": "2026-04-27T06:21:24.476Z"
+      },
+      "id": "mc4flkg36enliy"
+    },
+    {
+      "name": "System Health Dashboard and Service Architecture",
+      "entityType": "Container",
+      "observations": [
+        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host machine only; must be started separately)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, inside Docker via supervisord)\n- `localhost:3032` — observations viewer\n- `localhost:3033` — health API\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n\n**Architectural rule:** Docker runs headless backend services/APIs; host runs tools requiring host networking or hot-reload dev UIs. All port values must come exclusively from the shared `.env.ports` file — no hardcoding.\n\n**Known issues:**\n- `constraint-dashboard` port 3030: Next.js app not started by `supervisord` — must be started manually on host\n- `supervisord.conf` reverted to 9-process known-good state; `Dockerfile.coding-services` is primary artifact for service build changes\n- Stale browser cache hides deployed fixes — hard refresh (`Cmd+Shift+R`) required after bundle updates\n- `health-verifier.js` edited April 27 to fix `checkHTTPHealth` function (option-2 behavior); syntax validated — two prior unresolved violations (`[INFO] undefined` log entry and `[ERROR] supervisorctl not found` from `isDockerMode()` returning `true` on host) may also have been addressed\n- **Dashboard SIGKILL/auto-heal loop (April 26)**: under investigation — `health-remediation-actions.js` and related configs read; primary artifact under investigation is `server.js`; no fixes confirmed yet\n- **Stale Docker bind-mount (April 27)**: host config file size differed from container snapshot by 58 bytes; restarting the service forced a remount and resolved display issue — restart is the fix when container sees stale config\n- **Constraint system reliability (April 27)**: `proper-function-naming` fires correctly; magic-number rule was generating noise drowning out other violations; five tracked improvement tasks created: remove global magic-number rule, fix split-brain config ambiguity, fix unreliable constraints, remove fallback masks, and one investigative item — all in progress\n- `health-verifier.js` also involved in coding transcript monitor health investigation (April 27); LSL issue prioritized over consolidation visibility"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.849Z",
+        "last_updated": "2026-04-27T06:21:24.507Z"
+      },
+      "id": "mc4flkg3oje83q"
+    },
+    {
+      "name": "Git Repository Hygiene and Large File Management",
+      "entityType": "Fault",
+      "observations": [
+        "- `.specstory/archive/` gitignored; LSL history files >200KB auto-split at \"## Prompt Set\" boundaries\n- OKB `.data/exports/` gitignored; **pre-commit hook (\"OKB BASELINE GUARD\")** blocks KB export files when mixed with non-KB changes — KB files must be committed independently\n- Planned hook revision: allow commits where **only** KB files are staged; block only mixed commits — not yet implemented\n- `rapid-automations` `node_modules/` and build artifacts gitignored\n- `integrations/copi` submodule removed April 22\n- OKB submodule pointer in parent repo must be updated alongside submodule commits; diverged branches resolved via `git pull --rebase origin main`\n- Git submodules cause wave-based parallel execution orchestration to fall back to sequential mode\n- **OAuth token leak remediation**: `gho_`, `ghp_`, `github_pat_` patterns added to `redaction-patterns.json`; history rewritten with `git-filter-repo`; force-pushed\n- **User ID redaction**: `ConfigurableRedactor.js` replaces user IDs with `<USER_ID_REDACTED>`; 245 observations retroactively cleaned; `redaction-patterns.json` review for path-shortening rules pending\n- **AWS secret regex over-matching (root cause April 26)**: `[a-zA-Z0-9+/]{40}` pattern in `redaction-patterns.json` matches any 40-char alphanumeric string including file path segments — fix pending; boundary/context constraints needed (LSL redaction logic used as reference)\n- `gh` CLI lacks `github.com` auth; GitHub Actions triggered manually via browser\n- MkDocs `docs_dir` is `docs-content` — images must go in `docs-content/images/`; fix for misplaced screenshots not yet completed"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.855Z",
+        "last_updated": "2026-04-26T10:37:59.972Z"
+      },
+      "id": "mc4flkg4828deu"
+    },
+    {
+      "name": "Knowledge Context Injection System (v6.0 Milestone)",
+      "entityType": "Process",
+      "observations": [
+        "A multi-phase knowledge injection system built across phases 30–32, completing the v6.0 milestone.\n\n**Architecture:**\n- Global hook in `~/.claude/settings.json` for cross-project, cross-agent support\n- Shared retrieval client with context-aware relevance boosting (CWD, git activity, editor state signals)\n- Session-start adapters for Claude, OpenCode, Copilot, and Mastra agents\n- `src/retrieval/working-memory.js` — 300/700 token split between working memory and retrieval results\n- `config/agent-profiles.json` — per-agent scoring profiles with RRF fusion and tier weight multipliers\n- `scripts/write-session-state.js` — writes `.coding/session-state.json` for cross-agent session continuity (2-hour window)\n\n**Retrieval relevance fixes (April 25):**\n- MiniLM embedding scores cluster too tightly (0.75–0.82 range) — topic discrimination unreliable; Qdrant payload filtering, Memgraph graph traversal, and ontology infrastructure all unused\n- `knowledge-injection-hook.js` updated to extract topics from conversation transcript and pass them to retrieval service for Qdrant topic pre-filtering\n- Transcript feedback loop fixed (commit `800d0fdc`): hook now skips `system-reminder` blocks when extracting topics, preventing injected content from being re-read as user context\n- Noise reduced from ~80% to ~40% irrelevant after combined enrichment + topic filtering\n\n**Working memory and dedup fixes (April 25, commit `fdb41381`):**\n- `working-memory.js` updated to prefer canonical \"Coding\" project entity; API `?type=` filter was non-functional — `api-routes.js` fixed to accept both `type` (singular) and `types` (plural CSV)\n- `GraphDatabaseService.js` bug fixed: Project nodes were omitted from `?type=Project` results due to second-pass dedup logic\n- `working-memory.js` now filters out Project/System nodes leaking into component-type result lists\n- Near-duplicate insight dedup added to `token-budget.js` to collapse semantically identical insights\n- End state: working memory correctly shows Coding project with 8 real Components, no duplicates\n\n**Other hook bugs fixed April 25:**\n- `process.stdin.isTTY === false` strict equality never matched piped stdin — changed to truthy check\n- `MIN_TOKENS = 20` replaced with `MIN_WORDS = 4` to correctly filter trivial inputs\n\n**KG entity counts (actual):** 1 Project, 8 Component, 353 SubComponent, 310 Detail, 1 System (673 total — correctly typed, not misclassified)"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.867Z",
+        "last_updated": "2026-04-26T10:37:59.983Z"
+      },
+      "id": "mc4flkg2hh5oc"
+    },
+    {
+      "name": "OKB Operational Knowledge Base (OKB) Architecture and Known Issues",
+      "entityType": "File",
+      "observations": [
+        "The OKB lives under `integrations/operational-knowledge-management/` and uses Graphology + LevelDB + optional Qdrant for graph-based knowledge storage. The web viewer is a React/sigma.js app under `viewer/` served via Docker on port 8080, with `viewer/dist/` bind-mounted read-only — always requires `npm run build` after source changes. Key components: `src/intelligence/correlation.ts`, `src/intelligence/temporal.ts`, `GraphKnowledgeExporter.js` (exports to exactly 3 files: `raas.json`, `kpi-fw.json`, `general.json`).\n\n**IssueTriage component (`IssueTriage.tsx`) bugs and fixes:**\n- **Entity key format mismatch**: edges use `layer:id` prefixed keys while `IssueTriage` looked up bare `id` keys — identified, not yet fixed\n- **Evidence bloat**: BFS hop distance too large (3 hops, 900+ nodes) + domain-based fuzzy matching defaulting to `\"general\"` catch-all inflated evidence to 148+; **domain sweep removed entirely** from `IssueTriage.tsx` as too permissive\n- **Isolated nodes**: nodes with 0 actual edges (e.g. `Cluster10_ArgoWorkflowStopped`) legitimately show 0 RCA chain entries; `sourceRefs` cover isolated nodes directly\n- **Documentation-sourced entities**: 109 RCA-relevant entities ingested from mkdocs have no operational refs; proposed fix is BFS-based 2-hop propagation of ops refs at ingest\n- **Stale bundle cache**: UI fixes deployed in Docker JS bundle may be hidden by browser cache — always hard refresh (`Cmd+Shift+R`) before debugging display issues\n\n**Other known issues:**\n- Critical data loss: full graph purge wiped 2,122 operational evidence links — re-ingest via RCA pipeline is recovery path\n- `mergeEvidenceMetadata` skipped without `context` object, allowing silent sourceRef overwrites\n- Docker security: non-root `node_app` user (UID 1001), API keys via `env_file`\n- `package-lock.json` in `mcp-server-semantic-analysis` submodule had stale `file:../../_work/` paths — regenerated April 23\n- PlantUML diagram `observation-memory-hierarchy.puml` reviewed against documentation style guide April 23; no modifications made"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.875Z",
+        "last_updated": "2026-04-26T10:37:59.987Z"
+      },
+      "id": "mc4flkg4zr4twz"
+    },
+    {
+      "name": "Planning and Execution Workflow",
+      "entityType": "File",
+      "observations": [
+        "The project uses a structured phase-based planning workflow tracked across several docs.\n\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start of each phase with phase entry and requirements IDs\n- Auto-generated `{phase}-CONTEXT.md` files capture key architectural decisions before execution\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files (e.g. `32-01`, `32-02`)\n- Multi-wave or sequential plans used when intra-wave file conflicts exist on shared files (e.g. adapter files in phase 32)\n- `PROJECT.md` updated at completion of each phase\n- Milestone completion uses a `complete-milestone` workflow: pre-flight audit, plan summary verification, `STATE.md` update, git tag\n- Code-review workflow scoped to phase SUMMARY files; findings categorized as critical/warning/info"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.898Z",
+        "last_updated": "2026-04-26T10:38:00.003Z"
+      },
+      "id": "mc4flkg2vazpbn"
+    },
+    {
+      "name": "GSD Statusline and Hook Integration",
+      "entityType": "Process",
+      "observations": [
+        "- GSD updated from **1.38.3 → 1.38.5** (April 26); changelog covered SDK executor fixes, prompt improvements, and verification fixes\n- 7 custom skills were backed up before running the installer to prevent data loss; restart of Claude Code required to activate new commands\n- Context window percentage display (`context_window.remaining_percentage`) disappeared from GSD toolbar — root cause is Claude Code stopping to pass this field in hook stdin JSON; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.907Z",
+        "last_updated": "2026-04-27T06:21:24.584Z"
+      },
+      "id": "mc4flkg1y4ci6q"
+    },
+    {
+      "name": "Embedding-Based Deduplication Pipeline",
+      "entityType": "Port",
+      "observations": [
+        "Two deduplication scripts built to eliminate near-duplicate entries that exact SQL topic matching misses.\n\n**Insights dedup** (`dedup-insights-by-embedding.js`):\n- <USER_ID_REDACTED> Qdrant for embeddings, uses greedy pairwise merging (single-linkage chaining was abandoned — caused transitive merges of unrelated insights)\n- Similarity threshold: **0.93+** (MiniLM cosine floor empirically ~0.89–0.92; 0.90 was too aggressive)\n- Result: 19 → 16 insights on first run\n\n**Digests dedup** (`dedup-digests-by-embedding.js`):\n- Threshold: **0.97** — higher cutoff needed due to shared project vocabulary causing false positives at lower values\n- Result: 298 → 251 digests (47 duplicate clusters removed)\n\n**Upstream fix needed**: `ObservationConsolidator.js` used exact SQL topic matching for dedup; patch proposed to query Qdrant pre-insert to prevent duplicates from being created in the first place."
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.953Z",
+        "last_updated": "2026-04-26T10:38:00.025Z"
+      },
+      "id": "mc4flkg1pke36g"
+    },
+    {
+      "name": "Diagrams and Documentation Conventions",
+      "entityType": "Container",
+      "observations": [
+        "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, stereotypes, and arrow macros\n- Diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore` — should not be committed"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.956Z",
+        "last_updated": "2026-04-26T10:38:00.029Z"
+      },
+      "id": "mc4flkg1c37dsd"
+    },
+    {
+      "name": "Cross-Project Observation Contamination",
+      "entityType": "Fault",
+      "observations": [
+        "420 observations from `rapid-automations` and `onboarding-repro` projects were found polluting coding project digests and insights.\n\n- Root cause: no project scoping in observation <USER_ID_REDACTED>; `enhanced-transcript-monitor.js` had `isCodingRelated` logic but no project-level isolation\n- Fix approach: add `project` column to observations table with backfill, then filter <USER_ID_REDACTED> by project\n- `migrate-add-project-column.js` created with dry-run mode; dry-run confirmed 420 cross-contaminating + 21 null-project observations\n- Schema migration ran successfully but **project column data remained `null`** through multiple attempts — backfill population was still pending at last record\n- Later work shifted to `server.js`; stale processes were killed and script re-launched with output redirected to log files\n- **Known issue**: backfill completion unconfirmed — needs verification before cross-project filtering can be relied upon"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.960Z",
+        "last_updated": "2026-04-26T10:38:00.034Z"
+      },
+      "id": "mc4flkg2o0n16e"
+    },
+    {
+      "name": "GSD 1.38.5 Update",
+      "entityType": "Process",
+      "observations": [
+        "- GSD updated from **1.38.3 → 1.38.5** (April 26); changelog covered SDK executor fixes, prompt improvements, and verification fixes\n- 7 custom skills were backed up before running the installer to prevent data loss; restart of Claude Code required to activate new commands\n- Context window percentage display (`context_window.remaining_percentage`) disappeared from GSD toolbar — root cause is Claude Code stopping to pass this field in hook stdin JSON; no fix available from project side"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.907Z",
+        "last_updated": "2026-04-27T07:58:00.038711Z"
+      },
+      "id": "mc4flkg6oz95k"
+    },
+    {
+      "name": "LSL Tmux Health Indicator",
+      "entityType": "Process",
+      "observations": [
+        "- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-04-26T10:34:49.907Z",
+        "last_updated": "2026-04-27T07:58:00.038711Z"
+      },
+      "id": "mc4flkg3b4su5w"
     }
   ],
   "relations": [
@@ -18699,14 +18880,152 @@
       "to": "LoggingController",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Knowledge Context Injection Service (v6.0 Milestone)",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Operational Knowledge Base (OKB) Architecture and Known Issues",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Observations Pipeline: Recording, Storage, and Viewer",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "System Health Dashboard and Service Architecture",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Git Repository Hygiene and Large File Management",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Knowledge Context Injection System (v6.0 Milestone)",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OKB Operational Knowledge Base (OKB) Architecture and Known Issues",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Planning and Execution Workflow",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "GSD Statusline and Hook Integration",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Embedding-Based Deduplication Pipeline",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Diagrams and Documentation Conventions",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Cross-Project Observation Contamination",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "PromiseHandlesAsynchronousOperations",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ComponentReusableUIBuildingBlocks",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ApiHandlesExternalCommunication",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "MiddlewareProcessesRequestsInA",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "MiddlewareProcessesRequestsPipeline",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "RepositoryEncapsulatesDataAccessLogic",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "DecoratorAddsBehaviorToObjects",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ServiceContainsBusinessLogic",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "DecoratorAddsBehaviorObjects",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "RagSystem",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "GSD 1.38.5 Update",
+      "relationType": "has_insight",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-04-26T08:33:47.104Z",
-    "total_entities": 663,
-    "total_relations": 1108,
+    "exported_at": "2026-04-27T07:58:07.174Z",
+    "total_entities": 677,
+    "total_relations": 1131,
     "description": "Coding project infrastructure and patterns"
   }
 }
