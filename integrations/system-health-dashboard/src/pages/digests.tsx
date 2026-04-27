@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MarkdownText } from '@/components/markdown-text'
+import { MarkdownText, renderWithRedactionStyling } from '@/components/markdown-text'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -64,7 +64,13 @@ function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpand
                 {digest.filesTouched.length > 0 && (
                   <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                     <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span className="font-mono">{digest.filesTouched.slice(0, 5).join(', ')}{digest.filesTouched.length > 5 ? ` +${digest.filesTouched.length - 5} more` : ''}</span>
+                    <span className="font-mono">
+                      {renderWithRedactionStyling(
+                        digest.filesTouched.slice(0, 5).join(', ') +
+                          (digest.filesTouched.length > 5 ? ` +${digest.filesTouched.length - 5} more` : ''),
+                        `files-${digest.id}`
+                      )}
+                    </span>
                   </div>
                 )}
               </div>

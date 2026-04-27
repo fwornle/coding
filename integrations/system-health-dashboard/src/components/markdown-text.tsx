@@ -11,6 +11,18 @@ import { Fragment } from 'react'
 
 const REDACTION_TOKEN_RX = /<[A-Z][A-Z0-9_]*_REDACTED>/g
 
+/**
+ * Render a string into React nodes with redaction tokens styled as
+ * smaller, light-blue inline spans. Exported so plain-text fields outside
+ * the markdown renderer (digests' filesTouched, observation artifacts,
+ * etc.) can use the same visual treatment.
+ */
+export function renderWithRedactionStyling(text: string, keyBase: string = 'r'): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = []
+  pushRedactionAware(parts, text, keyBase)
+  return parts
+}
+
 function pushRedactionAware(parts: (string | JSX.Element)[], text: string, keyBase: string) {
   let last = 0
   let m: RegExpExecArray | null
