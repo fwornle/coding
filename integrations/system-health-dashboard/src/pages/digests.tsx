@@ -82,12 +82,48 @@ function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpand
   )
 }
 
+/**
+ * Pull a compact progress label out of the consolidator's last stderr
+ * line. The CLI emits patterns like:
+ *   [Consolidator] Day 2/5: 2026-04-26 — grouping observations
+ *   [Consolidator] Project 1/3: coding — synthesizing 12 digest(s)
+ * We surface the "Day N/M" or "Project N/M" prefix so the button shows
+ * "Day 2/5…" instead of generic "Consolidating…".
+ */
+function formatProgress(lastMessage?: string): string | null {
+  if (!lastMessage) return null
+  const stage = lastMessage.match(/Stage \d+\/\d+/)
+  if (stage) return stage[0] + '…'
+  const day = lastMessage.match(/Day \d+\/\d+/)
+  if (day) return day[0] + '…'
+  const proj = lastMessage.match(/Project \d+\/\d+/)
+  if (proj) return proj[0] + '…'
+  return null
+}
+
+interface InflightInfo {
+  pid: number
+  alive: boolean
+  ageMs: number
+  startedAt?: string
+  lastMessage?: string
+}
+
+interface ConsolidationStatus {
+  totalDigests: number
+  undigested: number
+  pendingPast?: number
+  pendingToday?: number
+  totalInsights: number
+  inflight?: InflightInfo | null
+}
+
 export function DigestsPage() {
   const [digests, setDigests] = useState<Digest[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [status, setStatus] = useState<{ totalDigests: number; undigested: number; pendingPast?: number; pendingToday?: number; totalInsights: number } | null>(null)
+  const [status, setStatus] = useState<ConsolidationStatus | null>(null)
   const [consolidating, setConsolidating] = useState(false)
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
   const [projects, setProjects] = useState<string[]>([])
@@ -160,6 +196,31 @@ export function DigestsPage() {
     fetchStatus()
   }, [fetchProjects, fetchStatus])
 
+  // Heartbeat-driven progress polling. While the consolidator is alive,
+  // poll /api/consolidation/status every 2s to surface progress and to
+  // detect completion even when the original POST response was lost
+  // (dashboard restart, network blip). When inflight goes null we clear
+  // the consolidating flag and refresh the digest list.
+  useEffect(() => {
+    if (!consolidating && !status?.inflight) return
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/consolidation/status`)
+        if (!res.ok) return
+        const data: ConsolidationStatus = await res.json()
+        setStatus(data)
+        // The heartbeat is the source of truth — if it's gone the child
+        // exited (cleanly or via the dashboard's orphan sweep), so the
+        // UI should stop showing "Consolidating…".
+        if (consolidating && !data.inflight) {
+          setConsolidating(false)
+          fetchDigests(projectFilter)
+        }
+      } catch { /* keep polling */ }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [consolidating, status?.inflight, fetchDigests, projectFilter])
+
   // Group digests by date
   const byDate = digests.reduce<Record<string, Digest[]>>((acc, d) => {
     if (!acc[d.date]) acc[d.date] = []
@@ -196,10 +257,13 @@ export function DigestsPage() {
               <div>{status.totalDigests} digests</div>
             </div>
           )}
-          {status && status.undigested > 0 && (
-            <Button size="sm" onClick={runConsolidation} disabled={consolidating || loading}>
-              {consolidating ? (
-                <><RefreshCw className="w-4 h-4 mr-1 animate-spin" />Consolidating...</>
+          {status && (status.undigested > 0 || status.inflight) && (
+            <Button size="sm" onClick={runConsolidation} disabled={consolidating || !!status.inflight || loading}>
+              {(consolidating || status.inflight) ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                  {formatProgress(status.inflight?.lastMessage) || 'Consolidating…'}
+                </>
               ) : (
                 <>Consolidate {status.undigested} obs</>
               )}

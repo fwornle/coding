@@ -993,14 +993,22 @@ export class ObservationConsolidator {
 
     let totalDigests = 0;
     let totalObs = 0;
+    const totalDays = eligibleDays.length;
 
-    for (const { date } of eligibleDays) {
+    process.stderr.write(`[Consolidator] Stage 1/2: consolidating ${totalDays} day(s) of observations\n`);
+    for (let i = 0; i < totalDays; i++) {
+      const { date } = eligibleDays[i];
+      // The leading "Day N/M" prefix is what the dashboard's status endpoint
+      // surfaces as the user-visible progress indicator (the heartbeat's
+      // lastMessage carries the most recent stderr line).
+      process.stderr.write(`[Consolidator] Day ${i + 1}/${totalDays}: ${date} — grouping observations\n`);
       const result = await this.consolidateDay(date);
       totalDigests += result.digests;
       totalObs += result.observations;
+      process.stderr.write(`[Consolidator] Day ${i + 1}/${totalDays}: ${date} — ${result.digests} digest(s) from ${result.observations} obs\n`);
     }
 
-    process.stderr.write(`[Consolidator] Consolidated ${eligibleDays.length} days: ${totalDigests} digests from ${totalObs} observations\n`);
+    process.stderr.write(`[Consolidator] Stage 1/2 complete: ${totalDays} days → ${totalDigests} digests from ${totalObs} observations\n`);
     return { days: eligibleDays.length, digests: totalDigests, observations: totalObs };
   }
 
@@ -1049,12 +1057,16 @@ export class ObservationConsolidator {
 
     const breakdown = [...digestsByProject.entries()]
       .map(([p, list]) => `${p}=${list.length}`).join(', ');
-    process.stderr.write(`[Consolidator] Synthesizing ${digests.length} digests into insights — projects: ${breakdown} (${allExistingInsights.length} existing total)\n`);
+    const totalProjects = digestsByProject.size;
+    process.stderr.write(`[Consolidator] Stage 2/2: synthesizing ${digests.length} digests into insights — ${totalProjects} project(s): ${breakdown}\n`);
 
     const DIGEST_CHUNK_SIZE = 30;
     const allInsightEntries = [];
 
+    let projectIdx = 0;
     for (const [project, projDigests] of digestsByProject) {
+      projectIdx++;
+      process.stderr.write(`[Consolidator] Project ${projectIdx}/${totalProjects}: ${project} — synthesizing ${projDigests.length} digest(s)\n`);
       const existingForProject = allExistingInsights.filter(
         i => (i.project || 'unknown') === project
       );
