@@ -7099,6 +7099,25 @@
     "project": "coding"
   },
   {
+    "id": "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
+    "date": "2026-04-25",
+    "theme": "Knowledge Context Injection Introspection Query",
+    "summary": "Developer <USER_ID_REDACTED> the assistant to enumerate what knowledge context had been injected into the current conversation via the system prompt.\n\n- Assistant successfully listed **12 insight items**, **2 digests**, and associated system metadata\n- Context was delivered via the knowledge context injection hook\n- Confirmed that a previously worked `isTTY` bug fix is live and functioning in the injected context\n- No artifacts or files were modified; this was a purely introspective/diagnostic exchange",
+    "observationIds": [
+      "760cbf3a-c8d2-4c46-8994-037822425316"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:01:33.320Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
     "id": "75d98280-a502-430d-bfa4-8d1b8ad4538f",
     "date": "2026-04-26",
     "theme": "Deduplicating Insights via Embedding Similarity Thresholds",
@@ -7465,6 +7484,180 @@
     "createdAt": "2026-04-27T06:20:35.872Z",
     "metadata": {
       "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "94ef7039-d9a4-4c26-ba0c-c7091c692b46",
+    "date": "2026-04-27",
+    "theme": "CLI Heartbeat and Dashboard Orphan Sweep Implementation",
+    "summary": "Implemented a heartbeat system to track live consolidation status across the CLI and dashboard:\n- `consolidate-observations.js` was updated to emit periodic heartbeat signals during processing runs\n- The dashboard server reads these heartbeats to distinguish active vs. orphaned consolidation processes\n- An orphan sweep was designed to run on dashboard startup to clean up stale consolidation state",
+    "observationIds": [
+      "30fddbd3-a227-4b6a-a504-92d68b9d90b0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/consolidate-observations.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T08:27:39.241Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a604eb00-d7ae-4f4d-b889-f4c5a8e41eb1",
+    "date": "2026-04-27",
+    "theme": "Tightening Fuzzy Merge Gate in Persistence Agent",
+    "summary": "Across two closely timed parallel task sessions, the fuzzy merge gate logic in `persistence-agent.ts` was tightened:\n- Updated `calculateNameSimilarity` and `calculateJaccardSimilarity` logic with revised threshold defaults\n- Two call sites (approximately lines 1189 and 3348) were updated to reflect the new defaults\n- Part of a broader multi-task batch execution; this task (Task 8) was confirmed completed",
+    "observationIds": [
+      "57af5d5d-ff3f-4b49-bece-151e34239b4e",
+      "a1187ffb-f361-4efa-b788-573bac48d811"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T08:27:39.241Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e415fb91-cdaf-4c9b-ae27-5043c9368261",
+    "date": "2026-04-27",
+    "theme": "Selective Commit of JSON Data Export Files",
+    "summary": "Performed a targeted git commit of modified JSON files from the `.data/observation-export/` directory:\n- Staged and committed `digests.json`, `insights.json`, `metadata.json`, and `observations.json`\n- Committed as `9eda88e8`",
+    "observationIds": [
+      "7ea01254-5ae6-4f19-9547-151da99e34fb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-27T08:27:39.241Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "919db31e-43b7-457e-ba1d-16c0961b118b",
+    "date": "2026-04-27",
+    "theme": "Fix redacted placeholder text rendering in dashboard HTML",
+    "summary": "A rendering bug was identified where `<USER_ID_REDACTED>` placeholders were silently dropped in the browser because observation summaries were rendered as raw HTML via `dangerouslySetInnerHTML`, causing the placeholder to be interpreted as an unknown HTML tag.\n\n- Root cause traced through `ConfigurableRedactor` → `ObservationSanitizer` → dashboard render path\n- Fixed by updating `markdown-text.tsx` to style redacted tokens distinctively and handle file path rendering\n- Extracted a shared `renderWithRedactionStyling` helper in `markdown-text.tsx` to consolidate redaction styling logic\n- Helper imported in both `digests.tsx` and `observation-card.tsx` so file paths and redacted tokens display consistently across the dashboard\n- Key files: `markdown-text.tsx`, `observation-card.tsx`, `digests.tsx`",
+    "observationIds": [
+      "f469cc59-c141-4418-b104-fd98fe2a96e0",
+      "2263cb05-19a4-46e7-a4dd-8811a1d55524",
+      "353657ee-d5da-4541-98e5-1f86548b4ff2",
+      "97bcd4c4-7ca0-49b1-a9c8-818857aa6f8a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T10:01:42.535Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "741c4bb3-b2cc-41b4-a09d-7b302949ab17",
+    "date": "2026-04-27",
+    "theme": "Update constraints documentation to match current architecture",
+    "summary": "Audited existing docs against the project style guide and updated `constraints.md` in `docs-content/core-systems/`. Removed outdated magic-numbers content and added new architecture details to bring the documentation in line with the current system state.",
+    "observationIds": [
+      "999d1f3b-d27e-4a7e-9ccf-b79e64f19832"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/constraints.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T10:01:42.535Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "334cf657-c8ba-499e-8830-69cd866bb4e7",
+    "date": "2026-04-27",
+    "theme": "Screenshot capture tooling: switch Playwright to gsd-browser",
+    "summary": "Attempted to capture full-page screenshots of `localhost:3032/digests`, `localhost:3032/observations`, and `localhost:8080` (VKB) for saving to `docs-content/images/`. The initial approach using Playwright headless Chromium was flagged as incorrect for this project. No scripts were written and no screenshots were captured; the session ended with the assistant investigating `gsd-browser` CLI capabilities as the correct replacement tool.",
+    "observationIds": [
+      "74d6194a-a350-4625-9b1b-f329db4f74c6",
+      "d897d2c6-3873-448c-b0c9-2b343089db8f",
+      "22e86113-e443-49bd-9614-d80300c1e556"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-27T10:01:42.535Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3e245d1a-cd2c-4e62-bb80-4859f06d8f42",
+    "date": "2026-04-27",
+    "theme": "Switch from Playwright to gsd-browser for Screenshots",
+    "summary": "Replaced Playwright with `gsd-browser` for screenshot functionality after investigating its CLI capabilities (screenshot, daemon, navigation commands). Resolved a daemon startup issue by clearing a stale singleton lock file. Changes reflected in `release-notes.md`.",
+    "observationIds": [
+      "af2563de-d9db-49fb-a2c8-64cee8a96c68"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/release-notes.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:13:36.903Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "21d0fbbc-71aa-4894-b9cd-a57d352041ca",
+    "date": "2026-04-27",
+    "theme": "Fix Stuck Consolidation Button and Add Progress Feedback",
+    "summary": "Investigated a UI bug where the consolidation button remained in a \"consolidating\" state even after the process completed. Diagnosed two root causes:\n- The digests page UI had no heartbeat polling, so the button never cleared if the POST response was lost.\n- No per-stage progress events were emitted during consolidation, leaving users with no feedback.\n\nFixed in `ObservationConsolidator.js` (`/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js`):\n- Added heartbeat polling on the frontend to detect completion independently of the POST response.\n- Added per-stage progress event emission on the CLI/backend side so the UI can display live feedback during consolidation runs.",
+    "observationIds": [
+      "79ab7743-984c-4588-8523-7c86a55062a7",
+      "f0d94363-1833-4ded-a47b-ba43da21baa7",
+      "1bb0f6c3-e6a5-4468-9460-c4fd513f331a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T10:13:36.903Z",
+    "metadata": {
+      "sourceCount": 3
     },
     "project": "coding"
   }

@@ -7195,6 +7195,20 @@
     "modifiedFiles": null
   },
   {
+    "id": "760cbf3a-c8d2-4c46-8994-037822425316",
+    "summary": "Intent: Developer asked what knowledge context was injected into the current conversation.\nApproach: Introspective query requiring the assistant to enumerate injected context from the system prompt.\nArtifacts: none\nResult: Assistant listed 12 insight items, 2 digests, and system metadata injected via the knowledge context injection hook, confirming the isTTY bug fix is live and working.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-25T06:58:51.145Z",
+    "digestedAt": "2026-04-27T10:01:33.320Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
     "id": "4438196a-6be6-4e99-b749-d506414727cf",
     "summary": "Intent: Redesign the knowledge injection system to work across all projects, all coding agents, and with context-focused relevance.\nApproach: The assistant analyzed the three requirements separately, identifying a quick fix for cross-project support (global settings), per-agent adapter work for cross-agent support, and richer context passing for focused relevance.\nArtifacts: edited PROJECT.md\nResult: Decision point reached: move hook to global ~/.claude/settings.json for immediate cross-project support, then create new phases for cross-agent adapters and context-aware relevance improvements.",
     "agent": "claude",
@@ -8605,7 +8619,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-27T06:21:01.051Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-27T08:27:39.241Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8621,7 +8635,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-27T06:56:10.258Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-27T08:27:39.241Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8637,7 +8651,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-04-27T06:56:10.258Z",
-    "digestedAt": null,
+    "digestedAt": "2026-04-27T08:27:39.241Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -8645,5 +8659,230 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts"
     ]
+  },
+  {
+    "id": "7ea01254-5ae6-4f19-9547-151da99e34fb",
+    "summary": "Intent: Commit all JSON files in the current git changeset\nApproach: Identified modified JSON files via git status, staged them selectively, and committed.\nArtifacts: edited observation-card.tsx\nResult: Committed 4 JSON files (`digests.json`, `insights.json`, `metadata.json`, `observations.json`) from `.data/observation-export/` in commit `9eda88e8`.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T08:25:28.536Z",
+    "digestedAt": "2026-04-27T08:27:39.241Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx"
+    ]
+  },
+  {
+    "id": "f469cc59-c141-4418-b104-fd98fe2a96e0",
+    "summary": "Intent: Developer shared a screenshot showing a rendering issue where `<USER_ID_REDACTED>` text was being parsed as an HTML tag and disappearing in the browser dashboard.\nApproach: Investigated the redaction pipeline by tracing from stored DB values through ConfigurableRedactor and ObservationSanitizer to the dashboard's render path, confirming the DB stores the correct placeholder but the HTML rendering strips it.\nArtifacts: edited observation-card.tsx\nResult: Root cause identified: the dashboard renders observation summaries as raw HTML (likely via `dangerouslySetInnerHTML`), causing `<USER_ID_REDACTED>` to be interpreted as an unknown HTML tag and silently dropped; fix needs to be applied in the dashboard's observation component render path.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T08:27:12.660Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx"
+    ]
+  },
+  {
+    "id": "2263cb05-19a4-46e7-a4dd-8811a1d55524",
+    "summary": "Intent: Fix styling for redacted/placeholder text shown in a screenshot of the system health dashboard.\nApproach: Updated the MarkdownText component to style redacted tokens distinctively, then applied consistent styling in the observation card component.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx, edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx\nResult: Redacted text tokens are now rendered with consistent visual styling across both the MarkdownText and ObservationCard components in the system health dashboard.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T09:08:41.531Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx"
+    ]
+  },
+  {
+    "id": "353657ee-d5da-4541-98e5-1f86548b4ff2",
+    "summary": "Intent: [fix rendering issue visible in screenshot, likely related to file paths or markdown display in the system health dashboard]\nApproach: Identified that file paths were being rendered as plain text bypassing the MarkdownText component, and addressed the issue within the shared markdown component.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx\nResult: Updated the MarkdownText component to handle file path rendering, consolidating the fix into the shared component rather than fixing individual call sites.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T09:45:55.194Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+    ]
+  },
+  {
+    "id": "97bcd4c4-7ca0-49b1-a9c8-818857aa6f8a",
+    "summary": "Intent: Fix file paths being rendered as plain text without redaction styling in the system health dashboard.\nApproach: Identified that digest file paths bypassed the MarkdownText component and were rendered as plain text; extracted a shared redaction styling helper to apply consistent styling across digests and observation cards.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx, edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx, edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx\nResult: A shared `renderWithRedactionStyling` helper was added to markdown-text.tsx and imported in both digests.tsx and observation-card.tsx so file paths display with proper redaction styling instead of plain text.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T09:45:55.194Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx"
+    ]
+  },
+  {
+    "id": "999d1f3b-d27e-4a7e-9ccf-b79e64f19832",
+    "summary": "Intent: Apply documentation style guide rules to existing documentation artifacts in the coding project.\nApproach: Audited existing PlantUML diagrams and markdown docs against the style guide, then made targeted edits to bring constraints documentation up to date.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/constraints.md\nResult: Updated the constraints documentation, removing outdated magic-numbers content and adding new architecture details to align with current system state.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T09:52:10.641Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/constraints.md"
+    ]
+  },
+  {
+    "id": "74d6194a-a350-4625-9b1b-f329db4f74c6",
+    "summary": "Intent: Capture full-page screenshots of localhost:3032/digests, localhost:3032/observations, and localhost:8080 (VKB), saving them to docs-content/images/ with specific filenames.\nApproach: Use Playwright headless Chromium scripts to navigate to each URL, handle the VKB screenshot by clicking a specific entity node before capturing, and save outputs to the project's docs-content/images/ directory.\nArtifacts: edited release-notes.md\nResult: Exchange shows only the initial environment check command being run; no scripts written or screenshots captured yet.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T09:59:36.883Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md"
+    ]
+  },
+  {
+    "id": "d897d2c6-3873-448c-b0c9-2b343089db8f",
+    "summary": "Intent: [questioned why Playwright is being used instead of gsd-browser for browser interactions]\nApproach: [switching to gsd-browser as the correct tool for browser operations in this project]\nArtifacts: edited release-notes.md\nResult: [identified that gsd-browser should be used instead of Playwright; assistant investigated gsd-browser availability and committed to switching]",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T10:00:20.877Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md"
+    ]
+  },
+  {
+    "id": "22e86113-e443-49bd-9614-d80300c1e556",
+    "summary": "Intent: Correct the assistant's use of Playwright for screenshots, directing it to use gsd-browser instead.\nApproach: Investigate gsd-browser CLI capabilities to replace Playwright screenshot functionality.\nArtifacts: edited release-notes.md\nResult: Identified that gsd-browser should be used for taking screenshots instead of Playwright; assistant acknowledged and began switching approaches.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:00:20.877Z",
+    "digestedAt": "2026-04-27T10:01:42.535Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md"
+    ]
+  },
+  {
+    "id": "af2563de-d9db-49fb-a2c8-64cee8a96c68",
+    "summary": "Intent: Replace Playwright with gsd-browser for taking screenshots.\nApproach: Investigated gsd-browser CLI capabilities (screenshot, daemon, navigation commands) to understand how to replicate Playwright screenshot functionality, then switched to using it.\nArtifacts: edited release-notes.md\nResult: Confirmed gsd-browser is the correct tool for screenshots; switched from Playwright to gsd-browser, including resolving a daemon startup issue by clearing a stale singleton lock file.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:00:20.877Z",
+    "digestedAt": "2026-04-27T10:13:36.903Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md"
+    ]
+  },
+  {
+    "id": "79ab7743-984c-4588-8523-7c86a55062a7",
+    "summary": "Intent: [user shared a screenshot, likely showing a UI issue with a button not clearing after consolidation completes]\nApproach: Investigated the consolidation state by checking heartbeat JSON and process list, then reviewed the digests page source to understand why the UI button wasn't clearing post-consolidation.\nArtifacts: edited ObservationConsolidator.js\nResult: Identified that the API shows consolidation is complete (no inflight, no process, no heartbeat) but the UI button is not updating to reflect the completed state — root cause traced to the digests page rendering logic.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:07:25.287Z",
+    "digestedAt": "2026-04-27T10:13:36.903Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "f0d94363-1833-4ded-a47b-ba43da21baa7",
+    "summary": "Intent: [shared a screenshot, likely showing a stuck \"consolidating\" button in the system health dashboard UI]\nApproach: Diagnosed two bugs: UI lacks heartbeat polling so button never clears when POST response is lost, and there's no progress feedback during consolidation runs.\nArtifacts: edited ObservationConsolidator.js\nResult: Identified root cause as missing heartbeat polling in the digests page UI; no code changes were made in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T10:07:25.287Z",
+    "digestedAt": "2026-04-27T10:13:36.903Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "1bb0f6c3-e6a5-4468-9460-c4fd513f331a",
+    "summary": "Intent: Fix UI bugs where consolidation button doesn't clear after completion and lacks progress feedback.\nApproach: Added heartbeat polling on the frontend so the button state clears even if POST response is lost, and added per-stage progress emission on the CLI side.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: ObservationConsolidator now emits progress events during consolidation stages so the UI can display feedback and detect completion via heartbeat polling rather than relying solely on the POST response.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-04-27T10:07:25.287Z",
+    "digestedAt": "2026-04-27T10:13:36.903Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "afb0be8a-0cd1-4ab2-aae1-653afd8ca958",
+    "summary": "Intent: Commit documentation image artifacts and rebuild MkDocs, including copying screenshots to docs-content for MkDocs to reference.\nApproach: Copy new screenshot images from docs/images to docs-content/images so MkDocs can find them, then stage files for commit and trigger the MkDocs build process.\nArtifacts: copied docs/images/log-digests.png, docs/images/log-insights.png, docs/images/log-observations.png to docs-content/images/\nResult: Screenshots were copied to docs-content/images/ and staged in git; MkDocs build script lookup was initiated but the exchange ended before the build completed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-27T12:10:50.308Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
   }
 ]
