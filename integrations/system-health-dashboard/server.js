@@ -80,6 +80,10 @@ class SystemHealthAPIServer {
         // Auto-consolidation state
         this.autoConsolidationInterval = null;
         this.consolidationRunning = false;
+        // Path to the consolidator's heartbeat file. The CLI owns the file
+        // (writes every ~2s, deletes on graceful exit). The dashboard reads
+        // it for status and uses it for the orphan-sweep on startup.
+        this.consolidationHeartbeatPath = join(codingRoot, '.observations', 'consolidation-heartbeat.json');
         // Tracks the in-flight consolidation Promise so shutdown can await
         // it instead of letting supervisor SIGKILL the process mid-write.
         this._activeConsolidation = null;
@@ -3111,6 +3115,7 @@ class SystemHealthAPIServer {
                     reject(error);
                 } else {
                     process.stderr.write(`✅ System Health API server started on port ${this.port}\n`);
+                    this._sweepConsolidationOrphans();
                     this.startAutoConsolidation();
                     resolve();
                 }
@@ -3533,6 +3538,77 @@ class SystemHealthAPIServer {
         } catch (error) {
             console.error(`[WebSocket] Failed to handle command ${command.type}:`, error);
         }
+    }
+
+    /**
+     * Read the consolidator's heartbeat file. Returns null when no run is
+     * active. When a run IS active, returns { pid, startedAt, lastHeartbeat,
+     * ageMs, alive, lastMessage, args } — the dashboard uses this so its
+     * status survives its own restarts.
+     */
+    _readConsolidationHeartbeat() {
+        try {
+            if (!existsSync(this.consolidationHeartbeatPath)) return null;
+            const data = JSON.parse(readFileSync(this.consolidationHeartbeatPath, 'utf8'));
+            const now = Date.now();
+            const last = new Date(data.lastHeartbeat || 0).getTime();
+            const ageMs = now - last;
+            // Verify the PID is actually alive — kill(0) throws when the
+            // process is gone, which means the file is stale (the child
+            // died ungracefully without cleaning up).
+            let alive = false;
+            try { process.kill(data.pid, 0); alive = true; } catch { alive = false; }
+            return {
+                pid: data.pid,
+                alive,
+                startedAt: data.startedAt,
+                lastHeartbeat: data.lastHeartbeat,
+                ageMs,
+                lastMessage: data.lastMessage,
+                args: data.args
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Sweep stale or orphaned consolidator runs at startup.
+     *
+     * Two failure modes the heartbeat lets us recover from:
+     *   1. PID is alive but heartbeat is older than the hard timeout — the
+     *      child is wedged on a hung LLM call. Send SIGTERM (escalate to
+     *      SIGKILL) and clean the file. Without this, dashboard restarts
+     *      orphan the child and there's no one left to enforce the timeout.
+     *   2. PID is dead but heartbeat exists — the child crashed ungracefully
+     *      and never deleted its own file. Just remove it.
+     *
+     * Called once on startup; not on a timer (the running dashboard's own
+     * timeout enforcer covers the live case).
+     */
+    _sweepConsolidationOrphans() {
+        const STALE_AGE_MS = 6 * 60 * 1000;
+        const hb = this._readConsolidationHeartbeat();
+        if (!hb) return;
+        if (!hb.alive) {
+            process.stderr.write(`[Consolidate] Cleaning stale heartbeat for dead PID ${hb.pid}\n`);
+            try { unlinkSync(this.consolidationHeartbeatPath); } catch { /* ignore */ }
+            return;
+        }
+        if (hb.ageMs > STALE_AGE_MS) {
+            process.stderr.write(`[Consolidate] Killing orphan consolidator PID ${hb.pid} (heartbeat ${Math.round(hb.ageMs / 1000)}s old)\n`);
+            try { process.kill(hb.pid, 'SIGTERM'); } catch { /* may already be dead */ }
+            // Give it 5s to exit cleanly, then SIGKILL.
+            setTimeout(() => {
+                try { process.kill(hb.pid, 0); process.kill(hb.pid, 'SIGKILL'); } catch { /* gone */ }
+                try { unlinkSync(this.consolidationHeartbeatPath); } catch { /* ignore */ }
+            }, 5000).unref();
+            return;
+        }
+        // Heartbeat is alive AND fresh — another dashboard instance might be
+        // running, or the previous instance crashed but the child is still
+        // healthy. Either way, leave it alone.
+        process.stderr.write(`[Consolidate] Found running consolidator PID ${hb.pid} (heartbeat ${Math.round(hb.ageMs / 1000)}s old) — leaving alone\n`);
     }
 
     /**
@@ -4422,7 +4498,17 @@ class SystemHealthAPIServer {
             let totalInsights = 0;
             try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
 
-            res.json({ totalObs, undigested, lowQuality, pendingPast, pendingToday, digested: totalObs - undigested - lowQuality, totalDigests, totalInsights });
+            // Inflight info from the consolidator's heartbeat file. Survives
+            // dashboard restarts so a manual trigger followed by a SIGKILL
+            // still surfaces "running for N seconds, last activity Xs ago".
+            const inflight = this._readConsolidationHeartbeat();
+
+            res.json({
+                totalObs, undigested, lowQuality, pendingPast, pendingToday,
+                digested: totalObs - undigested - lowQuality,
+                totalDigests, totalInsights,
+                inflight
+            });
         } catch (err) {
             process.stderr.write(`[ConsolidationAPI] Status error: ${err.message}\n`);
             if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {

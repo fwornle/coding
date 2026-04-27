@@ -151,6 +151,14 @@
           {
             "host": ".global-lsl-registry.json",
             "container": "/coding/.global-lsl-registry.json"
+          },
+          {
+            "host": "integrations/system-health-dashboard/server.js",
+            "container": "/coding/integrations/system-health-dashboard/server.js"
+          },
+          {
+            "host": "scripts/consolidate-observations.js",
+            "container": "/coding/scripts/consolidate-observations.js"
           }
         ],
         "auto_heal": true,

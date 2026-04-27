@@ -12,6 +12,7 @@
 
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import path from 'node:path';
+import fs from 'node:fs';
 
 const args = process.argv.slice(2);
 const dateFlag = args.indexOf('--date');
@@ -27,6 +28,56 @@ const jsonFlag = args.includes('--json');
 const includeTodayFlag = args.includes('--include-today');
 
 const dbPath = path.resolve('.observations/observations.db');
+
+// Heartbeat file lives next to the database so the dashboard (which already
+// knows .observations/) can read it without extra plumbing. Each line that
+// the consolidator writes to stderr bumps the heartbeat — that's our
+// "still alive" signal. Status endpoint reports the age; orphan sweep on
+// dashboard startup kills runs whose heartbeat has gone stale.
+const heartbeatPath = path.resolve('.observations/consolidation-heartbeat.json');
+const HEARTBEAT_FLUSH_MS = 2000;
+
+let lastStderrLine = 'starting…';
+function bumpHeartbeat(extras = {}) {
+  try {
+    fs.mkdirSync(path.dirname(heartbeatPath), { recursive: true });
+    fs.writeFileSync(heartbeatPath, JSON.stringify({
+      pid: process.pid,
+      startedAt: HEARTBEAT_STARTED_AT,
+      lastHeartbeat: new Date().toISOString(),
+      lastMessage: lastStderrLine,
+      args,
+      ...extras,
+    }));
+  } catch { /* heartbeat is best-effort */ }
+}
+const HEARTBEAT_STARTED_AT = new Date().toISOString();
+
+// Wrap stderr so any consolidator log line refreshes the heartbeat.
+const _origStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = (chunk, ...rest) => {
+  try {
+    const s = typeof chunk === 'string' ? chunk : chunk?.toString?.('utf8');
+    if (s) {
+      const line = s.trim().split('\n').filter(Boolean).pop();
+      if (line) lastStderrLine = line.slice(0, 240);
+    }
+  } catch { /* ignore */ }
+  bumpHeartbeat();
+  return _origStderrWrite(chunk, ...rest);
+};
+
+bumpHeartbeat({ stage: 'init' });
+const heartbeatTimer = setInterval(bumpHeartbeat, HEARTBEAT_FLUSH_MS);
+heartbeatTimer.unref?.();
+
+function clearHeartbeat() {
+  clearInterval(heartbeatTimer);
+  try { fs.unlinkSync(heartbeatPath); } catch { /* may not exist */ }
+}
+process.on('exit', clearHeartbeat);
+process.on('SIGTERM', () => { clearHeartbeat(); process.exit(143); });
+process.on('SIGINT', () => { clearHeartbeat(); process.exit(130); });
 
 function emitJson(obj) {
   if (jsonFlag) process.stdout.write(JSON.stringify(obj) + '\n');
