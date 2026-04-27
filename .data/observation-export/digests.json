@@ -7351,5 +7351,121 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "5ef87618-141d-4404-a1d6-bea1d2d6f88d",
+    "date": "2026-04-26",
+    "theme": "Debugging and Fixing Broken Observation Dashboard Updates",
+    "summary": "Investigated why the observation dashboard stopped updating after 11:32 AM, uncovering two stacked bugs:\n\n- **Deduplication hash collision**: `ObservationWriter.js` hashes empty `userContent`, causing every exchange in a session to collide to the same hash (`6d37c4ec`), silently discarding all generated summaries without writing to the DB.\n- **Stale file handle**: The transcript-monitor process held a stale handle to a rotated/corrupted DB file, causing writes to land in the wrong file.\n\nFixed by adding inode-rotation detection to `ObservationWriter.js` so it automatically compares inodes and reopens the database connection when the underlying file changes, preventing the split-brain scenario between writer and reader.",
+    "observationIds": [
+      "b3669ce3-8532-4085-b7dc-cceaea995936",
+      "58d514ed-2e94-4b28-b4d6-f80986ea0b24"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T05:47:30.339Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "77c1a37e-4738-45de-9607-05d72738c259",
+    "date": "2026-04-26",
+    "theme": "GSD Tool Update from 1.38.3 to 1.38.5",
+    "summary": "Ran the GSD update workflow across several exchanges to check for and install an available upgrade:\n\n- Observations 3–5 handled version detection, npm latest-check, and changelog fetching, confirming an update from `1.38.3` to `1.38.5` was available; changelog covered SDK executor fixes, prompt improvements, and verification fixes.\n- Observation 6 confirmed the update: custom skills (7 total) were backed up before running the installer to prevent data loss, then the GSD package was updated globally.\n- A restart of Claude Code is required to activate the new commands.\n- `ObservationWriter.js` appears listed as an artifact in several of these exchanges, likely as a side-effect of the active editing context rather than intentional modification.",
+    "observationIds": [
+      "f24200fd-e539-441a-8114-d0417cdaf863",
+      "fbc2a48a-1a66-4098-8614-4d792240f9de",
+      "d350ff30-7492-463a-9d30-09a658dcbf57",
+      "ad277afe-b84c-409f-9c7c-48d22f4254c8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T05:47:30.339Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4d48c6d9-0bb6-469e-bd26-90a603518c91",
+    "date": "2026-04-27",
+    "theme": "Health Verifier HTTP Check Context and Setup",
+    "summary": "Session opened by loading recent LSL log files to restore context from prior work (GSD update v1.38.3→v1.38.5, 7 custom skills preserved, Phase 10 runtime issues pending). Follow-up addressed a specific option-2 selection in the health check flow:\n- Edited `health-verifier.js` and `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-verifier.js`\n- Fixed or modified the `checkHTTPHealth` function behavior triggered by option 2\n- Syntax validated successfully after edits",
+    "observationIds": [
+      "3643b7b7-09bf-452f-89b6-3686975ec876",
+      "aa92bc16-1b5b-4ff5-8fc3-82c4f485d085"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-verifier.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T05:47:40.034Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ce7be6f6-4c41-480e-a1a7-0d9aa100d0b8",
+    "date": "2026-04-27",
+    "theme": "Constraint System Investigation and ESLint Config Fixes",
+    "summary": "Extended investigation into why the constraint/linting system was not firing reliably, culminating in a Docker bind-mount discovery. Work proceeded in several stages:\n- Initial probe of constraint monitor config and live API state via `engine-test.js` to diagnose why only the magic-number constraint was visibly triggering\n- Five tracked improvement tasks created: remove global magic-number rule, fix split-brain config ambiguity, fix unreliable constraints, remove fallback masks, and a fifth investigative item\n- Probe scripts written to `/tmp/probe-engine.mjs` confirmed `proper-function-naming` constraint fires correctly — the root cause was the magic-numbers rule generating noise that drowned out other violations\n- A screenshot-driven follow-up revealed a **stale Docker Desktop bind-mount**: host config file was 14978 bytes but container saw an outdated 14978-byte snapshot (discrepancy of 58 bytes vs. 15036 host size); restarting the service forced a remount and resolved the display issue\n- All five ESLint/constraint fixes remain in progress via tracked tasks pending these findings",
+    "observationIds": [
+      "01458954-784c-4ffd-99ce-00cc31814dc5",
+      "288c1b31-a75f-46db-add2-ef098464da1e",
+      "874d99a4-c404-42b5-9317-ebe89d4ae3b9",
+      "bd15fb1e-3c39-4b0d-b562-32e5afcb5f42",
+      "d39a965f-9de9-4e3f-ae0a-a8aa2598ad47"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/engine-test.js",
+      "/tmp/probe-engine.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-27T05:47:40.034Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "042d4dee-e93d-4c7a-9ba0-42733a5e8950",
+    "date": "2026-04-27",
+    "theme": "Coding Transcript Monitor Health Investigation",
+    "summary": "Both observations represent the same work session initiated at 05:50 by the claude agent, triggered by a shared screenshot of a health monitoring dashboard.\n\n- Goal was to diagnose the current status of the coding transcript monitor by reading health and state JSON files\n- Approach involved checking timestamps and lock files in `health/` and `state/` JSON files\n- `health-verifier.js` was edited as part of the investigation\n- Planned follow-up work was prioritized as: LSL issue first, then consolidation visibility",
+    "observationIds": [
+      "c2925a1f-9990-49bc-9514-3956966a3be0",
+      "f558a03a-3b55-4bce-812d-44dccbb5d139"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-verifier.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-27T06:20:35.872Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
   }
 ]
