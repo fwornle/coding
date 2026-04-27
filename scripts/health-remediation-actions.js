@@ -200,6 +200,9 @@ export class HealthRemediationActions {
         case 'check_mastra_agent':
           result = await this.checkMastraAgent(issueDetails);
           break;
+        case 'refresh_bind_mounts':
+          result = await this.refreshBindMounts(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -1109,6 +1112,57 @@ export class HealthRemediationActions {
       };
     } catch (error) {
       return { success: false, message: `Docker supervisorctl error: ${error.message}` };
+    }
+  }
+
+  /**
+   * Recreate the coding-services container to refresh stale single-file
+   * bind-mounts (a known macOS Docker Desktop quirk where the container
+   * caches the file at mount time and doesn't see later host edits).
+   *
+   * Called by the bind_mount_freshness check when host vs container
+   * file sizes diverge. Cooldown is enforced upstream by the verifier;
+   * the container also restarts in ~10s, so guard against running this
+   * inside the container itself.
+   */
+  async refreshBindMounts(details) {
+    if (existsSync('/.dockerenv')) {
+      return {
+        success: false,
+        message: 'Refusing to docker-compose restart from inside the container'
+      };
+    }
+
+    const composeDir = join(this.codingRoot, 'docker');
+    const command = `cd "${composeDir}" && docker-compose up -d coding-services`;
+    this.log(`Refreshing bind-mounts: ${command}`);
+
+    try {
+      const { stdout, stderr } = await execAsync(command, { timeout: 120000 });
+      this.log(`docker-compose output: ${stdout || stderr}`);
+
+      // Recreate vs restart: docker-compose up -d will recreate when the
+      // declared mounts have changed, otherwise it's a no-op. We want
+      // an unconditional remount, so force-recreate when sizes differ.
+      const needsForce = (details?.mismatched || []).length > 0;
+      if (needsForce) {
+        const forceCmd = `cd "${composeDir}" && docker-compose up -d --force-recreate coding-services`;
+        this.log(`Forcing recreate: ${forceCmd}`);
+        await execAsync(forceCmd, { timeout: 120000 });
+      }
+
+      // Give the dashboard a moment to come back up.
+      await this.sleep(5000);
+
+      return {
+        success: true,
+        message: `coding-services recreated to refresh ${details?.mismatched?.length || 0} stale bind-mount(s)`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to recreate coding-services: ${error.message}`
+      };
     }
   }
 

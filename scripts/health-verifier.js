@@ -24,6 +24,10 @@ import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 import ProcessStateManager from './process-state-manager.js';
 import HealthRemediationActions from './health-remediation-actions.js';
 import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
@@ -273,6 +277,11 @@ class HealthVerifier extends EventEmitter {
       this.log('Checking file health...');
       const fileChecks = await this.verifyFiles();
       checks.push(...fileChecks);
+
+      // Priority Check 5: Bind-mount staleness (macOS Docker Desktop quirk)
+      this.log('Checking Docker bind-mount freshness...');
+      const mountChecks = await this.verifyBindMountFreshness();
+      checks.push(...mountChecks);
 
       // Auto-Healing: Attempt to fix violations
       if (this.autoHealingEnabled) {
@@ -1213,6 +1222,117 @@ class HealthVerifier extends EventEmitter {
         });
       }
     }
+
+    return checks;
+  }
+
+  /**
+   * Verify Docker single-file bind-mounts are not showing a stale snapshot.
+   *
+   * On macOS Docker Desktop, single-file bind-mounts occasionally cache the
+   * file at mount time and don't reflect later host edits. The container
+   * sees a truncated/old version while the host has the current bytes —
+   * which silently corrupts YAML/JSON loaders inside the container.
+   *
+   * Strategy: pick the small bind-mounted files that the dashboard and
+   * constraint-monitor actually read, compare host stat vs `docker exec
+   * stat`. Any mismatch means the mount is stale; auto-heal by recreating
+   * the container.
+   */
+  async verifyBindMountFreshness() {
+    const checks = [];
+    const rule = this.rules.rules.services?.bind_mount_freshness;
+    if (!rule?.enabled) return checks;
+
+    const containerName = rule.container || 'coding-services';
+
+    // Quick guard: skip when the container isn't running. The check is
+    // pointless then, and the docker invocations would hang.
+    try {
+      const { stdout } = await execAsync(
+        `docker ps --filter name=${containerName} --filter status=running --format '{{.Names}}'`,
+        { timeout: 5000 }
+      );
+      if (!stdout.trim().includes(containerName)) {
+        return checks;
+      }
+    } catch (err) {
+      // Docker not reachable from the verifier's environment — skip.
+      this.log(`Bind-mount freshness skipped: ${err.message}`);
+      return checks;
+    }
+
+    const mismatched = [];
+    for (const mapping of rule.files || []) {
+      const hostPath = path.isAbsolute(mapping.host)
+        ? mapping.host
+        : path.join(this.codingRoot, mapping.host);
+      const containerPath = mapping.container;
+
+      let hostSize, containerSize;
+      try {
+        hostSize = fsSync.statSync(hostPath).size;
+      } catch {
+        // Host file is missing — that's a configuration problem, not a
+        // freshness problem. Surface it as its own warning, then move on.
+        checks.push({
+          category: 'services',
+          check: `bind_mount_${path.basename(hostPath)}`,
+          status: 'failed',
+          message: `Bind-mount source missing on host: ${hostPath}`,
+          details: { hostPath },
+          timestamp: new Date().toISOString()
+        });
+        continue;
+      }
+      try {
+        const { stdout } = await execAsync(
+          `docker exec ${containerName} stat -c '%s' ${containerPath}`,
+          { timeout: 5000 }
+        );
+        containerSize = parseInt(stdout.trim(), 10);
+      } catch (err) {
+        // The file isn't visible inside the container at all — also a
+        // mount misconfiguration, surface and continue.
+        checks.push({
+          category: 'services',
+          check: `bind_mount_${path.basename(hostPath)}`,
+          status: 'failed',
+          message: `Bind-mount target missing in container: ${containerPath}`,
+          details: { containerPath, error: err.message },
+          timestamp: new Date().toISOString()
+        });
+        continue;
+      }
+
+      if (hostSize !== containerSize) {
+        mismatched.push({ hostPath, containerPath, hostSize, containerSize });
+      }
+    }
+
+    if (mismatched.length === 0) {
+      checks.push({
+        category: 'services',
+        check: 'bind_mount_freshness',
+        status: 'passed',
+        message: `All ${(rule.files || []).length} bind-mounted files match host`,
+        timestamp: new Date().toISOString()
+      });
+      return checks;
+    }
+
+    checks.push({
+      category: 'services',
+      check: 'bind_mount_freshness',
+      status: 'failed',
+      message: `${mismatched.length} bind-mount(s) showing stale snapshot in ${containerName}`,
+      details: { mismatched, container: containerName },
+      recommendation: `Recreate the container to refresh the bind-mounts`,
+      auto_heal: rule.auto_heal !== false,
+      auto_heal_action: 'refresh_bind_mounts',
+      severity: rule.severity || 'warning',
+      timestamp: new Date().toISOString()
+    });
 
     return checks;
   }

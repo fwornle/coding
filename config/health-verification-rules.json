@@ -121,7 +121,7 @@
         "description": "LLM CLI Proxy - runs on host, reached via host.docker.internal from container. Required for observation summarization.",
         "auto_heal": false,
         "auto_heal_action": "restart_llm_cli_proxy",
-        "auto_heal_note": "Proxy runs on host, not in supervisord. Auto-heal disabled — manual start: cd integrations/llm-cli-proxy && npm start",
+        "auto_heal_note": "Proxy runs on host, not in supervisord. Auto-heal disabled \u2014 manual start: cd integrations/llm-cli-proxy && npm start",
         "expected_status": "required"
       },
       "enhanced_transcript_monitor": {
@@ -136,6 +136,26 @@
         "auto_heal": true,
         "auto_heal_action": "restart_transcript_monitor",
         "expected_status": "critical"
+      },
+      "bind_mount_freshness": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "bind_mount_diff",
+        "description": "Detect stale single-file Docker bind-mounts (macOS Docker Desktop quirk where the container shows a snapshot of the file at mount time, not the live host content).",
+        "container": "coding-services",
+        "files": [
+          {
+            "host": ".constraint-monitor.yaml",
+            "container": "/coding/.constraint-monitor.yaml"
+          },
+          {
+            "host": ".global-lsl-registry.json",
+            "container": "/coding/.global-lsl-registry.json"
+          }
+        ],
+        "auto_heal": true,
+        "auto_heal_action": "refresh_bind_mounts",
+        "auto_heal_note": "Recreates coding-services to remount bind-mounts. Brief (~10s) service outage."
       }
     },
     "processes": {
@@ -226,7 +246,11 @@
         "enabled": true,
         "severity": "critical",
         "check_type": "disk_usage",
-        "paths": [".data", ".logs", ".health"],
+        "paths": [
+          ".data",
+          ".logs",
+          ".health"
+        ],
         "min_free_gb": 1,
         "description": "Ensure sufficient disk space for operations",
         "auto_heal": false,
@@ -237,7 +261,12 @@
         "severity": "warning",
         "check_type": "file_exists_valid_json",
         "path": ".services-running.json",
-        "required_fields": ["timestamp", "services", "semantic_analysis", "vkb_server"],
+        "required_fields": [
+          "timestamp",
+          "services",
+          "semantic_analysis",
+          "vkb_server"
+        ],
         "description": "Services status file required for status line API indicator",
         "auto_heal": true,
         "auto_heal_action": "regenerate_services_file",
@@ -295,7 +324,10 @@
     "include_recommendations": true
   },
   "alert_thresholds": {
-    "overall_status_alert": ["degraded", "unhealthy"],
+    "overall_status_alert": [
+      "degraded",
+      "unhealthy"
+    ],
     "violation_count_warning": 3,
     "violation_count_error": 1,
     "critical_violations_alert": 1
