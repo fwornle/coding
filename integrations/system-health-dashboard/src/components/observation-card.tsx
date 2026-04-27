@@ -67,9 +67,20 @@ function getSummary(content: string, maxLen = 120): string {
   return firstLine.slice(0, maxLen) + '...'
 }
 
-/** Render basic markdown to HTML (bold, headers, inline code, backtick blocks) */
-function renderMarkdown(text: string): string {
+/** HTML-escape so redaction tokens like <USER_ID_REDACTED> render as text
+ *  instead of being parsed as unknown HTML elements (and disappearing). */
+function escapeHtml(text: string): string {
   return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** Render basic markdown to HTML (bold, headers, inline code, backtick blocks).
+ *  Escapes raw HTML first so user-supplied angle brackets — including redaction
+ *  tokens — survive the round trip and stay visible. */
+function renderMarkdown(text: string): string {
+  return escapeHtml(text)
     .replace(/^### (.+)$/gm, '<strong class="text-sm">$1</strong>')
     .replace(/^## (.+)$/gm, '<strong class="text-base">$1</strong>')
     .replace(/^# (.+)$/gm, '<strong class="text-lg">$1</strong>')
