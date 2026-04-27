@@ -61,6 +61,28 @@ function isDockerMode() {
   return false;
 }
 
+/**
+ * Detect if THIS process is running inside the Docker container (vs. on the host).
+ * Unlike isDockerMode(), this only checks /.dockerenv — a marker file or env var
+ * means the user has enabled Docker mode, but the verifier may still be running
+ * on the host where host.docker.internal does NOT resolve.
+ */
+function isInsideContainer() {
+  return fsSync.existsSync('/.dockerenv');
+}
+
+/**
+ * Rewrite endpoints that reference host.docker.internal when running on the host.
+ * The rules use host.docker.internal so the in-container verifier can reach
+ * host services; on the host that hostname doesn't resolve, so map it to localhost.
+ */
+function resolveHostEndpoint(endpoint) {
+  if (!isInsideContainer() && endpoint && endpoint.includes('host.docker.internal')) {
+    return endpoint.replace('host.docker.internal', 'localhost');
+  }
+  return endpoint;
+}
+
 class HealthVerifier extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -583,7 +605,7 @@ class HealthVerifier extends EventEmitter {
           // Proxy runs on host; use host.docker.internal so the check works
           // from inside the Docker container too (container localhost is the
           // container itself, not the host).
-          const proxyHealth = await (await fetch('http://host.docker.internal:12435/health', {
+          const proxyHealth = await (await fetch(resolveHostEndpoint('http://host.docker.internal:12435/health'), {
             signal: AbortSignal.timeout(3000)
           })).json();
           // If proxy is healthy but ALL providers have high consecutive failures,
@@ -1317,11 +1339,12 @@ class HealthVerifier extends EventEmitter {
    * Check HTTP health endpoint
    */
   async checkHTTPHealth(serviceName, endpoint, timeout) {
+    const resolvedEndpoint = resolveHostEndpoint(endpoint);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(resolvedEndpoint, {
         method: 'GET',
         signal: controller.signal
       });
