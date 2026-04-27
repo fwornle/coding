@@ -50,17 +50,19 @@ Real-time code quality enforcement through PreToolUse hooks.
 | `debug-not-speculate` | ERROR |
 | `no-evolutionary-names` | ERROR |
 
-### Code Quality (7)
+### Code Quality (5)
 
 | Constraint | Severity |
 |------------|----------|
 | `proper-error-handling` | ERROR |
-| `no-console-log` | WARNING |
-| `no-console-error` | WARNING |
-| `no-console-warn` | WARNING |
+| `no-console-log` | ERROR |
 | `no-var-declarations` | WARNING |
 | `proper-function-naming` | INFO |
-| `no-magic-numbers` | INFO |
+| `no-backup-files` | CRITICAL |
+
+`no-magic-numbers` was retired — its `\b\d{2,}\b` pattern matched any 2+ digit number (port numbers, PIDs, line numbers, even Bash command digits) and produced 96% of all logged violations, drowning out everything else.
+
+`no-console-log` carries `tool_filter: ['Edit','Write']` and `file_pattern: \.(js|ts|jsx|tsx|mjs|cjs)$` so it only fires when source code actually changes. `no-backup-files` carries `applies_to: file_path` so it inspects target paths instead of file content.
 
 ### PlantUML (5)
 
@@ -96,7 +98,26 @@ Real-time code quality enforcement through PreToolUse hooks.
 
 ## Configuration
 
-**File**: `integrations/mcp-constraint-monitor/constraints.yaml`
+### Single canonical source of truth
+
+The constraint monitor used to load configs from multiple paths with silent fallbacks:
+
+- The host hooks loaded `${CODING_REPO}/.constraint-monitor.yaml`
+- The container dashboard loaded `integrations/mcp-constraint-monitor/constraints.yaml`
+
+These two files drifted — the same `no-console-log` rule was severity=error on the host and severity=warning in the dashboard. The dashboard reported 20 constraints; the running hook enforced 30. **`/Users/Q284340/Agentic/coding/.constraint-monitor.yaml` is now the only canonical config.** It is bind-mounted into the container at `/coding/.constraint-monitor.yaml`, and `findProjectConfig()` throws when the file is missing instead of falling back to a different one.
+
+If you see `Error: CODING_REPO=... but ... does not exist`, fix the path or set `CONSTRAINT_CONFIG_PATH` explicitly — the system refuses to silently load from somewhere else.
+
+### Regex matches are authoritative
+
+A separate `SemanticValidator` previously called an LLM (anthropic/claude-haiku, groq/llama-3.3, gemini-2.5-flash) to second-guess regex matches. When the routed provider was unreachable (e.g. corp network blocking Anthropic), the validator fell back to a different model whose judgment then suppressed valid matches — `no-hardcoded-secrets` had fired exactly once across the entire history. The semantic-validation path has been removed; if a constraint over-matches, tighten the regex or add `exceptions`/`whitelist`/`file_pattern` rather than asking an LLM to disagree with it.
+
+### Engine errors are surfaced, not swallowed
+
+`checkConstraintsDirectly` used to catch any engine error and return zero violations ("fail open"). That hid bugs like the config split-brain. It now re-throws so the wrapper hook prints the error to stderr where Claude can see it.
+
+**File**: `${CODING_REPO}/.constraint-monitor.yaml`
 
 ```yaml
 - id: no-hardcoded-secrets

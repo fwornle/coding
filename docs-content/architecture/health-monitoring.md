@@ -119,6 +119,27 @@ GPS checks for the coordinator daemon via `pgrep` before restarting. This preven
 - Generates health scores (0-100) per service
 - Triggers auto-healing via HealthRemediationActions
 
+### host.docker.internal endpoint rewriting
+
+`checkHTTPHealth` rewrites `host.docker.internal:*` URLs to `localhost:*` when the verifier is running on the host (no `/.dockerenv`). The same rule config is shared by the in-container verifier — which keeps `host.docker.internal` since it actually works there — and the host-side daemon, which would otherwise mark services like the LLM CLI proxy unavailable purely because `host.docker.internal` doesn't resolve outside Docker.
+
+### Bind-mount staleness supervision
+
+macOS Docker Desktop occasionally caches single-file bind-mounts at mount time and stops reflecting later host edits — the symptom is that the container sees a truncated/older copy of the file while the host has the current content, silently breaking YAML/JSON loaders inside the container.
+
+The verifier compares host `stat` vs `docker exec stat` for each bind-mounted file in `coding-services`:
+
+| Watched file | Why |
+|--------------|-----|
+| `.constraint-monitor.yaml` | Constraint config — drift breaks the dashboard |
+| `.global-lsl-registry.json` | LSL coordinator status — drift hides projects |
+| `integrations/system-health-dashboard/server.js` | Dashboard code — drift causes startup failures |
+| `scripts/consolidate-observations.js` | Consolidator CLI — drift desyncs heartbeat schema |
+
+When sizes diverge, the verifier raises a `bind_mount_freshness` violation and the `refresh_bind_mounts` remediation runs `docker-compose up -d --force-recreate coding-services` (with the standard per-action cooldown to avoid restart loops; refuses to run from inside the container).
+
+![Bind-mount staleness detection and auto-healing](../images/bind-mount-staleness-detection.png)
+
 ## Status Aggregation
 
 **Component**: `scripts/statusline-health-monitor.js`

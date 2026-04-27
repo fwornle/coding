@@ -1,0 +1,48 @@
+@startuml bind-mount-staleness-detection
+!include _standard-style.puml
+
+title Bind-Mount Staleness Detection and Auto-Healing
+
+skinparam ParticipantPadding 12
+
+participant "host-side\nhealth-verifier" as V <<core>>
+participant "host filesystem\n(.constraint-monitor.yaml,\nserver.js, …)" as Host <<storage>>
+participant "coding-services\ncontainer" as C <<infra>>
+database "container view\nof bind-mounted files" as M <<storage>>
+participant "HealthRemediation\nrefreshBindMounts" as R <<core>>
+participant "docker-compose" as D <<external>>
+
+V -> Host: stat(host_path).size
+activate V
+Host --> V: hostSize
+
+V -> C: docker exec stat -c %s container_path
+C -> M: read file
+M --> C: containerSize
+C --> V: containerSize
+
+alt sizes match
+    V --> V: passed: bind_mount_freshness
+else sizes differ\n(macOS Docker Desktop\nstale snapshot bug)
+    V --> V: violation:\n  - check: bind_mount_freshness\n  - severity: warning\n  - auto_heal_action: refresh_bind_mounts
+    V -> R: performAutoHealing(action)
+    activate R
+    R -> R: refuse if /.dockerenv\n(running in container)
+    R -> D: docker-compose up -d \\\n--force-recreate coding-services
+    activate D
+    D -> C: recreate container
+    C -> M: re-mount files (fresh)
+    D --> R: ok
+    deactivate D
+    R --> V: success
+    deactivate R
+end
+deactivate V
+
+note over V, R
+  Per-action cooldown (5 min) prevents
+  restart loops if the underlying mount
+  bug recurs.
+end note
+
+@enduml

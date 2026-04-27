@@ -1,0 +1,63 @@
+@startuml consolidator-heartbeat-flow
+!include _standard-style.puml
+
+title Consolidator Heartbeat and Orphan Sweep
+
+actor User
+participant "Dashboard\n(server.js)" as D <<api>>
+participant "consolidate-\nobservations.js\n(detached child)" as Child <<cli>>
+database ".observations/\nconsolidation-\nheartbeat.json" as HB <<storage>>
+database ".observations/\nobservations.db" as DB <<storage>>
+participant "ObservationConsolidator" as OC <<core>>
+
+== Trigger ==
+
+User -> D: POST /api/consolidation/run
+D -> Child: spawn(detached, --json)
+note right
+  Detached so a dashboard SIGKILL
+  doesn't corrupt the SQLite WAL
+  mid-LLM-call.
+end note
+activate Child
+
+Child -> HB: write {pid, startedAt,\n  lastHeartbeat, stage: "init"}
+Child -> Child: wrap process.stderr.write\nso every log line bumps the heartbeat
+loop every ~2s
+    Child -> HB: refresh lastHeartbeat
+end
+
+Child -> OC: run({includeToday})
+activate OC
+loop for each undigested day
+    OC -> DB: read observations
+    OC -> OC: LLM theme grouping
+    OC -> DB: write digest
+    Child -> HB: bump (last stderr line\n  becomes lastMessage)
+end
+OC --> Child: result
+deactivate OC
+
+Child -> HB: unlink (graceful exit)
+deactivate Child
+
+== Status ==
+
+User -> D: GET /api/consolidation/status
+D -> HB: read heartbeat?
+HB --> D: { pid, ageMs, alive, lastMessage }\nor null
+D --> User: { totalObs, undigested, …,\n  inflight: { … } | null }
+
+== Orphan sweep on dashboard startup ==
+
+D -> HB: read on startup
+alt heartbeat is fresh (alive PID, ageMs < 6 min)
+    D --> D: leave running consolidator alone
+else PID dead
+    D -> HB: unlink stale file
+else PID alive but heartbeat stale
+    D -> Child: SIGTERM (5s grace) → SIGKILL
+    D -> HB: unlink
+end
+
+@enduml

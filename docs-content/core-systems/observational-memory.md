@@ -73,8 +73,46 @@ Access at `http://localhost:3032/observations`.
 - **LLM metadata** -- each card shows `model@provider` and token counts when expanded
 - **Markdown rendering** -- bold, headers, inline code rendered in expanded view
 - **ESC / click-outside** -- closes expanded observation cards
+- **Redaction tokens styled inline** -- markers like `<USER_ID_REDACTED>`, `<AWS_SECRET_REDACTED>`, `<COMPANY_NAME_REDACTED>` are rendered as smaller, sky-blue spans so they don't dominate the surrounding text. The same styling applies on the digests and insights pages
 
 ![Observation Viewer — expanded observation with structured summary](../images/observation-viewer-item.png)
+
+### Per-project consolidation
+
+Phases B/C/D (Apr 26) made the consolidation pipeline project-aware end-to-end:
+
+- Observations carry a `project` column populated by the LSL classifier
+- `ObservationConsolidator` partitions observations by project before LLM grouping, so a session that touched two projects produces two digests (one per project) rather than a cross-project blend
+- Insight synthesis runs per project — an insight from project B can no longer contaminate project A's narrative just because it was logged in the same window
+- The Digests and Insights pages have a project selector; the API accepts `?project=<name>` for filtering
+
+### Heartbeat-backed consolidation status
+
+The dashboard spawns the consolidator as a detached child so a SIGKILL on the dashboard never corrupts the SQLite WAL mid-LLM-call. The trade-off was that an orphaned child became immortal — the in-process timeout enforcer was lost on restart, and there was no progress signal. Symptom: a 21-hour run with 0% CPU and a permanently grey "Consolidating…" button.
+
+Now the CLI writes `.observations/consolidation-heartbeat.json` every ~2 seconds (any stderr line refreshes it, so the last log message is always exposed as `lastMessage`). The dashboard's `/api/consolidation/status` returns that heartbeat as `inflight: { pid, alive, ageMs, startedAt, lastMessage }` — survives across dashboard restarts. On startup the dashboard sweeps stale heartbeats: dead PID → cleans the file; alive PID with `ageMs > 6 min` → SIGTERM (5s grace) then SIGKILL.
+
+![Consolidator heartbeat and orphan sweep](../images/consolidator-heartbeat-flow.png)
+
+### Mixed-topic safeguard in the knowledge graph
+
+The wave-analysis pipeline writes online-learned entities into the knowledge graph. Earlier the persistence agent's fuzzy name dedup merged entities at Jaccard ≥ 0.7 with no content check, producing nodes like "GSD Statusline and Hook Integration" that bundled a GSD changelog with an LSL tmux indicator description simply because both names contained "hook" and "integration".
+
+Three layers of defence are now in place:
+
+| Gate | What it does | Threshold |
+|------|--------------|-----------|
+| Name match (tightened) | Stop-list of generic words (`hook`, `integration`, `system`, `update`, `health`, …) is filtered out before Jaccard; ≥1 shared **non-generic** word required | 0.85 |
+| Content veto | After a name match, observation Jaccard must clear MIN_CONTENT_SIMILARITY before the merge proceeds | 0.15 |
+| Mixed-topic detection | At write time, every entity's bullets are pairwise scored. Any pair below 0.10 stamps `metadata.mixed_topics: true` | 0.10 |
+
+The VKB Node Details panel surfaces mixed-topic entities with an amber warning and a count of unrelated observation pairs, so they can be reviewed and split.
+
+### Redaction sanitization
+
+`ObservationSanitizer` repairs legacy `<AWS_SECRET_REDACTED>frag` corruption that an over-broad earlier regex left in stored observations. It uses sibling fields/entries as a recovery oracle (e.g. when a `modifiedFiles` list contains both `server.js` and `<AWS_SECRET_REDACTED>er.js`, the basename match restores the path). Active code paths run the sanitizer before persisting; a one-time DB sweep is available via `scripts/sanitize-observations.js`.
+
+The matching redaction *pattern* fix landed in `redaction-patterns.json`: `aws_secret_standalone` now uses lookarounds (`(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/])`) so a 40-char run inside a longer base64-like path can't be eaten as a "secret" anymore.
 
 ## LLM Provider Routing
 
