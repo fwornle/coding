@@ -3,7 +3,29 @@ import { Fragment } from 'react'
 /**
  * Lightweight markdown renderer for observation summaries/insights.
  * Handles: bullet lists, inline code (`backticks`), bold (**text**), line breaks.
+ *
+ * Also styles redaction tokens emitted by the LSL pipeline
+ * (e.g. <USER_ID_REDACTED>, <AWS_SECRET_REDACTED>) as smaller, light-blue
+ * inline spans so paths and sentences containing them stay readable.
  */
+
+const REDACTION_TOKEN_RX = /<[A-Z][A-Z0-9_]*_REDACTED>/g
+
+function pushRedactionAware(parts: (string | JSX.Element)[], text: string, keyBase: string) {
+  let last = 0
+  let m: RegExpExecArray | null
+  REDACTION_TOKEN_RX.lastIndex = 0
+  while ((m = REDACTION_TOKEN_RX.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    parts.push(
+      <span key={`${keyBase}-r-${m.index}`} className="text-[0.78em] text-sky-400/80">
+        {m[0]}
+      </span>
+    )
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+}
 
 function renderInline(text: string): (string | JSX.Element)[] {
   const parts: (string | JSX.Element)[] = []
@@ -14,7 +36,7 @@ function renderInline(text: string): (string | JSX.Element)[] {
 
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) {
-      parts.push(text.slice(last, match.index))
+      pushRedactionAware(parts, text.slice(last, match.index), `pre-${match.index}`)
     }
     const token = match[0]
     if (token.startsWith('`')) {
@@ -33,7 +55,7 @@ function renderInline(text: string): (string | JSX.Element)[] {
     last = match.index + token.length
   }
   if (last < text.length) {
-    parts.push(text.slice(last))
+    pushRedactionAware(parts, text.slice(last), 'tail')
   }
   return parts
 }

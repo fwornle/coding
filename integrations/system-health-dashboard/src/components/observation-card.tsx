@@ -78,7 +78,9 @@ function escapeHtml(text: string): string {
 
 /** Render basic markdown to HTML (bold, headers, inline code, backtick blocks).
  *  Escapes raw HTML first so user-supplied angle brackets — including redaction
- *  tokens — survive the round trip and stay visible. */
+ *  tokens — survive the round trip and stay visible. Redaction tokens
+ *  (e.g. <USER_ID_REDACTED>) are styled as smaller light-blue inline spans
+ *  so paths/sentences containing them stay readable. */
 function renderMarkdown(text: string): string {
   return escapeHtml(text)
     .replace(/^### (.+)$/gm, '<strong class="text-sm">$1</strong>')
@@ -88,6 +90,9 @@ function renderMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-muted rounded text-xs font-mono">$1</code>')
     .replace(/^- /gm, '• ')
     .replace(/^(Intent|Approach|Artifacts|Result|Outcome|Status):/gm, '<strong>$1:</strong>')
+    // Style redaction tokens AFTER the escapeHtml pass turned `<X>` into `&lt;X&gt;`.
+    .replace(/&lt;([A-Z][A-Z0-9_]*_REDACTED)&gt;/g,
+      '<span class="text-[0.78em] text-sky-400/80">&lt;$1&gt;</span>')
 }
 
 function formatLlmTag(obs: Observation): string | null {
