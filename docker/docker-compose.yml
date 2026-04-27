@@ -40,6 +40,9 @@ services:
       # Project paths (mapped via volumes)
       - TARGET_REPO_PATH=/workspace
       - CODING_ROOT=/coding
+      # CODING_REPO is what config-manager.js uses to find .constraint-monitor.yaml.
+      # Inside the container this is /coding (bind-mounted from the host repo).
+      - CODING_REPO=/coding
       # API keys (passed through from host)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -86,6 +89,14 @@ services:
       # Constraint monitor source (live-mounted so dashboard-server changes
       # don't require an image rebuild).
       - ${CODING_REPO:-.}/integrations/mcp-constraint-monitor/src:/coding/integrations/mcp-constraint-monitor/src:ro
+      # Canonical constraint config — single source of truth shared between
+      # host hooks and the in-container dashboard. Without this, the dashboard
+      # silently loaded a different (stale) constraint set than the host hooks.
+      - ${CODING_REPO:-.}/.constraint-monitor.yaml:/coding/.constraint-monitor.yaml:ro
+      # Violation history — both the host hook (writer) and the in-container
+      # dashboard (reader) must see the same file so what's logged appears on
+      # the dashboard.
+      - ${CODING_REPO:-.}/.mcp-sync:/coding/.mcp-sync:rw
       # LSL coordinator registry — bind-mounted so the constraint-monitor
       # dashboard inside the container can read coordinator/project
       # heartbeat timestamps. Without this, system-health always

@@ -64,13 +64,6 @@ constraints:
   severity: info
   enabled: true
   suggestion: 'Use descriptive verb-based names: getUserData(), processResults()'
-- id: no-magic-numbers
-  group: code_quality
-  pattern: \b\d{2,}\b(?!\s*(px|%|em|rem|vh|vw))
-  message: Magic numbers detected - consider using named constants
-  severity: info
-  enabled: true
-  suggestion: 'Define meaningful constants: const MAX_RETRIES = 3'
 - id: no-hardcoded-secrets
   group: security
   pattern: (api[_-]?key|password|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
@@ -78,7 +71,6 @@ constraints:
   severity: critical
   enabled: true
   suggestion: Use environment variables or secure key management
-  semantic_validation: true
 - id: no-eval-usage
   group: security
   pattern: \beval\s*\(
@@ -104,7 +96,6 @@ constraints:
   severity: error
   enabled: true
   suggestion: Use debugging tools and verification commands to identify root causes
-  semantic_validation: true
 - id: no-evolutionary-names
   group: architecture
   pattern: (?:class|function|const|let|var)\s+\w*(?<![a-z])(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)(?![a-z])
@@ -113,7 +104,6 @@ constraints:
   severity: error
   enabled: true
   suggestion: Rename to descriptive functional name and refactor the original
-  semantic_validation: false
   whitelist:
   - scripts/enhanced-transcript-monitor.js
   - scripts/enhanced-*.js
@@ -123,6 +113,10 @@ constraints:
   message: 'CRITICAL: Backup files prohibited in development - use git for versioning'
   severity: critical
   enabled: true
+  applies_to: file_path
+  tool_filter:
+  - Write
+  - Edit
   suggestion: Remove backup files and commit changes to git instead. Use 'git diff'
     to compare versions.
 - id: knowledge-base-direct-manipulation
@@ -372,7 +366,6 @@ constraints:
   suggestion: 'User typing ''ukb'' at Claude prompt means: Call mcp-server-semantic-analysis
     tool (full or incremental workflow). Never try to run ''ukb'' as a bash/shell
     command - it was completely removed from the system.'
-  semantic_validation: true
 settings:
   compliance:
     excellent_threshold: 9
