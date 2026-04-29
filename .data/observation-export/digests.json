@@ -7418,6 +7418,304 @@
     "project": "coding"
   },
   {
+    "id": "9f4e6839-af40-4d2f-9fbd-f4795ea448e8",
+    "date": "2026-04-26",
+    "theme": "Digests Page Count vs Empty List Bug Investigation",
+    "summary": "Investigated a UI bug where the digests page header displayed a count of 329 but the body showed \"No digests yet.\"\n- Root cause traced to `SafeDatabase` corruption recovery, which auto-restores the schema without the `project` column\n- This causes the digests list query to return empty while the count query still returns 329\n- Affected file: `SafeDatabase.js`\n- No fix was implemented during this session; investigation concluded with root cause identified.",
+    "observationIds": [
+      "90c70395-12f5-42d1-b028-84feafa3ea39",
+      "f97e4b90-c067-4926-bc25-98a8f5787dd5",
+      "2e06adcf-481c-48cc-9f2f-7a17b04bc09a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "SafeDatabase.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "504cafd9-012d-4945-8142-8c7243e51d6d",
+    "date": "2026-04-26",
+    "theme": "Hung Node.js Process Diagnosis in Docker Container",
+    "summary": "Investigated a potentially hung process inside the `coding-services` Docker container, prompted by a screenshot showing stuck process state.\n- Inspected PIDs 3331 and 4069 via process status, `wchan`, and open file descriptors\n- Determined the process was likely blocked on network/socket I/O\n- Reviewed `server.js` as part of the investigation\n- No code changes were made; diagnosis was exploratory.",
+    "observationIds": [
+      "45a5f5d9-6b78-4dbf-8e27-082b9bab0dfc",
+      "4227b67f-b065-46be-ba9b-e16ed9f6c284"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "server.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d86040c1-36c3-42c7-b594-ff622f453b4b",
+    "date": "2026-04-26",
+    "theme": "Commit KB Export JSON Snapshots to Git",
+    "summary": "Staged and committed three knowledge-base export JSON files as a dedicated chore commit, satisfying the OKB BASELINE GUARD hook that requires KB exports in separate commits.\n- Files committed: `.data/knowledge-export/coding.json`, `.data/knowledge-export/resi.json`, `.data/knowledge-export/ui.json`\n- `UKBDatabaseWriter.js` was noted as an associated artifact, reflecting upstream KB cleanup changes\n- `.specstory` files were explicitly excluded from staging.",
+    "observationIds": [
+      "2b3fc02e-4854-4fa5-87b8-072308d85fb9",
+      "97c4169e-211d-4ba5-8df6-1dd8cc7582a0",
+      "1743ea77-77a6-40fd-9f3d-e71adb0ab702"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "UKBDatabaseWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2fe5f0bf-b660-486b-8cb1-c409917647fd",
+    "date": "2026-04-26",
+    "theme": "UKBDatabaseWriter Fixes and Online Pipeline KG Integration",
+    "summary": "Investigated entity records post-deduplication (checking `source`, `extracted_at`, `last_modified` fields), then landed two bug fixes and established an architectural direction for the online pipeline.\n- Fix 1: `source` field now correctly wired through the `handleUpdateEntity` API endpoint in `api-routes.js`\n- Fix 2: `HistorySidebar.tsx` now displays both created and modified timestamps\n- Also updated `graphIntents.ts` as part of the same commit (`b082a500`)\n- Architectural decision: online insights (and potentially digests) should be persisted as KG entities tagged `source:'online'`, integrated after `synthesizeInsights()` — implementation deferred pending design decisions on digest inclusion, entity type mapping, and observation replace-vs-append behavior.",
+    "observationIds": [
+      "a9ed4241-745c-4819-913c-b0c9ce11507a",
+      "dafbc62b-000f-47c1-8a4e-941dc6b6667b",
+      "28eca078-8910-4682-a712-145f02df4d81"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/UKBDatabaseWriter.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/vkb-server/api-routes.js",
+      "<AWS_SECRET_REDACTED>ns/memory-/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/memory-visualizer/src/components/KnowledgeGraph/HistorySidebar.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/memory-visualizer/src/intents/graphIntents.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ffa18888-d422-4bfb-8730-0f4216eab40a",
+    "date": "2026-04-26",
+    "theme": "Ontology-Based Insight Classification and Observation Replace Strategy",
+    "summary": "Explored using the existing ontology system for entity classification of insights only (not full pipeline), and confirmed that observations should be replaced/re-synthesized rather than appended when new digests arrive.\n- Investigated `OntologyClassifier` and API routes to map available classification infrastructure\n- Target file for changes: `ObservationConsolidator.js`\n- No implementation occurred; session ended after codebase exploration to locate ontology classification APIs.",
+    "observationIds": [
+      "f2fbd114-8162-449c-868c-07eab133e4c9",
+      "7fb87960-8553-4215-9fde-6880b6d87e87",
+      "8dabd3cf-bd0e-49f9-b3fd-4d9ca3b7d882"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "653087d4-db95-477e-bf28-8d2eabeed921",
+    "date": "2026-04-26",
+    "theme": "Auto-Create Project Anchor Entities and Insight Relations",
+    "summary": "Extended `ObservationConsolidator.js` to automatically create project anchor entities per team and link insight entities to them via the relations API, ensuring graph connectivity.\n- Located relation-handling endpoints in `api-routes.js` to understand edge creation\n- `ObservationConsolidator.js` updated to POST relation edges connecting each insight entity to its corresponding project anchor\n- Project anchor entities are auto-created per team during the seeding phase\n- Ensures the \"Online/Auto\" legend nodes are properly connected in the knowledge graph.",
+    "observationIds": [
+      "4a002537-e6fc-49dd-9b0a-383de1f5b953",
+      "b76774d4-b2ff-4d3c-be94-dee3e8f670f1",
+      "b7c5ded3-b92e-4266-ac6d-ca31a02fb812"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7e779191-89ce-4081-bdcb-d5c40856a21b",
+    "date": "2026-04-26",
+    "theme": "Knowledge Graph Fringe Node and Project-Anchor Connectivity Investigation",
+    "summary": "Investigated disconnected/fringe nodes in the knowledge graph visualization, focusing on project-anchor connectivity across teams.\n- <USER_ID_REDACTED> the `localhost:8080` API for all relations and entities to inspect graph structure\n- Read `KnowledgeQueryService.js` and `GraphDatabaseService.js` to understand relation storage and query mechanisms\n- Determined the API lacks support for cross-team relations needed to link to the central `coding:CollectiveKnowledge` node\n- No fixes applied; diagnosis identified the need to extend the API for cross-team relation support.",
+    "observationIds": [
+      "77dcde34-3b58-4a96-8049-1bc779f79317",
+      "2245bfa6-5546-42c7-a7f6-087d71ff06bb",
+      "5a10d4af-4065-46b9-8d79-4cb03226ea16",
+      "5e457c9a-8a1c-45a6-92d6-03f6183d063d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "GraphDatabaseService.js",
+      "KnowledgeQueryService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fb640def-d065-460b-9cdb-430ff71b0be7",
+    "date": "2026-04-26",
+    "theme": "NodeDetails Observation Rendering Investigation",
+    "summary": "Investigated a UI rendering issue in the memory visualizer's node details panel, prompted by a screenshot.\n- Located and read `NodeDetails.tsx` to understand observation rendering logic and the `renderTextWithLinks` function\n- No changes were made; session was exploratory only.",
+    "observationIds": [
+      "738229fe-32f9-45ef-a522-c27c110a8638",
+      "d7cd13a0-425a-44a0-8f4f-014e13d3dd9b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "NodeDetails.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1b45601a-7545-4668-88e7-28ea4cbe8b49",
+    "date": "2026-04-26",
+    "theme": "Fix Path Highlighting Traversal to Online Insight Nodes",
+    "summary": "Diagnosed and fixed a bug where path highlighting in the memory visualizer graph failed to traverse to newly added online/insight nodes.\n- Root cause: `has_insight` relation type was missing from the set of hierarchy edge types used by the BFS path-tracing logic in `graphHelpers.ts`\n- Fix: added `has_insight` alongside `contains`, `includes`, and `parent-child` in the BFS traversal\n- Result: the visualizer now correctly highlights paths through insight nodes up to their parent project nodes.",
+    "observationIds": [
+      "bc42c22d-3710-4581-a07e-e860cce4b03c",
+      "5bb3ead2-6fff-46ad-bb41-2c2044594088",
+      "f617b212-2800-4c49-a526-593631c0741a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/memory-visualizer/src/utils/graphHelpers.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b2b71b84-dbaf-4951-9db1-a3afee8ea097",
+    "date": "2026-04-26",
+    "theme": "Style Redaction Tokens in NodeDetails Component",
+    "summary": "Added distinct visual styling for `<X_REDACTED>` tokens in the memory visualizer's node details panel.\n- Added a custom text renderer in `NodeDetails.tsx` to detect redaction tokens and wrap them in styled `<span>` elements\n- Styling: pale blue color and reduced font size, rendering inline with surrounding text\n- Tokens are now visually distinct instead of appearing as plain text.",
+    "observationIds": [
+      "d72a28eb-e482-441f-9a6f-52e97ce6d448",
+      "283800ed-b5c6-4b39-87e5-873e5c5f3829"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "<AWS_SECRET_REDACTED>ns/memory-/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/memory-visualizer/src/components/KnowledgeGraph/NodeDetails.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9ecf42eb-e1c4-493f-9c58-53052d4aec75",
+    "date": "2026-04-26",
+    "theme": "Coordinator Heartbeat Self-Reporting for Dashboard Liveness",
+    "summary": "Updated the LSL coordinator to self-report its heartbeat into the registry, enabling timestamp-based liveness detection on the dashboard.\n- `global-lsl-coordinator.js`: `performHealthCheck` now writes the coordinator's own timestamp to the registry on each cycle\n- `dashboard-server.js`: liveness check updated to prefer the timestamp-based approach over unreliable PID checks\n- Enables the dashboard to accurately detect coordinator staleness without relying on PID inspection.",
+    "observationIds": [
+      "3554c63e-75ac-4db4-bf30-bc2e0b4fc6cc",
+      "be5a7498-c17a-40f6-9078-8eeec8e127ab"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "global-lsl-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a1340ac1-85a4-4319-81fa-55e09b899cf4",
+    "date": "2026-04-26",
+    "theme": "Add Docker Bind Mount for Constraint-Monitor Live Reload",
+    "summary": "Added a bind mount for the `mcp-constraint-monitor` service in `docker-compose.yml` so local source changes are reflected in the container without requiring an image rebuild.\n- Diagnosed the missing mount by grepping `docker-compose.yml`\n- Bind mount maps the local `mcp-constraint-monitor` source directory into the container\n- Enables live iteration on `dashboard-server.js` and related files during development.",
+    "observationIds": [
+      "bacf3742-3bda-4e90-82b3-9cf1677adc70",
+      "0c7eab95-20c1-4f2f-880e-df9c9e5cb7b3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "docker-compose.yml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f6a1f40b-012c-4795-9ca6-d6cc2b00f785",
+    "date": "2026-04-26",
+    "theme": "Observations Pipeline Stoppage Investigation (11:32 AM Cutoff)",
+    "summary": "Investigated why observation recording stopped at 11:32 AM, prompted by a screenshot showing the gap.\n- Examined recent observation export files and <USER_ID_REDACTED> the live observations API and database for the 11:32 AM cutoff\n- Also investigated `enhanced-transcript-monitor` and `ObservationWriter` to trace how prompt sets are detected and observations are fired\n- Checked the database for duplicates or gaps and reviewed running processes\n- No root cause was confirmed and no fix was implemented; investigation remained in progress across all three exchanges.",
+    "observationIds": [
+      "2a540b0b-c425-4ccb-97ca-6009278daa5d",
+      "b40c7bc0-8087-46ab-abfe-f95d1d0c22d7",
+      "43a889cc-a53a-4b0f-9dff-a14baca9e930"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-28T17:01:17.850Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
     "id": "4d48c6d9-0bb6-469e-bd26-90a603518c91",
     "date": "2026-04-27",
     "theme": "Health Verifier HTTP Check Context and Setup",
@@ -7658,6 +7956,228 @@
     "createdAt": "2026-04-27T10:13:36.903Z",
     "metadata": {
       "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "32b3fee5-fa09-43ec-9049-fd94be301d7d",
+    "date": "2026-04-27",
+    "theme": "Documentation Images Staged for MkDocs Build",
+    "summary": "The goal was to commit new documentation screenshots and rebuild the MkDocs site. The approach involved copying images from `docs/images/` to `docs-content/images/` so MkDocs could reference them, then staging the files for commit.\n\n- Copied `docs/images/log-digests.png`, `docs/images/log-insights.png`, and `docs/images/log-observations.png` to `docs-content/images/`\n- Files were staged in git successfully\n- The MkDocs build script lookup was initiated but the session ended before the build completed — build success is unconfirmed",
+    "observationIds": [
+      "afb0be8a-0cd1-4ab2-aae1-653afd8ca958"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-28T16:53:14.108Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2ff1aa6f-695e-4899-8f06-5c4a11e08597",
+    "date": "2026-04-28",
+    "theme": "Embedding Listener Service Failure Diagnosis and Fix",
+    "summary": "A red status indicator on the system health dashboard triggered investigation into a failing service. Out of 12 health checks, only the `embedding-listener` supervisord process was failing with a FATAL state (\"Exited too <USER_ID_REDACTED>\"); all other services (Qdrant, VKB, constraint-monitor, etc.) were healthy.\n\n- Investigated supervisor process status, error logs, and config files to identify root cause\n- Attempted manual process execution to reproduce the failure\n- Root cause identified: fastembed local cache was not available at runtime because the `local_cache` directory is not bind-mounted into the container\n- Fix applied: moved fastembed cache pre-warming into the Docker builder stage so the cache is baked into the image and copied to production\n- Files changed: `/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf`, `/Users/<USER_ID_REDACTED>/Agentic/coding/docker/Dockerfile.coding-services`",
+    "observationIds": [
+      "5aaed06a-bc07-46b9-8c47-b51f6f6f0a0c",
+      "690ce776-b429-4d55-a514-783150260b2f",
+      "d9eb1761-2e34-4e1d-8110-72ebd8b82db5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-28T16:53:19.825Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "97b4272e-259d-4624-991f-1f1a72f34ce1",
+    "date": "2026-04-28",
+    "theme": "Fix fastembed cache and proxy config in Docker",
+    "summary": "Goal was to resolve `embedding-listener` startup failures (`FATAL`) in the Docker-based coding services environment.\n\n- Pre-warmed the fastembed model cache during the Docker **builder stage** and copied it into the production image (~90MB baked in), since `local_cache` is not bind-mounted at runtime\n- Fixed `supervisord` to **inherit proxy environment variables** rather than clearing them, with `NO_PROXY` configured to cover internal services\n- Files changed: `docker/supervisord.conf`, `docker/Dockerfile.coding-services`\n\nResult: `embedding-listener` now starts cleanly (`RUNNING`, no `FATAL`), health check reports healthy with `violationCount 0`, and external fetches work as a fallback via inherited proxy env.",
+    "observationIds": [
+      "4b9fd520-3b99-4a3f-8b97-9f475ce38e82"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/Dockerfile.coding-services"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T07:31:41.329Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d4e71d09-8179-438f-b0ea-5be57ca8e33a",
+    "date": "2026-04-29",
+    "theme": "Docker Port 3030 Conflict Diagnosis and Fix",
+    "summary": "Investigated and resolved a Docker container startup failure caused by a port conflict on port 3030, which the `coding-services` container's Constraint Dashboard Next.js service needed to bind.\n\n- Used `lsof` to identify the conflicting process (PID 26437, child of 26281) already listening on TCP port 3030\n- Traced the full Docker startup chain through `entrypoint.sh`, `bin/coding`, and `scripts/launch-agent-common.sh`\n- Determined that `entrypoint.sh` runs inside the container and cannot intercept host-side port-binding failures\n- Concluded the fix must live on the host before `docker-compose up` is invoked\n- Applied changes to `free-coding-ports.sh` across multiple iterations to implement host-side port availability checks",
+    "observationIds": [
+      "4f51350f-e9d0-4fb7-ba91-161afead5d49",
+      "1f8566db-2dee-45e1-bd23-59c784d01bef",
+      "872fb924-d1e4-4a1c-97f4-6546bb04272b",
+      "26a755c9-0fd7-402c-8636-df50eb2b2091",
+      "e885609c-df02-4642-a6aa-cd4503bcdf8c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/free-coding-ports.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-29T05:55:02.939Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8f852d13-922f-4abe-b7e9-ed2071897a3f",
+    "date": "2026-04-29",
+    "theme": "Consolidation Progress UI Component Development",
+    "summary": "Designed and built a shared progress indicator component for the system health dashboard's consolidation UI, giving developers visibility into wait time and stuck processes.\n\n- Observation 6 analyzed existing heartbeat infrastructure (startedAt, ageMs, lastMessage, N/M parsing) and proposed two scopes: option A (digests only) vs. option B (shared component for both digests and insights)\n- Developer selected option B; observation 7 implemented the shared component\n- Investigated `ObservationConsolidator.js` and existing dashboard pages to align stage/progress terminology before building\n- Created shared component at `src/components/consolidation-progress.tsx`, rendering progress bar, elapsed time, last activity, and current step",
+    "observationIds": [
+      "705a240e-6d8b-403a-bb32-fb002e1fa91d",
+      "ca12d55a-c09f-4818-9ece-e29ce6846cb1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T05:55:02.939Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7c1282b2-ec9c-429b-8c2d-059d795e3059",
+    "date": "2026-04-29",
+    "theme": "Consolidation Progress Bar Diagnosis and Staleness Fixes",
+    "summary": "Work resumed from prior sessions building a consolidation-progress UI for the system-health-dashboard with heartbeat polling. The session focused on diagnosing a frozen progress bar during Stage 2 insight synthesis, surfaced via screenshots.\n\n- **Root cause**: `\"Insights updated: N\"` messages emitted by `ObservationConsolidator` during Stage 2 matched no regex patterns in the live-logging progress parser, so the bar froze at the last parsed chunk ratio\n- **Second bug**: heartbeat timestamps were bumped on a timer rather than on actual stderr activity, making staleness detection unreliable\n- **Proposed fixes**: separate stderr timestamp tracking, composite stage/chunk progress math, and recognition of terminal summary lines\n- **Implemented fix (obs 6)**: `consolidate-observations.js` now records `lastStderrAt` in its heartbeat; `server.js` forwards `lastStderrAt` and computes `stderrAgeMs` in the inflight consolidation status object\n- All changes remain uncommitted",
+    "observationIds": [
+      "b6a20578-bcf8-40f7-a84b-26bb32ccd4ec",
+      "f2cc9ba1-fa66-42cf-94d0-e189c076aa2a",
+      "ab020f5c-d1bd-467d-babb-dd96a82d697f",
+      "8d24b44f-5c30-49fc-956d-7e3965544403",
+      "67064c52-d288-4168-a6d8-8a452dc327e9",
+      "548064aa-60aa-4362-a386-ef5d99d6e3b6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/consolidate-observations.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T07:31:48.288Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6980365a-9c34-4480-a012-e52a27254af6",
+    "date": "2026-04-29",
+    "theme": "Consolidator Process Hang and Redis Connection Cleanup",
+    "summary": "Investigated why `ObservationConsolidator.js` failed to exit after a successful run, with the process hanging indefinitely due to an unclosed handle.\n\n- Root cause identified: an unclosed Redis or DB connection in `consolidator.close()` keeping the Node.js event loop alive\n- The heartbeat interval was ruled out as the culprit (confirmed `.unref()`-ed)\n- The actual consolidation run had completed successfully (2 new digests produced)\n- Fix applied to `ObservationConsolidator.js` to address connection cleanup",
+    "observationIds": [
+      "2c813acf-f68f-43d2-ac85-c65ed05fa32e",
+      "fc0b93d4-bd1d-464d-8e23-11ae67f4f42d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ObservationConsolidator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-29T07:45:31.434Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "89c9c70f-10d4-48f4-8fc2-d6b76cbb8760",
+    "date": "2026-04-29",
+    "theme": "Live Logging Dashboard Server Unreachable on Port 3033",
+    "summary": "Diagnosed a \"Failed to fetch\" error appearing in the live-logging dashboard, triggered by the consolidation service being down or crashed.\n\n- Error surfaced via dashboard UI screenshot showing a fetch failure\n- Verified via `curl` and heartbeat JSON that `localhost:3033` was unreachable\n- No fix was applied during this exchange; diagnosis only\n- Likely related to the process hang/crash investigated in observations 1–2",
+    "observationIds": [
+      "e5a58826-38fb-4678-9069-f7a5c329119c",
+      "18f6ea1e-58aa-4268-b9ea-2eb1c4ec2d46"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-29T07:45:31.434Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2c23802e-5621-433f-ba21-0ec44db758d3",
+    "date": "2026-04-29",
+    "theme": "Progress Bar and Runtime Error Bugs in Live Logging",
+    "summary": "Two distinct bugs identified in the live-logging system from developer-shared screenshots:\n\n- **Progress bar bug**: chunk progress incorrectly hits 100% when the ratio is `1/1`, indicating a logic flaw in the `N/M` display calculation\n- **Runtime error**: a crash at `ObservationConsolidator.js:943`, likely a regression in `close()` caused by singleton reuse across multiple runs\n- Source of `ObservationConsolidator.js` was read for diagnosis; no edits made in this exchange",
+    "observationIds": [
+      "88ed66df-df19-4d9b-ae1f-b9462956da7c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-04-29T07:45:31.434Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "68f0531f-ec85-4feb-9349-6c389aec37d2",
+    "date": "2026-04-29",
+    "theme": "Progress Bar and ObservationConsolidator Runtime Bug Investigation",
+    "summary": "Two UI bugs were investigated from shared screenshots: a progress bar prematurely reaching 100% during active processing, and an intermittent runtime error in `ObservationConsolidator.js` around line 940–943.\n\n- **Progress bar bug**: Root cause confirmed as a chunk ratio calculation error in `consolidation-progress.tsx` — the N/M ratio marks 100% at the *start* of a chunk rather than the *end*, causing the display to jump to completion prematurely.\n- **Runtime error**: Observations diverged slightly between runs — one pass suspected a `close()`/singleton regression as the source of the intermittent error; a second diagnostic pass identified a concrete `SqliteError: database disk image is malformed` at line 940, pointing to actual corruption in `observations.db`.\n- `consolidation-progress.tsx` was edited in both sessions as part of the investigation.\n- The SQLite corruption finding supersedes the singleton theory and warrants direct inspection and repair of `observations.db`.",
+    "observationIds": [
+      "093a4a74-a4f4-4ade-8071-1e7dd5758113",
+      "f9a20d2c-d8e4-4e3e-abbc-61c85afed356"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-29T09:26:49.794Z",
+    "metadata": {
+      "sourceCount": 2
     },
     "project": "coding"
   }
