@@ -136,6 +136,17 @@ RUN cd integrations/mcp-constraint-monitor/dashboard && \
     CONSTRAINT_DASHBOARD_PORT=3030 CONSTRAINT_API_PORT=3031 \
     ./node_modules/.bin/next build 2>/dev/null || true
 
+# Pre-warm Node fastembed cache so embedding-listener doesn't need to fetch
+# from storage.googleapis.com on first boot. fastembed pings the bucket on
+# every init() — without proxy egress (NO_PROXY=qdrant,redis,...) the lookup
+# fails ENOTFOUND and the listener crashes into supervisord FATAL.
+# Use HTTP_PROXY from the build env if present so this works on networks
+# requiring a corporate proxy.
+WORKDIR /coding
+RUN mkdir -p /coding/local_cache && \
+    cd integrations/mcp-server-semantic-analysis && \
+    node --input-type=module -e "import('fastembed').then(m=>m.FlagEmbedding.init({model:m.EmbeddingModel.AllMiniLML6V2,cacheDir:'/coding/local_cache'})).then(()=>process.stderr.write('[Dockerfile] fastembed cache warmed\n')).catch(e=>{process.stderr.write('[Dockerfile] fastembed pre-warm failed: '+e.message+'\n');process.exit(0)})"
+
 # ============================================================
 # Stage 5: Production image
 # ============================================================
@@ -151,6 +162,8 @@ COPY --from=builder /coding/lib ./lib
 COPY --from=builder /coding/scripts ./scripts
 COPY --from=builder /coding/config ./config
 COPY --from=builder /coding/knowledge-management ./knowledge-management
+# Pre-warmed fastembed model cache (see "Pre-warm Node fastembed cache" in builder)
+COPY --from=builder /coding/local_cache ./local_cache
 
 # Copy Python virtual environments
 COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
