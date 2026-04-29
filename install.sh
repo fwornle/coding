@@ -2664,6 +2664,127 @@ setup_api_admin_keys() {
 }
 
 # Main installation flow
+# Configure the private session-history side-repo.
+#
+# The .specstory/history/, .specstory/logs/classification/ and
+# .specstory/archive/ trees contain verbatim Claude session transcripts
+# (full prompts, full responses, file paths, occasionally secrets that
+# slipped past redaction). They are .gitignore'd in this public repo and
+# live in a SEPARATE PRIVATE repo so conversation content can't leak via
+# a public clone.
+#
+# This step asks the user for the URL of that private repo, stores it in
+# .env as CODING_HISTORY_REPO, then delegates to bin/init-history.sh
+# which clones into .specstory/history/ (or just creates the empty dirs
+# if the user skipped or has no access).
+setup_history_repo() {
+    info "Configuring private session-history repository"
+
+    local env_file="$CODING_REPO/.env"
+    local hist_dir="$CODING_REPO/.specstory/history"
+    local existing=""
+
+    if [[ -f "$env_file" ]] && grep -q '^CODING_HISTORY_REPO=' "$env_file"; then
+        existing="$(grep '^CODING_HISTORY_REPO=' "$env_file" | head -1 | cut -d= -f2-)"
+    fi
+
+    cat <<'EOF'
+
+  ──────────────────────────────────────────────────────────────────
+  PRIVATE SESSION-HISTORY REPO
+
+  This repo writes verbatim Claude session transcripts into
+    .specstory/history/
+    .specstory/logs/classification/
+    .specstory/archive/
+
+  These trees are .gitignore'd here — they live in a SEPARATE PRIVATE
+  repo so conversation content (including occasional unredacted
+  secrets, internal paths, stakeholder names) can't leak via a public
+  clone.
+
+  Suggested name: coding-history (any host where your team has access
+  works — github.com, GitHub Enterprise, GitLab, Gitea…)
+
+  If you don't have a repo yet:
+    1. Open your git host's web UI
+    2. Create a NEW PRIVATE repository named "coding-history"
+    3. Do NOT add a README/license/.gitignore (it must be empty)
+    4. Copy its clone URL and paste it below
+  ──────────────────────────────────────────────────────────────────
+
+EOF
+
+    local repo_url=""
+    if [[ -n "$existing" ]]; then
+        echo "  Currently configured: $existing"
+        read -r -p "  Keep this URL? [Y/n]: " keep
+        if [[ -z "${keep:-}" || "${keep}" =~ ^[Yy]$ ]]; then
+            repo_url="$existing"
+        else
+            read -r -p "  New private history repo URL [blank to skip]: " repo_url
+        fi
+    else
+        read -r -p "  Private history repo URL [blank to skip]: " repo_url
+    fi
+
+    if [[ -z "$repo_url" ]]; then
+        warning "No private history repo configured — using local-only dirs."
+        INSTALLATION_WARNINGS+=("History: no private repo configured (local-only)")
+    else
+        # Persist into .env (create if missing, replace if existing)
+        [[ -f "$env_file" ]] || touch "$env_file"
+        if grep -q '^CODING_HISTORY_REPO=' "$env_file"; then
+            local tmp
+            tmp="$(mktemp)"
+            awk -v url="$repo_url" '
+                /^CODING_HISTORY_REPO=/ { print "CODING_HISTORY_REPO=" url; next }
+                { print }
+            ' "$env_file" > "$tmp" && mv "$tmp" "$env_file"
+        else
+            echo "CODING_HISTORY_REPO=$repo_url" >> "$env_file"
+        fi
+        success "Saved CODING_HISTORY_REPO to .env"
+    fi
+
+    # Always ensure the dirs exist so LSL services don't crash. init-history.sh
+    # also handles cloning the private repo when it's configured AND the
+    # local dir is empty.
+    if [[ -x "$CODING_REPO/bin/init-history.sh" ]]; then
+        "$CODING_REPO/bin/init-history.sh" || warning "init-history.sh exited non-zero"
+    else
+        # First-run before init-history.sh has been chmod'd or in a partial
+        # checkout — make sure the dirs exist so we don't break later steps.
+        mkdir -p "$hist_dir" "$CODING_REPO/.specstory/logs/classification" "$CODING_REPO/.specstory/archive"
+    fi
+
+    # Detect the "I have local content but no git checkout" case and surface
+    # the seed recipe — destructive enough that the user should run it
+    # themselves rather than us doing it implicitly.
+    if [[ -n "$repo_url" ]] \
+        && [[ -d "$hist_dir" ]] \
+        && [[ -n "$(ls -A "$hist_dir" 2>/dev/null || true)" ]] \
+        && [[ ! -d "$hist_dir/.git" ]]; then
+        cat <<EOF
+
+  ${YELLOW}NOTE${NC}: $hist_dir/ already has content but isn't a git
+  checkout. To seed your private repo with the existing snapshot:
+
+    cd $hist_dir
+    git init -b main
+    git add .
+    git commit -m "initial snapshot"
+    git remote add origin $repo_url
+    git push -u origin main
+
+  After that, $hist_dir/ tracks the private repo and any future commits
+  there go ONLY to that private repo (this 'coding' repo ignores the
+  folder via .gitignore).
+
+EOF
+    fi
+}
+
 main() {
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
     echo -e "${PURPLE}=====================================================${NC}"
@@ -2684,11 +2805,12 @@ main() {
     if [[ "$SANDBOX_MODE" == "true" ]]; then
         log "Running in SANDBOX MODE"
     fi
-    
+
     # Run installation steps
     check_dependencies
     detect_agents
     configure_team_setup
+    setup_history_repo
     install_node_dependencies
     initialize_knowledge_databases
     install_plantuml

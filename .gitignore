@@ -44,6 +44,14 @@ __pycache__/
 .specstory/archive/
 .obsolete/workflow-archives/specstory-archive/2025-10-05_0800-0900_g9b30a.md
 
+# Session-history is private — verbatim Claude transcripts that may contain
+# secrets, internal paths, or stakeholder names. Lives in a separate private
+# repo (see install.sh + bin/init-history.sh, and CODING_HISTORY_REPO in
+# .env). The folder is created locally by init-history.sh so LSL services
+# don't crash on a fresh public checkout, but its contents are never
+# committed to this repo.
+.specstory/history/
+
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
 # /knowledge-management/coding-knowledge-base/
@@ -146,7 +154,9 @@ integrations/mcp-server-browserbase/
 .specstory/validation-report.json
 .specstory/change-log.json
 .specstory/logs/*
-!.specstory/logs/classification/
+# .specstory/logs/classification/ used to be tracked, but the per-session
+# classification decisions cross-reference history/ files by path — equally
+# sensitive in scope. Now also private (covered by .specstory/logs/* above).
 .logs/
 scripts/monitoring-*.log
 scripts/watchdog-*.log

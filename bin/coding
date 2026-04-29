@@ -310,6 +310,14 @@ export CODING_AGENT="$AGENT"
 export CODING_TOOLS_PATH="$SCRIPT_DIR/.."
 export CODING_REPO="$SCRIPT_DIR/.."
 export CODING_PROJECT_DIR="$PROJECT_DIR"
+
+# Ensure private session-history dirs exist. These trees (history/, logs/,
+# archive/) are .gitignore'd in 'coding' and live in a separate private
+# repo configured via install.sh. LSL services that write to them crash
+# if the dirs don't exist on a fresh public checkout.
+if [ -x "$SCRIPT_DIR/init-history.sh" ]; then
+  "$SCRIPT_DIR/init-history.sh" 2>/dev/null || true
+fi
 export CODING_AGENT_ADAPTER_PATH="$SCRIPT_DIR/../lib/agent-api/adapters"
 export CODING_HOOKS_CONFIG="$SCRIPT_DIR/../config/hooks-config.json"
 export CODING_TRANSCRIPT_FORMAT="$AGENT"
