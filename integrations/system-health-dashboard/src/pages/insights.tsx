@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MarkdownText } from '@/components/markdown-text'
+import { ConsolidationProgress, type InflightInfo } from '@/components/consolidation-progress'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -75,7 +76,7 @@ export function InsightsPage() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number } | null>(null)
+  const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number; inflight?: InflightInfo | null } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
   const [projects, setProjects] = useState<string[]>([])
@@ -150,6 +151,26 @@ export function InsightsPage() {
     fetchStatus()
   }, [fetchProjects, fetchStatus])
 
+  // Poll heartbeat while a run is alive (or while we just kicked one off).
+  // Detect completion via inflight transition so the insight list refreshes
+  // even if the original POST response was lost to a network blip / restart.
+  useEffect(() => {
+    if (!consolidating && !status?.inflight) return
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/consolidation/status`)
+        if (!res.ok) return
+        const data = await res.json()
+        setStatus(data)
+        if (consolidating && !data.inflight) {
+          setConsolidating(false)
+          fetchInsights(query, projectFilter)
+        }
+      } catch { /* keep polling */ }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [consolidating, status?.inflight, fetchInsights, query, projectFilter])
+
   const handleSearch = () => fetchInsights(query, projectFilter)
 
   return (
@@ -183,10 +204,10 @@ export function InsightsPage() {
               <div>{status.totalInsights} insights from {status.totalDigests} digests</div>
             </div>
           )}
-          {status && status.undigested > 0 && (
-            <Button size="sm" onClick={runConsolidation} disabled={consolidating || loading}>
-              {consolidating ? (
-                <><RefreshCw className="w-4 h-4 mr-1 animate-spin" />Consolidating...</>
+          {status && (status.undigested > 0 || status.inflight) && (
+            <Button size="sm" onClick={runConsolidation} disabled={consolidating || !!status.inflight || loading}>
+              {(consolidating || status.inflight) ? (
+                <><RefreshCw className="w-4 h-4 mr-1 animate-spin" />Consolidating…</>
               ) : (
                 <>Consolidate</>
               )}
@@ -213,6 +234,8 @@ export function InsightsPage() {
           </Button>
         )}
       </div>
+
+      {status?.inflight && <ConsolidationProgress inflight={status.inflight} />}
 
       {consolidationError && (
         <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">

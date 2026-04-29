@@ -38,6 +38,12 @@ const heartbeatPath = path.resolve('.observations/consolidation-heartbeat.json')
 const HEARTBEAT_FLUSH_MS = 2000;
 
 let lastStderrLine = 'starting…';
+// lastStderrAt updates only when the worker actually emits a log line.
+// lastHeartbeat below ticks every 2s regardless — that proves the process is
+// alive but is useless for telling whether the worker is currently blocked
+// (e.g. on a multi-minute LLM call). The dashboard uses lastStderrAt to drive
+// its "last activity Xs ago" / amber-red staleness signal.
+let lastStderrAt = new Date().toISOString();
 function bumpHeartbeat(extras = {}) {
   try {
     fs.mkdirSync(path.dirname(heartbeatPath), { recursive: true });
@@ -45,6 +51,7 @@ function bumpHeartbeat(extras = {}) {
       pid: process.pid,
       startedAt: HEARTBEAT_STARTED_AT,
       lastHeartbeat: new Date().toISOString(),
+      lastStderrAt,
       lastMessage: lastStderrLine,
       args,
       ...extras,
@@ -60,7 +67,10 @@ process.stderr.write = (chunk, ...rest) => {
     const s = typeof chunk === 'string' ? chunk : chunk?.toString?.('utf8');
     if (s) {
       const line = s.trim().split('\n').filter(Boolean).pop();
-      if (line) lastStderrLine = line.slice(0, 240);
+      if (line) {
+        lastStderrLine = line.slice(0, 240);
+        lastStderrAt = new Date().toISOString();
+      }
     }
   } catch { /* ignore */ }
   bumpHeartbeat();
@@ -154,7 +164,14 @@ async function runPipeline(consolidator, opts = {}) {
   return result;
 }
 
-main().catch(err => {
+main().then(() => {
+  // Force exit on the one-shot path. Even with consolidator.close() releasing
+  // its known handles, third-party HTTP keep-alive agents (qdrant, embedding
+  // service) can keep the event loop alive long enough that the dashboard
+  // banner stays in "Wrapping up…" for minutes. process.on('exit') still
+  // fires clearHeartbeat synchronously so the heartbeat file is unlinked.
+  if (!daemonFlag) process.exit(0);
+}).catch(err => {
   process.stderr.write(`[consolidate-observations] Fatal: ${err.message}\n${err.stack}\n`);
   process.exit(1);
 });

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MarkdownText, renderWithRedactionStyling } from '@/components/markdown-text'
+import { ConsolidationProgress, type InflightInfo, type ConsolidationStatusBase } from '@/components/consolidation-progress'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -82,41 +83,16 @@ function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpand
   )
 }
 
-/**
- * Pull a compact progress label out of the consolidator's last stderr
- * line. The CLI emits patterns like:
- *   [Consolidator] Day 2/5: 2026-04-26 — grouping observations
- *   [Consolidator] Project 1/3: coding — synthesizing 12 digest(s)
- * We surface the "Day N/M" or "Project N/M" prefix so the button shows
- * "Day 2/5…" instead of generic "Consolidating…".
- */
-function formatProgress(lastMessage?: string): string | null {
+// Compact label rendered inside the trigger button while a run is alive.
+// Full progress (bar, elapsed, last-activity, message) is in <ConsolidationProgress />.
+function compactProgress(lastMessage?: string): string | null {
   if (!lastMessage) return null
-  const stage = lastMessage.match(/Stage \d+\/\d+/)
-  if (stage) return stage[0] + '…'
-  const day = lastMessage.match(/Day \d+\/\d+/)
-  if (day) return day[0] + '…'
-  const proj = lastMessage.match(/Project \d+\/\d+/)
-  if (proj) return proj[0] + '…'
-  return null
+  const m = lastMessage.match(/(Day|Project|Stage) \d+\/\d+/)
+  return m ? m[0] + '…' : null
 }
 
-interface InflightInfo {
-  pid: number
-  alive: boolean
-  ageMs: number
-  startedAt?: string
-  lastMessage?: string
-}
-
-interface ConsolidationStatus {
-  totalDigests: number
-  undigested: number
-  pendingPast?: number
-  pendingToday?: number
-  totalInsights: number
-  inflight?: InflightInfo | null
-}
+type ConsolidationStatus = ConsolidationStatusBase
+export type { InflightInfo }
 
 export function DigestsPage() {
   const [digests, setDigests] = useState<Digest[]>([])
@@ -262,7 +238,7 @@ export function DigestsPage() {
               {(consolidating || status.inflight) ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                  {formatProgress(status.inflight?.lastMessage) || 'Consolidating…'}
+                  {compactProgress(status.inflight?.lastMessage) || 'Consolidating…'}
                 </>
               ) : (
                 <>Consolidate {status.undigested} obs</>
@@ -271,6 +247,8 @@ export function DigestsPage() {
           )}
         </div>
       </div>
+
+      {status?.inflight && <ConsolidationProgress inflight={status.inflight} />}
 
       {consolidationError && (
         <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">

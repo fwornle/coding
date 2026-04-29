@@ -1554,5 +1554,18 @@ Produce updated/new insights.`,
       try { this.db.close(); } catch { /* ok */ }
       this.db = null;
     }
+    // ioredis keeps a TCP socket open with reconnection logic; without an
+    // explicit disconnect the Node event loop never drains and the wrapper
+    // process hangs after printing its summary lines. .disconnect() is sync
+    // and tears the socket down immediately (no need to await .quit()).
+    if (this._redisPub) {
+      try { this._redisPub.disconnect(); } catch { /* ok */ }
+      this._redisPub = null;
+    }
+    // Embedding service / Qdrant clients are HTTP-based; their keep-alive
+    // sockets normally drain on their own, but null-ing the references
+    // releases them for GC sooner.
+    this._embeddingService = null;
+    this._qdrantClient = null;
   }
 }

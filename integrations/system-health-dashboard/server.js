@@ -3553,6 +3553,12 @@ class SystemHealthAPIServer {
             const now = Date.now();
             const last = new Date(data.lastHeartbeat || 0).getTime();
             const ageMs = now - last;
+            // stderrAgeMs is the time since the worker last *spoke* (wrote a
+            // stderr line), distinct from ageMs which only proves the process
+            // is alive. Old heartbeats (pre-fix) lack lastStderrAt — fall back
+            // to ageMs so the orphan sweep behaves the same as before.
+            const stderrAt = data.lastStderrAt ? new Date(data.lastStderrAt).getTime() : last;
+            const stderrAgeMs = now - stderrAt;
             // Verify the PID is actually alive — kill(0) throws when the
             // process is gone, which means the file is stale (the child
             // died ungracefully without cleaning up).
@@ -3564,6 +3570,8 @@ class SystemHealthAPIServer {
                 startedAt: data.startedAt,
                 lastHeartbeat: data.lastHeartbeat,
                 ageMs,
+                lastStderrAt: data.lastStderrAt,
+                stderrAgeMs,
                 lastMessage: data.lastMessage,
                 args: data.args
             };
