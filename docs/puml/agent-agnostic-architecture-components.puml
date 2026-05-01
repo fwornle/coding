@@ -34,14 +34,13 @@ package "Common Setup Layer" {
 }
 
 package "Shared Services Layer" {
-    component "start-services.sh\n(Native Mode)" as services_native <<service>> {
+    component "docker compose" as services_docker <<infra>> {
+        [coding-services\n(all-in-one container)]
         [VKB Server]
         [Semantic Analysis]
-        [Constraint Monitor\n(standalone containers)]
+        [Constraint Monitor]
         [Live Logging System]
-    }
-    component "docker compose\n(Docker Mode)" as services_docker <<infra>> {
-        [coding-services\n(all-in-one container)]
+        [Redis + Qdrant + Memgraph]
     }
 }
 
@@ -63,12 +62,10 @@ launch_claude ..> common : sources
 launch_copilot ..> common : sources
 launch_future ..> common : sources
 
-' Launchers use services (Docker or Native mode)
-launch_claude --> services_native : native mode
-launch_claude --> services_docker : docker mode
-launch_copilot --> services_native : native mode
-launch_copilot --> services_docker : docker mode
-launch_future --> services_native : starts
+' Launchers use the dockerized service stack
+launch_claude --> services_docker : ensures up
+launch_copilot --> services_docker : ensures up
+launch_future --> services_docker : ensures up
 
 ' Launchers use tmux wrapper to launch agents
 launch_claude --> tmux_wrapper : wraps
@@ -92,7 +89,6 @@ claude_adapter ..|> adapter_interface : implements
 copilot_adapter ..|> adapter_interface : implements
 
 ' Common setup provides to all
-common --> services_native : initializes
 common --> services_docker : initializes
 
 note right of tmux_wrapper
@@ -123,15 +119,8 @@ note right of adapter_interface
   • logConversation()
 end note
 
-note bottom of services_native
-  **Native Mode:**
-  Services run as Node.js processes
-  Constraint Monitor uses standalone
-  Redis + Qdrant containers
-end note
-
 note bottom of services_docker
-  **Docker Mode:**
+  **Containerized stack:**
   All services in coding-services
   container (Redis, Qdrant, Memgraph
   included - no duplicate containers)

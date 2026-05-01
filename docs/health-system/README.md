@@ -249,35 +249,9 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 
 **Detailed Flow**: See [Enhanced Health Monitoring](./enhanced-health-monitoring.md)
 
-## Docker Mode Support
+## CGR Cache Staleness
 
-The health system is fully Docker-aware and adapts its behavior based on the deployment mode.
-
-### Docker Mode Detection
-
-![Docker Health Detection](../images/docker-health-detection.png)
-
-The system detects Docker mode using a 3-tier priority check:
-
-1. **Environment Variable** (highest priority): `CODING_DOCKER_MODE=true`
-2. **Marker File**: `.docker-mode` file in coding repo root
-3. **Container Detection**: `/.dockerenv` file (inside containers)
-
-This detection is used by:
-- `health-verifier.js` - Adapts CGR cache checks
-- `health-remediation-actions.js` - Uses appropriate restart commands
-- `statusline-health-monitor.js` - Includes Docker MCP health
-
-### CGR Cache Staleness in Docker
-
-In Docker mode, the `.git` directory is not mounted (for performance), so the CGR cache staleness check cannot count commits behind. Instead:
-
-- **Native Mode**: Runs `cgr-cache-staleness.sh` to count commits since last index
-- **Docker Mode**: Reads `cache-metadata.json` directly for cached commit info
-
-The dashboard displays:
-- Native: "CGR cache: 5 commits behind" or "Current"
-- Docker: "coding @ abc123" (shows cached commit, staleness unknown)
+The `.git` directory is not mounted into the coding-services container (for performance), so the CGR cache staleness check cannot count commits behind. The verifier reads `cache-metadata.json` directly and the dashboard displays the cached commit, e.g. `coding @ abc123` (staleness unknown).
 
 ### Service Supervision Hierarchy
 

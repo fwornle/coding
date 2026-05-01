@@ -19,9 +19,6 @@ launcher -> launcher: Validate config exists\nconfig/agents/opencode.sh
 launcher -> common: launch_agent()
 activate common
 
-== Docker Detection ==
-common -> common: _detect_docker_mode()\n.docker-mode / container / env var
-
 == Environment Setup ==
 common -> common: _load_env_files()\n.env, .env.ports
 

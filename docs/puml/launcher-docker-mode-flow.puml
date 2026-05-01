@@ -8,8 +8,6 @@ participant "config/agents/{name}.sh" as config
 participant "launch-agent-common.sh" as common
 participant "ensure-docker.sh" as docker_helper
 participant "docker compose" as compose
-participant "start-services.sh" as native_svc
-participant "start-services-robust.js" as robust
 participant "tmux-session-wrapper.sh" as tmux
 
 == Agent Resolution ==
@@ -26,64 +24,33 @@ note right
   hook functions
 end note
 
-== Docker Mode Detection ==
-
-common -> common: _check_transition_lock()
-note right
-  Wait up to 60s if
-  .transition-in-progress
-  lock file exists
-end note
-
-common -> common: _detect_docker_mode()
-note right
-  3-tier priority:
-  1. .docker-mode marker file
-  2. coding-services container running
-  3. CODING_DOCKER_MODE env var
-end note
-
-common -> common: export CODING_DOCKER_MODE
-
 == Dry-Run Exit ==
 
 alt CODING_DRY_RUN = true
-  common --> entry: exit 0\nDRY-RUN: Agent={name}, Docker={mode}
+  common --> entry: exit 0\nDRY-RUN: Agent={name}
 end
 
 == Service Startup ==
 
-alt Docker Mode = true
-  common -> docker_helper: early_docker_launch()
-  common -> docker_helper: ensure_docker_running()
+common -> docker_helper: early_docker_launch()
+common -> docker_helper: ensure_docker_running()
 
-  alt Docker not running
-    common --> entry: exit 1 (Docker required)
-  end
-
-  alt coding-services already healthy
-    common -> common: curl localhost:8080/health
-    note right: Reuse existing containers\n(no Docker destabilization)
-  else Not running
-    common -> compose: docker compose up -d
-    activate compose
-    compose --> common: containers started
-    deactivate compose
-    common -> common: Wait for health (up to 60s)
-  end
-
-  common -> common: Generate Docker MCP config\n(if needed)
-
-else Native Mode
-  common -> native_svc: start-services.sh
-  activate native_svc
-  native_svc -> robust: startAllServices()
-  activate robust
-  robust --> native_svc: services started
-  deactivate robust
-  native_svc --> common: OK
-  deactivate native_svc
+alt Docker not running
+  common --> entry: exit 1 (Docker required)
 end
+
+alt coding-services already healthy
+  common -> common: curl localhost:8080/health
+  note right: Reuse existing containers\n(no Docker destabilization)
+else Not running
+  common -> compose: docker compose up -d
+  activate compose
+  compose --> common: containers started
+  deactivate compose
+  common -> common: Wait for health (up to 60s)
+end
+
+common -> common: Generate MCP config (if needed)
 
 == Common Initialization ==
 
