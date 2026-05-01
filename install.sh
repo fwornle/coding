@@ -1742,70 +1742,47 @@ configure_team_setup() {
     info "Knowledge is managed by GraphDB at .data/knowledge-graph/ (auto-persisted)"
 }
 
-# Configure Docker mode for containerized MCP servers
+# Build Docker infrastructure — the only supported deployment mode. Native
+# mode (host processes for MCP servers, dashboards, semantic-analysis) was
+# removed; Docker is mandatory because the supervisor/coordinator/dashboard
+# stack assumes a single source of truth for service lifecycle.
 configure_docker_mode() {
-    echo -e "\n${CYAN}🐳 Docker Mode Configuration${NC}"
+    echo -e "\n${CYAN}🐳 Docker Setup${NC}"
     echo ""
-    echo -e "Docker mode runs MCP servers in containers via HTTP/SSE transport."
-    echo -e "This provides better isolation and simplified deployment."
-    echo ""
-    echo -e "  ${GREEN}1${NC} = Enable Docker mode (recommended for production)"
-    echo -e "  ${GREEN}2${NC} = Use native mode (default, servers run directly on host)"
-    echo -e "  ${GREEN}3${NC} = Skip (decide later)"
-    echo ""
-    read -p "$(echo -e ${CYAN}Your choice [1/2/3]: ${NC})" docker_choice
+    echo "All coding services (MCP servers, dashboards, semantic-analysis,"
+    echo "constraint-monitor, embedding listener) run in Docker. The only"
+    echo "host-side processes are bin/coding itself, the LSL transcript"
+    echo "monitor, the LLM proxy on :12435, and bin/init-history.sh."
 
-    case "$docker_choice" in
-        1)
-            info "Enabling Docker mode..."
+    if ! command -v docker &>/dev/null; then
+        error_exit "Docker is required but not installed. Install Docker Desktop first: https://www.docker.com/products/docker-desktop"
+    fi
 
-            # Check Docker availability
-            if ! command -v docker &>/dev/null; then
-                warning "Docker not found. Install Docker first: https://www.docker.com/products/docker-desktop"
-                INSTALLATION_WARNINGS+=("Docker mode: Docker not installed")
-                return 1
-            fi
+    if ! docker info &>/dev/null; then
+        error_exit "Docker daemon is not running. Start Docker Desktop, then re-run install.sh."
+    fi
 
-            if ! docker info &>/dev/null; then
-                warning "Docker daemon not running. Start Docker Desktop first."
-                INSTALLATION_WARNINGS+=("Docker mode: Docker daemon not running")
-                return 1
-            fi
+    # The .docker-mode marker is kept for backwards compatibility — older
+    # scripts still test for it. It's effectively always on now.
+    touch "$CODING_REPO/.docker-mode"
 
-            # Create marker file
-            touch "$CODING_REPO/.docker-mode"
-            success "Docker mode enabled via .docker-mode marker"
+    if [[ -f "$CODING_REPO/docker/docker-compose.yml" ]]; then
+        info "Building Docker images (this may take a few minutes)..."
+        if docker compose -f "$CODING_REPO/docker/docker-compose.yml" build; then
+            success "Docker images built"
+        else
+            warning "Docker build had issues — you may need to rebuild manually"
+            INSTALLATION_WARNINGS+=("Docker: Build had warnings")
+        fi
+    fi
 
-            # Build Docker infrastructure if compose file exists
-            if [[ -f "$CODING_REPO/docker/docker-compose.yml" ]]; then
-                info "Building Docker images (this may take a few minutes)..."
-                if docker compose -f "$CODING_REPO/docker/docker-compose.yml" build; then
-                    success "Docker images built successfully"
-                else
-                    warning "Docker build had issues - you may need to build manually"
-                    INSTALLATION_WARNINGS+=("Docker mode: Build had warnings")
-                fi
-            fi
+    if [[ -x "$CODING_REPO/scripts/generate-docker-mcp-config.sh" ]]; then
+        info "Generating Docker MCP configuration..."
+        "$CODING_REPO/scripts/generate-docker-mcp-config.sh" || warning "Could not generate Docker MCP config"
+    fi
 
-            # Generate Docker MCP config
-            if [[ -x "$CODING_REPO/scripts/generate-docker-mcp-config.sh" ]]; then
-                info "Generating Docker MCP configuration..."
-                "$CODING_REPO/scripts/generate-docker-mcp-config.sh" || warning "Could not generate Docker MCP config"
-            fi
-
-            success "Docker mode configured"
-            info "  Use 'coding --claude' to start services in Docker mode"
-            info "  Use 'rm .docker-mode' to switch back to native mode"
-            ;;
-        2)
-            info "Using native mode (default)"
-            rm -f "$CODING_REPO/.docker-mode" 2>/dev/null || true
-            ;;
-        3|*)
-            info "Skipping Docker mode configuration"
-            info "  To enable later: touch $CODING_REPO/.docker-mode"
-            ;;
-    esac
+    success "Docker setup complete"
+    info "  Use 'coding --claude' or 'coding --copilot' to launch the agent against the dockerized stack"
 }
 
 # Install PlantUML for diagram generation
