@@ -8180,5 +8180,154 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "b7cf8b35-8a96-48bb-a73c-94359cc3b63f",
+    "date": "2026-04-29",
+    "theme": "Committing Pending Changes in Logical Grouped Commits",
+    "summary": "Goal was to commit all outstanding working-tree changes to the repository in a clean, organized manner.\n\n- Changes grouped into logical commits by category: dashboard server files, observation exports, knowledge exports, and specstory history\n- `consolidation-progress.tsx` was among the edited artifacts\n- One specstory history file was intentionally unstaged before committing\n- All pending changes successfully committed across multiple logical commits",
+    "observationIds": [
+      "cfb5acc1-9b64-4de0-a93e-b61f13d58caf",
+      "a3a195e2-731e-4faa-a3b9-ca2e3bf04541"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T15:46:44.127Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "62c95079-8653-4863-ab8e-af96766f9681",
+    "date": "2026-04-29",
+    "theme": "Isolating Specstory History into Private Sub-Repo",
+    "summary": "Analyzed a plan to move `.specstory/history/` into a nested, ignored private git repo (`coding-history`) to prevent history files from leaking into the public repo.\n\n- Chosen approach: nested ignored git repo (not a submodule) to avoid exposing a private URL via `.gitmodules` and eliminate commit-pointer friction\n- `.gitignore` updated accordingly\n- Confirmed all service scripts already auto-create the history directory, so public checkouts remain functional without changes\n- Two open decisions deferred: whether to seed `coding-history` with full history or a snapshot only, and whether to scrub past commits via `git filter-repo` (destructive/force-push) or only block future leaks",
+    "observationIds": [
+      "00105c6b-8cfc-4c4a-ba48-c73cc2d0b887"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-04-29T15:46:44.127Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8df34d08-45d0-4296-848a-966e0516cf30",
+    "date": "2026-04-29",
+    "theme": "Scrubbing Specstory History from Git via filter-repo",
+    "summary": "Executed a destructive `git filter-repo` operation to permanently remove `.specstory/history` paths from the repository's git history.\n\n- Remote origin URL saved to `/tmp/coding-origin-url` prior to the operation, since `filter-repo` strips remotes\n- `pre-history-scrub` tag created at HEAD as a recoverable backup reference\n- Pending changes in `README.md` committed and pushed before the destructive step\n- `git filter-repo` run to rewrite history, stripping the specified paths across all commits\n- Remote re-added manually after `filter-repo` completed; force-push to origin executed to publish the rewritten history",
+    "observationIds": [
+      "0e501d20-c6b7-4445-8e6b-2cde7d9d7b88",
+      "cff38633-c415-45fa-8c63-c2660ac175d6",
+      "d92a0cbc-c36a-4853-bd23-2c8836963375"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/coding-history-staging/README.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T15:46:44.127Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f1e3827a-65d8-4601-8478-b5774ac75b65",
+    "date": "2026-04-29",
+    "theme": "Staging Private History Snapshot for CN-Internal Mirror Push",
+    "summary": "Coordinated pushing a `coding-history` snapshot to a CN-internal mirror repository while VPN was unavailable, performing all non-VPN-gated work immediately.\n\n- GitHub API used to check collaborators and fork activity: no collaborators beyond the developer; two public forks identified, one active\n- CN-internal and `origin-work` remotes confirmed to require VPN — all actual pushes deferred\n- Local staging snapshot initialized at `/tmp/coding-history-staging/` using hardlinks to avoid duplicating disk space\n- Noted that branches `feat/online-learning` and `gh-pages` still required `filter-repo` scrubbing\n- Staging area confirmed ready to push once VPN is reconnected",
+    "observationIds": [
+      "577995a1-f78e-454c-b408-7358873089d9",
+      "8df9b356-423d-4c9b-83b0-54917d4ad1b7",
+      "1f59ed30-e227-42ba-83d8-9ef1dfaabd41"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/coding-history-staging/README.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-04-29T15:46:44.127Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a3645644-65c9-42b4-be5c-b73c1a382e8e",
+    "date": "2026-04-29",
+    "theme": "Notifying Fork Owners and Scrubbing Remaining Stale Branches",
+    "summary": "Drafted collaborator/fork-owner notifications about the force-push history rewrite and began scrubbing remaining stale remote branches.\n\n- Notification template produced explaining: the force-push rewrite on `main`, its impact on existing forks and clones, and step-by-step resync instructions\n- Branches `feat/online-learning` and `gh-pages` identified as still needing remote alignment — locally already rewritten via `filter-repo`\n- Force-push of those branches to `origin` was initiated to bring the remote refs in sync with the rewritten local history\n- Branch scrubbing was in progress but not confirmed complete within the session",
+    "observationIds": [
+      "575a08f8-01c0-42a1-99cb-c49c080428c4",
+      "d123797b-c6b2-4ea8-8d31-9af29f9a5843"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-04-29T15:46:44.127Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6f0cf0af-0bae-4049-935d-26a40df25ac9",
+    "date": "2026-04-29",
+    "theme": "VPN-Dependent Git Push Tasks Partially Completed",
+    "summary": "Resumed VPN-dependent tasks targeting two corporate Git hosts after confirming VPN connectivity.\n\n- **Completed:** Force-pushed rewritten `main` and `feat/online-learning` branches to `cc-github.bmwgroup.net` (`origin-work`) with clean histories.\n- **Blocked:** Push of coding-history snapshot to `<COMPANY_NAME_REDACTED>.ghe.com` failed due to SSH key rejection — remains pending.\n\nNo artifacts were modified locally; work was purely remote Git operations. SSH key configuration for the GHE host needs to be resolved before the history snapshot push can proceed.",
+    "observationIds": [
+      "0d1bf159-dc39-422a-bf1b-44aa17713fca"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-01T04:53:43.908Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "347ffbef-508c-4727-8ebb-51dbcbaa87fd",
+    "date": "2026-04-30",
+    "theme": "Diagnosing and Resolving Stopped coding-services Container",
+    "summary": "All three observations form a single diagnostic and remediation session for a downed service, handled by the **claude** agent.\n\n- **Symptom:** Dashboard showed LSL DOWN alerts with auto-healing active, traced to the `coding-services` container being in a `Created` (never-started) state (`ExitCode=0`, no start timestamp).\n- **Root cause:** Port `3030` was held by a leftover Next.js dev server, preventing the container from starting.\n- **Resolution:** Killed the conflicting process using the existing utility script `free-coding-ports.sh`, then successfully started the `coding-services` container.\n- No source files were modified; the fix was purely operational (process/container management).",
+    "observationIds": [
+      "0a6c50e6-4c32-4e09-b6cd-cc8f1e8fa5e2",
+      "94ba6411-cd69-4c17-9fcf-81344f5af017",
+      "67c33a54-e4fd-4975-a2b7-c53047902dc6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-01T04:53:49.943Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
   }
 ]
