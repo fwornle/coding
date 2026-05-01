@@ -7,13 +7,18 @@
 	],
 	"settings": {
 		"debug.console.acceptSuggestionOnEnter": "off",
+		"git.openRepositoryInParentFolders": "always",
+		"git.autoRepositoryDetection": "subFolders",
+		"git.repositoryScanMaxDepth": 1,
 		"git.repositoryScanIgnoredFolders": [
-			"node_modules"
-		],
-		"git.ignoredRepositories": [
+			"node_modules",
+			".specstory",
 			".specstory/history"
 		],
-		"git.repositoryScanMaxDepth": 0,
+		"git.ignoredRepositories": [
+			"${workspaceFolder}/.specstory/history",
+			".specstory/history"
+		],
 		"workbench.colorCustomizations": {
 			"activityBar.activeBackground": "#1f6fd0",
 			"activityBar.background": "#1f6fd0",
