@@ -9230,7 +9230,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T09:37:17.374Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9246,7 +9246,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T09:37:17.374Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9278,7 +9278,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T09:42:12.764Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9294,7 +9294,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T09:48:40.667Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9311,7 +9311,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T09:58:58.934Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9327,7 +9327,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T09:58:58.934Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9343,7 +9343,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T09:58:58.934Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9359,7 +9359,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T10:01:45.882Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9375,7 +9375,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T10:05:31.945Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9391,7 +9391,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T10:05:31.945Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9407,7 +9407,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T10:05:31.945Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9423,7 +9423,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T10:08:19.368Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -9439,13 +9439,577 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-01T10:10:03.617Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-01T13:24:05.549Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
     },
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "ea1189fd-6339-44da-8964-1cc9b11a371f",
+    "summary": "Intent: [confirmed proceeding with a pending fix]\nApproach: Applied a logic fix to the health prompt hook to correctly classify the healthy+violations state as green rather than yellow.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js\nResult: Hook now treats `overallStatus=healthy` with non-critical violations as green/silent; only blocks on critical violations or shows yellow when auto-healing is active, committed as `0f52b20d1`.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:10:03.617Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "e314c2ff-fd5b-4ff7-be2f-046e69bf19d5",
+    "summary": "Intent: Commit the .data JSON files to the repository.\nApproach: Split commits by file type following project convention separating KB exports from observation exports.\nArtifacts: edited combined-status-line.js\nResult: Git commit(s) initiated for .data JSON files; outcome not fully confirmed in the exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:11:16.698Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "6d7c3608-fc9a-43f8-93b1-f1e4f93c283a",
+    "summary": "Intent: [developer shared a screenshot, likely showing a terminal/editor status line with a skull/warning emoji badge, asking about its source]\nApproach: Investigated the statusline configuration separately from the prompt hook, since both are independent components that could display badges.\nArtifacts: edited combined-status-line.js\nResult: Identified that the `[💀⚠️]` badge in the statusline comes from a separate script distinct from the prompt hook; investigation was ongoing at exchange end.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:13:29.568Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "12f09d40-c25f-4a9d-a11d-33b0bc43ad56",
+    "summary": "Intent: [diagnose the source of a `[💀⚠️]` badge appearing in the statusline]\nApproach: Investigated project config and live statusline script output to trace which component generates the warning badge.\nArtifacts: edited combined-status-line.js\nResult: Identified that the statusline runs a separate script from the prompt hook; investigation focused on finding what drives the `[💀⚠️]` badge in that script.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:13:29.568Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "97ed6df7-e08b-4dc3-b74b-91d6fbaca3c6",
+    "summary": "Intent: [investigate what is driving the 💀⚠️/🏥⚠️ badge visible in a screenshot of the terminal/tmux statusline]\nApproach: Searched the combined-status-line.js script to trace which code path generates the badge, distinguishing it from previously fixed prompt hook paths.\nArtifacts: edited combined-status-line.js\nResult: Identified that the badge originates from combined-status-line.js (tmux statusline), a separate code path from the prompt hook fixes done earlier; no changes were made.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:13:29.568Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "4e471782-bd5f-4585-9840-21e86ecd145b",
+    "summary": "Intent: Fix the `[🏥⚠️]` badge appearing in the tmux statusline shown in the screenshot.\nApproach: Same logic bug as the previously fixed prompt hook — `healthVerifier` fields like `overallStatus` and `autoHealingActive` needed correct access pattern in the combined status line script.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Fixed the health badge rendering logic in the tmux statusline by correcting how `healthVerifier` status fields are read, mirroring the earlier prompt hook fix.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:13:29.568Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "df53e905-b749-4906-a2fd-38936dbd48e5",
+    "summary": "Intent: [user approved a pending change]\nApproach: Applied three Git-related VS Code workspace settings to fix repository scanning behavior.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Added `git.ignoredRepositories`, `git.scanRepositories`, and `git.repositoryScanIgnoredFolders` settings to hide `.specstory/history` from Source Control while keeping real repos visible.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:15:11.945Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "b68ae0be-d82c-4c89-bade-f83e7a9ed9e6",
+    "summary": "Intent: Check for GSD updates, install if available, and display what changed.\nApproach: Routed to the update workflow to handle version detection, npm version checking, changelog display, and update execution.\nArtifacts: edited coding.code-workspace\nResult: Began GSD update check by reading the update workflow and detecting installed version; process was in progress with no files modified.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:32:53.862Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "8dc391bb-f233-43a5-aba3-d90d7c8bc68c",
+    "summary": "Intent: Run the GSD update workflow to check for and install available updates.\nApproach: Followed the update workflow by detecting installed version, querying npm for latest, comparing versions, and fetching changelog from GitHub.\nArtifacts: edited coding.code-workspace\nResult: Update detected from version 1.38.5 to 1.39.0; changelog fetched for display pending user confirmation.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:32:53.862Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "d7d481ef-014f-4b14-ba1b-e24f9bb868d1",
+    "summary": "Intent: [user shared a screenshot of VS Code SCM panel for diagnosis — no explicit request, implicitly continuing investigation of missing parent repo in SCM]\nApproach: Analyzed screenshot showing 5 submodule entries but no parent repo, ruled out auth errors from console, identified `git.scanRepositories: [\".\"]` as the cause since it triggers subdirectory scanning rather than registering the workspace root itself.\nArtifacts: edited coding.code-workspace\nResult: Diagnosis confirmed that removing `git.scanRepositories: [\".\"]` and adding `git.repositoryScanMaxDepth: 0` should restore parent repo visibility in SCM panel; awaiting user approval to apply the settings change.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T11:06:03.093Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "7832a5f2-0f2f-4ce9-9d8c-aace7117334c",
+    "summary": "Intent: Confirmed applying a workspace file change.\nApproach: Edited the workspace file to add or modify a folder entry (likely `path: \".\"`) to surface the parent git repo in VS Code's SCM panel.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: The coding.code-workspace was updated; developer was instructed to reload the window and report whether the parent repo appears in the SCM panel.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T11:12:17.146Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "77eace9c-8c9b-4464-ba4b-65ce4619f554",
+    "summary": "Intent: [fix a workspace configuration issue shown in an image]\nApproach: Inspected git status and recent log, then committed a workspace file change to remove self-referencing scanRepositories configuration.\nArtifacts: edited coding.code-workspace\nResult: Committed fix to coding.code-workspace that drops self-referencing scanRepositories setting to prevent duplicate/conflicting repository entries in the workspace.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T11:14:08.157Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "b0576396-171c-4ef6-9403-900bab62eb4e",
+    "summary": "Intent: [commit a workspace configuration fix shown in the image]\nApproach: Staged only the workspace file to avoid committing unrelated harness drift files.\nArtifacts: edited coding.code-workspace\nResult: Committed removal of self-referencing scanRepositories entry in the workspace file as commit 73c7a704.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T11:14:08.157Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "bec15e62-425e-4f41-bcb4-2cf7a6792a6b",
+    "summary": "Intent: How to make .specstory/history and .specstory/logs files visible in the repo/SCM view.\nApproach: Investigated git status of both directories — history is a nested git repo that can be explicitly added via `git.scanRepositories`, while logs is not a git repo and is gitignored, requiring either initializing it as a separate repo or un-ignoring it.\nArtifacts: edited coding.code-workspace\nResult: For .specstory/history: replace `git.ignoredRepositories` with `git.scanRepositories` in workspace settings. For .specstory/logs: either initialize it as a new git repo and add to `scanRepositories`, or remove the gitignore entry (not recommended due to sensitivity).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T11:15:11.949Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "f1c8b032-b8ee-42fa-b192-6d79f2900095",
+    "summary": "Intent: Confirm proceeding with step 1 (commit before destructive changes), accept history/logs scope, and approve plan A.\nApproach: Sequential safe-first approach, committing current state before any destructive git history rewrites.\nArtifacts: edited coding.code-workspace\nResult: Developer confirmed scope (history and logs/classifications plus classification.log), approved plan A, and greenlit Step 1 commit before restructuring.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T11:30:40.454Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "d9a7f3f5-4a64-440e-b607-999f7b4f9eee",
+    "summary": "Intent: Unblock and proceed with remaining steps, specifically investigating and fixing step 3 after confirming steps 1 and 2 are complete.\nApproach: Verified git-filter-repo availability and committed/pushed pending session logs in the .specstory/history subtree.\nArtifacts: edited coding.code-workspace\nResult: Pending ~140 session logs in .specstory/history were committed and pushed; git-filter-repo availability was confirmed for subsequent steps.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T11:41:49.319Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "10a2ea5d-1901-42da-8b1c-2865d159f6fb",
+    "summary": "Intent: Proceed with steps after prior blockers were resolved — specifically investigate which toolchain files reference `.specstory/history` `.git` directory (step 3), having already completed step 1 (commit/push) and step 2.\nApproach: Sequentially executed step 1 (commit and push pending history files), then began step 3 survey of toolchain files referencing `.git` to determine what needs fixing before a planned `.git` directory move.\nArtifacts: edited coding.code-workspace\nResult: Step 1 completed — 146 file changes pushed to `.specstory/history` remote. Step 3 investigation initiated to identify which toolchain files reference `.specstory/history/.git`, with a noted dependency that the LSL writer must be paused before the `.git` move in step 4.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T11:41:49.319Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "141a35ea-576f-43d3-aac5-4c4b0e40867a",
+    "summary": "Intent: Run a diff between two directories and proceed with option A (replace directory with symlink) if they match.\nApproach: Verified byte-identical content across 828 files before destructively replacing the directory with a symlink to avoid data loss.\nArtifacts: edited coding.code-workspace\nResult: Diff confirmed 828 files were byte-identical; symlink replacement of `.specstory/logs/classification` was executed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T12:10:40.070Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "0d5f4d48-6976-4199-ad09-ce14a0b7a229",
+    "summary": "Intent: Run a diff between two directories and proceed with option A (replace classification dir with symlink and expose private repo in workspace SCM panel).\nApproach: Verified 828 files byte-identical before symlinking, then replaced the classification directory/log with symlinks pointing into the tracked private repo path, and switched workspace git config from `ignoredRepositories` to `scanRepositories`.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: `.specstory/logs/classification/` and `.specstory/logs/classification.log` are now symlinks into `.specstory/history/`; workspace setting updated so the private `.specstory/history` repo appears as a separate SCM entry alongside the parent `coding` repo.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:10:40.070Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "9b20c01f-32e3-4883-abd4-eb9463c4724a",
+    "summary": "Intent: Fix the issue where the parent folder disappears after reloading the workspace.\nApproach: Identified that `scanRepositories` and parent auto-discovery conflict in workspace mode, so reverted to the previously working configuration setting.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace file updated to resolve the mutual exclusivity conflict between `scanRepositories` and parent auto-discovery, preventing the parent from vanishing on reload.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:15:03.445Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "369276f2-41b1-4447-9a77-6d29c2fafd30",
+    "summary": "Intent: Fix the parent repository disappearing after workspace reload in VS Code.\nApproach: Reverted workspace file to the last known working configuration, confirming that `scanRepositories` is incompatible with workspace-mode parent auto-discovery and must be avoided.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace file restored to working state with `ignoredRepositories` safety net; parent repo and 5 submodules should reappear on reload. Two future options proposed: multi-root workspace folders or separate windows for `.specstory/history`.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:15:03.445Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "5ce08d24-84dd-4196-b951-2f6828a2d5fa",
+    "summary": "Intent: Configure VS Code workspace as multi-root to surface the parent repo and submodules in the SCM panel.\nApproach: Added workspace folders to the `.code-workspace` file so each repo/submodule appears as a distinct SCM source.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace now includes the `coding` parent folder and `coding-history (private)` alongside 5 submodules, enabling independent SCM tracking per folder in the VS Code panel.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:18:01.402Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "083b677e-ea7c-4017-b2b4-1b213fa68ed7",
+    "summary": "Intent: [shared a screenshot, likely showing a VS Code workspace or git configuration issue]\nApproach: Reverted workspace configuration to avoid nested folder conflicts that break VS Code git repo discovery for both parent and child folders.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Removed the nested `.specstory/history` folder as a second workspace entry, restoring the previously working single-folder workspace configuration.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:19:47.654Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "6adfeeba-39f3-41cf-b798-60418675e48a",
+    "summary": "Intent: [image-based request, likely asking to fix or investigate VS Code workspace git detection issues with nested folders]\nApproach: Attempted to add `.specstory/history` as a second workspace folder, but discovered VS Code's git extension breaks parent repo detection when nested folders are added; reverted to working baseline.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace file reverted to committed baseline state; concluded that nested workspace folders prevent VS Code SCM from detecting both repos simultaneously, and documented three alternative workflows for managing the inner `coding-history` repo.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:19:47.654Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "74b1f07e-af88-49f9-a867-eefb7c92fdf6",
+    "summary": "Intent: [user reporting that the \"coding\" project is still missing/not working after previous fix attempts]\nApproach: Investigating whether symlink changes introduced after a known-working commit are causing the project to disappear.\nArtifacts: edited coding.code-workspace\nResult: No fix applied yet; assistant identified symlinks added after commit 73c7a7047 as the next investigation target.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T12:21:33.281Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "20f3d898-897e-4951-80e8-46185b76d095",
+    "summary": "Intent: Fix missing \"coding\" folder/workspace in VS Code after previous symlink-related changes\nApproach: Identified that VS Code's git extension may traverse symlinks into `.specstory/history/.git`, re-triggering the parent repository disappearing issue; added `.specstory` to `repositoryScanIgnoredFolders` to prevent traversal.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Added `.specstory` to `repositoryScanIgnoredFolders` in the workspace config to block VS Code's git extension from following symlinks into that directory.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:21:33.281Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "88e23265-d0bf-4415-8b50-5989523c1176",
+    "summary": "Intent: [sharing a screenshot, likely showing a broken VS Code workspace state with missing parent repository]\nApproach: Hypothesis that symlinks in `.specstory/logs/classification/` caused VS Code's git extension to traverse into `.specstory/history/` (which contains `.git`), registering it as a repo and breaking parent repo display; fix by removing symlinks and restoring real files.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Removed symlinks from `.specstory/logs/classification/`, restored real classification files, and reverted workspace file to match the working baseline commit to restore the parent repository in VS Code's source control view.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T12:26:24.517Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "7932679d-1c75-4db0-aadb-63963d4b161c",
+    "summary": "Intent: Understand why the nested `.git` in `.specstory/history` keeps breaking workspace mode and get agreement on using the output writer approach to fix it.\nApproach: The assistant diagnosed the root cause as VS Code's two-tier git discovery (blessed submodules vs. unblessed nested repos) and confirmed the writer-output approach avoids the problem by keeping everything under one top-level folder without symlinks or duplicate dirs.\nArtifacts: edited classification-logger.js\nResult: Decision reached to fix the issue by changing writers to output directly to `.specstory/history/...`, eliminating symlinks and the unblessed nested `.git` problem; next step is surveying which scripts write classification files before applying changes.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T12:32:05.723Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/classification-logger.js"
+    ]
+  },
+  {
+    "id": "91a228b8-0e0a-47f0-a22d-d4894c6cd753",
+    "summary": "Intent: Load and summarize recent session logs to establish continuity context from previous work sessions.\nApproach: Read the two most recent LSL files from the coding project's specstory history directory, then synthesize key tasks, current state, and suggested next steps.\nArtifacts: edited classification-logger.js\nResult: Sessions from 2026-05-01 14:00–16:00 covered a VS Code SCM parent repo disappearance fix and a classification log migration to symlinks; the 15:00 session suggested pending edits to install.sh/init-history.sh that may not have been completed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T13:11:29.006Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/classification-logger.js"
+    ]
+  },
+  {
+    "id": "49f41465-b923-480b-b45b-c3bc9da9dc13",
+    "summary": "Intent: [resume a previously interrupted task]\nApproach: Resumed work by checking the current state of symlinks and related files to understand what changed since the last session.\nArtifacts: edited classification-logger.js\nResult: Investigation revealed that previously created symlinks for `.specstory/logs/classification` and `classification.log` were gone, replaced by regular files/directories; root cause investigation was ongoing.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T13:18:41.898Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/classification-logger.js"
+    ]
+  },
+  {
+    "id": "c1f10282-dfdc-4ce6-aed0-197050f19488",
+    "summary": "Intent: Resume a previously analyzed fix after a VSCode crash by reviewing the latest session transcript.\nApproach: Search recent session history files to identify the prior analysis and planned fix.\nArtifacts: edited classification-logger.js\nResult: Assistant began searching session transcripts to find the prior analysis and resume the interrupted fix.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T13:20:21.538Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/classification-logger.js"
+    ]
+  },
+  {
+    "id": "97dc953c-dc97-429b-bf09-c5caa751ddeb",
+    "summary": "Intent: Resume a previously interrupted analysis and fix after a VSCode crash by reading the prior session transcript.\nApproach: Read the latest transcript to reconstruct context about where the fix was interrupted, identifying the symlink revert and the proposed \"output writer\" approach as the next step.\nArtifacts: edited classification-logger.js\nResult: Identified that the symlink approach was reverted and the next fix is to change the classification writer to output directly into `.specstory/history/logs/classification/` instead of `.specstory/logs/`, eliminating the extra top-level folder that confuses VS Code's SCM panel.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T13:20:21.538Z",
+    "digestedAt": "2026-05-01T13:24:05.549Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/classification-logger.js"
+    ]
+  },
+  {
+    "id": "c8a4c0f5-552f-4ab8-95f3-492b3f5ecd9a",
+    "summary": "Intent: Add a copy button to observation, digest, and insight cards for easy content copying\nApproach: Created a reusable `CopyButton` component with clipboard API integration, using a Copy→Check icon swap on success and stopPropagation to avoid interfering with card expand/collapse interactions.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx\nResult: New `CopyButton` component created with Lucide icons (Copy/Check), 1.5s visual feedback on copy success, and click propagation stopped — ready to be wired into the three card components.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T13:30:03.077Z",
+    "digestedAt": "2026-05-01T13:36:29.707Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx"
+    ]
+  },
+  {
+    "id": "1eb269bb-ced7-41b5-b3f1-11b272a44b94",
+    "summary": "Intent: Resume work by reviewing the last section of the latest session log or internal transcript.\nApproach: Read the end of the most recent specstory history file to recover session state and continue from where work left off.\nArtifacts: edited copy-button.tsx, edited clipboard-button.tsx, edited observation-card.tsx, edited digests.tsx, edited insights.tsx\nResult: Last session ended mid-build during `npm run build` with 2138 modules transformed and output truncated at the chunk rendering stage.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T13:32:37.929Z",
+    "digestedAt": "2026-05-01T13:36:29.707Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/clipboard-button.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
+    ]
+  },
+  {
+    "id": "1f543bac-9c94-4fe1-bb0c-e12b8d186781",
+    "summary": "Intent: Resume the previous session's work on migrating classification log paths from `.specstory/logs/classification/` to `.specstory/history/logs/classification/`\nApproach: Read the last LSL/transcript to restore context, then identified the exact stopping point — code changes done but uncommitted, old process still running on old paths, needing commit → restart → cleanup sequence.\nArtifacts: edited copy-button.tsx, edited clipboard-button.tsx, edited observation-card.tsx, edited digests.tsx, edited insights.tsx\nResult: Session context restored; three remaining steps identified: commit the 4 modified files, restart the LSL coordinator, then delete the old `.specstory/logs/` directory. Awaiting user decision on restart strategy (self-restart vs kill PID 90030).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T13:33:20.499Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/clipboard-button.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
     ]
   }
 ]

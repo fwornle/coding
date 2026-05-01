@@ -8494,5 +8494,197 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "24599f1f-e4fd-4ec3-a39e-be992002f4b5",
+    "date": "2026-05-01",
+    "theme": "VS Code SCM Panel Missing Parent Git Repo",
+    "summary": "Ongoing effort to surface the parent `coding` repo in VS Code's Source Control panel while suppressing or correctly handling the `.specstory/history` nested git repo.\n\n- **Root cause**: `git.openRepositoryInParentFolders: \"never\"` was blocking parent repo registration; later, `git.scanRepositories: [\".\"]` caused subdirectory scanning instead of registering the workspace root.\n- Iterative fixes applied to `coding.code-workspace`: dropped the blocking override, added `git.ignoredRepositories`, tried `git.scanRepositories` + `git.repositoryScanMaxDepth: 0`, then reverted after discovering `scanRepositories` is incompatible with workspace-mode parent auto-discovery.\n- Committed removal of self-referencing `scanRepositories` entry as `73c7a704`.\n- Final resolution: reverted to `ignoredRepositories` safety net and configured a **multi-root workspace** by explicitly adding `coding` parent and `coding-history (private)` as workspace folders alongside 5 submodules, giving each independent SCM tracking in the panel.\n- Primary file modified throughout: `/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace`",
+    "observationIds": [
+      "12757191-8f43-4b97-8fbe-8682413de49d",
+      "b6c7ae7a-25ea-4560-bcb8-eb6c3c30b410",
+      "cad0e5d2-b285-46df-876e-539105509d73",
+      "4f57f745-ec69-4eba-a47b-940c3f90c614",
+      "cad68291-1309-46e2-a8fd-9d7b1a77ee72",
+      "df53e905-b749-4906-a2fd-38936dbd48e5",
+      "d7d481ef-014f-4b14-ba1b-e24f9bb868d1",
+      "7832a5f2-0f2f-4ce9-9d8c-aace7117334c",
+      "77eace9c-8c9b-4464-ba4b-65ce4619f554",
+      "b0576396-171c-4ef6-9403-900bab62eb4e",
+      "9b20c01f-32e3-4883-abd4-eb9463c4724a",
+      "369276f2-41b1-4447-9a77-6d29c2fafd30",
+      "5ce08d24-84dd-4196-b951-2f6828a2d5fa"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 13
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c984b002-062f-473c-8cd8-2d2e0461215e",
+    "date": "2026-05-01",
+    "theme": "Health Monitor and Statusline Badge False Warnings",
+    "summary": "Investigated and fixed spurious health warnings surfacing in both the prompt hook and the tmux statusline.\n\n- **Prompt hook** (`health-prompt-hook.js`): The hook was misclassifying `overallStatus=healthy` with non-critical constraint-monitor violations as yellow/warning. Fixed to treat this state as green/silent; only blocks on critical violations or shows yellow when auto-healing is active. Committed as `0f52b20d1`.\n- **Tmux statusline** (`combined-status-line.js`): A separate `[💀⚠️]`/`[🏥⚠️]` badge traced to `combined-status-line.js` — same logic bug where `healthVerifier` fields (`overallStatus`, `autoHealingActive`) were read incorrectly. Fixed by mirroring the prompt hook correction.\n- Additional finding: a stale `[Raw]` observation (ID `3db421fe`) in the live DB was causing a separate statusline health warning; identified as self-clearing once the row is re-backfilled.\n- Running coordinator (PID 74629) was found to predate a heartbeat-stamping commit, causing stale registry timestamps; clean restart was planned.",
+    "observationIds": [
+      "421b7943-9134-4f04-99f0-a77b6c0dbea4",
+      "bc3479c1-936f-49c2-bdb7-a6aa196002f5",
+      "d45e3b49-8963-45cb-9e09-15ed63d669f7",
+      "02303f66-4460-40be-b435-c4cb0184822d",
+      "af00e23b-ff7a-48fc-9529-21d51b744663",
+      "697fd0f4-bbea-45ca-8611-37124b65257a",
+      "ded0413b-06c1-492e-b5ee-72111137799d",
+      "ea1189fd-6339-44da-8964-1cc9b11a371f",
+      "e314c2ff-fd5b-4ff7-be2f-046e69bf19d5",
+      "6d7c3608-fc9a-43f8-93b1-f1e4f93c283a",
+      "12f09d40-c25f-4a9d-a11d-33b0bc43ad56",
+      "97ed6df7-e08b-4dc3-b74b-91d6fbaca3c6",
+      "4e471782-bd5f-4585-9840-21e86ecd145b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/observational-memory.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 13
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0e131bc9-4124-4ee9-a186-54f4454dd886",
+    "date": "2026-05-01",
+    "theme": "Session Context Load and GSD Version Update",
+    "summary": "Routine session maintenance tasks performed mid-morning.\n\n- Obs 8: `/sl` command executed to load recent LSL files and establish context continuity from prior sessions (coverage: 2026-05-01 11:00–13:00).\n- Obs 21–22: GSD update workflow run — detected installed version `1.38.5`, <USER_ID_REDACTED> npm for latest (`1.39.0`), fetched changelog from GitHub, and queued update pending user confirmation. No files modified during this check.",
+    "observationIds": [
+      "d510cac9-3064-432c-b82c-8e506b8ca008",
+      "b68ae0be-d82c-4c89-bade-f83e7a9ed9e6",
+      "8dc391bb-f233-43a5-aba3-d90d7c8bc68c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ed02949c-bb17-4f75-8f9d-3ea31d07acae",
+    "date": "2026-05-01",
+    "theme": "Restructuring .specstory History and Logs with Symlinks",
+    "summary": "Planned and executed a restructuring of `.specstory/history` and `.specstory/logs` to unify classification data under a tracked private repo and expose it in the SCM panel.\n\n- **Scope confirmed**: `.specstory/history`, `.specstory/logs/classifications/`, and `classification.log`.\n- **Step 1**: Committed and pushed ~146 pending session log files to `.specstory/history` remote before any destructive changes.\n- **Step 3 survey**: Identified toolchain files referencing `.specstory/history/.git`; noted LSL writer must be paused before any `.git` directory move.\n- **Symlink replacement** (option A): Diffed `.specstory/logs/classification/` against target — confirmed 828 files byte-identical — then replaced the directory and `classification.log` with symlinks pointing into `.specstory/history/`.\n- **Workspace update**: Switched `coding.code-workspace` from `git.ignoredRepositories` to `git.scanRepositories` to surface `.specstory/history` as a separate SCM entry (later partially reverted due to conflict with parent auto-discovery; see SCM digest).\n- Primary files: `coding.code-workspace`; symlink targets under `.specstory/logs/`.",
+    "observationIds": [
+      "bec15e62-425e-4f41-bcb4-2cf7a6792a6b",
+      "f1c8b032-b8ee-42fa-b192-6d79f2900095",
+      "d9a7f3f5-4a64-440e-b607-999f7b4f9eee",
+      "10a2ea5d-1901-42da-8b1c-2865d159f6fb",
+      "141a35ea-576f-43d3-aac5-4c4b0e40867a",
+      "0d5f4d48-6976-4199-ad09-ce14a0b7a229"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bfc7799d-2822-4425-bf96-a6787ea2f2d2",
+    "date": "2026-05-01",
+    "theme": "VS Code SCM Parent Repo Disappearing Fix Investigation",
+    "summary": "Recurring investigation into VS Code's git extension losing the parent `coding` repository in the SCM panel, caused by a nested `.git` directory inside `.specstory/history/`.\n\n- Root cause: VS Code's git extension traverses symlinks in `.specstory/logs/classification/` into `.specstory/history/` which contains its own `.git`, registering it as an unblessed nested repo and dropping the parent\n- Attempted fixes included: removing nested workspace folder entries, adding `.specstory` to `repositoryScanIgnoredFolders`, and removing symlinks from `.specstory/logs/classification/`\n- All changes were ultimately reverted to the working baseline commit `73c7a7047`\n- Key file repeatedly edited: `/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace`\n- **Decision reached**: eliminate symlinks entirely by changing classification writers to output directly into `.specstory/history/logs/classification/`, keeping everything under one top-level folder and avoiding the unblessed nested `.git` problem\n- Next step identified: survey which scripts write classification files before applying changes",
+    "observationIds": [
+      "083b677e-ea7c-4017-b2b4-1b213fa68ed7",
+      "6adfeeba-39f3-41cf-b798-60418675e48a",
+      "74b1f07e-af88-49f9-a867-eefb7c92fdf6",
+      "20f3d898-897e-4951-80e8-46185b76d095",
+      "88e23265-d0bf-4415-8b50-5989523c1176",
+      "7932679d-1c75-4db0-aadb-63963d4b161c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0d533edb-6916-4cec-895b-eac80b34b0ae",
+    "date": "2026-05-01",
+    "theme": "Session Continuity Recovery After VSCode Crash",
+    "summary": "Multiple context-reconstruction attempts after a VSCode crash interrupted the ongoing fix work.\n\n- Loaded recent LSL session files from `.specstory/history/` to re-establish context\n- Discovered that previously created symlinks for `.specstory/logs/classification` and `classification.log` had disappeared and been replaced by regular files/directories — root cause unclear\n- Confirmed the \"output writer\" approach as the active plan: change the classification writer to output directly into `.specstory/history/logs/classification/` instead of `.specstory/logs/`, eliminating the extra top-level folder\n- Pending edits to `install.sh` and `init-history.sh` were flagged as possibly incomplete from prior sessions\n- No artifacts were modified during this recovery phase",
+    "observationIds": [
+      "91a228b8-0e0a-47f0-a22d-d4894c6cd753",
+      "49f41465-b923-480b-b45b-c3bc9da9dc13",
+      "c1f10282-dfdc-4ce6-aed0-197050f19488",
+      "97dc953c-dc97-429b-bf09-c5caa751ddeb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:24:05.549Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a2ce5159-8561-4c6a-a191-3c894ac3fef9",
+    "date": "2026-05-01",
+    "theme": "Copy Button Feature Added to Dashboard Cards",
+    "summary": "Goal was to add a reusable copy-to-clipboard button across observation, digest, and insight cards in the system health dashboard.\n\n- Created `copy-button.tsx` (and `clipboard-button.tsx`) with clipboard API integration using Lucide `Copy`/`Check` icons\n- Implemented 1.5s visual feedback on copy success with `stopPropagation` to prevent interference with card expand/collapse\n- Wired the component into `observation-card.tsx`, `digests.tsx`, and `insights.tsx`\n- Session ended mid-build during `npm run build` with 2138 modules transformed; build completion status unknown",
+    "observationIds": [
+      "c8a4c0f5-552f-4ab8-95f3-492b3f5ecd9a",
+      "1eb269bb-ced7-41b5-b3f1-11b272a44b94"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/clipboard-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-01T13:36:29.707Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
   }
 ]
