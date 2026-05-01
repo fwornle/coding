@@ -8764,9 +8764,7 @@
     "createdAt": "2026-04-29T07:40:53.195Z",
     "digestedAt": "2026-04-29T07:45:31.434Z",
     "llm": null,
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "modifiedFiles": null
   },
   {
     "id": "18f6ea1e-58aa-4268-b9ea-2eb1c4ec2d46",
@@ -8776,13 +8774,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T07:40:53.195Z",
     "digestedAt": "2026-04-29T07:45:31.434Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "88ed66df-df19-4d9b-ae1f-b9462956da7c",
@@ -8792,13 +8785,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T07:43:31.102Z",
     "digestedAt": "2026-04-29T07:45:31.434Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "093a4a74-a4f4-4ade-8071-1e7dd5758113",
@@ -8808,13 +8796,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T07:43:31.102Z",
     "digestedAt": "2026-04-29T09:26:49.794Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "f9a20d2c-d8e4-4e3e-abbc-61c85afed356",
@@ -8824,13 +8807,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T07:43:31.102Z",
     "digestedAt": "2026-04-29T09:26:49.794Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "cfb5acc1-9b64-4de0-a93e-b61f13d58caf",
@@ -8840,13 +8818,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T09:27:18.197Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "a3a195e2-731e-4faa-a3b9-ca2e3bf04541",
@@ -8856,13 +8829,8 @@
     "quality": "high",
     "createdAt": "2026-04-29T09:27:18.197Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "00105c6b-8cfc-4c4a-ba48-c73cc2d0b887",
@@ -8872,13 +8840,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T11:14:29.555Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/.gitignore"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "0e501d20-c6b7-4445-8e6b-2cde7d9d7b88",
@@ -8888,13 +8851,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T13:08:59.361Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "cff38633-c415-45fa-8c63-c2660ac175d6",
@@ -8904,13 +8862,8 @@
     "quality": "high",
     "createdAt": "2026-04-29T13:08:59.361Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "d92a0cbc-c36a-4853-bd23-2c8836963375",
@@ -8920,13 +8873,8 @@
     "quality": "high",
     "createdAt": "2026-04-29T13:08:59.361Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "577995a1-f78e-454c-b408-7358873089d9",
@@ -8936,13 +8884,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T14:50:08.445Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "8df9b356-423d-4c9b-83b0-54917d4ad1b7",
@@ -8952,13 +8895,8 @@
     "quality": "high",
     "createdAt": "2026-04-29T14:50:08.445Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "1f59ed30-e227-42ba-83d8-9ef1dfaabd41",
@@ -8968,13 +8906,8 @@
     "quality": "high",
     "createdAt": "2026-04-29T14:50:08.445Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/tmp/coding-history-staging/README.md"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "575a08f8-01c0-42a1-99cb-c49c080428c4",
@@ -8984,16 +8917,8 @@
     "quality": "normal",
     "createdAt": "2026-04-29T15:24:10.794Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "claude-sonnet-4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/.gitignore",
-      "/Users/Q284340/Agentic/coding/bin/init-history.sh",
-      "/Users/Q284340/Agentic/coding/install.sh",
-      "/Users/Q284340/Agentic/coding/bin/coding"
-    ]
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "d123797b-c6b2-4ea8-8d31-9af29f9a5843",
@@ -9003,16 +8928,30 @@
     "quality": "high",
     "createdAt": "2026-04-29T15:24:10.794Z",
     "digestedAt": "2026-04-29T15:46:44.127Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/.gitignore",
-      "/Users/Q284340/Agentic/coding/bin/init-history.sh",
-      "/Users/Q284340/Agentic/coding/install.sh",
-      "/Users/Q284340/Agentic/coding/bin/coding"
-    ]
+    "llm": null,
+    "modifiedFiles": null
+  },
+  {
+    "id": "49aa47dc-0d28-4051-8453-57f5da24a3c8",
+    "summary": "Intent: Complete pending VPN-dependent tasks: push history snapshot to corporate GHE, persist env config, and force-push rewritten branches to corporate mirror.\nApproach: Checked staging directory and remote connectivity, then attempted pushes to both corporate GitHub instances. Found cc-github reachable but corporate GHE rejecting SSH key.\nArtifacts: none\nResult: `feat/online-learning` was already in sync on origin-work; `main` force-push to cc-github completed. History repo push to `<COMPANY_NAME_REDACTED>.ghe.com` blocked by SSH key rejection; `.env` persistence pending.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-29T15:50:47.013Z",
+    "digestedAt": "2026-05-01T09:31:25.549Z",
+    "llm": null,
+    "modifiedFiles": null
+  },
+  {
+    "id": "29ab0c3b-2bc8-4234-b80b-f373821d151b",
+    "summary": "Intent: Complete the pending VPN-dependent cleanup tasks for the `coding` repo history scrub.\nApproach: On VPN connection, push the history snapshot to the corporate GHE repo, persist the env var, and force-push rewritten branches to the internal work mirror (cc-github).\nArtifacts: none\nResult: cc-github `main` was force-pushed successfully; `feat/online-learning` required a second force-push after discovering a stale tracking ref. Corporate GHE (`<COMPANY_NAME_REDACTED>.ghe.com`) was unreachable via SSH, leaving the history repo push incomplete.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-04-29T15:50:47.013Z",
+    "digestedAt": "2026-05-01T09:31:25.549Z",
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "0d1bf159-dc39-422a-bf1b-44aa17713fca",
@@ -9022,10 +8961,7 @@
     "quality": "normal",
     "createdAt": "2026-04-29T15:50:47.013Z",
     "digestedAt": "2026-05-01T04:53:43.908Z",
-    "llm": {
-      "model": "claude-sonnet-4.6",
-      "provider": "copilot"
-    },
+    "llm": null,
     "modifiedFiles": null
   },
   {
@@ -9036,10 +8972,7 @@
     "quality": "normal",
     "createdAt": "2026-04-30T17:10:20.135Z",
     "digestedAt": "2026-05-01T04:53:49.943Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
+    "llm": null,
     "modifiedFiles": null
   },
   {
@@ -9050,10 +8983,7 @@
     "quality": "high",
     "createdAt": "2026-04-30T17:10:20.135Z",
     "digestedAt": "2026-05-01T04:53:49.943Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
+    "llm": null,
     "modifiedFiles": null
   },
   {
@@ -9064,10 +8994,7 @@
     "quality": "high",
     "createdAt": "2026-04-30T17:10:20.135Z",
     "digestedAt": "2026-05-01T04:53:49.943Z",
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
+    "llm": null,
     "modifiedFiles": null
   },
   {
@@ -9077,14 +9004,9 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T08:32:01.259Z",
-    "digestedAt": null,
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/scripts/global-service-coordinator.js"
-    ]
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "06c1db06-d89e-491f-8d5b-b93b13e2f7a3",
@@ -9093,14 +9015,9 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T08:32:01.259Z",
-    "digestedAt": null,
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/scripts/global-service-coordinator.js"
-    ]
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "b08a87ae-71f5-4d28-82b2-83356f73f12a",
@@ -9109,14 +9026,9 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T08:32:01.259Z",
-    "digestedAt": null,
-    "llm": {
-      "model": "Claude Sonnet 4.6",
-      "provider": "copilot"
-    },
-    "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/scripts/global-service-coordinator.js"
-    ]
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": null
   },
   {
     "id": "8e8ca9d8-4368-4aa9-84df-a11c74f89f35",
@@ -9125,18 +9037,415 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-01T08:49:37.129Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": null
+  },
+  {
+    "id": "f366e643-78bf-4452-9e2d-7e5246ec691f",
+    "summary": "Intent: Commit the JSON files in the current git changeset\nApproach: Identified changed JSON files, grouped them by logical purpose to match established commit conventions.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Six JSON files were staged and split into three commits covering observation exports, KB export, and config changes (icons + Groq billing month rollover).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:51:47.466Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "a6813abd-6712-4feb-b2a8-3ae5cd71ad76",
+    "summary": "Intent: Commit the JSON files in the current git changeset\nApproach: Split commits by logical grouping matching established project conventions: observation exports, knowledge-base export, and config changes.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Three commits created — one for observation-export digests/insights/metadata JSONs, one for the coding knowledge-graph export, and one for live-logging-config changes (emoji literals and Groq billing month rollover).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T08:51:47.466Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "37fdb37c-c853-46b9-9add-96b7959b0e81",
+    "summary": "Intent: Resume work from a previous session by reading the latest transcript to understand where progress stopped, then continue from that point.\nApproach: Assistant searched transcript files to identify the last incomplete task or decision point before continuing.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Assistant began reviewing transcripts to find the stopping point but the exchange ends mid-investigation without completing the resumption.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:55:27.541Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "b1cc8fc5-1143-4293-9174-27dbd6eb22ce",
+    "summary": "Intent: Resume a previously paused multi-step plan by reading the latest transcript to determine where work left off.\nApproach: Read and search the transcript history file for markers indicating the last completed step and what remains, before continuing execution.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: The assistant located and read the transcript but the exchange ended mid-investigation before resuming any actual work.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:55:27.541Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "641c0a02-2594-4b4f-bf34-d7fba7684f82",
+    "summary": "Intent: Resume a multi-phase refactoring plan from where it left off in the previous session, after reading the latest transcript to identify the stopping point.\nApproach: Read the prior session transcript to reconstruct plan state (phases A–D), then continue with phase C (service scripts) by updating remaining files that still reference DOCKER_MODE/native/docker-mode-transition.js.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/post-session-logger.js, edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-process-supervisor.js\nResult: Phase C work resumed; post-session-logger.js and global-process-supervisor.js were updated to remove legacy native/DOCKER_MODE references, with syntax verified after editing.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T08:55:27.541Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "93d23253-0e57-4554-840b-68ea63846417",
+    "summary": "Intent: [shared an image, likely showing broken/missing observations in the coding project]\nApproach: Investigated existing tooling and database state to understand scope of broken observations before taking action.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Identified `backfill-raw-observations.js` as the relevant recovery tool; investigation was in progress but no changes were made.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:56:35.753Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "e8ec4a75-e529-4050-9b7a-ca64733fb86e",
+    "summary": "Intent: [image shared — appears to show broken/undigested observations, developer wanted investigation and recovery]\nApproach: Read existing backfill and consolidation scripts to understand the pipeline, then <USER_ID_REDACTED> the database to identify 21 undigested raw observations with low <USER_ID_REDACTED> scores that were being skipped by the consolidator.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Identified 21 raw observations (mostly Apr 29/30, from opencode) stuck in undigested state due to <USER_ID_REDACTED>=low filtering in the consolidator; backfill script was found as the recovery tool and execution was initiated.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:56:35.753Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": null,
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "6d68bf9d-c40e-4f4e-aca9-d7c46c5b04d0",
+    "summary": "Intent: [sharing a screenshot, likely showing broken/raw observations in the system that need investigation and recovery]\nApproach: Assistant investigated the observations database, found 21 undigested low-<USER_ID_REDACTED> raw observations from Apr 30, identified a consolidator skip issue, and attempted backfill recovery — discovering DB corruption causing 6 failures.\nArtifacts: edited post-session-logger.js, edited global-process-supervisor.js\nResult: Investigation revealed 21 raw observations skipped due to <USER_ID_REDACTED>=low, 15/21 recovered via backfill script, 6 failed due to SQLite database corruption (\"disk image is malformed\").",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T08:56:35.753Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/Q284340/Agentic/coding/scripts/global-process-supervisor.js"
+    ]
+  },
+  {
+    "id": "7faf954e-1c42-48c2-9ce9-bf84b3b1968f",
+    "summary": "Intent: [share an image for the assistant to analyze/investigate]\nApproach: Assistant began investigating by running git commands to examine repository state.\nArtifacts: edited coding.code-workspace\nResult: Exchange was cut off before any resolution; the assistant started examining git repository state in response to the image but did not complete the investigation.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:23:41.319Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "be3170ae-3a75-4ab3-9cb6-c6a593d47210",
+    "summary": "Intent: [shared an image, likely showing a git/workspace issue for investigation]\nApproach: Assistant began investigating the repository structure, nested git repos, and workspace configuration to diagnose the issue shown in the image.\nArtifacts: edited coding.code-workspace\nResult: Investigation was in progress; assistant was examining parent repo state, nested `.specstory/history` git repo, and the VS Code workspace file but no conclusion was reached in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:23:41.319Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "c65806c8-4b30-4c5b-8ae9-880841e39d7e",
+    "summary": "Intent: Diagnose why the parent `coding` repo is missing from VS Code's SCM panel while 5 submodules appear.\nApproach: Investigated git repo structure, `.gitmodules`, `.gitignore`, and workspace settings to identify conflicts between a nested git repo in an ignored path and VS Code's repository discovery behavior.\nArtifacts: edited coding.code-workspace\nResult: Root cause identified: `.specstory/history/.git` (a nested <COMPANY_NAME_REDACTED>.ghe.com repo in an ignored directory) confuses VS Code's git scanner, compounded by auth hangs causing the parent repo to drop from SCM. Fix is to add `.vscode/settings.json` excluding `.specstory` from VS Code's git repository scanning.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:23:41.319Z",
+    "digestedAt": "2026-05-01T09:31:42.041Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "9e1c1bb8-16c1-4a73-82ac-be42c86b7a8b",
+    "summary": "Intent: [shared a screenshot showing the coding repo missing from VS Code's source control view while 5 submodules appear]\nApproach: Assistant reviewed the workspace file to diagnose why the parent coding repo isn't appearing in VS Code's git source control panel despite submodules rendering correctly.\nArtifacts: edited markdown-text.tsx\nResult: Issue identified as the parent coding repository still not appearing in VS Code source control; further diagnosis planned to check nested .git dirs and VS Code git extension state.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:37:17.374Z",
+    "digestedAt": "2026-05-01T09:40:09.342Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+    ]
+  },
+  {
+    "id": "12757191-8f43-4b97-8fbe-8682413de49d",
+    "summary": "Intent: [user shared a screenshot, likely showing a Git/VS Code issue with the parent \"coding\" repo not appearing in source control]\nApproach: Diagnosed missing parent repo in VS Code Git extension by checking workspace config, nested .git directories, and .gitignore entries for specstory.\nArtifacts: edited coding.code-workspace\nResult: Investigation found submodules rendering correctly but parent repo still not detected; root cause not yet resolved in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:37:17.374Z",
     "digestedAt": null,
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
     },
     "modifiedFiles": [
-      "/Users/Q284340/Agentic/coding/scripts/global-service-coordinator.js",
-      "/Users/Q284340/Agentic/coding/scripts/free-coding-ports.sh",
-      "/Users/Q284340/Agentic/coding/bin/coding",
-      "/Users/Q284340/Agentic/coding/install.sh",
-      "/Users/Q284340/Agentic/coding/scripts/launch-agent-common.sh",
-      "/Users/Q284340/Agentic/coding/scripts/claude-mcp-launcher.sh"
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "b6c7ae7a-25ea-4560-bcb8-eb6c3c30b410",
+    "summary": "Intent: Fix VS Code SCM panel to show the parent `coding` repository while suppressing the `.specstory/history` nested git repo.\nApproach: Dropped the `git.openRepositoryInParentFolders: \"never\"` workspace override that was blocking parent repo registration, and added `git.ignoredRepositories` with the explicit path to `.specstory/history` to prevent it from appearing via any discovery path.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace settings updated to allow parent repo auto-detection while explicitly ignoring the `.specstory/history` nested git directory, so the `coding` repo should now appear in the SCM panel alongside (not buried under) the 5 submodules.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:37:17.374Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "01379f25-5c4c-4fdd-a505-bcfda61ce5a6",
+    "summary": "Intent: [approve proceeding with a previously proposed change]\nApproach: Applied redaction styling to inline code spans by passing inner text through the redaction rendering function, allowing styled redaction tokens to appear nested within code formatting.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx\nResult: The inline-code rendering branch in markdown-text.tsx now processes its content through `renderWithRedactionStyling`, so redacted tokens inside code spans display with sky-blue/0.78em styling nested within the muted-mono code background.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:38:10.798Z",
+    "digestedAt": "2026-05-01T09:40:09.342Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/markdown-text.tsx"
+    ]
+  },
+  {
+    "id": "421b7943-9134-4f04-99f0-a77b6c0dbea4",
+    "summary": "Intent: User asked why the health monitor didn't detect and flag the LSL being down before auto-fixing it.\nApproach: Investigated the health prompt hook script and related health monitoring files to understand the detection and alerting logic.\nArtifacts: edited coding.code-workspace\nResult: Read the health-prompt-hook.js to examine why LSL-down conditions weren't being flagged proactively; root cause analysis was in progress but no fixes were applied.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:42:12.764Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "bc3479c1-936f-49c2-bdb7-a6aa196002f5",
+    "summary": "Intent: [shared an image, likely showing a statusline warning or health indicator, asking for diagnosis]\nApproach: Assistant read coordinator scripts and ran diagnostic commands to trace the statusline warning back to a single [Raw] observation remaining in the live database from a prior DB-corruption window.\nArtifacts: edited coding.code-workspace, edited observational-memory.md\nResult: Identified that the statusline health warning originates from one [Raw] observation (ID 3db421fe) in the live DB; it will clear once that row is recovered and re-backfilled.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T09:48:40.667Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/observational-memory.md"
+    ]
+  },
+  {
+    "id": "cad0e5d2-b285-46df-876e-539105509d73",
+    "summary": "Intent: [user confirmed to proceed with a previously discussed action]\nApproach: Applied a workspace configuration tweak as part of a multi-step commit and push workflow.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: The coding workspace file was updated as part of preparing focused commits for pushing.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:58:58.934Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "4f57f745-ec69-4eba-a47b-940c3f90c614",
+    "summary": "Intent: [confirmed proceeding with a previously proposed plan]\nApproach: Applied a workspace configuration edit, validated JSON integrity, then prepared focused commits.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace file updated and validated as correct JSON; git status checked in preparation for splitting changes into two commits.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:58:58.934Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "cad68291-1309-46e2-a8fd-9d7b1a77ee72",
+    "summary": "Intent: [user confirmed \"yes\" to proceed with a proposed action]\nApproach: Assistant edited the workspace file and ran validation/git checks to prepare commits.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace\nResult: Workspace file was updated; git status and diff checks were run to assess what changes needed to be committed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T09:58:58.934Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "d510cac9-3064-432c-b82c-8e506b8ca008",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions.\nApproach: The /sl command reads recent LSL files from the coding project's specstory history, loading multiple files when recent ones are short to ensure sufficient context.\nArtifacts: edited coding.code-workspace\nResult: Session continuity summary was produced covering work from 2026-05-01 11:00–13:00 in the coding project.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:01:45.882Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/coding.code-workspace"
+    ]
+  },
+  {
+    "id": "d45e3b49-8963-45cb-9e09-15ed63d669f7",
+    "summary": "Intent: Resume work as previously suggested by the assistant.\nApproach: Assistant began by checking system health state before restarting a coordinator process.\nArtifacts: edited health-prompt-hook.js\nResult: Assistant inspected LSL watchdog heartbeat file and running coordinator processes as a preliminary step before resuming; no changes made yet.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:05:31.945Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "02303f66-4460-40be-b435-c4cb0184822d",
+    "summary": "Intent: Resume the previously suggested action (restarting the LSL coordinator)\nApproach: Inspect current system health files and running processes before restarting to avoid disrupting existing mechanisms.\nArtifacts: edited health-prompt-hook.js\nResult: Investigation revealed the running coordinator (PID 74629) was started April 23, predating a heartbeat-stamping commit, causing stale registry timestamps and a missing watchdog heartbeat file; clean restart was planned.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:05:31.945Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "af00e23b-ff7a-48fc-9529-21d51b744663",
+    "summary": "Intent: Resume suggested diagnostic/repair work on the coding project's health monitoring system.\nApproach: Investigated running processes, heartbeat files, and the health-prompt-hook script to identify the source of health warnings, discovering LSL was healthy and the actual alert came from constraint-monitor violations.\nArtifacts: edited health-prompt-hook.js\nResult: Determined LSL monitoring was functioning correctly (age: 4 seconds, no stale heartbeat), and the \"System Health: Issues detected\" warning originated from constraint-monitor violations, not LSL.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:05:31.945Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "697fd0f4-bbea-45ca-8611-37124b65257a",
+    "summary": "Intent: Fix the coding git repo not appearing in workspace view when loading as workspace (vs folder), and check the latest transcript for pending observations from April 30.\nApproach: Revisit the previous workspace fix by inspecting the workspace config file and git setup, then re-read the end of the latest transcript to identify outstanding issues.\nArtifacts: edited health-prompt-hook.js\nResult: Investigation started; the previous fix was found to be ineffective for workspace mode, and the latest transcript files were located for review, but no concrete fix was applied yet.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-01T10:08:19.368Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/health-prompt-hook.js"
+    ]
+  },
+  {
+    "id": "ded0413b-06c1-492e-b5ee-72111137799d",
+    "summary": "Intent: [confirmed proceeding with a pending change]\nApproach: Applied the previously discussed edit and verified syntax before committing.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js\nResult: health-prompt-hook.js was updated, passed syntax check, and committed to the coding repo.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-01T10:10:03.617Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-prompt-hook.js"
     ]
   }
 ]
