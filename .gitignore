@@ -11,7 +11,8 @@ claude-code-mcp-docker.json
 
 # Editor directories and files
 .idea
-.vscode
+.vscode/*
+!.vscode/settings.json
 *.swp
 *.swo
 *~
@@ -209,8 +210,8 @@ src/**/*.d.ts
 !src/retrieval/**/*.js
 !src/hooks/**/*.js
 
-# Editor and IDE files
-.vscode/settings.json
+# Editor and IDE files (.vscode/ already ignored above with explicit exception
+# for settings.json so the workspace SCM ignore-list ships with the repo)
 .vscode/launch.json
 
 # Temporary and swap files

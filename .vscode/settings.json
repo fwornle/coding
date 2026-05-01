@@ -1,0 +1,21 @@
+{
+  // Git settings duplicated from coding.code-workspace so they apply
+  // whether the project is opened via "Open Folder" or via the workspace
+  // file. Without this folder-level copy, opening as a folder bypasses
+  // the workspace settings and the SCM panel re-discovers nested repos.
+  "git.openRepositoryInParentFolders": "always",
+  "git.autoRepositoryDetection": "subFolders",
+  "git.repositoryScanMaxDepth": 0,
+  "git.repositoryScanIgnoredFolders": [
+    "node_modules",
+    ".specstory",
+    ".specstory/history",
+    ".specstory/history/.git"
+  ],
+  "git.ignoredRepositories": [
+    "${workspaceFolder}/.specstory/history",
+    "${workspaceFolder}/.specstory/history/.git",
+    ".specstory/history",
+    ".specstory/history/.git"
+  ]
+}

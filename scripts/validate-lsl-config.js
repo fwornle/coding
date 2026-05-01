@@ -907,7 +907,7 @@ class LSLConfigValidator {
   checkFilePermissionCompliance() {
     const criticalPaths = [
       this.configDir,
-      path.join(this.projectPath, '.specstory', 'logs'),
+      path.join(this.projectPath, '.specstory', 'history', 'logs'),
       this.lslConfigPath,
       this.redactionConfigPath
     ];
@@ -943,7 +943,7 @@ class LSLConfigValidator {
   }
 
   checkLogRetentionCompliance() {
-    const logDir = path.join(this.projectPath, '.specstory', 'logs');
+    const logDir = path.join(this.projectPath, '.specstory', 'history', 'logs');
     if (!fs.existsSync(logDir)) {
       return { compliant: true, message: 'No logs directory (compliant by default)' };
     }

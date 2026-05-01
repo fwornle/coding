@@ -24,7 +24,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 class OperationalLogger {
   constructor(options = {}) {
     this.projectPath = options.projectPath || process.cwd();
-    this.logDir = options.logDir || path.join(this.projectPath, '.specstory', 'logs');
+    // Operational logs (system/classification/routing/performance/errors) live
+    // alongside other LSL artifacts in the private history repo.
+    this.logDir = options.logDir || path.join(this.projectPath, '.specstory', 'history', 'logs');
     this.debug = options.debug || false;
     this.enabled = options.enabled !== false; // Default to enabled
     

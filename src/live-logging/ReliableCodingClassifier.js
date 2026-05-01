@@ -171,10 +171,14 @@ class ReliableCodingClassifier {
         maxClassificationTimeMs: this.options.embeddingMaxTimeMs || 3000
       });
       
-      // Initialize operational logger
+      // Initialize operational logger.
+      // Let OperationalLogger use its default logDir (.specstory/history/logs)
+      // so we have one source of truth for the path. The previous explicit
+      // override here was the actual reason system.log kept reappearing under
+      // the old top-level .specstory/logs/ even after the default was fixed.
       if (this.enableLogging) {
         this.operationalLogger = new OperationalLogger({
-          logDir: path.join(this.projectPath, '.specstory', 'logs'),
+          projectPath: this.projectPath,
           debug: this.debug
         });
       }
