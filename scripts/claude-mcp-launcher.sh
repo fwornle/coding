@@ -21,12 +21,13 @@ export CODING_KNOWLEDGE_EXPORT="$CODING_REPO_DIR/.data/knowledge-export"
 export CODING_TOOLS_PATH="$CODING_REPO_DIR"
 
 # Path to the MCP config file
-# Priority: 1) Docker mode if detected, 2) Environment variable, 3) Default local config
-if [[ "$CODING_DOCKER_MODE" == "true" ]] && [[ -f "$CODING_REPO_DIR/claude-code-mcp-docker.json" ]]; then
+# Docker is the only supported mode — prefer claude-code-mcp-docker.json,
+# fall back to MCP_CONFIG env or the processed default if the docker config
+# hasn't been generated yet (install.sh runs generate-docker-mcp-config.sh).
+if [[ -f "$CODING_REPO_DIR/claude-code-mcp-docker.json" ]]; then
     MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-docker.json"
     echo -e "${BLUE}🐳 Using Docker MCP config${NC}"
 elif [[ -n "$MCP_CONFIG" ]] && [[ -f "$MCP_CONFIG" ]]; then
-    # MCP_CONFIG already set from environment (e.g., by launch-claude.sh)
     echo -e "${BLUE}Using MCP config from environment: $MCP_CONFIG${NC}"
 else
     MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-processed.json"
@@ -118,9 +119,8 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
 
         echo -e "${GREEN}✅ Session complete${NC}"
 
-        # In Docker mode, containers persist across sessions - no cleanup needed
-        # In native mode, PSM (Process State Manager) handles service cleanup via launch-claude.sh trap
-        # LSL (Live Session Logging) handles transcript capture during the session
+        # Docker containers persist across sessions — no cleanup needed.
+        # LSL (Live Session Logging) handles transcript capture during the session.
 
         # Check if LSL captured the session (look for recent .md files with correct naming pattern)
         local session_found=false
