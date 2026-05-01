@@ -12103,14 +12103,14 @@
     },
     {
       "name": "Git Repository Hygiene and Large File Management",
-      "entityType": "Fault",
+      "entityType": "Service",
       "observations": [
-        "- `.specstory/archive/` gitignored; LSL history files >200KB auto-split at \"## Prompt Set\" boundaries\n- OKB `.data/exports/` gitignored; **pre-commit hook (\"OKB BASELINE GUARD\")** blocks KB export files when mixed with non-KB changes — KB files must be committed independently\n- KB export files: `.data/knowledge-export/coding.json`, `.data/knowledge-export/resi.json`, `.data/knowledge-export/ui.json`\n- `rapid-automations` `node_modules/` and build artifacts gitignored; `local_cache/` (fastembed ONNX model cache) gitignored\n- `integrations/copi` submodule removed April 22\n- OKB submodule pointer in parent repo must be updated alongside submodule commits; diverged branches resolved via `git pull --rebase origin main`\n- Git submodules cause wave-based parallel execution orchestration to fall back to sequential mode\n- **OAuth token leak remediation**: `gho_`, `ghp_`, `github_pat_` patterns added to `redaction-patterns.json`; history rewritten with `git-filter-repo`; force-pushed\n- **User ID redaction**: `ConfigurableRedactor.js` replaces user IDs with `<USER_ID_REDACTED>`; 245 observations retroactively cleaned\n- **AWS secret regex over-matching**: `[a-zA-Z0-9+/]{40}` pattern in `redaction-patterns.json` matches any 40-char alphanumeric string — fix pending\n- **`.specstory/history/` scrubbed from git history**: `git filter-repo` run; `pre-history-scrub` tag created as backup; moved to private nested sub-repo (`coding-history`) not tracked as submodule; `.gitignore` updated; service scripts auto-create history directory so public checkouts remain functional\n- **Corporate remote sync**: `main` and `feat/online-learning` force-pushed to `cc-github.bmwgroup.net` (`origin-work`); push of `coding-history` snapshot to `<COMPANY_NAME_REDACTED>.ghe.com` **blocked by SSH key rejection** — pending resolution\n- Two public forks identified; fork-owner notification template drafted explaining force-push rewrite impact\n- `gh` CLI lacks `github.com` auth; GitHub Actions triggered manually via browser\n- MkDocs `docs_dir` is `docs-content` — images must go in `docs-content/images/`\n- **VS Code SCM missing parent repo**: `.specstory/history/.git` (nested remote repo inside ignored directory) confuses VS Code's git scanner; fix: add `.specstory` to `git.ignoredRepositories` or `git.repositoryScanIgnoredFolders` in `.vscode/settings.json`; `coding.code-workspace` modified during investigation"
+        "- `.specstory/archive/` gitignored; LSL history files >200KB auto-split at \"## Prompt Set\" boundaries\n- OKB `.data/exports/` gitignored; **pre-commit hook (\"OKB BASELINE GUARD\")** blocks KB export files when mixed with non-KB changes\n- KB export files: `.data/knowledge-export/coding.json`, `.data/knowledge-export/resi.json`, `.data/knowledge-export/ui.json`\n- `rapid-automations` `node_modules/` and build artifacts gitignored; `local_cache/` (fastembed ONNX model cache) gitignored\n- `integrations/copi` submodule removed April 22\n- OKB submodule pointer in parent repo must be updated alongside submodule commits; diverged branches resolved via `git pull --rebase origin main`\n- Git submodules cause wave-based parallel execution orchestration to fall back to sequential mode\n- **OAuth token leak remediation**: `gho_`, `ghp_`, `github_pat_` patterns added to `redaction-patterns.json`; history rewritten with `git-filter-repo`; force-pushed\n- **User ID redaction**: `ConfigurableRedactor.js` replaces user IDs with `<USER_ID_REDACTED>`; 245 observations retroactively cleaned\n- **AWS secret regex over-matching**: `[a-zA-Z0-9+/]{40}` pattern in `redaction-patterns.json` matches any 40-char alphanumeric string — fix pending\n- **`.specstory/history/` scrubbed from git history**: moved to private nested sub-repo (`coding-history`); `.gitignore` updated; service scripts auto-create history directory\n- **Corporate remote sync**: `main` and `feat/online-learning` force-pushed to `cc-github.bmwgroup.net`; push to `<COMPANY_NAME_REDACTED>.ghe.com` **blocked by SSH key rejection** — pending\n- MkDocs `docs_dir` is `docs-content` — images must go in `docs-content/images/`\n- **VS Code SCM missing parent repo (ongoing)**: nested `.git` inside `.specstory/history/` confuses VS Code's git scanner; VS Code traverses symlinks and finds unblessed nested repos, dropping the parent `coding` repo from SCM panel\n  - `coding.code-workspace` repeatedly edited during investigation; reverted to baseline commit `73c7a7047`\n  - Tried: `git.openRepositoryInParentFolders`, `git.scanRepositories`, `git.ignoredRepositories`, `git.repositoryScanIgnoredFolders`, multi-root workspace folders\n  - **Symlink approach failed**: symlinks from `.specstory/logs/classification/` into `.specstory/history/` caused VS Code to traverse into the nested `.git` — symlinks removed\n  - **Decided fix**: eliminate symlinks entirely; change classification writers to output directly into `.specstory/history/logs/classification/`; survey of scripts writing classification files is the next step\n  - Pending edits to `install.sh` and `init-history.sh` flagged as possibly incomplete"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.855Z",
-        "last_updated": "2026-05-01T09:32:49.882Z"
+        "last_updated": "2026-05-01T13:24:42.354Z"
       },
       "id": "mc4flkg4828deu"
     },
@@ -12157,12 +12157,12 @@
       "name": "GSD Statusline and Hook Integration",
       "entityType": "Process",
       "observations": [
-        "- GSD updated from **1.38.3 → 1.38.5** (April 26); changelog covered SDK executor fixes, prompt improvements, and verification fixes\n- 7 custom skills were backed up before running the installer to prevent data loss; restart of Claude Code required to activate new commands\n- Context window percentage display (`context_window.remaining_percentage`) disappeared from GSD toolbar — root cause is Claude Code stopping to pass this field in hook stdin JSON; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`"
+        "- GSD updated from **1.38.3 → 1.38.5** (April 26); **1.39.0** detected available May 1, update queued pending confirmation\n- 7 custom skills backed up before running installer to prevent data loss; restart of Claude Code required to activate new commands\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field in hook stdin JSON; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **False warning fixes (May 1)**:\n  - `health-prompt-hook.js`: was misclassifying `overallStatus=healthy` with non-critical constraint-monitor violations as yellow/warning; fixed to treat as green/silent — commit `0f52b20d1`\n  - `combined-status-line.js`: same logic bug where `healthVerifier` fields (`overallStatus`, `autoHealingActive`) were read incorrectly — mirrored fix applied\n- Stale coordinator process (PID 74629) predated heartbeat-stamping commit, causing stale registry timestamps; clean restart planned\n- Stale `[Raw]` observation (ID `3db421fe`) in live DB caused separate statusline health warning; self-clears once row is re-backfilled"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.907Z",
-        "last_updated": "2026-04-27T06:21:24.584Z"
+        "last_updated": "2026-05-01T13:24:42.366Z"
       },
       "id": "mc4flkg1y4ci6q"
     },
@@ -19042,7 +19042,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-01T09:32:54.993Z",
+    "exported_at": "2026-05-01T13:24:47.403Z",
     "total_entities": 678,
     "total_relations": 1132,
     "description": "Coding project infrastructure and patterns"
