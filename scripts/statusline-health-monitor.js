@@ -20,7 +20,6 @@ import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import ProcessStateManager from './process-state-manager.js';
-import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
 import { enableAutoRestart } from './auto-restart-watcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,10 +52,6 @@ class StatusLineHealthMonitor {
     this.psm = new ProcessStateManager({ codingRoot: this.codingRepoPath });
     this.serviceName = 'statusline-health-monitor';
     this.healthRefreshInterval = null;
-
-    // Docker mode transition state
-    this.monitoringPaused = false;
-    this.transitionData = null;
 
     // Billing scraper state
     this.lastBillingCheck = 0;
@@ -1293,11 +1288,12 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Get MCP Constraint Monitor (guardrails) health
+   * Get MCP Constraint Monitor (guardrails) health.
+   * Constraint monitor runs on SSE port 3849 inside the coding-services container.
    */
-  async getConstraintMonitorHealthDocker() {
+  async getConstraintMonitorHealth() {
     try {
-      const ssePort = 3849; // Constraint monitor SSE port in Docker
+      const ssePort = 3849;
       const response = await Promise.race([
         execAsync(`curl -s http://localhost:${ssePort}/health --max-time 3`),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500))
@@ -1307,230 +1303,23 @@ class StatusLineHealthMonitor {
         return {
           status: 'healthy',
           icon: '✅',
-          details: `Docker SSE port ${ssePort} healthy`
+          details: `SSE port ${ssePort} healthy`
         };
       }
       return {
         status: 'warning',
         icon: '🟡',
-        details: `Docker SSE port ${ssePort}: ${data.status || 'unknown'}`
+        details: `SSE port ${ssePort}: ${data.status || 'unknown'}`
       };
     } catch (error) {
       return {
         status: 'warning',
         icon: '🟡',
-        details: 'Docker constraint monitor SSE (3849) not responding'
+        details: 'Constraint monitor SSE (3849) not responding'
       };
     }
   }
 
-    async getConstraintMonitorHealth() {
-    try {
-      // In Docker mode, constraint monitor runs on SSE port 3849 inside the container
-      // Native mode uses dashboard port 3030 and API port 3031
-      if (this.isDockerMode()) {
-        return this.getConstraintMonitorHealthDocker();
-      }
-
-      // Enhanced health checking with port connectivity, compilation errors, and CPU monitoring
-      const dashboardPort = 3030; // From .env.ports: CONSTRAINT_DASHBOARD_PORT
-      const apiPort = 3031;       // From .env.ports: CONSTRAINT_API_PORT
-
-      // Check process existence and CPU usage (with fallback for no processes)
-      let psOutput = '';
-      try {
-        const result = await execAsync('ps aux | grep "constraint-monitor\\|dashboard.*next\\|constraint.*api" | grep -v grep || true');
-        psOutput = result.stdout;
-      } catch (grepError) {
-        // grep returns exit code 1 when no matches found, that's ok
-        psOutput = '';
-      }
-      const processes = psOutput.trim().split('\n').filter(line => line.length > 0);
-      
-      let processHealth = {
-        running: processes.length > 0,
-        highCpu: false,
-        details: []
-      };
-      
-      // Analyze CPU usage for stuck processes
-      for (const processLine of processes) {
-        const parts = processLine.trim().split(/\s+/);
-        if (parts.length >= 3) {
-          const cpuUsage = parseFloat(parts[2]) || 0;
-          const pid = parts[1];
-          if (cpuUsage > 50) { // High CPU threshold
-            processHealth.highCpu = true;
-            processHealth.details.push(`PID ${pid}: ${cpuUsage}% CPU`);
-          }
-        }
-      }
-      
-      // Test port connectivity
-      let portHealth = {
-        dashboard: false,
-        api: false
-      };
-      
-      try {
-        // Quick HTTP connectivity test for dashboard
-        const dashboardResponse = await Promise.race([
-          execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${dashboardPort} --max-time 3`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-        ]);
-        const dashboardStatus = parseInt(dashboardResponse.stdout.trim());
-        portHealth.dashboard = dashboardStatus >= 200 && dashboardStatus < 500;
-      } catch (error) {
-        // Dashboard port not responding
-        portHealth.dashboard = false;
-      }
-      
-      // Enhanced API check: get full health response including enforcement status
-      let enforcementHealth = {
-        checked: false,
-        healthy: null,
-        message: null
-      };
-
-      try {
-        // Fetch full health response with enforcement details
-        const apiResponse = await Promise.race([
-          execAsync(`curl -s http://localhost:${apiPort}/api/health --max-time 3`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-        ]);
-
-        if (apiResponse.stdout.trim()) {
-          try {
-            const healthData = JSON.parse(apiResponse.stdout.trim());
-            portHealth.api = true; // API responded
-
-            // Extract enforcement status
-            if (healthData.enforcement) {
-              enforcementHealth.checked = true;
-              enforcementHealth.healthy = healthData.enforcement.healthy;
-              enforcementHealth.message = healthData.enforcement.message;
-            }
-          } catch (parseError) {
-            // Not JSON, but API responded
-            portHealth.api = true;
-          }
-        }
-      } catch (error) {
-        // API port not responding
-        portHealth.api = false;
-      }
-
-      // Check for compilation errors in dashboard logs
-      let compilationHealth = {
-        hasErrors: false,
-        errorDetails: ''
-      };
-
-      try {
-        // Check recent log files for TypeScript/Next.js compilation errors
-        const logCheckPath = path.join(this.codingRepoPath, 'integrations/mcp-constraint-monitor/dashboard');
-        const buildCheck = await execAsync(`cd "${logCheckPath}" 2>/dev/null && grep -l "Parsing ecmascript\\|Expression expected\\|Module not found\\|Type error\\|Build error" .next/server/*.js 2>/dev/null | head -1`);
-
-        if (buildCheck.stdout.trim()) {
-          compilationHealth.hasErrors = true;
-          compilationHealth.errorDetails = 'TypeScript compilation errors detected';
-        }
-      } catch (error) {
-        // No compilation errors found (grep returns 1 when no matches)
-        compilationHealth.hasErrors = false;
-      }
-
-      // Also check if dashboard responds with actual content (not error page)
-      if (portHealth.dashboard && !compilationHealth.hasErrors) {
-        try {
-          const contentCheck = await execAsync(`curl -s http://localhost:${dashboardPort} --max-time 3 | grep -q "Constraint Monitor" && echo "ok" || echo "error"`);
-          if (contentCheck.stdout.trim() === 'error') {
-            compilationHealth.hasErrors = true;
-            compilationHealth.errorDetails = 'Dashboard returning error page';
-          }
-        } catch (error) {
-          // Ignore content check errors
-        }
-      }
-
-      // Determine overall health status
-      let healthResult;
-
-      if (!processHealth.running) {
-        healthResult = {
-          status: 'inactive',
-          icon: '⚫',
-          details: 'Constraint monitor offline'
-        };
-      } else if (compilationHealth.hasErrors) {
-        healthResult = {
-          status: 'compilation_error',
-          icon: '🔴',
-          details: compilationHealth.errorDetails || 'Compilation errors detected'
-        };
-      } else if (processHealth.highCpu) {
-        healthResult = {
-          status: 'stuck',
-          icon: '🔴',
-          details: `High CPU usage: ${processHealth.details.join(', ')}`
-        };
-      } else if (!portHealth.dashboard && !portHealth.api) {
-        healthResult = {
-          status: 'unresponsive',
-          icon: '🔴',
-          details: 'Ports 3030,3031 unresponsive'
-        };
-      } else if (!portHealth.dashboard || !portHealth.api) {
-        const failedPorts = [];
-        if (!portHealth.dashboard) failedPorts.push('3030');
-        if (!portHealth.api) failedPorts.push('3031');
-
-        healthResult = {
-          status: 'degraded',
-          icon: '🟡',
-          details: `Port ${failedPorts.join(',')} down`
-        };
-      } else if (enforcementHealth.checked && enforcementHealth.healthy === false) {
-        // Ports responsive BUT enforcement is broken - this is a critical issue!
-        healthResult = {
-          status: 'enforcement_broken',
-          icon: '🟡',
-          reason: 'enf',
-          details: enforcementHealth.message || 'Constraint enforcement not working'
-        };
-      } else {
-        // All checks passed including enforcement
-        healthResult = {
-          status: 'healthy',
-          icon: '✅',
-          details: 'Ports 3030,3031 responsive, enforcement active'
-        };
-      }
-      
-      // Trigger auto-healing for unhealthy states
-      if (this.autoHealEnabled && ['inactive', 'stuck', 'unresponsive', 'degraded'].includes(healthResult.status)) {
-        this.log(`Detected unhealthy constraint monitor: ${healthResult.status}`, 'WARN');
-        
-        // Run auto-healing asynchronously to not block health check
-        setImmediate(async () => {
-          const healed = await this.autoHealConstraintMonitor(healthResult);
-          if (healed) {
-            this.log(`🎉 Constraint monitor auto-healed successfully`, 'INFO');
-          }
-        });
-      }
-      
-      return healthResult;
-      
-    } catch (error) {
-      this.log(`Constraint monitor health check error: ${error.message}`, 'DEBUG');
-      return {
-        status: 'unknown',
-        icon: '❓',
-        details: 'Health check failed'
-      };
-    }
-  }
 
   /**
    * Get Database (GraphDB + LevelDB) health status
@@ -1704,18 +1493,7 @@ class StatusLineHealthMonitor {
         details: details
       };
 
-      // Trigger auto-healing for unhealthy VKB server
-      if (this.autoHealEnabled && healthStatus === 'unhealthy') {
-        this.log(`Detected unhealthy VKB server: ${healthResult.details}`, 'WARN');
-
-        // Run auto-healing asynchronously to not block health check
-        setImmediate(async () => {
-          const healed = await this.autoHealVKBServer(healthResult);
-          if (healed) {
-            this.log(`🎉 VKB server auto-healed successfully`, 'INFO');
-          }
-        });
-      }
+      // Container-mode lifecycle is supervisord's responsibility — no host-side auto-heal here.
 
       return healthResult;
 
@@ -1817,26 +1595,6 @@ class StatusLineHealthMonitor {
         details: 'Health check failed'
       };
     }
-  }
-
-  /**
-   * Check if running in Docker mode
-   * Docker mode is detected by:
-   * - CODING_DOCKER_MODE environment variable
-   * - .docker-mode marker file
-   * - running coding-services container
-   */
-  isDockerMode() {
-    // Check environment variable
-    if (process.env.CODING_DOCKER_MODE === 'true') {
-      return true;
-    }
-    // Check marker file
-    const markerFile = path.join(this.codingRepoPath, '.docker-mode');
-    if (fs.existsSync(markerFile)) {
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -2033,10 +1791,6 @@ class StatusLineHealthMonitor {
    * Returns combined health for semantic-analysis, constraint-monitor, code-graph-rag
    */
   async getDockerMCPHealth() {
-    if (!this.isDockerMode()) {
-      return null; // Not in Docker mode, skip these checks
-    }
-
     const [saHealth, cmHealth, cgrHealth] = await Promise.all([
       this.getSemanticAnalysisSSEHealth(),
       this.getConstraintMonitorSSEHealth(),
@@ -2145,316 +1899,6 @@ class StatusLineHealthMonitor {
     }
   }
 
-  /**
-   * Auto-heal constraint monitor service when issues are detected
-   */
-  async autoHealConstraintMonitor(healthStatus) {
-    if (!this.autoHealEnabled) return false;
-
-    // Skip auto-healing in Docker mode - services run in containers, not native
-    if (this.isDockerMode()) {
-      this.log('🐳 Auto-healing SKIPPED for constraint-monitor - Docker mode active (services run in containers)', 'INFO');
-      return false;
-    }
-
-    // Skip auto-healing during Docker mode transition
-    if (this.monitoringPaused) {
-      this.log('🔇  Auto-healing SKIPPED for constraint-monitor - Docker mode transition in progress', 'INFO');
-      return false;
-    }
-
-    // Also check lock file directly (in case signal was missed)
-    try {
-      const transitionLocked = await isTransitionLocked();
-      if (transitionLocked) {
-        this.log('🔒 Auto-healing SKIPPED for constraint-monitor - transition lock detected', 'INFO');
-        return false;
-      }
-    } catch {
-      // Continue if check fails (fail open)
-    }
-
-    const serviceKey = 'constraint-monitor';
-    const now = Date.now();
-    
-    // Check if we're in cooldown period
-    const lastHeal = this.lastHealingTime.get(serviceKey) || 0;
-    if (now - lastHeal < this.healingCooldown) {
-      this.log(`Auto-heal cooldown for ${serviceKey}, waiting ${Math.round((this.healingCooldown - (now - lastHeal)) / 1000)}s`, 'DEBUG');
-      return false;
-    }
-    
-    // Check if we've exceeded max attempts
-    const attempts = this.healingAttempts.get(serviceKey) || 0;
-    if (attempts >= this.maxHealingAttempts) {
-      this.log(`Max healing attempts (${this.maxHealingAttempts}) reached for ${serviceKey}`, 'ERROR');
-      return false;
-    }
-    
-    let healed = false;
-    
-    try {
-      this.log(`🔧 Auto-healing constraint monitor (status: ${healthStatus.status})`, 'INFO');
-      
-      // Different healing strategies based on the issue
-      switch (healthStatus.status) {
-        case 'stuck':
-          // High CPU - kill and restart
-          this.log('Detected stuck process with high CPU, killing and restarting...', 'INFO');
-          await this.killConstraintMonitorProcesses();
-          await this.startConstraintMonitorServices();
-          healed = true;
-          break;
-          
-        case 'unresponsive':
-        case 'degraded':
-          // Ports not responding - try graceful restart first
-          this.log('Services unresponsive, attempting graceful restart...', 'INFO');
-          await this.restartConstraintMonitorGracefully();
-          healed = true;
-          break;
-          
-        case 'inactive':
-        case 'down':
-          // Not running - start services
-          this.log('Services not running, starting...', 'INFO');
-          await this.startConstraintMonitorServices();
-          healed = true;
-          break;
-          
-        default:
-          this.log(`No auto-heal action for status: ${healthStatus.status}`, 'DEBUG');
-          return false;
-      }
-      
-      if (healed) {
-        // Update tracking
-        this.healingAttempts.set(serviceKey, attempts + 1);
-        this.lastHealingTime.set(serviceKey, now);
-        
-        // Wait a bit for services to stabilize
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        // Verify healing worked
-        const newHealth = await this.getConstraintMonitorHealth();
-        if (newHealth.status === 'healthy') {
-          this.log(`✅ Auto-healing successful! Constraint monitor is now healthy`, 'INFO');
-          // Reset attempts on successful heal
-          this.healingAttempts.set(serviceKey, 0);
-          return true;
-        } else {
-          this.log(`⚠️ Auto-healing completed but service still unhealthy: ${newHealth.status}`, 'WARN');
-          return false;
-        }
-      }
-    } catch (error) {
-      this.log(`Auto-healing failed: ${error.message}`, 'ERROR');
-      this.healingAttempts.set(serviceKey, attempts + 1);
-      this.lastHealingTime.set(serviceKey, now);
-      return false;
-    }
-    
-    return false;
-  }
-  
-  /**
-   * Kill constraint monitor processes forcefully
-   */
-  async killConstraintMonitorProcesses() {
-    try {
-      // Kill all constraint monitor related processes
-      await execAsync('pkill -f "constraint-monitor" || true');
-      await execAsync('pkill -f "dashboard.*next.*3030" || true');
-      await execAsync('lsof -ti:3030,3031 | xargs kill -9 2>/dev/null || true');
-      
-      this.log('Killed constraint monitor processes', 'INFO');
-      
-      // Wait for processes to fully terminate
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    } catch (error) {
-      this.log(`Error killing processes: ${error.message}`, 'WARN');
-    }
-  }
-  
-  /**
-   * Start constraint monitor services
-   */
-  async startConstraintMonitorServices() {
-    try {
-      const monitorPath = path.join(this.codingRepoPath, 'integrations', 'mcp-constraint-monitor');
-      
-      // Start dashboard on port 3030
-      this.log('Starting constraint monitor dashboard on port 3030...', 'INFO');
-      execAsync(`cd "${monitorPath}" && PORT=3030 npm run dashboard > /dev/null 2>&1 &`).catch(err => {
-        this.log(`Dashboard start error (non-critical): ${err.message}`, 'DEBUG');
-      });
-      
-      // Start API on port 3031 if needed
-      this.log('Starting constraint monitor API on port 3031...', 'INFO');
-      execAsync(`cd "${monitorPath}" && PORT=3031 npm run api > /dev/null 2>&1 &`).catch(err => {
-        this.log(`API start error (non-critical): ${err.message}`, 'DEBUG');
-      });
-      
-      this.log('Constraint monitor services start initiated', 'INFO');
-    } catch (error) {
-      this.log(`Error starting services: ${error.message}`, 'ERROR');
-      throw error;
-    }
-  }
-  
-  /**
-   * Gracefully restart constraint monitor
-   */
-  async restartConstraintMonitorGracefully() {
-    try {
-      this.log('Attempting graceful restart of constraint monitor...', 'INFO');
-      
-      // Try to stop gracefully first
-      await execAsync('pkill -SIGTERM -f "constraint-monitor" || true');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Force kill if still running
-      const { stdout } = await execAsync('pgrep -f "constraint-monitor" || true');
-      if (stdout.trim()) {
-        this.log('Processes still running after SIGTERM, forcing kill...', 'INFO');
-        await this.killConstraintMonitorProcesses();
-      }
-      
-      // Start services
-      await this.startConstraintMonitorServices();
-      
-      this.log('Graceful restart completed', 'INFO');
-    } catch (error) {
-      this.log(`Graceful restart failed: ${error.message}`, 'ERROR');
-      throw error;
-    }
-  }
-
-  /**
-   * Auto-heal VKB server when issues are detected
-   */
-  async autoHealVKBServer(healthStatus) {
-    if (!this.autoHealEnabled) return false;
-
-    // Skip auto-healing in Docker mode - services run in containers, not native
-    if (this.isDockerMode()) {
-      this.log('🐳 Auto-healing SKIPPED for VKB server - Docker mode active (services run in containers)', 'INFO');
-      return false;
-    }
-
-    // Skip auto-healing during Docker mode transition
-    if (this.monitoringPaused) {
-      this.log('🔇  Auto-healing SKIPPED for VKB server - Docker mode transition in progress', 'INFO');
-      return false;
-    }
-
-    // Also check lock file directly (in case signal was missed)
-    try {
-      const transitionLocked = await isTransitionLocked();
-      if (transitionLocked) {
-        this.log('🔒 Auto-healing SKIPPED for VKB server - transition lock detected', 'INFO');
-        return false;
-      }
-    } catch {
-      // Continue if check fails (fail open)
-    }
-
-    const serviceKey = 'vkb-server';
-    const now = Date.now();
-
-    // Check if we're in cooldown period
-    const lastHeal = this.lastHealingTime.get(serviceKey) || 0;
-    if (now - lastHeal < this.healingCooldown) {
-      this.log(`Auto-heal cooldown for ${serviceKey}, waiting ${Math.round((this.healingCooldown - (now - lastHeal)) / 1000)}s`, 'DEBUG');
-      return false;
-    }
-
-    // Check if we've exceeded max attempts
-    const attempts = this.healingAttempts.get(serviceKey) || 0;
-    if (attempts >= this.maxHealingAttempts) {
-      this.log(`Max healing attempts (${this.maxHealingAttempts}) reached for ${serviceKey}`, 'ERROR');
-      return false;
-    }
-
-    let healed = false;
-
-    try {
-      this.log(`🔧 Auto-healing VKB server (issue: ${healthStatus.details})`, 'INFO');
-
-      // VKB healing strategy: kill any stale processes on port 8080 and restart
-      await this.restartVKBServer();
-      healed = true;
-
-      if (healed) {
-        // Update tracking
-        this.healingAttempts.set(serviceKey, attempts + 1);
-        this.lastHealingTime.set(serviceKey, now);
-
-        // Wait a bit for server to stabilize
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Verify healing worked
-        const newHealth = await this.getVKBServerHealth();
-        if (newHealth.status === 'healthy') {
-          this.log(`✅ Auto-healing successful! VKB server is now healthy`, 'INFO');
-          // Reset attempts on successful heal
-          this.healingAttempts.set(serviceKey, 0);
-          return true;
-        } else {
-          this.log(`⚠️ Auto-healing completed but VKB server still unhealthy: ${newHealth.details}`, 'WARN');
-          return false;
-        }
-      }
-    } catch (error) {
-      this.log(`VKB auto-healing failed: ${error.message}`, 'ERROR');
-      this.healingAttempts.set(serviceKey, attempts + 1);
-      this.lastHealingTime.set(serviceKey, now);
-      return false;
-    }
-
-    return false;
-  }
-
-  /**
-   * Restart VKB server
-   */
-  async restartVKBServer() {
-    try {
-      this.log('Stopping any existing VKB server processes...', 'INFO');
-
-      // Gracefully stop VKB first (allows LevelDB to close properly)
-      const vkbStopScript = path.join(this.codingRepoPath, 'bin', 'vkb');
-      try {
-        await execAsync(`"${vkbStopScript}" stop`, { timeout: 5000 });
-      } catch (stopErr) {
-        this.log('Graceful stop failed, trying SIGTERM...', 'DEBUG');
-      }
-
-      // Give graceful shutdown time, then SIGTERM (not SIGKILL)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await execAsync('lsof -ti:8080 | xargs kill -15 2>/dev/null || true');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Only force kill if still running
-      await execAsync('lsof -ti:8080 | xargs kill -9 2>/dev/null || true');
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Use the bin/vkb script to start the server properly
-      const vkbScript = path.join(this.codingRepoPath, 'bin', 'vkb');
-
-      this.log('Starting VKB server via bin/vkb...', 'INFO');
-
-      // Start VKB in background (--no-browser to prevent opening windows on auto-heal)
-      execAsync(`"${vkbScript}" start --no-browser`).catch(err => {
-        this.log(`VKB start error (non-critical): ${err.message}`, 'DEBUG');
-      });
-
-      this.log('VKB server restart initiated', 'INFO');
-    } catch (error) {
-      this.log(`Error restarting VKB server: ${error.message}`, 'ERROR');
-      throw error;
-    }
-  }
 
   /**
    * Format status line display
@@ -2462,12 +1906,6 @@ class StatusLineHealthMonitor {
    */
   formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth = null) {
     let statusLine = '';
-
-    // Show transition status if in progress
-    if (this.monitoringPaused && this.transitionData) {
-      const { fromMode, toMode } = this.transitionData;
-      statusLine += `[🔄 TRANSITIONING: ${fromMode} → ${toMode}] `;
-    }
 
     // Global Coding Monitor with reason code if not healthy
     if (gcmHealth.icon === '🟡' || gcmHealth.icon === '🔴') {
@@ -2990,40 +2428,11 @@ class StatusLineHealthMonitor {
   async start() {
     this.log('🚀 Starting StatusLine Health Monitor...');
 
-    // Log Docker mode status at startup for diagnostics
-    const dockerMode = this.isDockerMode();
-    this.log(`📦 Docker mode: ${dockerMode ? 'ENABLED (auto-heal will skip native services)' : 'disabled (native mode)'}`);
-    if (dockerMode) {
-      this.log(`   - Auto-healing for VKB/constraint-monitor: DISABLED in Docker mode`);
-      this.log(`   - Services should run in containers, not native processes`);
-    }
-
     // Write PID file for shell script compatibility
     this.writePidFile();
 
     // Register with PSM
     await this.registerWithPSM();
-
-    // Install Docker mode transition signal handlers
-    process.on('SIGUSR2', async () => {
-      this.monitoringPaused = true;
-      try {
-        this.transitionData = await getTransitionLockData();
-      } catch {
-        this.transitionData = { fromMode: 'unknown', toMode: 'unknown' };
-      }
-      this.log('🔇  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
-      // Update status to show transition
-      await this.updateStatusLine();
-    });
-
-    process.on('SIGUSR1', () => {
-      this.monitoringPaused = false;
-      this.transitionData = null;
-      this.log('▶️  Monitoring RESUMED (Docker mode transition complete)');
-      // Force status update after transition
-      this.updateStatusLine();
-    });
 
     // Initial update
     await this.updateStatusLine();
@@ -3148,7 +2557,7 @@ Auto-Healing:
     // Watch for code changes and auto-restart (supervisor will restart us)
     enableAutoRestart({
       scriptUrl: import.meta.url,
-      dependencies: ['./process-state-manager.js', './docker-mode-transition.js'],
+      dependencies: ['./process-state-manager.js'],
       cleanupFn: async () => {
         monitor.stop();
         monitor.removePidFile();
