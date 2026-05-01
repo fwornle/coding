@@ -27,29 +27,6 @@ const scriptRoot = join(__dirname, '..');
 const execAsync = promisify(exec);
 
 /**
- * Detect if running in Docker mode
- * Checks multiple indicators:
- * 1. CODING_DOCKER_MODE environment variable (set by launch-claude.sh)
- * 2. .docker-mode marker file in coding repo
- * 3. /.dockerenv (when running inside container)
- */
-function isDockerMode() {
-  // Environment variable takes precedence (set by launch scripts)
-  if (process.env.CODING_DOCKER_MODE === 'true') {
-    return true;
-  }
-
-  // Check for .docker-mode marker file
-  const codingRoot = process.env.CODING_REPO || scriptRoot;
-  if (existsSync(join(codingRoot, '.docker-mode'))) {
-    return true;
-  }
-
-  // Running inside container
-  return existsSync('/.dockerenv');
-}
-
-/**
  * Map of remediation actions to supervisord group:program names
  */
 const DOCKER_SERVICE_MAP = {
@@ -65,11 +42,8 @@ export class HealthRemediationActions {
     this.codingRoot = options.codingRoot || process.env.CODING_REPO || scriptRoot;
     this.psm = new ProcessStateManager({ codingRoot: this.codingRoot });
     this.debug = options.debug || false;
-    this.isDocker = isDockerMode();
 
-    if (this.isDocker) {
-      this.log('Docker mode detected - using supervisorctl for service restarts');
-    }
+    this.log('Using supervisorctl for service restarts');
 
     // Track healing attempts for cooldown enforcement
     this.healingAttempts = new Map(); // action -> { count, lastAttempt, cooldownUntil }
@@ -239,59 +213,11 @@ export class HealthRemediationActions {
 
   /**
    * Kill process holding database lock
-   * In Docker mode, VKB server legitimately holds the lock - skip killing
+   * VKB server legitimately holds the lock in Docker — skip killing.
    */
   async killLockHolder(details) {
-    if (this.isDocker) {
-      this.log('Docker mode: VKB server owns LevelDB lock legitimately - skipping kill');
-      return { success: true, message: 'Docker mode: lock holder is VKB server (expected)' };
-    }
-
-    const pid = details.lock_holder_pid;
-
-    if (!pid) {
-      return { success: false, message: 'No PID provided' };
-    }
-
-    try {
-      // Check if it's VKB server first (graceful shutdown)
-      const service = await this.psm.getService('vkb-server', 'global');
-
-      if (service && service.pid === pid) {
-        this.log('Lock holder is VKB server - attempting graceful shutdown');
-        try {
-          await execAsync('vkb server stop');
-          await this.sleep(2000); // Wait for shutdown
-          return { success: true, message: 'VKB server stopped gracefully' };
-        } catch (error) {
-          this.log('Graceful VKB shutdown failed, forcing kill', 'WARN');
-        }
-      }
-
-      // Force kill the process
-      this.log(`Killing lock holder process: ${pid}`);
-      process.kill(pid, 'SIGTERM');
-
-      // Wait and verify
-      await this.sleep(1000);
-
-      if (!this.isProcessAlive(pid)) {
-        return { success: true, message: `Process ${pid} terminated` };
-      }
-
-      // Try SIGKILL if SIGTERM didn't work
-      this.log(`SIGTERM failed, using SIGKILL on ${pid}`);
-      process.kill(pid, 'SIGKILL');
-      await this.sleep(500);
-
-      return {
-        success: !this.isProcessAlive(pid),
-        message: this.isProcessAlive(pid) ? 'Failed to kill process' : `Process ${pid} killed`
-      };
-
-    } catch (error) {
-      return { success: false, message: error.message };
-    }
+    this.log('VKB server owns LevelDB lock legitimately - skipping kill');
+    return { success: true, message: 'Lock holder is VKB server (expected)' };
   }
 
   /**
@@ -315,35 +241,7 @@ export class HealthRemediationActions {
   async restartVKBServer(details) {
     try {
       this.log('Restarting VKB server...');
-
-      if (this.isDocker) {
-        return await this.supervisorctlRestart('restart_vkb_server', 'http://localhost:8080/health');
-      }
-
-      // Stop if running
-      try {
-        await execAsync('vkb server stop', { timeout: 5000 });
-        await this.sleep(2000);
-      } catch (error) {
-        // Ignore stop errors (might not be running)
-      }
-
-      // Start VKB server
-      await execAsync('vkb server start --no-browser', { timeout: 10000 });
-      await this.sleep(3000);
-
-      // Verify it's running
-      const response = await fetch('http://localhost:8080/health', {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000)
-      });
-
-      if (response.ok) {
-        return { success: true, message: 'VKB server restarted successfully' };
-      } else {
-        return { success: false, message: `VKB server returned status ${response.status}` };
-      }
-
+      return await this.supervisorctlRestart('restart_vkb_server', 'http://localhost:8080/health');
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -355,44 +253,8 @@ export class HealthRemediationActions {
   async restartConstraintMonitor(details) {
     try {
       this.log('Restarting constraint monitor...');
-
-      if (this.isDocker) {
-        const port = process.env.CONSTRAINT_MONITOR_PORT || '3849';
-        return await this.supervisorctlRestart('restart_constraint_monitor', `http://localhost:${port}/health`);
-      }
-
-      // Find and kill existing process
-      try {
-        const { stdout } = await execAsync('lsof -ti:3031');
-        const pid = parseInt(stdout.trim());
-        if (pid) {
-          process.kill(pid, 'SIGTERM');
-          await this.sleep(1000);
-        }
-      } catch (error) {
-        // Port not in use, that's fine
-      }
-
-      // Start constraint monitor (assuming it's part of the MCP server)
-      await execAsync('npm run api:start', {
-        cwd: this.codingRoot,
-        timeout: 10000,
-        detached: true
-      });
-
-      await this.sleep(3000);
-
-      // Verify it's running
-      const response = await fetch('http://localhost:3031', {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000)
-      });
-
-      return {
-        success: response.ok,
-        message: response.ok ? 'Constraint monitor restarted' : 'Failed to verify restart'
-      };
-
+      const port = process.env.CONSTRAINT_MONITOR_PORT || '3849';
+      return await this.supervisorctlRestart('restart_constraint_monitor', `http://localhost:${port}/health`);
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -404,56 +266,8 @@ export class HealthRemediationActions {
   async restartDashboardServer(details) {
     try {
       this.log('Restarting dashboard server...');
-
-      if (this.isDocker) {
-        const port = process.env.HEALTH_DASHBOARD_PORT || '3032';
-        return await this.supervisorctlRestart('restart_dashboard_server', `http://localhost:${port}`);
-      }
-
-      // Find and kill existing process. The dashboard's SIGTERM handler
-      // drains in-flight consolidation and checkpoints the SQLite WAL
-      // before exiting — give it room. Without this grace the previous
-      // 1s sleep let supervisor SIGKILL land mid-write and corrupt WAL.
-      try {
-        const { stdout } = await execAsync('lsof -ti:3030');
-        const pid = parseInt(stdout.trim());
-        if (pid) {
-          process.kill(pid, 'SIGTERM');
-          // Poll for exit so we don't wait the full deadline when the
-          // process drains quickly.
-          const SHUTDOWN_DEADLINE_MS = 12000;
-          const POLL_MS = 500;
-          let waited = 0;
-          while (waited < SHUTDOWN_DEADLINE_MS) {
-            await this.sleep(POLL_MS);
-            waited += POLL_MS;
-            try { process.kill(pid, 0); } catch { break; /* exited */ }
-          }
-        }
-      } catch (error) {
-        // Port not in use, that's fine
-      }
-
-      // Start dashboard
-      await execAsync('PORT=3030 npm run dashboard', {
-        cwd: this.codingRoot,
-        timeout: 10000,
-        detached: true
-      });
-
-      await this.sleep(3000);
-
-      // Verify it's running
-      const response = await fetch('http://localhost:3030', {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000)
-      });
-
-      return {
-        success: response.ok,
-        message: response.ok ? 'Dashboard server restarted' : 'Failed to verify restart'
-      };
-
+      const port = process.env.HEALTH_DASHBOARD_PORT || '3032';
+      return await this.supervisorctlRestart('restart_dashboard_server', `http://localhost:${port}`);
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -462,45 +276,7 @@ export class HealthRemediationActions {
   async restartHealthAPI(details) {
     try {
       this.log('Restarting System Health API server...');
-
-      if (this.isDocker) {
-        return await this.supervisorctlRestart('restart_health_api', 'http://localhost:3033/api/health');
-      }
-
-      // Find and kill existing process
-      try {
-        const { stdout } = await execAsync('lsof -ti:3033');
-        const pid = parseInt(stdout.trim());
-        if (pid) {
-          process.kill(pid, 'SIGTERM');
-          await this.sleep(1000);
-        }
-      } catch (error) {
-        // Port not in use, that's fine
-      }
-
-      // Start health API server (from system-health-dashboard)
-      const healthDashboardDir = join(this.codingRoot, 'integrations/system-health-dashboard');
-      const cmd = `cd ${healthDashboardDir} && npm run api > /dev/null 2>&1 &`;
-
-      await execAsync(cmd, {
-        shell: '/bin/bash',
-        timeout: 5000
-      });
-
-      await this.sleep(2000);
-
-      // Verify it's running
-      const response = await fetch('http://localhost:3033/api/health', {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000)
-      });
-
-      return {
-        success: response.ok,
-        message: response.ok ? 'Health API server restarted' : 'Failed to verify restart'
-      };
-
+      return await this.supervisorctlRestart('restart_health_api', 'http://localhost:3033/api/health');
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -512,52 +288,8 @@ export class HealthRemediationActions {
   async restartHealthFrontend(details) {
     try {
       this.log('Restarting System Health Dashboard frontend...');
-
-      if (this.isDocker) {
-        const port = process.env.HEALTH_DASHBOARD_PORT || '3032';
-        return await this.supervisorctlRestart('restart_health_frontend', `http://localhost:${port}`);
-      }
-
-      // Find and kill existing process on port 3032
-      try {
-        const { stdout } = await execAsync('lsof -ti:3032');
-        const pid = parseInt(stdout.trim());
-        if (pid) {
-          process.kill(pid, 'SIGTERM');
-          await this.sleep(1000);
-        }
-      } catch (error) {
-        // Port not in use, that's fine
-      }
-
-      // Start frontend via npm run dev
-      const healthDashboardDir = join(this.codingRoot, 'integrations/system-health-dashboard');
-      const cmd = `cd ${healthDashboardDir} && npm run dev > /dev/null 2>&1 &`;
-
-      await execAsync(cmd, {
-        shell: '/bin/bash',
-        timeout: 5000,
-        env: {
-          ...process.env,
-          SYSTEM_HEALTH_DASHBOARD_PORT: '3032',
-          SYSTEM_HEALTH_API_PORT: '3033'
-        }
-      });
-
-      await this.sleep(3000);
-
-      // Verify it's running by checking if port is listening
-      try {
-        const { stdout } = await execAsync('lsof -ti:3032');
-        const isRunning = stdout.trim().length > 0;
-        return {
-          success: isRunning,
-          message: isRunning ? 'Health Dashboard frontend restarted' : 'Failed to verify restart'
-        };
-      } catch (error) {
-        return { success: false, message: 'Port 3032 not listening after restart' };
-      }
-
+      const port = process.env.HEALTH_DASHBOARD_PORT || '3032';
+      return await this.supervisorctlRestart('restart_health_frontend', `http://localhost:${port}`);
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -567,47 +299,8 @@ export class HealthRemediationActions {
    * Start Qdrant vector database
    */
   async startQdrant(details) {
-    try {
-      this.log('Starting Qdrant vector database...');
-
-      if (this.isDocker) {
-        this.log('Docker mode: Qdrant runs as a separate container - cannot restart from here');
-        return { success: false, message: 'Docker mode: Qdrant is managed by docker-compose externally' };
-      }
-
-      // Check if docker-compose file exists
-      const composeFile = `${this.codingRoot}/docker-compose.yml`;
-
-      // Start Qdrant via docker-compose
-      await execAsync(`docker-compose -f ${composeFile} up -d qdrant`, {
-        timeout: 30000
-      });
-
-      // Wait for Qdrant to be ready
-      await this.sleep(5000);
-
-      // Verify it's running
-      for (let i = 0; i < 5; i++) {
-        try {
-          const response = await fetch('http://localhost:6333/health', {
-            method: 'GET',
-            signal: AbortSignal.timeout(2000)
-          });
-
-          if (response.ok) {
-            return { success: true, message: 'Qdrant started successfully' };
-          }
-        } catch (error) {
-          // Retry
-          await this.sleep(2000);
-        }
-      }
-
-      return { success: false, message: 'Qdrant started but health check failed' };
-
-    } catch (error) {
-      return { success: false, message: error.message };
-    }
+    this.log('Qdrant runs as a separate container managed by docker-compose externally');
+    return { success: false, message: 'Qdrant is managed by docker-compose externally' };
   }
 
   /**
@@ -810,9 +503,8 @@ export class HealthRemediationActions {
 
       const statusFile = `${this.codingRoot}/.services-running.json`;
 
-      // Use Docker-aware ports
-      const constraintPort = this.isDocker ? (process.env.CONSTRAINT_MONITOR_PORT || '3849') : '3031';
-      const dashboardPort = this.isDocker ? (process.env.HEALTH_DASHBOARD_PORT || '3032') : '3030';
+      const constraintPort = process.env.CONSTRAINT_MONITOR_PORT || '3849';
+      const dashboardPort = process.env.HEALTH_DASHBOARD_PORT || '3032';
 
       // Gather health status from HTTP checks
       const vkbHealthy = await this.checkHttpHealth('http://localhost:8080/health', 2000);
@@ -940,8 +632,7 @@ export class HealthRemediationActions {
     try {
       this.log('Checking LLM CLI Proxy status...');
 
-      // In Docker mode, check via host.docker.internal
-      const proxyHost = this.isDocker ? 'host.docker.internal' : 'localhost';
+      const proxyHost = 'host.docker.internal';
       const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
       const proxyUrl = `http://${proxyHost}:${proxyPort}/health`;
 
@@ -1005,7 +696,7 @@ export class HealthRemediationActions {
 
       // Mastra is running — check LLM proxy connectivity (non-blocking per D-15)
       const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
-      const proxyHost = this.isDocker ? 'host.docker.internal' : 'localhost';
+      const proxyHost = 'host.docker.internal';
       const proxyHealthy = await this.checkHttpHealth(`http://${proxyHost}:${proxyPort}/health`, 3000);
 
       if (!proxyHealthy) {
