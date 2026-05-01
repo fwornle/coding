@@ -245,6 +245,7 @@ site/
 
 # Coding infrastructure runtime files (auto-added by coding startup)
 logs/
+!.specstory/logs/
 
 # Observation memory (mastra plugin)
 # Track config, ignore DB files (already covered by *.db rule)
