@@ -17,6 +17,19 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
+# Stop respawning daemons FIRST. Without this, killing the leaf next-server
+# below is futile — the global-service-coordinator's 15s health-check loop
+# respawns it within seconds of the kill. We wipe the watchdog before
+# touching its children so the kills stick long enough for Docker to bind.
+# The coordinator itself is slated for removal in Phase B; this is bridge
+# scaffolding.
+coordinator_pids=$(pgrep -f 'global-service-coordinator\.js' 2>/dev/null || true)
+if [ -n "$coordinator_pids" ]; then
+  echo "🔧 Stopping global-service-coordinator (PIDs: $coordinator_pids) so kills below stick"
+  echo "$coordinator_pids" | xargs kill 2>/dev/null || true
+  sleep 1
+fi
+
 # Extract host ports from "HOST:CONTAINER" mappings in docker-compose.yml
 host_ports=$(grep -oE '^\s+- "([0-9]+):' "$COMPOSE_FILE" | grep -oE '[0-9]+' || true)
 
