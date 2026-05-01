@@ -207,9 +207,45 @@ class GlobalServiceCoordinator extends EventEmitter {
   }
 
   /**
+   * Probe whether the dockerized coding-services container is running. When
+   * it is, this coordinator must NOT spawn native versions of the same
+   * services (constraint-dashboard on :3030, constraint-api on :3031) — they
+   * already run inside the container and double-spawning produces port
+   * conflicts and an endless kill/respawn dance.
+   *
+   * This is intentionally cheap (single docker CLI call, ~50ms) and silent
+   * on failure: if docker isn't installed or the daemon is down, we treat
+   * that as "not in Docker mode" and fall through to the native path.
+   *
+   * Phase A scaffolding — the whole coordinator will be deleted in Phase B
+   * when native mode is removed entirely. Until then this prevents the
+   * day-in-day-out port-3030 collision.
+   */
+  async isDockerCodingServicesRunning() {
+    try {
+      const { stdout } = await execAsync(
+        'docker ps --filter "name=^coding-services$" --filter "status=running" --format "{{.Names}}"',
+        { timeout: 3000 }
+      );
+      return stdout.trim() === 'coding-services';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Ensure global services are running
    */
   async ensureGlobalServices() {
+    // Skip native service spawning when Docker is providing them.
+    // Without this guard, the coordinator's watch loop respawns the native
+    // Next.js constraint-dashboard on :3030 within seconds of any kill,
+    // colliding with the Docker container's own bind on the same port.
+    if (await this.isDockerCodingServicesRunning()) {
+      this.log('Docker coding-services is running — skipping native service spawn (constraint-api, constraint-dashboard run in container)');
+      return true;
+    }
+
     // MCP services are started by claude-mcp via coding/bin/coding
     // But we also manage other global services like the constraint dashboard
     const globalServices = Object.entries(this.serviceDefinitions)
@@ -501,18 +537,34 @@ class GlobalServiceCoordinator extends EventEmitter {
    */
   async performHealthCheck() {
     this.debug('🔍 Performing global health check...');
-    
+
     let healthyCount = 0;
     let recoveredCount = 0;
-    
+
+    // Cache the Docker-mode probe for this tick so we don't re-shell out per
+    // service. Global services (constraint-api, constraint-dashboard) live
+    // inside the coding-services container when it's running — recovering
+    // native equivalents creates the port-3030 collision. See
+    // isDockerCodingServicesRunning() for the rationale.
+    const dockerActive = await this.isDockerCodingServicesRunning();
+
     // Check global services
     await this.ensureGlobalServices();
-    
+
     // Check all registered services
     for (const [serviceKey, service] of Object.entries(this.registry.services)) {
       const serviceDef = this.getServiceDefinition(serviceKey);
       if (!serviceDef) continue;
-      
+
+      // Skip recovery of global services when Docker provides them. Without
+      // this, registry entries from a pre-Docker start linger and the
+      // recovery loop tries to respawn them every 15s, fighting Docker for
+      // the same host ports.
+      if (dockerActive && serviceDef.type === 'global') {
+        this.debug(`Skipping ${serviceKey} health check — provided by Docker`);
+        continue;
+      }
+
       const isHealthy = await this.isServiceHealthy(serviceKey, serviceDef, service.projectPath);
 
       if (isHealthy) {
