@@ -54,26 +54,13 @@ _check_transition_lock() {
   fi
 }
 
-# Detect whether we should use Docker mode
+# Docker is the only supported deployment mode. The DOCKER_MODE / CODING_DOCKER_MODE
+# variables are kept for backwards-compatibility with downstream scripts and
+# log lines that key off them — they're effectively constants now and could
+# be folded out in a later cleanup pass.
 _detect_docker_mode() {
-  DOCKER_MODE=false
-
-  if [ -f "$CODING_REPO/.docker-mode" ]; then
-    DOCKER_MODE=true
-    _agent_log "🐳 Docker mode enabled (via .docker-mode marker)"
-  fi
-
-  if timeout 5 docker ps --format '{{.Names}}' 2>/dev/null | grep -q "coding-services"; then
-    DOCKER_MODE=true
-    _agent_log "🐳 Docker mode enabled (coding-services container running)"
-  fi
-
-  if [ "$CODING_DOCKER_MODE" = "true" ]; then
-    DOCKER_MODE=true
-    _agent_log "🐳 Docker mode enabled (via CODING_DOCKER_MODE env)"
-  fi
-
-  export CODING_DOCKER_MODE="$DOCKER_MODE"
+  DOCKER_MODE=true
+  export CODING_DOCKER_MODE=true
 }
 
 # Generate unique session ID
@@ -159,15 +146,11 @@ _load_env_files() {
   fi
 }
 
-# Check and start Docker
+# Check and start Docker — required (Docker is the only supported mode).
 _ensure_docker() {
   if ! ensure_docker_running; then
-    if [ "$DOCKER_MODE" = true ]; then
-      _agent_log "❌ Docker mode requires Docker to be running"
-      exit 1
-    fi
-    _agent_log "⚠️ WARNING: Continuing in DEGRADED mode without Docker/Qdrant"
-    _agent_log "   Knowledge base will work but without semantic search capabilities"
+    _agent_log "❌ Docker is required but not running. Start Docker Desktop and retry."
+    exit 1
   fi
 }
 
@@ -278,75 +261,63 @@ _resolve_port_conflicts() {
 
 # Start coding services (Docker or Native mode)
 _start_services() {
-  # Check if Node.js is available
   if ! command -v node &> /dev/null; then
     _agent_log "Error: Node.js is required but not found in PATH"
     exit 1
   fi
 
-  if [ "$DOCKER_MODE" = true ]; then
-    local docker_dir="$CODING_REPO/docker"
+  local docker_dir="$CODING_REPO/docker"
+  if [ ! -f "$docker_dir/docker-compose.yml" ]; then
+    _agent_log "Error: Docker compose file not found at $docker_dir/docker-compose.yml"
+    exit 1
+  fi
 
-    if [ ! -f "$docker_dir/docker-compose.yml" ]; then
-      _agent_log "Error: Docker compose file not found at $docker_dir/docker-compose.yml"
-      exit 1
-    fi
-
-    # Fast path: already healthy and ports are bound
-    # (skip this shortcut after --force, since we just tore everything down)
-    if [ "$CODING_FORCE_CLEAN" != "true" ] && curl -sf http://localhost:8080/health >/dev/null 2>&1; then
-      _agent_log "✅ coding-services already running and healthy - reusing existing containers"
-    else
-      # Detect stale container (running but ports not bound to host) — common after
-      # Docker Desktop crashes or port conflicts.  Fix it immediately instead of
-      # waiting 60s to fail.
-      if _container_has_unbound_ports; then
-        _resolve_port_conflicts "$docker_dir/docker-compose.yml"
-        _agent_log "🐳 Recreating coding-services (stale port bindings)..."
-        export CODING_REPO
-        docker compose -f "$docker_dir/docker-compose.yml" up -d --force-recreate coding-services
-      else
-        # Normal startup path
-        _resolve_port_conflicts "$docker_dir/docker-compose.yml"
-        _agent_log "🐳 Starting coding services via Docker..."
-        export CODING_REPO
-        if ! docker compose -f "$docker_dir/docker-compose.yml" up -d; then
-          _agent_log "Error: Failed to start Docker containers"
-          exit 1
-        fi
-      fi
-
-      _agent_log "⏳ Waiting for coding-services to be healthy..."
-      local max_wait=30
-      for i in $(seq 1 $max_wait); do
-        if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
-          _agent_log "✅ coding-services healthy after ${i}s"
-          break
-        fi
-        if [ "$i" -eq "$max_wait" ]; then
-          _agent_log "❌ coding-services health check failed after ${max_wait}s"
-          if _diagnose_unhealthy_services "$docker_dir"; then
-            break  # recovery succeeded
-          fi
-          exit 1
-        fi
-        sleep 1
-      done
-    fi
-
-    # Generate Docker MCP config if it doesn't exist or is outdated
-    if [ ! -f "$CODING_REPO/claude-code-mcp-docker.json" ] || \
-       [ "$CODING_REPO/docker/docker-compose.yml" -nt "$CODING_REPO/claude-code-mcp-docker.json" ]; then
-      _agent_log "Generating Docker MCP configuration..."
-      "$SCRIPT_DIR/generate-docker-mcp-config.sh" || _agent_log "Warning: Could not generate Docker MCP config"
-    fi
+  # Fast path: already healthy and ports are bound
+  # (skip this shortcut after --force, since we just tore everything down)
+  if [ "$CODING_FORCE_CLEAN" != "true" ] && curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    _agent_log "✅ coding-services already running and healthy - reusing existing containers"
   else
-    _agent_log "Starting coding services for ${AGENT_DISPLAY_NAME} (native mode)..."
-
-    if ! "$CODING_REPO/start-services.sh"; then
-      _agent_log "Error: Failed to start services"
-      exit 1
+    # Detect stale container (running but ports not bound to host) — common after
+    # Docker Desktop crashes or port conflicts. Fix it immediately instead of
+    # waiting 60s to fail.
+    if _container_has_unbound_ports; then
+      _resolve_port_conflicts "$docker_dir/docker-compose.yml"
+      _agent_log "🐳 Recreating coding-services (stale port bindings)..."
+      export CODING_REPO
+      docker compose -f "$docker_dir/docker-compose.yml" up -d --force-recreate coding-services
+    else
+      _resolve_port_conflicts "$docker_dir/docker-compose.yml"
+      _agent_log "🐳 Starting coding services via Docker..."
+      export CODING_REPO
+      if ! docker compose -f "$docker_dir/docker-compose.yml" up -d; then
+        _agent_log "Error: Failed to start Docker containers"
+        exit 1
+      fi
     fi
+
+    _agent_log "⏳ Waiting for coding-services to be healthy..."
+    local max_wait=30
+    for i in $(seq 1 $max_wait); do
+      if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+        _agent_log "✅ coding-services healthy after ${i}s"
+        break
+      fi
+      if [ "$i" -eq "$max_wait" ]; then
+        _agent_log "❌ coding-services health check failed after ${max_wait}s"
+        if _diagnose_unhealthy_services "$docker_dir"; then
+          break  # recovery succeeded
+        fi
+        exit 1
+      fi
+      sleep 1
+    done
+  fi
+
+  # Generate Docker MCP config if it doesn't exist or is outdated
+  if [ ! -f "$CODING_REPO/claude-code-mcp-docker.json" ] || \
+     [ "$CODING_REPO/docker/docker-compose.yml" -nt "$CODING_REPO/claude-code-mcp-docker.json" ]; then
+    _agent_log "Generating Docker MCP configuration..."
+    "$SCRIPT_DIR/generate-docker-mcp-config.sh" || _agent_log "Warning: Could not generate Docker MCP config"
   fi
 
   # Brief wait for services to stabilize
@@ -469,9 +440,7 @@ launch_agent() {
   fi
 
   # 7. Early Docker launch (parallel with setup)
-  if [ "$DOCKER_MODE" = true ]; then
-    early_docker_launch
-  fi
+  early_docker_launch
 
   # 8. Session ID + register
   _generate_session_id
@@ -533,11 +502,7 @@ launch_agent() {
   agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
 
   # 16. Log mode info
-  if [ "$DOCKER_MODE" = true ]; then
-    _agent_log "Docker mode: MCP servers will use stdio-proxy → SSE connections to Docker"
-  else
-    _agent_log "Native mode: MCP servers will run as local processes"
-  fi
+  _agent_log "MCP servers run via stdio-proxy → SSE connections to Docker"
 
   # 17. Set env vars
   _set_agent_env_vars
