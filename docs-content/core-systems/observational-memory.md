@@ -73,7 +73,7 @@ Access at `http://localhost:3032/observations`.
 - **LLM metadata** -- each card shows `model@provider` and token counts when expanded
 - **Markdown rendering** -- bold, headers, inline code rendered in expanded view
 - **ESC / click-outside** -- closes expanded observation cards
-- **Redaction tokens styled inline** -- markers like `&lt;USER_ID_REDACTED&gt;`, `&lt;AWS_SECRET_REDACTED&gt;`, `&lt;COMPANY_NAME_REDACTED&gt;` are rendered as smaller, sky-blue spans so they don't dominate the surrounding text. The same styling applies on the digests and insights pages
+- **Redaction tokens styled inline** -- markers like `<USER_ID_REDACTED>`, `<AWS_SECRET_REDACTED>`, `<COMPANY_NAME_REDACTED>` are rendered as smaller, sky-blue spans so they don't dominate the surrounding text. The same styling applies on the digests and insights pages
 
 ![Observation Viewer — expanded observation with structured summary](../images/observation-viewer-item.png)
 
@@ -110,7 +110,7 @@ The VKB Node Details panel surfaces mixed-topic entities with an amber warning a
 
 ### Redaction sanitization
 
-`ObservationSanitizer` repairs legacy `&lt;AWS_SECRET_REDACTED&gt;frag` corruption that an over-broad earlier regex left in stored observations. It uses sibling fields/entries as a recovery oracle (e.g. when a `modifiedFiles` list contains both `server.js` and `&lt;AWS_SECRET_REDACTED&gt;er.js`, the basename match restores the path). Active code paths run the sanitizer before persisting; a one-time DB sweep is available via `scripts/sanitize-observations.js`.
+`ObservationSanitizer` repairs legacy `<AWS_SECRET_REDACTED>frag` corruption that an over-broad earlier regex left in stored observations. It uses sibling fields/entries as a recovery oracle (e.g. when a `modifiedFiles` list contains both `server.js` and `<AWS_SECRET_REDACTED>er.js`, the basename match restores the path). Active code paths run the sanitizer before persisting; a one-time DB sweep is available via `scripts/sanitize-observations.js`.
 
 The matching redaction *pattern* fix landed in `redaction-patterns.json`: `aws_secret_standalone` now uses lookarounds — a negative lookbehind and lookahead around `[A-Za-z0-9+/]{40}` — so a 40-char run inside a longer base64-like path can't be eaten as a "secret" anymore.
 
