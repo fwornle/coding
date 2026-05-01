@@ -6,6 +6,11 @@
 	],
 	"settings": {
 		"debug.console.acceptSuggestionOnEnter": "off",
+		"git.repositoryScanIgnoredFolders": [
+			"node_modules",
+			".specstory"
+		],
+		"git.openRepositoryInParentFolders": "never",
 		"workbench.colorCustomizations": {
 			"activityBar.activeBackground": "#1f6fd0",
 			"activityBar.background": "#1f6fd0",
