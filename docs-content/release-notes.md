@@ -73,7 +73,7 @@ Three guards now run in `persistence-agent.ts`:
 
 ### Sanitizer + redaction-pattern correction
 
-- `ObservationSanitizer` repairs legacy `&lt;AWS_SECRET_REDACTED&gt;frag` corruption using sibling fields as the recovery oracle (e.g. matches by basename across `modifiedFiles` arrays).
+- `ObservationSanitizer` repairs legacy `<AWS_SECRET_REDACTED>frag` corruption using sibling fields as the recovery oracle (e.g. matches by basename across `modifiedFiles` arrays).
 - The `aws_secret_standalone` regex got lookarounds so a 40-char run inside a base64-like path can no longer be eaten as a "secret".
 
 See [Observational Memory](core-systems/observational-memory.md).
@@ -92,7 +92,7 @@ See [Observational Memory](core-systems/observational-memory.md).
 
 | Fix | Symptom |
 |-----|---------|
-| `escapeHtml` pre-pass in `renderMarkdown` | `&lt;USER_ID_REDACTED&gt;` rendered as an unknown HTML element and disappeared, producing visually broken paths like `/Users//Agentic/...` |
+| `escapeHtml` pre-pass in `renderMarkdown` | `<USER_ID_REDACTED>` rendered as an unknown HTML element and disappeared, producing visually broken paths like `/Users//Agentic/...` |
 | Redaction-token styling | All `<*_REDACTED>` markers now render as smaller (`text-[0.78em]`) sky-blue spans across observations, digests, and insights |
 | `renderWithRedactionStyling` helper | Plain-text path renders (digest `filesTouched`, observation compact-row summaries) get the same treatment |
 | VKB mixed-topic panel | Entities with `metadata.mixed_topics: true` get an amber warning in the Node Details sidebar |

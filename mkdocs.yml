@@ -74,7 +74,6 @@ nav:
     - Installation: getting-started/installation.md
     - Verify & Repair: getting-started/verify-repair.md
     - Configuration: getting-started/configuration.md
-    - Docker Mode: getting-started/docker-mode.md
   - Core Systems:
     - Overview: core-systems/index.md
     - Live Session Logging: core-systems/lsl.md
@@ -107,7 +106,6 @@ nav:
     - VKB Visualization: guides/vkb-visualization.md
     - Knowledge Workflows: guides/knowledge-workflows.md
     - Skills System: guides/skills-system.md
-    - Docker Mode Setup: guides/docker-mode-setup.md
   - Reference:
     - Overview: reference/index.md
     - Commands: reference/commands.md
