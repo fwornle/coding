@@ -13,9 +13,7 @@
 		"git.ignoredRepositories": [
 			".specstory/history"
 		],
-		"git.scanRepositories": [
-			"."
-		],
+		"git.repositoryScanMaxDepth": 0,
 		"workbench.colorCustomizations": {
 			"activityBar.activeBackground": "#1f6fd0",
 			"activityBar.background": "#1f6fd0",
