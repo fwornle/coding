@@ -96,6 +96,18 @@ function _attemptRecovery(dbPath) {
   // Strategy 3: dump + reimport via sqlite3 CLI
   const backupPath = dbPath + '.corrupted-' + Date.now();
   const recoveredPath = dbPath + '.recovered';
+  // Marker tells sibling processes (transcript monitor, prompt hook) that
+  // any health-file staleness during this window is an expected stall, not
+  // a failure. Cleared in finally{}; auto-expires via timestamp if we crash.
+  const recoveringMarker = path.join(path.dirname(dbPath), 'db-recovering.json');
+  try {
+    fs.writeFileSync(recoveringMarker, JSON.stringify({
+      pid: process.pid,
+      startedAt: Date.now(),
+      reason: 'SafeDatabase strategy-3 dump/reimport',
+      dbPath,
+    }));
+  } catch { /* best effort */ }
   try {
     // Use CLI sqlite3 for dump — it handles some corruption better than the library
     execSync(`sqlite3 "${dbPath}" ".dump" | sqlite3 "${recoveredPath}"`, {
@@ -119,6 +131,8 @@ function _attemptRecovery(dbPath) {
     }
   } catch (err) {
     process.stderr.write(`[SafeDatabase] CLI dump recovery failed: ${err.message}\n`);
+  } finally {
+    try { if (fs.existsSync(recoveringMarker)) fs.unlinkSync(recoveringMarker); } catch { /* ok */ }
   }
 
   // Clean up failed recovery attempt
