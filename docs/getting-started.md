@@ -204,23 +204,16 @@ brew install --cask docker
 curl -fsSL https://get.docker.com | sh
 ```
 
-### Enable Docker Mode
+### Launch
 
 ```bash
-# Create marker file (one-time setup)
-touch .docker-mode
-
-# That's it! Now just launch Claude
 coding --claude
 ```
 
 The `coding --claude` command automatically:
-1. Detects Docker mode via the `.docker-mode` marker file
-2. Starts all containers via Docker Compose
-3. Waits for health checks to pass
-4. Launches Claude with the Docker MCP configuration
-
-**Alternative**: You can also set `export CODING_DOCKER_MODE=true` instead of the marker file.
+1. Starts all containers via Docker Compose
+2. Waits for health checks to pass
+3. Launches Claude wired to the containerized MCP servers
 
 ### Verify Health (Optional)
 
@@ -244,19 +237,6 @@ curl http://localhost:3849/health  # constraint-monitor
 | Qdrant | 6333/6334 | HTTP/gRPC |
 | Redis | 6379 | TCP |
 | Memgraph | 7687/3100 | Bolt/HTTP |
-
-### Switch Between Modes
-
-```bash
-# Enable Docker mode
-touch .docker-mode
-coding --claude   # Services start automatically
-
-# Disable Docker mode (return to native)
-rm .docker-mode
-docker compose -f docker/docker-compose.yml down  # Stop containers
-coding --claude   # Now runs in native mode
-```
 
 See [Docker Deployment Guide](../docker/README.md) for detailed configuration.
 

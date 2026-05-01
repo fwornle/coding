@@ -499,18 +499,11 @@ lsof -i :8080
 # Check Docker status
 docker info
 
-# Docker mode: containers are inside coding-services
+# Containers live inside the coding-services stack
 docker ps --filter "name=coding"
 
-# Native mode: check standalone constraint-monitor containers
-docker ps --filter "name=constraint-monitor"
-
-# Check docker-compose logs (native mode only)
-cd integrations/mcp-constraint-monitor
-docker-compose logs
-
-# Verify Docker mode detection
-echo $CODING_DOCKER_MODE
+# Container logs
+docker compose -f docker/docker-compose.yml logs coding-services
 ```
 
 ### Services Keep Failing

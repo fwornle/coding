@@ -125,9 +125,6 @@ Native mode runs MCP servers as direct Node.js processes. Use this if you prefer
 git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
 cd ~/Agentic/coding
 
-# Remove Docker mode marker (ensures native mode)
-rm -f .docker-mode
-
 # Run installer
 ./install.sh
 
@@ -135,52 +132,7 @@ rm -f .docker-mode
 source ~/.bashrc  # or ~/.zshrc
 ```
 
-### Native vs Docker Comparison
-
-| Aspect | Docker Mode | Native Mode |
-|--------|-------------|-------------|
-| **Isolation** | Full container isolation | Runs in your environment |
-| **Persistence** | Services survive restarts | Restarted each session |
-| **Resources** | Higher (Docker overhead) | Lower |
-| **Setup** | Requires Docker | Node.js only |
-| **Browser sharing** | Multiple sessions share browser | Per-session browser |
-| **Debugging** | Container logs | Direct process logs |
-
----
-
-## Switching Modes
-
-You can switch between Docker and Native modes at any time.
-
-### Docker to Native
-
-```bash
-coding --switch-to-native
-```
-
-Or manually:
-
-```bash
-rm -f .docker-mode
-docker compose -f docker/docker-compose.yml down
-```
-
-### Native to Docker
-
-```bash
-coding --switch-to-docker
-```
-
-Or manually:
-
-```bash
-touch .docker-mode
-./install.sh  # Rebuilds Docker config
-```
-
-![Mode Transition](../images/docker-mode-state-machine.png)
-
-For detailed transition documentation, see [Docker Mode Setup Guide](../guides/docker-mode-setup.md).
+The installer requires Docker — there is no native fallback.
 
 ---
 
@@ -191,7 +143,7 @@ For detailed transition documentation, see [Docker Mode Setup Guide](../guides/d
 | `coding` command | `~/Agentic/coding/bin/` | Launch Claude with all integrations |
 | `vkb` command | `~/Agentic/coding/bin/` | View Knowledge Base |
 | `ukb` command | `~/Agentic/coding/bin/` | Update Knowledge Base |
-| MCP Servers | Docker or native | Semantic Analysis, Constraints, etc. |
+| MCP Servers | Docker | Semantic Analysis, Constraints, etc. |
 | Claude Hooks | `~/.claude/settings.json` | LSL monitoring, constraint checks |
 | Knowledge Store | `.data/knowledge-graph/` | Graph database |
 | Session Logs | `.specstory/history/` | LSL files |
@@ -279,6 +231,4 @@ rm -f .docker-mode .transition-in-progress
 
 ## Related Documentation
 
-- [Docker Mode Details](docker-mode.md) - In-depth Docker configuration
-- [Docker Mode Setup Guide](../guides/docker-mode-setup.md) - Advanced transition scenarios
 - [Troubleshooting](../reference/troubleshooting.md) - Common issues and solutions

@@ -231,5 +231,4 @@ git submodule update --remote integrations/mcp-server-semantic-analysis
 ## Related Documentation
 
 - [Configuration](../getting-started/configuration.md) - API keys and settings
-- [Docker Mode](../getting-started/docker-mode.md) - Container deployment
 - [Data Flow](../architecture/data-flow.md) - Integration data flow

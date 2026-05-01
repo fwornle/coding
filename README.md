@@ -27,37 +27,21 @@ llm "Explain this error message"
 cat file.js | llm "Review this code"
 ```
 
-### 🐳 Docker Deployment (Optional)
+### 🐳 Docker Deployment
 
-For containerized deployment with persistent services:
+The coding stack runs in Docker — there is no native fallback.
 
 ```bash
-# Switch to Docker mode (safe transition with health monitoring)
-coding --switch-to-docker
-
-# Start Claude or CoPilot - Docker services are already running
+# Start Claude or CoPilot — Docker services start automatically
 coding --claude
 coding --copilot
-
-# Check current mode
-coding --mode-status
 ```
-
-The transition system ensures safe mode switching with:
-- Automatic pause of health monitors during transition
-- Graceful service shutdown with data flush
-- Automatic rollback on failure
-- Multi-session support
-- Docker-aware health verification (CGR cache, service restarts)
 
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers, no duplicate containers when switching agents.
 
-**MCP Configuration**: Automatically selects the correct MCP config based on deployment mode:
-- Docker mode: Uses stdio-proxy → SSE bridge to communicate with containerized servers
-- Native mode: Runs MCP servers directly as Node.js processes
-- Configuration selection is centralized in `claude-mcp-launcher.sh`
+**MCP Configuration**: `claude-mcp-launcher.sh` wires the stdio-proxy → SSE bridge so the agent talks to the containerized MCP servers.
 
-**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles Docker mode detection, service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) treats Redis, Qdrant, and Memgraph as built-ins of the coding-services container, so it never spawns duplicates.
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
@@ -80,21 +64,13 @@ All agents get the same infrastructure: tmux session wrapping, status line, heal
 
 See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new agents.
 
-**Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
-- CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
-- Service restarts use Docker-appropriate commands
-- Dashboard shows cached commit info instead of staleness count
-
-**To switch back to native mode**:
-```bash
-coding --switch-to-native
-```
+**Health System**: The health verifier reads cached commit info from `cache-metadata.json` (no `.git` inside the container) and uses supervisorctl for service restarts.
 
 The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools like Claude Code and GitHub Copilot.
 
 ![Docker Container Architecture](docs/images/dockerized-system-architecture.png)
 
-See [Architecture Report](docs/architecture-report.md) for full system overview, [Docker Mode Transition](docs/docker-mode-transition.md) for switching details, and [Docker Deployment Guide](docker/README.md) for container configuration.
+See [Architecture Report](docs/architecture-report.md) for full system overview, and the [Docker Deployment Guide](docker/README.md) for container configuration.
 
 ### Environment Resilience
 
@@ -470,7 +446,6 @@ Copyright © 2025 Frank Wornle
 - **Skills System**: [docs/skills-system.md](docs/skills-system.md)
 - **Adding Agents**: [docs/agent-integration-guide.md](docs/agent-integration-guide.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
-- **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)
 - **System Overview**: [docs/system-overview.md](docs/system-overview.md)
 - **Core Systems**: [docs/core-systems/](docs/core-systems/)

@@ -373,7 +373,7 @@ coding --lsl-status
 - `AGENT_COMMAND="$CODING_REPO/bin/claude-mcp"` — launches via MCP wrapper
 - `AGENT_ENABLE_PIPE_CAPTURE=false` — Claude has native transcript support
 - `agent_check_requirements()` — checks MCP sync status
-- `agent_pre_launch()` — logs Docker/native mode info
+- `agent_pre_launch()` — logs container startup info
 
 ### GitHub Copilot CLI (`config/agents/copilot.sh`)
 

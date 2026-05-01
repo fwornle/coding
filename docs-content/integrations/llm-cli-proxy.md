@@ -217,4 +217,3 @@ See the [`@rapid/llm-proxy` package documentation](https://bmw.ghe.com/adpnext-a
 
 - [LLM Architecture](../architecture/llm-architecture.md) — Unified LLM provider layer
 - [LLM Providers Guide](../guides/llm-providers.md) — Provider configuration
-- [Docker Mode](../getting-started/docker-mode.md) — Docker deployment

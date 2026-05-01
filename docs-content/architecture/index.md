@@ -80,11 +80,7 @@ MCP servers run as native stdio processes managed by Claude CLI.
 
 MCP servers run as HTTP/SSE services in containers.
 
-- **Pros**: Persistent services, shared browser, better isolation
-- **Cons**: Docker required, higher memory
-- **Best for**: Teams, multi-session workflows
-
-See [Docker Mode](../getting-started/docker-mode.md) for setup details.
+All services run in containers, so Docker Desktop must be installed and running. The stack is launched automatically by `coding --claude`. See the [Docker Deployment Guide](https://github.com/fwornle/coding/blob/main/docker/README.md) for container details.
 
 ## Development Patterns
 

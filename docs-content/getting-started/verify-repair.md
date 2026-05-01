@@ -219,22 +219,6 @@ mkdir -p .data/knowledge-graph
 ukb full
 ```
 
-### Docker Mode Not Detected
-
-**Symptoms**: Services run in native mode despite Docker installed
-
-**Fix**:
-```bash
-# Create Docker mode marker
-touch .docker-mode
-
-# Verify
-ls -la .docker-mode
-
-# Restart
-coding
-```
-
 ---
 
 ## Repair Commands
@@ -248,7 +232,7 @@ coding
 This will:
 1. Check all prerequisites
 2. Reinstall missing components
-3. Rebuild Docker containers (if Docker mode)
+3. Rebuild Docker containers
 4. Reset configuration to defaults
 5. Restart all services
 

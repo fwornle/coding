@@ -188,14 +188,6 @@ Within a Claude Code session:
 
     [:octicons-arrow-right-24: Configure](configuration.md)
 
--   :material-docker:{ .lg .middle } **Docker Mode**
-
-    ---
-
-    Deep dive into Docker deployment
-
-    [:octicons-arrow-right-24: Docker details](docker-mode.md)
-
 -   :material-wrench:{ .lg .middle } **Verify & Repair**
 
     ---

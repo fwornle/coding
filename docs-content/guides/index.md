@@ -52,14 +52,6 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   </div>
 </a>
 
-<a href="docker-mode-setup/" class="thumbnail-card">
-  <img src="../images/docker-mode-architecture.png" alt="Docker Mode">
-  <div class="card-content">
-    <h3>Docker Mode Setup</h3>
-    <p>Complete transition procedure, mode detection, port mapping, and troubleshooting</p>
-  </div>
-</a>
-
 </div>
 
 ## When to Use These Guides

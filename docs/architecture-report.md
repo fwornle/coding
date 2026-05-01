@@ -230,17 +230,6 @@ start_qdrant             → SKIPPED (external container)
 
 ---
 
-## Docker Mode Transition
-
-The system supports seamless switching between native (launchd) and Docker modes:
-
-- **Native Mode**: Services run directly on macOS via launchd agents
-- **Docker Mode**: All services containerized in the stack above
-- **Transition**: Managed by `docker-mode-transition.js` with lock-based coordination
-- **Indicator**: Status line shows `[🐳]` when in Docker mode
-
----
-
 ## Resource Usage (observed)
 
 | Container | CPU | Memory | Notes |
