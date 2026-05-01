@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MarkdownText, renderWithRedactionStyling } from '@/components/markdown-text'
 import { ConsolidationProgress, type InflightInfo, type ConsolidationStatusBase } from '@/components/consolidation-progress'
+import { ClipboardButton } from '@/components/clipboard-button'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -38,6 +39,9 @@ const AGENT_COLORS: Record<string, string> = {
 }
 
 function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpanded: boolean; onToggle: () => void }) {
+  const clipboardText = `# ${digest.theme}\n\n${digest.summary}${
+    digest.filesTouched.length > 0 ? `\n\nFiles: ${digest.filesTouched.join(', ')}` : ''
+  }`
   return (
     <Card
       className={`border-l-4 ${digest.quality === 'high' ? 'border-l-amber-500' : 'border-l-border'} cursor-pointer hover:bg-accent/30 transition-colors`}
@@ -57,6 +61,7 @@ function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpand
                   {a}
                 </Badge>
               ))}
+              <ClipboardButton text={clipboardText} className="ml-auto" title="Copy digest" />
             </div>
 
             {isExpanded && (

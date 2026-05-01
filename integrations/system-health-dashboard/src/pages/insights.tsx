@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MarkdownText } from '@/components/markdown-text'
 import { ConsolidationProgress, type InflightInfo } from '@/components/consolidation-progress'
+import { ClipboardButton } from '@/components/clipboard-button'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -44,6 +45,7 @@ function confidenceBar(c: number): string {
 function InsightCard({ insight }: { insight: Insight }) {
   const updated = new Date(insight.lastUpdated)
   const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000)
+  const clipboardText = `# ${insight.topic}\n\nConfidence: ${Math.round(insight.confidence * 100)}%\n\n${insight.summary}`
 
   return (
     <Card className="hover:bg-accent/20 transition-colors">
@@ -54,6 +56,7 @@ function InsightCard({ insight }: { insight: Insight }) {
             <Badge variant="outline" className={`text-xs ${confidenceColor(insight.confidence)}`}>
               {Math.round(insight.confidence * 100)}%
             </Badge>
+            <ClipboardButton text={clipboardText} title="Copy insight" />
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">

@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AgentBadge } from '@/components/agent-badge'
 import { renderWithRedactionStyling } from '@/components/markdown-text'
+import { ClipboardButton } from '@/components/clipboard-button'
 
 const AGENT_BORDER_COLORS: Record<string, string> = {
   claude: 'border-l-blue-500',
@@ -170,6 +171,13 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
                 <span className="text-[10px] text-muted-foreground/60 font-mono ml-auto">
                   {llmTag}
                 </span>
+              )}
+              {isExpanded && (
+                <ClipboardButton
+                  text={observation.content}
+                  className={llmTag ? '' : 'ml-auto'}
+                  title="Copy observation"
+                />
               )}
             </div>
             {!isExpanded && (
