@@ -35,10 +35,10 @@ class ClassificationLogger {
     if (options.logDir) {
       this.logDir = path.resolve(options.logDir);
     } else if (projectPath) {
-      this.logDir = path.join(projectPath, '.specstory', 'logs', 'classification');
+      this.logDir = path.join(projectPath, '.specstory', 'history', 'logs', 'classification');
     } else {
       // Fallback to coding repo (should rarely happen)
-      this.logDir = path.join(codingRepo, '.specstory', 'logs', 'classification');
+      this.logDir = path.join(codingRepo, '.specstory', 'history', 'logs', 'classification');
     }
 
     this.projectName = options.projectName || 'unknown';
@@ -91,7 +91,7 @@ class ClassificationLogger {
       }
 
       // Read coding markdown files (from-<project> postfix)
-      const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+      const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
       if (fs.existsSync(codingLogDir)) {
         const codingFiles = fs.readdirSync(codingLogDir)
           .filter(f => f.endsWith(`_from-${this.projectName}.md`));
@@ -351,7 +351,7 @@ class ClassificationLogger {
       // Skip if no new decisions AND all required markdown files exist
       if (currentCount === previousCount && this.finalizedWindows.has(fullWindow)) {
         const localFileExists = localDecisions.length === 0 || fs.existsSync(path.join(this.logDir, `${fullWindow}.md`));
-        const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+        const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
         const codingFileExists = codingDecisions.length === 0 || fs.existsSync(path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`));
         if (localFileExists && codingFileExists) {
           continue;
@@ -388,7 +388,7 @@ class ClassificationLogger {
 
       // Generate CODING classification log (stored in coding repo with _from-<project> postfix)
       if (codingDecisions.length > 0) {
-        const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+        const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
         fs.mkdirSync(codingLogDir, { recursive: true });
 
         const codingFile = path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
@@ -508,7 +508,7 @@ class ClassificationLogger {
           // Check if the calculated file exists
           const historyDir = decision.classification.isCoding
             ? path.join(this.codingRepo, '.specstory', 'history')
-            : path.join(this.logDir, '../../history');
+            : path.join(this.logDir, '../..');
           const calculatedPath = path.join(historyDir, calculatedFilename);
 
           if (fs.existsSync(calculatedPath)) {
@@ -516,9 +516,9 @@ class ClassificationLogger {
           }
         }
 
-        const lslFilePath = decision.classification.isCoding
-          ? `../../../history/${lslFileName}`  // CODING logs are in coding/.specstory/logs/classification, LSL in coding/.specstory/history
-          : `../../history/${lslFileName}`;     // LOCAL logs are in project/.specstory/logs/classification, LSL in project/.specstory/history
+        // Classification logs now live at .specstory/history/logs/classification/,
+        // LSL files at .specstory/history/ — both branches resolve up two levels.
+        const lslFilePath = `../../${lslFileName}`;
         const lslLink = lslFileName !== 'pending' ? `[${lslFileName}](${lslFilePath}#${decision.promptSetId})` : `\`${lslFileName}\``;
 
         // Make prompt set heading clickable
@@ -691,7 +691,7 @@ class ClassificationLogger {
       if (layer0Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer0Coding) {
-          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -729,7 +729,7 @@ class ClassificationLogger {
       if (layer1Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer1Coding) {
-          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -767,7 +767,7 @@ class ClassificationLogger {
       if (layer2Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer2Coding) {
-          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -805,7 +805,7 @@ class ClassificationLogger {
       if (layer3Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer3Coding) {
-          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -843,7 +843,7 @@ class ClassificationLogger {
       if (layer4Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer4Coding) {
-          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -876,7 +876,7 @@ class ClassificationLogger {
       // Create appropriate links for CODING and LOCAL
       const links = [];
       if (codingCount > 0) {
-        const codingFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+        const codingFile = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
         links.push(`[CODING: ${codingCount}](${codingFile})`);
       }
       if (localCount > 0) {
@@ -908,7 +908,7 @@ class ClassificationLogger {
             ? path.basename(decision.lslFile)
             : `${window}_from-${this.projectName}.md`;
           const lslFilePath = `file://${this.codingRepo}/.specstory/history/${lslFileName}`;
-          const classificationFilePath = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const classificationFilePath = `file://${this.codingRepo}/.specstory/history/logs/classification/${window}_from-${this.projectName}.md`;
 
           markdown += `- [${promptSetId}](${lslFilePath}#${promptSetId}) `;
           markdown += `([classification](${classificationFilePath}#prompt-set-${promptSetId})) `;

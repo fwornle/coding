@@ -2643,8 +2643,9 @@ setup_api_admin_keys() {
 # Main installation flow
 # Configure the private session-history side-repo.
 #
-# The .specstory/history/, .specstory/logs/classification/ and
-# .specstory/archive/ trees contain verbatim Claude session transcripts
+# The .specstory/history/ and .specstory/archive/ trees contain verbatim
+# Claude session transcripts (the history repo also tracks logs/classification/
+# inside its tree)
 # (full prompts, full responses, file paths, occasionally secrets that
 # slipped past redaction). They are .gitignore'd in this public repo and
 # live in a SEPARATE PRIVATE repo so conversation content can't leak via
@@ -2671,8 +2672,7 @@ setup_history_repo() {
   PRIVATE SESSION-HISTORY REPO
 
   This repo writes verbatim Claude session transcripts into
-    .specstory/history/
-    .specstory/logs/classification/
+    .specstory/history/                       (LSL transcripts + classification)
     .specstory/archive/
 
   These trees are .gitignore'd here — they live in a SEPARATE PRIVATE
@@ -2732,7 +2732,7 @@ EOF
     else
         # First-run before init-history.sh has been chmod'd or in a partial
         # checkout — make sure the dirs exist so we don't break later steps.
-        mkdir -p "$hist_dir" "$CODING_REPO/.specstory/logs/classification" "$CODING_REPO/.specstory/archive"
+        mkdir -p "$hist_dir" "$hist_dir/logs/classification" "$CODING_REPO/.specstory/archive"
     fi
 
     # Detect the "I have local content but no git checkout" case and surface

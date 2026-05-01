@@ -2,9 +2,10 @@
 # bin/init-history.sh — ensure private session-history dirs exist.
 #
 # Called by bin/coding on every launch and by install.sh during setup. The
-# .specstory/history/ + .specstory/logs/classification/ + .specstory/archive/
-# trees are excluded from the public 'coding' repo and live in a separate
-# private repo (see install.sh and the CODING_HISTORY_REPO entry in .env).
+# .specstory/history/ + .specstory/archive/ trees are excluded from the
+# public 'coding' repo and live in a separate private repo (see install.sh
+# and the CODING_HISTORY_REPO entry in .env). Classification logs now live
+# inside the private repo at .specstory/history/logs/classification/.
 #
 # Behaviour:
 #   - If CODING_HISTORY_REPO is configured AND .specstory/history/ has no
@@ -19,7 +20,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 HIST_DIR=".specstory/history"
-CLASS_DIR=".specstory/logs/classification"
+CLASS_DIR=".specstory/history/logs/classification"
 ARCH_DIR=".specstory/archive"
 
 # Source CODING_HISTORY_REPO from .env without polluting the parent shell.

@@ -19,8 +19,9 @@ claude-code-mcp-docker.json
 # Logs
 *.log
 /logs/
-# Note: Use /logs/ (with leading slash) to only match top-level logs directory
-# This allows .specstory/logs/classification/ to be tracked via negation below
+# Note: Use /logs/ (with leading slash) to only match top-level logs directory.
+# Classification logs now live in the private history repo at
+# .specstory/history/logs/classification/ (covered by line 53).
 
 # Temporary files
 *.tmp
@@ -154,9 +155,9 @@ integrations/mcp-server-browserbase/
 .specstory/validation-report.json
 .specstory/change-log.json
 .specstory/logs/*
-# .specstory/logs/classification/ used to be tracked, but the per-session
-# classification decisions cross-reference history/ files by path — equally
-# sensitive in scope. Now also private (covered by .specstory/logs/* above).
+# Classification logs moved into the private history repo at
+# .specstory/history/logs/classification/ (covered by .specstory/history/ at line 53).
+# .specstory/logs/ itself remains for runtime artifacts (system.log, metrics-*.json).
 .logs/
 scripts/monitoring-*.log
 scripts/watchdog-*.log
