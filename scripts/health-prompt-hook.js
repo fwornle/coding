@@ -294,13 +294,18 @@ function outputHealthContext(healthStatus) {
         const ageSeconds = Math.floor(healthStatus.ageMs / 1000);
         const criticalCount = healthStatus.status.criticalCount || 0;
         const violations = healthStatus.status.violationCount || 0;
+        // Trust the verifier's verdict: when it has classified the run as
+        // healthy (and isn't currently auto-healing), accepted/non-critical
+        // violations should not produce a permanent yellow banner.
+        const overallHealthy = healthStatus.status.overallStatus === 'healthy'
+            && !healthStatus.status.autoHealingActive;
 
-        if (violations === 0 && !lslWarning) {
-            context = `✅ System Health: All systems operational (verified ${ageSeconds}s ago)\n`;
-        } else if (criticalCount > 0) {
+        if (criticalCount > 0) {
             context = `❌ System Health: Critical issues detected - check dashboard\n`;
         } else if (lslWarning) {
             context = lslWarning;
+        } else if (violations === 0 || overallHealthy) {
+            context = `✅ System Health: All systems operational (verified ${ageSeconds}s ago)\n`;
         } else {
             context = `⚠️ System Health: Issues detected - auto-healing active\n`;
         }
