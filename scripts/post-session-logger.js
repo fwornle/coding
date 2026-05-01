@@ -422,9 +422,7 @@ ${isRerouted ? '- ⚠️  This session was RE-ROUTED from its original project d
   }
 
   async stopSemanticAnalysisSystem() {
-    // No-op: In Docker mode, services run in containers managed by docker-compose
-    // In native mode, PSM (Process State Manager) handles cleanup via launch-claude.sh
-    // Service lifecycle is now handled by the proper infrastructure, not this fallback logger
+    // No-op: services run in containers managed by docker-compose; lifecycle is not this logger's concern.
   }
 }
 
