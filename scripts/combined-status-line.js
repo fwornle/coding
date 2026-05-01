@@ -1656,15 +1656,24 @@ class CombinedStatusLine {
     if (healthVerifier && healthVerifier.status === 'operational') {
       const criticalCount = healthVerifier.criticalCount || 0;
       const violationCount = healthVerifier.violationCount || 0;
+      // Trust the verifier's verdict: when it has classified the run as
+      // healthy (and isn't currently auto-healing), accepted/non-critical
+      // violations should not flip the badge to yellow. Same fix pattern
+      // as health-prompt-hook.js outputHealthContext().
+      const verifierHealthy = healthVerifier.overallStatus === 'healthy'
+        && !healthVerifier.autoHealingActive;
 
       if (criticalCount > 0) {
         parts.push('[🏥❌]'); // Critical - check dashboard
         overallColor = 'red';
-      } else if (!gcmHealthy || violationCount > 0) {
-        parts.push('[🏥⚠️]'); // GCM or health issues - check dashboard
+      } else if (!gcmHealthy) {
+        parts.push('[🏥⚠️]'); // GCM unhealthy (independent of verifier)
         if (overallColor === 'green') overallColor = 'yellow';
-      } else {
+      } else if (verifierHealthy || violationCount === 0) {
         parts.push('[🏥✅]'); // All healthy (GCM + services)
+      } else {
+        parts.push('[🏥⚠️]'); // Non-accepted violations
+        if (overallColor === 'green') overallColor = 'yellow';
       }
     } else if (healthVerifier && healthVerifier.status === 'stale') {
       parts.push('[🏥⏰]'); // Stale
