@@ -255,27 +255,27 @@
     },
     "trajectory_states": {
       "exploring": {
-        "icon": "\ud83d\udd0dEX",
+        "icon": "🔍EX",
         "description": "Information gathering phase"
       },
       "on_track": {
-        "icon": "\ud83d\udcc8ON",
+        "icon": "📈ON",
         "description": "Productive trajectory progression"
       },
       "off_track": {
-        "icon": "\ud83d\udcc9OFF",
+        "icon": "📉OFF",
         "description": "Deviating from optimal path"
       },
       "implementing": {
-        "icon": "\u2699\ufe0fIMP",
+        "icon": "⚙️IMP",
         "description": "Active code modification"
       },
       "verifying": {
-        "icon": "\u2705VER",
+        "icon": "✅VER",
         "description": "Testing and validation phase"
       },
       "blocked": {
-        "icon": "\ud83d\udeabBLK",
+        "icon": "🚫BLK",
         "description": "Intervention preventing action"
       }
     }
@@ -326,7 +326,7 @@
     },
     "groq": {
       "billingType": "monthly",
-      "billingMonth": "APR",
+      "billingMonth": "MAY",
       "spendLimit": null,
       "externalSpend": 0,
       "autoScrape": false,
