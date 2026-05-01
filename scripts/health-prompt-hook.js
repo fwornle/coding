@@ -252,18 +252,29 @@ function _isPidAlive(pid) {
 }
 
 /**
- * Read the LSL coordinator registry and check whether the watchdog has
- * stamped a recent health-check tick. Returns true when the watchdog is
- * actively monitoring (within ~2 ticks of its 30s interval).
+ * Check whether the LSL watchdog has stamped a recent health-check tick.
+ * Prefers the lightweight dedicated heartbeat file written by
+ * global-lsl-coordinator's performHealthCheck; falls back to the
+ * coordinator entry in the registry for older daemons. Returns true when
+ * the watchdog is actively monitoring (within ~2 ticks of its 30s
+ * interval).
  */
 function _watchdogIsFresh() {
+    const FRESH_WINDOW_MS = 75_000;
+    try {
+        const hbPath = join(codingRoot, '.health', 'lsl-watchdog-heartbeat.json');
+        if (existsSync(hbPath)) {
+            const hb = JSON.parse(readFileSync(hbPath, 'utf-8'));
+            if (hb?.timestamp && (Date.now() - hb.timestamp) < FRESH_WINDOW_MS) return true;
+        }
+    } catch { /* fall through to registry check */ }
     try {
         const registryPath = join(codingRoot, '.global-lsl-registry.json');
         if (!existsSync(registryPath)) return false;
         const reg = JSON.parse(readFileSync(registryPath, 'utf-8'));
         const last = reg?.coordinator?.lastHealthCheck;
         if (!last) return false;
-        return (Date.now() - last) < 75_000;
+        return (Date.now() - last) < FRESH_WINDOW_MS;
     } catch { return false; }
 }
 

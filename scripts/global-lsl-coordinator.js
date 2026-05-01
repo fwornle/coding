@@ -510,11 +510,35 @@ class GlobalLSLCoordinator {
     // PID. The registry is bind-mounted into the container, so an
     // mtime + lastHealthCheck check works across the namespace.
     if (!this.registry.coordinator) this.registry.coordinator = {};
-    this.registry.coordinator.lastHealthCheck = Date.now();
+    const tickAt = Date.now();
+    this.registry.coordinator.pid = process.pid;
+    this.registry.coordinator.lastHealthCheck = tickAt;
     this.registry.coordinator.healthCheckInterval = this.healthCheckInterval || this.registry.coordinator.healthCheckInterval || 30000;
 
     this.log(`Health check complete: ${healthyCount} healthy, ${recoveredCount} recovered, ${prunedCount} pruned`);
     this.saveRegistry();
+
+    // Also stamp a dedicated lightweight heartbeat file alongside the
+    // per-monitor health files. Consumers (the prompt hook, dashboard)
+    // can detect "watchdog is alive and ticking" via a single small
+    // file without parsing the full registry. The hook reads this in
+    // _watchdogIsFresh() to suppress false-alarm 'LSL DOWN' messages
+    // when a per-monitor heartbeat is briefly stale but the watchdog
+    // is on track to clean up within the next tick.
+    try {
+      const heartbeatPath = path.join(this.codingRepoPath, '.health', 'lsl-watchdog-heartbeat.json');
+      fs.writeFileSync(heartbeatPath, JSON.stringify({
+        pid: process.pid,
+        timestamp: tickAt,
+        intervalMs: this.healthCheckInterval || 30000,
+        projects: Object.keys(this.registry.projects || {}),
+        healthy: healthyCount,
+        recovered: recoveredCount,
+        pruned: prunedCount,
+      }, null, 2));
+    } catch (err) {
+      this.log(`Failed to stamp watchdog heartbeat: ${err.message}`);
+    }
   }
 
   /**
