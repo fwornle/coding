@@ -297,7 +297,7 @@ class LSLFileManager {
 class EnhancedOperationalLogger {
   constructor(options = {}) {
     this.options = {
-      logDir: options.logDir || join(process.cwd(), '.specstory', 'logs'),
+      logDir: options.logDir || join(process.cwd(), '.specstory', 'history', 'logs'),
       enableMetrics: options.enableMetrics !== false,
       enableAlerts: options.enableAlerts !== false,
       metricsInterval: options.metricsInterval || 60000, // 1 minute
@@ -702,7 +702,7 @@ class LiveLoggingCoordinator {
   async initializeOperationalLogger() {
     try {
       this.operationalLogger = new EnhancedOperationalLogger({
-        logDir: join(process.cwd(), '.specstory', 'logs'),
+        logDir: join(process.cwd(), '.specstory', 'history', 'logs'),
         enableMetrics: true,
         enableAlerts: true,
         metricsInterval: 60000,
