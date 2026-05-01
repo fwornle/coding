@@ -176,6 +176,7 @@ function checkLSLHealth() {
         let isStopped = false;
         let isStale = false;
         let ageSec = 0;
+        let monitorPid = null;
 
         if (!isDown) {
             const health = JSON.parse(readFileSync(healthFile, 'utf-8'));
@@ -183,46 +184,87 @@ function checkLSLHealth() {
             ageSec = Math.floor(ageMs / 1000);
             isStopped = health.status === 'stopped';
             isStale = ageMs > 120_000; // 2 minutes
+            monitorPid = health.metrics?.processId || null;
         }
 
-        if (isDown || isStopped || isStale) {
-            // Attempt auto-recovery: spawn global-lsl-coordinator in background
-            // Rate-limited by a lockfile to prevent spawning on every prompt
-            const lockFile = join(codingRoot, '.health', '.lsl-recovery-lock');
-            let shouldRecover = true;
-            if (existsSync(lockFile)) {
-                try {
-                    const lockAge = Date.now() - statSync(lockFile).mtimeMs;
-                    shouldRecover = lockAge > 60_000; // At most once per minute
-                } catch { /* proceed with recovery */ }
-            }
+        if (!isDown && !isStopped && !isStale) return ''; // Healthy
 
-            if (shouldRecover) {
-                try {
-                    // Touch lockfile
-                    writeFileSync(lockFile, String(Date.now()));
-                    // Fire-and-forget: spawn coordinator to restart monitor
-                    const coordinator = spawn('node', [
-                        join(codingRoot, 'scripts', 'global-lsl-coordinator.js'),
-                        'ensure',
-                        codingRoot
-                    ], { detached: true, stdio: 'ignore', cwd: codingRoot });
-                    coordinator.unref();
-                } catch { /* recovery is best-effort */ }
-
-                return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded. Auto-recovery attempted.\n';
-            }
-
-            if (isDown) return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded.\n';
-            if (isStopped) return '🔴 LSL DOWN: Transcript monitor stopped. Session history is NOT being recorded.\n';
-            return `🔴 LSL STALE: Transcript monitor health not updated for ${ageSec}s. LSL may have crashed.\n`;
+        // Suppress false alarms when SafeDatabase is mid-rotation. The
+        // transcript monitor briefly stalls reopening the DB; that's an
+        // expected stall, not a failure. Marker auto-cleared by the
+        // recovery routine; we apply a 60s ceiling in case it crashes.
+        const dbMarker = join(codingRoot, '.observations', 'db-recovering.json');
+        if ((isStale || isStopped) && existsSync(dbMarker)) {
+            try {
+                const m = JSON.parse(readFileSync(dbMarker, 'utf-8'));
+                if (Date.now() - (m.startedAt || 0) < 60_000) return '';
+            } catch { /* ignore malformed marker */ }
         }
 
-        return ''; // Healthy
+        // Suppress false alarms when the LSL watchdog has been ticking
+        // recently AND the monitor process is alive. The watchdog runs
+        // every 30s and will recover anything actually broken; we don't
+        // need to also alarm the user on every prompt.
+        if (isStale && !isStopped && monitorPid && _isPidAlive(monitorPid)) {
+            const watchdogFresh = _watchdogIsFresh();
+            if (watchdogFresh) return '';
+        }
+
+        // Attempt auto-recovery: spawn global-lsl-coordinator in background
+        // Rate-limited by a lockfile to prevent spawning on every prompt
+        const lockFile = join(codingRoot, '.health', '.lsl-recovery-lock');
+        let shouldRecover = true;
+        if (existsSync(lockFile)) {
+            try {
+                const lockAge = Date.now() - statSync(lockFile).mtimeMs;
+                shouldRecover = lockAge > 60_000; // At most once per minute
+            } catch { /* proceed with recovery */ }
+        }
+
+        if (shouldRecover) {
+            try {
+                writeFileSync(lockFile, String(Date.now()));
+                const coordinator = spawn('node', [
+                    join(codingRoot, 'scripts', 'global-lsl-coordinator.js'),
+                    'ensure',
+                    codingRoot
+                ], { detached: true, stdio: 'ignore', cwd: codingRoot });
+                coordinator.unref();
+            } catch { /* recovery is best-effort */ }
+        }
+
+        // Differentiate DOWN (file missing or status=stopped — real failure)
+        // from STALE (file exists but timestamp is old — usually transient).
+        if (isDown) return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded. Auto-recovery attempted.\n';
+        if (isStopped) return '🔴 LSL DOWN: Transcript monitor reports stopped. Session history is NOT being recorded. Auto-recovery attempted.\n';
+        return `⚠️ LSL STALE: Transcript monitor health not updated for ${ageSec}s (process ${monitorPid ? `PID ${monitorPid} alive` : 'unknown'}). Auto-recovery attempted.\n`;
     } catch {
         // If we can't check, don't block — but warn
         return '⚠️ LSL: Unable to verify transcript monitor status\n';
     }
+}
+
+/**
+ * Check if a PID is alive (signal 0 probe).
+ */
+function _isPidAlive(pid) {
+    try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+/**
+ * Read the LSL coordinator registry and check whether the watchdog has
+ * stamped a recent health-check tick. Returns true when the watchdog is
+ * actively monitoring (within ~2 ticks of its 30s interval).
+ */
+function _watchdogIsFresh() {
+    try {
+        const registryPath = join(codingRoot, '.global-lsl-registry.json');
+        if (!existsSync(registryPath)) return false;
+        const reg = JSON.parse(readFileSync(registryPath, 'utf-8'));
+        const last = reg?.coordinator?.lastHealthCheck;
+        if (!last) return false;
+        return (Date.now() - last) < 75_000;
+    } catch { return false; }
 }
 
 /**
