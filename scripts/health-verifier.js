@@ -30,7 +30,6 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 import ProcessStateManager from './process-state-manager.js';
 import HealthRemediationActions from './health-remediation-actions.js';
-import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
 import { enableAutoRestart } from './auto-restart-watcher.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
@@ -38,38 +37,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Detect if running in Docker mode
- * Checks multiple indicators:
- * 1. CODING_DOCKER_MODE environment variable (set by launch-claude.sh)
- * 2. .docker-mode marker file in coding repo
- * 3. /.dockerenv (when running inside container)
- */
-function isDockerMode() {
-  // Check environment variable first (set by launch-claude.sh)
-  if (process.env.CODING_DOCKER_MODE === 'true') {
-    return true;
-  }
-
-  // Check for .docker-mode marker file (created when user enables Docker mode)
-  const codingRoot = path.resolve(__dirname, '..');
-  const dockerModeMarker = path.join(codingRoot, '.docker-mode');
-  if (fsSync.existsSync(dockerModeMarker)) {
-    return true;
-  }
-
-  // Check /.dockerenv (when running inside the container itself)
-  if (fsSync.existsSync('/.dockerenv')) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
  * Detect if THIS process is running inside the Docker container (vs. on the host).
- * Unlike isDockerMode(), this only checks /.dockerenv — a marker file or env var
- * means the user has enabled Docker mode, but the verifier may still be running
- * on the host where host.docker.internal does NOT resolve.
+ * The host can also run the verifier (for status / rule-loading), where
+ * host.docker.internal does not resolve — so endpoint rewriting hinges on this.
  */
 function isInsideContainer() {
   return fsSync.existsSync('/.dockerenv');
@@ -119,15 +89,13 @@ class HealthVerifier extends EventEmitter {
     this.lastReport = null;
     this.healingHistory = new Map(); // Track healing attempts per action
     this.autoHealingEnabled = this.rules.auto_healing.enabled;
-    this.monitoringPaused = false; // Paused during Docker mode transitions
 
     // Ensure directories exist
     this.ensureDirectories();
   }
 
   /**
-   * Load health verification rules
-   * In Docker mode, applies port and service overrides for containerized environment
+   * Load health verification rules and apply container-environment overrides.
    */
   loadRules() {
     try {
@@ -135,11 +103,7 @@ class HealthVerifier extends EventEmitter {
       const rulesData = fsSync.readFileSync(rulesFile, 'utf8');
       const rules = JSON.parse(rulesData);
 
-      // Apply Docker-specific overrides
-      if (isDockerMode()) {
-        console.log('[HealthVerifier] Docker mode detected - applying rule overrides');
-        this.applyDockerOverrides(rules);
-      }
+      this.applyDockerOverrides(rules);
 
       return rules;
     } catch (error) {
@@ -225,25 +189,6 @@ class HealthVerifier extends EventEmitter {
   async verify() {
     const startTime = Date.now();
     this.log('Starting health verification');
-
-    // Check for Docker mode transition in progress
-    if (this.monitoringPaused) {
-      this.log('Health verification paused - Docker mode transition in progress');
-      return { status: 'paused', reason: 'Docker mode transition in progress' };
-    }
-
-    // Also check lock file directly (in case signal was missed)
-    try {
-      const transitionLocked = await isTransitionLocked();
-      if (transitionLocked) {
-        const lockData = await getTransitionLockData();
-        this.log(`Health verification skipped - transition in progress: ${lockData?.fromMode} → ${lockData?.toMode}`);
-        return { status: 'paused', reason: 'Docker mode transition in progress', lockData };
-      }
-    } catch (error) {
-      // Continue if check fails (fail open)
-      this.log(`Transition lock check failed: ${error.message}`, 'WARN');
-    }
 
     try {
       let checks = [];  // Use let since checks may be reassigned during auto-healing recheck
@@ -1007,20 +952,6 @@ class HealthVerifier extends EventEmitter {
 
     if (!rule?.enabled) return checks;
 
-    // Only run inside Docker — supervisord doesn't exist on host
-    if (!isDockerMode()) {
-      checks.push({
-        category: 'processes',
-        check: 'supervisord_status',
-        status: 'passed',
-        severity: 'info',
-        message: 'Supervisord check skipped (not in Docker mode)',
-        details: { skipped_reason: 'not_docker' },
-        timestamp: new Date().toISOString()
-      });
-      return checks;
-    }
-
     try {
       const { execSync } = await import('child_process');
       let output;
@@ -1557,11 +1488,11 @@ class HealthVerifier extends EventEmitter {
     const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
     const metadataFile = path.join(cgrDir, 'shared-data', 'cache-metadata.json');
 
-    // Skip staleness check in Docker mode - .git directory not available
-    // But still try to read cache metadata to show cached commit info
-    if (isDockerMode()) {
-      let details = { skipped_reason: 'docker_mode' };
-      let message = 'CGR cache check skipped (Docker mode - no .git access)';
+    // Skip staleness check in container — .git directory not available.
+    // But still try to read cache metadata to show cached commit info.
+    {
+      let details = { skipped_reason: 'no_git_access' };
+      let message = 'CGR cache check skipped (no .git access in container)';
 
       // Try to read cache metadata for display
       if (fsSync.existsSync(metadataFile)) {
@@ -1973,17 +1904,8 @@ class HealthVerifier extends EventEmitter {
       return;
     }
 
-    // Check for existing instance (singleton enforcement)
-    // Skip in Docker mode - supervisord manages the process lifecycle
-    if (!isDockerMode()) {
-      const existing = await this.checkExistingInstance();
-      if (existing.running) {
-        this.log(`Another health-verifier instance is already running (PID: ${existing.pid})`);
-        console.log(`⚠️  Health verifier already running (PID: ${existing.pid})`);
-        console.log('   Use "health-verifier stop" first if you want to restart.');
-        return;
-      }
-    }
+    // Singleton enforcement is delegated to supervisord, which manages this
+    // process's lifecycle inside the coding-services container.
 
     this.running = true;
     this.cycleCount = 0;
@@ -2014,17 +1936,6 @@ class HealthVerifier extends EventEmitter {
       this.log(`UNHANDLED REJECTION: ${reason}`, 'ERROR');
       this.consecutiveErrors++;
       // Don't exit immediately - let watchdog decide
-    });
-
-    // Install signal handlers for Docker mode transition
-    process.on('SIGUSR2', () => {
-      this.monitoringPaused = true;
-      this.log('🔇  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
-    });
-
-    process.on('SIGUSR1', () => {
-      this.monitoringPaused = false;
-      this.log('▶️  Monitoring RESUMED (Docker mode transition complete)');
     });
 
     // Register this instance with PSM
@@ -2155,23 +2066,6 @@ class HealthVerifier extends EventEmitter {
       actions: []
     };
 
-    // Check for Docker mode transition - skip healing during transition
-    if (this.monitoringPaused) {
-      this.log('Auto-healing skipped - Docker mode transition in progress');
-      return results;
-    }
-
-    try {
-      const transitionLocked = await isTransitionLocked();
-      if (transitionLocked) {
-        const lockData = await getTransitionLockData();
-        this.log(`Auto-healing skipped - transition in progress: ${lockData?.fromMode} → ${lockData?.toMode}`);
-        return results;
-      }
-    } catch {
-      // Continue if check fails (fail open)
-    }
-
     // Find all violations that have auto_heal enabled
     const healableViolations = checks.filter(c =>
       c.status !== 'passed' && c.auto_heal && c.auto_heal_action
@@ -2262,8 +2156,7 @@ runIfMain(import.meta.url, () => {
             scriptUrl: import.meta.url,
             dependencies: [
               './process-state-manager.js',
-              './health-remediation-actions.js',
-              './docker-mode-transition.js'
+              './health-remediation-actions.js'
             ],
             cleanupFn: () => verifier.stop(),
             logger: (msg) => verifier.log(msg)
