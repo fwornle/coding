@@ -42,9 +42,6 @@ const CODING_DIR = path.resolve(SCRIPT_DIR, '..');
 const execAsync = promisify(exec);
 const psm = new ProcessStateManager();
 
-// Docker mode: when true, skip launching containers already provided by coding-services
-const DOCKER_MODE = process.env.CODING_DOCKER_MODE === 'true';
-
 /**
  * Check if any process matching the script pattern is running at OS level
  * This catches orphaned processes that PSM doesn't know about
@@ -424,84 +421,25 @@ const SERVICE_CONFIGS = {
     maxRetries: 2,
     timeout: 30000,
     startFn: async () => {
-      // In Docker mode, Redis + Qdrant are already provided by coding-services container
-      if (DOCKER_MODE) {
-        console.log('[ConstraintMonitor] Docker mode: Redis + Qdrant provided by coding-services - skipping standalone containers');
-        return {
-          service: 'constraint-monitor-docker',
-          mode: 'docker-mode-builtin',
-          containers: ['coding-redis', 'coding-qdrant']
-        };
-      }
-
-      console.log('[ConstraintMonitor] Starting Docker containers...');
-
-      // Check if Docker is running
-      try {
-        await execAsync('docker info', { timeout: 5000 });
-      } catch (error) {
-        throw new Error('Docker not running - required for Constraint Monitor');
-      }
-
-      // Start docker-compose services (Redis + Qdrant)
-      const constraintDir = path.join(CODING_DIR, 'integrations', 'mcp-constraint-monitor');
-
-      if (!fs.existsSync(constraintDir)) {
-        throw new Error('Constraint Monitor not installed in integrations/');
-      }
-
-      try {
-        await execAsync('docker-compose up -d', {
-          cwd: constraintDir,
-          timeout: 60000
-        });
-      } catch (error) {
-        throw new Error(`Docker compose failed: ${error.message}`);
-      }
-
-      console.log('[ConstraintMonitor] Docker containers started successfully');
-      console.log('[ConstraintMonitor] Web services (API + Dashboard) managed by Global Service Coordinator');
-
+      // Redis + Qdrant are provided by the coding-services container.
+      process.stderr.write('[ConstraintMonitor] Redis + Qdrant provided by coding-services - skipping standalone containers\n');
       return {
         service: 'constraint-monitor-docker',
-        mode: 'docker-compose',
-        containers: ['redis', 'qdrant']
+        mode: 'coding-services-builtin',
+        containers: ['coding-redis', 'coding-qdrant']
       };
     },
     healthCheckFn: async (result) => {
-      // In Docker mode, check coding-services health endpoint instead
-      if (result && result.mode === 'docker-mode-builtin') {
-        try {
-          const healthy = await isPortListening(PORTS.VKB);
-          if (healthy) {
-            console.log('[ConstraintMonitor] Docker mode: coding-services healthy (Redis + Qdrant builtin)');
-            return true;
-          }
-          console.log('[ConstraintMonitor] Docker mode: coding-services health check failed');
-          return false;
-        } catch (error) {
-          console.log('[ConstraintMonitor] Docker mode health check error:', error.message);
-          return false;
-        }
-      }
-
-      // Native mode: Check Docker containers only - web services checked by coordinator
       try {
-        const { stdout } = await execAsync(
-          'docker ps --filter "name=constraint-monitor" --format "{{.Names}}" | wc -l',
-          { timeout: 5000 }
-        );
-
-        const containerCount = parseInt(stdout.trim(), 10);
-        if (containerCount < 2) {
-          console.log('[ConstraintMonitor] Health check failed: insufficient Docker containers');
-          return false;
+        const healthy = await isPortListening(PORTS.VKB);
+        if (healthy) {
+          process.stderr.write('[ConstraintMonitor] coding-services healthy (Redis + Qdrant builtin)\n');
+          return true;
         }
-
-        console.log('[ConstraintMonitor] Docker containers healthy');
-        return true;
+        process.stderr.write('[ConstraintMonitor] coding-services health check failed\n');
+        return false;
       } catch (error) {
-        console.log('[ConstraintMonitor] Health check error:', error.message);
+        process.stderr.write(`[ConstraintMonitor] health check error: ${error.message}\n`);
         return false;
       }
     }
@@ -725,94 +663,25 @@ const SERVICE_CONFIGS = {
     maxRetries: 2,
     timeout: 45000, // Memgraph can take time to start
     startFn: async () => {
-      // In Docker mode, Memgraph is already provided by coding-services container
-      if (DOCKER_MODE) {
-        console.log('[Memgraph] Docker mode: Memgraph provided by coding-services - skipping standalone container');
-        return {
-          service: 'memgraph-docker',
-          mode: 'docker-mode-builtin',
-          ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
-        };
-      }
-
-      console.log('[Memgraph] Starting Memgraph Docker container for code-graph-rag...');
-
-      // Check if Docker is running
-      try {
-        await execAsync('docker info', { timeout: 5000 });
-      } catch (error) {
-        throw new Error('Docker not running - required for Memgraph');
-      }
-
-      // Check if code-graph-rag is installed
-      const codeGraphRagDir = path.join(CODING_DIR, 'integrations', 'code-graph-rag');
-      if (!fs.existsSync(codeGraphRagDir)) {
-        throw new Error('code-graph-rag not installed in integrations/ - run install.sh first');
-      }
-
-      // Check for docker-compose.yaml
-      const dockerComposePath = path.join(codeGraphRagDir, 'docker-compose.yaml');
-      if (!fs.existsSync(dockerComposePath)) {
-        throw new Error('docker-compose.yaml not found in code-graph-rag/ - run install.sh to create it');
-      }
-
-      // Pass port configuration via env vars (upstream docker-compose uses MEMGRAPH_PORT, LAB_PORT)
-      // We map from our .env.ports naming to upstream's expected env var names
-      const composeEnv = {
-        ...process.env,
-        MEMGRAPH_PORT: String(PORTS.MEMGRAPH_BOLT),
-        MEMGRAPH_HTTP_PORT: String(PORTS.MEMGRAPH_HTTPS),
-        LAB_PORT: String(PORTS.MEMGRAPH_LAB)
-      };
-
-      try {
-        await execAsync('docker-compose up -d', {
-          cwd: codeGraphRagDir,
-          timeout: 60000,
-          env: composeEnv
-        });
-      } catch (error) {
-        throw new Error(`Docker compose failed for Memgraph: ${error.message}`);
-      }
-
-      console.log('[Memgraph] Docker container started successfully');
-      console.log(`[Memgraph] Bolt port: ${PORTS.MEMGRAPH_BOLT}, Lab UI: http://localhost:${PORTS.MEMGRAPH_LAB}`);
-
+      // Memgraph is provided by the coding-services container.
+      process.stderr.write('[Memgraph] Memgraph provided by coding-services - skipping standalone container\n');
       return {
         service: 'memgraph-docker',
-        mode: 'docker-compose',
+        mode: 'coding-services-builtin',
         ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
       };
     },
     healthCheckFn: async (result) => {
-      // In Docker mode, check TCP port directly (Memgraph provided by coding-services)
-      if (result && result.mode === 'docker-mode-builtin') {
-        try {
-          const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
-          if (isListening) {
-            console.log(`[Memgraph] Docker mode: Bolt port ${PORTS.MEMGRAPH_BOLT} listening (coding-services builtin)`);
-            return true;
-          }
-          console.log(`[Memgraph] Docker mode: Bolt port ${PORTS.MEMGRAPH_BOLT} not yet listening`);
-          return false;
-        } catch (error) {
-          console.log('[Memgraph] Docker mode health check error:', error.message);
-          return false;
-        }
-      }
-
-      // Native mode: Check if Memgraph is listening on Bolt port using TCP (not HTTP)
-      // Memgraph uses Bolt protocol, not HTTP, so we need raw TCP socket check
       try {
         const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
-        if (!isListening) {
-          console.log(`[Memgraph] Health check failed: Bolt port ${PORTS.MEMGRAPH_BOLT} not listening`);
-          return false;
+        if (isListening) {
+          process.stderr.write(`[Memgraph] Bolt port ${PORTS.MEMGRAPH_BOLT} listening (coding-services builtin)\n`);
+          return true;
         }
-        console.log(`[Memgraph] Container healthy (Bolt port ${PORTS.MEMGRAPH_BOLT} listening)`);
-        return true;
+        process.stderr.write(`[Memgraph] Bolt port ${PORTS.MEMGRAPH_BOLT} not yet listening\n`);
+        return false;
       } catch (error) {
-        console.log('[Memgraph] Health check error:', error.message);
+        process.stderr.write(`[Memgraph] health check error: ${error.message}\n`);
         return false;
       }
     }
