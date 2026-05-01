@@ -22,7 +22,7 @@ source "$_AGENT_COMMON_DIR/detect-network.sh"
 # ==============================================================================
 # GITIGNORE VALIDATION
 # ==============================================================================
-# Ensure .specstory/logs/ is not ignored by gitignore
+# Ensure .specstory/history/logs/ is not ignored by gitignore
 # This is critical for classification logs from both live logging and batch processing
 ensure_specstory_logs_tracked() {
   local project_dir="$1"
@@ -33,27 +33,27 @@ ensure_specstory_logs_tracked() {
     return 0
   fi
 
-  # Check if logs/ pattern exists and .specstory/logs/ is not exempted
+  # Check if logs/ pattern exists and .specstory/history/logs/ is not exempted
   if grep -q "^logs/" "$gitignore_file" 2>/dev/null; then
-    if ! grep -q "^\!\.specstory/logs/" "$gitignore_file" 2>/dev/null; then
-      log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/logs/classification/"
-      log "🔧 Adding exception '!.specstory/logs/' to .gitignore..."
+    if ! grep -q "^\!\.specstory/history/logs/" "$gitignore_file" 2>/dev/null; then
+      log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/history/logs/classification/"
+      log "🔧 Adding exception '!.specstory/history/logs/' to .gitignore..."
 
       # Insert the exception right after the logs/ line (cross-platform compatible)
       if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' '/^logs\//a\
-!.specstory/logs/
+!.specstory/history/logs/
 ' "$gitignore_file"
       else
         sed -i '/^logs\//a\
-!.specstory/logs/
+!.specstory/history/logs/
 ' "$gitignore_file"
       fi
 
       if [ $? -eq 0 ]; then
-        log "✅ Added .specstory/logs/ exception to .gitignore"
+        log "✅ Added .specstory/history/logs/ exception to .gitignore"
       else
-        log "❌ Failed to update .gitignore - please manually add: !.specstory/logs/"
+        log "❌ Failed to update .gitignore - please manually add: !.specstory/history/logs/"
       fi
     fi
   fi
@@ -211,7 +211,7 @@ start_transcript_monitoring() {
     mkdir -p "$project_dir/.specstory/history"
   fi
 
-  # Ensure .specstory/logs/ is tracked in git
+  # Ensure .specstory/history/logs/ is tracked in git
   ensure_specstory_logs_tracked "$project_dir"
 
   # Use global coordinator to ensure robust LSL

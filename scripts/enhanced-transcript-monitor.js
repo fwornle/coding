@@ -22,6 +22,7 @@ import path from 'path';
 import os from 'os';
 import readline from 'readline';
 import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
+import { lslWritePath, resolveLslPath, lslListAll } from './lsl-paths.js';
 import AdaptiveExchangeExtractor from '../src/live-logging/AdaptiveExchangeExtractor.js';
 // SemanticAnalyzer removed — called APIs directly without proxy support, hanging on VPN
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
@@ -2840,11 +2841,11 @@ ORDER BY m.time_created ASC;`;
     if (resolvedTarget === resolvedProject) {
       // Local project - use generateLSLFilename with same target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, targetProject);
-      return path.join(targetProject, '.specstory', 'history', filename);
+      return lslWritePath(path.join(targetProject, '.specstory', 'history'), filename);
     } else {
       // Redirected to coding project - use generateLSLFilename with different target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, this.config.projectPath);
-      return path.join(targetProject, '.specstory', 'history', filename);
+      return lslWritePath(path.join(targetProject, '.specstory', 'history'), filename);
     }
   }
 
@@ -4459,19 +4460,21 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     console.log('✅ Historical transcript reprocessing completed!');
     console.log(`📋 Generated detailed LSL files with current format`);
     
-    // Show summary of created files
+    // Show summary of created files (recurse YYYY/MM subdirs)
     if (fs.existsSync(historyDir)) {
-      const newFiles = fs.readdirSync(historyDir).filter(file => 
-        file.includes('-session') && file.endsWith('.md')
+      const newFiles = lslListAll(historyDir, (name) =>
+        name.includes('-session') && name.endsWith('.md')
       );
-      console.log(`📁 Created ${newFiles.length} session files in ${path.basename(targetProject)}`);
+      process.stderr.write(`📁 Created ${newFiles.length} session files in ${path.basename(targetProject)}\n`);
     }
-    
+
     if (targetProject !== codingPath && fs.existsSync(path.join(codingPath, '.specstory', 'history'))) {
-      const codingFiles = fs.readdirSync(path.join(codingPath, '.specstory', 'history')).filter(file => 
-        file.includes('from-' + path.basename(targetProject)) && file.endsWith('.md')
+      const projectBase = path.basename(targetProject);
+      const codingFiles = lslListAll(
+        path.join(codingPath, '.specstory', 'history'),
+        (name) => name.includes('from-' + projectBase) && name.endsWith('.md')
       );
-      console.log(`📁 Created ${codingFiles.length} redirected session files in coding project`);
+      process.stderr.write(`📁 Created ${codingFiles.length} redirected session files in coding project\n`);
     }
     
   } catch (error) {

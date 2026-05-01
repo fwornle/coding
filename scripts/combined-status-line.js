@@ -11,6 +11,7 @@ import path, { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { getTimeWindow, getShortTimeWindow } from './timezone-utils.js';
+import { lslListAll } from './lsl-paths.js';
 import { UKBProcessManager } from './ukb-process-manager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -135,19 +136,24 @@ class CombinedStatusLine {
         join(targetProject, '.specstory/history')      // Target project
       ];
       
-      // Look specifically for current tranche session files
+      // Look specifically for current tranche session files (recurse YYYY/MM)
       for (const historyDir of checkDirs) {
         if (existsSync(historyDir)) {
-          if (process.env.DEBUG_STATUS) {
-            console.error(`DEBUG: Checking directory: ${historyDir}`);
-            const allFiles = fs.readdirSync(historyDir);
-            console.error(`DEBUG: All files in ${historyDir}:`, allFiles.filter(f => f.includes(today)));
-          }
-          
           // Convert short format back to full format for file matching
           const fullTranche = getTimeWindow(now);
-          const currentTrancheFiles = fs.readdirSync(historyDir)
-            .filter(f => f.includes(today) && f.includes(fullTranche) && f.includes('session') && f.endsWith('.md'));
+          const allMatching = lslListAll(historyDir, (name) =>
+            name.includes(today) && name.endsWith('.md')
+          );
+
+          if (process.env.DEBUG_STATUS) {
+            console.error(`DEBUG: Checking directory: ${historyDir}`);
+            console.error(`DEBUG: All files in ${historyDir} matching today:`, allMatching.map(p => path.basename(p)));
+          }
+
+          const currentTrancheFiles = allMatching.filter(p => {
+            const name = path.basename(p);
+            return name.includes(fullTranche) && name.includes('session');
+          });
           
           if (process.env.DEBUG_STATUS) {
             console.error(`DEBUG: Looking for files with: ${today} AND ${fullTranche} AND session.md`);

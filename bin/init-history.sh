@@ -2,10 +2,11 @@
 # bin/init-history.sh — ensure private session-history dirs exist.
 #
 # Called by bin/coding on every launch and by install.sh during setup. The
-# .specstory/history/ + .specstory/archive/ trees are excluded from the
-# public 'coding' repo and live in a separate private repo (see install.sh
-# and the CODING_HISTORY_REPO entry in .env). Classification logs now live
-# inside the private repo at .specstory/history/logs/classification/.
+# .specstory/history/ tree is excluded from the public 'coding' repo and
+# lives in a separate private repo (see install.sh and the
+# CODING_HISTORY_REPO entry in .env). Classification logs and operational
+# logs both live inside the private repo at .specstory/history/logs/.
+# LSL files are organized by year/month at .specstory/history/YYYY/MM/<file>.md.
 #
 # Behaviour:
 #   - If CODING_HISTORY_REPO is configured AND .specstory/history/ has no
@@ -21,7 +22,6 @@ cd "$REPO_ROOT"
 
 HIST_DIR=".specstory/history"
 CLASS_DIR=".specstory/history/logs/classification"
-ARCH_DIR=".specstory/archive"
 
 # Source CODING_HISTORY_REPO from .env without polluting the parent shell.
 history_repo=""
@@ -47,4 +47,4 @@ fi
 
 # Always ensure the dirs exist so LSL services don't crash on a fresh
 # checkout that hasn't been through install.sh.
-mkdir -p "$HIST_DIR" "$CLASS_DIR" "$ARCH_DIR"
+mkdir -p "$HIST_DIR" "$CLASS_DIR"

@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimeWindow, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
+import { lslWritePath, resolveLslPath, lslListAll, dateSubdirFromFilename } from './lsl-paths.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,9 +75,11 @@ class ClassificationLogger {
    */
   initializeWindowTracking() {
     try {
-      // Read local markdown files
-      const localFiles = fs.readdirSync(this.logDir)
-        .filter(f => f.endsWith('.md') && !f.includes('_from-'));
+      // Read local markdown files (recurse YYYY/MM subdirs as well as flat root)
+      const localFiles = lslListAll(
+        this.logDir,
+        (f) => f.endsWith('.md') && !f.includes('_from-')
+      ).map(p => path.basename(p));
 
       for (const file of localFiles) {
         const windowName = file.replace('.md', '');
@@ -93,8 +96,10 @@ class ClassificationLogger {
       // Read coding markdown files (from-<project> postfix)
       const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
       if (fs.existsSync(codingLogDir)) {
-        const codingFiles = fs.readdirSync(codingLogDir)
-          .filter(f => f.endsWith(`_from-${this.projectName}.md`));
+        const codingFiles = lslListAll(
+          codingLogDir,
+          (f) => f.endsWith(`_from-${this.projectName}.md`)
+        ).map(p => path.basename(p));
 
         for (const file of codingFiles) {
           const windowName = file.replace(`_from-${this.projectName}.md`, '');
@@ -119,9 +124,10 @@ class ClassificationLogger {
    * Count decisions in a specific window from JSONL files
    */
   countDecisionsInWindow(windowName) {
-    const jsonlFile = path.join(this.logDir, `${windowName}.jsonl`);
+    // Resolve YYYY/MM-organized location, fall back to flat root for legacy files
+    const jsonlFile = resolveLslPath(this.logDir, `${windowName}.jsonl`);
 
-    if (!fs.existsSync(jsonlFile)) {
+    if (!jsonlFile) {
       return 0;
     }
 
@@ -165,7 +171,7 @@ class ClassificationLogger {
 
     if (!this.windowedLogs.has(fullWindow)) {
       const filename = `${fullWindow}.jsonl`;
-      const logFile = path.join(this.logDir, filename);
+      const logFile = lslWritePath(this.logDir, filename);
 
       // Initialize new window log file
       if (!fs.existsSync(logFile)) {
@@ -350,9 +356,9 @@ class ClassificationLogger {
 
       // Skip if no new decisions AND all required markdown files exist
       if (currentCount === previousCount && this.finalizedWindows.has(fullWindow)) {
-        const localFileExists = localDecisions.length === 0 || fs.existsSync(path.join(this.logDir, `${fullWindow}.md`));
+        const localFileExists = localDecisions.length === 0 || resolveLslPath(this.logDir, `${fullWindow}.md`) !== null;
         const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
-        const codingFileExists = codingDecisions.length === 0 || fs.existsSync(path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`));
+        const codingFileExists = codingDecisions.length === 0 || resolveLslPath(codingLogDir, `${fullWindow}_from-${this.projectName}.md`) !== null;
         if (localFileExists && codingFileExists) {
           continue;
         }
@@ -364,7 +370,7 @@ class ClassificationLogger {
 
       // Generate LOCAL classification log (stored locally in project)
       if (localDecisions.length > 0) {
-        const localFile = path.join(this.logDir, `${fullWindow}.md`);
+        const localFile = lslWritePath(this.logDir, `${fullWindow}.md`);
 
         // CRITICAL FIX: ALWAYS use windowTimestamp, never preserve existing wrong timestamps
         // Previous bug: extractExistingTimestamp() would read wrong timestamps and preserve them
@@ -389,9 +395,7 @@ class ClassificationLogger {
       // Generate CODING classification log (stored in coding repo with _from-<project> postfix)
       if (codingDecisions.length > 0) {
         const codingLogDir = path.join(this.codingRepo, '.specstory', 'history', 'logs', 'classification');
-        fs.mkdirSync(codingLogDir, { recursive: true });
-
-        const codingFile = path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
+        const codingFile = lslWritePath(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
 
         // CRITICAL FIX: ALWAYS use windowTimestamp, never preserve existing wrong timestamps
         const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING', windowTimestamp.toISOString());
@@ -505,20 +509,24 @@ class ClassificationLogger {
             sourceProject
           );
 
-          // Check if the calculated file exists
+          // Check if the calculated file exists (resolve YYYY/MM-organized or flat)
           const historyDir = decision.classification.isCoding
             ? path.join(this.codingRepo, '.specstory', 'history')
             : path.join(this.logDir, '../..');
-          const calculatedPath = path.join(historyDir, calculatedFilename);
-
-          if (fs.existsSync(calculatedPath)) {
+          if (resolveLslPath(historyDir, calculatedFilename) !== null) {
             lslFileName = calculatedFilename;
           }
         }
 
-        // Classification logs now live at .specstory/history/logs/classification/,
-        // LSL files at .specstory/history/ — both branches resolve up two levels.
-        const lslFilePath = `../../${lslFileName}`;
+        // Build relative path from this classification log's YYYY/MM/ subdir
+        // up to the LSL file's YYYY/MM/ subdir.
+        // Classification log: .specstory/history/logs/classification/YYYY/MM/<file>.md
+        // LSL file:           .specstory/history/YYYY/MM/<lslFileName>
+        // Climb 4 levels (YYYY/MM/classification/logs/), then descend into LSL's date subdir.
+        const lslDateSubdir = dateSubdirFromFilename(lslFileName);
+        const lslFilePath = lslDateSubdir
+          ? `../../../../${lslDateSubdir}/${lslFileName}`
+          : `../../../../${lslFileName}`;
         const lslLink = lslFileName !== 'pending' ? `[${lslFileName}](${lslFilePath}#${decision.promptSetId})` : `\`${lslFileName}\``;
 
         // Make prompt set heading clickable
@@ -557,11 +565,10 @@ class ClassificationLogger {
     const allDecisions = [];
 
     try {
-      const files = fs.readdirSync(this.logDir);
-      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
+      // Recurse YYYY/MM subdirs and flat root for legacy files.
+      const jsonlFiles = lslListAll(this.logDir, (n) => n.endsWith('.jsonl'));
 
-      for (const file of jsonlFiles) {
-        const filePath = path.join(this.logDir, file);
+      for (const filePath of jsonlFiles) {
         const content = fs.readFileSync(filePath, 'utf8');
         const lines = content.trim().split('\n').filter(line => line.trim());
 

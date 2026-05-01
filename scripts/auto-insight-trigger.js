@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { lslListAll } from './lsl-paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -225,20 +226,17 @@ class AutoInsightTrigger {
         return false;
       }
       
-      // Get latest session file
-      const files = await fs.readdir(specstoryPath);
-      const sessionFiles = files
-        .filter(file => file.endsWith('.md'))
+      // Get latest session file (recurse YYYY/MM subdirs and flat root)
+      const sessionPaths = lslListAll(specstoryPath, (name) => name.endsWith('.md'))
         .sort()
         .reverse();
-      
-      if (sessionFiles.length === 0) {
+
+      if (sessionPaths.length === 0) {
         this.logger.debug('No session files found');
         return false;
       }
-      
-      const latestFile = sessionFiles[0];
-      const latestFilePath = path.join(specstoryPath, latestFile);
+
+      const latestFilePath = sessionPaths[0];
       const stats = await fs.stat(latestFilePath);
       
       // Check if the latest file is newer than our last successful run
@@ -250,7 +248,7 @@ class AutoInsightTrigger {
         }
       }
       
-      this.logger.debug(`New session detected: ${latestFile}`);
+      this.logger.debug(`New session detected: ${path.basename(latestFilePath)}`);
       return true;
       
     } catch (error) {

@@ -100,7 +100,12 @@ class SmartClaudeLogger {
     }
     
     const filename = this.generateSessionFilename(targetRepo);
-    this.sessionFile = path.join(targetRepo, '.specstory', 'history', filename);
+    const dateMatch = filename.match(/(\d{4})-(\d{2})-\d{2}/);
+    const subDir = dateMatch
+      ? path.join(targetRepo, '.specstory', 'history', dateMatch[1], dateMatch[2])
+      : path.join(targetRepo, '.specstory', 'history');
+    fs.mkdirSync(subDir, { recursive: true });
+    this.sessionFile = path.join(subDir, filename);
     this.currentSession = {
       startTime: new Date().toISOString(),
       messages: [],

@@ -217,9 +217,8 @@ class LSLConfigValidator {
     const requiredDirs = [
       '.specstory',
       '.specstory/history',
-      '.specstory/logs',
-      '.specstory/config',
-      '.specstory/archive'
+      '.specstory/history/logs',
+      '.specstory/config'
     ];
 
     let valid = 0;

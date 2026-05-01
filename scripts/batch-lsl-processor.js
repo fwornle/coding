@@ -29,6 +29,7 @@ import { execSync } from 'child_process';
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
 import { getTimeWindow, formatTimestamp, generateLSLFilename, utcToLocalTime } from './timezone-utils.js';
+import { lslListAll, lslWritePath } from './lsl-paths.js';
 import ClassificationLogger from './classification-logger.js';
 import UserHashGenerator from './user-hash-generator.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
@@ -348,13 +349,11 @@ class BatchLSLProcessor {
   async regenerateMarkdownFromJsonl(datePattern) {
     console.log(`🔄 Regenerating markdown from JSONL files matching: ${datePattern || 'all'}`);
 
-    const classificationLogDir = path.join(this.projectPath, '.specstory', 'logs', 'classification');
+    const classificationLogDir = path.join(this.projectPath, '.specstory', 'history', 'logs', 'classification');
 
-    // Find all JSONL files
-    const jsonlFiles = fs.readdirSync(classificationLogDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .filter(f => !datePattern || f.includes(datePattern))
-      .map(f => path.join(classificationLogDir, f));
+    // Find all JSONL files (recurses YYYY/MM subdirs and flat root)
+    const jsonlFiles = lslListAll(classificationLogDir, (name) => name.endsWith('.jsonl'))
+      .filter(p => !datePattern || path.basename(p).includes(datePattern));
 
     console.log(`Found ${jsonlFiles.length} JSONL files to regenerate`);
 
@@ -1019,26 +1018,21 @@ class BatchLSLProcessor {
       
       const filename = generateLSLFilename(timestamp, projectName, targetProject, actualSourceProject);
       
-      // Determine target directory
-      let targetDir;
+      // Determine target directory base (filename will land under YYYY/MM/)
+      let targetBase;
       if (fileType === 'foreign') {
         // Foreign files go to coding repo
-        targetDir = path.join(this.codingRepo, '.specstory', 'history');
+        targetBase = path.join(this.codingRepo, '.specstory', 'history');
       } else {
         // Local files go to project directory
-        targetDir = path.join(this.projectPath, '.specstory', 'history');
+        targetBase = path.join(this.projectPath, '.specstory', 'history');
       }
-      
-      // Ensure target directory exists
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-      
+
       // File size control: split into part files when exceeding 200KB
       // (matches live ETM behavior via getActiveSessionFilePath)
       const maxSizeBytes = 200 * 1024;
       let finalFilename = filename;
-      let filePath = path.join(targetDir, finalFilename);
+      let filePath = lslWritePath(targetBase, finalFilename);
 
       if (fs.existsSync(filePath)) {
         const existingSize = fs.statSync(filePath).size;
@@ -1046,7 +1040,7 @@ class BatchLSLProcessor {
           let partNum = 1;
           while (true) {
             finalFilename = generateLSLFilename(timestamp, projectName, targetProject, actualSourceProject, { partNumber: partNum });
-            filePath = path.join(targetDir, finalFilename);
+            filePath = lslWritePath(targetBase, finalFilename);
             if (!fs.existsSync(filePath)) break;
             const partSize = fs.statSync(filePath).size;
             if (partSize + Buffer.byteLength(markdownContent) <= maxSizeBytes) break;
@@ -1104,10 +1098,11 @@ class BatchLSLProcessor {
       for (const dir of dirsToCheck) {
         if (!fs.existsSync(dir)) continue;
 
-        const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+        // Recurse YYYY/MM subdirs and flat root
+        const filePaths = lslListAll(dir, (name) => name.endsWith('.md'));
 
-        for (const filename of files) {
-          const filePath = path.join(dir, filename);
+        for (const filePath of filePaths) {
+          const filename = path.basename(filePath);
 
           // Parse time window from filename (YYYY-MM-DD_HHMM-HHMM_hash.md)
           const timeWindowMatch = filename.match(/(\d{4}-\d{2}-\d{2})_(\d{4})-(\d{4})/);
@@ -1242,21 +1237,22 @@ class BatchLSLProcessor {
             const classificationDir = path.join(
               dir.includes('coding') ? this.codingRepo : this.projectPath,
               '.specstory',
+              'history',
               'logs',
               'classification'
             );
 
             if (fs.existsSync(classificationDir)) {
-              // Find classification files matching this time window
-              const classificationFiles = fs.readdirSync(classificationDir);
+              // Find classification files matching this time window (recurse YYYY/MM)
               const timeWindowBase = `${date}_${startTime}-${endTime}`;
+              const classFilePaths = lslListAll(
+                classificationDir,
+                (name) => name.startsWith(timeWindowBase) && (name.endsWith('.jsonl') || name.endsWith('.md'))
+              );
 
-              for (const classFile of classificationFiles) {
-                if (classFile.startsWith(timeWindowBase) && (classFile.endsWith('.jsonl') || classFile.endsWith('.md'))) {
-                  const classFilePath = path.join(classificationDir, classFile);
-                  fs.unlinkSync(classFilePath);
-                  console.log(`🗑️  Deleted classification log: ${classFile}`);
-                }
+              for (const classFilePath of classFilePaths) {
+                fs.unlinkSync(classFilePath);
+                process.stderr.write(`🗑️  Deleted classification log: ${path.basename(classFilePath)}\n`);
               }
             }
           }
@@ -1547,9 +1543,6 @@ class BatchLSLProcessor {
       targetDir = path.join(this.projectPath, '.specstory/history');
     }
 
-    // Ensure directory exists
-    fs.mkdirSync(targetDir, { recursive: true });
-
     // Use original generateLSLFilename function from timezone-utils.js
     const projectName = this.projectPath.split('/').pop();
     const targetProject = foreignOnly && classification.isCoding ? 'coding' : projectName;
@@ -1567,7 +1560,7 @@ class BatchLSLProcessor {
 
     let partNumber = null;
     let filename = generateLSLFilename(timestamp, projectName, targetProject, sourceProject);
-    let filePath = path.join(targetDir, filename);
+    let filePath = lslWritePath(targetDir, filename);
 
     if (fs.existsSync(filePath)) {
       const existingSize = fs.statSync(filePath).size;
@@ -1576,7 +1569,7 @@ class BatchLSLProcessor {
         partNumber = 1;
         while (true) {
           filename = generateLSLFilename(timestamp, projectName, targetProject, sourceProject, { partNumber });
-          filePath = path.join(targetDir, filename);
+          filePath = lslWritePath(targetDir, filename);
           if (!fs.existsSync(filePath)) break;
           const partSize = fs.statSync(filePath).size;
           if (partSize + Buffer.byteLength(content) <= maxSizeBytes) break;
@@ -1772,9 +1765,7 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
       return [];
     }
     
-    const files = fs.readdirSync(historyDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(historyDir, f))
+    const files = lslListAll(historyDir, (name) => name.endsWith('.md'))
       .filter(f => {
         const stat = fs.statSync(f);
         return stat.mtime >= start && stat.mtime <= end;
