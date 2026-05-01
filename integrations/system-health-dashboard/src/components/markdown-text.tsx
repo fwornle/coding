@@ -54,7 +54,7 @@ function renderInline(text: string): (string | JSX.Element)[] {
     if (token.startsWith('`')) {
       parts.push(
         <code key={match.index} className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
-          {token.slice(1, -1)}
+          {renderWithRedactionStyling(token.slice(1, -1), `code-${match.index}`)}
         </code>
       )
     } else if (token.startsWith('**')) {
