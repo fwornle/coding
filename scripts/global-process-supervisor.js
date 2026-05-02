@@ -63,9 +63,16 @@ class GlobalProcessSupervisor {
   log(message, level = 'INFO') {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level}] [Supervisor] ${message}`;
-    console.log(logEntry);
+    process.stderr.write(logEntry + '\n');
 
-    // Append to log file
+    // Gate file writes by level. DEBUG is console-only by default; promote
+    // to file via SUPERVISOR_LOG_LEVEL=DEBUG when actively investigating.
+    // Without this gate the supervisor produces ~9 MB of DEBUG noise per
+    // day (every-30s health-check spam for dormant projects).
+    const fileThreshold = (process.env.SUPERVISOR_LOG_LEVEL || 'INFO').toUpperCase();
+    const RANK = { DEBUG: 10, INFO: 20, WARN: 30, ERROR: 40 };
+    if ((RANK[level] || 20) < (RANK[fileThreshold] || 20)) return;
+
     try {
       fs.appendFileSync(this.logPath, logEntry + '\n');
     } catch {
@@ -507,7 +514,11 @@ class GlobalProcessSupervisor {
       const health = this.isMonitorHealthy(projectPath);
 
       if (!health.healthy) {
-        this.log(`Monitor unhealthy for ${path.basename(projectPath)}: ${health.reason}`);
+        // DEBUG: this fires every 30s for every dormant project whose
+        // monitor is intentionally not running. The downstream restart path
+        // logs INFO when it actually restarts; this detection is redundant
+        // signal otherwise.
+        this.log(`Monitor unhealthy for ${path.basename(projectPath)}: ${health.reason}`, 'DEBUG');
 
         if (await this.restartTranscriptMonitor(projectPath)) {
           restartCount++;
