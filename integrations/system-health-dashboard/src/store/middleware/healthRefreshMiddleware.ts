@@ -27,19 +27,77 @@ const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.S
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
 const UKB_API_URL = `http://localhost:${API_PORT}/api/ukb`
 
+// Polling cadence:
+//   ACTIVE_INTERVAL_MS — fast polling while a workflow is running/paused so the
+//                        viz stays smooth (matches the SSE stream cadence).
+//   IDLE_INTERVAL_MS   — slow polling when there is no active workflow. The
+//                        dashboard still needs to learn when one starts.
+// At idle the loop is the only thing running 24/7, so the order-of-magnitude
+// gap matters: 500 ms idle polling burns ~9% sustained CPU per backgrounded
+// dashboard tab. A backgrounded tab with hidden visibility pauses entirely.
+const ACTIVE_INTERVAL_MS = 500
+const IDLE_INTERVAL_MS = 2000
+
 // Singleton manager for auto-refresh
 class HealthRefreshManager {
   private refreshInterval: NodeJS.Timeout | null = null
+  private currentIntervalMs: number = IDLE_INTERVAL_MS
   private store: any = null
   private refreshCount = 0
   private sseConnection: EventSource | null = null
   private lastSSEUpdate: number = 0
+  private visibilityHandler: (() => void) | null = null
 
   initialize(store: any) {
     this.store = store
     Logger.info(LogCategories.REFRESH, 'HealthRefreshManager initialized')
+    this.installVisibilityListener()
     this.startAutoRefresh()
     this.connectSSE()
+  }
+
+  /**
+   * Returns the desired polling cadence based on current workflow state.
+   * Fast (500 ms) only while a workflow is active; slow (2 s) otherwise so a
+   * backgrounded dashboard tab does not burn 9% CPU 24/7.
+   */
+  private getDesiredIntervalMs(): number {
+    if (!this.store) return IDLE_INTERVAL_MS
+    try {
+      const state = this.store.getState()
+      const status = state?.ukb?.execution?.status
+      const running = state?.ukb?.running ?? 0
+      if (status === 'running' || status === 'paused' || running > 0) {
+        return ACTIVE_INTERVAL_MS
+      }
+    } catch {
+      /* fall through to idle */
+    }
+    return IDLE_INTERVAL_MS
+  }
+
+  /**
+   * Pause polling when the tab is hidden, resume (with an immediate refresh)
+   * when it becomes visible again. Eliminates overnight CPU burn from
+   * minimised/backgrounded dashboard tabs that browsers keep alive.
+   */
+  private installVisibilityListener() {
+    if (typeof document === 'undefined') return // SSR
+    if (this.visibilityHandler) return
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        Logger.debug(LogCategories.REFRESH, 'Tab visible — resuming auto-refresh')
+        this.fetchAllData()
+        this.startAutoRefresh()
+      } else {
+        Logger.debug(LogCategories.REFRESH, 'Tab hidden — pausing auto-refresh')
+        if (this.refreshInterval) {
+          clearInterval(this.refreshInterval)
+          this.refreshInterval = null
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', this.visibilityHandler)
   }
 
   /**
@@ -234,17 +292,34 @@ class HealthRefreshManager {
   }
 
   startAutoRefresh() {
+    // Don't start polling for hidden tabs — the visibility listener will
+    // resume us when the tab is shown again.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      Logger.debug(LogCategories.REFRESH, 'Skipping auto-refresh start: tab is hidden')
+      return
+    }
     if (this.refreshInterval) return
 
-    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (500ms interval for smooth workflow updates)')
+    const intervalMs = this.getDesiredIntervalMs()
+    this.currentIntervalMs = intervalMs
+    Logger.info(LogCategories.REFRESH, `Starting auto-refresh cycle (${intervalMs}ms interval)`)
 
     // Initial fetch
     this.fetchAllData()
 
-    // Auto-refresh every 500ms for smooth workflow visualization
     this.refreshInterval = setInterval(() => {
       this.fetchAllData()
-    }, 500)
+      // After each fetch, the workflow status may have flipped between
+      // idle/running. Re-evaluate cadence and restart the timer if it
+      // should change.
+      const desired = this.getDesiredIntervalMs()
+      if (desired !== this.currentIntervalMs) {
+        Logger.info(LogCategories.REFRESH, `Adjusting refresh cadence: ${this.currentIntervalMs}ms → ${desired}ms`)
+        if (this.refreshInterval) clearInterval(this.refreshInterval)
+        this.refreshInterval = null
+        this.startAutoRefresh()
+      }
+    }, intervalMs)
   }
 
   stopAutoRefresh() {
