@@ -102,17 +102,11 @@ flowchart TD
 
 ## MCP Server Communication
 
-**Native Mode**:
-
-```
-Claude CLI <--stdio--> MCP Server Process
-```
-
-**Docker Mode**:
-
 ```
 Claude CLI <--stdio--> Proxy <--HTTP/SSE--> Container Server
 ```
+
+The host-side Claude CLI talks to lightweight stdio proxies, which forward to the containerized MCP servers over HTTP/SSE.
 
 ## Storage Locations
 

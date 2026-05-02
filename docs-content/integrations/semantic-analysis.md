@@ -119,24 +119,7 @@ The QA agent implements feedback loops:
 
 ## Configuration
 
-**Native Mode**:
-
-```json
-{
-  "mcpServers": {
-    "semantic-analysis": {
-      "command": "node",
-      "args": ["/path/to/mcp-server-semantic-analysis/build/index.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "your-key",
-        "OPENAI_API_KEY": "optional-fallback"
-      }
-    }
-  }
-}
-```
-
-**Docker Mode**:
+The host-side Claude/Copilot CLI talks to the containerized semantic-analysis server via a lightweight stdio proxy:
 
 ```json
 {
@@ -183,7 +166,6 @@ extract_patterns {
 ## Health Check
 
 ```bash
-# Docker mode
 curl http://localhost:3848/health
 
 # View logs

@@ -6,38 +6,20 @@ Get coding running in under 5 minutes.
 
 ---
 
-## Installation Options
+## Installation
 
-Choose your deployment mode:
+Coding runs in Docker. All services (MCP servers, databases, dashboards) run as containers; only the Claude/Copilot CLI runs natively on the host and connects via lightweight stdio proxies.
 
-=== "Docker (Recommended)"
+![Docker Architecture](../images/docker-architecture.png)
 
-    ![Docker Architecture](../images/docker-architecture.png)
+**Benefits**:
 
-    **Benefits**:
+- Isolated services in containers
+- Persistent state survives restarts
+- Consistent behavior across machines
+- Easy cleanup (just stop containers)
 
-    - Isolated services in containers
-    - Persistent state survives restarts
-    - Multiple Claude sessions share browser
-    - Consistent behavior across machines
-    - Easy cleanup (just stop containers)
-
-    **Requirements**: Docker Desktop or Docker Engine
-
-    [Install with Docker](installation.md#docker-installation-recommended){ .md-button .md-button--primary }
-
-=== "Native"
-
-    **Benefits**:
-
-    - Lower resource usage (no Docker overhead)
-    - Direct access to processes for debugging
-    - Works without Docker installed
-    - Faster startup
-
-    **Requirements**: Node.js 18+ only
-
-    [Install Native](installation.md#native-installation){ .md-button }
+[Install with Docker](installation.md#docker-installation){ .md-button .md-button--primary }
 
 ---
 
@@ -45,11 +27,11 @@ Choose your deployment mode:
 
 | Tool | Required | Purpose |
 |------|----------|---------|
-| **Node.js 18+** | Yes | Runtime for all services |
+| **Docker** | Yes | Container runtime (Docker Desktop or Docker Engine) |
+| **Node.js 18+** | Yes | Runtime for the host-side launcher |
 | **Git** | Yes | Clone repository, submodules |
 | **jq** | Yes | JSON processing in scripts |
 | **tmux** | Yes | Unified agent session wrapping and status bar |
-| **Docker** | For Docker mode | Container runtime |
 
 ### Quick Install
 
@@ -57,14 +39,14 @@ Choose your deployment mode:
 
     ```bash
     brew install git node jq tmux
-    brew install --cask docker  # For Docker mode
+    brew install --cask docker
     ```
 
 === "Linux (Ubuntu/Debian)"
 
     ```bash
     sudo apt update && sudo apt install -y git nodejs npm jq tmux
-    curl -fsSL https://get.docker.com | sh  # For Docker mode
+    curl -fsSL https://get.docker.com | sh
     ```
 
 === "Windows (WSL2)"
@@ -83,7 +65,7 @@ Choose your deployment mode:
 git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
 cd ~/Agentic/coding
 
-# 2. Run installer (Docker mode is default)
+# 2. Run installer
 ./install.sh
 
 # 3. Reload shell

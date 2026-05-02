@@ -128,22 +128,10 @@ flowchart TB
 
 ## MCP Configuration
 
-MCP servers are configured automatically by the installer. The configuration depends on your deployment mode.
-
-### Docker Mode (Default)
-
-MCP servers run as HTTP/SSE services in Docker containers. Claude communicates via stdio-proxy:
+MCP servers are configured automatically by the installer. They run as HTTP/SSE services in Docker containers; Claude communicates via stdio-proxy:
 
 ```
 Claude Code <-> stdio-proxy.js <-> HTTP/SSE <-> Docker Container
-```
-
-### Native Mode
-
-MCP servers run as direct Node.js processes managed by Claude CLI:
-
-```
-Claude Code <-> stdio <-> Node.js Process
 ```
 
 ### Configuration Location
@@ -193,19 +181,13 @@ Each MCP server provides tools accessible within Claude sessions:
 
 ## Health Checks
 
-### Docker Mode
-
 ```bash
 # Check all health endpoints
 for port in 3848 3849 3850 8080 3032; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "N/A"')"
 done
-```
 
-### Native Mode
-
-```bash
-# Check if MCP servers are registered
+# Check MCP servers are registered
 cat ~/.claude/settings.json | jq '.mcpServers | keys'
 ```
 

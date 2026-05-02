@@ -74,24 +74,7 @@ Scopes: `full`, `structure`, `behavior`, `dependencies`
 
 ## Configuration
 
-**Native Mode**:
-
-```json
-{
-  "mcpServers": {
-    "code-graph-rag": {
-      "command": "node",
-      "args": ["/path/to/code-graph-rag/build/index.js"],
-      "env": {
-        "MEMGRAPH_HOST": "localhost",
-        "MEMGRAPH_PORT": "7687"
-      }
-    }
-  }
-}
-```
-
-**Docker Mode**:
+The host-side Claude/Copilot CLI talks to the containerized code-graph-rag server via a lightweight stdio proxy:
 
 ```json
 {

@@ -91,7 +91,7 @@ PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
   node scripts/batch-lsl-processor.js retroactive 2024-12-01 2024-12-03
 ```
 
-## Docker Mode Issues
+## Docker Issues
 
 ### Container Won't Start
 
@@ -127,9 +127,6 @@ kill $(lsof -ti :3848)
 ### Connection Refused
 
 ```bash
-# Verify Docker mode is active
-ls -la .docker-mode
-
 # Check container status
 docker compose -f docker/docker-compose.yml ps
 

@@ -60,7 +60,7 @@ git --version
 # jq
 jq --version
 
-# Docker (if Docker mode)
+# Docker
 docker --version
 docker info
 ```
@@ -83,7 +83,7 @@ If commands not found, check your PATH:
 echo $PATH | grep -q "Agentic/coding/bin" && echo "OK" || echo "Missing from PATH"
 ```
 
-### 3. Check Docker Services (Docker Mode)
+### 3. Check Docker Services
 
 ```bash
 # List running containers
@@ -139,7 +139,7 @@ curl -s http://localhost:8080/api/entities | jq 'length'
 
 **Symptoms**: Health check shows services as red/unavailable
 
-**Docker Mode Fix**:
+**Fix**:
 ```bash
 # Restart Docker services
 docker compose -f docker/docker-compose.yml restart
@@ -147,12 +147,6 @@ docker compose -f docker/docker-compose.yml restart
 # If that fails, rebuild
 docker compose -f docker/docker-compose.yml down
 docker compose -f docker/docker-compose.yml up -d --build
-```
-
-**Native Mode Fix**:
-```bash
-# Restart services
-coding --restart-services
 ```
 
 ### Port Conflicts
@@ -261,7 +255,7 @@ pkill -f "coding"
 
 # Remove state files
 rm -rf .data .specstory .health .logs .cache
-rm -f .docker-mode .transition-in-progress
+rm -f .transition-in-progress
 
 # Reinstall
 ./install.sh
@@ -285,8 +279,6 @@ node --version >> diagnostics.txt
 echo "=== Docker ===" >> diagnostics.txt
 docker --version >> diagnostics.txt
 docker compose version >> diagnostics.txt
-echo "=== Mode ===" >> diagnostics.txt
-ls -la .docker-mode 2>&1 >> diagnostics.txt
 echo "=== Services ===" >> diagnostics.txt
 docker compose -f docker/docker-compose.yml ps 2>&1 >> diagnostics.txt
 echo "=== Health ===" >> diagnostics.txt

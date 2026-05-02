@@ -133,7 +133,7 @@ All agents share the same infrastructure: tmux session wrapping, status line, he
 ## Quick Start
 
 ```bash
-# Clone and install (Docker mode is default)
+# Clone and install
 git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
 cd ~/Agentic/coding && ./install.sh
 

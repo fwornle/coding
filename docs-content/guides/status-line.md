@@ -8,21 +8,14 @@ Real-time visual indicators of system health and development activity rendered v
 
 ### Example Display
 
-**Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
-```
-
-**Docker Mode:**
-```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Component Breakdown
 
 | Component | Example | Description |
 |-----------|---------|-------------|
-| Docker Mode | `[🐳]` | Indicator that system is running in Docker mode |
 | Docker MCP Health | `[🐳MCP:SA✅CM✅CGR✅]` | Health of containerized MCP SSE servers |
 | System Health | `[🏥✅]` | Unified health (infrastructure + services) |
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons |
@@ -124,13 +117,7 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 
 ---
 
-## Docker Mode Indicators
-
-### Detection
-
-Docker mode is detected when:
-- The `.docker-mode` marker file exists in the coding repository
-- OR the `CODING_DOCKER_MODE=true` environment variable is set
+## Containerized MCP Indicators
 
 ### Docker MCP Health Display
 

@@ -99,7 +99,7 @@ GPS checks for the coordinator daemon via `pgrep` before restarting. This preven
 
 **Component**: `scripts/global-service-coordinator.js`
 
-**Function**: Manages constraint services (api-service port 3031, dashboard-service port 3030). In Docker mode, these services are managed by supervisord instead.
+**Function**: Manages constraint services (api-service port 3031, dashboard-service port 3030). These services are managed by supervisord inside the `coding-services` container.
 
 - 15-second health check loop with port-based liveness checks
 - **OS-level duplicate check** via `findRunningProcessesByScript()` before every spawn

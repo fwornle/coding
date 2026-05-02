@@ -64,7 +64,6 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 | **Constraint Testing** | Adding new constraints, debugging detection, or testing enforcement |
 | **VKB Visualization** | Exploring knowledge graphs or integrating VKB programmatically |
 | **Knowledge Workflows** | Understanding how knowledge is captured, processed, and stored |
-| **Docker Mode Setup** | Switching between native and Docker deployment modes |
 
 ## Quick Links
 

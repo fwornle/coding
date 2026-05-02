@@ -14,7 +14,7 @@ Before installing, ensure you have these tools:
     # Install prerequisites
     brew install git node jq tmux
 
-    # Install Docker Desktop (for recommended Docker mode)
+    # Install Docker Desktop
     brew install --cask docker
     ```
 
@@ -50,9 +50,9 @@ Before installing, ensure you have these tools:
 
 ---
 
-## Docker Installation (Recommended)
+## Docker Installation
 
-Docker mode provides the best experience with isolated services, persistent state, and easy management.
+Coding runs in Docker. All services (MCP servers, databases, dashboards) run as containers; only the Claude/Copilot CLI runs natively on the host.
 
 ![Docker Architecture](../images/docker-architecture.png)
 
@@ -77,13 +77,12 @@ cd ~/Agentic/coding
 
 The installer will:
 
-1. Detect Docker availability
-2. Create `.docker-mode` marker (enables Docker mode)
-3. Build Docker containers
-4. Configure Claude MCP servers for SSE/HTTP communication
-5. Set up Claude hooks (LSL, constraints)
-6. Initialize knowledge store
-7. Add `coding` and `vkb` commands to your PATH
+1. Verify Docker is installed and running
+2. Build Docker containers
+3. Configure Claude MCP servers for SSE/HTTP communication
+4. Set up Claude hooks (LSL, constraints)
+5. Initialize knowledge store
+6. Add `coding` and `vkb` commands to your PATH
 
 !!! info "Non-Intrusive Installation"
     The installer prompts before any system changes and creates timestamped backups of your shell configuration. Use `--skip-all` to decline all system-level changes.
@@ -114,28 +113,6 @@ coding
 
 ---
 
-## Native Installation
-
-Native mode runs MCP servers as direct Node.js processes. Use this if you prefer not to use Docker or need lower resource usage.
-
-### Installation Steps
-
-```bash
-# Clone repository
-git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
-cd ~/Agentic/coding
-
-# Run installer
-./install.sh
-
-# Reload shell
-source ~/.bashrc  # or ~/.zshrc
-```
-
-The installer requires Docker — there is no native fallback.
-
----
-
 ## What Gets Installed
 
 | Component | Location | Purpose |
@@ -155,7 +132,6 @@ The installer requires Docker — there is no native fallback.
 | `~/.claude/settings.json` | Claude hooks configuration |
 | `.env` | API keys and settings |
 | `.env.ports` | Port configuration |
-| `.docker-mode` | Docker mode marker (if Docker) |
 
 ---
 
@@ -213,7 +189,7 @@ docker compose -f docker/docker-compose.yml down 2>/dev/null
 pkill -f "coding"
 
 # Clean state (preserves knowledge base)
-rm -f .docker-mode .transition-in-progress
+rm -f .transition-in-progress
 
 # Reinstall
 ./install.sh

@@ -48,12 +48,11 @@ When a new agent is launched:
 
 1. `bin/coding` validates config exists in `config/agents/<name>.sh`
 2. Shared orchestrator (`launch-agent-common.sh`) sources the config
-3. Docker mode detection (3-tier: marker file, container check, env var)
-4. **Network detection** — VPN/CN status, proxy auto-configuration
-5. Services start (Docker compose or native, based on mode)
-6. Agent-specific hooks run (`agent_check_requirements`, `agent_pre_launch`)
-7. Agent validates API connectivity (`validate_agent_connectivity`)
-8. Agent launches wrapped in tmux session with unified status bar
+3. **Network detection** — VPN/CN status, proxy auto-configuration
+4. Services start (Docker compose brings up the `coding-services` container stack)
+5. Agent-specific hooks run (`agent_check_requirements`, `agent_pre_launch`)
+6. Agent validates API connectivity (`validate_agent_connectivity`)
+7. Agent launches wrapped in tmux session with unified status bar
 
 ### Startup Sequence
 
@@ -80,16 +79,14 @@ The launcher detects the network environment and automatically configures each a
 - All agents call `validate_agent_connectivity()` to verify API reachability before launch
 - `CODING_FORCE_CN=true/false` overrides detection for testing
 
-### Launcher Docker Mode Flow
+### Launcher Service-Startup Flow
 
-![Launcher Docker Mode Flow](../images/launcher-docker-mode-flow.png)
+![Launcher Docker Flow](../images/launcher-docker-mode-flow.png)
 
-All agents share identical Docker mode logic via `launch-agent-common.sh`:
+All agents share identical container-startup logic via `launch-agent-common.sh`:
 
-- Transition lock checking (waits for mode transitions)
-- 3-tier Docker mode detection
-- Conditional Docker/native service startup
 - Container reuse (health check before starting new containers)
+- Docker compose service startup
 - Docker MCP config generation
 
 ---
@@ -134,7 +131,7 @@ coding --agent myagent
 ```
 
 !!! info "What You Get Automatically"
-    - Docker mode detection and service startup
+    - Docker container startup
     - Monitoring verification
     - LSL transcript monitoring
     - Tmux session with status bar
@@ -190,7 +187,7 @@ agent_cleanup() {
 ```
 
 !!! tip "Hook Environment"
-    All hooks have access to `_agent_log` for logging, `$CODING_REPO`, `$TARGET_PROJECT_DIR`, `$DOCKER_MODE`, `$SESSION_ID`, and all other env vars set by the orchestrator.
+    All hooks have access to `_agent_log` for logging, `$CODING_REPO`, `$TARGET_PROJECT_DIR`, `$SESSION_ID`, and all other env vars set by the orchestrator.
 
 ---
 
@@ -422,7 +419,7 @@ coding --lsl-status
 ### Services Not Starting
 
 1. Are required ports available (8080, etc.)?
-2. Is Docker running (for Docker mode)?
+2. Is Docker running?
 3. Does `start-services.sh` complete successfully?
 
 ### Pipe-Pane Capture Not Working

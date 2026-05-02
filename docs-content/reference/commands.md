@@ -25,9 +25,6 @@ coding --force --claude
 # Dry run (validates config, network, Docker — does not launch)
 coding --opencode --dry-run
 
-# Docker mode
-touch .docker-mode && coding --claude
-
 # Help
 coding --help
 ```
@@ -151,18 +148,12 @@ docker compose -f docker/docker-compose.yml down -v
 
 ## Health Checks
 
-### Docker Mode
-
 ```bash
-# All health endpoints
-for port in 3847 3848 3849 3850; do
+# All MCP health endpoints
+for port in 3848 3849 3850; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status')"
 done
-```
 
-### Native Mode
-
-```bash
 # LSL monitor health
 cat .health/coding-transcript-monitor-health.json | jq '{status, activity}'
 

@@ -162,7 +162,7 @@ See `INTERACTIVE-TEST-PROMPTS.md` for manual test scenarios.
 # API health
 curl http://localhost:3031/api/health
 
-# Docker mode
+# MCP SSE health
 curl http://localhost:3849/health
 ```
 

@@ -13,27 +13,22 @@ package "Capture Layer" as capture {
 }
 
 package "Analysis Layer" as analysis {
-  component [GroqSemanticEngine] as groq {
-    note right : <50ms analysis\nmixtral-8x7b model
-  }
+  component "GroqSemanticEngine" as groq
+  note right of groq : <50ms analysis\nmixtral-8x7b model
 
-  component [ConstraintDetector] as detector {
-    note right : Pattern matching +\nSemantic analysis
-  }
+  component "ConstraintDetector" as detector
+  note right of detector : Pattern matching +\nSemantic analysis
 }
 
 package "Storage Layer" as storage {
-  component [Qdrant Docker Database] as qdrant {
-    note right : <3ms queries\nHNSW + quantization\nRuns in Docker container
-  }
+  component "Qdrant Docker Database" as qdrant
+  note right of qdrant : <3ms queries\nHNSW + quantization\nRuns in Docker container
 
-  component [DuckDBAnalytics] as duckdb {
-    note right : <5ms analytics\nColumnar storage
-  }
+  component "DuckDB Analytics" as duckdb
+  note right of duckdb : <5ms analytics\nColumnar storage
 
-  component [RedisCache] as redis {
-    note right : Sub-millisecond\nanalysis cache
-  }
+  component "Redis Cache" as redis
+  note right of redis : Sub-millisecond\nanalysis cache
 }
 
 package "Intervention Layer" as intervention {

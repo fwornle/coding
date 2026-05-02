@@ -9,7 +9,7 @@ System design principles and patterns for the coding infrastructure.
 ### 1. Agent-Agnostic Design
 
 !!! success "Multi-Agent Support"
-    Both **Claude Code** and **GitHub CoPilot** are fully supported with identical Docker mode logic, shared services, and unified launcher infrastructure. Adding new agents follows a documented adapter pattern.
+    Both **Claude Code** and **GitHub CoPilot** are fully supported with identical infrastructure (containerized services + stdio proxies on the host) and a unified launcher. Adding new agents follows a documented adapter pattern.
 
 The architecture supports multiple AI coding assistants through a unified adapter pattern:
 
@@ -66,21 +66,9 @@ Progressive escalation for reliability:
 | 2 | System Coordinator | Overall health, metrics |
 | 1 | System Watchdog | Critical failures, alerts |
 
-## Deployment Modes
+## Deployment
 
-### Native Mode (Default)
-
-MCP servers run as native stdio processes managed by Claude CLI.
-
-- **Pros**: Simple setup, no Docker, lower memory
-- **Cons**: Processes restart with each session
-- **Best for**: Individual developers
-
-### Docker Mode
-
-MCP servers run as HTTP/SSE services in containers.
-
-All services run in containers, so Docker Desktop must be installed and running. The stack is launched automatically by `coding --claude`. See the [Docker Deployment Guide](https://github.com/fwornle/coding/blob/main/docker/README.md) for container details.
+MCP servers run as HTTP/SSE services in Docker containers; the host-side Claude/Copilot CLI talks to them via lightweight stdio proxies. Docker Desktop must be installed and running. The stack is launched automatically by `coding --claude`. See the [Docker Deployment Guide](https://github.com/fwornle/coding/blob/main/docker/README.md) for container details.
 
 ## Development Patterns
 

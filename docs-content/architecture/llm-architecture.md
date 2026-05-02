@@ -84,7 +84,7 @@ The system supports 14 LLM providers with tier-based model selection:
 - Automatic quota tracking with persistent storage
 - Exponential backoff on exhaustion (5m → 15m → 1h)
 - Seamless fallback to API providers
-- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+- **From containers**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
 #### 2. GitHub Copilot (Primary Provider)
 **Method**: Direct HTTP POST to Copilot API
@@ -107,7 +107,7 @@ The system supports 14 LLM providers with tier-based model selection:
 - Shared quota tracking system
 - Automatic provider rotation on exhaustion
 - Zero API costs
-- **Docker mode**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+- **From containers**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
 ---
 

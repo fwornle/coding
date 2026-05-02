@@ -29,7 +29,6 @@ vkb
 |----------|---------|
 | `CODING_TOOLS_PATH` | Path to coding repository |
 | `CODING_REPO` | Same as above (alias) |
-| `CODING_DOCKER_MODE` | Enable Docker mode (`true`) |
 | `LSL_ENABLED` | Enable Live Session Logging |
 | `TRANSCRIPT_SOURCE_PROJECT` | Current project path |
 
