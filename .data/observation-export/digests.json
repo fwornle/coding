@@ -8686,5 +8686,515 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "0589da2c-8232-49c8-95a5-67d0463978dd",
+    "date": "2026-05-01",
+    "theme": "VS Code SCM Git Discovery Broken by Nested Repos",
+    "summary": "Investigated and partially resolved VS Code SCM panel failing to show the main `coding` repo and its submodules due to nested `.git` directories confusing the git extension.\n\n- Reverted `coding.code-workspace` to a known-good baseline after confirming a second nested workspace folder breaks git discovery\n- Added `.specstory` to `repositoryScanIgnoredFolders` to suppress symlink traversal into `.specstory/history/.git`\n- Discussion concluded that the cleanest long-term fix is outputting directly to `.specstory/history/` (writer-output approach) rather than patching workspace config\n- At end of day (obs 35), workspace file updated again to implement Schema A settings with SCM panel in parallel display mode",
+    "observationIds": [
+      "1568ed62-286d-4f87-9d9f-bb4822d3ba50",
+      "8d031abc-2c46-4c9a-8cc8-b78d8a1ac638",
+      "fe7d275d-bfa3-4134-9c7a-bfadd2b595c1",
+      "03194c69-5716-410c-847f-c1332d5ae37f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/clipboard-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2c2861b9-4122-4c98-bc7a-804c9fa6f016",
+    "date": "2026-05-01",
+    "theme": "Classification Log Path Migration to history/ Subfolder",
+    "summary": "Migrated classification log output from `.specstory/logs/classification/` into `.specstory/history/logs/classification/` to eliminate the unblessed nested repo that VS Code's SCM was discovering as a separate root.\n\n- Updated path references in `scripts/classification-logger.js`, `bin/init-history.sh`, `install.sh`, and `.gitignore`\n- Discovered that the global LSL coordinator (PID 90030) was still running on old paths post-commit and needed an explicit kill/restart\n- Committed the four modified files as `18f594851`; `.claude/settings.local.json` left uncommitted as runtime drift\n- Post-restart: 9 transcript monitors respawned, 8 duplicate monitors (supervisor race condition) cleaned up, leaving 1 supervisor and 1 monitor per project\n- Old `.specstory/logs/classification/` directory (828 files) flagged for deletion pending developer confirmation",
+    "observationIds": [
+      "2cc90133-0c9a-4440-80cf-0ba9b0cbed44",
+      "c321994b-d145-4979-a366-f777bf403a6e",
+      "1f543bac-9c94-4fe1-bb0c-e12b8d186781",
+      "902ca903-4f0a-4d5b-a5b2-378e0633cfbe",
+      "78478d46-3eae-417e-b3e7-d5ff50461572",
+      "c6173cb8-fb76-4523-8eba-b5bc2959f8c1",
+      "c88edb47-f0d8-4d52-bc0b-b395c4aa6733",
+      "d107f69f-ed20-4e0b-81a7-2ab93bdf67b5",
+      "a25db2a5-1091-4cdb-82b4-45ea37f51509"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/classification-logger.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/bin/init-history.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/install.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore",
+      "copy-button.tsx",
+      "clipboard-button.tsx",
+      "observation-card.tsx",
+      "digests.tsx",
+      "insights.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/live-logging-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "coding"
+  },
+  {
+    "id": "582500f3-43f0-4f2d-b2d0-0944459ff21a",
+    "date": "2026-05-01",
+    "theme": "Dashboard Clipboard Button UI Feature Added",
+    "summary": "Built and shipped a reusable clipboard copy button for all three card types in the system health dashboard.\n\n- Created `clipboard-button.tsx` (named to avoid the \"copy\" evolutionary flag) using Lucide icons with a 1.5s checkmark confirmation and click propagation stop\n- Wired into `observation-card.tsx` (shows on row expand), `digests.tsx` (right-aligned in header), and `insights.tsx` (next to confidence badge)\n- Each card type copies formatted markdown: raw markdown for observations, theme/summary/files for digests, topic/summary/confidence for insights\n- Committed as a standalone UI feature commit alongside refreshed observation export (+944/-174 lines) and knowledge export data",
+    "observationIds": [
+      "e4a926ea-8357-44b9-af46-4db991a3d540",
+      "930f05ad-c0e6-4ead-a9a5-ecf12bbd87f9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/copy-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/clipboard-button.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/observation-card.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f8e809c2-1b16-4940-9676-d08a288e8e06",
+    "date": "2026-05-01",
+    "theme": "Flatten Nested .specstory/history Directory Structure",
+    "summary": "Investigated and flattened an unexpectedly nested `.specstory` directory structure that had accumulated duplicate and misplaced files.\n\n- Discovered `.specstory/history/history/` (2.6 GB) and `.specstory/history/archive/` (~206 MB) as nested artifacts inside the inner git repo\n- Safely removed empty `.specstory/archive/` at top level; flagged large nested dirs for confirmation before touching\n- Moved 19,691 LSL `.md` files from `history/history/` up to `history/` root; 5 archive files moved up; 30 orphan log files from top-level `.specstory/logs/` absorbed into `history/logs/`\n- 5 filename collisions preserved as `.legacy.md` variants to avoid data loss\n- Changes committed to inner `.specstory/history` repo as `d00bd42c`",
+    "observationIds": [
+      "2020eb26-d52a-4eb7-bdab-5d5fadbdf330",
+      "1e948cc8-35f4-4fff-ae00-cd4827cfe7f7",
+      "1c6f52ed-8f3e-4662-a572-f2a4c2b11de8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/live-logging-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fed84267-52e6-499f-971a-c665b7bfb290",
+    "date": "2026-05-01",
+    "theme": "live-logging-coordinator Default Paths Updated",
+    "summary": "Evaluated whether `live-logging-coordinator.js` could be deleted after the migration, then took the lighter-weight path of updating its internal defaults instead.\n\n- Audit found active references in `start-services.sh`, `stop-services.sh`, config files, and multiple test files — full retirement would require broad refactoring\n- User selected option 1 (keep file, update paths); both default `specstory/history` log paths inside `scripts/live-logging-coordinator.js` were updated to the new migrated structure\n- Change committed to the repo",
+    "observationIds": [
+      "09475df7-53db-415a-bd21-98e76c37b7d1",
+      "a07c1922-47f5-40e2-ae96-e08c6faba9c5",
+      "8e80edb2-15a8-467d-8220-d9f07384e25c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/live-logging-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eeb76f5c-e9e9-4656-9084-670adb40e460",
+    "date": "2026-05-01",
+    "theme": "Push .specstory/history Commits to GHE Remote",
+    "summary": "Verified and pushed pending commits from the inner `.specstory/history` repo to the company GitHub Enterprise remote.\n\n- Found 2 unpushed commits in the inner repo and 1 in the outer `coding` repo pending VPN connectivity\n- Once VPN confirmed active, push executed successfully (obs 21); subsequent check (obs 23, opencode agent) confirmed the inner repo was fully synced — 0 commits ahead/behind\n- VS Code SCM fix for the outer `coding` repo was deferred in these exchanges",
+    "observationIds": [
+      "035ca3f6-ea88-49e6-8626-dc40084d7334",
+      "be70cece-0cc1-4eaf-bbc7-290355b134c0",
+      "f579f3d6-25d8-4df7-b242-dd0eab0850c4"
+    ],
+    "agents": [
+      "claude",
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d8f1bd7e-97c3-4a00-af01-0f1d6e269a29",
+    "date": "2026-05-01",
+    "theme": "SSH Authentication Failure with GitHub Enterprise",
+    "summary": "Extended troubleshooting session (opencode agent) diagnosing SSH key rejection against the company GHE instance.\n\n- New ed25519 work key uploaded but consistently showed \"Never used\" on GHE despite org-level SSO authorization for both organizations\n- Ruled out: key format validity, fingerprint mismatch, proxy interference, agent state issues\n- Key was confirmed SAML-authorized and cryptographically intact; server accepts the key type but rejects the specific key\n- Root cause identified as likely a SAML SSO session timing issue — GHE requires an active SAML session at the moment of key authorization\n- Recommended fix: log out and back into GHE to refresh the SAML session, then immediately re-add and re-authorize the SSH key",
+    "observationIds": [
+      "b0c398c5-67a8-4129-88dd-8854568e70a8",
+      "548e7dcc-dbcd-48fd-bd61-b78c9cf0fc5f",
+      "e2c41416-6de7-42dd-84d6-0ad9dfe8c0bf",
+      "e610cb2a-0aea-456f-86aa-a9adcaced708",
+      "b6f33271-2b0a-464e-b85b-6e5cbf58d2fe",
+      "3621daf6-8d9e-4aa3-942a-6a93ad43d873",
+      "232ef2b0-d285-4887-bc05-41a3f9675eb1",
+      "80114670-e6e2-4981-a487-c4876b5336a9"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 8
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7286f89a-cf29-43cd-892a-1a864113d41c",
+    "date": "2026-05-01",
+    "theme": "Plan LSL Files into YYYY/MM Subfolder Structure",
+    "summary": "Scoped a planned reorganization of LSL files and classification logs into a `YYYY/MM/*` subdirectory hierarchy.\n\n- Audited 19 files with path references, categorized into writers, readers, setup scripts, and test roles\n- No code changes made; assistant presented a full plan and requested two key decisions before proceeding: whether to keep full date prefixes in filenames or strip them, and whether to apply the same `YYYY/MM` structure to `logs/` as well",
+    "observationIds": [
+      "50008310-7bc7-408b-a2d1-889e2a386ea8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "896887cb-ba97-4251-9d02-06e6d460f50e",
+    "date": "2026-05-01",
+    "theme": "Remove Duplicate coding-history Repo from adpnext-apps Org",
+    "summary": "Verified that the local codebase already references `Frank-Woernle/coding-history` as its remote origin, making a local config change unnecessary.\n\n- Both opencode agent sessions confirmed the `.specstory/history` remote is correctly pointed at `Frank-Woernle/coding-history`\n- Deletion of the `adpnext-apps/coding-history` duplicate requires org admin action via the GHE web UI — current user lacks sufficient permissions to perform it via CLI",
+    "observationIds": [
+      "d6aa76c9-8ca8-4a1b-ac92-e7de9ce9e751",
+      "971b1b61-a28c-4625-a895-872bc14c5c7b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9da5ade1-cb39-474b-ac82-ec611f4a5933",
+    "date": "2026-05-01",
+    "theme": "VSCode Workspace Schema and SCM Configuration Update",
+    "summary": "Configured the VSCode workspace file to consolidate settings across Schema A, log configuration, and SCM parallel mode.\n\n- Updated `.code-workspace` to add missing SCM-related settings while preserving existing schema and log configurations\n- Changes were committed with Schema A configuration, unified log settings, and VSCode SCM enabled in parallel mode",
+    "observationIds": [
+      "ade5a2c1-4244-4595-bd96-45bac0bbe818"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4834a372-efdd-4614-b232-ee16d22c1399",
+    "date": "2026-05-01",
+    "theme": "LSL Central Paths Script Update",
+    "summary": "Following user approval of a previously proposed change, the central LSL paths script was updated.\n\n- Investigated the project's module system and file structure prior to making changes\n- Updated `scripts/lsl-paths.js` as proposed, aligning it with the LSL system's path conventions",
+    "observationIds": [
+      "624b86d5-3e8f-47e4-b810-2be1876f2cc1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/lsl-paths.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "57c75995-3803-4e85-9ce0-2e7ee4595032",
+    "date": "2026-05-01",
+    "theme": "OperationalLogger system.log Path Relocation into LSL History",
+    "summary": "Investigated ownership of `.specstory/logs/system.log` and resolved its placement within the LSL system's expected directory structure.\n\n- Traced the log file writer to `OperationalLogger.js` via source investigation\n- Observation 38 identified the file as the writer but left relocation unresolved; observation 39 completed the fix\n- Updated `src/live-logging/OperationalLogger.js` to redirect `system.log` output from `.specstory/logs/` to `.specstory/history/logs/`, aligning with LSL conventions\n- A secondary issue — sub-repos still appearing — was noted but not addressed in these observations",
+    "observationIds": [
+      "471f8634-dd93-4f5a-840e-dc986e86074d",
+      "d3829f62-e631-410e-8bb7-1ecc04674718"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/OperationalLogger.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T00:27:10.247Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a97072cd-108f-4af5-9fd5-90494be45710",
+    "date": "2026-05-01",
+    "theme": "Multi-phase refactor dropping native/docker-mode branches",
+    "summary": "Resumed and completed a multi-phase refactoring effort to treat Docker mode as always-true across the codebase.\n\n- **Phase C (service scripts):** Stripped all `isDockerMode`, `isTransitionLocked`, `monitoringPaused`, native-mode fallbacks, and SIGUSR signal handlers from 8 scripts: `post-session-logger.js`, `global-process-supervisor.js`, `health-remediation-actions.js`, `combined-status-line.js`, `start-services-robust.js`, `health-verifier.js`, `statusline-health-monitor.js`, `global-service-coordinator.js`. Deleted `docker-mode-transition.js` as no longer imported.\n- **Phase D (docs/PUML):** Deleted obsolete native-mode/transition files (`docker-mode-transition.md`, `docker-mode-architecture.puml`, `docker-health-detection.puml`, associated PNGs); updated 14 markdown files and 4 PUML diagrams across `docs/` and `docs-content/` to reflect docker-only architecture.",
+    "observationIds": [
+      "b8928315-7f70-4e84-84ca-dacc5b45eb06",
+      "92383b66-69e1-4dff-8b74-0ede6a02c1a7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/post-session-logger.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-process-supervisor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-remediation-actions.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/start-services-robust.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-verifier.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/statusline-health-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-service-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/health-system/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/architecture-report.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/getting-started.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/health-system/robust-startup-system.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/agent-integration-guide.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/agent-integration.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/getting-started/installation.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/getting-started/verify-repair.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/getting-started/index.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/integrations/llm-cli-proxy.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/agent-agnostic-architecture-components.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/launcher-docker-mode-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/mcp-config-selection.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/launcher-startup-sequence.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T09:56:27.439Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5d2961ad-ab4c-47d2-8a4f-36cfd051fabf",
+    "date": "2026-05-01",
+    "theme": "VS Code SCM panel parent repo disappearing debug",
+    "summary": "Extended investigation and iterative fixing of a VS Code SCM panel issue where the parent `coding` repo would briefly appear then vanish.\n\n- Root cause traced to the nested `.specstory/history/.git` repo (a GHE remote) triggering enterprise auth failures and tearing down the repo list.\n- Initial fix: added `git.repositoryScanIgnoredFolders: [\".specstory\"]` and `git.openRepositoryInParentFolders: \"never\"` to `coding.code-workspace`.\n- Attempted symlinking `.specstory/logs/classification/` into `.specstory/history/logs/` and switching to `git.scanRepositories` to surface the private repo — this broke parent repo detection and was reverted.\n- Attempted multi-root workspace configuration adding `coding-history (private)` and 5 submodules as separate roots — also broke detection, reverted.\n- Final resolution: removed symlinks from `.specstory/logs/classification/`, restored real files, reverted `coding.code-workspace` to known-good baseline with `ignoredRepositories` safety net. Recommended redirecting classification writers to output directly into the private repo path instead of using symlinks.",
+    "observationIds": [
+      "63a11803-06d1-4763-8b82-8d54072f076c",
+      "340e0b0c-4ec4-441d-9870-65beeca5323d",
+      "635bfa74-da33-425c-ab6c-82917363b43f",
+      "1f341e8a-b42e-4ec3-b336-df79b1b0fe19",
+      "4af03b0e-5ab6-4ac0-bf72-78787c82ec18",
+      "8dda98c4-2b24-4da3-aa6f-47b0f9da5583"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T09:56:27.439Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "583b0194-0fc3-440f-b495-96d753851822",
+    "date": "2026-05-01",
+    "theme": "GSD tool updated from v1.38.5 to v1.39.0",
+    "summary": "Ran the GSD update workflow, detected a new version, and upgraded globally from v1.38.5 to v1.39.0. The update consolidated 31 micro-skills into grouped parent commands with flags. A restart of Claude Code is required to pick up the changes. No files were directly edited.",
+    "observationIds": [
+      "ab68e9eb-6d4b-4a9c-8a12-370981afae42"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-02T09:56:27.439Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7303c6d8-335a-41a6-9cf2-da201eab2b92",
+    "date": "2026-05-01",
+    "theme": "Migrate log paths to `.specstory/history/logs/`",
+    "summary": "Completed log path migration by updating default paths in `live-logging-coordinator.js` to target `.specstory/history/logs/` instead of `.specstory/logs/`. Both default path entries in the file were updated, completing the migration across all active LSL writer scripts. Change committed as `1cca23c3e`.",
+    "observationIds": [
+      "7a3dd66b-a41a-4b6e-913e-e8104d7f4629"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/live-logging-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T09:56:27.439Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d182720e-c19f-4e65-8883-29b0bcff96b4",
+    "date": "2026-05-02",
+    "theme": "Session Context Load and Monitor Health Check",
+    "summary": "Loaded recent session logs to restore context from prior May 1-2 work, covering LSL filesystem reorganization and ghost process resolution. Verified post-restart health of the LSL monitor (PID 80134) and coordinator processes, confirming stability. Open threads noted: Phase 10 runtime issues, wave-analysis race condition, SCM panel fix awaiting user confirmation, and a respawn loop in other project monitors.",
+    "observationIds": [
+      "f3ac80c7-8311-46e2-b18e-7b2d0388f25f",
+      "e8212313-dd5e-4e8b-af2d-90f92e85e204"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-process-supervisor.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-02T14:22:49.603Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "80feab7d-8f73-4548-bc10-b1d16cf31703",
+    "date": "2026-05-02",
+    "theme": "Coding Services Container Idle CPU Diagnosis and Fix",
+    "summary": "Investigated persistent high CPU usage (~8-9%, later observed at 13-30%) in the `coding-services` Docker container during idle periods with no active clients.\n\n**Diagnosis path:**\n- Checked health files, supervisor/coordinator logs, and SSE stream behavior to narrow the source\n- Used `docker stats` sampling and `top -bn2` delta-based per-PID profiling to identify internal timers\n- Found a 100ms `setInterval` at `server.js:1031` firing 10×/second regardless of client connections\n- PID 99 (`system-health-dashboard/server.js`) identified spiking to 6-8% on a ~12-14s cadence; PID 132 caught at 84% in a single tick\n\n**Fixes applied across three commits:**\n- `scripts/global-process-supervisor.js`: DEBUG file-write gate to reduce logging (~9MB/day saved)\n- `scripts/health-prompt-hook.js`: cwd-robust LSL check to eliminate false alarms\n- `integrations/system-health-dashboard/src/store/middleware/healthRefreshMiddleware.ts`: adaptive polling with visibility gate to cut idle CPU ~10×\n- `integrations/system-health-dashboard/server.js`: SSE handler rewritten to stat-gate the 618KB JSON read on `mtimeMs+size`, adaptive intervals (100ms active / 1s idle), dead `watcher`/`debounceTimer` declarations removed — committed as `e1f12d7ab`, dropping idle CPU from ~5% to ~1.93%\n\nPost-fix analysis confirmed baseline reduction; `code-graph-rag` Python SSE server identified as next optimization target. Intermittent 7-8% spikes on ~12-14s cadence remained under investigation at session end.",
+    "observationIds": [
+      "f96da570-6526-462a-84c1-3a3cb7b682f2",
+      "5e5eb5b4-4008-4053-8878-07982aeb5cc3",
+      "bbe8eee6-2991-4dfc-81ca-7158c45e1e60",
+      "d1c87dc6-2caf-408d-97f4-39b6ac60fca2",
+      "8668d5a0-d703-43b5-bba1-d54b9c1afbb8",
+      "34660757-1533-49ef-b4ff-bfaf50f68476",
+      "62393201-a18f-418b-921e-f03703e88b82",
+      "40e950ed-e4da-4163-becd-9d6ba4dee12b",
+      "23c85066-5edd-45f0-9ed9-217492bdca27",
+      "7e1d4f50-9772-4dce-91ca-7679bb0aeac3",
+      "87e9f867-e1dc-463f-8bab-23c025af2bdc",
+      "cbe3bafb-8b66-4820-b199-e5c45a8c1218",
+      "6b6665dc-417f-4270-8752-be143f43fabf",
+      "c520bfcd-c522-4be7-a73c-cc746b0e1475",
+      "1e62a478-76e8-4c52-93a8-4dd25cbe9f0f",
+      "55e7d2b9-25b8-4579-beb1-3064023bdadd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/global-process-supervisor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/store/middleware/healthRefreshMiddleware.ts",
+      "scripts/health-prompt-hook.js",
+      "integrations/system-health-dashboard/src/store/middleware/healthRefreshMiddleware",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T14:22:49.603Z",
+    "metadata": {
+      "sourceCount": 16
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d9bda45b-b40f-44b7-a350-840df2970c4b",
+    "date": "2026-05-02",
+    "theme": "GSD Tool Update Check and Version Upgrade",
+    "summary": "Ran the GSD update skill to check for available upgrades. Detected GSD `1.39.1` available against installed `1.39.0`; changelog was fetched and displayed. Installation was pending user confirmation at session end.",
+    "observationIds": [
+      "9b9746ff-612a-4620-b58a-a72f7a3475e6",
+      "94720c91-24e9-4467-9296-f016877bc620"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-02T14:22:49.603Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eb6ed09a-230e-4a4b-9566-c26ef88f4b1a",
+    "date": "2026-05-02",
+    "theme": "Surfacing Remote Coding-History Repo in VSCode",
+    "summary": "All three observations represent the same investigative session where `claude` worked toward displaying a company GitHub Enterprise `coding-history` repository in VSCode's Source Control panel.\n\n- Initial steps focused on examining existing git remotes and local file structure to understand the current workspace setup\n- No `coding-history` directory was found on disk, leading to the key insight that VSCode can only surface repositories that exist locally\n- Three approaches were proposed as solutions: **multi-root workspace**, **sibling repo with auto-discovery**, or **submodule**\n- No files were created or modified; the session ended with clarifying questions pending (full repo URL, desired disk location, preferred workspace approach)",
+    "observationIds": [
+      "79e69e1f-360e-4360-a6cc-bc3b38d395a3",
+      "04887ca0-a02f-4c7d-a137-7cdbe07613c9",
+      "2c3c6ba3-ee70-4b84-8a8a-9cd6a36130c5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-02T14:25:21.872Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
   }
 ]
