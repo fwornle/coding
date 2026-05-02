@@ -11,7 +11,7 @@ participant "refresh_entity\nTool" as REFRESH
 participant "Content\nValidation\nAgent" as CVA
 participant "Insight\nGeneration\nAgent" as IGA
 participant "Semantic\nAnalyzer" as SA
-participant "Serena\nCode\nAnalyzer" as SERENA
+participant "Code Graph\nRAG" as CGR
 participant "LLM\n(Groq/Gemini/\nAnthropic)" as LLM
 database "GraphDB" as DB
 collections "Insight\nDocument\n(.md)" as MD
@@ -35,10 +35,10 @@ end note
 CVA -> IGA : refreshEntityInsights()
 activate IGA
 
-IGA -> SERENA : analyzeCodeReferences()
-activate SERENA
-SERENA --> IGA : code symbols + file structures
-deactivate SERENA
+IGA -> CGR : analyzeCodeReferences()
+activate CGR
+CGR --> IGA : code symbols + file structures
+deactivate CGR
 
 group Deep Insight Generation [LLM-powered analysis]
   IGA -> SA : analyzeContent(prompt)
