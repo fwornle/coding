@@ -149,6 +149,193 @@ ensure_coding_runtime_ignored() {
 export -f ensure_coding_runtime_ignored
 
 # ==============================================================================
+# PRIVATE HISTORY REPO BOOTSTRAP
+# ==============================================================================
+# Ensure .specstory/history/ is a private git repo separate from the outer project.
+# On first encounter of a project, prompts the user (with a derived default) for
+# the remote URL. Skips silently on subsequent launches. Honors $LSL_HISTORY_AUTO
+# (= "yes" | "no") and $LSL_HISTORY_REMOTE_TEMPLATE for non-interactive setups.
+#
+# Layout when done:
+#   <project>/.specstory/history/.git   <- private repo
+#   <project>/.specstory/history-skipped <- marker if user declined
+#   <project>/.gitignore                 <- contains '.specstory/history/'
+ensure_private_history_repo() {
+  local project_dir="$1"
+  local history_dir="$project_dir/.specstory/history"
+  local skipped_marker="$project_dir/.specstory/.history-repo-skipped"
+
+  # 1. Already configured — nothing to do
+  if [ -d "$history_dir/.git" ] || [ -f "$history_dir/.git" ]; then
+    return 0
+  fi
+
+  # 2. User previously declined — leave them alone
+  if [ -f "$skipped_marker" ]; then
+    return 0
+  fi
+
+  # 3. Outer must be a git repo (so we can ignore .specstory/history/ in it)
+  if ! git -C "$project_dir" rev-parse --git-dir >/dev/null 2>&1; then
+    log "Skipping private history repo bootstrap: $project_dir is not a git repository"
+    return 0
+  fi
+
+  # 3a. Refuse to migrate if outer repo already tracks files under .specstory/history/
+  # Adding it to .gitignore would NOT untrack existing files — that needs a deliberate
+  # `git rm --cached` by the user. Print the recipe and skip.
+  local tracked_history_count
+  tracked_history_count=$(git -C "$project_dir" ls-files .specstory/history 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${tracked_history_count:-0}" -gt 0 ]; then
+    log "⚠️  Outer repo already tracks $tracked_history_count file(s) under .specstory/history/"
+    log "    Refusing to bootstrap a private history repo over tracked files."
+    log "    To migrate manually:"
+    log "      cd $project_dir"
+    log "      git rm -r --cached .specstory/history/"
+    log "      git commit -m 'chore: stop tracking .specstory/history (moving to private repo)'"
+    log "    Then re-run coding/bin/coding to bootstrap the private repo."
+    touch "$skipped_marker"
+    return 0
+  fi
+
+  # 4. Derive default remote URL from outer repo's remote, swapping in -history suffix
+  local default_url=""
+  local outer_remote
+  outer_remote=$(git -C "$project_dir" config --get remote.origin.url 2>/dev/null || true)
+  local project_name
+  project_name=$(basename "$project_dir")
+
+  if [ -n "$outer_remote" ]; then
+    # Replace the trailing .git path component with <name>-history.git
+    # Handles git@host:owner/repo.git, https://host/owner/repo.git, etc.
+    local host_owner repo_basename
+    if [[ "$outer_remote" =~ ^([^/]+/)([^/]+)\.git$ ]]; then
+      host_owner="${BASH_REMATCH[1]}"
+      repo_basename="${BASH_REMATCH[2]}"
+      default_url="${host_owner}${repo_basename}-history.git"
+    else
+      # Fallback: append -history before .git
+      default_url="${outer_remote%.git}-history.git"
+    fi
+  fi
+
+  # Honor template override
+  if [ -n "${LSL_HISTORY_REMOTE_TEMPLATE:-}" ]; then
+    default_url="${LSL_HISTORY_REMOTE_TEMPLATE//\{project\}/$project_name}"
+  fi
+
+  # 5. Decide remote URL — prompt unless non-interactive or LSL_HISTORY_AUTO is set
+  local remote_url=""
+  local auto_mode="${LSL_HISTORY_AUTO:-}"
+
+  if [ "$auto_mode" = "no" ]; then
+    log "LSL_HISTORY_AUTO=no — skipping private history repo bootstrap for $project_name"
+    touch "$skipped_marker"
+    return 0
+  fi
+
+  if [ "$auto_mode" = "yes" ]; then
+    remote_url="$default_url"
+    log "LSL_HISTORY_AUTO=yes — using default remote: $remote_url"
+  elif [ -t 0 ] && [ -t 1 ]; then
+    # Interactive prompt
+    echo ""
+    echo "─────────────────────────────────────────────────────────────────"
+    echo " 🔐 Private History Repo Setup ($project_name)"
+    echo "─────────────────────────────────────────────────────────────────"
+    echo " LSL session logs are stored in .specstory/history/ as a separate"
+    echo " private git repo, so chat history never leaks into the public repo."
+    echo ""
+    if [ -n "$default_url" ]; then
+      echo " Default remote: $default_url"
+    else
+      echo " (no default could be derived from outer repo's remote)"
+    fi
+    echo ""
+    echo " Press Enter to accept default, type a URL, or 'skip' to opt out."
+    echo "─────────────────────────────────────────────────────────────────"
+    local answer
+    read -r -p "Remote URL [${default_url:-skip}]: " answer
+
+    case "$answer" in
+      skip|no|n|N)
+        log "User declined private history repo for $project_name — marking and continuing"
+        touch "$skipped_marker"
+        return 0
+        ;;
+      "")
+        remote_url="$default_url"
+        ;;
+      *)
+        remote_url="$answer"
+        ;;
+    esac
+  else
+    # Non-interactive and no auto setting — skip silently with hint
+    log "Non-interactive launch — skipping private history repo bootstrap"
+    log "  To configure: re-run interactively, or set LSL_HISTORY_AUTO=yes (with optional LSL_HISTORY_REMOTE_TEMPLATE)"
+    return 0
+  fi
+
+  # 6. Create the directory + init the nested repo
+  mkdir -p "$history_dir"
+  if ! git -C "$history_dir" init -b main >/dev/null 2>&1; then
+    log "❌ Failed to git-init $history_dir — aborting private history setup"
+    return 1
+  fi
+  log "✅ Initialized private history repo at $history_dir"
+
+  # 7. Ensure outer .gitignore ignores .specstory/history/
+  local outer_gitignore="$project_dir/.gitignore"
+  touch "$outer_gitignore"
+  if ! grep -qxF ".specstory/history/" "$outer_gitignore" 2>/dev/null && \
+     ! grep -qxF ".specstory/history" "$outer_gitignore" 2>/dev/null; then
+    {
+      echo ""
+      echo "# Private history repo — chat logs live in a separate <name>-history repo"
+      echo ".specstory/history/"
+    } >> "$outer_gitignore"
+    log "✅ Added .specstory/history/ to outer .gitignore"
+  fi
+
+  # 8. Wire remote + initial commit
+  if [ -n "$remote_url" ]; then
+    git -C "$history_dir" remote add origin "$remote_url" 2>/dev/null || \
+      git -C "$history_dir" remote set-url origin "$remote_url"
+    log "✅ Configured remote: $remote_url"
+
+    # Stage anything already in the directory + a placeholder if empty
+    if [ -z "$(ls -A "$history_dir" 2>/dev/null | grep -v '^\.git$')" ]; then
+      cat > "$history_dir/README.md" <<EOF
+# ${project_name}-history
+
+Private LSL/session history for the **${project_name}** project. Created by
+\`coding/bin/coding\` on first launch. Do not make this repo public.
+EOF
+    fi
+
+    git -C "$history_dir" add -A >/dev/null 2>&1
+    git -C "$history_dir" commit -m "Initial private history repo for ${project_name}" >/dev/null 2>&1 || true
+
+    # Try to push — non-fatal if remote doesn't exist yet
+    if git -C "$history_dir" push -u origin main 2>/dev/null; then
+      log "✅ Pushed initial commit to $remote_url"
+    else
+      log "ℹ️  Could not push to $remote_url yet (remote may not exist)."
+      if command -v gh >/dev/null 2>&1; then
+        log "   To create it: gh repo create ${remote_url##*/} --private --source $history_dir --push"
+      else
+        log "   Create the private repo on the host, then: git -C $history_dir push -u origin main"
+      fi
+    fi
+  else
+    log "ℹ️  No remote URL provided — local-only repo. Add one later with:"
+    log "    git -C $history_dir remote add origin <url> && git -C $history_dir push -u origin main"
+  fi
+}
+export -f ensure_private_history_repo
+
+# ==============================================================================
 # SESSION REMINDER
 # ==============================================================================
 # Show latest session log for continuity
@@ -550,6 +737,10 @@ agent_common_init() {
   ensure_data_directory_ignored "$target_project_dir"
   ensure_coding_runtime_ignored "$target_project_dir"
 
+  # Bootstrap a private <project>-history repo at .specstory/history/ on first launch
+  # (skips silently if already configured or user previously declined)
+  ensure_private_history_repo "$target_project_dir"
+
   # Start robust transcript monitoring for target project
   if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then
     start_transcript_monitoring "$target_project_dir" "$coding_repo"
@@ -582,6 +773,7 @@ agent_common_init() {
 export -f log
 export -f ensure_specstory_logs_tracked
 export -f ensure_data_directory_ignored
+export -f ensure_private_history_repo
 export -f show_session_reminder
 export -f start_transcript_monitoring
 export -f start_statusline_health_monitor
