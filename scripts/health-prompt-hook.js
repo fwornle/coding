@@ -14,7 +14,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename, resolve as resolvePath } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
@@ -57,7 +57,7 @@ async function main() {
         }
 
         // Normal flow: provide health context to Claude
-        outputHealthContext(healthStatus);
+        outputHealthContext(healthStatus, hookData);
         process.exit(0);
 
     } catch (error) {
@@ -168,10 +168,28 @@ function outputBlockedResponse(healthStatus) {
  * directory so it checks the correct project's transcript monitor, not
  * just the coding project.
  */
-function checkLSLHealth() {
+function checkLSLHealth(hookCwd) {
     try {
-        const projectName = basename(process.cwd());
+        // Prefer the cwd Claude Code passes in via the hook payload, then
+        // fall back to process.cwd(). Resolve to an absolute path so
+        // basename() returns the project directory and not "" for "/".
+        const rawCwd = hookCwd || process.cwd();
+        const cwd = resolvePath(rawCwd);
+
+        // If we're invoked from anywhere inside the coding repo (e.g. a
+        // subdirectory like .specstory/history), the monitor we care
+        // about is the coding project's monitor — not "history" or any
+        // other intermediate directory's name.
+        const insideCoding = cwd === codingRoot || cwd.startsWith(codingRoot + '/');
+        const projectName = insideCoding ? basename(codingRoot) : basename(cwd);
         const healthFile = join(codingRoot, '.health', `${projectName}-transcript-monitor-health.json`);
+
+        // If we're outside the coding repo and there is no health file
+        // for this project, treat it as "no monitor configured" rather
+        // than a failure — this hook is global and runs from arbitrary
+        // working directories.
+        if (!insideCoding && !existsSync(healthFile)) return '';
+
         const isDown = !existsSync(healthFile);
         let isStopped = false;
         let isStale = false;
@@ -282,11 +300,14 @@ function _watchdogIsFresh() {
  * Output health context for Claude (normal flow)
  * Simplified: no counts, just status. Details on dashboard.
  */
-function outputHealthContext(healthStatus) {
+function outputHealthContext(healthStatus, hookData) {
     let context = '';
 
-    // Always check LSL independently — this must never be suppressed
-    const lslWarning = checkLSLHealth();
+    // Always check LSL independently — this must never be suppressed.
+    // Pass the hook payload's cwd so the project lookup uses Claude Code's
+    // notion of "current project" rather than process.cwd(), which can
+    // drift after subshell `cd` calls and produce false LSL DOWN alarms.
+    const lslWarning = checkLSLHealth(hookData?.cwd);
 
     if (healthStatus.isStale) {
         context = `🔄 System Health: Verification triggered (data was stale)\n`;
