@@ -3,22 +3,46 @@
 		{
 			"name": "coding",
 			"path": "."
+		},
+		{
+			"name": "coding-history",
+			"path": ".specstory/history"
+		},
+		{
+			"name": "code-graph-rag",
+			"path": "integrations/code-graph-rag"
+		},
+		{
+			"name": "mcp-constraint-monitor",
+			"path": "integrations/mcp-constraint-monitor"
+		},
+		{
+			"name": "mcp-server-semantic-analysis",
+			"path": "integrations/mcp-server-semantic-analysis"
+		},
+		{
+			"name": "mcp-server-browserbase",
+			"path": "integrations/mcp-server-browserbase"
+		},
+		{
+			"name": "memory-visualizer",
+			"path": "integrations/memory-visualizer"
+		},
+		{
+			"name": "serena",
+			"path": "integrations/serena"
 		}
 	],
 	"settings": {
 		"debug.console.acceptSuggestionOnEnter": "off",
 		"git.openRepositoryInParentFolders": "always",
-		"git.autoRepositoryDetection": "subFolders",
-		"git.repositoryScanMaxDepth": 1,
+		"git.autoRepositoryDetection": false,
+		"git.detectSubmodules": false,
+		"git.repositoryScanMaxDepth": 0,
 		"git.repositoryScanIgnoredFolders": [
-			"node_modules",
-			".specstory",
-			".specstory/history"
+			"node_modules"
 		],
-		"git.ignoredRepositories": [
-			"${workspaceFolder}/.specstory/history",
-			".specstory/history"
-		],
+		"git.ignoredRepositories": [],
 		"workbench.colorCustomizations": {
 			"activityBar.activeBackground": "#1f6fd0",
 			"activityBar.background": "#1f6fd0",
