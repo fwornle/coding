@@ -9,7 +9,7 @@
 import express from 'express';
 import { createServer, get as httpGet } from 'http';
 import { WebSocketServer } from 'ws';
-import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -992,43 +992,54 @@ class SystemHealthAPIServer {
         res.flushHeaders();
 
         const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+        let lastSig = '';
         let lastContent = '';
-        let watcher = null;
-        let debounceTimer = null;
+        let lastStatus = null;
+        let pollTimer = null;
 
-        // Send initial state
+        // Cadence: tight while a workflow is active, relaxed when idle.
+        // workflow-progress.json is ~600 KB, so reading + parsing it 10x/sec
+        // per connected SSE client (Chrome holds the socket open even with
+        // the lid closed) was burning ~5 % container CPU at idle. Stat-gating
+        // turns idle ticks into a single sub-microsecond syscall.
+        const FAST_MS = 100;   // active workflow
+        const SLOW_MS = 1000;  // completed / failed / null
+
         const sendUpdate = () => {
             try {
                 if (existsSync(progressPath)) {
-                    const content = readFileSync(progressPath, 'utf8');
-                    // Only send if content changed
-                    if (content !== lastContent) {
-                        lastContent = content;
-                        const progress = JSON.parse(content);
-                        // Bridge state machine format to legacy flat format
-                        const bridged = this.bridgeStateMachineToLegacy(progress);
-                        const dataToSend = bridged || progress;
-                        process.stderr.write(`[SSE-TX] ${new Date().toISOString().slice(11,23)} step=${dataToSend.currentStep} details=${dataToSend.stepsDetail?.length || 0}\n`);
-                        res.write(`data: ${JSON.stringify(dataToSend)}\n\n`);
+                    const stat = statSync(progressPath);
+                    const sig = `${stat.mtimeMs}-${stat.size}`;
+                    if (sig !== lastSig) {
+                        lastSig = sig;
+                        const content = readFileSync(progressPath, 'utf8');
+                        if (content !== lastContent) {
+                            lastContent = content;
+                            const progress = JSON.parse(content);
+                            const bridged = this.bridgeStateMachineToLegacy(progress);
+                            const dataToSend = bridged || progress;
+                            lastStatus = dataToSend?.status || null;
+                            process.stderr.write(`[SSE-TX] ${new Date().toISOString().slice(11,23)} step=${dataToSend.currentStep} details=${dataToSend.stepsDetail?.length || 0}\n`);
+                            res.write(`data: ${JSON.stringify(dataToSend)}\n\n`);
+                        }
                     }
-                } else {
-                    // No workflow running
-                    if (lastContent !== 'null') {
-                        lastContent = 'null';
-                        res.write(`data: null\n\n`);
-                    }
+                } else if (lastContent !== 'null') {
+                    lastContent = 'null';
+                    lastSig = '';
+                    lastStatus = null;
+                    res.write(`data: null\n\n`);
                 }
             } catch (error) {
                 // Ignore read errors during rapid updates
+            } finally {
+                const delay = (lastStatus === 'running' || lastStatus === 'paused')
+                    ? FAST_MS
+                    : SLOW_MS;
+                pollTimer = setTimeout(sendUpdate, delay);
             }
         };
 
-        // Send initial state immediately
         sendUpdate();
-
-        // Use fast polling (100ms) instead of fs.watch which is unreliable on macOS
-        // This provides responsive real-time updates for workflow visualization
-        const pollInterval = setInterval(sendUpdate, 100);
 
         // Send heartbeat every 15 seconds to keep connection alive
         const heartbeat = setInterval(() => {
@@ -1041,7 +1052,7 @@ class SystemHealthAPIServer {
 
         // Cleanup on connection close
         req.on('close', () => {
-            clearInterval(pollInterval);
+            if (pollTimer) clearTimeout(pollTimer);
             clearInterval(heartbeat);
         });
     }
