@@ -21,7 +21,6 @@ services:
     environment:
       # Service ports
       - SEMANTIC_ANALYSIS_PORT=3848
-      - BROWSER_ACCESS_PORT=3847
       - CONSTRAINT_MONITOR_PORT=3849
       - CODE_GRAPH_RAG_PORT=3850
       - VKB_PORT=8080
@@ -58,7 +57,6 @@ services:
       - LLM_CLI_PROXY_URL=http://host.docker.internal:12435
     ports:
       - "8080:8080"     # VKB Server
-      - "3847:3847"     # Browser Access SSE
       - "3848:3848"     # Semantic Analysis SSE
       - "3849:3849"     # Constraint Monitor SSE
       - "3850:3850"     # Code-Graph-RAG SSE

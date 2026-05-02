@@ -64,9 +64,7 @@ endif
 
 partition "Install Submodule Components" {
   :Install Memory Visualizer;
-  :Install Browserbase;
   :Install Semantic Analysis;
-  :Install Serena;
   :Install Constraint Monitor;
 }
 

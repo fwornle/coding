@@ -58,7 +58,6 @@ MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Events), consu
 | Service | Port | Language | Purpose |
 |---------|------|----------|---------|
 | **semantic-analysis** | 3848 | TypeScript | LLM-powered code analysis, UKB workflow engine, ontology classification, pattern extraction |
-| **browser-access** | 3847 | TypeScript | Web page fetching, content extraction, screenshot capture |
 | **constraint-monitor** | 3849 | TypeScript | Code quality rules enforcement, real-time violation tracking |
 | **code-graph-rag** | 3850 | Python 3.12 | AST-based code indexing via Tree-sitter, call graph analysis, natural language code queries |
 
@@ -69,7 +68,7 @@ User-facing web applications and APIs.
 | Service | Port | Purpose |
 |---------|------|---------|
 | **vkb-server** | 8080 | Knowledge graph viewer (D3.js visualization), entity CRUD API, insight document serving |
-| **health-dashboard** | 3033 | Health verification API, UKB workflow monitoring, SSE real-time updates, API quota checking |
+| **health-dashboard** | 3033 | Health verification API, UKB workflow monitoring, SSE real-time updates |
 | **health-dashboard-frontend** | 3032 | React + Redux UI, real-time health status, workflow visualization |
 | **constraint-dashboard** | 3030 | Constraint Monitor Dashboard (Next.js), violations timeline, compliance tracking |
 | **constraint-dashboard-api** | 3031 | Constraint Monitor REST API, enforcement engine, configuration management |
@@ -139,7 +138,6 @@ Git History / Session Logs
 | 8080 | VKB Knowledge Viewer | HTTP | http://localhost:8080 |
 | 3032 | Health Dashboard UI | HTTP | http://localhost:3032 |
 | 3033 | Health Dashboard API | HTTP/WS | http://localhost:3033 |
-| 3847 | Browser Access MCP | SSE | http://localhost:3847 |
 | 3848 | Semantic Analysis MCP | SSE | http://localhost:3848 |
 | 3849 | Constraint Monitor MCP | SSE | http://localhost:3849 |
 | 3850 | Code-Graph-RAG MCP | SSE | http://localhost:3850 |

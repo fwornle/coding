@@ -21,7 +21,6 @@ flowchart TB
 
     subgraph "Analysis Layer"
         MCP --> SA[Semantic Analysis]
-        MCP --> BA[Browser Access]
         MCP --> CGR[Code Graph RAG]
     end
 

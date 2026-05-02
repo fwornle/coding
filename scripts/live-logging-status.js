@@ -142,7 +142,6 @@ class SimpleStatusAnalyzer {
       const parts = toolName.split('__');
       if (parts[1] === 'memory') return '🧠';
       if (parts[1] === 'semantic-analysis') return '🔬';
-      if (parts[1] === 'browser-access') return '🌐';
       if (parts[1] === 'constraint-monitor') return '🔒';
       return '⚙️';
     }

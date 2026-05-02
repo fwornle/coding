@@ -25,7 +25,6 @@ Real-time visual indicators of system health and development activity rendered v
 | Docker Mode | `[🐳]` | Indicator that system is running in Docker mode |
 | Docker MCP Health | `[🐳MCP:SA✅CM✅CGR✅]` | Health of containerized MCP SSE servers |
 | System Health | `[🏥✅]` | Unified health (infrastructure + services) |
-| API Quota | `[Gq$0FEB A$0 O$0 X$25]` | LLM provider spend/balance (live) |
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons |
 | Constraint Compliance | `🔒 67%` | Code quality compliance percentage |
 | Trajectory State | `🔍 EX` | Current development activity |
@@ -123,105 +122,6 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 
 ---
 
-## API Quota Monitoring
-
-All four LLM providers update automatically via API-based or centralized tracking mechanisms. No manual spend updates needed after initial key setup.
-
-### Format
-
-`[Provider$X ...]` — dollar amounts show live spend or remaining balance.
-
-### Provider Data Sources
-
-| Abbrev | Provider | Data Source | Setup |
-|--------|----------|-------------|-------|
-| `Gq` | Groq | BudgetTracker + centralized reporters | Automatic (no key needed) |
-| `Ggl` | Google Gemini | Free tier (no tracking) | `GEMINI_API_KEY` |
-| `A` | Anthropic | Admin API (cost report) | `ANTHROPIC_ADMIN_API_KEY` |
-| `O` | OpenAI | Admin API (costs) | `OPENAI_ADMIN_API_KEY` |
-| `X` | X.AI Grok | Management API (balance) | `XAI_MANAGEMENT_KEY` + `XAI_TEAM_ID` |
-
-### Display Logic
-
-| Scenario | Display | Meaning |
-|----------|---------|---------|
-| Admin API: spend data | `A$2` | $2 spent this month (live) |
-| Admin API: with prepaid credits | `A$18` | $18 remaining of prepaid |
-| Monthly self-tracked (Groq) | `Gq$0FEB` | $0 spent in February |
-| Management API (xAI) | `X$25` | $25 remaining balance |
-| Free tier (Google) | `Ggl●` | Available (rate-limited) |
-| No admin key configured | `O○` | Cannot get usage data |
-
-### Pie Chart Symbols
-
-Used when percentage-based display applies (prepaid credits configured):
-
-| Symbol | Name | Remaining |
-|--------|------|-----------|
-| `●` | Full | >87.5% |
-| `◕` | Three-quarters | 62.5-87.5% |
-| `◐` | Half | 37.5-62.5% |
-| `◔` | Quarter | 12.5-37.5% |
-| `○` | Empty | <12.5% or no data |
-
-### Setup
-
-Run the interactive setup script to configure API keys (one-time):
-
-```bash
-node scripts/setup-api-keys.js
-```
-
-Each key is validated with a test API call before saving to `.env`. Groq requires no setup.
-
-### API Keys Reference
-
-| Variable | Provider | Where to Get It |
-|----------|----------|----------------|
-| `ANTHROPIC_ADMIN_API_KEY` | Anthropic | console.anthropic.com → Settings → Admin API Keys |
-| `OPENAI_ADMIN_API_KEY` | OpenAI | platform.openai.com/settings/organization/admin-keys |
-| `XAI_MANAGEMENT_KEY` | xAI | console.x.ai → Settings → Management Keys |
-| `XAI_TEAM_ID` | xAI | console.x.ai team settings URL |
-
-### How Groq Cost Tracking Works
-
-Groq has no billing API. Spend is tracked through three complementary mechanisms:
-
-1. **BudgetTracker** (`src/inference/BudgetTracker.js`) — Tracks costs from LLM calls made through the main inference pipeline. Writes to `.data/llm-usage-costs.json` (debounced, atomic).
-
-2. **Centralized Usage Reporters** — External Groq API consumers report usage via shared modules:
-    - `lib/utils/usage-cost-reporter.js` (Node.js) — Used by `mcp-constraint-monitor`
-    - `integrations/code-graph-rag/codebase_rag/utils/usage_cost_reporter.py` (Python) — Used by `code-graph-rag`
-    - Both use file locking and write to the same `.data/llm-usage-costs.json`
-
-3. **externalSpend offset** — Manual offset in config for consumers not yet integrated (e.g., `okb/rapid-automations`, Docker). Resets to 0 on month rollover.
-
-4. **Stagehand billing scraper** (`scripts/groq-billing-scraper.js`) — Periodic ground-truth validation against the Groq billing dashboard using AI-powered page extraction. Runs hourly when `autoScrape` is enabled.
-
-Total spend = `localSpend` (from cost file) + `externalSpend` (config offset).
-
-### Configuration
-
-Provider credits in `config/live-logging-config.json` serve as fallbacks:
-
-```json
-{
-  "provider_credits": {
-    "groq": {
-      "billingType": "monthly",
-      "billingMonth": "MAR",
-      "spendLimit": null,
-      "externalSpend": 13.32,
-      "autoScrape": true,
-      "scrapeIntervalMinutes": 60
-    },
-    "anthropic": { "prepaidCredits": 0 },
-    "openai": { "prepaidCredits": null },
-    "xai": { "prepaidCredits": 25 }
-  }
-}
-```
-
 ---
 
 ## Docker Mode Indicators
@@ -306,7 +206,6 @@ This ensures the status bar **never goes blank** under system load (ESM imports 
    - Read health verification status
    - Query constraint monitor API
    - Read trajectory state file
-   - Check API quota for all providers
    - Scan LSL registry
 2. **Status Aggregation**: Combine all indicators
 3. **Display**: Render to tmux status bar (supports tmux formatting codes: `#[underscore]`, `#[bold]`, colors)
@@ -320,8 +219,6 @@ This ensures the status bar **never goes blank** under system load (ESM imports 
 | Pre-rendered status (fast-path) | 60s TTL, 20s background refresh |
 | Health status | 5 minutes |
 | Constraint compliance | 1 minute |
-| API quota (real-time) | 30 seconds |
-| API quota (estimated) | 5 minutes |
 | Trajectory state | Read on every update |
 | LSL status | Read on every update |
 
@@ -552,12 +449,6 @@ docker compose -f docker/docker-compose.yml logs coding-services
 | `scripts/global-service-coordinator.js` | Constraint service management with spawn guards |
 | `scripts/auto-restart-watcher.js` | File-change detection for daemon code reloading |
 | `scripts/health-verifier.js` | Health status provider |
-| `lib/api-quota-checker.js` | API quota provider (calls Admin/Management APIs) |
-| `src/inference/BudgetTracker.js` | LLM cost tracking with file persistence |
-| `lib/utils/usage-cost-reporter.js` | Shared Node.js usage cost reporter (external consumers) |
-| `scripts/groq-billing-scraper.js` | Stagehand-based Groq billing page scraper |
-| `scripts/setup-api-keys.js` | Interactive admin/management API key setup |
-| `.data/llm-usage-costs.json` | Centralized cost output (BudgetTracker + external reporters) |
 | `.lsl/global-registry.json` | LSL session registry |
 | `.health/verification-status.json` | Health status cache |
 | `.logs/statusline-health-status.txt` | Rendered status line output |
@@ -568,4 +459,4 @@ docker compose -f docker/docker-compose.yml logs coding-services
 | File | Purpose |
 |------|---------|
 | `config/status-line-config.json` | Status line configuration |
-| `config/live-logging-config.json` | API quota and provider config |
+| `config/live-logging-config.json` | Provider config |

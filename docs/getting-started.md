@@ -133,8 +133,6 @@ This ensures you can always restore your original shell configuration if needed.
 2. **Integration Components**
    - MCP Semantic Analysis Server (14 agents)
    - MCP Constraint Monitor
-   - Serena AST Analysis (MCP)
-   - Browser Access (Stagehand)
    - Memory Visualizer (web UI)
 
 3. **Shell Integration**
@@ -190,7 +188,6 @@ For teams or users who prefer containerized deployments, the coding system suppo
 ### Benefits of Docker Mode
 
 - **Persistent Services**: MCP servers run continuously, surviving session restarts
-- **Shared Browser Automation**: Multiple Claude sessions share the same browser instance
 - **Isolated Databases**: Qdrant, Redis, and Memgraph run in containers
 - **Consistent Environment**: Same behavior across different machines
 

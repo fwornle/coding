@@ -24,14 +24,6 @@ rectangle "coding-services container" as container {
       Ontology classification
     end note
 
-    component "Browser Access\nPort 3847 (SSE)" <<api>> as browser {
-    }
-    note right of browser
-      Web page fetching
-      Content extraction
-      Screenshot capture
-    end note
-
     component "Constraint Monitor\nPort 3849 (SSE)" <<core>> as constraint {
     }
     note right of constraint
@@ -71,7 +63,6 @@ rectangle "coding-services container" as container {
       Health verification data
       UKB workflow monitoring
       SSE real-time updates
-      API quota checking
       Service restart API
     end note
 
@@ -132,7 +123,6 @@ rectangle "coding-services container" as container {
 
 ' Process management
 supervisor --> sem : "autostart\nautorestart"
-supervisor --> browser : "autostart\nautorestart"
 supervisor --> constraint : "autostart\nautorestart"
 supervisor --> cgr : "autostart\nautorestart"
 supervisor --> vkb : "autostart\nautorestart"

@@ -24,7 +24,6 @@ fi
 
 # Port configuration
 SEMANTIC_ANALYSIS_PORT="${SEMANTIC_ANALYSIS_PORT:-3848}"
-BROWSER_ACCESS_PORT="${BROWSER_ACCESS_PORT:-3847}"
 CONSTRAINT_MONITOR_PORT="${CONSTRAINT_MONITOR_PORT:-3849}"
 CODE_GRAPH_RAG_PORT="${CODE_GRAPH_RAG_PORT:-3850}"
 
@@ -37,14 +36,6 @@ cat > "$OUTPUT_FILE" << EOF
       "args": ["$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/stdio-proxy.js"],
       "env": {
         "SEMANTIC_ANALYSIS_SSE_URL": "http://localhost:$SEMANTIC_ANALYSIS_PORT",
-        "CODING_REPO": "$CODING_REPO"
-      }
-    },
-    "browser-access": {
-      "command": "node",
-      "args": ["$CODING_REPO/integrations/browser-access/dist/stdio-proxy.js"],
-      "env": {
-        "BROWSER_ACCESS_SSE_URL": "http://localhost:$BROWSER_ACCESS_PORT",
         "CODING_REPO": "$CODING_REPO"
       }
     },
@@ -63,16 +54,6 @@ cat > "$OUTPUT_FILE" << EOF
         "CODE_GRAPH_RAG_SSE_URL": "http://localhost:$CODE_GRAPH_RAG_PORT"
       }
     },
-    "serena": {
-      "command": "npx",
-      "args": ["-y", "serena-mcp@latest", "--project-path", "$CODING_REPO"],
-      "env": {}
-    },
-    "shadcn": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/shadcn-mcp@latest"],
-      "env": {}
-    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@anthropic-ai/context7-mcp@latest"],
@@ -85,6 +66,5 @@ EOF
 log "Generated Docker MCP config: $OUTPUT_FILE"
 log "Services configured:"
 log "  - semantic-analysis -> http://localhost:$SEMANTIC_ANALYSIS_PORT"
-log "  - browser-access -> http://localhost:$BROWSER_ACCESS_PORT"
 log "  - constraint-monitor -> http://localhost:$CONSTRAINT_MONITOR_PORT"
 log "  - code-graph-rag -> http://localhost:$CODE_GRAPH_RAG_PORT"

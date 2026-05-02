@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, multi-project coordination through a 6-layer protection architecture with 9 core classes, and real-time API quota monitoring for LLM providers.
+The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, and multi-project coordination through a 6-layer protection architecture with 9 core classes.
 
 ![System Health Dashboard](../images/health-monitor.png)
 
@@ -91,12 +91,6 @@ The system implements a robust 6-layer monitoring protection with 9 core classes
 - Unified status display across all Claude Code sessions
 - Individual session status with smart abbreviations
 - Integration with constraint monitoring and semantic analysis
-
-#### API Quota Checker (`lib/api-quota-checker.js`)
-- Shared library for checking LLM provider quotas
-- Multi-provider support (Groq, Google, Anthropic, OpenAI, X.AI)
-- Two-tier caching strategy (30s real-time, 5min estimated)
-- Used by both statusline and dashboard for consistency
 
 ## StatusLine Architecture
 
@@ -293,24 +287,6 @@ The system includes a real-time web-based health dashboard accessible at `http:/
    - Automatic stale PID cleanup
    - Process lifecycle tracking
 
-4. **API Quota** (LLM Providers)
-   - Real-time quota monitoring for all configured providers
-   - Provider status: Groq, Google Gemini, Anthropic Claude, OpenAI, X.AI (Grok)
-   - Usage percentage and remaining quota display
-   - Color-coded health indicators (🟢 operational, 🟡 warning, 🔴 error)
-   - Support for both free tier and billing-based providers
-   - Auto-refresh every 5 seconds
-
-**API Quota Provider Support:**
-
-| Provider | Abbreviation | Quota Type | Display |
-|----------|--------------|------------|---------|
-| Groq | Gq | Free tier (7.2M tokens/day) | Shows percentage |
-| Google Gemini | Ggl | Free tier (15 RPM, 1M TPD) | Shows percentage |
-| Anthropic Claude | A | Billing-based | Estimated status |
-| OpenAI | O | Billing-based | Estimated status |
-| X.AI (Grok) | X | Free credits ($25) | Shows percentage |
-
 **Dashboard Actions:**
 - **Run Verification**: Manually trigger health verification
 - **Auto-Healing**: Toggle automatic recovery mechanisms
@@ -365,7 +341,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ### Current Display
 ```
-[C🟢 UT🫒] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Component Breakdown
@@ -375,7 +351,6 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
 | Constraint Compliance | `🔒 67%` | Code quality compliance | 67% compliance |
 | Trajectory State | `🔍EX` | Development activity | EX=exploring, IMP=implementing |
-| API Quota | `[Gq$0FEB A$0 O$0 X$25]` | LLM provider spend/balance (live) | All providers auto-tracked |
 | Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
 | Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
 | LSL Time Window | `📋17-18` | Session time range | 17:00-18:00 |

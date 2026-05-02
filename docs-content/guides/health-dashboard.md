@@ -136,13 +136,6 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 - Automatic stale PID cleanup
 - Process lifecycle tracking
 
-**4. API Quota** (LLM Providers)
-
-- Real-time quota monitoring for all configured providers
-- Provider status: Groq, Google Gemini, Anthropic Claude, OpenAI, X.AI (Grok)
-- Usage percentage and remaining quota display
-- Color-coded health indicators (green=operational, yellow=warning, red=error)
-
 ### Dashboard Actions
 
 - **Run Verification**: Manually trigger health verification

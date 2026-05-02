@@ -42,7 +42,6 @@ vkb
 | 3031 | Constraint API |
 | 3032 | Health Dashboard |
 | 3033 | Health API |
-| 3847 | Browser Access SSE |
 | 3848 | Semantic Analysis SSE |
 | 3849 | Constraint Monitor SSE |
 | 3850 | Code Graph RAG SSE |

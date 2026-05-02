@@ -31,11 +31,8 @@ try {
 class CombinedStatusLine {
   constructor() {
     this.cacheTimeout = config.status_line?.cache_timeout || 5000;
-    this.apiCheckInterval = config.status_line?.api_check_interval || 30000;
     this.lastUpdate = 0;
-    this.lastApiCheck = 0;
     this.statusCache = null;
-    this.apiCache = null;
     this.currentSessionId = null;
     this.config = config;
 
@@ -805,36 +802,6 @@ class CombinedStatusLine {
         sessions: {},
         guards: { icon: '❌', status: 'error' }
       };
-    }
-  }
-
-  async getAPIUsageEstimate() {
-    try {
-      // Check if we have cached API data that's still valid
-      const now = Date.now();
-      if (this.apiCache && (now - this.lastApiCheck) < this.apiCheckInterval) {
-        return this.apiCache;
-      }
-
-      // Use shared API quota checker utility
-      const apiQuotaChecker = await import('../lib/api-quota-checker.js');
-
-      // Check all active providers in parallel
-      const providers = await apiQuotaChecker.checkAllProviders(this.config, {
-        useCache: true,
-        timeout: 5000
-      });
-
-      // Cache the results
-      this.apiCache = { providers };
-      this.lastApiCheck = now;
-
-      return this.apiCache;
-    } catch (error) {
-      if (process.env.DEBUG_STATUS) {
-        console.error('API usage check error:', error.message);
-      }
-      return { providers: [] };
     }
   }
 
@@ -1694,42 +1661,6 @@ class CombinedStatusLine {
       parts.push('[🏥💤]'); // Offline
     }
 
-    // API Provider Status - SECOND in status line (Multi-provider display with bar chart emojis)
-    if (semantic.status === 'operational') {
-      const apiData = await this.getAPIUsageEstimate();
-      const providers = apiData.providers || [];
-
-      if (providers.length > 0) {
-        // Import the formatter utility
-        const apiQuotaChecker = await import('../lib/api-quota-checker.js');
-
-        // Format each provider for display
-        const providerDisplays = providers.map(p => apiQuotaChecker.formatQuotaDisplay(p));
-
-        // Combine into single bracket: [G📊🟢 A📊🟡55%]
-        parts.push(`[${providerDisplays.join(' ')}]`);
-
-        // Update overall color based on worst provider status
-        const hasCritical = providers.some(p => p.status === 'critical');
-        const hasLow = providers.some(p => p.status === 'low' || p.status === 'degraded');
-
-        if (hasCritical) {
-          overallColor = 'red';
-        } else if (hasLow && overallColor === 'green') {
-          overallColor = 'yellow';
-        }
-      } else {
-        // No providers configured - show generic healthy status
-        parts.push('[API✅]');
-      }
-    } else if (semantic.status === 'degraded') {
-      parts.push('[API⚠️]');
-      if (overallColor === 'green') overallColor = 'yellow';
-    } else {
-      parts.push('[API❌]');
-      overallColor = 'red';
-    }
-
     // Sessions Display (without separate GCM indicator - merged into 🏥)
     // Show all sessions - inactive ones display with dark icons (💤/⚫)
     // Only remove sessions when the Claude session is actually closed/exited
@@ -1879,7 +1810,10 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    const statusText = parts.join(' ');
+    // Trailing pad: when the statusline shrinks between renders (e.g. variable-
+    // length segments come and go), some renderers leave residual chars from the
+    // previous longer render. The pad overwrites those columns with spaces.
+    const statusText = parts.join(' ') + '          ';
 
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details

@@ -955,7 +955,6 @@ docker compose -f docker/docker-compose.yml ps
 docker compose -f docker/docker-compose.yml logs coding-services
 
 # Test health endpoints
-curl http://localhost:3847/health  # Browser Access
 curl http://localhost:3848/health  # Semantic Analysis
 curl http://localhost:3849/health  # Constraint Monitor
 curl http://localhost:3850/health  # Code Graph RAG
@@ -999,7 +998,6 @@ docker compose -f docker/docker-compose.yml up -d
 **Diagnosis:**
 ```bash
 # Check if ports are listening
-lsof -i :3847  # Browser Access
 lsof -i :3848  # Semantic Analysis
 lsof -i :3849  # Constraint Monitor
 lsof -i :3850  # Code Graph RAG
@@ -1078,7 +1076,6 @@ docker compose -f docker/docker-compose.yml up -d
 ```bash
 # Update .env.ports with different ports
 cat >> .env.ports << EOF
-BROWSER_ACCESS_SSE_PORT=4847
 SEMANTIC_ANALYSIS_SSE_PORT=4848
 CONSTRAINT_MONITOR_SSE_PORT=4849
 CODE_GRAPH_RAG_SSE_PORT=4850
@@ -1249,7 +1246,6 @@ docker compose -f docker/docker-compose.yml down && docker compose -f docker/doc
 **Port Reference:**
 | Port | Service | Health Check |
 |------|---------|--------------|
-| 3847 | Browser Access SSE | `curl http://localhost:3847/health` |
 | 3848 | Semantic Analysis SSE | `curl http://localhost:3848/health` |
 | 3849 | Constraint Monitor SSE | `curl http://localhost:3849/health` |
 | 3850 | Code Graph RAG SSE | `curl http://localhost:3850/health` |

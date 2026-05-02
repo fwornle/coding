@@ -104,7 +104,7 @@ That's it! The installer handles everything automatically.
 | **`coding`** | Launch Claude Code with all integrations |
 | **`vkb`** | View Knowledge Base (web visualization) |
 | **`ukb`** | Update Knowledge Base (knowledge extraction) |
-| **MCP Servers** | Semantic Analysis, Constraint Monitor, Browser Access, Code Graph |
+| **MCP Servers** | Semantic Analysis, Constraint Monitor, Code Graph |
 | **LSL** | Live Session Logging with 4-layer monitoring |
 | **Hooks** | PreToolUse (constraints) and PostToolUse (logging) |
 

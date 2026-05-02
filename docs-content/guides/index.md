@@ -16,7 +16,7 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   <img src="../images/status-line-display.png" alt="Status Line">
   <div class="card-content">
     <h3>Status Line Guide</h3>
-    <p>Complete emoji reference, API quota monitoring, trajectory states, and configuration</p>
+    <p>Complete emoji reference, trajectory states, and configuration</p>
   </div>
 </a>
 
@@ -59,7 +59,7 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 | Guide | Use When... |
 |-------|-------------|
 | **Agent Integration** | Adding a new AI coding assistant to the system |
-| **Status Line** | You need to understand status bar indicators or configure API quota display |
+| **Status Line** | You need to understand status bar indicators |
 | **Health Dashboard** | Investigating health issues or understanding the monitoring architecture |
 | **Constraint Testing** | Adding new constraints, debugging detection, or testing enforcement |
 | **VKB Visualization** | Exploring knowledge graphs or integrating VKB programmatically |

@@ -169,7 +169,7 @@ When a critical constraint is violated, the tool call simply doesn't execute. Th
 Running multiple services, databases, and monitoring processes requires robust health management.
 
 ![System Health Dashboard](images/health-mon.png)
-*The health dashboard: real-time status of databases (Qdrant, CGR Cache), services (VKB Server, Constraint Monitor), processes, API quotas, and UKB workflows - all with auto-healing active.*
+*The health dashboard: real-time status of databases (Qdrant, CGR Cache), services (VKB Server, Constraint Monitor), processes, and UKB workflows - all with auto-healing active.*
 
 The system uses a 3-layer supervision architecture:
 

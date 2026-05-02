@@ -32,16 +32,6 @@ MCP tools and REST API endpoints.
 | `get_violation_history` | Past violations |
 | `update_constraints` | Modify constraint rules |
 
-### Browser Access
-
-| Tool | Description |
-|------|-------------|
-| `stagehand_navigate` | Navigate to URL |
-| `stagehand_act` | Perform page actions |
-| `stagehand_extract` | Extract page text |
-| `stagehand_observe` | Find actionable elements |
-| `screenshot` | Capture page screenshot |
-
 ### Code Graph RAG
 
 | Tool | Description |

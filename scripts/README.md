@@ -98,5 +98,4 @@ Scripts are organized here to keep the repository root clean while maintaining e
 - `bin/vkb` - Universal wrapper (added to PATH)
 
 ### Component-Specific Scripts
-- `browser-access/` - Browser automation scripts
 - `knowledge-management/` - Knowledge management tools

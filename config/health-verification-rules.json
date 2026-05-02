@@ -210,7 +210,6 @@
         "auto_heal": false,
         "expected_processes": [
           "semantic-analysis",
-          "browser-access",
           "constraint-monitor",
           "constraint-dashboard",
           "code-graph-rag",

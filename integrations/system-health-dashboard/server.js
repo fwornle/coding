@@ -126,7 +126,6 @@ class SystemHealthAPIServer {
         const HOT_POLL_PATHS = new Set([
             '/api/health-verifier/status',
             '/api/health-verifier/report',
-            '/api/health-verifier/api-quota',
             '/api/ukb/processes',
             '/api/ukb/status',
             '/api/health',
@@ -222,7 +221,6 @@ class SystemHealthAPIServer {
         // freshness while bounding CPU cost from many concurrent tabs.
         this.app.get('/api/health-verifier/status', this.cachedGet(1000, this.handleGetHealthStatus.bind(this)));
         this.app.get('/api/health-verifier/report', this.cachedGet(1000, this.handleGetHealthReport.bind(this)));
-        this.app.get('/api/health-verifier/api-quota', this.cachedGet(1000, this.handleGetAPIQuota.bind(this)));
         this.app.post('/api/health-verifier/verify', this.handleTriggerVerification.bind(this));
         this.app.post('/api/health-verifier/restart-service', this.handleRestartService.bind(this));
 
@@ -509,45 +507,6 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to retrieve health report',
-                error: error.message
-            });
-        }
-    }
-
-    /**
-     * Get API quota status for all configured providers
-     */
-    async handleGetAPIQuota(req, res) {
-        try {
-            // Dynamically import the API quota checker (ESM)
-            const apiQuotaChecker = await import('../../lib/api-quota-checker.js');
-
-            // Load live-logging config for API settings
-            const configPath = join(codingRoot, 'config/live-logging-config.json');
-            let config = {};
-
-            if (existsSync(configPath)) {
-                config = JSON.parse(readFileSync(configPath, 'utf8'));
-            }
-
-            // Check all active providers
-            const providers = await apiQuotaChecker.checkAllProviders(config, {
-                useCache: true,
-                timeout: 5000
-            });
-
-            res.json({
-                status: 'success',
-                data: {
-                    providers,
-                    lastUpdate: new Date().toISOString()
-                }
-            });
-        } catch (error) {
-            console.error('Failed to get API quota:', error);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to retrieve API quota',
                 error: error.message
             });
         }

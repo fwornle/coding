@@ -10,11 +10,6 @@ import {
   fetchHealthReportFailure,
 } from '../slices/healthReportSlice'
 import {
-  fetchAPIQuotaStart,
-  fetchAPIQuotaSuccess,
-  fetchAPIQuotaFailure,
-} from '../slices/apiQuotaSlice'
-import {
   fetchUKBStatusStart,
   fetchUKBStatusSuccess,
   fetchUKBStatusFailure,
@@ -344,8 +339,6 @@ class HealthRefreshManager {
     await this.fetchHealthStatus()
     // Fetch health report
     await this.fetchHealthReport()
-    // Fetch API quota data
-    await this.fetchAPIQuota()
     // Fetch UKB process status
     await this.fetchUKBStatus()
   }
@@ -392,27 +385,6 @@ class HealthRefreshManager {
     } catch (error: any) {
       this.store.dispatch(fetchHealthReportFailure(error.message))
       Logger.error(LogCategories.HEALTH, 'Failed to fetch health report:', error)
-    }
-  }
-
-  private async fetchAPIQuota() {
-    if (!this.store) return
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api-quota`)
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      if (result.status === 'success' && result.data) {
-        this.store.dispatch(fetchAPIQuotaSuccess(result.data))
-      } else {
-        throw new Error(result.message || 'Invalid response format')
-      }
-    } catch (error: any) {
-      this.store.dispatch(fetchAPIQuotaFailure(error.message))
-      Logger.error(LogCategories.API, 'Failed to fetch API quota:', error)
     }
   }
 

@@ -36,7 +36,6 @@ All ports are centralized in `.env.ports`:
 | 3031 | Constraint Monitor API | Docker |
 | 3032 | System Health Dashboard UI | Docker |
 | 3033 | System Health API | Docker |
-| 3847 | Browser Access SSE | Docker |
 | 3848 | Semantic Analysis SSE | Docker |
 | 3849 | Constraint Monitor SSE | Docker |
 | 3850 | Code Graph RAG SSE | Docker |

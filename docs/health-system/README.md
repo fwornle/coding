@@ -11,8 +11,8 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - **Pre-Prompt Checks** - Verifies system health before every Claude prompt
 - **Self-Monitoring** - The health system monitors itself
 - **Auto-Healing** - Automatically restarts failed services
-- **Status Line** - Real-time indicators in Claude Code status bar with API quota monitoring
-- **Dashboard** - Visual monitoring at `http://localhost:3032` with 4-card system (Databases, Services, Processes, API Quota)
+- **Status Line** - Real-time indicators in Claude Code status bar
+- **Dashboard** - Visual monitoring at `http://localhost:3032` with 3-card system (Databases, Services, Processes)
 
 ## Architecture
 
@@ -179,19 +179,13 @@ The supervision architecture includes multiple guards to prevent runaway process
 - Real-time indicators in Claude Code status bar
 - Multi-session support with smart abbreviations
 
-**API Quota Checker** (`lib/api-quota-checker.js`)
-- Shared library for LLM provider quota monitoring
-- Multi-provider support with smart caching
-- Used by both statusline and dashboard
-
 **Dashboard** (`integrations/system-health-dashboard/`)
 - React-based real-time visualization at port 3032
-- 4-card monitoring system (Databases, Services, Processes, API Quota)
+- 3-card monitoring system (Databases, Services, Processes)
 - UKB Workflow Monitor with visual workflow graph of agent execution
 - Service status indicators
 - Auto-healing history
 - Manual restart controls
-- Real-time API quota tracking
 
 ![UKB Workflow Monitor](../images/health-monitor-multi-agent-wf.png)
 
@@ -216,7 +210,6 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 - **Semantic Analysis SSE** - AI analysis server (port 3848)
 - **Constraint Monitor SSE** - Constraint enforcement MCP (port 3849)
 - **Code Graph RAG SSE** - Code graph analysis MCP (port 3850)
-- **Browser Access SSE** - Browser automation MCP (port 3847)
 
 ### Processes
 - Stale PID detection
@@ -227,13 +220,6 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 - **LSL Health** - Verifies transcript monitor is running and processing
 - **Exchange Activity** - Tracks exchange count and last processed UUID
 - **Suspicious Activity** - Detects stuck or stale monitors
-
-### API Quota (Automatic Tracking)
-- **Groq** - Centralized tracking via BudgetTracker + usage reporters (`Gq$15MAR`) or free tier (`Gq●`). External consumers (mcp-constraint-monitor, code-graph-rag) report via `usage-cost-reporter`. Periodic Stagehand billing scraper validates against Groq dashboard.
-- **Google Gemini** - Free tier quota (15 RPM, 1M TPD)
-- **Anthropic Claude** - Live spend via Admin API (`A$0`) or prepaid credits
-- **OpenAI** - Live spend via Admin API (`O$0`) or prepaid credits
-- **X.AI (Grok)** - Live balance via Management API (`X$25`) or static config
 
 ## How It Works
 
@@ -313,7 +299,6 @@ The status line appears automatically in Claude Code:
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
 - `[C🟢 UT🫒]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
 - `[🔒 67% 🔍EX]` - Constraint compliance percentage + trajectory state
-- `[Gq$0FEB A$0 O$0 X$25]` - API quota (live spend/balance from APIs)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
 - `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)
 - `📋17-18` - LSL time window (HHMM-HHMM)
@@ -358,11 +343,6 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/start-services-robust.js` - Service startup with supervisor
 - `scripts/tmux-session-wrapper.sh` - Tmux session wrapper (configures status-line-fast.cjs)
-- `lib/api-quota-checker.js` - API quota checking (Admin/Management APIs + centralized cost tracking)
-- `src/inference/BudgetTracker.js` - LLM cost tracking with `.data/llm-usage-costs.json` persistence
-- `lib/utils/usage-cost-reporter.js` - Shared Node.js usage cost reporter for external API consumers
-- `scripts/groq-billing-scraper.js` - Stagehand-based Groq billing page scraper (periodic validation)
-- `scripts/setup-api-keys.js` - Interactive admin/management API key setup
 
 **Data Files**:
 - `.live-process-registry.json` - ProcessStateManager registry
@@ -378,7 +358,6 @@ See [Status Line System](./status-line.md) for complete documentation.
 **Dashboard**:
 - `integrations/system-health-dashboard/server.js` - API server (port 3033)
 - `integrations/system-health-dashboard/src/` - React UI (port 3032)
-- `integrations/system-health-dashboard/src/store/slices/apiQuotaSlice.ts` - API quota state
 
 ## Troubleshooting
 

@@ -32,16 +32,11 @@
   - Usage: Real-time balance tracking via Management API
 
 **Browser Automation:**
-- Browserbase - Managed browser platform
-  - SDK: @browserbasehq/stagehand 2.0+
-  - Auth: BROWSERBASE_API_KEY, BROWSERBASE_PROJECT_ID
-  - Purpose: Web scraping, automated testing
-  - Location: `integrations/browser-access/`
-
 - Playwright - Browser automation library
   - Package: playwright 1.40+
   - Purpose: Direct browser control, cross-browser testing
   - Features: Chromium, Firefox, WebKit support
+  - Used by: `/playwright-cli` skill
 
 ## Data Storage
 
@@ -147,10 +142,6 @@
 - XAI_API_KEY - xAI (Grok) API key (optional)
 - XAI_MANAGEMENT_KEY - xAI Management API key (optional, for balance tracking)
 - XAI_TEAM_ID - xAI team ID (optional)
-
-**Required env vars (for browser automation):**
-- BROWSERBASE_API_KEY - Browserbase API key (optional)
-- BROWSERBASE_PROJECT_ID - Browserbase project ID (optional)
 
 **Database connection vars:**
 - QDRANT_URL - Vector DB: http://qdrant:6333 (Docker), http://localhost:6333 (local)

@@ -5,7 +5,6 @@
 - **Documentation skill**: ALWAYS invoke `documentation-style` skill before creating/modifying PlantUML, Mermaid, or documentation artifacts
 - **PlantUML**: Use `plantuml` CLI command. NEVER `java -jar plantuml.jar`
 - **TypeScript**: Mandatory with strict type checking
-- **Serena MCP**: ONLY for reading/searching code. Use Edit/Write for file operations
 - **API design**: Never modify working APIs for TypeScript compliance; fix types instead
 
 ## Startup & Services

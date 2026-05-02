@@ -105,15 +105,13 @@
 - Used by: Knowledge capture, audit trails, workflow input
 
 **Integration/Tools Layer:**
-- Purpose: Connect to external systems (browser automation, code analysis, database access)
+- Purpose: Connect to external systems (code analysis, database access)
 - Location: `integrations/`
 - Contains:
-  - browser-access (Playwright automation)
   - code-graph-rag (semantic code search via graph)
   - copi (CoPilot CLI integration)
   - llm-cli-proxy (command-line LLM access)
   - mcp-constraint-monitor (real-time guardrails)
-  - serena (code search/navigation)
 - Depends on: MCP SDK, external service SDKs
 - Used by: Agent adapters, workflow orchestration
 

@@ -21,16 +21,8 @@
 			"path": "integrations/mcp-server-semantic-analysis"
 		},
 		{
-			"name": "mcp-server-browserbase",
-			"path": "integrations/mcp-server-browserbase"
-		},
-		{
 			"name": "memory-visualizer",
 			"path": "integrations/memory-visualizer"
-		},
-		{
-			"name": "serena",
-			"path": "integrations/serena"
 		}
 	],
 	"settings": {

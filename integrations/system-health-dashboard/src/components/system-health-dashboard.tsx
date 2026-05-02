@@ -40,7 +40,6 @@ export default function SystemHealthDashboard() {
   const [serviceDetailOpen, setServiceDetailOpen] = useState(false)
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
-  const apiQuota = useAppSelector((state) => state.apiQuota)
   const ukb = useAppSelector((state) => state.ukb)
   const cgr = useAppSelector((state) => state.cgr)
 
@@ -259,84 +258,6 @@ export default function SystemHealthDashboard() {
         status: 'operational' as const,
         description: 'PSM tracking',
         tooltip: 'Process State Manager (PSM) is operational. Process lifecycle tracking and health monitoring are active.'
-      })
-    }
-
-    return items
-  }
-
-  // Build API items from quota data
-  const getAPIItems = () => {
-    const items = []
-
-    if (apiQuota.providers.length === 0) {
-      items.push({
-        name: 'No Providers',
-        status: 'offline' as const,
-        description: 'No API keys configured',
-        tooltip: 'No LLM provider API keys found in environment'
-      })
-      return items
-    }
-
-    // Map each provider to an item
-    for (const provider of apiQuota.providers) {
-      const remainingCredits = typeof provider.quota.remainingCredits === 'number' ? provider.quota.remainingCredits : null
-      const remainingPercent = typeof provider.quota.remaining === 'number' ? provider.quota.remaining : null
-      const status: 'operational' | 'warning' | 'error' | 'offline' =
-        provider.status === 'healthy' || provider.status === 'moderate' ? 'operational' :
-        provider.status === 'low' || provider.status === 'degraded' ? 'warning' :
-        provider.status === 'critical' ? 'error' : 'offline'
-
-      // Description: show remaining $ if prepaid, spent $ if monthly, or availability status
-      let description = ''
-      const spentAmount = provider.cost && typeof provider.cost.total === 'number' ? provider.cost.total : null
-      if (remainingCredits !== null) {
-        // Has prepaid credits configured - show remaining $
-        description = `$${Math.round(remainingCredits)} remaining`
-      } else if (provider.cacheStrategy === 'free-tier') {
-        // Free tier provider
-        description = 'Free tier (available)'
-      } else if (provider.cacheStrategy === 'config-monthly' && spentAmount !== null) {
-        // Monthly billing - show spent amount this month
-        description = `$${Math.round(spentAmount)} spent`
-      } else if (provider.quota.remaining === 'N/A') {
-        // No admin key configured
-        description = 'No admin key'
-      } else if (remainingPercent !== null) {
-        // Has percentage but no $ amount
-        description = `${remainingPercent}% available`
-      } else {
-        description = 'Available'
-      }
-
-      // Build detailed tooltip
-      let tooltip = `${provider.name}\n`
-      tooltip += `Status: ${provider.status}\n`
-      if (remainingCredits !== null) {
-        tooltip += `Remaining: $${remainingCredits.toFixed(2)}\n`
-      }
-      if (provider.cost && typeof provider.cost.total === 'number') {
-        tooltip += `Spent: $${provider.cost.total.toFixed(2)}\n`
-      }
-      if (provider.quota.limit) {
-        tooltip += `Limit: ${provider.quota.limit}\n`
-      }
-      if (provider.rateLimit) {
-        if (provider.rateLimit.requestsPerMinute) {
-          tooltip += `Rate: ${provider.rateLimit.requestsPerMinute} RPM\n`
-        }
-        if (provider.rateLimit.tokensPerDay) {
-          tooltip += `Tokens: ${(provider.rateLimit.tokensPerDay / 1000000).toFixed(1)}M TPD\n`
-        }
-      }
-      tooltip += `Data: ${provider.cacheStrategy}`
-
-      items.push({
-        name: provider.name,
-        status,
-        description,
-        tooltip
       })
     }
 
@@ -577,11 +498,6 @@ export default function SystemHealthDashboard() {
           title="Processes"
           icon={<Activity className="h-5 w-5" />}
           items={getProcessItems()}
-        />
-        <HealthStatusCard
-          title="API Quota"
-          icon={<Zap className="h-5 w-5" />}
-          items={getAPIItems()}
         />
         <HealthStatusCard
           title="UKB Workflows"

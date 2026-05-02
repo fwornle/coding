@@ -115,14 +115,11 @@ coding/
         rules/                          # Constraint rules
         monitors/                       # Real-time monitors
         index.ts                        # Entry point
-    browser-access/                     # Playwright automation
     code-graph-rag/                     # Code graph search
-    serena/                             # Code navigation
     copi/                               # CoPilot integration
     llm-cli-proxy/                      # CLI LLM access
     system-health-dashboard/            # Status dashboard (React)
     memory-visualizer/                  # Knowledge visualization
-    shadcn-mcp/                         # UI component library
   config/                               # Configuration files
     agents/                             # Agent configs
       claude.sh                         # Claude Code launcher

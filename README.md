@@ -213,7 +213,6 @@ Real-time per-exchange observations from live coding sessions, inspired by the o
 - **[MCP Constraint Monitor](integrations/mcp-constraint-monitor/)** - PreToolUse hook enforcement
 - **[MCP Semantic Analysis](integrations/mcp-semantic-analysis/)** - 11-agent AI analysis system
 - **[VKB Visualizer](integrations/vkb-visualizer/)** - Knowledge graph visualization
-- **[Serena MCP](integrations/mcp-serena/)** - Structure-aware code search
 - **[All Integrations](integrations/)** - Complete integration list
 
 ### Skills & Commands

@@ -380,12 +380,12 @@ check_dependencies() {
         missing_deps+=("tmux")
     fi
 
-    # Install uv if missing (required for Serena MCP server)
+    # Install uv if missing (required for code-graph-rag Python venv)
     if ! command -v uv >/dev/null 2>&1; then
         if confirm_system_change \
             "Install uv (Python package installer) via curl | sh" \
-            "This downloads and executes an installer script from astral.sh. Required for Serena MCP."; then
-            info "Installing uv (Python package installer, required for Serena MCP)..."
+            "This downloads and executes an installer script from astral.sh. Required for code-graph-rag."; then
+            info "Installing uv (Python package installer, required for code-graph-rag)..."
             if curl -LsSf https://astral.sh/uv/install.sh | sh; then
                 # Source shell config to update PATH
                 export PATH="$HOME/.local/bin:$PATH"
@@ -396,11 +396,11 @@ check_dependencies() {
                     info "Add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
                 fi
             else
-                warning "Failed to install uv. Serena MCP server may not be available."
+                warning "Failed to install uv. code-graph-rag may not be available."
                 SKIPPED_SYSTEM_DEPS+=("uv")
             fi
         else
-            warning "Skipped uv installation. Serena MCP server may not be available."
+            warning "Skipped uv installation. code-graph-rag may not be available."
             SKIPPED_SYSTEM_DEPS+=("uv")
             info "To install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
         fi

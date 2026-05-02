@@ -22,7 +22,7 @@
 
 **Package Manager:**
 - npm (Node.js packages) - Root and integration-level package.json files
-- uv (Python packages) - code-graph-rag and serena integrations
+- uv (Python packages) - code-graph-rag integration
 - Lockfile: package-lock.json present
 
 ## Frameworks
@@ -69,9 +69,7 @@
 
 **Code Analysis:**
 - @xenova/transformers 2.17+ - HuggingFace transformers for local embeddings
-- cheerio 1.0+ - HTML/XML parsing (browser-access)
-- playwright 1.40+ - Browser automation
-- @browserbasehq/stagehand 2.0+ - High-level browser control (Browserbase integration)
+- playwright 1.40+ - Browser automation (used by /playwright-cli skill)
 - tree-sitter 0.25+ - AST parsing (Python, code-graph-rag)
 
 **Infrastructure:**
@@ -110,7 +108,7 @@
 **Build:**
 - `tsconfig.json` - TypeScript compiler configuration (ES2020 target, strict mode)
 - Express port mapping via environment variables
-- Docker environment variables: SEMANTIC_ANALYSIS_PORT, BROWSER_ACCESS_PORT, CONSTRAINT_MONITOR_PORT, etc.
+- Docker environment variables: SEMANTIC_ANALYSIS_PORT, CONSTRAINT_MONITOR_PORT, etc.
 
 **Database Configuration:**
 - QDRANT_URL - Vector database host:port (default: http://localhost:6333)
@@ -140,7 +138,6 @@
 - **8080** - VKB Server (knowledge base viewer)
 - **3032** - Health Dashboard HTTP API
 - **3033** - Health Dashboard WebSocket
-- **3847** - Browser Access SSE stream
 - **3848** - Semantic Analysis SSE stream (workflows)
 - **3849** - Constraint Monitor SSE stream
 - **3850** - Code-Graph-RAG SSE stream

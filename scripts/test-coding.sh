@@ -2054,7 +2054,6 @@ echo -e "  • Run ${CYAN}ukb --interactive${NC} to add your first knowledge pat
 echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
 echo -e "  • Access professional constraint monitor at ${CYAN}http://localhost:3030${NC}"
 echo -e "  • Configure constraint groups in ${CYAN}integrations/mcp-constraint-monitor/constraints.yaml${NC}"
-echo -e "  • Install shadcn/ui MCP: ${CYAN}pnpm dlx shadcn@latest mcp init --client claude${NC}"
 echo -e "  • See docs/README.md for comprehensive documentation"
 
 echo -e "\n${BOLD}Professional Dashboard Features:${NC}"
@@ -2100,12 +2099,6 @@ if [ -d "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard" ] && [ -f "
     echo -e "  ${GREEN}✅ Next.js Professional Dashboard${NC} - Available"
 else
     echo -e "  ${RED}❌ Next.js Professional Dashboard${NC} - Missing"
-fi
-
-if [ -d "$CODING_ROOT/integrations/shadcn-mcp" ]; then
-    echo -e "  ${GREEN}✅ shadcn/ui MCP Server${NC} - Installed"
-else
-    echo -e "  ${RED}❌ shadcn/ui MCP Server${NC} - Not Found"
 fi
 
 if [ -f "$CODING_ROOT/.global-lsl-registry.json" ]; then

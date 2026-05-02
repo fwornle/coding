@@ -53,10 +53,6 @@ class StatusLineHealthMonitor {
     this.serviceName = 'statusline-health-monitor';
     this.healthRefreshInterval = null;
 
-    // Billing scraper state
-    this.lastBillingCheck = 0;
-    this.billingScraperRunning = false;
-
     this.ensureLogDirectory();
   }
   /**
@@ -1508,96 +1504,6 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Get Browser Access SSE Server health status
-   * Monitors the shared MCP server for parallel Claude sessions
-   */
-  async getBrowserAccessHealth() {
-    try {
-      const browserAccessPort = 3847;
-      let healthIssues = [];
-      let healthStatus = 'healthy';
-
-      // Check if the SSE server is listening on port 3847
-      try {
-        const portCheck = await execAsync(`lsof -i :${browserAccessPort} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
-          timeout: 2000,
-          encoding: 'utf8'
-        });
-
-        if (!portCheck.stdout.includes('listening')) {
-          // Server not running - this is acceptable if browser automation not needed
-          return {
-            status: 'inactive',
-            icon: '⚪',
-            details: 'SSE server not running (optional)'
-          };
-        }
-
-        // Port is listening - check health endpoint
-        try {
-          const healthResponse = await Promise.race([
-            execAsync(`curl -s http://localhost:${browserAccessPort}/health --max-time 3`),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-          ]);
-
-          const healthData = JSON.parse(healthResponse.stdout.trim());
-
-          if (healthData.status === 'ok') {
-            const sessions = healthData.sessions || 0;
-            const stagehandInit = healthData.stagehandInitialized ? 'yes' : 'no';
-            return {
-              status: 'healthy',
-              icon: '✅',
-              details: `SSE :3847 OK (${sessions} sessions, stagehand: ${stagehandInit})`
-            };
-          } else {
-            healthIssues.push('Health endpoint returned error');
-            healthStatus = 'warning';
-          }
-        } catch (healthError) {
-          if (healthError.message === 'timeout') {
-            healthIssues.push('Health timeout');
-            healthStatus = 'warning';
-          } else {
-            healthIssues.push('Health check failed');
-            healthStatus = 'warning';
-          }
-        }
-      } catch (portError) {
-        healthIssues.push('Port check failed');
-        healthStatus = 'warning';
-      }
-
-      // Determine icon and details
-      let icon, details;
-      if (healthStatus === 'healthy') {
-        icon = '✅';
-        details = 'Browser SSE OK';
-      } else if (healthStatus === 'warning') {
-        icon = '🟡';
-        details = healthIssues.join(', ');
-      } else {
-        icon = '🔴';
-        details = healthIssues.join(', ');
-      }
-
-      return {
-        status: healthStatus,
-        icon: icon,
-        details: details
-      };
-
-    } catch (error) {
-      this.log(`Browser access health check error: ${error.message}`, 'DEBUG');
-      return {
-        status: 'unknown',
-        icon: '❓',
-        details: 'Health check failed'
-      };
-    }
-  }
-
-  /**
    * Get Semantic Analysis SSE Server health status (Docker mode)
    * Monitors the semantic-analysis MCP SSE server on port 3848
    */
@@ -1904,7 +1810,7 @@ class StatusLineHealthMonitor {
    * Format status line display
    * @param {Object} dockerMCPHealth - Docker MCP SSE servers health (null if not in Docker mode)
    */
-  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth = null) {
+  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, healthDashboardHealth, dockerMCPHealth = null) {
     let statusLine = '';
 
     // Global Coding Monitor with reason code if not healthy
@@ -1957,16 +1863,6 @@ class StatusLineHealthMonitor {
       statusLine += ` [VKB:${vkbHealth.icon}]`;
     }
 
-    // Browser Access SSE Server Health (only show if not inactive)
-    if (browserAccessHealth && browserAccessHealth.status !== 'inactive') {
-      if (browserAccessHealth.icon === '🟡' || browserAccessHealth.icon === '🔴') {
-        const reason = this.getShortReason(browserAccessHealth.details || browserAccessHealth.status);
-        statusLine += ` [Browser:${browserAccessHealth.icon}(${reason})]`;
-      } else {
-        statusLine += ` [Browser:${browserAccessHealth.icon}]`;
-      }
-    }
-
     // Health Dashboard (UI:3032, API:3033) - always show since it's core infrastructure
     if (healthDashboardHealth) {
       if (healthDashboardHealth.icon === '🟡' || healthDashboardHealth.icon === '🔴') {
@@ -1990,114 +1886,23 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Check and run billing scraper if interval has passed.
-   * Spawns the Stagehand-based scraper as a background child process to avoid
-   * blocking status line updates. The scraper has its own interval gating
-   * (shouldScrape checks lastScraped + scrapeIntervalMinutes in config).
-   *
-   * Primary spend tracking is via BudgetTracker + externalSpend offset in
-   * api-quota-checker.js. The scraper provides periodic ground-truth validation
-   * against the Groq billing dashboard.
-   */
-  async checkBillingScraper() {
-    // Don't spawn if a scrape is already running
-    if (this._scraperRunning) return;
-
-    // Quick interval check to avoid spawning needlessly every 15s.
-    // The scraper also checks internally, but this saves the process spawn overhead.
-    try {
-      const configPath = path.join(this.codingRepoPath, 'config', 'live-logging-config.json');
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      const groqConfig = config?.provider_credits?.groq;
-      if (!groqConfig || groqConfig.billingType !== 'monthly') return;
-      if (!groqConfig.autoScrape) return;
-
-      const intervalMs = (groqConfig.scrapeIntervalMinutes || 15) * 60 * 1000;
-      const lastScraped = groqConfig.lastScraped ? new Date(groqConfig.lastScraped).getTime() : 0;
-      if ((Date.now() - lastScraped) < intervalMs) return;
-    } catch {
-      return; // Config read error — skip this cycle
-    }
-
-    // Spawn the Stagehand scraper as a background process
-    const scraperPath = path.join(this.codingRepoPath, 'scripts', 'groq-billing-scraper.js');
-    if (!fs.existsSync(scraperPath)) {
-      this.log('Billing scraper not found, skipping', 'WARN');
-      return;
-    }
-
-    this._scraperRunning = true;
-    this.log('Spawning Groq billing scraper (background)...');
-
-    try {
-      const child = spawn('node', [scraperPath], {
-        cwd: this.codingRepoPath,
-        env: { ...process.env, CODING_REPO: this.codingRepoPath },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false, // Keep attached so we know when it finishes
-      });
-
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (data) => { stdout += data.toString(); });
-      child.stderr.on('data', (data) => { stderr += data.toString(); });
-
-      child.on('close', (code) => {
-        this._scraperRunning = false;
-        if (code === 0) {
-          try {
-            const result = JSON.parse(stdout.trim().split('\n').pop());
-            if (result.scraped) {
-              this.log(`Billing scraper: updated Groq spend to $${result.spend}`);
-            } else {
-              this.log(`Billing scraper: skipped (${result.reason || 'no scrape needed'})`);
-            }
-          } catch {
-            this.log('Billing scraper: completed (could not parse output)');
-          }
-        } else {
-          this.log(`Billing scraper exited with code ${code}: ${stderr.trim()}`, 'WARN');
-        }
-      });
-
-      child.on('error', (error) => {
-        this._scraperRunning = false;
-        this.log(`Billing scraper spawn error: ${error.message}`, 'WARN');
-      });
-
-      // Safety timeout: kill after 2 minutes to prevent zombie processes
-      setTimeout(() => {
-        if (this._scraperRunning) {
-          try { child.kill('SIGTERM'); } catch {}
-          this._scraperRunning = false;
-          this.log('Billing scraper killed (timeout after 2min)', 'WARN');
-        }
-      }, 120_000);
-    } catch (error) {
-      this._scraperRunning = false;
-      this.log(`Failed to spawn billing scraper: ${error.message}`, 'WARN');
-    }
-  }
-
-  /**
    * Update status line
    */
   async updateStatusLine() {
     try {
-      // Gather health data from all components (including new database, VKB, browser-access, health dashboard, and Docker MCP checks)
-      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth] = await Promise.all([
+      // Gather health data from all components (including database, VKB, health dashboard, and Docker MCP checks)
+      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, healthDashboardHealth, dockerMCPHealth] = await Promise.all([
         this.getGlobalCodingMonitorHealth(),
         this.getProjectSessionsHealth(),
         this.getConstraintMonitorHealth(),
         this.getDatabaseHealth(),
         this.getVKBServerHealth(),
-        this.getBrowserAccessHealth(),
         this.getHealthDashboardHealth(),
         this.getDockerMCPHealth()
       ]);
 
       // Format status line
-      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth);
+      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, healthDashboardHealth, dockerMCPHealth);
 
       // Write status file for Claude Code integration
       // IMPORTANT: Always write/touch the file even when content hasn't changed,
@@ -2126,7 +1931,6 @@ class StatusLineHealthMonitor {
           console.log(`  Constraints: ${constraintHealth.status} - ${constraintHealth.details}`);
           console.log(`  Database: ${databaseHealth.status} - ${databaseHealth.details}`);
           console.log(`  VKB: ${vkbHealth.status} - ${vkbHealth.details}`);
-          console.log(`  Browser Access: ${browserAccessHealth.status} - ${browserAccessHealth.details}`);
           console.log(`  Health Dashboard: ${healthDashboardHealth.status} - ${healthDashboardHealth.details}`);
           if (dockerMCPHealth) {
             console.log(`  Docker MCP: ${dockerMCPHealth.status} - ${dockerMCPHealth.details}`);
@@ -2142,11 +1946,6 @@ class StatusLineHealthMonitor {
 
       // Broadcast terminal titles to all Claude sessions for visibility in idle terminals
       await this.broadcastTerminalTitles(sessionHealth);
-
-      // Check if it's time to run the billing scraper (runs in background)
-      this.checkBillingScraper().catch(error => {
-        this.log(`Billing scraper error: ${error.message}`, 'WARN');
-      });
 
     } catch (error) {
       this.log(`Error updating status line: ${error.message}`, 'ERROR');

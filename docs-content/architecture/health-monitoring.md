@@ -209,7 +209,7 @@ Sessions use a graduated cooling scheme based on idle time:
 
 **Features**:
 
-- Real-time service status (4-card system: Databases, Services, Processes, API Quota)
+- Real-time service status (3-card system: Databases, Services, Processes)
 - UKB Workflow Monitor with visual workflow graph
 - Service restart controls
 - Auto-healing history

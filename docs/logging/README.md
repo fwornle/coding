@@ -78,7 +78,6 @@ Predefined categories for the coding infrastructure:
 | Category | Description |
 |----------|-------------|
 | health | Health monitoring and status line |
-| billing | API quota and billing tracking |
 | transcript | Live session logging and transcript monitoring |
 | knowledge | Knowledge management and UKB operations |
 | workflow | Workflow execution and agent coordination |

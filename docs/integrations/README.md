@@ -134,8 +134,6 @@ cd ~/Agentic/coding
 # This installs:
 # ✓ MCP Semantic Analysis Server
 # ✓ MCP Constraint Monitor
-# ✓ Serena AST Analysis
-# ✓ Browser Access (optional)
 # ✓ VSCode CoPilot Extension (optional)
 ```
 

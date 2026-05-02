@@ -5,7 +5,6 @@ import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux'
 import healthStatusReducer from './slices/healthStatusSlice'
 import healthReportReducer from './slices/healthReportSlice'
 import autoHealingReducer from './slices/autoHealingSlice'
-import apiQuotaReducer from './slices/apiQuotaSlice'
 import ukbReducer from './slices/ukbSlice'
 import cgrReducer from './slices/cgrSlice'
 import workflowConfigReducer from './slices/workflowConfigSlice'
@@ -18,7 +17,6 @@ const rootReducer = combineReducers({
   healthStatus: healthStatusReducer,
   healthReport: healthReportReducer,
   autoHealing: autoHealingReducer,
-  apiQuota: apiQuotaReducer,
   ukb: ukbReducer,
   cgr: cgrReducer,
   workflowConfig: workflowConfigReducer,
