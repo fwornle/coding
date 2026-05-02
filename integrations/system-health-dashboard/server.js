@@ -118,27 +118,117 @@ class SystemHealthAPIServer {
             res.redirect(`http://localhost:${this.dashboardPort}`);
         });
 
-        // Logging middleware
+        // Logging middleware. We skip the four hot polling endpoints to
+        // avoid generating ~16 stderr writes per second under heavy
+        // dashboard polling (which itself shows up as a few % CPU). The
+        // stderr write is synchronous and pipes through docker's log
+        // driver, so this matters more than it looks.
+        const HOT_POLL_PATHS = new Set([
+            '/api/health-verifier/status',
+            '/api/health-verifier/report',
+            '/api/health-verifier/api-quota',
+            '/api/ukb/processes',
+            '/api/ukb/status',
+            '/api/health',
+        ]);
         this.app.use((req, res, next) => {
-            console.log(`${req.method} ${req.path}`);
+            if (!HOT_POLL_PATHS.has(req.path)) {
+                process.stderr.write(`${req.method} ${req.path}\n`);
+            }
             next();
         });
+    }
+
+    /**
+     * Wrap an async GET handler with an in-memory response cache. While a
+     * fresh entry exists (within TTL) every caller gets the cached body
+     * with no handler work. Coalesces concurrent in-flight requests into
+     * one upstream call. This bounds CPU cost on the read-mostly status
+     * endpoints regardless of how many tabs poll them.
+     */
+    cachedGet(ttlMs, handler) {
+        // Cache the SERIALIZED response body and a content ETag so:
+        //  1. Cache HITs skip re-running the handler AND JSON.stringify.
+        //  2. Clients that re-poll get HTTP 304 (zero-body) when the
+        //     payload is unchanged — important for big responses like
+        //     /api/ukb/processes which can hit ~500 KB.
+        // Coalesces concurrent in-flight requests into one upstream call.
+        const cache = { status: 200, body: null, etag: null, expires: 0, inflight: null };
+        const send = (req, res, status, body, etag, hitState) => {
+            res.setHeader('X-Cache', hitState);
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            if (etag) res.setHeader('ETag', etag);
+            const ifNoneMatch = req.headers['if-none-match'];
+            if (status === 200 && etag && ifNoneMatch === etag) {
+                return res.status(304).end();
+            }
+            res.status(status).end(body);
+        };
+        const computeEtag = (s) => {
+            // Lightweight FNV-1a 32-bit hash over the serialized body. Cheap
+            // even for 500 KB; collisions are not a correctness concern
+            // here (worst case is a stale render until the next miss).
+            let h = 0x811c9dc5;
+            for (let i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+            }
+            return `W/"${s.length.toString(16)}-${h.toString(16)}"`;
+        };
+        return async (req, res) => {
+            const now = Date.now();
+            if (cache.body && now < cache.expires) {
+                return send(req, res, cache.status, cache.body, cache.etag, 'HIT');
+            }
+            if (cache.inflight) {
+                const v = await cache.inflight;
+                return send(req, res, v.status, v.body, v.etag, 'COALESCED');
+            }
+            cache.inflight = new Promise((resolve) => {
+                const captured = { status: 200, body: null, etag: null };
+                const fakeRes = {
+                    setHeader: () => {},
+                    status(code) { captured.status = code; return this; },
+                    json(body) {
+                        captured.body = JSON.stringify(body);
+                        captured.etag = computeEtag(captured.body);
+                        resolve(captured);
+                        return this;
+                    },
+                };
+                Promise.resolve(handler(req, fakeRes)).catch((err) => {
+                    captured.status = 500;
+                    captured.body = JSON.stringify({ status: 'error', message: err?.message || 'cache handler failed' });
+                    captured.etag = null;
+                    resolve(captured);
+                });
+            });
+            const v = await cache.inflight;
+            cache.status = v.status;
+            cache.body = v.body;
+            cache.etag = v.etag;
+            cache.expires = Date.now() + ttlMs;
+            cache.inflight = null;
+            return send(req, res, v.status, v.body, v.etag, 'MISS');
+        };
     }
 
     setupRoutes() {
         // Health check endpoint
         this.app.get('/api/health', this.handleHealthCheck.bind(this));
 
-        // System health verifier endpoints
-        this.app.get('/api/health-verifier/status', this.handleGetHealthStatus.bind(this));
-        this.app.get('/api/health-verifier/report', this.handleGetHealthReport.bind(this));
-        this.app.get('/api/health-verifier/api-quota', this.handleGetAPIQuota.bind(this));
+        // System health verifier endpoints — read-mostly, hit hard by the
+        // dashboard's polling loop. A 1 s response cache keeps perceived
+        // freshness while bounding CPU cost from many concurrent tabs.
+        this.app.get('/api/health-verifier/status', this.cachedGet(1000, this.handleGetHealthStatus.bind(this)));
+        this.app.get('/api/health-verifier/report', this.cachedGet(1000, this.handleGetHealthReport.bind(this)));
+        this.app.get('/api/health-verifier/api-quota', this.cachedGet(1000, this.handleGetAPIQuota.bind(this)));
         this.app.post('/api/health-verifier/verify', this.handleTriggerVerification.bind(this));
         this.app.post('/api/health-verifier/restart-service', this.handleRestartService.bind(this));
 
         // UKB (Update Knowledge Base) process management endpoints
-        this.app.get('/api/ukb/status', this.handleGetUKBStatus.bind(this));
-        this.app.get('/api/ukb/processes', this.handleGetUKBProcesses.bind(this));
+        this.app.get('/api/ukb/status', this.cachedGet(1000, this.handleGetUKBStatus.bind(this)));
+        this.app.get('/api/ukb/processes', this.cachedGet(1000, this.handleGetUKBProcesses.bind(this)));
         this.app.post('/api/ukb/cleanup', this.handleUKBCleanup.bind(this));
         this.app.post('/api/ukb/cancel', this.handleCancelWorkflow.bind(this));
         this.app.post('/api/ukb/single-step-mode', this.handleSingleStepMode.bind(this));
