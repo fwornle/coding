@@ -12092,12 +12092,12 @@
       "name": "System Health Dashboard and Service Architecture",
       "entityType": "Container",
       "observations": [
-        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host machine only; must be started separately)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, inside Docker via supervisord)\n- `localhost:3032` — observations viewer\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n\n**Architectural rule:** Docker runs headless backend services/APIs; host runs tools requiring host networking or hot-reload dev UIs. All port values must come exclusively from the shared `.env.ports` file — no hardcoding.\n\n**Known issues and fixes:**\n- **Port 3030 conflict**: if another process holds port 3030 on the host, the `coding-services` container fails to start (stays in `Created` state, `ExitCode=0`); fix: `free-coding-ports.sh` pre-flight script — run before `docker-compose up`\n- **`coding-services` container stuck in `Created` state (April 30)**: root cause was a leftover Next.js dev server holding port 3030; resolved by running `free-coding-ports.sh`\n- `supervisord.conf` reverted to 9-process known-good state; `Dockerfile.coding-services` is primary artifact for service build changes\n- **`supervisord` proxy inheritance**: `supervisord.conf` now inherits proxy env vars rather than clearing them; `NO_PROXY` covers internal services\n- Stale browser cache hides deployed fixes — hard refresh (`Cmd+Shift+R`) required after bundle updates\n- **Dashboard SIGKILL/auto-heal loop (April 26)**: under investigation — no fixes confirmed yet\n- **Stale Docker bind-mount**: restarting the service forces a remount and resolves stale config display\n- **Screenshot tooling**: `gsd-browser` CLI is the correct tool for capturing screenshots of local services\n- **`mcp-constraint-monitor` live reload**: bind mount added to `docker-compose.yml`\n- **Coordinator heartbeat self-reporting**: `global-lsl-coordinator.js` `performHealthCheck` now writes coordinator's own timestamp to registry\n- **`embedding-listener` FATAL failure (fixed April 28)**: fastembed local cache not bind-mounted; fixed by pre-warming model cache in Docker builder stage (~90MB baked into image)\n- **`localhost:3033` unreachable (April 29)**: live-logging dashboard server crashed due to `ObservationConsolidator.js` process hang from unclosed Redis/DB connection (fix applied)\n- **Multi-phase refactoring in progress (May 1)**: phases A→B→C→D targeting `global-service-coordinator.js`, `free-coding-ports.sh`, `post-session-logger.js`, `global-process-supervisor.js`; Phase C removing legacy `DOCKER_MODE`/native/`docker-mode-transition.js` references — `post-session-logger.js` and `global-process-supervisor.js` updated"
+        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only; start separately)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, inside Docker via supervisord)\n- `localhost:3032` — observations viewer\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n\n**Architectural rule:** Docker runs headless backend services/APIs; host runs tools requiring host networking or hot-reload dev UIs. All port values must come exclusively from the shared `.env.ports` file — no hardcoding.\n\n**Known issues and fixes:**\n- **Port 3030 conflict**: leftover Next.js dev server holds port 3030 → `coding-services` container stays in `Created` state; fix: `free-coding-ports.sh`\n- `supervisord.conf` reverted to 9-process known-good state; `Dockerfile.coding-services` is primary artifact for service build changes\n- **`supervisord` proxy inheritance**: `supervisord.conf` now inherits proxy env vars; `NO_PROXY` covers internal services\n- Stale browser cache hides deployed fixes — hard refresh (`Cmd+Shift+R`) required after bundle updates\n- **Multi-phase Docker-mode refactor completed (May 1, phases C+D)**:\n  - Stripped all `isDockerMode`, `isTransitionLocked`, `monitoringPaused`, native-mode fallbacks, SIGUSR handlers from 8 scripts: `post-session-logger.js`, `global-process-supervisor.js`, `health-remediation-actions.js`, `combined-status-line.js`, `start-services-robust.js`, `health-verifier.js`, `statusline-health-monitor.js`, `global-service-coordinator.js`\n  - Deleted `docker-mode-transition.js` (no longer imported)\n  - Deleted obsolete docs/PUML: `docker-mode-transition.md`, `docker-mode-architecture.puml`, `docker-health-detection.puml`, associated PNGs\n  - Updated 14 markdown files and 4 PUML diagrams to reflect docker-only architecture\n- **Screenshot tooling**: `gsd-browser` CLI for capturing screenshots of local services\n- **`mcp-constraint-monitor` live reload**: bind mount added to `docker-compose.yml`\n- **Coordinator heartbeat self-reporting**: `global-lsl-coordinator.js` `performHealthCheck` writes coordinator's own timestamp to registry\n- **`embedding-listener` FATAL (fixed April 28)**: fastembed cache pre-warmed in Docker builder stage (~90MB baked into image)\n- **Dashboard clipboard copy button (May 1)**: `clipboard-button.tsx` added; wired into `observation-card.tsx`, `digests.tsx`, `insights.tsx`; each copies formatted markdown"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.849Z",
-        "last_updated": "2026-05-01T09:32:49.897Z"
+        "last_updated": "2026-05-02T09:57:32.426Z"
       },
       "id": "mc4flkg3oje83q"
     },
@@ -12105,12 +12105,12 @@
       "name": "Git Repository Hygiene and Large File Management",
       "entityType": "Service",
       "observations": [
-        "- `.specstory/archive/` gitignored; LSL history files >200KB auto-split at \"## Prompt Set\" boundaries\n- OKB `.data/exports/` gitignored; **pre-commit hook (\"OKB BASELINE GUARD\")** blocks KB export files when mixed with non-KB changes\n- KB export files: `.data/knowledge-export/coding.json`, `.data/knowledge-export/resi.json`, `.data/knowledge-export/ui.json`\n- `rapid-automations` `node_modules/` and build artifacts gitignored; `local_cache/` (fastembed ONNX model cache) gitignored\n- `integrations/copi` submodule removed April 22\n- OKB submodule pointer in parent repo must be updated alongside submodule commits; diverged branches resolved via `git pull --rebase origin main`\n- Git submodules cause wave-based parallel execution orchestration to fall back to sequential mode\n- **OAuth token leak remediation**: `gho_`, `ghp_`, `github_pat_` patterns added to `redaction-patterns.json`; history rewritten with `git-filter-repo`; force-pushed\n- **User ID redaction**: `ConfigurableRedactor.js` replaces user IDs with `<USER_ID_REDACTED>`; 245 observations retroactively cleaned\n- **AWS secret regex over-matching**: `[a-zA-Z0-9+/]{40}` pattern in `redaction-patterns.json` matches any 40-char alphanumeric string — fix pending\n- **`.specstory/history/` scrubbed from git history**: moved to private nested sub-repo (`coding-history`); `.gitignore` updated; service scripts auto-create history directory\n- **Corporate remote sync**: `main` and `feat/online-learning` force-pushed to `cc-github.bmwgroup.net`; push to `<COMPANY_NAME_REDACTED>.ghe.com` **blocked by SSH key rejection** — pending\n- MkDocs `docs_dir` is `docs-content` — images must go in `docs-content/images/`\n- **VS Code SCM missing parent repo (ongoing)**: nested `.git` inside `.specstory/history/` confuses VS Code's git scanner; VS Code traverses symlinks and finds unblessed nested repos, dropping the parent `coding` repo from SCM panel\n  - `coding.code-workspace` repeatedly edited during investigation; reverted to baseline commit `73c7a7047`\n  - Tried: `git.openRepositoryInParentFolders`, `git.scanRepositories`, `git.ignoredRepositories`, `git.repositoryScanIgnoredFolders`, multi-root workspace folders\n  - **Symlink approach failed**: symlinks from `.specstory/logs/classification/` into `.specstory/history/` caused VS Code to traverse into the nested `.git` — symlinks removed\n  - **Decided fix**: eliminate symlinks entirely; change classification writers to output directly into `.specstory/history/logs/classification/`; survey of scripts writing classification files is the next step\n  - Pending edits to `install.sh` and `init-history.sh` flagged as possibly incomplete"
+        "- `.specstory/archive/` gitignored; LSL history files >200KB auto-split at \"## Prompt Set\" boundaries\n- OKB `.data/exports/` gitignored; **pre-commit hook (\"OKB BASELINE GUARD\")** blocks KB export files when mixed with non-KB changes\n- KB export files: `.data/knowledge-export/coding.json`, `.data/knowledge-export/resi.json`, `.data/knowledge-export/ui.json`\n- `rapid-automations` `node_modules/` and build artifacts gitignored; `local_cache/` (fastembed ONNX model cache) gitignored\n- `integrations/copi` submodule removed April 22\n- OKB submodule pointer in parent repo must be updated alongside submodule commits; diverged branches resolved via `git pull --rebase origin main`\n- Git submodules cause wave-based parallel execution orchestration to fall back to sequential mode\n- **OAuth token leak remediation**: `gho_`, `ghp_`, `github_pat_` patterns added to `redaction-patterns.json`; history rewritten with `git-filter-repo`; force-pushed\n- **User ID redaction**: `ConfigurableRedactor.js` replaces user IDs with `<USER_ID_REDACTED>`; 245 observations retroactively cleaned\n- **AWS secret regex over-matching**: `[a-zA-Z0-9+/]{40}` pattern in `redaction-patterns.json` matches any 40-char alphanumeric string — fix pending\n- **`.specstory/history/` is a private nested sub-repo** (`coding-history`) pointing at `Frank-Woernle/coding-history` on GHE; `.gitignore` updated; service scripts auto-create history directory\n- **Duplicate remote** `adpnext-apps/coding-history` exists on GHE — deletion requires org admin via web UI\n- **SSH key rejection on GHE**: new ed25519 work key uploaded, SAML-authorized, but rejected; root cause likely SAML SSO session timing — fix: log out/in to refresh SAML session, then immediately re-add and re-authorize the key\n- MkDocs `docs_dir` is `docs-content` — images must go in `docs-content/images/`\n- **`.specstory` directory structure flattened (May 1)**: `history/history/` (2.6 GB) and nested `archive/` cleaned; 19,691 LSL `.md` files moved up to `history/` root; committed as `d00bd42c`"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.855Z",
-        "last_updated": "2026-05-01T13:24:42.354Z"
+        "last_updated": "2026-05-02T09:57:32.317Z"
       },
       "id": "mc4flkg4828deu"
     },
@@ -12157,12 +12157,12 @@
       "name": "GSD Statusline and Hook Integration",
       "entityType": "Process",
       "observations": [
-        "- GSD updated from **1.38.3 → 1.38.5** (April 26); **1.39.0** detected available May 1, update queued pending confirmation\n- 7 custom skills backed up before running installer to prevent data loss; restart of Claude Code required to activate new commands\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field in hook stdin JSON; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **False warning fixes (May 1)**:\n  - `health-prompt-hook.js`: was misclassifying `overallStatus=healthy` with non-critical constraint-monitor violations as yellow/warning; fixed to treat as green/silent — commit `0f52b20d1`\n  - `combined-status-line.js`: same logic bug where `healthVerifier` fields (`overallStatus`, `autoHealingActive`) were read incorrectly — mirrored fix applied\n- Stale coordinator process (PID 74629) predated heartbeat-stamping commit, causing stale registry timestamps; clean restart planned\n- Stale `[Raw]` observation (ID `3db421fe`) in live DB caused separate statusline health warning; self-clears once row is re-backfilled"
+        "- GSD updated to **1.39.0** (May 1); previous was 1.38.5; v1.39.0 consolidates 31 micro-skills into grouped parent commands with flags; restart of Claude Code required to activate\n- 7 custom skills backed up before running installer to prevent data loss\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **False warning fixes (May 1)**:\n  - `health-prompt-hook.js`: misclassified `overallStatus=healthy` with non-critical violations as warning — fixed, commit `0f52b20d1`\n  - `combined-status-line.js`: same logic bug — mirrored fix applied; note this file was also stripped of native-mode branches in Phase C refactor\n- Stale `[Raw]` observation (ID `3db421fe`) in live DB caused separate statusline health warning; self-clears once row is re-backfilled"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.907Z",
-        "last_updated": "2026-05-01T13:24:42.366Z"
+        "last_updated": "2026-05-02T09:57:32.432Z"
       },
       "id": "mc4flkg1y4ci6q"
     },
@@ -12243,6 +12243,45 @@
         "last_updated": "2026-04-28T17:02:52.597Z"
       },
       "id": "mc4flkg1rcmna"
+    },
+    {
+      "name": "LSL File Storage and Path Conventions",
+      "entityType": "Process",
+      "observations": [
+        "All LSL and classification log output now lives under `.specstory/history/` (the inner git sub-repo). Key path migration completed May 1:\n\n- **Classification logs**: migrated from `.specstory/logs/classification/` → `.specstory/history/logs/classification/`; updated in `scripts/classification-logger.js`, `bin/init-history.sh`, `install.sh`, `.gitignore`\n- **`system.log`**: `src/live-logging/OperationalLogger.js` updated to write to `.specstory/history/logs/` instead of `.specstory/logs/`\n- **`scripts/lsl-paths.js`**: updated to reflect new path conventions\n- **`scripts/live-logging-coordinator.js`**: kept (not retired — referenced by `start-services.sh`, `stop-services.sh`, config, and test files); internal default paths updated to new structure\n- **Old `.specstory/logs/classification/`** (828 files): flagged for deletion pending developer confirmation\n- **Nested directory cleanup (May 1)**: `.specstory/history/history/` (2.6 GB) and `.specstory/history/archive/` artifacts flattened; 19,691 LSL `.md` files moved up to `history/` root; 5 filename collisions preserved as `.legacy.md`; committed as `d00bd42c`\n- **Planned**: reorganize LSL files and classification logs into `YYYY/MM/*` subdirectory hierarchy — scoped but not yet executed; key decisions pending on filename date prefix retention and whether `logs/` gets same structure\n- After any coordinator path change, the global LSL coordinator process must be explicitly killed and restarted (stale PID will continue writing to old paths)\n- Post-restart pattern: 9 transcript monitors respawn; supervisor race condition may create ~8 duplicate monitors — clean to 1 supervisor + 1 monitor per project"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-02T00:28:01.313Z",
+        "last_updated": "2026-05-02T00:28:01.313Z"
+      },
+      "id": "mc4flkgfv4mki"
+    },
+    {
+      "name": "VS Code SCM panel parent repo disappearing debug",
+      "entityType": "Config",
+      "observations": [
+        "- **Root cause**: nested `.specstory/history/.git` (GHE remote) triggers enterprise auth failures, causing VS Code to tear down the entire repo list\n- **All failed approaches**: `git.openRepositoryInParentFolders`, `git.scanRepositories`, `git.ignoredRepositories`, `git.repositoryScanIgnoredFolders`, multi-root workspace folders, symlinking classification logs into history — all caused regressions and were reverted\n- **Symlink approach specifically failed**: VS Code traverses symlinks and discovers the nested `.git`, dropping parent repo\n- **Final workspace config**: `coding.code-workspace` restored to baseline with `git.repositoryScanIgnoredFolders: [\".specstory\"]`, `git.openRepositoryInParentFolders: \"never\"`, and `git.ignoredRepositories` safety net; SCM parallel display mode enabled (Schema A settings, committed May 1)\n- **Definitive fix**: redirect all log writers to output directly into `.specstory/history/logs/` — eliminates symlinks entirely\n- **Classification log migration completed**: `scripts/classification-logger.js`, `bin/init-history.sh`, `install.sh`, `.gitignore` updated; committed `18f594851`\n- `OperationalLogger.js` redirected `system.log` from `.specstory/logs/` to `.specstory/history/logs/`\n- `live-logging-coordinator.js` default paths updated to `.specstory/history/logs/`; committed `1cca23c3e`\n- Old `.specstory/logs/classification/` (828 files) flagged for deletion; sub-repos still appearing is a noted secondary issue"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-02T09:57:32.334Z",
+        "last_updated": "2026-05-02T09:57:32.334Z"
+      },
+      "id": "mc4flkg2xp8tyx"
+    },
+    {
+      "name": "LSL Live Session Logging System",
+      "entityType": "RuntimeDiagnostics",
+      "observations": [
+        "- **Log path standard**: all LSL writers now output to `.specstory/history/logs/` (migration completed May 1)\n  - `classification-logger.js`, `live-logging-coordinator.js`, `OperationalLogger.js` all updated\n  - Old `.specstory/logs/` paths are obsolete; 828 legacy classification files pending deletion\n- **`lsl-paths.js`** (`scripts/lsl-paths.js`) updated to align with new path conventions\n- **Coordinator management**: global LSL coordinator (was PID 90030) must be explicitly killed and restarted after path changes — it does not pick up new defaults while running\n- Post-restart pattern: 9 transcript monitors respawn, supervisor race condition may create ~8 duplicates; clean state = 1 supervisor + 1 monitor per project\n- **`live-logging-coordinator.js`** kept (not retired) due to active references in `start-services.sh`, `stop-services.sh`, config files, and test files\n- **Planned**: LSL files and classification logs reorganized into `YYYY/MM/*` subdirectory hierarchy — scoped but not yet implemented; two open decisions: strip date prefixes from filenames, and whether to apply same structure to `logs/`"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-02T09:57:32.415Z",
+        "last_updated": "2026-05-02T09:57:32.415Z"
+      },
+      "id": "mc4flkg2nj7k5v"
     }
   ],
   "relations": [
@@ -19037,14 +19076,32 @@
       "to": "Knowledge Graph (OKB) Online Pipeline and Memory Visualizer",
       "relationType": "has_insight",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LSL File Storage and Path Conventions",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "VS Code SCM panel parent repo disappearing debug",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LSL Live Session Logging System",
+      "relationType": "has_insight",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-01T13:24:47.403Z",
-    "total_entities": 678,
-    "total_relations": 1132,
+    "exported_at": "2026-05-02T09:57:37.446Z",
+    "total_entities": 681,
+    "total_relations": 1135,
     "description": "Coding project infrastructure and patterns"
   }
 }
