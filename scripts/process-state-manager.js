@@ -652,7 +652,11 @@ class ProcessStateManager {
       await fs.access(levelDBLockPath);
       // Lock file exists - check who owns it
       const { spawn } = await import('child_process');
-      const lsof = spawn('/usr/sbin/lsof', [levelDBLockPath]);
+      // Use bare 'lsof' so PATH resolves it correctly. macOS ships it at
+      // /usr/sbin/lsof; Linux (the Docker image) at /usr/bin/lsof. The
+      // hardcoded macOS path was throwing ENOENT inside the container,
+      // crash-looping anything that called this (notably health-verifier).
+      const lsof = spawn('lsof', [levelDBLockPath]);
 
       let output = '';
       lsof.stdout.on('data', (data) => {
