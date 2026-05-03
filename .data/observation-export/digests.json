@@ -9716,5 +9716,92 @@
       "sourceCount": 1
     },
     "project": "rapid-automations"
+  },
+  {
+    "id": "f219b47f-ab72-4355-a497-be0849262e9c",
+    "date": "2026-05-03",
+    "theme": "Adding Umbrella and History Repos to VS Code Workspace",
+    "summary": "Goal was to make the `rapid-automations` umbrella git project and `rapid-automations-history` project appear in the VS Code workspace's Source Control panel.\n\n- Compared against a known-working workspace configuration from another project as a baseline\n- Updated `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace` to explicitly declare all 6 repository folders\n- Set `git.autoRepositoryDetection: false` to ensure all repos are explicitly registered\n- A VS Code window reload was required for changes to take effect",
+    "observationIds": [
+      "ba6a1115-c595-4de7-aa57-4448f80d1fdf",
+      "7dcd7027-3267-4b40-b7af-7dc6930ed162",
+      "81ace05a-0314-4864-b4b7-92455470684a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T09:50:09.937Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "4c816774-8cfa-4291-b114-c50e40eef026",
+    "date": "2026-05-03",
+    "theme": "Diagnosing Missing Repos and GHE SSH Auth Failure",
+    "summary": "After the workspace update, investigation continued into why only 4 of 6 repos were visible — `rapid-automations` and `rapid-automations-history` remained missing.\n\n- Initial suspicion was a GitHub Enterprise (GHE) authentication problem\n- VS Code's Git extension triggered auto-fetch using `<EMAIL_REDACTED>` as the SSH username rather than the standard `git@` user, causing a `publickey permission denied` error\n- Further analysis found that remote URLs explicitly specifying `<EMAIL_REDACTED>` override the `User git` directive in the SSH config, breaking GHE auth for SSH remotes (HTTPS remotes unaffected)\n- Direct SSH connection tests ruled out a simple user-override as the sole cause — `git@<COMPANY_NAME_REDACTED>.ghe.com` also failed, pointing to an underlying SSH key authentication issue with the GHE server itself\n- No workspace artifacts were modified during this phase; investigation was ongoing",
+    "observationIds": [
+      "9632c364-348a-4261-856f-d06cf93d0134",
+      "6c94da6f-5f23-4db3-9d41-e8623837b447",
+      "851ae4e9-0325-42f8-a6b2-baaac9e723f0",
+      "804780dd-5082-429f-957b-19915740a120",
+      "ab167851-5f4a-457a-b919-30c998ef2d44"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-03T09:50:09.937Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "083d3809-4697-4138-b232-4ac4d53e7650",
+    "date": "2026-05-03",
+    "theme": "Data Export Commits and Architecture Diagram Verification",
+    "summary": "Two related maintenance tasks were performed by the claude agent in quick succession:\n\n- Staged and committed observational JSON files across two directories — `.data/observation-export/` and `.data/knowledge-export/` — following an established two-commit convention mirroring prior export patterns.\n- Reviewed the `observation-memory-hierarchy` PUML diagram against the current architecture; confirmed it accurately reflects the single-owner HTTP gateway design.\n- Minor gap noted: two backfill patch endpoints are absent from the diagram, but were deemed non-architecturally-critical utilities and not requiring an update.\n- `rapid-automations.code-workspace` was touched in both observations.",
+    "observationIds": [
+      "607fe93b-29f3-4716-ada9-e61c9255fb5e",
+      "a95cecf0-6bcb-40ac-88de-8ba14b6c5aef"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T09:50:09.937Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "061f214f-340d-4e89-ba70-104b9b7fd9f6",
+    "date": "2026-05-03",
+    "theme": "GHE SSH Auth Failure and VS Code SCM Bug",
+    "summary": "Diagnosed an SSH authentication failure when connecting to `<COMPANY_NAME_REDACTED>.ghe.com` from VS Code/Git. Two distinct issues were identified:\n\n- **SSH key rejection**: Both personal and work SSH keys are refused by the GHE server regardless of the URL username used — the work key needs to be re-registered under GHE Settings → Keys.\n- **VS Code SCM display bug**: Umbrella/history repositories do not appear in the `rapid-automations` workspace when the Repositories view is disabled.\n\nNo files were modified; this observation represents a diagnostic session only.",
+    "observationIds": [
+      "45b3b508-9e6c-47aa-b002-5f7461894ad3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-03T09:50:37.791Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
   }
 ]

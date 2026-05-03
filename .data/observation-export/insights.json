@@ -1064,10 +1064,36 @@
     "project": "coding"
   },
   {
+    "id": "b49b8904-56e1-4c08-9122-df7b3ed48b58",
+    "topic": "Diagrams and Documentation Conventions",
+    "summary": "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE (patched commit `bc8a559` for `rapid-automations-history`)\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore` — should not be committed",
+    "confidence": 0.8,
+    "digestIds": [
+      "c724a186-dffb-4c8e-a44f-0bdfd221a206",
+      "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
+      "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
+      "f4afcd6b-96a6-449f-a305-68eec3d88a44",
+      "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
+      "5534b0a7-3c1d-4010-bb12-3425c1884daf",
+      "301fd6d1-bb53-4200-ae9b-7d55ba29579b",
+      "d9e4a40d-5f32-4c12-bebc-124766e378ab",
+      "0f7ed7d5-1919-4e89-8ad8-f29f658c05ed",
+      "a09b1447-8803-436e-8840-570ee13c7127",
+      "e4a4fcb1-1022-4da2-a40f-4b3acb57069e",
+      "9c82a74e-d7f0-435b-ae80-9f4a9f86fc12",
+      "a269b31a-0a33-4a21-ab6c-bfbc61fea71b",
+      "e05f3f0a-07ec-4828-9464-d2ea13623958"
+    ],
+    "lastUpdated": "2026-05-03T08:33:40.103Z",
+    "createdAt": "2026-04-25T15:07:41.719Z",
+    "metadata": {},
+    "project": "coding"
+  },
+  {
     "id": "3f2703a3-4642-468c-aace-06352845809e",
     "topic": "LLM CLI Proxy and Provider Health Tracking",
     "summary": "The LLM CLI proxy runs on port 12435 and is the central inference gateway for all coding-project consumers including the ETM observation pipeline, MCP servers, and OKB. Primary source is `integrations/llm-cli-proxy/src/index.ts` (TypeScript) with a parallel `integrations/llm-proxy/src/proxy.js`.\n\n**Provider routing:**\n- VPN-aware filtering via `src/vpn-detection.ts` inspects `utun` routes and DNS suffixes: outside VPN `claude-code` preferred; inside VPN/CN order is Copilot → Groq → OpenAI → Anthropic\n- Copilot provider exchanges `gho_` OAuth tokens for short-lived session tokens via `api.github.com/copilot_internal/v2/token` (5-minute expiry buffer caching); enterprise tokens use OAuth token directly against `copilot-api.${enterpriseUrl}`\n- Node.js `fetch` does not respect system proxy environment variables on VPN — fix is integrating `undici`'s `ProxyAgent` as the global dispatcher in proxy startup code\n- Non-VPN-compatible providers (Groq, OpenAI, Anthropic direct) hang indefinitely on VPN unless `AbortController` timeouts are applied; per-provider timeout set to 20–30s\n- `getOrderedProviders` skips unhealthy providers; `SemanticAnalyzer` direct API initialization calls removed as dead-code hang source\n- Provider chain should be set to Copilot-only on VPN to avoid wasting time falling through to blocked providers\n\n**Operational notes:**\n- Concurrent Copilot API calls during batch ingestion take 26–52 seconds each; 180-second timeout is appropriate\n- Compaction \"Bad Request\" (HTTP 400) errors are provider-side context size limit issues — no code fix applicable in the proxy",
-    "confidence": 0.85,
+    "confidence": 0.7499999999999999,
     "digestIds": [
       "baa49b86-e902-4a7f-8023-a9a3fde2f476",
       "da1dfdd8-a2ad-4f2c-b431-a44ce8e8d411",
@@ -1207,7 +1233,7 @@
     "id": "e33de847-100d-4970-ad2e-293308959d30",
     "topic": "Knowledge Context Injection System (v6.0 Milestone)",
     "summary": "A multi-phase knowledge injection system built across phases 30–32, completing the v6.0 milestone.\n\n**Architecture:**\n- Global hook in `~/.claude/settings.json` for cross-project, cross-agent support\n- Shared retrieval client with context-aware relevance boosting (CWD, git activity, editor state signals)\n- Session-start adapters for Claude, OpenCode, Copilot, and Mastra agents\n- `src/retrieval/working-memory.js` — 300/700 token split between working memory and retrieval results\n- `config/agent-profiles.json` — per-agent scoring profiles with RRF fusion and tier weight multipliers\n- `scripts/write-session-state.js` — writes `.coding/session-state.json` for cross-agent session continuity (2-hour window)\n\n**Retrieval relevance fixes (April 25):**\n- MiniLM embedding scores cluster too tightly (0.75–0.82 range) — topic discrimination unreliable; Qdrant payload filtering, Memgraph graph traversal, and ontology infrastructure all unused\n- `knowledge-injection-hook.js` updated to extract topics from conversation transcript and pass them to retrieval service for Qdrant topic pre-filtering\n- Transcript feedback loop fixed (commit `800d0fdc`): hook now skips `system-reminder` blocks when extracting topics, preventing injected content from being re-read as user context\n- Noise reduced from ~80% to ~40% irrelevant after combined enrichment + topic filtering\n\n**Working memory and dedup fixes (April 25, commit `fdb41381`):**\n- `working-memory.js` updated to prefer canonical \"Coding\" project entity; API `?type=` filter was non-functional — `api-routes.js` fixed to accept both `type` (singular) and `types` (plural CSV)\n- `GraphDatabaseService.js` bug fixed: Project nodes were omitted from `?type=Project` results due to second-pass dedup logic\n- `working-memory.js` now filters out Project/System nodes leaking into component-type result lists\n- Near-duplicate insight dedup added to `token-budget.js` to collapse semantically identical insights\n- End state: working memory correctly shows Coding project with 8 real Components, no duplicates\n\n**Other hook bugs fixed April 25:**\n- `process.stdin.isTTY === false` strict equality never matched piped stdin — changed to truthy check\n- `MIN_TOKENS = 20` replaced with `MIN_WORDS = 4` to correctly filter trivial inputs\n\n**KG entity counts (actual):** 1 Project, 8 Component, 353 SubComponent, 310 Detail, 1 System (673 total — correctly typed, not misclassified)",
-    "confidence": 0.85,
+    "confidence": 0.7499999999999999,
     "digestIds": [
       "c724a186-dffb-4c8e-a44f-0bdfd221a206",
       "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
@@ -1262,7 +1288,7 @@
     "id": "4d3e576e-7ac9-4257-a729-4e49a5d449eb",
     "topic": "OKB Operational Knowledge Base (OKB) Architecture and Known Issues",
     "summary": "The OKB lives under `integrations/operational-knowledge-management/` and uses Graphology + LevelDB + optional Qdrant for graph-based knowledge storage. The web viewer is a React/sigma.js app under `viewer/` served via Docker on port 8080, with `viewer/dist/` bind-mounted read-only — always requires `npm run build` after source changes. Key components: `src/intelligence/correlation.ts`, `src/intelligence/temporal.ts`, `GraphKnowledgeExporter.js` (exports to exactly 3 files: `raas.json`, `kpi-fw.json`, `general.json`).\n\n**IssueTriage component (`IssueTriage.tsx`) bugs and fixes:**\n- **Entity key format mismatch**: edges use `layer:id` prefixed keys while `IssueTriage` looked up bare `id` keys — identified, not yet fixed\n- **Evidence bloat**: BFS hop distance too large (3 hops, 900+ nodes) + domain-based fuzzy matching defaulting to `\"general\"` catch-all inflated evidence to 148+; **domain sweep removed entirely** from `IssueTriage.tsx` as too permissive\n- **Isolated nodes**: nodes with 0 actual edges (e.g. `Cluster10_ArgoWorkflowStopped`) legitimately show 0 RCA chain entries; `sourceRefs` cover isolated nodes directly\n- **Documentation-sourced entities**: 109 RCA-relevant entities ingested from mkdocs have no operational refs; proposed fix is BFS-based 2-hop propagation of ops refs at ingest\n- **Stale bundle cache**: UI fixes deployed in Docker JS bundle may be hidden by browser cache — always hard refresh (`Cmd+Shift+R`) before debugging display issues\n\n**Other known issues:**\n- Critical data loss: full graph purge wiped 2,122 operational evidence links — re-ingest via RCA pipeline is recovery path\n- `mergeEvidenceMetadata` skipped without `context` object, allowing silent sourceRef overwrites\n- Docker security: non-root `node_app` user (UID 1001), API keys via `env_file`\n- `package-lock.json` in `mcp-server-semantic-analysis` submodule had stale `file:../../_work/` paths — regenerated April 23\n- PlantUML diagram `observation-memory-hierarchy.puml` reviewed against documentation style guide April 23; no modifications made",
-    "confidence": 0.85,
+    "confidence": 0.7499999999999999,
     "digestIds": [
       "da6460d7-30c1-4656-8d04-67d6ca4e2bdf",
       "3bac52ca-e8d8-40a2-9a44-99471ba54ce3",
@@ -1522,32 +1548,6 @@
     "project": "coding"
   },
   {
-    "id": "b49b8904-56e1-4c08-9122-df7b3ed48b58",
-    "topic": "Diagrams and Documentation Conventions",
-    "summary": "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE (patched commit `bc8a559` for `rapid-automations-history`)\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore` — should not be committed",
-    "confidence": 0.8,
-    "digestIds": [
-      "c724a186-dffb-4c8e-a44f-0bdfd221a206",
-      "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
-      "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
-      "f4afcd6b-96a6-449f-a305-68eec3d88a44",
-      "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
-      "5534b0a7-3c1d-4010-bb12-3425c1884daf",
-      "301fd6d1-bb53-4200-ae9b-7d55ba29579b",
-      "d9e4a40d-5f32-4c12-bebc-124766e378ab",
-      "0f7ed7d5-1919-4e89-8ad8-f29f658c05ed",
-      "a09b1447-8803-436e-8840-570ee13c7127",
-      "e4a4fcb1-1022-4da2-a40f-4b3acb57069e",
-      "9c82a74e-d7f0-435b-ae80-9f4a9f86fc12",
-      "a269b31a-0a33-4a21-ab6c-bfbc61fea71b",
-      "e05f3f0a-07ec-4828-9464-d2ea13623958"
-    ],
-    "lastUpdated": "2026-05-03T08:33:40.103Z",
-    "createdAt": "2026-04-25T15:07:41.719Z",
-    "metadata": {},
-    "project": "coding"
-  },
-  {
     "id": "c0294fd6-c817-48c7-a507-10fd0542dcf8",
     "topic": "Observations API Server and Host-API Pattern",
     "summary": "`observations-api-server.mjs` is a standalone host-side HTTP service replacing direct SQLite access from the dashboard layer, following the established host-API wrapper pattern already used for OKB/VKB and LevelDB.\n\n**Implementation:**\n- Exposes endpoints for observation projects, digests, insights, consolidation status, and write operations\n- Integrates `ObservationWriter`, warm-on-startup path, and a host-side consolidation runner (no separate spawned process)\n- Retrieval/embedding (Qdrant) functionality also integrated directly into the server\n- Dashboard handler blocks replaced with HTTP forwarders\n- Registered as a service in `docker-compose.yml`\n\n**Corruption investigation (2026-05-03):**\n- Recurring SQLite corruption on `observations.db` traced to a macOS process (PID 4449, `com.<COMPANY_NAME_REDACTED>...`) holding open all corrupted DB files plus the live DB\n- A backfill operation preceded a corruption event at 07:36, suggesting possible causal link\n- Duplicate `transcript-monitor` processes were also found and terminated to avoid race conditions\n\n**Key files:**\n- `/Users/.../scripts/observations-api-server.mjs`\n- `/Users/.../docker/docker-compose.yml`\n\n**Pending:** MkDocs documentation and PlantUML diagrams (`observation-pipeline.puml`) not yet updated to reflect new architecture.",
@@ -1598,7 +1598,7 @@
     "id": "199058cf-4f37-4999-8202-cebb607a95e8",
     "topic": "Embedding-Based Deduplication Pipeline",
     "summary": "Two deduplication scripts built to eliminate near-duplicate entries that exact SQL topic matching misses.\n\n**Insights dedup** (`dedup-insights-by-embedding.js`):\n- <USER_ID_REDACTED> Qdrant for embeddings, uses greedy pairwise merging (single-linkage chaining was abandoned — caused transitive merges of unrelated insights)\n- Similarity threshold: **0.93+** (MiniLM cosine floor empirically ~0.89–0.92; 0.90 was too aggressive)\n- Result: 19 → 16 insights on first run\n\n**Digests dedup** (`dedup-digests-by-embedding.js`):\n- Threshold: **0.97** — higher cutoff needed due to shared project vocabulary causing false positives at lower values\n- Result: 298 → 251 digests (47 duplicate clusters removed)\n\n**Upstream fix needed**: `ObservationConsolidator.js` used exact SQL topic matching for dedup; patch proposed to query Qdrant pre-insert to prevent duplicates from being created in the first place.",
-    "confidence": 0.7,
+    "confidence": 0.5999999999999999,
     "digestIds": [
       "75d98280-a502-430d-bfa4-8d1b8ad4538f",
       "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
@@ -1613,7 +1613,7 @@
     "id": "18478a7a-f35f-4900-a2e0-657661754b8e",
     "topic": "Knowledge Context Injection Service (v6.0 Milestone)",
     "summary": "A standalone HTTP retrieval/injection service (port 3848) built as milestone v6.0. Architecture decided April 24 via GSD multi-phase pipeline.\n\n**Architecture decisions:**\n- Standalone HTTP service rather than coupling to any single agent's hook system\n- Separate adapter layers per agent: Claude hooks, Copilot extensions, OpenCode config, Mastra middleware\n- Hybrid **RRF (Reciprocal Rank Fusion)** scoring combining vector + keyword results with token budgeting\n\n**Phase 28 — Embedding pipeline (complete):**\n- `embedding-config.json`, `src/embedding-service.ts`, `src/content-hash.ts` (SHA-256 idempotency), `src/qdrant-collections.ts`\n- 4 separate Qdrant collections (not unified); Redis pub/sub write-time hooks for new content\n- Backfill CLI with content-hash idempotency; 1,464 items backfilled: `observations=645`, `digests=132`, `insights=12`, `kg_entities=675`\n- **Known bugs:** fastembed tokenizer binaries blocked by `--ignore-scripts`; `embedding-config.json` path resolution broken at runtime (`__dirname` points to `dist/embedding/` not `src/embedding/`)\n- Qdrant point counts lag SQLite source counts after April 25 DB fixes — backfill needs re-run\n\n**Phase 29 — Retrieval service:** `rrf-fusion.js`, `token-budget.js`, `keyword-search.js`, `retrieval-service.js` built; API endpoint wiring completed.\n\n**Phase 30+ — Hook adapter:** See \"Knowledge Context Injection System\" insight for details.",
-    "confidence": 0.6999999999999998,
+    "confidence": 0.5999999999999998,
     "digestIds": [
       "39bd0bf0-a492-4385-ac85-33dac1e70259",
       "d042caba-3198-4aa3-876f-0c0824894e43",
@@ -1656,7 +1656,7 @@
     "id": "fc34cb6a-be67-4e3f-b44c-bb3c3594e829",
     "topic": "Planning and Execution Workflow",
     "summary": "The project uses a structured phase-based planning workflow tracked across several docs.\n\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start of each phase with phase entry and requirements IDs\n- Auto-generated `{phase}-CONTEXT.md` files capture key architectural decisions before execution\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files (e.g. `32-01`, `32-02`)\n- Multi-wave or sequential plans used when intra-wave file conflicts exist on shared files (e.g. adapter files in phase 32)\n- `PROJECT.md` updated at completion of each phase\n- Milestone completion uses a `complete-milestone` workflow: pre-flight audit, plan summary verification, `STATE.md` update, git tag\n- Code-review workflow scoped to phase SUMMARY files; findings categorized as critical/warning/info",
-    "confidence": 0.5999999999999999,
+    "confidence": 0.49999999999999983,
     "digestIds": [
       "c724a186-dffb-4c8e-a44f-0bdfd221a206",
       "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
@@ -1674,7 +1674,7 @@
     "id": "64017939-446f-433f-8694-24c459239cd6",
     "topic": "Cross-Project Observation Contamination",
     "summary": "420 observations from `rapid-automations` and `onboarding-repro` projects were found polluting coding project digests and insights.\n\n- Root cause: no project scoping in observation <USER_ID_REDACTED>; `enhanced-transcript-monitor.js` had `isCodingRelated` logic but no project-level isolation\n- Fix approach: add `project` column to observations table with backfill, then filter <USER_ID_REDACTED> by project\n- `migrate-add-project-column.js` created with dry-run mode; dry-run confirmed 420 cross-contaminating + 21 null-project observations\n- Schema migration ran successfully but **project column data remained `null`** through multiple attempts — backfill population was still pending at last record\n- Later work shifted to `server.js`; stale processes were killed and script re-launched with output redirected to log files\n- **Known issue**: backfill completion unconfirmed — needs verification before cross-project filtering can be relied upon",
-    "confidence": 0.5,
+    "confidence": 0.4,
     "digestIds": [
       "75d98280-a502-430d-bfa4-8d1b8ad4538f",
       "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
@@ -1689,7 +1689,7 @@
     "id": "1e3370ab-e164-4828-88d8-8f44f9802eb8",
     "topic": "Operational Knowledge Base (OKB) Architecture and Known Issues",
     "summary": "The OKB lives under `integrations/operational-knowledge-management/` and uses Graphology + LevelDB + optional Qdrant for graph-based knowledge storage. The web viewer is a React/sigma.js app under `viewer/` served via Docker on port 8080, with `viewer/dist/` bind-mounted read-only — always requires `npm run build` after source changes. Key components: `src/intelligence/correlation.ts`, `src/intelligence/temporal.ts`, `GraphKnowledgeExporter.js` (exports to exactly 3 files: `raas.json`, `kpi-fw.json`, `general.json`).\n\n**IssueTriage component (`IssueTriage.tsx`) bugs and fixes:**\n- **Entity key format mismatch**: edges use `layer:id` prefixed keys while `IssueTriage` looked up bare `id` keys — identified, not yet fixed\n- **Evidence bloat**: BFS hop distance too large (3 hops, 900+ nodes) + domain-based fuzzy matching defaulting to `\"general\"` catch-all; **domain sweep removed entirely** from `IssueTriage.tsx`\n- **Isolated nodes**: nodes with 0 actual edges legitimately show 0 RCA chain entries; `sourceRefs` cover isolated nodes directly\n- **Documentation-sourced entities**: 109 RCA-relevant entities from mkdocs have no operational refs; proposed fix is BFS-based 2-hop propagation of ops refs at ingest\n- **Stale bundle cache**: always hard refresh (`Cmd+Shift+R`) before debugging display issues\n\n**Other known issues:**\n- Critical data loss: full graph purge wiped 2,122 operational evidence links — re-ingest via RCA pipeline is recovery path\n- `mergeEvidenceMetadata` skipped without `context` object, allowing silent sourceRef overwrites\n- Docker security: non-root `node_app` user (UID 1001), API keys via `env_file`\n- `package-lock.json` in `mcp-server-semantic-analysis` submodule had stale `file:../../_work/` paths — regenerated April 23\n- 1,464 OKB entities now embedded in Qdrant as part of v6.0 milestone (Phase 28)",
-    "confidence": 0.4999999999999997,
+    "confidence": 0.39999999999999974,
     "digestIds": [
       "baa49b86-e902-4a7f-8023-a9a3fde2f476",
       "da1dfdd8-a2ad-4f2c-b431-a44ce8e8d411",
@@ -1904,7 +1904,7 @@
     "id": "ea1b47d8-d295-4556-87d4-533251a60406",
     "topic": "OKB Skill and Ingestion Pipeline",
     "summary": "The OKB ingest skill `SKILL.md` is hardlinked between `integrations/rapid-toolkit/.agents/skills/okb-ingest/` and `.opencode/skills/okb-ingest/`. Extended to **v1.3.0** on April 7 with:\n- **Path D**: Confluence ingestion workflow\n- **Path E**: CodeBeamer ingestion workflow\n- Mandatory Copilot-on-VPN LLM provider configuration section with Docker proxy guidance\n- Six new error handling rows covering previously undocumented failure modes\n\n**Six failure modes fixed in v1.3.0:**\n1. Zod nullable schema failure\n2. Copilot JSON truncation with markdown fence wrapping\n3. PII filter false positives blocking valid entities\n4. Missing Confluence/CodeBeamer workflow documentation\n5. No LLM provider guidance for VPN environments\n6. Incomplete error handling reference\n\n**Ingestion operational notes:**\n- `source-documents` LevelDB content hash entries must be cleared to allow re-ingestion of already-seen pages\n- Concurrent Copilot API calls during batch ingest take 26–52 seconds each; 180-second timeouts needed\n- Node.js `fetch` does not respect system proxy env vars on VPN — must use `undici` `ProxyAgent` as global dispatcher in `llm-proxy.mjs`\n- Semantic dedup (0.7 Jaccard) in `ObservationWriter` silently suppresses repetitive Confluence ingestion observations when 3+ prior similar observations exist in the same session",
-    "confidence": 0.34999999999999987,
+    "confidence": 0.3,
     "digestIds": [
       "6cdd2b72-a4c7-4cef-9382-d6f99cba8d04",
       "4a77f82f-bd6d-4d35-aa5d-c19480280ca2",
