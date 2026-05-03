@@ -55,6 +55,10 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       # LLM CLI Proxy - HTTP bridge to host's claude/copilot-cli commands
       - LLM_CLI_PROXY_URL=http://host.docker.internal:12435
+      # Observations API - host-side gateway for .observations/observations.db
+      # (single-owner pattern; bind-mount of .observations/ will be removed
+      # once retrieval is also migrated)
+      - OBS_API_URL=http://host.docker.internal:12436
     ports:
       - "8080:8080"     # VKB Server
       - "3848:3848"     # Semantic Analysis SSE
@@ -67,7 +71,11 @@ services:
     volumes:
       # Persistent data
       - ${CODING_REPO:-.}/.data:/coding/.data
-      - ${CODING_REPO:-.}/.observations:/coding/.observations
+      # NOTE: .observations is intentionally NOT bind-mounted. Phase 5 of the
+      # observations-api migration: the host obs-api service is the single
+      # owner of observations.db, and the container reaches it via HTTP at
+      # OBS_API_URL (host.docker.internal:12436). Eliminates SQLite WAL/SHM
+      # corruption from concurrent openers across the Docker bind-mount boundary.
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
       - ${CODING_REPO:-.}/.git:/coding/.git:ro
@@ -105,9 +113,8 @@ services:
       # Observation pipeline (live-mounted as a directory so new files like
       # ObservationSanitizer.js are picked up without rebuilding the image).
       - ${CODING_REPO:-.}/src/live-logging:/coding/src/live-logging:ro
-      # Consolidator CLI used by the dashboard's spawn-based consolidation
-      # endpoint (decoupled from the dashboard PID for WAL safety).
-      - ${CODING_REPO:-.}/scripts/consolidate-observations.js:/coding/scripts/consolidate-observations.js:ro
+      # (Consolidator CLI mount removed in Phase 5 — consolidation runs
+      # in-process inside the host observations-api server.)
       # Embedding pipeline (live-mounted for development)
       - ${CODING_REPO:-.}/dist/embedding:/coding/dist/embedding:ro
       - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro

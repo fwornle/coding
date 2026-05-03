@@ -36,6 +36,7 @@ import ProcessStateManager from './process-state-manager.js';
 import { enableAutoRestart } from './auto-restart-watcher.js';
 import { execSync as _execSync } from 'child_process';
 import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
+import { ObservationApiClient } from '../src/live-logging/ObservationApiClient.js';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -814,15 +815,21 @@ class EnhancedTranscriptMonitor {
    */
   async _initObservationWriter() {
     try {
-      this.observationWriter = new ObservationWriter({
-        dbPath: path.join(codingRoot, '.observations', 'observations.db'),
-        // proxyUrl derived from LLM_CLI_PROXY_PORT env var (default 12435) in ObservationWriter
-        // No provider specified — proxy uses network-adaptive routing
-        // (VPN → copilot, outside → claude-code, fallback → groq/openai/anthropic)
-        batchSize: 2, // Small batches for per-exchange granularity
-      });
-      await this.observationWriter.init();
-      this.debug('[ObservationTap] Writer initialized');
+      // When OBS_API_URL is set, route writes through the host Observations API
+      // (single-owner pattern; no direct SQLite handle in this process).
+      // Otherwise fall back to direct DB writes for legacy/standalone use.
+      if (process.env.OBS_API_URL) {
+        this.observationWriter = new ObservationApiClient({ baseUrl: process.env.OBS_API_URL });
+        await this.observationWriter.init();
+        this.debug(`[ObservationTap] HTTP client initialized (${process.env.OBS_API_URL})`);
+      } else {
+        this.observationWriter = new ObservationWriter({
+          dbPath: path.join(codingRoot, '.observations', 'observations.db'),
+          batchSize: 2,
+        });
+        await this.observationWriter.init();
+        this.debug('[ObservationTap] Direct writer initialized');
+      }
     } catch (err) {
       process.stderr.write(`[ObservationTap] Init failed (non-blocking): ${err.message}\n`);
       this.observationWriter = null;
@@ -965,9 +972,25 @@ class EnhancedTranscriptMonitor {
    * (2) multi-turn tool calls across prompt set boundaries,
    * (3) ETM restarts re-processing already-written exchanges.
    */
-  _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles) {
-    if (!this.observationWriter?.db) return;
+  async _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles) {
+    if (!this.observationWriter) return;
     if (!modifiedFiles || modifiedFiles.length === 0) return;
+
+    // HTTP path (single-owner mode): delegate to host API.
+    if (this.observationWriter instanceof ObservationApiClient) {
+      try {
+        const r = await this.observationWriter.patchRecentArtifacts(this.agentType, modifiedFiles);
+        if (r?.patched > 0) {
+          process.stderr.write(`[ObservationTap] Patched ${r.patched} recent observations via API\n`);
+        }
+      } catch (err) {
+        process.stderr.write(`[ObservationTap] Failed to patch observations: ${err.message}\n`);
+      }
+      return;
+    }
+
+    // Direct DB path (legacy fallback when OBS_API_URL is unset).
+    if (!this.observationWriter.db) return;
     try {
       const db = this.observationWriter.db;
       const rows = db.prepare(
@@ -1007,8 +1030,24 @@ class EnhancedTranscriptMonitor {
     * contains modifiedFiles but summary says "Artifacts: none".
     * This handles backfilled observations and old entries the live patcher missed.
     */
-   _patchHistoricalArtifacts() {
-     if (!this.observationWriter?.db) return;
+   async _patchHistoricalArtifacts() {
+     if (!this.observationWriter) return;
+
+     // HTTP path (single-owner mode): delegate to host API.
+     if (this.observationWriter instanceof ObservationApiClient) {
+       try {
+         const r = await this.observationWriter.patchHistoricalArtifacts();
+         if (r?.patched > 0) {
+           process.stderr.write(`[ObservationTap] Startup: patched ${r.patched} historical observations via API\n`);
+         }
+       } catch (err) {
+         process.stderr.write(`[ObservationTap] Historical artifact patch failed: ${err.message}\n`);
+       }
+       return;
+     }
+
+     // Direct DB path (legacy fallback).
+     if (!this.observationWriter.db) return;
      try {
        const db = this.observationWriter.db;
        const rows = db.prepare(

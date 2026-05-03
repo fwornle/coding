@@ -173,6 +173,7 @@ const PORTS = {
   MEMGRAPH_HTTPS: parseInt(process.env.MEMGRAPH_HTTPS_PORT || '7444', 10),
   MEMGRAPH_LAB: parseInt(process.env.MEMGRAPH_LAB_PORT || '3100', 10),
   LLM_CLI_PROXY: parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10),
+  OBSERVATIONS_API: parseInt(process.env.OBSERVATIONS_API_PORT || '12436', 10),
 };
 
 // Service configurations
@@ -228,7 +229,13 @@ const SERVICE_CONFIGS = {
       ], {
         detached: true,
         stdio: ['ignore', etmLogFd, etmLogFd],
-        cwd: CODING_DIR
+        cwd: CODING_DIR,
+        env: {
+          ...process.env,
+          // Route writes via the host Observations API instead of opening
+          // observations.db directly. The host API is the single owner.
+          OBS_API_URL: process.env.OBS_API_URL || `http://localhost:${PORTS.OBSERVATIONS_API}`,
+        }
       });
       fs.closeSync(etmLogFd);
 
@@ -911,6 +918,49 @@ const SERVICE_CONFIGS = {
       if (result.skipRegistration) return true;
       return createHttpHealthCheck(PORTS.LLM_CLI_PROXY, '/health')(result);
     }
+  },
+
+  observationsApi: {
+    name: 'Observations API',
+    required: false,
+    maxRetries: 2,
+    timeout: 15000,
+    startFn: async () => {
+      if (await isPortListening(PORTS.OBSERVATIONS_API)) {
+        return { pid: 'already-running', service: 'observations-api', skipRegistration: true };
+      }
+
+      const entry = path.join(CODING_DIR, 'scripts/observations-api-server.mjs');
+      if (!fs.existsSync(entry)) {
+        throw new Error(`observations-api-server.mjs not found at ${entry}`);
+      }
+
+      const logFile = path.join(CODING_DIR, '.data', 'observations-api.log');
+      const logFd = fs.openSync(logFile, 'a');
+      const child = spawn('node', [entry], {
+        detached: true,
+        stdio: ['ignore', logFd, logFd],
+        cwd: CODING_DIR,
+        env: {
+          ...process.env,
+          OBSERVATIONS_API_PORT: String(PORTS.OBSERVATIONS_API),
+        },
+      });
+      fs.closeSync(logFd);
+      child.unref();
+
+      await sleep(1000);
+
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('Observations API process died immediately');
+      }
+
+      return { pid: child.pid, port: PORTS.OBSERVATIONS_API, service: 'observations-api' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createHttpHealthCheck(PORTS.OBSERVATIONS_API, '/health')(result);
+    }
   }
 };
 
@@ -1331,6 +1381,25 @@ async function startAllServices() {
     await registerWithPSM(llmCliProxyResult, 'integrations/llm-cli-proxy/dist/server.js');
   } else {
     results.degraded.push(llmCliProxyResult);
+  }
+
+  // OPTIONAL: Observations API (host-side gateway for .observations/observations.db)
+  const observationsApiResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.observationsApi.name,
+    SERVICE_CONFIGS.observationsApi.startFn,
+    SERVICE_CONFIGS.observationsApi.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.observationsApi.required,
+      maxRetries: SERVICE_CONFIGS.observationsApi.maxRetries,
+      timeout: SERVICE_CONFIGS.observationsApi.timeout
+    }
+  );
+
+  if (observationsApiResult.status === 'success') {
+    results.successful.push(observationsApiResult);
+    await registerWithPSM(observationsApiResult, 'scripts/observations-api-server.mjs');
+  } else {
+    results.degraded.push(observationsApiResult);
   }
 
   console.log('');

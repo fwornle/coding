@@ -18,8 +18,10 @@ import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
-import { RetrievalService } from '../../src/retrieval/retrieval-service.js';
-import { openDatabase } from '../../src/live-logging/SafeDatabase.js';
+// RetrievalService now runs in the host Observations API service. The
+// dashboard's POST /api/retrieve handler is a thin HTTP forwarder (Phase 5).
+// observations.db is owned by the host Observations API service; the dashboard
+// no longer opens SQLite directly (Phase 5 — see scripts/observations-api-server.mjs).
 
 const require_cjs = createRequire(import.meta.url);
 
@@ -96,14 +98,6 @@ class SystemHealthAPIServer {
 
         this.setupMiddleware();
         this.setupRoutes();
-
-        // Eagerly initialize retrieval service (warms fastembed model to avoid cold-start on first request)
-        this.retrievalService = new RetrievalService({
-            dbGetter: () => this._getObservationsDb(),
-        });
-        this.retrievalService.initialize().catch(err => {
-            process.stderr.write(`[RetrievalService] Eager init failed: ${err.message}\n`);
-        });
     }
 
     setupMiddleware() {
@@ -3175,7 +3169,6 @@ class SystemHealthAPIServer {
                     reject(error);
                 } else {
                     process.stderr.write(`✅ System Health API server started on port ${this.port}\n`);
-                    this._sweepConsolidationOrphans();
                     this.startAutoConsolidation();
                     resolve();
                 }
@@ -3785,25 +3778,29 @@ class SystemHealthAPIServer {
             // Skip new runs once shutdown begins so SIGTERM can drain.
             if (this._shuttingDown) return;
             try {
-                const db = this._getObservationsDb();
-                if (!db) return;
-
-                const today = new Date().toISOString().split('T')[0];
-                const row = db.prepare(
-                    "SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND date(created_at) < ?"
-                ).get(today);
-                const pastUndigested = row?.cnt || 0;
+                // Pull undigested-past-days count from the host Observations API
+                // rather than opening the SQLite file across the bind-mount.
+                const status = await this._fetchObsApi('/api/consolidation/status');
+                if (!status) return;
+                const pastUndigested = Number(status.pendingPast) || 0;
 
                 if (pastUndigested >= UNDIGESTED_THRESHOLD) {
-                    process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days — triggering consolidation\n`);
+                    process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days — triggering consolidation via host API\n`);
                     this.consolidationRunning = true;
-                    // The child holds its own DB handle. We still await the
-                    // wait Promise so stop() can drain — but if the
-                    // dashboard is killed mid-wait, the child carries on.
+                    const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
                     this._activeConsolidation = (async () => {
                         try {
-                            const result = await this._spawnConsolidator([]);
-                            process.stderr.write(`[AutoConsolidate] Done: ${result.digests || 0} digests, ${result.created || 0} insights created, ${result.updated || 0} updated\n`);
+                            const r = await fetch(`${base}/api/consolidation/run`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({}),
+                            });
+                            const result = await r.json();
+                            if (r.ok && result?.ok !== false) {
+                                process.stderr.write(`[AutoConsolidate] Done: ${result.digests || 0} digests, ${result.created || 0} insights created, ${result.updated || 0} updated\n`);
+                            } else {
+                                process.stderr.write(`[AutoConsolidate] API returned error: ${result?.error || r.status}\n`);
+                            }
                         } catch (err) {
                             process.stderr.write(`[AutoConsolidate] Failed: ${err.message}\n`);
                         }
@@ -3851,16 +3848,8 @@ class SystemHealthAPIServer {
             }
         }
 
-        // Checkpoint and close the cached observations DB handle so the
-        // WAL is flushed before the process exits. The handle is readonly,
-        // but the consolidator may have left WAL frames a checkpoint can
-        // safely fold back into the main DB.
-        if (this._obsDb) {
-            try { this._obsDb.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
-            try { this._obsDb.close(); } catch { /* ignore */ }
-            this._obsDb = null;
-            this._obsDbOpenedAt = null;
-        }
+        // observations.db is no longer opened in this process — all reads
+        // and the retrieval pipeline live on the host Observations API.
 
         // Close HTTP server with a hard deadline. server.close() waits for
         // active sockets to drain, so destroy them after a short grace —
@@ -4160,505 +4149,144 @@ class SystemHealthAPIServer {
     }
 
     // ── Observations API (Phase 23) ────────────────────────────────────
+    //
+    // The dashboard no longer opens observations.db directly. All reads go
+    // through the host-side Observations API (default http://host.docker.internal:12436)
+    // to keep a single owner of the SQLite file and avoid WAL/SHM corruption
+    // across the Docker bind-mount boundary.
 
     /**
-     * Get a read-only connection to the observations SQLite database.
-     * Re-opens every 30s so WAL-mode writes from the host are visible.
+     * Forward a request to the host Observations API and pipe the response back.
+     * Preserves status codes so 503/500 from upstream surface unchanged.
      */
-    _getObservationsDb() {
-        const now = Date.now();
-        const REOPEN_INTERVAL_MS = 30_000;
-
-        if (this._obsDb && this._obsDbOpenedAt && (now - this._obsDbOpenedAt) < REOPEN_INTERVAL_MS) {
-            return this._obsDb;
-        }
-
-        // Close stale connection before re-opening
-        if (this._obsDb) {
-            try { this._obsDb.close(); } catch { /* ignore */ }
-            this._obsDb = null;
-        }
-
+    async _forwardObsApi(req, res, pathAndQuery) {
+        const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
+        const url = `${base}${pathAndQuery}`;
         try {
-            const dbPath = join(codingRoot, '.observations', 'observations.db');
-            if (!existsSync(dbPath)) {
-                return null;
-            }
-            this._obsDb = openDatabase(dbPath, { readonly: true });
-            this._obsDbOpenedAt = now;
-            return this._obsDb;
+            const upstream = await fetch(url, { method: 'GET' });
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
         } catch (err) {
-            process.stderr.write(`[ObservationsAPI] DB init failed: ${err.message}\n`);
+            process.stderr.write(`[ObservationsAPI] forward to ${url} failed: ${err.message}\n`);
+            res.status(502).json({ error: 'Observations API unreachable' });
+        }
+    }
+
+    /**
+     * Fetch JSON from the host Observations API. Returns null on failure.
+     * Used by in-process consumers (e.g. AutoConsolidate daemon).
+     */
+    async _fetchObsApi(pathAndQuery) {
+        const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
+        try {
+            const r = await fetch(`${base}${pathAndQuery}`);
+            if (!r.ok) return null;
+            return await r.json();
+        } catch {
             return null;
         }
     }
 
     /**
-     * Invalidate the cached observations DB connection (e.g. after a query error).
-     * Next call to _getObservationsDb() will re-open a fresh connection.
-     */
-    _invalidateObservationsDb() {
-        if (this._obsDb) {
-            try { this._obsDb.close(); } catch { /* ignore */ }
-        }
-        this._obsDb = null;
-        this._obsDbOpenedAt = null;
-    }
-
-    /**
-     * GET /api/observations — paginated observations with filtering and FTS5 search.
-     * Query params: agent, from, to, project, q (full-text), limit, offset
-     * Response: { data, total, limit, offset }
+     * GET /api/observations — forwards to host Observations API.
+     * Query params: agent, from, to, project, q, quality, limit, offset
      */
     handleGetObservations(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) {
-            return res.status(503).json({ error: 'Observations database unavailable' });
-        }
-
-        const { agent, from, to, project, q, limit: limitStr, offset: offsetStr } = req.query;
-        const limit = Math.min(parseInt(limitStr) || 50, 200);
-        const offset = parseInt(offsetStr) || 0;
-
-        try {
-            const where = [];
-            const params = {};
-
-            if (agent) {
-                // Support both array (?agent=a&agent=b) and comma-separated (?agent=a,b)
-                const agents = Array.isArray(agent) ? agent : agent.split(',').map(a => a.trim());
-                where.push(`agent IN (${agents.map((_, i) => `@agent${i}`).join(',')})`);
-                agents.forEach((a, i) => { params[`agent${i}`] = a; });
-            }
-            if (from) {
-                where.push('created_at >= @from');
-                params.from = from;
-            }
-            if (to) {
-                where.push('created_at <= @to');
-                // If date-only (no T), make it end-of-day inclusive
-                params.to = to.includes('T') ? to : `${to}T23:59:59.999Z`;
-            }
-            if (project) {
-                where.push("json_extract(metadata, '$.project') = @project");
-                params.project = project;
-            }
-
-            if (req.query.quality) {
-                const qualities = Array.isArray(req.query.quality) ? req.query.quality : req.query.quality.split(',');
-                where.push(`COALESCE(quality, 'normal') IN (${qualities.map((_, i) => `@quality${i}`).join(',')})`);
-                qualities.forEach((q, i) => { params[`quality${i}`] = q; });
-            }
-
-            if (q) {
-                // FTS5 full-text search per D-08 — fall back to LIKE if FTS table doesn't exist
-                try {
-                    db.prepare('SELECT 1 FROM observations_fts LIMIT 0').get();
-                    where.push('observations.rowid IN (SELECT rowid FROM observations_fts WHERE observations_fts MATCH @q)');
-                } catch {
-                    where.push('summary LIKE @q');
-                    q = `%${q}%`;
-                }
-                params.q = q;
-            }
-
-            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-            const countQuery = db.prepare(`SELECT COUNT(*) as total FROM observations ${whereClause}`);
-            const { total } = countQuery.get(params);
-
-            const dataQuery = db.prepare(`
-                SELECT id, summary as content, agent,
-                       session_id as sessionId,
-                       json_extract(metadata, '$.project') as project,
-                       created_at as timestamp,
-                       source_file as source,
-                       metadata,
-                       COALESCE(quality, 'normal') as quality
-                FROM observations ${whereClause}
-                ORDER BY created_at DESC
-                LIMIT @limit OFFSET @offset
-            `);
-            params.limit = limit;
-            params.offset = offset;
-
-            const rows = dataQuery.all(params);
-            // Parse metadata and merge LLM fields into each row
-            const data = rows.map(row => {
-                let meta = {};
-                try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
-                const { metadata: _raw, ...rest } = row;
-                return {
-                    ...rest,
-                    llmModel: meta.llmModel || null,
-                    llmProvider: meta.llmProvider || null,
-                    llmTokens: meta.llmTokens || null,
-                    llmLatencyMs: meta.llmLatencyMs || null,
-                };
-            });
-
-            res.json({ data, total, limit, offset });
-        } catch (err) {
-            process.stderr.write(`[ObservationsAPI] Query error: ${err.message}\n`);
-            // Invalidate cached connection on corruption — next request gets a fresh handle
-            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
-                this._invalidateObservationsDb();
-            }
-            res.status(500).json({ error: 'Failed to query observations' });
-        }
+        return this._forwardObsApi(req, res, `/api/observations${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
      * GET /api/observations/projects — distinct project names for filter dropdown.
      */
     handleGetObservationProjects(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) {
-            return res.status(503).json({ error: 'Observations database unavailable' });
-        }
-        try {
-            const rows = db.prepare(
-                "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL ORDER BY project"
-            ).all();
-            res.json(rows.map(r => r.project).filter(Boolean));
-        } catch (err) {
-            process.stderr.write(`[ObservationsAPI] Projects query error: ${err.message}\n`);
-            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
-                this._invalidateObservationsDb();
-            }
-            res.status(500).json({ error: 'Failed to query projects' });
-        }
+        return this._forwardObsApi(req, res, '/api/observations/projects');
     }
 
     /**
      * GET /api/digests/projects — distinct project names for the digests filter dropdown.
      */
     handleGetDigestProjects(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-        try {
-            try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch { return res.json([]); }
-            const rows = db.prepare(
-                'SELECT DISTINCT project FROM digests WHERE project IS NOT NULL ORDER BY project'
-            ).all();
-            res.json(rows.map(r => r.project).filter(Boolean));
-        } catch (err) {
-            process.stderr.write(`[DigestsAPI] Projects query error: ${err.message}\n`);
-            res.status(500).json({ error: 'Failed to query digest projects' });
-        }
+        return this._forwardObsApi(req, res, '/api/digests/projects');
     }
 
     /**
      * GET /api/insights/projects — distinct project names for the insights filter dropdown.
      */
     handleGetInsightProjects(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-        try {
-            try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch { return res.json([]); }
-            const rows = db.prepare(
-                'SELECT DISTINCT project FROM insights WHERE project IS NOT NULL ORDER BY project'
-            ).all();
-            res.json(rows.map(r => r.project).filter(Boolean));
-        } catch (err) {
-            process.stderr.write(`[InsightsAPI] Projects query error: ${err.message}\n`);
-            res.status(500).json({ error: 'Failed to query insight projects' });
-        }
+        return this._forwardObsApi(req, res, '/api/insights/projects');
     }
 
     /**
      * GET /api/projects — union of distinct projects across observations,
-     * digests, and insights. Used by any UI surface that wants the global
-     * project list (e.g. a top-level filter affecting all three pages).
+     * digests, and insights.
      */
     handleGetAllProjects(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-        try {
-            const all = new Set();
-            try {
-                const obs = db.prepare(
-                    "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL"
-                ).all();
-                for (const r of obs) if (r.project) all.add(r.project);
-            } catch { /* table may be missing */ }
-            try {
-                const digs = db.prepare(
-                    'SELECT DISTINCT project FROM digests WHERE project IS NOT NULL'
-                ).all();
-                for (const r of digs) if (r.project) all.add(r.project);
-            } catch { /* table may be missing */ }
-            try {
-                const ins = db.prepare(
-                    'SELECT DISTINCT project FROM insights WHERE project IS NOT NULL'
-                ).all();
-                for (const r of ins) if (r.project) all.add(r.project);
-            } catch { /* table may be missing */ }
-            res.json([...all].sort());
-        } catch (err) {
-            process.stderr.write(`[API] All-projects query error: ${err.message}\n`);
-            res.status(500).json({ error: 'Failed to query projects' });
-        }
+        return this._forwardObsApi(req, res, '/api/projects');
     }
 
     /**
      * GET /api/digests — paginated daily digests with filtering.
-     * Query params: date, from, to, q, project, limit, offset
      */
     handleGetDigests(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) {
-            return res.status(503).json({ error: 'Observations database unavailable' });
-        }
-
-        const { date, from, to, q, project, limit: limitStr, offset: offsetStr } = req.query;
-        const limit = Math.min(parseInt(limitStr) || 50, 200);
-        const offset = parseInt(offsetStr) || 0;
-
-        try {
-            // Check if digests table exists
-            try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch {
-                return res.json({ data: [], total: 0, limit, offset });
-            }
-
-            const where = [];
-            const params = {};
-
-            if (date) {
-                where.push('date = @date');
-                params.date = date;
-            }
-            if (from) {
-                where.push('date >= @from');
-                params.from = from;
-            }
-            if (to) {
-                where.push('date <= @to');
-                params.to = to;
-            }
-            if (q) {
-                where.push('(theme LIKE @q OR summary LIKE @q)');
-                params.q = `%${q}%`;
-            }
-            if (project) {
-                where.push('project = @project');
-                params.project = project;
-            }
-
-            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-            const { total } = db.prepare(`SELECT COUNT(*) as total FROM digests ${whereClause}`).get(params);
-
-            params.limit = limit;
-            params.offset = offset;
-            const rows = db.prepare(`
-                SELECT id, date, theme, summary, observation_ids as observationIds,
-                       agents, files_touched as filesTouched, quality, created_at as createdAt,
-                       project
-                FROM digests ${whereClause}
-                ORDER BY date DESC, created_at DESC
-                LIMIT @limit OFFSET @offset
-            `).all(params);
-
-            const data = rows.map(row => ({
-                ...row,
-                observationIds: JSON.parse(row.observationIds || '[]'),
-                agents: JSON.parse(row.agents || '[]'),
-                filesTouched: JSON.parse(row.filesTouched || '[]'),
-            }));
-
-            res.json({ data, total, limit, offset });
-        } catch (err) {
-            process.stderr.write(`[DigestsAPI] Query error: ${err.message}\n`);
-            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
-                this._invalidateObservationsDb();
-            }
-            res.status(500).json({ error: 'Failed to query digests' });
-        }
+        return this._forwardObsApi(req, res, `/api/digests${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
      * GET /api/insights — all project insights.
-     * Query params: topic, q
      */
     handleGetInsights(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) {
-            return res.status(503).json({ error: 'Observations database unavailable' });
-        }
-
-        const { topic, q, project } = req.query;
-
-        try {
-            // Check if insights table exists
-            try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
-                return res.json({ data: [], total: 0 });
-            }
-
-            const where = [];
-            const params = {};
-
-            if (topic) {
-                where.push('topic = @topic');
-                params.topic = topic;
-            }
-            if (q) {
-                where.push('(topic LIKE @q OR summary LIKE @q)');
-                params.q = `%${q}%`;
-            }
-            if (project) {
-                where.push('project = @project');
-                params.project = project;
-            }
-
-            const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-            const rows = db.prepare(`
-                SELECT id, topic, summary, confidence, digest_ids as digestIds,
-                       last_updated as lastUpdated, created_at as createdAt, project
-                FROM insights ${whereClause}
-                ORDER BY confidence DESC, last_updated DESC
-            `).all(params);
-
-            const data = rows.map(row => ({
-                ...row,
-                digestIds: JSON.parse(row.digestIds || '[]'),
-            }));
-
-            res.json({ data, total: data.length });
-        } catch (err) {
-            process.stderr.write(`[InsightsAPI] Query error: ${err.message}\n`);
-            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
-                this._invalidateObservationsDb();
-            }
-            res.status(500).json({ error: 'Failed to query insights' });
-        }
+        return this._forwardObsApi(req, res, `/api/insights${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
      * GET /api/consolidation/status — overview of consolidation state.
      */
     handleGetConsolidationStatus(req, res) {
-        const db = this._getObservationsDb();
-        if (!db) {
-            return res.status(503).json({ error: 'Observations database unavailable' });
-        }
-
-        try {
-            const totalObs = db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
-            const today = new Date().toISOString().split('T')[0];
-
-            // Safely check tables that may not exist yet
-            let undigested = totalObs;
-            let pendingPast = 0;
-            let pendingToday = 0;
-            let lowQuality = 0;
-            try {
-                undigested = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
-                lowQuality = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality = 'low'").get().cnt;
-                pendingPast = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) < ?").get(today).cnt;
-                pendingToday = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) = ?").get(today).cnt;
-            } catch { /* digested_at column may not exist */ }
-
-            let totalDigests = 0;
-            try { totalDigests = db.prepare('SELECT COUNT(*) as cnt FROM digests').get().cnt; } catch { /* table may not exist */ }
-
-            let totalInsights = 0;
-            try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
-
-            // Inflight info from the consolidator's heartbeat file. Survives
-            // dashboard restarts so a manual trigger followed by a SIGKILL
-            // still surfaces "running for N seconds, last activity Xs ago".
-            const inflight = this._readConsolidationHeartbeat();
-
-            res.json({
-                totalObs, undigested, lowQuality, pendingPast, pendingToday,
-                digested: totalObs - undigested - lowQuality,
-                totalDigests, totalInsights,
-                inflight
-            });
-        } catch (err) {
-            process.stderr.write(`[ConsolidationAPI] Status error: ${err.message}\n`);
-            if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('disk I/O')) {
-                this._invalidateObservationsDb();
-            }
-            res.status(500).json({ error: 'Failed to get consolidation status' });
-        }
+        return this._forwardObsApi(req, res, '/api/consolidation/status');
     }
 
     /**
-     * POST /api/consolidation/run — trigger consolidation (digests + insights).
-     * Body: { date?: string } — optional specific date to consolidate
+     * POST /api/consolidation/run — forwards to host Observations API.
+     * The host service runs consolidation in-process (single owner of
+     * observations.db) and coalesces concurrent triggers itself.
      */
     async handleRunConsolidation(req, res) {
         if (this._shuttingDown) {
             return res.status(503).json({ error: 'Server is shutting down' });
         }
-        // Coalesce concurrent triggers. The frontend disables the button
-        // while consolidating, but a stale tab or a polling refresh can
-        // still POST again. Fork two children fighting for the SQLite
-        // write lock and one will appear to hang for several minutes.
-        // Instead, attach to the in-flight run so all callers see the
-        // same outcome.
-        if (this._activeConsolidation) {
-            try {
-                const result = await this._activeConsolidation;
-                return res.json({ success: true, attached: true, ...result });
-            } catch (err) {
-                return res.status(500).json({ error: err.message || 'Unknown error' });
-            }
-        }
-        const flags = req.body?.date
-            ? ['--date', String(req.body.date)]
-            : ['--include-today'];
-        const run = this._spawnConsolidator(flags);
-        this._activeConsolidation = run;
+        const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
         try {
-            const result = await run;
-            res.json({ success: true, ...result });
+            const upstream = await fetch(`${base}/api/consolidation/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(req.body || {}),
+            });
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
         } catch (err) {
-            process.stderr.write(`[ConsolidationAPI] Run error: ${err.message}\n`);
-            res.status(500).json({ error: err.message || 'Unknown error' });
-        } finally {
-            if (this._activeConsolidation === run) this._activeConsolidation = null;
+            process.stderr.write(`[ConsolidationAPI] forward error: ${err.message}\n`);
+            res.status(502).json({ error: 'Observations API unreachable' });
         }
     }
 
     /**
-     * POST /api/retrieve — retrieve relevant knowledge for a query.
-     * Body: { query: string, budget?: number (100-5000), threshold?: number }
-     * Returns: { markdown: string, meta: { query, budget, results_count, latency_ms } }
+     * POST /api/retrieve — forwards to host Observations API.
+     * Retrieval (fastembed + Qdrant + keyword search + RRF) runs on the host
+     * alongside the SQLite owner. Container has no direct DB access.
      */
     async handleRetrieve(req, res) {
-        const startMs = Date.now();
-        const { query, budget = 1000, threshold = 0.75, context = null } = req.body;
-
-        if (!query || typeof query !== 'string' || query.trim().length === 0) {
-            return res.status(400).json({ error: 'query (string) is required' });
-        }
-
-        // Cap query length to prevent abuse (T-29-05)
-        if (query.length > 500) {
-            return res.status(400).json({ error: 'query must be 500 characters or less' });
-        }
-
-        // Validate budget is a reasonable number
-        const parsedBudget = Number(budget);
-        if (isNaN(parsedBudget) || parsedBudget < 100 || parsedBudget > 5000) {
-            return res.status(400).json({ error: 'budget must be between 100 and 5000' });
-        }
-
+        const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
         try {
-            const result = await this.retrievalService.retrieve(query, {
-                budget: parsedBudget,
-                threshold: Number(threshold) || 0.75,
-                context: context || null,
+            const upstream = await fetch(`${base}/api/retrieve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(req.body || {}),
             });
-            result.meta.latency_ms = Date.now() - startMs;
-            res.json(result);
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
         } catch (err) {
-            process.stderr.write(`[RetrievalAPI] Error: ${err.message}\n`);
-            res.status(500).json({ error: 'Retrieval failed' });
+            process.stderr.write(`[RetrievalAPI] forward error: ${err.message}\n`);
+            res.status(502).json({ error: 'Observations API unreachable' });
         }
     }
 }

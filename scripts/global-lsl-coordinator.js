@@ -237,7 +237,11 @@ class GlobalLSLCoordinator {
             PROJECT_PATH: projectPath,
             TRANSCRIPT_SOURCE_PROJECT: projectPath,  // Critical: Tell monitor which project to monitor
             CODING_TOOLS_PATH: this.codingRepoPath,
-            CODING_AGENT: process.env.CODING_AGENT || 'claude'  // Pass agent type to monitor
+            CODING_AGENT: process.env.CODING_AGENT || 'claude',  // Pass agent type to monitor
+            // Single-owner pattern: route writes via the host Observations API
+            // instead of opening observations.db directly. Eliminates the
+            // multi-writer Docker bind-mount corruption pattern.
+            OBS_API_URL: process.env.OBS_API_URL || 'http://localhost:12436',
           }
         });
 
