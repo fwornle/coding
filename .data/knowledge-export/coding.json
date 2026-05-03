@@ -12105,12 +12105,12 @@
       "name": "Git Repository Hygiene and Large File Management",
       "entityType": "File",
       "observations": [
-        "- **Root cause of SCM issues**: nested `.specstory/history/.git` (GHE remote) triggers enterprise auth failures, causing VS Code to tear down the entire repo list\n- **Final workspace config**: `coding.code-workspace` explicitly lists all 8 repos (coding, `.specstory/history`, and 6 `integrations/` sub-repos) with auto-discovery disabled; same pattern applied to `rapid-automations.code-workspace` (main repo + history repo + 4 submodules)\n- **VSCode SCM nested-repo fix**: applied to both `coding` and `rapid-automations` workspaces via workspace-scoped `.vscode/settings.json` (JSONC format); reference implementation in `coding.code-workspace`\n- **Fix documented**: `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_vscode_scm_nested_history.md`\n- **Private history repo bootstrap**: `scripts/agent-common-setup.sh` includes `ensure_private_history_repo` — derives default history remote by appending `-history` to outer repo name; supports `LSL_HISTORY_AUTO` / `LSL_HISTORY_REMOTE_TEMPLATE` env overrides\n- **History repo file layout**: all `*-history` repos use `yyyy/mm/*` directory structure (matching `coding-history` convention); README files added to all 6 repos\n- **Migration tooling**: `scripts/migrate-history-to-private.sh` uses `git-filter-repo`; `--auto` flag runs Phase A+C only; stash-pop conflicts can occur if history files moved to submodule between stash and pop\n- **`rapid-automations` migration**: corporate org context (`adpnext-apps`), 297 history files migrated to Frank-Woernle private org on `<COMPANY_NAME_REDACTED>.ghe.com` via HTTPS\n- **Public repo audit**: 6 public `github.com` repos actively leaked chat logs; `balance`, `iso-9001`, `timeline` migrated; `iso-9001` had unpurged corporate remote at `cc-github.bmwgroup.net`\n- **Log path standard**: all LSL writers output to `.specstory/history/logs/`; old `.specstory/logs/` paths obsolete\n- **Cleanup**: 6 backup bundle files (~196 MB) deleted from `~/Agentic/` and `~/Agentic/_work/` via `agent-common-setup.sh`"
+        "- **Root cause of SCM issues**: nested `.specstory/history/.git` (GHE remote) triggers enterprise auth failures, causing VS Code to tear down the entire repo list\n- **Final workspace config**: both `coding.code-workspace` and `rapid-automations.code-workspace` explicitly list all repos with auto-discovery disabled — resolves SCM panel suppression of `.specstory/history`\n- **VSCode SCM nested repo fix**: applied at workspace scope via `.vscode/settings.json`; pattern documented in `~/.claude/projects/.../memory/feedback_vscode_scm_nested_history.md` for reuse\n- **Prior suppression mechanism**: `git.repositoryScanIgnoredFolders`, `git.ignoredRepositories`, and `git.repositoryScanMaxDepth:0` were intentionally hiding `.specstory/history`; replaced by explicit folder declarations\n- **Secondary VSCode bug**: submodule auto-detection cascade overrides explicit workspace folder registrations — fixed by disabling auto-detection in workspace settings\n- **Private history repo bootstrap**: `scripts/agent-common-setup.sh` (`ensure_private_history_repo`) derives default history remote by appending `-history` to outer repo name; supports `LSL_HISTORY_AUTO` / `LSL_HISTORY_REMOTE_TEMPLATE` env overrides for CI\n- **Migration pattern**: `.specstory/history` migration replicated from `coding` to `rapid-automations` on May 3; stash conflict resolved by committing diff to private history repo; all 8 private LSL history repos on `<COMPANY_NAME_REDACTED>.ghe.com/Frank-Woernle/` now include `lsl-repo-split.png` diagram reference\n- **Directory layout standard**: all `*-history` repos use `yyyy/mm/*` hierarchy (matches `coding-history` convention); 297 files reorganized in `rapid-automations-history`\n- **Migration tooling**: `scripts/migrate-history-to-private.sh` uses `git-filter-repo`; cosmetic HTTPS-URL parser bug (malformed `///` URLs) fixed\n- **Log path standard**: all LSL writers output to `.specstory/history/logs/`; old `.specstory/logs/` paths obsolete\n- **Public repo audit (May 2)**: 6 public `github.com` repos actively leaked chat logs (~459 tracked files): `agentic-ai-nano`, `balance`, `curriculum-alignment`, `timeline`, `ui-template`, `iso-9001`"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.855Z",
-        "last_updated": "2026-05-03T05:37:03.498Z"
+        "last_updated": "2026-05-03T08:33:40.371Z"
       },
       "id": "mc4flkg4828deu"
     },
@@ -12155,14 +12155,14 @@
     },
     {
       "name": "GSD Statusline and Hook Integration",
-      "entityType": "Knowledge",
+      "entityType": "File",
       "observations": [
-        "- GSD **1.39.1** available as of May 2 (installed version 1.39.0); upgrade pending user confirmation\n- GSD 1.39.0 (installed May 1) consolidates 31 micro-skills into grouped parent commands with flags; restart of Claude Code required to activate\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **`health-prompt-hook.js`**: cwd-robust LSL check added May 2 to eliminate false alarms\n- **False warning fixes (May 1)**: `health-prompt-hook.js` and `combined-status-line.js` both fixed for misclassifying `overallStatus=healthy` with non-critical violations as warning\n- **API quota display removed (May 2)**: Groq, Anthropic, OpenAI, X/Grok provider display stripped from `combined-status-line.js`\n- **Parallel session detection (by-design)**: statusline shows one indicator per project; simultaneous `C` + `RA` indicators require both claude PIDs to have distinct project `cwd`s — confirmed not a regression from API-removal commit; `getRunningAgentSessions`/`getProjectSessionsHealth` logic unchanged"
+        "- **Current GSD version**: `1.40.0` (updated May 3 from 1.39.1); 65 skills installed; runtime restart required after install\n- **v1.40.0 changes**: 6 namespaced `<COMPANY_NAME_REDACTED>-skills` added, skill surface consolidated from 86→59 entries, new `gsd-edit-phase` and post-merge build gate\n- **v1.39.0 change**: consolidates 31 micro-skills into grouped parent commands with flags\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **Parallel session detection**: `getRunningAgentSessions`/`getProjectSessionsHealth` logic is intact (not broken by API-removal commit); single-entry-per-project behavior is pre-existing design, not a regression\n- **`health-prompt-hook.js`**: cwd-robust LSL check added May 2 to eliminate false alarms\n- **False warning fixes (May 1)**: `health-prompt-hook.js` and `combined-status-line.js` both fixed for misclassifying `overallStatus=healthy` with non-critical violations as warning\n- **API quota display removed (May 2)**: Groq, Anthropic, OpenAI, X/Grok provider display stripped from `combined-status-line.js`"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.907Z",
-        "last_updated": "2026-05-03T05:37:03.570Z"
+        "last_updated": "2026-05-03T08:33:40.439Z"
       },
       "id": "mc4flkg1y4ci6q"
     },
@@ -12181,14 +12181,14 @@
     },
     {
       "name": "Diagrams and Documentation Conventions",
-      "entityType": "Container",
+      "entityType": "File",
       "observations": [
-        "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, component stereotypes, arrow macros, and layout guidelines\n- Diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `lsl-repo-split.puml`\n- `lsl-repo-split.puml` updated May 3 to include standard style include, consistent stereotypes, and layout guidelines; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore`\n- **History repo READMEs**: 7 of N repos received README updates in May 3 rollout; remaining repos identified for patching (work in progress, no artifacts confirmed modified yet)"
+        "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE (patched commit `bc8a559` for `rapid-automations-history`)\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore` — should not be committed"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.956Z",
-        "last_updated": "2026-05-03T05:37:03.595Z"
+        "last_updated": "2026-05-03T08:33:40.537Z"
       },
       "id": "mc4flkg1c37dsd"
     },
@@ -19099,7 +19099,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-03T05:37:08.653Z",
+    "exported_at": "2026-05-03T08:33:45.638Z",
     "total_entities": 681,
     "total_relations": 1135,
     "description": "Coding project infrastructure and patterns"
