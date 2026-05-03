@@ -1,17 +1,21 @@
 @startuml retrieval-service-pipeline
 !include _standard-style.puml
 
-title Retrieval Service Pipeline\nPOST /api/retrieve Request Flow
+title Retrieval Service Pipeline\nPOST /api/retrieve Request Flow\n(runs in the host obs-api process)
 
 top to bottom direction
 
 actor "Agent Adapter" as CALLER
 
-rectangle "POST /api/retrieve" <<api>> as ENDPOINT {
+rectangle "Dashboard (container)\nPOST /api/retrieve" <<api>> as DASH {
+  component "Thin HTTP forwarder\nto host.docker.internal:12436" <<api>> as DFWD
+}
+
+rectangle "Observations API Server\n(host, localhost:12436)\nPOST /api/retrieve" <<api>> as ENDPOINT {
   component "Input Validation\n{query, budget, threshold, context}" <<api>> as INPUT
 }
 
-rectangle "RetrievalService.retrieve()" as SERVICE {
+rectangle "RetrievalService.retrieve()\n(in-process, shares writer's db handle)" as SERVICE {
 
   rectangle "Step 0: Working Memory" as STEP0 {
     component "buildWorkingMemory()" <<core>> as BUILD_WM
@@ -50,7 +54,8 @@ rectangle "Response" as RESPONSE {
 }
 
 ' === Flow ===
-CALLER SYNC_LINE INPUT
+CALLER SYNC_LINE DFWD : POST /api/retrieve
+DFWD SYNC_LINE INPUT : forward
 INPUT SYNC_LINE BUILD_WM
 
 BUILD_WM SYNC_LINE FETCH_KG : Project + Component\nentities

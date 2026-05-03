@@ -42,6 +42,26 @@ See [Health Monitoring](architecture/health-monitoring.md).
 
 ## Observational Memory
 
+### Single-owner observations gateway (May 3)
+
+Periodic `observations.db.corrupted-*` files (10+ in 8 days) were traced to the canonical SQLite-on-Docker-Desktop-Mac corruption pattern: the host transcript monitor and the in-container dashboard both opened the file across the bind-mount boundary, and Apple Virtualization VM bind-mounts don't provide mmap coherence for SQLite's WAL/SHM shared memory.
+
+A new host service — the **Observations API server** at `scripts/observations-api-server.mjs` (port 12436) — is now the single owner of `observations.db`. Every other consumer reaches the DB exclusively through this HTTP gateway:
+
+| Consumer | Before | After |
+|----------|--------|-------|
+| Transcript monitor | `new ObservationWriter()` (direct SQLite) | `new ObservationApiClient()` POSTing `/api/observations/messages` |
+| Dashboard reads (9 endpoints) | per-process readonly handle | thin HTTP forwarders to `host.docker.internal:12436` |
+| Dashboard `POST /api/retrieve` | RetrievalService in container, opens DB | forward to host (RetrievalService runs in-process inside obs-api) |
+| Dashboard `POST /api/consolidation/run` | spawn `consolidate-observations.js` child | forward to host (ObservationConsolidator runs in-process inside obs-api) |
+| Container `.observations` mount | bind-mounted rw | **mount removed entirely** |
+
+Pattern mirrors the OKB/VKB approach: one process owns the DB, everyone else over HTTP. Same five-phase rollout structure (build, migrate reads, migrate writes, migrate consolidation, drop bind mount). Verified by zero new corruption files in the 48 h window after cutover.
+
+![Observation pipeline (single-owner host gateway)](images/observation-pipeline.png)
+
+![Consolidation flow with in-process heartbeat](images/consolidator-heartbeat-flow.png)
+
 ### Per-project consolidation (Apr 26)
 
 Phases A/B/C/D made the pipeline project-aware end-to-end:
@@ -51,13 +71,11 @@ Phases A/B/C/D made the pipeline project-aware end-to-end:
 - Insight synthesis runs per project — no more cross-project narrative bleed
 - Digests/Insights pages have a project selector; API accepts `?project=<name>`
 
-### Consolidator heartbeat + orphan sweep
+### Consolidator heartbeat + orphan sweep (Apr, superseded May 3)
 
-Detached spawn protected the SQLite WAL across dashboard restarts but left orphans immortal — a 21-hour 0%-CPU run on the live dashboard prompted the work.
+Detached spawn originally protected the SQLite WAL across dashboard restarts but left orphans immortal — a 21-hour 0%-CPU run on the live dashboard prompted the work. The CLI wrote `.observations/consolidation-heartbeat.json` every ~2 s; any stderr line refreshed it; the dashboard swept stale heartbeats on startup.
 
-The CLI now writes `.observations/consolidation-heartbeat.json` every ~2 s; any stderr line refreshes it. `/api/consolidation/status` returns that as `inflight: { pid, alive, ageMs, lastMessage }`. On startup the dashboard sweeps stale heartbeats (dead PID → unlink; alive PID with `ageMs > 6 min` → SIGTERM/SIGKILL).
-
-![Consolidator heartbeat and orphan sweep](images/consolidator-heartbeat-flow.png)
+This whole arrangement was **superseded by the single-owner gateway above**: consolidation now runs in-process inside the host obs-api server, which already owns the SQLite handle. No spawn, no second writer, no orphan-child timeout enforcement to worry about. The heartbeat file is still written (now by the obs-api itself) and surfaced via `/api/consolidation/status` so the dashboard's progress indicator continues to work.
 
 ### Mixed-topic safeguards in the knowledge graph
 

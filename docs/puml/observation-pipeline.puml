@@ -1,7 +1,7 @@
 @startuml observation-pipeline
 !include _standard-style.puml
 
-title Observational Memory Pipeline
+title Observational Memory Pipeline\n(single-owner host gateway)
 
 top to bottom direction
 
@@ -12,19 +12,21 @@ rectangle "Coding Agents" <<agent>> {
   component "Mastracode" as mastra
 }
 
-rectangle "Enhanced Transcript Monitor\n(per project)" <<core>> as etm {
+rectangle "Enhanced Transcript Monitor\n(host, per project)" <<core>> as etm {
   component "_firePromptSetObservation()" as fire
+  component "ObservationApiClient\n(HTTP shim)" as etmclient
 }
 
-rectangle "ObservationWriter" <<core>> as ow {
-  component "summarize()" as summarize
-  component "_sanitizeSummary()" as sanitize
-  component "_serializedWrite()" as serialize
-  component "writeObservation()" as write
-  component "Semantic dedup\n(Jaccard + containment)" as dedup
+rectangle "Observations API Server\n(host, localhost:12436)\nSINGLE OWNER of observations.db" <<api>> as obsapi {
+  component "POST /api/observations/messages" as ep_messages
+  component "ObservationWriter" as ow
+  component "summarize() + sanitize()" as summarize
+  component "Semantic dedup\n+ serialized write" as dedup
+  component "ObservationConsolidator\n(in-process)" as oc
+  component "RetrievalService\n(fastembed + Qdrant)" as rs
 }
 
-rectangle "LLM CLI Proxy\n(localhost:12435)" <<api>> as proxy {
+rectangle "LLM CLI Proxy\n(host, localhost:12435)" <<api>> as proxy {
   component "LLMService" as llm
 }
 
@@ -34,16 +36,16 @@ rectangle "LLM Providers" <<external>> as providers {
   component "groq\n(API fallback)" as groq
 }
 
-database "SQLite WAL\n.observations/\nobservations.db" <<storage>> as db
+database "SQLite WAL\n.observations/\nobservations.db\n(host filesystem)" <<storage>> as db
 
 rectangle "Git-Tracked Export" <<storage>> as export {
   component "ObservationExporter" as exporter
   file ".data/observation-export/\nobservations.json\ndigests.json\ninsights.json" as json
 }
 
-rectangle "Health Dashboard\n(localhost:3032)" <<api>> as dash {
-  component "REST API\n(port 3033)" as api
-  component "Dashboard UI" as ui
+rectangle "coding-services container\n(no .observations bind mount)" <<infra>> as container {
+  component "Health Dashboard API\n(port 3033)\nthin HTTP forwarders" as dashapi
+  component "Dashboard UI\n(port 3032)" as ui
 }
 
 claude --> etm
@@ -51,24 +53,34 @@ copilot --> etm
 opencode --> etm
 mastra --> etm
 
-fire --> summarize : messages\n(fire-and-forget)
+fire --> etmclient : messages\n(fire-and-forget)
+etmclient SYNC_LINE ep_messages : POST\n/api/observations/messages
+ep_messages --> ow
+ow --> summarize : LLM summarize\nvia proxy
 summarize --> proxy : POST /api/complete
 proxy --> llm
 llm --> cc : priority 1
 llm --> cp : priority 2
 llm --> groq : priority 3
-
 summarize <-- proxy : summary +\nmodel/provider/tokens
-summarize --> sanitize : raw LLM output
-sanitize --> serialize : cleaned summary
-serialize --> dedup : write lock\n(TOCTOU prevention)
-dedup --> write : if unique
-write --> db
+summarize --> dedup : cleaned summary
+dedup DATA_LINE db : writeObservation()\n(single writer, WAL)
 
-write ASYNC_LINE exporter : debounced\n(10s coalesce)
+ow ASYNC_LINE exporter : debounced\n(10s coalesce)
 exporter DATA_LINE json
 
-api --> db : readonly\n(auto-reconnect\non corruption)
-ui --> api : fetch + poll
+oc DATA_LINE db : reads + writes\ndigests, insights
+rs DATA_LINE db : keyword search\n(FTS5)
+
+dashapi SYNC_LINE obsapi : host.docker.internal:12436\n(reads, retrieve, consolidate/run)
+ui --> dashapi : fetch + poll
+
+note right of obsapi
+  **Single-owner pattern** (mirrors OKB):
+  one process opens observations.db at runtime.
+  Eliminates SQLite WAL/SHM corruption from
+  concurrent openers across the Docker
+  bind-mount boundary.
+end note
 
 @enduml

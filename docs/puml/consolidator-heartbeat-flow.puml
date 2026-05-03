@@ -1,63 +1,66 @@
 @startuml consolidator-heartbeat-flow
 !include _standard-style.puml
 
-title Consolidator Heartbeat and Orphan Sweep
+title Consolidation Flow with In-Process Heartbeat\n(host obs-api owns observations.db)
 
 actor User
-participant "Dashboard\n(server.js)" as D <<api>>
-participant "consolidate-\nobservations.js\n(detached child)" as Child <<cli>>
+participant "Dashboard\n(server.js, container)" as D <<api>>
+participant "Observations API\n(host, :12436)" as A <<api>>
 database ".observations/\nconsolidation-\nheartbeat.json" as HB <<storage>>
 database ".observations/\nobservations.db" as DB <<storage>>
-participant "ObservationConsolidator" as OC <<core>>
+participant "ObservationConsolidator\n(in-process)" as OC <<core>>
 
 == Trigger ==
 
 User -> D: POST /api/consolidation/run
-D -> Child: spawn(detached, --json)
+D -> A: POST /api/consolidation/run\n(forward via host.docker.internal:12436)
 note right
-  Detached so a dashboard SIGKILL
-  doesn't corrupt the SQLite WAL
-  mid-LLM-call.
+  Dashboard is a thin forwarder.
+  Consolidation runs in-process inside
+  the obs-api server, which already
+  owns the SQLite handle — no spawn,
+  no second writer, no WAL race.
 end note
-activate Child
+activate A
 
-Child -> HB: write {pid, startedAt,\n  lastHeartbeat, stage: "init"}
-Child -> Child: wrap process.stderr.write\nso every log line bumps the heartbeat
+A -> A: coalesce concurrent triggers\n(_consolidationPromise)
+A -> HB: write {pid, startedAt,\n  lastHeartbeat, args}
+A -> A: tap process.stderr so any\nconsolidator log line refreshes\nlastStderrAt + lastMessage
 loop every ~2s
-    Child -> HB: refresh lastHeartbeat
+    A -> HB: refresh lastHeartbeat
 end
 
-Child -> OC: run({includeToday})
+A -> OC: run({includeToday}) | consolidateDay(date) | synthesizeInsights()
 activate OC
 loop for each undigested day
     OC -> DB: read observations
     OC -> OC: LLM theme grouping
     OC -> DB: write digest
-    Child -> HB: bump (last stderr line\n  becomes lastMessage)
+    A -> HB: bump (last stderr line\n  becomes lastMessage)
 end
-OC --> Child: result
+OC --> A: result
 deactivate OC
 
-Child -> HB: unlink (graceful exit)
-deactivate Child
+A -> HB: unlink (graceful exit)
+A --> D: { success, ok, digests, created, updated }
+deactivate A
+D --> User: same payload
 
 == Status ==
 
 User -> D: GET /api/consolidation/status
-D -> HB: read heartbeat?
-HB --> D: { pid, ageMs, alive, lastMessage }\nor null
-D --> User: { totalObs, undigested, …,\n  inflight: { … } | null }
+D -> A: forward GET
+A -> HB: read heartbeat
+HB --> A: { pid, ageMs, alive, lastMessage } | null
+A --> D: { totalObs, undigested, …,\n  inflight: { … } | null }
+D --> User: same payload
 
-== Orphan sweep on dashboard startup ==
+== Auto-consolidation (host-side, every 30 min) ==
 
-D -> HB: read on startup
-alt heartbeat is fresh (alive PID, ageMs < 6 min)
-    D --> D: leave running consolidator alone
-else PID dead
-    D -> HB: unlink stale file
-else PID alive but heartbeat stale
-    D -> Child: SIGTERM (5s grace) → SIGKILL
-    D -> HB: unlink
+D -> A: GET /api/consolidation/status\n(via _fetchObsApi)
+A --> D: pendingPast count
+alt pendingPast >= 10
+    D -> A: POST /api/consolidation/run
 end
 
 @enduml

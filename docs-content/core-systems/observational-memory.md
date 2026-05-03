@@ -20,16 +20,25 @@ The system uses SQLite (`.observations/observations.db`) as its runtime store an
 
 ![Memory Hierarchy Architecture](../images/observation-memory-hierarchy.png)
 
+### Single-owner architecture
+
+The runtime DB has exactly **one owner**: a host process called the **Observations API server** (`scripts/observations-api-server.mjs`, port `12436`). Every other consumer — the transcript monitor, the dashboard inside the `coding-services` container, the consolidator, the retrieval pipeline — reaches `observations.db` exclusively through this HTTP service. The `.observations` directory is **not** bind-mounted into the container.
+
+This eliminates the classic SQLite-on-Docker-Desktop-Mac corruption pattern where concurrent processes (host writer + container reader) lose WAL/SHM coherence across the bind-mount boundary, producing periodic `observations.db.corrupted-*` files. Pattern mirrors the OKB/VKB approach: one writer, everyone else over HTTP.
+
 ### Components
 
 | Component | Location | Role |
 |-----------|----------|------|
-| **ObservationWriter** | `src/live-logging/ObservationWriter.js` | Summarizes exchanges via LLM proxy, writes to SQLite with dedup |
-| **ObservationConsolidator** | `src/live-logging/ObservationConsolidator.js` | Consolidates observations into digests and insights via LLM |
+| **Observations API server** | `scripts/observations-api-server.mjs` | Host service (port 12436). **Single owner** of `observations.db`. Hosts `ObservationWriter`, `ObservationConsolidator`, `RetrievalService` in-process |
+| **ObservationWriter** | `src/live-logging/ObservationWriter.js` | Summarizes exchanges via LLM proxy, writes to SQLite with dedup. Runs inside the obs-api server |
+| **ObservationConsolidator** | `src/live-logging/ObservationConsolidator.js` | Consolidates observations into digests and insights via LLM. Runs in-process inside the obs-api server |
+| **RetrievalService** | `src/retrieval/retrieval-service.js` | Keyword + semantic + RRF retrieval. Runs in-process inside the obs-api server |
 | **ObservationExporter** | `src/live-logging/ObservationExporter.js` | Git-friendly JSON export to `.data/observation-export/` |
-| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per prompt-set (fire-and-forget) |
-| **Consolidation CLI** | `scripts/consolidate-observations.js` | CLI/daemon for running the consolidation pipeline |
-| **Health API** | `integrations/system-health-dashboard/server.js` | REST endpoints for observations, digests, insights |
+| **ObservationApiClient** | `src/live-logging/ObservationApiClient.js` | Thin HTTP shim used by the transcript monitor (replaces direct SQLite access) |
+| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per prompt-set via the API client (fire-and-forget) |
+| **Consolidation CLI** | `scripts/consolidate-observations.js` | Legacy stand-alone CLI/daemon. The dashboard's `POST /api/consolidation/run` no longer spawns it — consolidation runs in-process inside the obs-api server |
+| **Health API (dashboard)** | `integrations/system-health-dashboard/server.js` | Container service (port 3033). Now a **thin HTTP forwarder** to the host obs-api for all observation/digest/insight/retrieve/consolidation calls |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/` | Browsable views: observations, digests, insights |
 | **LLM Proxy Bridge** | [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) | Routes summarization to subscription providers (port 12435) |
 
@@ -38,14 +47,14 @@ The system uses SQLite (`.observations/observations.db`) as its runtime store an
 ![Observation Pipeline](../images/observation-pipeline.png)
 
 1. **Exchange completed** -- the ETM detects a completed prompt set (user + assistant exchanges)
-2. **Fire-and-forget** -- `_firePromptSetObservation()` sends messages to ObservationWriter (never awaited, never blocks LSL)
-3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a structured summary (Intent/Approach/Artifacts/Result)
+2. **Fire-and-forget over HTTP** -- `_firePromptSetObservation()` calls `ObservationApiClient.processMessages()`, which `POST`s `/api/observations/messages` to the host obs-api on `localhost:12436` (never awaited, never blocks LSL)
+3. **LLM summarization** -- inside the obs-api, `ObservationWriter` calls the LLM proxy to generate a structured summary (Intent/Approach/Artifacts/Result)
 4. **Summary sanitization** -- `_sanitizeSummary()` strips unfilled template placeholders and LLM self-correction artifacts
-5. **Serialized write** -- `_serializedWrite()` acquires a promise-chain lock to prevent TOCTOU races between concurrent fire-and-forget calls
+5. **Serialized write** -- `_serializedWrite()` acquires a promise-chain lock to prevent TOCTOU races between concurrent calls
 6. **Dedup check** -- content hash + semantic keyword similarity (Jaccard + containment) against a 4-hour sliding window
-7. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens)
+7. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens). The obs-api holds the only RW handle in the system
 8. **JSON export** -- debounced (10s coalesce) export to `.data/observation-export/observations.json`
-9. **Dashboard** -- REST API serves observations; dashboard polls every 30s
+9. **Dashboard** -- the dashboard inside the container forwards `/api/observations*` to the host obs-api at `host.docker.internal:12436`; it never opens SQLite directly
 
 ## Supported Agents
 
@@ -88,11 +97,13 @@ Phases B/C/D (Apr 26) made the consolidation pipeline project-aware end-to-end:
 
 ### Heartbeat-backed consolidation status
 
-The dashboard spawns the consolidator as a detached child so a SIGKILL on the dashboard never corrupts the SQLite WAL mid-LLM-call. The trade-off was that an orphaned child became immortal — the in-process timeout enforcer was lost on restart, and there was no progress signal. Symptom: a 21-hour run with 0% CPU and a permanently grey "Consolidating…" button.
+Consolidation now runs **in-process inside the host obs-api server** rather than as a child process spawned by the dashboard. The obs-api already owns the SQLite handle, so a single in-process call replaces the previous `spawn(consolidate-observations.js)` flow — no second writer, no WAL race, no orphan-child timeout enforcement to worry about.
 
-Now the CLI writes `.observations/consolidation-heartbeat.json` every ~2 seconds (any stderr line refreshes it, so the last log message is always exposed as `lastMessage`). The dashboard's `/api/consolidation/status` returns that heartbeat as `inflight: { pid, alive, ageMs, startedAt, lastMessage }` — survives across dashboard restarts. On startup the dashboard sweeps stale heartbeats: dead PID → cleans the file; alive PID with `ageMs > 6 min` → SIGTERM (5s grace) then SIGKILL.
+The obs-api writes `.observations/consolidation-heartbeat.json` every ~2 seconds while a run is in flight (any stderr line refreshes it, so the last log message is always exposed as `lastMessage`). `GET /api/consolidation/status` returns that heartbeat as `inflight: { pid, alive, ageMs, startedAt, lastMessage }`. On graceful shutdown the obs-api waits up to 20 s for the in-flight run to drain.
 
-![Consolidator heartbeat and orphan sweep](../images/consolidator-heartbeat-flow.png)
+Concurrent triggers are coalesced — a second `POST /api/consolidation/run` while one is in flight attaches to the same promise instead of starting a new run. The dashboard's `POST /api/consolidation/run` is a thin HTTP forwarder; the dashboard's auto-consolidation daemon (every 30 min when `pendingPast >= 10`) likewise forwards rather than spawning.
+
+![Consolidation flow with in-process heartbeat](../images/consolidator-heartbeat-flow.png)
 
 ### Mixed-topic safeguard in the knowledge graph
 
@@ -144,7 +155,7 @@ node scripts/convert-transcripts.js specstory
 
 ## Database
 
-SQLite database at `.observations/observations.db` with **WAL mode** and `busy_timeout=5000ms` for safe concurrent access across multiple ETM writers and the Docker-hosted API reader.
+SQLite database at `.observations/observations.db` with **WAL mode** and `busy_timeout=5000ms`. The host obs-api server is the only process that opens this file at runtime — concurrent in-process connections (writer, consolidator, retrieval) coexist safely under WAL because they share the same SQLite shared memory. The Docker container has no access to the file (the `.observations` bind mount was removed).
 
 **Observations table:**
 ```sql
@@ -261,7 +272,7 @@ Observations are deduplicated at multiple levels before storage:
 - **Semantic dedup**: Stemmed keyword similarity (Jaccard > 0.4 or containment > 0.7) against a 4-hour sliding window of the last 50 observations per agent. Synonymous verbs are canonicalized (debug/diagnose/investigate -> `debug`, showing/displaying/appearing -> `show`) and stop words stripped before comparison
 - **Summary sanitization**: `_sanitizeSummary()` detects unfilled LLM template placeholders (`[what the developer...]`) and self-correction artifacts (multiple `Intent:` blocks) -- discards or cleans the output before storage
 - **Trivial filter**: observations containing "trivial exchange" or "no actionable content" are skipped entirely
-- **WAL mode**: SQLite WAL mode + `busy_timeout=5000ms` prevents corruption from concurrent ETM writes and Docker bind-mount reads
+- **WAL mode + single owner**: SQLite WAL mode + `busy_timeout=5000ms` plus the single-owner host gateway eliminates the cross-process WAL/SHM coherence issues that previously caused periodic `observations.db.corrupted-*` files
 
 ## Consolidation Pipeline
 
@@ -323,12 +334,17 @@ node scripts/consolidate-observations.js --daemon
 
 ## API Endpoints
 
+All endpoints below are exposed by **both** the host obs-api server (`localhost:12436`) and the in-container dashboard (`localhost:3033`). The dashboard versions are thin HTTP forwarders to the host.
+
 ### Observations
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/observations` | GET | Paginated observations with agent/date/project/quality/FTS filters |
 | `/api/observations/projects` | GET | Distinct project names for filter dropdown |
+| `/api/observations/messages` | POST | (host only) Process a chunk of raw messages: LLM summarize + dedup + insert. Used by the transcript monitor's `ObservationApiClient` |
+| `/api/observations/patch-artifacts/recent` | POST | (host only) Backfill `Artifacts:` on recent observations whose summaries still say "Artifacts: none" |
+| `/api/observations/patch-artifacts/historical` | POST | (host only) One-time pass over up to 500 historical rows to fix the same condition |
 
 ### Digests
 
@@ -351,8 +367,9 @@ node scripts/consolidate-observations.js --daemon
 
 ## Error Recovery
 
-The health API server (`server.js`) implements automatic error recovery for the observations database:
+The host obs-api server implements automatic error recovery for the observations database:
 
-- **Connection caching**: DB handle reopened every 30s to pick up schema changes
-- **Corruption recovery**: When a query fails with "malformed", "corrupt", or "disk I/O" errors, the cached connection is immediately invalidated via `_invalidateObservationsDb()` -- the next request gets a fresh handle instead of serving errors for 30s
-- **WAL checkpoint**: ObservationWriter runs `PRAGMA wal_checkpoint(PASSIVE)` every 15s so the readonly Docker reader sees fresh data
+- **Single persistent handle**: the writer keeps one RW connection open for the lifetime of the process; a separate handle is opened per consolidation run via `ObservationConsolidator.init()`
+- **Corruption invalidation**: when any query fails with "malformed", "corrupt", or "disk I/O", the cached writer is closed via `invalidateDb()` and the next request lazily reopens. `SafeDatabase` runs an integrity check on open and auto-recovers via SHM/WAL deletion or `sqlite3 .dump | sqlite3` reimport, with the prior corrupt file preserved as `observations.db.corrupted-<ts>`
+- **WAL checkpoint**: writer runs `PRAGMA wal_checkpoint(TRUNCATE)` periodically and on shutdown
+- **Container resilience**: the dashboard's HTTP forwarders return 502 when the host obs-api is unreachable; the SPA surfaces this as a transient error rather than corrupting the cached state

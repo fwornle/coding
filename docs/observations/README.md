@@ -17,36 +17,48 @@ Observational Memory captures per-exchange observations during coding sessions. 
 
 ![Observation Pipeline](../images/observation-pipeline.png)
 
+The observation system follows a **single-owner** pattern: a host process (the Observations API server on port `12436`) owns `observations.db` exclusively. The Docker `coding-services` container has no direct access to the SQLite file — the `.observations` bind mount was removed. Every other component reaches the DB through the host gateway over HTTP.
+
+This eliminates the SQLite WAL/SHM corruption that affected earlier versions where the host transcript monitor and the in-container dashboard both opened the file across the Docker bind-mount boundary.
+
 ```
-ETM (per project)          ObservationWriter          LLM CLI Proxy (12435)
-   |                            |                          |
-   | _fireObservation()         |                          |
-   |  user + assistant msg ---->| summarize() ------------>| claude-code / copilot
-   |                            |<---- summary + metadata -|  (auto-fallback)
-   |                            | writeObservation()       |
+ETM (per project)         Observations API (host, :12436)         LLM CLI Proxy (:12435)
+   |                            |                                       |
+   | _firePromptSetObservation()|                                       |
+   | ObservationApiClient ----->| POST /api/observations/messages       |
+   |                            |   ObservationWriter.processMessages() |
+   |                            |   summarize() -------------------->   | claude-code / copilot
+   |                            |<--- summary + metadata --------       |
+   |                            | writeObservation() (single writer)    |
    |                            |  --> SQLite (.observations/observations.db)
    |                            |
-Dashboard (3032) <-- API (3033) <-- reads SQLite (readonly)
+Container coding-services
+   |
+Dashboard UI (:3032) <-- Dashboard API (:3033, thin HTTP forwarders) -->
+                                  host.docker.internal:12436
+                                  (reads, retrieve, consolidate/run)
 ```
 
 ### Components
 
 | Component | Location | Role |
 |-----------|----------|------|
-| **ObservationWriter** | `src/live-logging/ObservationWriter.js` | Summarizes exchanges via LLM proxy, writes to SQLite |
-| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per exchange (fire-and-forget) |
-| **Health API** | `integrations/system-health-dashboard/server.js` | REST endpoints for querying observations |
+| **Observations API server** | `scripts/observations-api-server.mjs` | Host service (port 12436). **Single owner** of `observations.db`. Hosts ObservationWriter, ObservationConsolidator, RetrievalService in-process |
+| **ObservationWriter** | `src/live-logging/ObservationWriter.js` | Summarizes exchanges via LLM proxy, writes to SQLite. Runs inside the obs-api server |
+| **ObservationApiClient** | `src/live-logging/ObservationApiClient.js` | Thin HTTP shim used by the transcript monitor (replaces direct SQLite access) |
+| **ETM Observation Tap** | `scripts/enhanced-transcript-monitor.js` | Fires observations per exchange via the API client (fire-and-forget) |
+| **Dashboard API** | `integrations/system-health-dashboard/server.js` | Container service (port 3033). Thin HTTP forwarders to the host obs-api |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/observations.tsx` | Browsable UI with filters, search, compact view |
 | **LLM CLI Proxy** | `integrations/llm-cli-proxy/` | Routes summarization to subscription providers (port 12435) |
 
 ## Pipeline
 
 1. **Exchange completed** -- the ETM detects a user-assistant exchange
-2. **Fire-and-forget** -- `_fireObservation()` sends messages to ObservationWriter (never awaited, never blocks LSL)
-3. **LLM summarization** -- ObservationWriter calls the LLM proxy to generate a structured summary
+2. **Fire-and-forget over HTTP** -- `ObservationApiClient.processMessages()` POSTs `/api/observations/messages` to the host obs-api on `localhost:12436` (never awaited, never blocks LSL)
+3. **LLM summarization** -- inside the obs-api, ObservationWriter calls the LLM proxy to generate a structured summary
 4. **Dedup check** -- DB-level dedup prevents storing duplicate summaries per agent
-5. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens)
-6. **Dashboard** -- REST API serves observations; dashboard polls every 30s
+5. **Storage** -- observation written to SQLite with metadata (agent, project, LLM model/provider, tokens). The obs-api holds the only RW handle in the system
+6. **Dashboard** -- the dashboard inside the container forwards `/api/observations*` to the host obs-api at `host.docker.internal:12436`
 
 ## Supported Agents
 
@@ -109,7 +121,7 @@ node scripts/backfill-raw-observations.js
 
 ## Database
 
-SQLite database at `.observations/observations.db` with WAL mode enabled for concurrent access.
+SQLite database at `.observations/observations.db` with WAL mode enabled. The host obs-api server is the only process that opens this file at runtime. The Docker container has no access (the `.observations` bind mount was removed).
 
 **Schema:**
 ```sql

@@ -2,100 +2,85 @@
 !include _standard-style.puml
 
 top to bottom direction
-title Observation Memory Hierarchy
+title Observation Memory Hierarchy\n(host obs-api as single owner)
 
-rectangle "Real-Time Capture" {
+rectangle "Real-Time Capture (host)" {
   component "ETM\n(Enhanced Transcript Monitor)" as ETM <<infra>>
-  component "ObservationWriter" as OW <<core>>
-  database "observations.db\nobservations table" as OBS <<storage>>
+  component "ObservationApiClient\n(HTTP shim)" as OAC <<core>>
 }
 
-rectangle "Consolidation Pipeline" {
+rectangle "Observations API Server\n(host, port 12436)\nSINGLE OWNER" <<api>> as OBSAPI {
+  component "ObservationWriter" as OW <<core>>
   component "ObservationConsolidator" as OC <<core>>
-  database "observations.db\ndigests table" as DIG <<storage>>
-  database "observations.db\ninsights table" as INS <<storage>>
+  component "RetrievalService" as RS <<core>>
+  component "ObservationExporter" as EXP <<core>>
+}
+
+rectangle "SQLite store" <<storage>> {
+  database ".observations/observations.db\nobservations | digests | insights" as DB <<storage>>
 }
 
 rectangle "LLM Services" {
   component "LLM Proxy\n(port 12435)" as LLM <<agent>>
 }
 
-rectangle "Git-Tracked Export" {
-  component "ObservationExporter" as EXP <<core>>
-  file "observations.json" as EX_OBS <<storage>>
-  file "digests.json" as EX_DIG <<storage>>
-  file "insights.json" as EX_INS <<storage>>
+rectangle "Git-Tracked Export" <<storage>> {
+  file ".data/observation-export/\nobservations.json | digests.json | insights.json" as EX
 }
 
-rectangle "Dashboard (port 3032)" {
-  component "/observations" as UI_OBS <<api>>
-  component "/digests" as UI_DIG <<api>>
-  component "/insights" as UI_INS <<api>>
+rectangle "Dashboard (container)" <<infra>> {
+  component "/api/observations\n/api/digests\n/api/insights\n/api/consolidation/*\n/api/retrieve" as DASH_API <<api>>
+  component "Dashboard UI\n(port 3032)" as UI <<api>>
 }
 
-rectangle "API (port 3033)" {
-  component "GET /api/observations" as API_OBS <<api>>
-  component "GET /api/digests" as API_DIG <<api>>
-  component "GET /api/insights" as API_INS <<api>>
-  component "GET /api/consolidation/status" as API_STATUS <<api>>
-}
-
-' Real-time flow
-ETM SYNC_LINE OW : per exchange
+' Real-time write flow
+ETM SYNC_LINE OAC : per-exchange messages
+OAC SYNC_LINE OW : POST\n/api/observations/messages
 OW SYNC_LINE LLM : summarize()
-OW DATA_LINE OBS : writeObservation()\n(serialized lock)
+OW DATA_LINE DB : writeObservation()\n(serialized lock)
 
-' Export from writer (debounced)
-OW ASYNC_LINE EXP : debounced\n(10s coalesce)
-
-' Consolidation flow
-OBS ASYNC_LINE OC : undigested\nobservations
+' Consolidation
+OC DATA_LINE DB : reads observations,\nwrites digests + insights
 OC SYNC_LINE LLM : consolidateDay()\nsynthesizeInsights()
-OC DATA_LINE DIG : thematic\ndigests
-OC DATA_LINE INS : persistent\nknowledge
 
-' Export from consolidator (after run)
+' Retrieval (in-process, runs alongside writer)
+RS DATA_LINE DB : keyword search\n(FTS5)
+
+' Export (debounced after writes, full after consolidation)
+OW ASYNC_LINE EXP : debounced (10s)
 OC ASYNC_LINE EXP : exportAll()
+EXP DATA_LINE EX
 
-' Exporter writes JSON
-EXP DATA_LINE EX_OBS
-EXP DATA_LINE EX_DIG
-EXP DATA_LINE EX_INS
+' Dashboard forwarders → host
+DASH_API SYNC_LINE OBSAPI : host.docker.internal:12436\n(thin HTTP forwarders)
+UI --> DASH_API : fetch + poll
 
-' API reads
-OBS ..> API_OBS
-DIG ..> API_DIG
-INS ..> API_INS
-
-' UI
-API_OBS ..> UI_OBS
-API_DIG ..> UI_DIG
-API_INS ..> UI_INS
-
-note right of EXP
-  **.data/observation-export/**
-  Git-tracked JSON (no raw messages)
-  Mirrors UKB knowledge-export pattern
-  Skips write if content unchanged
+note right of OBSAPI
+  **Single-owner pattern** (mirrors OKB).
+  Container has no observations.db access:
+  the .observations bind mount was removed.
+  All reads, writes, retrieval, consolidation
+  go through this one process.
 end note
 
 note right of OC
   **Triggers:**
-  Daily cron (--daemon at 02:00)
-  Manual: node scripts/consolidate-observations.js
-  API: POST /api/consolidation/run
+  POST /api/consolidation/run (manual + dashboard)
+  Dashboard AutoConsolidate: every 30 min
+    when pendingPast >= 10
+  Daemon (legacy): node scripts/consolidate-observations.js --daemon
 
   **Thresholds:**
-  Digests: per day, skip today (daemon)
+  Digests: per day, skip today (auto)
   Insights: >= 5 unsynthesized digests
   Confidence decay: -0.05/week (floor 0.3)
 end note
 
-note bottom of OBS
+note bottom of DB
   **Dedup:** serialized write lock
   + stemmed keyword Jaccard/containment
   + LLM summary sanitization
-  **WAL mode** for concurrent access
+  **WAL mode**, single in-process owner
 end note
 
 @enduml
