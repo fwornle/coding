@@ -1,0 +1,53 @@
+@startuml lsl-repo-split
+!include _standard-style.puml
+
+title Public repo + private LSL companion: how they split
+
+skinparam folder {
+  BackgroundColor<<workspace>> #FAFAFA
+  BorderColor #888888
+  FontStyle bold
+}
+
+skinparam component {
+  BackgroundColor<<public>> #E8F5E8
+  BackgroundColor<<private>> #FFF2E6
+  BackgroundColor<<gitignore>> #FFFACD
+}
+
+skinparam cloud {
+  BackgroundColor<<public_host>> #E8F5E8
+  BackgroundColor<<private_host>> #FFF2E6
+  BorderColor #555555
+}
+
+actor Developer as dev
+
+folder "Local working tree\n~/Agentic/<project>/" as ws <<workspace>> {
+  component "Source code\n(src/, docs/, tests/, ...)\n" as src <<public>>
+  component ".gitignore\nblocks .specstory/history/" as ign <<gitignore>>
+  component ".specstory/history/\n(nested git repo)\n  <yyyy>/<mm>/*.md\n  logs/" as hist <<private>>
+}
+
+cloud "Public host (github.com)\n<user>/<project>" as pub <<public_host>> {
+  component "Source code +\nproject docs" as pub_code <<public>>
+}
+
+cloud "Private LSL host (bmw.ghe.com)\n<org>/<project>-history" as priv <<private_host>> {
+  component "<yyyy>/<mm>/*.md  (transcripts)\nlogs/  (LSL routing logs)" as priv_logs <<private>>
+}
+
+dev --> ws : edits / runs `coding`
+
+src -[#2E7D32]-> pub_code : git push (public)
+hist -[#E65100]-> priv_logs : git push (private)
+ign .[#B8860B].> hist : excludes from\nouter repo
+
+note bottom of ws
+  Two git repos in one working tree:
+  - the **outer** repo tracks code; .specstory/history/ is .gitignore'd
+  - the **inner** repo at .specstory/history/ tracks LSL transcripts only,
+    pushing to the private companion — never to the public host
+end note
+
+@enduml
