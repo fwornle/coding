@@ -9196,5 +9196,199 @@
       "sourceCount": 3
     },
     "project": "coding"
+  },
+  {
+    "id": "82339b7a-9d5a-431d-a7e6-da0c6881cb1f",
+    "date": "2026-05-02",
+    "theme": "VSCode Workspace SCM Multi-Repo Visibility Fix",
+    "summary": "Goal was to make the `coding-history` repo (at `.specstory/history`) visible in VSCode's SCM panel alongside the main `coding` repo and integration sub-repos.\n\n- Root cause: `.specstory/history` was intentionally suppressed via `git.repositoryScanIgnoredFolders`, `git.ignoredRepositories`, and `git.repositoryScanMaxDepth:0` to prevent a prior bug where the parent repo disappeared from SCM\n- Fix: Explicitly declared all repos as named folder entries in `coding.code-workspace` rather than relying on auto-discovery\n- Secondary bug: VSCode's submodule auto-detection cascade was overriding explicit workspace folder registrations during repo discovery; fixed by disabling auto-detection in workspace settings\n- Final state: `coding.code-workspace` lists all 8 repos explicitly (coding, `.specstory/history`, and 6 `integrations/` sub-repos) with auto-discovery disabled",
+    "observationIds": [
+      "5e0e8327-2a74-4199-a1c8-e55fa5d11279",
+      "e118b1b8-51ea-47e7-892c-e86625a9a029",
+      "f69488e0-ed1d-4df4-88a5-7e6ce7d33ae7",
+      "e46463a9-d2d1-43a5-8d18-a9129d4d0b9b",
+      "a8ee41eb-645d-4518-b267-6d6063574587",
+      "287c784c-94c6-4497-a16a-fd9f20b6cb96",
+      "e1f31cbd-ec20-4561-b34e-ec8fde2a0891"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1d01fef4-0df4-42ce-a2cf-bb29151766b9",
+    "date": "2026-05-02",
+    "theme": "Remove Serena, Stagehand, and Shadcn MCP Integrations",
+    "summary": "Performed a full cleanup of Serena, browser-access/Stagehand, and shadcn MCP entries from the project.\n\n- Surveyed affected files before editing: `.claude/mcp.json`, `.claude/settings.local.json`, `install.sh`, `generate-docker-mcp-config.sh`\n- Removed Stagehand/browser-access and shadcn entries from `claude-code-mcp-docker.json` and `scripts/generate-docker-mcp-config.sh`\n- Updated `install.sh`, `coding.code-workspace`, `CLAUDE.md`, and `.github/copilot-instructions.md` with revised Serena MCP integration references (Serena running on detached HEAD of upstream `oraios/serena`)",
+    "observationIds": [
+      "28c58eed-d49e-4d06-b412-42eb021db833",
+      "f7505620-5efc-49d4-9ed6-d63c8642482d",
+      "6815442d-c0ba-433a-88dc-542627f5fa4a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/claude-code-mcp-docker.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/generate-docker-mcp-config.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/install.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/coding.code-workspace",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/CLAUDE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.github/copilot-instructions.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "04d1980c-bb3e-435a-8ad1-f8af1263f446",
+    "date": "2026-05-02",
+    "theme": "Remove API Provider Quota Tracking from Status Line",
+    "summary": "Partially removed API provider display (Groq, Anthropic, OpenAI, X/Grok) from `scripts/combined-status-line.js` and planned removal from the health monitor and related MkDocs/PlantUML documentation. API quota checker imports, cache variables, and provider display logic were identified as removal targets; work was in progress with health monitor and documentation updates still pending at the time of observation.",
+    "observationIds": [
+      "ec1ae5fa-3d5d-4376-a353-bb650f20ec6e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "15896d9c-c343-4702-85b7-e6a2a0c68b0b",
+    "date": "2026-05-02",
+    "theme": "Commit Cleanup: Serena, Browser-Access, API Quota Removal",
+    "summary": "Staged and committed all pending changes from the MCP/integration cleanup work in three logical commits to satisfy the OKB BASELINE GUARD hook:\n\n- **Commit 1**: Cleanup of serena, browser-access, shadcn, mcp-server-browserbase, and API quota tracking (81 files, net -8256 lines); also touched `deep-insight-generation.puml`\n- **Commit 2**: Observation export refresh (4 files)\n- **Commit 3**: Knowledge export baseline refresh (1 file)\n\nWorking tree left clean but not yet pushed to remote.",
+    "observationIds": [
+      "d426e894-c3bc-4204-965f-1a4ef6ef5665"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/deep-insight-generation.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2b464294-772d-4908-805c-181f6e265a0a",
+    "date": "2026-05-02",
+    "theme": "Fix Getting-Started Docs Deployment Mode Tabs",
+    "summary": "Investigated a discrepancy between the local and published documentation site after a screenshot surfaced an issue with deployment mode tab labels.\n\n- Determined the PUML/diagram fix existed locally but had not been pushed, explaining why the published site showed the old version\n- Located the relevant content in `docs-content/getting-started/index.md` (Docker vs. Native deployment mode tabs)\n- Edited `index.md` to fix tab labels or ordering to match the intended \"Docker (Recommended)\" vs \"Native\" structure",
+    "observationIds": [
+      "218959c2-a9d3-4831-b4e0-f9c1a269779d",
+      "3aed62bd-86e5-4970-92f3-814ebbfcbeab",
+      "0a6a10ed-89ee-4b5f-86c0-57a0dc2ceed3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/getting-started/index.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "adb19409-c689-4579-9877-d34049df450b",
+    "date": "2026-05-02",
+    "theme": "Private History Repo Bootstrap in Agent Common Setup",
+    "summary": "Designed and implemented a mechanism for `coding/bin/coding` to store LSL/SpecStory history in a separate private `<project>-history` repo for every project it manages.\n\n- Added `ensure_private_history_repo` function to `scripts/agent-common-setup.sh`\n- Derives default history remote URL by appending `-history` to the outer repo's remote name\n- Prompts interactively on first run with skip/accept/override options; writes a skip marker if declined\n- Supports `LSL_HISTORY_AUTO` and `LSL_HISTORY_REMOTE_TEMPLATE` env overrides for CI contexts\n- Includes a pre-check to silently skip repos where `.specstory/history/.git` already exists\n- Attempts initial push with `gh`-based fallback hints on failure\n- Changes committed and pushed to `origin/main`",
+    "observationIds": [
+      "e43104fa-1797-44fb-8438-6177327097fe",
+      "297d2476-bbba-42b5-9fca-9b7e6c33981d",
+      "e028c144-b6f4-401a-bb0e-9759c02c58a5",
+      "920d46c4-daf2-48b1-8ce1-7909888f482b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7387be12-11fd-429c-91f6-0cd9e596f169",
+    "date": "2026-05-02",
+    "theme": "Audit and Migrate Public LSL History to Private Repos",
+    "summary": "Audited all repos under `~/Agentic/` to find SpecStory chat logs leaking in public GitHub repos, then scripted and executed migration to private GHE repos.\n\n**Audit findings:**\n- 6 public `github.com` repos actively leaking chat logs: `agentic-ai-nano`, `balance`, `curriculum-alignment`, `timeline`, `ui-template`, `iso-9001` (~459 tracked files total)\n- 4 internal repos flagged for lower-priority migration\n\n**Migration script** (`scripts/migrate-history-to-private.sh`):\n- Uses `git-filter-repo` to purge `.specstory/history/` from public repo history\n- Includes preflight checks for tooling availability and uncommitted changes\n- Fixed a cosmetic HTTPS-URL parser bug that was producing malformed URLs like `<COMPANY_NAME_REDACTED>.ghe.com///...`\n\n**Execution:**\n- `balance` repo: stashed `constraint-monitor.yaml`, ran `--purge`, private history pushed to `<COMPANY_NAME_REDACTED>.ghe.com/Frank-Woernle/balance-history`\n- `iso-9001` and `timeline` repos migrated; `iso-9001` had an unpurged corporate remote at `cc-github.bmwgroup.net` that was not force-pushed\n- Migration script committed to the `coding` repo",
+    "observationIds": [
+      "76635541-3499-4b62-b2ae-c91397c40db5",
+      "1ea12b66-a7a7-48f8-a197-368d25e31a3f",
+      "d13e987d-6429-47cb-8f8c-16657ff47fd9",
+      "3faa64dc-b02a-4460-a412-2c98cf051164",
+      "bf46b460-a58f-46b1-92c2-ad3e2407e4c1",
+      "048d148a-da3d-4006-8b66-f699d5b8bba5",
+      "4365e626-1767-48ea-9597-0e826ae0538d",
+      "eb9fdac8-93e9-409d-bb72-ba6e92531472",
+      "b208dbfc-bb59-4a0f-83c3-f0f8943fcb48",
+      "f4b4739a-7e6f-43d5-9799-99b76dafc283"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 10
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3f416836-b5b7-4688-a295-fa40c76ea47d",
+    "date": "2026-05-02",
+    "theme": "Commit Constraint Monitor Updates Across Multiple Repos",
+    "summary": "After the history migration work, committed `.constraint-monitor.yaml` updates across four repos: `balance`, `ui-template`, `curriculum-alignment`, and `agentic-ai-nano`. Diffs were inspected first to distinguish semantic changes from auto-formatting — `ui-template` received a distinct commit message reflecting actual constraint removals, while the others were committed as auto-formatting changes. All four repos were pushed.",
+    "observationIds": [
+      "53ee3b10-13cd-4c29-8cb4-bd994e2dabe5",
+      "a43b9b3e-aebf-495d-8180-afaa01e86aef"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-03T04:21:57.293Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
   }
 ]

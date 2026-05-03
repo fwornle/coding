@@ -10815,7 +10815,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T14:31:06.499Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10831,7 +10831,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:33:04.879Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10847,7 +10847,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:33:04.879Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10863,7 +10863,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T14:35:42.172Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10879,7 +10879,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:35:42.172Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10895,7 +10895,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:38:34.829Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10911,7 +10911,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:38:34.829Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -10927,7 +10927,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T14:39:31.798Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10944,7 +10944,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:45:28.405Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10965,7 +10965,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:47:40.313Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10982,7 +10982,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T14:59:20.742Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -10998,7 +10998,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T15:52:31.868Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11014,7 +11014,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T16:50:55.390Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11030,7 +11030,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T16:59:23.809Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11046,7 +11046,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T16:59:23.809Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11062,7 +11062,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-02T17:13:16.625Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11078,7 +11078,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T17:16:37.778Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -11094,7 +11094,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-02T17:25:22.690Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-03T04:21:57.293Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -11102,5 +11102,233 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh"
     ]
+  },
+  {
+    "id": "920d46c4-daf2-48b1-8ce1-7909888f482b",
+    "summary": "Intent: [confirming a proposed change]\nApproach: Added a bootstrap function to the launcher script that detects and initializes a private project-history repo on first launch, with a pre-check to skip if already initialized.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh\nResult: Launcher now bootstraps a private `<project>-history` repo on first run; existing projects with `.specstory/history/.git` are silently skipped. Changes committed and pushed to `origin/main` in two commits.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:25:22.690Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh"
+    ]
+  },
+  {
+    "id": "76635541-3499-4b62-b2ae-c91397c40db5",
+    "summary": "Intent: Audit all repos in ~/Agentic/* and ~/Agentic/_work/* to identify which ones have LSL files tracked in a public GitHub repo that need to be moved to a private GHE repo.\nApproach: Enumerate all git repositories and check their remotes to find any pointing to public github.com origins, then assess which contain LSLs requiring migration to the private enterprise host.\nArtifacts: edited migrate-history-to-private.sh\nResult: Investigation was in progress but incomplete — the assistant began listing repos and formatting a summary table but did not finish producing the full audit results.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-02T17:30:36.395Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "1ea12b66-a7a7-48f8-a197-368d25e31a3f",
+    "summary": "Intent: Audit all repos in ~/Agentic/ and ~/Agentic/_work/ to identify which ones have LSL (SpecStory) history files tracked in public GitHub repos that need to be migrated to a private GHE repo.\nApproach: Scanned all repo origins and counted tracked .specstory/history/ files to triage by urgency (public github.com leaks vs. internal-only vs. no action needed).\nArtifacts: edited migrate-history-to-private.sh\nResult: Identified 6 public github.com repos actively leaking chat logs (agentic-ai-nano, balance, curriculum-alignment, timeline, ui-template, iso-9001 totaling ~459 tracked files) requiring urgent migration to <COMPANY_NAME_REDACTED>.ghe.com private repos, plus 4 internal repos needing lower-priority migration; provided git rm --cached migration recipe and noted full history purge requires git filter-repo with force-push.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-02T17:30:36.395Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "d13e987d-6429-47cb-8f8c-16657ff47fd9",
+    "summary": "Intent: [user selected option \"1-3\" from a prior menu or list of choices]\nApproach: Used git-filter-repo availability check and created a migration script for moving history to a private repo.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh\nResult: Migration script written to handle single-repo history migration, with git-filter-repo as the underlying tool.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:40:38.507Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "3faa64dc-b02a-4460-a412-2c98cf051164",
+    "summary": "Intent: [user selected options 1-3 from a previous menu/list, likely to proceed with a migration task]\nApproach: Script-based git history migration using git-filter-repo, with preflight checks on tooling availability and repo status before execution.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh\nResult: Migration script created and validated for syntax; preflight checks confirmed git-filter-repo availability and inspected the balance repo's current state before running the migration.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:40:38.507Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "bf46b460-a58f-46b1-92c2-ad3e2407e4c1",
+    "summary": "Intent: Run migration steps 1-3 for migrating history to private repo.\nApproach: Created a shell script to automate the migration process, then preflighted the balance repo to check for blockers before running.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh\nResult: Migration script created and validated, but balance repo has 2 uncommitted changes that need to be resolved before proceeding with the migration.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:40:38.507Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "048d148a-da3d-4006-8b66-f699d5b8bba5",
+    "summary": "Intent: [user sent \"a\" — likely a confirmation or continuation prompt]\nApproach: The assistant ran a migration/purge script on the balance project history.\nArtifacts: edited migrate-history-to-private.sh\nResult: Executed migrate-history-to-private.sh with --purge flag on the balance project, including stashing constraint-monitor.yaml beforehand.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-02T17:52:28.995Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "4365e626-1767-48ea-9597-0e826ae0538d",
+    "summary": "Intent: Run the migration/purge script against the balance repository to remove chat logs from its git history.\nApproach: Executed the migrate-history-to-private script with --purge flag, stashed a blocking file to allow the purge to proceed, then fixed a cosmetic URL parsing bug in the script.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh\nResult: Chat logs purged from balance repo history; fixed HTTPS-URL parser bug in the script that was printing malformed URLs like `<COMPANY_NAME_REDACTED>.ghe.com///...`.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:52:28.995Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "eb9fdac8-93e9-409d-bb72-ba6e92531472",
+    "summary": "Intent: [trigger script execution for balance repo purge]\nApproach: Running migrate-history-to-private.sh with --purge flag on the balance repo, with a bug fix to the HTTPS-URL parser mid-run.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh\nResult: Balance repo history purged of chat logs, private history pushed to <COMPANY_NAME_REDACTED>.ghe.com/Frank-Woernle/balance-history, URL parser bug fixed in script, and script committed to coding repo.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T17:52:28.995Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/migrate-history-to-private.sh"
+    ]
+  },
+  {
+    "id": "b208dbfc-bb59-4a0f-83c3-f0f8943fcb48",
+    "summary": "Intent: [user sent \"a\", likely a confirmation to proceed with the migration task]\nApproach: Processing the smallest repository first in a multi-repo migration sequence, stashing a specific file before running a history purge script.\nArtifacts: none\nResult: Initiated history migration for the iso-9001 repository (4 files), stashing constraint-monitor.yaml and running the purge script as part of a 5-repo migration sequence.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-02T17:57:23.034Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f4b4739a-7e6f-43d5-9799-99b76dafc283",
+    "summary": "Intent: [single character \"a\" — likely a continue/proceed signal for an in-progress migration task]\nApproach: Treating \"a\" as confirmation to proceed with migrating git history across multiple repositories using a purge script.\nArtifacts: none\nResult: Migration progressed through iso-9001 and timeline repos; iso-9001 has an unpurged corporate remote at cc-github.bmwgroup.net that was not force-pushed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-02T17:57:23.034Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "53ee3b10-13cd-4c29-8cb4-bd994e2dabe5",
+    "summary": "Intent: [abbreviated/unclear user message \"c\" — likely \"commit\" based on context]\nApproach: Checked diffs across multiple repos before committing to distinguish semantic changes from auto-formatting, then committed each separately.\nArtifacts: none\nResult: Committed `.constraint-monitor.yaml` updates across balance, ui-template, curriculum-alignment, and agentic-ai-nano repos; ui-template had semantic removals while others were auto-formatting changes.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T18:10:43.246Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "a43b9b3e-aebf-495d-8180-afaa01e86aef",
+    "summary": "Intent: Commit and push `.constraint-monitor.yaml` updates across multiple repos.\nApproach: Checked diffs first to distinguish semantic changes from formatting, then committed with appropriate messages per repo.\nArtifacts: none\nResult: `.constraint-monitor.yaml` committed and pushed across balance, ui-template, curriculum-alignment, and agentic-ai-nano repos, with ui-template getting a distinct commit message reflecting actual constraint removals.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-02T18:10:43.246Z",
+    "digestedAt": "2026-05-03T04:21:57.293Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "b8a1d9f9-f33e-439d-8946-00826d1418a5",
+    "summary": "Intent: Delete backup bundle files that are no longer needed\nApproach: Directly remove pre-purge backup bundles from the filesystem to free disk space.\nArtifacts: none\nResult: 6 backup bundle files (~196 MB) deleted from ~/Agentic/ and ~/Agentic/_work/ directories.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-03T04:21:44.752Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "315c6a7f-a66f-4c87-aeed-7c09ec9d49ec",
+    "summary": "Intent: Reorganize all new *-history repos (local and remote) to use yyyy/mm/* directory structure, matching the coding-history repo layout.\nApproach: Discovered all new history repos had flat file structures, then applied a reorganization script to nest files under year/month subdirectories to match the existing coding-history convention.\nArtifacts: none\nResult: Script was written and run to reorganize history files into yyyy/mm/* structure across all 6 new history repos both locally and remotely.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-03T04:23:08.624Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
   }
 ]
