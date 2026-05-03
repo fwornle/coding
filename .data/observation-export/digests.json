@@ -9390,5 +9390,229 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "716275e6-ce0e-47eb-9f22-ab206626ffea",
+    "date": "2026-05-02",
+    "theme": "Diagnosing Idle CPU Usage in Dashboard Container",
+    "summary": "Investigated unexpectedly high idle CPU usage (~5-12%) in a `coding-service` dashboard Docker container with the lid closed and no active browser tabs.\n\n- Sampled `docker stats` repeatedly to confirm sustained CPU consumption at idle\n- Grepped `server.js` for timer patterns and reviewed logs for watchdog/`lsof` anomalies\n- Read `server.js` directly to trace internal timer-driven work\n- Identified two prime suspects:\n  - A **100ms SSE heartbeat/push timer** at `server.js:1031`, firing per active client — potentially looping on stale/zombie connections\n  - An **auto-consolidation timer** at `server.js:3853` with unknown idle cost\n- Next steps: confirm whether stale SSE connections are being held open, and profile the consolidation timer's CPU overhead at idle",
+    "observationIds": [
+      "2cd0a56a-7d06-4b49-8596-7cae7978e550"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-03T05:35:26.435Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b824a118-3ad8-4af3-8e72-fc4b740222fb",
+    "date": "2026-05-03",
+    "theme": "Cleanup and Reorganization of History Repos",
+    "summary": "Early session maintenance work on the private history repositories:\n\n- Deleted 6 backup bundle files (~196 MB) from `~/Agentic/` and `~/Agentic/_work/` directories via `agent-common-setup.sh`\n- Reorganized all 6 new `*-history` repos from flat file structure to `yyyy/mm/*` directory layout (matching the `coding-history` convention), applied both locally and remotely\n- Added customized `README.md` files to 6 repos (`balance`, `timeline`, `ui-template`, `curriculum-alignment`, and others), committed and pushed to each",
+    "observationIds": [
+      "b8a1d9f9-f33e-439d-8946-00826d1418a5",
+      "315c6a7f-a66f-4c87-aeed-7c09ec9d49ec",
+      "d7810b60-5e60-4a5c-82b8-70142ea77a63"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b76e20f8-b040-49ff-9927-acb4fb54aa61",
+    "date": "2026-05-03",
+    "theme": "Session Continuity Load for Coding Project",
+    "summary": "Loaded the two most recent LSL files from the coding project's `.specstory/history` directory to establish session continuity. The resulting summary covered 2026-05-02 to 2026-05-03 activity (private history repo migration and cleanup across 6 repos). No files were modified; this was a read-only orientation step.",
+    "observationIds": [
+      "d33cf4dd-6509-42dc-becd-1c1610925bbc"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3853d100-97a4-4aef-9de2-63b4112706d6",
+    "date": "2026-05-03",
+    "theme": "Migrating rapid-automations History to Private Repo",
+    "summary": "Replicated the `.specstory/history` migration pattern (used for the `coding` repo) for `rapid-automations`, with extra care due to the corporate org context and dirty working tree:\n\n- Assessed differences: `rapid-automations` is in a shared corporate org (`adpnext-apps`), had a dirty working tree, and contained 297 history files\n- Clarified destination (Frank-Woernle private org on `<COMPANY_NAME_REDACTED>.ghe.com` via HTTPS), purge mode, and `yyyy/mm/` reorganization before proceeding\n- Stashed dirty working tree, set local submodule ignore config, and ran migration with `--auto` flag (Phase A+C only)\n- Resolved a stash-pop conflict caused by history files having moved to the private submodule between stash creation and pop\n- Updated `rapid-automations.code-workspace` to include the main repo, new history repo, and all 4 submodules as explicit folder entries for VSCode source control visibility\n- Key artifact: `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace`",
+    "observationIds": [
+      "5a9556b2-101a-4491-87ef-8b924a737e91",
+      "64fc850e-5859-425f-9cdf-86a0e0692657",
+      "9b46fe92-25fd-426c-a592-d92a84c33931",
+      "88624cd8-0b04-449c-83bd-2e2afd038325",
+      "4711b0dd-7d07-4b78-8a5d-5f7511afac40",
+      "75ccaafc-d146-4466-9b37-c087c6873069"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5f1f4a23-5366-40fd-89f0-c28b21f7f4aa",
+    "date": "2026-05-03",
+    "theme": "Diagnosing and Fixing Statusline Parallel Session Detection",
+    "summary": "Investigated why the status line failed to display both `C` and `RA` project indicators simultaneously for parallel Claude coding sessions:\n\n- Read `status-line.md` documentation and examined `combined-status-line-cache`, running processes, and tmux session paths\n- Audited recent git commits touching statusline and health monitor files to check for regressions from the API cost tracker removal\n- Determined the API-removal commit only deleted quota segments; `getRunningAgentSessions`/`getProjectSessionsHealth` logic was untouched\n- Root cause identified as pre-existing single-entry-per-project design, not a regression; both active claude PIDs had `cwd` in `coding`, not `rapid-automations`\n- No code changes were made; the behavior was confirmed as by-design",
+    "observationIds": [
+      "69c105f0-c694-4b80-8d9e-acb624eb4132",
+      "6a2d12b2-51ec-4be0-9b3c-a52e8f53419a",
+      "f8fab0f3-ffdc-4ade-b39f-ea4e0c7906a2",
+      "10c26e14-44a8-4d35-a1c6-d3b756d878d3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/rapid-automations.code-workspace",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.vscode/settings.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d870d967-df32-4eb1-8ada-71592e0e9aa6",
+    "date": "2026-05-03",
+    "theme": "Session Continuity Load and VSCode SCM Fix for rapid-automations",
+    "summary": "Loaded session context from the coding project's history, then replicated yesterday's VSCode SCM nested-repo fix for the `rapid-automations` workspace:\n\n- Read recent LSL files from coding project history for orientation (no files modified)\n- Reviewed the working `coding.code-workspace` and `.vscode/settings.json` as the reference implementation\n- Applied the SCM nested fix to `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.vscode/settings.json` at workspace scope (JSONC format)\n- Created/updated memory file `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_vscode_scm_nested_history.md` to record the fix for future reference",
+    "observationIds": [
+      "9c00bdbd-4596-420b-86eb-7921fddc923e",
+      "d00eaa03-6ab6-4ee7-9147-9b7c77b97b03",
+      "0d4990cf-a4f5-482d-b7f7-1659190372aa",
+      "f4179930-4278-4f68-8b0e-72dc8ba3ec39",
+      "4aaefb4b-c20c-43f7-aae6-d665fd1f7709",
+      "954f53b4-c090-48d7-99e8-222c828f3f6c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.vscode/settings.json",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_vscode_scm_nested_history.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "aaad4b96-9d05-4f3e-b1b3-bf67272cbeff",
+    "date": "2026-05-03",
+    "theme": "PlantUML Diagram Styling for lsl-repo-split",
+    "summary": "Applied documentation style guide standards to the `lsl-repo-split.puml` diagram and regenerated its PNG output:\n\n- Updated `/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-repo-split.puml` to include the standard style include, consistent component stereotypes, and layout guidelines\n- Regenerated PNG output to `docs/images/lsl-repo-split.png`\n- Three overlapping observations all describe the same operation; no conflicts between them",
+    "observationIds": [
+      "f38aaf1d-4b31-433c-b873-a80924fcb2e8",
+      "7235943f-a671-4b95-80ca-047c3a7d29df",
+      "6c840304-9ca4-4964-9dec-5779afdeb324"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-repo-split.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "96783bb0-4c80-4e19-b517-7fa0835f0e8b",
+    "date": "2026-05-03",
+    "theme": "Auditing Missing PNG in History Repo READMEs",
+    "summary": "After noticing a specific PNG image was missing from a hosted history repository's `README.md`, began scanning all local `*-history` repos to identify which ones were missed during the earlier README rollout. Only 7 repos had been updated; the assistant started identifying and patching the remaining ones. No artifacts were recorded as modified in this exchange.",
+    "observationIds": [
+      "986509c0-fd85-4415-81bc-23d1bbdfac3f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "83d3beb2-8a9b-4a86-86a5-e50c7b8ed539",
+    "date": "2026-05-03",
+    "theme": "Session Continuity Log Loading and Summarization",
+    "summary": "Goal was to establish context continuity at session start using the `/sl` command protocol.\n\n- Identified working directory and listed recent `.specstory/history` files in the `rapid-automations` project\n- Loaded the two most recent LSL files covering activity from **2026-04-23 to 2026-04-25**\n- Artifact touched in both steps: `lsl-repo-split.puml`\n\nSession context was successfully reconstructed from prior history before proceeding with new work.",
+    "observationIds": [
+      "349e820e-3ae1-49a3-b283-88205631bb32",
+      "3605146a-846a-40e7-a626-d1155ace1be1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-repo-split.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "40e6565a-5138-4ecc-a29e-e6c9519c17b2",
+    "date": "2026-05-03",
+    "theme": "Observations Database Backfill Script Execution",
+    "summary": "Goal was to process any unhandled raw entries in the observations SQLite database via a backfill operation.\n\n- Ran the existing backfill script against the observations database\n- Only **3 unprocessed raw entries** were found; all were processed successfully\n- No artifacts were modified; script completed cleanly with no errors reported",
+    "observationIds": [
+      "1fdf732c-d9cf-4cfc-b1b4-0c225f08fc70"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-03T05:35:58.161Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
   }
 ]

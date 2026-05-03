@@ -306,7 +306,13 @@
       "Bash(rm -f ./__TRACKED_VAR__/cache/gsd-update-check.json)",
       "Bash(rm -f __TRACKED_VAR__/__TRACKED_VAR__/cache/gsd-update-check.json)",
       "Bash([ -f \"$HOME/.claude/gsd-local-patches/backup-meta.json\" ])",
-      "Bash(crontab -l)"
+      "Bash(crontab -l)",
+      "Bash(tmux ls *)",
+      "Read(//Users/Q284340/Agentic/coding/**)",
+      "Read(//Users/Q284340/.claude/projects/**)",
+      "Read(//Users/Q284340/Agentic/coding/=== RA .vscode/**)",
+      "Read(//Users/Q284340/Agentic/coding/=== RA .specstory/**)",
+      "Read(//Users/Q284340/Agentic/coding/=== RA .specstory/history/**)"
     ],
     "deny": [],
     "ask": []
