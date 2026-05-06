@@ -9803,5 +9803,201 @@
       "sourceCount": 1
     },
     "project": "rapid-automations"
+  },
+  {
+    "id": "a5796ff4-33ad-441f-9f62-3c500e89b82c",
+    "date": "2026-05-03",
+    "theme": "Fix VS Code SCM Repo Visibility in Rapid-Automations Workspace",
+    "summary": "All four observations represent a single continuous session by the `claude` agent to fix the VS Code SCM panel showing only one repository instead of all six in the `rapid-automations` workspace.\n\n- **Root cause:** The `scm:view:visibleRepositories` state in the workspace SQLite DB was corrupted, containing only `[2]` instead of the full index array `[0,1,2,3,4,5]`.\n- **Approach:** Apply a direct `sqlite3 UPDATE` to rewrite the visible repositories array once VS Code fully releases the DB file lock (VS Code PID 804 held the DB open initially).\n- **Progress:** A backup of the workspace state DB was created successfully; by observation 4, VS Code had released the lock and the `UPDATE` was ready to be applied — but had not yet been executed pending final confirmation.\n- No source files were modified; all work targeted the workspace SQLite state database directly.",
+    "observationIds": [
+      "2b4f4c75-b11a-44a4-80c4-27c898060f40",
+      "b95516fa-a844-400e-a6c3-2e61db7685f3",
+      "3a8350d8-209f-484f-915d-0c27f064adcb",
+      "3fa720b8-e031-4f18-9a76-35f60d41c6ac"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-06T00:17:35.502Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4c2602d8-d69c-4b5b-9d1a-771af650e28a",
+    "date": "2026-05-03",
+    "theme": "Session Context Continuity Load and Summary",
+    "summary": "Loaded recent session logs across `rapid-automations` and `coding` projects to re-establish context continuity. Key findings:\n- `rapid-automations` had 5 unpushed commits and a dirty OKM submodule\n- `coding` project had an unresolved architecture diagram mismatch around HTTP gateway shielding SQLite",
+    "observationIds": [
+      "989e722c-c281-4fff-b3e0-cc09d423e972"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-06T00:17:35.502Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "0d6a6742-ca79-468f-87ad-c0110ccd6838",
+    "date": "2026-05-03",
+    "theme": "OKM Submodule Commit and Remote Push via HTTPS",
+    "summary": "Goal was to commit OKB JSON files in the `operational-knowledge-management` submodule and sync both it and the `rapid-automations` parent repo to remote. SSH access limitations on internal remotes prompted a switch to HTTPS throughout.\n- JSON files in `.data/exports` were staged in the OKM submodule; initial commit/bump was incomplete mid-exchange\n- Pushes ultimately succeeded using explicit HTTPS URLs for both `rapid-automations` and the OKM subproject\n- Remote origin URLs were updated via `git remote set-url` to replace SSH with HTTPS equivalents\n- A `url.<base>.insteadOf` rewrite rule in git config was suspected of causing fetch to continue routing through SSH despite the URL change; this was resolved by observation 5\n- Final state: `rapid-automations` and OKM submodule sync cleanly with `origin/main` via HTTPS; `rapid-agentic-sandbox`, `rapid-toolkit`, and `rapidscribe-meeting` submodules retain SSH origins",
+    "observationIds": [
+      "a4dc1e9b-7ef9-4ac4-8750-76e7e1ab2ca2",
+      "98947081-9295-435a-88bb-2e5483eb7a8e",
+      "b54d8edd-0c31-4bb5-b146-da8d53c14c97",
+      "3ababde3-4e7b-45cf-a7ac-0670429a5a50"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-06T00:17:35.502Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "edbc168e-3c65-4ff1-a794-d62b08497e58",
+    "date": "2026-05-05",
+    "theme": "Docker Container Recreating in Loop: Bind Mount Fix",
+    "summary": "A Docker container was being force-recreated every ~5 minutes due to a stale health verification rule referencing `scripts/consolidate-observations.js` in the `bind_mount_freshness.files` list — a file no longer bind-mounted after the obs-api cutover but still baked into the image at a mismatched size.\n\n- **Root cause:** `health-verification-rules.json` was never updated after the bind-mount was removed, causing a permanent mismatch loop\n- **Fix:** Removed the stale file reference from `bind_mount_freshness.files` in `/Users/<USER_ID_REDACTED>/Agentic/coding/config/health-verification-rules.json`\n- **Verification:** Container `136c389e4f45` remained stable at 22 min uptime, zero heal attempts post-restart, 18/18 health checks passing with 0 violations; Task #4 marked complete",
+    "observationIds": [
+      "4d31f4bc-8cf7-40d8-bbb5-7dd17311bcdf",
+      "bf875dc8-fdcc-4c06-b607-4a795d27542c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/health-verification-rules.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-06T00:17:44.307Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4595e850-59a5-4954-b477-74bdd35530e4",
+    "date": "2026-05-05",
+    "theme": "False LSL Down Alert Caused by JSON Parse Error",
+    "summary": "Investigated a dashboard discrepancy where LSL appeared red/down despite the system being operational. Screenshots showed conflicting health indicators across the monitoring UI (served on port `3032`, not `3030`).\n\n- **Root cause:** A JSON parse error in the health hook caused it to default to a `DOWN` state, producing a false \"LSL DOWN\" alert\n- LSL processes were confirmed running (PIDs verified, health files current)\n- Observations API on port `12436` was healthy and returning current data\n- The dashboard's \"all green\" vs. LSL red discrepancy reflected divergent health check sources reading different system states\n- No artifacts were modified; investigation was diagnostic only",
+    "observationIds": [
+      "4e35d316-1036-4c25-96e5-515971f70547",
+      "80a0a6cb-45f3-46fa-a44a-66466fee1855",
+      "b00d30c6-28de-4985-85d2-5f4b83e7d1a2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-06T00:17:44.307Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bd67823d-3431-496e-9875-e8c488219572",
+    "date": "2026-05-06",
+    "theme": "Stale Health Files and Runaway Log Cleanup",
+    "summary": "Sequential maintenance tasks (Path A → Path B) targeting stale health monitor files and unbounded log growth.\n\n- Removed 4 stale `.health/` JSON files for abandoned projects stopped >3 days\n- Truncated runaway logs from 3.2GB to 169MB; deleted ~4GB of old capture files\n- Added 10MB log rotation to `health-verifier.js` and `statusline-health-monitor.js` to prevent recurrence\n- Added 14-day capture cleanup to `tmux-session-wrapper.sh`",
+    "observationIds": [
+      "30ab131f-8f1c-46c2-b66a-bf510d2f0003",
+      "cdda3de0-6824-42e6-bcbd-7ed8d99f4f1d",
+      "acf5350b-1657-4888-b8b1-cd70503b21e8",
+      "c966632d-5b52-4498-b586-8e319d4f53a6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-verifier.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/statusline-health-monitor.js",
+      "tmux-session-wrapper.sh",
+      "multiple stale .health JSON files and log/capture files"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-06T05:09:44.140Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4e8a1d20-7c63-406d-9e72-1174c351886d",
+    "date": "2026-05-06",
+    "theme": "Root Cause Analysis of Health Monitoring Architecture Issues",
+    "summary": "Broad diagnostic pass across the health monitoring stack to explain why LSL showed red, why the observation system appeared broken, and why the dashboard falsely reported \"all green.\"\n\n- LSL red was a false alarm caused by stale `.health` JSON files\n- Observation system was actually healthy; dashboard \"all green\" was honest but used incomplete rules missing container recreate counts and supervisord crash loops\n- The `launchd → watchdog → supervisor → statusline` chain was flagged as over-engineered, actively obscuring real bugs by treating everything as a fallback\n- Two remediation paths proposed: **tactical** (1-2hr symptom fixes) or **strategic** (single source of truth, narrowed auto-heal, dropped redundant layers)\n- Modified `enhanced-transcript-monitor.js`",
+    "observationIds": [
+      "fbe50ee0-a718-45a5-9024-0450443f9be0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-06T05:09:44.140Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eac26ceb-ac9d-4bac-8636-fbc019615e7b",
+    "date": "2026-05-06",
+    "theme": "Dashboard Unhealthy Due to Container Host Bind-Mount Mismatch",
+    "summary": "Investigated a discrepancy (evidenced by screenshots) where the dashboard reported unhealthy status despite the host reporting healthy.\n\n- Root cause: dashboard reads `/coding/.health/verification-status.json` **inside the container**, which is not bind-mounted to the host's `.health/` directory\n- The host writes to a separate `.health/` path, so the container sees stale or missing data and surfaces it as unhealthy\n- Traced data flow through `server.js` and `verification-status.json` write paths to confirm the mismatch\n- All three observations converge on the same diagnosis; `enhanced-transcript-monitor.js` was edited during investigation",
+    "observationIds": [
+      "474a6aa4-a682-447c-b14c-6556eb9097c4",
+      "20aa1fea-3845-4b6c-a5dd-38b1c926f7bf",
+      "333253e7-a537-43e5-ac54-5fda3d092bb8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-06T05:09:44.140Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "28ee9bc0-ead5-4083-b7ae-d9b3d50be022",
+    "date": "2026-05-06",
+    "theme": "Health Monitoring Consolidation Spec Phase Initialization",
+    "summary": "Attempted to run the spec-phase workflow for the **health-monitoring-consolidation** redesign (Phase B).\n\n- Read `spec-phase.md` workflow and scouted the codebase as prerequisites\n- Discovered the phase does not yet exist in `ROADMAP.md`\n- Resolution required: add the phase as **Phase 33** under a new **v7.0** milestone before spec work (questions + `SPEC.md` generation) can proceed\n- No artifacts were created; work is blocked pending the roadmap update",
+    "observationIds": [
+      "b321f34e-b553-45d7-9e1f-52904fb417e3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-06T05:10:46.173Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
   }
 ]
