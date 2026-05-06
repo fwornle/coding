@@ -9,6 +9,7 @@
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
 - v6.0 -- Knowledge Context Injection (Phases 28-32, shipped 2026-04-25) -> [archive](milestones/v6.0-ROADMAP.md)
+- v7.0 -- Health Monitoring Consolidation (Phase 33, in progress)
 
 ---
 
@@ -87,6 +88,15 @@
 - [x] **Phase 30.1: Cross-Project Agent-Agnostic Injection** (2/2 plans) -- completed 2026-04-25
 - [x] **Phase 31: Working Memory** (1/1 plan) -- completed 2026-04-25
 - [x] **Phase 32: Agent Profiles & Additional Adapters** (2/2 plans) -- completed 2026-04-25
+
+</details>
+
+---
+
+<details>
+<summary>v7.0 Health Monitoring Consolidation -- Phase 33</summary>
+
+- [ ] **Phase 33: Health Monitoring Consolidation** - Replace the 4-layer watchdog stack and parallel health-state readers with a single source of truth, narrow auto-heal, parallel-session-aware PSM, and detection-not-fallback semantics. Supersedes the never-shipped v5.0 plan with sharper, executable scope.
 
 </details>
 
