@@ -4,7 +4,11 @@
  * Owns:
  *   - In-memory health state (the canonical SoT; see /health/state shape).
  *   - HTTP endpoints: GET /health, GET /health/state, POST /signals, POST /health/refresh.
- *   - 5s tick scheduler (registered in plan 33-03; this skeleton creates the timer hook only).
+ *   - 5s tick scheduler that runs the full check registry: docker .State.Health.Status
+ *     passthrough (R7), PSM-backed db_health + service liveness, LSL staleness pass,
+ *     and per-rule iteration over all four categories (databases/services/processes/files)
+ *     in `config/health-verification-rules.json` (D-05). Per-check error isolation: a
+ *     throwing check tags its slice as 'unknown' — never 'healthy' (SPEC R6).
  *   - Per-session LSL tracking with 15s staleness threshold and 5min eviction (D-10).
  *
  * Replaces the four legacy daemons:
@@ -12,6 +16,10 @@
  *   - global-process-supervisor.js
  *   - global-service-coordinator.js
  *   - global-lsl-coordinator.js
+ *
+ * Defense-in-depth: the rules `bind_mount_freshness` (D-06) and `supervisord_status`
+ * (D-08) are SKIPPED with a WARN log even if config still contains them — plan 33-06
+ * deletes them from config; coordinator must not process them in any plan ordering.
  *
  * Pattern source: scripts/observations-api-server.mjs (single-owner HTTP gateway).
  * Bind: 0.0.0.0 (Linux Docker host-gateway requires this; loopback enforcement is at the
@@ -24,9 +32,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
+import ProcessStateManager from './process-state-manager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -34,6 +44,14 @@ const PORT = parseInt(process.env.HEALTH_COORDINATOR_PORT || '3034', 10);
 const TICK_MS = parseInt(process.env.HEALTH_COORDINATOR_TICK_MS || '5000', 10);
 const STARTED_AT = Date.now();
 const LOG_PATH = path.join(REPO_ROOT, '.logs', 'health-coordinator.log');
+const RULES_PATH = path.join(REPO_ROOT, 'config', 'health-verification-rules.json');
+const DOCKER_INSPECT_TIMEOUT_MS = 5_000;
+
+// Rules whose presence is an error per Phase 33 design (D-06, D-08).
+// Defense-in-depth: even if config still contains them (plan 33-06 deletes them),
+// the coordinator MUST NOT process them. Per SPEC R5 (narrow heals only) and
+// R7 (Docker owns container health) + D-08 (drop container-process supervision).
+const FORBIDDEN_RULE_NAMES = new Set(['bind_mount_freshness', 'supervisord_status']);
 
 // Heartbeat staleness threshold (D-10): >15s without a heartbeat → status: 'stopped'
 const HEARTBEAT_STALENESS_MS = 15_000;
@@ -86,9 +104,94 @@ const currentState = {
   lsl_by_project: {},
   processes: [],
   databases: { status: 'unknown' },
+  files: [],
   generated_at: new Date(STARTED_AT).toISOString(),
   coordinator_uptime_s: 0
 };
+
+/**
+ * Load the rules file. Schema preserved per SPEC R8.
+ * @returns {object|null} Rules object, or null with logged warning if missing/malformed.
+ */
+function loadRules() {
+  try {
+    const raw = fs.readFileSync(RULES_PATH, 'utf8');
+    const rules = JSON.parse(raw);
+    if (!rules.rules || typeof rules.rules !== 'object') {
+      log(`rules file missing top-level "rules" object`, 'ERROR');
+      return null;
+    }
+    return rules;
+  } catch (err) {
+    log(`failed to load ${RULES_PATH}: ${err.message}`, 'ERROR');
+    return null;
+  }
+}
+
+let RULES = loadRules();
+
+/**
+ * Iterate over each enabled rule in a category. Per-rule errors are caught and
+ * logged so one throwing rule cannot poison the rest of the category iteration.
+ * SPEC R6: outer catch logs only — the inner check function tags its own slice
+ * with 'unknown' (never 'healthy') on failure.
+ *
+ * @param {string} category - 'databases' | 'services' | 'processes' | 'files'
+ * @param {(name: string, rule: object) => Promise<void>} fn
+ */
+async function forEachEnabledRule(category, fn) {
+  if (!RULES?.rules?.[category]) return;
+  for (const [name, rule] of Object.entries(RULES.rules[category])) {
+    if (FORBIDDEN_RULE_NAMES.has(name)) {
+      log(`skipping forbidden rule '${name}' (Phase 33 D-06/D-08)`, 'WARN');
+      continue;
+    }
+    if (!rule || rule.enabled === false) continue;
+    try {
+      await fn(name, rule);
+    } catch (err) {
+      log(`check '${category}.${name}' threw: ${err.message}`, 'ERROR');
+    }
+  }
+}
+
+// PSM instance — single coordinator-owned manager (matches CONTEXT "Reusable Assets").
+// PSM exposes: registerService, isProcessAlive, checkDatabaseHealth, getHealthStatus.
+const psm = new ProcessStateManager({ codingRoot: REPO_ROOT });
+let psmReady = false;
+psm.initialize().then(() => { psmReady = true; }).catch(err => {
+  log(`PSM init failed: ${err.message}`, 'ERROR');
+});
+
+/**
+ * Read Docker container healthcheck status (SPEC R7). Surfaces Docker's own
+ * answer verbatim. Never substitutes 'healthy' on error.
+ *
+ * Equivalent shell command:
+ *   docker inspect coding-services --format '{{.State.Health.Status}}'
+ *
+ * @returns {{ status: string, last_probe_end: string | null }}
+ */
+function pollDockerHealth() {
+  if (INJECT_THROW.includes('docker_health')) {
+    throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=docker_health)');
+  }
+  try {
+    const result = spawnSync('docker',
+      ['inspect', 'coding-services', '--format', '{{.State.Health.Status}}'],
+      { encoding: 'utf8', timeout: DOCKER_INSPECT_TIMEOUT_MS }
+    );
+    if (result.status !== 0) {
+      // Docker daemon down or container not found / no healthcheck declared
+      return { status: 'unknown', last_probe_end: null };
+    }
+    const status = (result.stdout || '').trim() || 'none';
+    return { status, last_probe_end: new Date().toISOString() };
+  } catch (err) {
+    log(`docker inspect failed: ${err.message}`, 'ERROR');
+    return { status: 'unknown', last_probe_end: null };
+  }
+}
 
 /**
  * Apply a heartbeat / status signal to the in-memory state.
@@ -191,28 +294,199 @@ function refreshLslStaleness() {
 }
 
 /**
- * The 5s tick. Plan 33-03 fills in the check registry; this skeleton runs the
- * staleness pass and updates the timestamp.
+ * Run all health checks. Updates currentState in place. Per-check errors are
+ * isolated so one failing check does not corrupt other slices. SPEC R6: any
+ * unhandled error in a slice surfaces as 'unknown' for that slice — never
+ * 'healthy'.
  *
- * SPEC R6: a check that throws MUST surface as 'unknown', never 'healthy'.
- * Per-check error handling lives in the check registry (plan 33-03); the outer
- * tick boundary here only logs the error and refreshes the timestamp — the
- * relevant slice keeps its last value (initialised to 'unknown').
+ * Slice coverage:
+ *   - container.healthcheck — Docker `.State.Health.Status` passthrough (R7)
+ *   - lsl / lsl_by_project — staleness pass + project rollup (D-10)
+ *   - services — PSM-tracked host services
+ *   - databases — PSM checkDatabaseHealth aggregate
+ *   - per-rule entries (databases/services/processes/files) via forEachEnabledRule
+ */
+async function runAllChecks() {
+  // ----- Container healthcheck (SPEC R7) -----
+  try {
+    currentState.container = pollDockerHealth();
+  } catch (err) {
+    log(`container check threw: ${err.message}`, 'ERROR');
+    currentState.container = { healthcheck: 'unknown', last_probe_end: null };
+  }
+
+  // ----- LSL staleness + project rollup (signals were ingested between ticks) -----
+  try {
+    if (INJECT_THROW.includes('lsl')) {
+      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=lsl)');
+    }
+    refreshLslStaleness();
+  } catch (err) {
+    log(`lsl refresh threw: ${err.message}`, 'ERROR');
+    // Mark every project rollup as 'unknown' on failure (SPEC R6).
+    const rollup = {};
+    for (const e of Object.values(currentState.lsl)) {
+      const name = e.projectName || 'unknown';
+      rollup[name] = 'unknown';
+    }
+    currentState.lsl_by_project = rollup;
+  }
+
+  // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
+  try {
+    if (INJECT_THROW.includes('services')) {
+      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=services)');
+    }
+    if (psmReady && typeof psm.getRegisteredServices === 'function') {
+      const registered = psm.getRegisteredServices() || [];
+      currentState.services = registered.map(svc => ({
+        name: svc.name,
+        pid: svc.pid || null,
+        status: svc.pid && psm.isProcessAlive(svc.pid) ? 'running' : 'stopped',
+        last_seen: Date.now()
+      }));
+    }
+    // If PSM has no getRegisteredServices method, currentState.services is left
+    // for signal-driven population (POST /signals service_status) and the rule
+    // iteration below ensures each enabled rule gets at least an 'unknown' slot.
+  } catch (err) {
+    log(`services check threw: ${err.message}`, 'ERROR');
+    // Mark every service as 'unknown' (SPEC R6 — never 'healthy' on exception)
+    currentState.services = (currentState.services || []).map(s => ({ ...s, status: 'unknown' }));
+  }
+
+  // ----- Database health via PSM (LevelDB lock detection + Phase A whitelist) -----
+  try {
+    if (INJECT_THROW.includes('db_health')) {
+      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=db_health)');
+    }
+    if (psmReady && typeof psm.checkDatabaseHealth === 'function') {
+      const dbStatus = await psm.checkDatabaseHealth();
+      // PSM returns { levelDB: { available, locked, lockedBy }, qdrant: { available } }
+      // Aggregate to a single status: healthy iff levelDB available + not locked + qdrant available.
+      const levelDbOk = dbStatus?.levelDB?.available !== false && dbStatus?.levelDB?.locked !== true;
+      const qdrantOk = dbStatus?.qdrant?.available === true;
+      const aggregate = (levelDbOk && qdrantOk) ? 'healthy' : 'degraded';
+      currentState.databases = {
+        ...(currentState.databases || {}),
+        status: aggregate,
+        levelDB: dbStatus?.levelDB,
+        qdrant: dbStatus?.qdrant
+      };
+    }
+  } catch (err) {
+    log(`db_health check threw: ${err.message}`, 'ERROR');
+    currentState.databases = { status: 'unknown' };
+  }
+
+  // ----- Rule iteration: ALL FOUR CATEGORIES (W6 — D-05 says "each enabled rule -----
+  // becomes a registered check on the 5s tick"). Coverage map per category:
+  //   - databases: PSM-backed (already populated above by db_health slice;
+  //     forEachEnabledRule iterates rules so they appear in /health/state.databases
+  //     even if PSM has not yet reported a status — default 'unknown', NEVER 'healthy').
+  //   - services:  coordinator + signal-driven (signals from reduced statusline
+  //     daemon and health-verifier reporters arrive via POST /signals; rule
+  //     iteration ensures each enabled rule has an entry in currentState.services
+  //     even before its first signal — default 'unknown').
+  //   - files:     coordinator file-mtime check (a generic stat-based handler;
+  //     each rule can carry a `path` or `paths` array; coordinator stats them
+  //     and surfaces 'unknown' if missing AND no PSM-backed implementation).
+  //   - processes: signal-driven (existing path; processes report via signals).
+  // For rule kinds with no PSM-backed implementation, the entry gets status:
+  // 'unknown' (NEVER 'healthy' — SPEC R6).
+
+  // databases: ensure each enabled DB rule has a slot in currentState.databases.
+  // The PSM-backed db_health slice above sets the aggregate; per-rule entries
+  // surface here so /health/state.databases.<rule_name> is greppable.
+  if (!currentState.databases || typeof currentState.databases !== 'object') {
+    currentState.databases = { status: 'unknown' };
+  }
+  await forEachEnabledRule('databases', async (name, _rule) => {
+    // PSM exposes lock detection (leveldb_lock_check) and accessibility
+    // (leveldb_accessibility, qdrant_availability). If PSM has not yet
+    // reported on this rule, default to 'unknown' — never 'healthy' (SPEC R6).
+    if (currentState.databases[name] === undefined) {
+      currentState.databases[name] = 'unknown';
+    }
+  });
+
+  // services: ensure each enabled service rule appears in currentState.services.
+  // Signals from reduced reporters (statusline-health-monitor, health-verifier-cli,
+  // enhanced-transcript-monitor) update these via ingestSignal('service_status', ...).
+  // Rule iteration ensures the entry exists even before the first signal.
+  if (!Array.isArray(currentState.services)) currentState.services = [];
+  await forEachEnabledRule('services', async (name, _rule) => {
+    const idx = currentState.services.findIndex(s => s.name === name);
+    if (idx < 0) {
+      currentState.services.push({ name, status: 'unknown', last_seen: null });
+    }
+  });
+
+  // files: each enabled rule may carry a `path` or `paths` field; coordinator
+  // performs an fs.statSync mtime check. If the file is missing, surface
+  // 'unknown' (NEVER 'healthy' — SPEC R6). currentState gains a `files` slot.
+  if (!Array.isArray(currentState.files)) currentState.files = [];
+  await forEachEnabledRule('files', async (name, rule) => {
+    const idx = currentState.files.findIndex(f => f.name === name);
+    let status = 'unknown';
+    let mtime = null;
+    try {
+      const paths = Array.isArray(rule.paths) ? rule.paths : (rule.path ? [rule.path] : []);
+      if (paths.length === 0) {
+        // No path declared — leave 'unknown'; SPEC R6 forbids defaulting to 'healthy'.
+      } else {
+        // Stat all paths; the freshest mtime represents the rule's recency.
+        let freshest = 0;
+        for (const p of paths) {
+          try {
+            const resolved = path.isAbsolute(p) ? p : path.join(REPO_ROOT, p);
+            const s = fs.statSync(resolved);
+            if (s.mtimeMs > freshest) freshest = s.mtimeMs;
+            status = 'present';  // at least one path stat'd successfully
+          } catch { /* keep status as-is; missing path stays 'unknown' */ }
+        }
+        mtime = freshest > 0 ? new Date(freshest).toISOString() : null;
+      }
+    } catch (err) {
+      log(`files.${name} stat threw: ${err.message}`, 'ERROR');
+      status = 'unknown';
+    }
+    const entry = { name, status, mtime };
+    if (idx < 0) currentState.files.push(entry);
+    else currentState.files[idx] = entry;
+  });
+
+  // processes: signal-driven (existing path). Rule iteration ensures each
+  // enabled rule has an entry in currentState.processes even before its
+  // first signal.
+  if (!Array.isArray(currentState.processes)) currentState.processes = [];
+  await forEachEnabledRule('processes', async (name, _rule) => {
+    const idx = currentState.processes.findIndex(p => p.name === name);
+    if (idx < 0) {
+      currentState.processes.push({ name, pid: null, status: 'unknown' });
+    }
+  });
+
+  // Update timestamp + uptime AFTER checks so /health/state never shows
+  // a fresh generated_at while checks themselves are stale.
+  currentState.generated_at = new Date().toISOString();
+  currentState.coordinator_uptime_s = Math.floor((Date.now() - STARTED_AT) / 1000);
+}
+
+/**
+ * The 5s tick. Delegates to runAllChecks; the outer guard logs and never
+ * overwrites slices to 'healthy' on error (SPEC R6).
  */
 async function tick() {
   try {
     if (INJECT_THROW.includes('tick')) {
       throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=tick)');
     }
-    refreshLslStaleness();
-    // Plan 33-03 inserts: docker healthcheck poll, service liveness checks, rules iteration.
-    currentState.generated_at = new Date().toISOString();
-    currentState.coordinator_uptime_s = Math.floor((Date.now() - STARTED_AT) / 1000);
+    await runAllChecks();
   } catch (err) {
-    log(`tick failed: ${err.message}`, 'ERROR');
-    // SPEC R6: do NOT silently mark healthy. The relevant slice remains at its
-    // last value; the per-check error path in plan 33-03 surfaces 'unknown'.
-    // Never overwrite to 'healthy' on error.
+    // Outer guard: should not be reached because runAllChecks isolates per-check
+    // errors. If it IS reached, log and DO NOT mark anything 'healthy'.
+    log(`runAllChecks threw at top level: ${err.message}`, 'ERROR');
   }
 }
 
@@ -264,7 +538,11 @@ app.post('/signals', (req, res) => {
 });
 
 app.post('/health/refresh', async (_req, res) => {
+  // D-04: dashboard's "Run Verification" button proxies here.
+  // Re-read rules so config changes take effect without coordinator restart.
   try {
+    const reloaded = loadRules();
+    if (reloaded) RULES = reloaded;
     await forceTick();
     res.json(currentState);
   } catch (err) {
