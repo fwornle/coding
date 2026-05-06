@@ -1456,8 +1456,11 @@ class EnhancedTranscriptMonitor {
                 if (this.currentUserPromptSet.length > 0) {
                   const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
                   if (targetProject !== null) {
-                    // FIX: Use tranche from the FIRST exchange in the set being written
-                    const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+                    // Use the LAST exchange's tranche so long sets that cross
+                    // an hour boundary land in the newer hour's file (matches
+                    // wall-clock expectation rather than first-exchange anchor).
+                    const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+                    const setTranche = this.getCurrentTimetranche(lastExch.timestamp);
                     const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
                     if (wasWritten) {
                       this.currentUserPromptSet = [];
@@ -1474,8 +1477,10 @@ class EnhancedTranscriptMonitor {
                 if (this.currentUserPromptSet.length > 0) {
                   const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
                   if (targetProject !== null) {
-                    // FIX: Use tranche from the FIRST exchange in the set being written
-                    const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+                    // Use the LAST exchange's tranche so long sets that cross
+                    // an hour boundary land in the newer hour's file.
+                    const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+                    const setTranche = this.getCurrentTimetranche(lastExch.timestamp);
                     const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
                     if (wasWritten) {
                       this.currentUserPromptSet = [];
@@ -1501,8 +1506,9 @@ class EnhancedTranscriptMonitor {
         
         // Complete any remaining user prompt set
         if (this.currentUserPromptSet.length > 0) {
-          console.log(`🔄 Completing final user prompt set with ${this.currentUserPromptSet.length} exchanges after streaming`);
-          const currentTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+          process.stderr.write(`[EnhancedTranscriptMonitor] Completing final user prompt set with ${this.currentUserPromptSet.length} exchanges after streaming\n`);
+          const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
+          const currentTranche = this.getCurrentTimetranche(lastExch.timestamp);
           const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
           console.log(`🎯 Final target project for streaming: ${targetProject}`);
           if (targetProject !== null) {
