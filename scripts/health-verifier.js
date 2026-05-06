@@ -177,6 +177,10 @@ class HealthVerifier extends EventEmitter {
     }
 
     try {
+      try {
+        const sz = fsSync.statSync(this.logPath).size;
+        if (sz > 10 * 1024 * 1024) fsSync.renameSync(this.logPath, this.logPath + '.1');
+      } catch { /* missing/unwritable on first call is fine */ }
       fsSync.appendFileSync(this.logPath, logEntry);
     } catch (error) {
       console.error(`Failed to write log: ${error.message}`);
@@ -988,7 +992,12 @@ class HealthVerifier extends EventEmitter {
           const name = fullName.includes(':') ? fullName.split(':')[1] : fullName;
           processes.push({ name, fullName, status, detail });
 
-          if (status === 'FATAL' || status === 'STOPPED' || status === 'BACKOFF') {
+          // STOPPED + "Not started" means the program has autostart=false and
+          // has never been started — that's intentional, not a failure.
+          // Real failures are FATAL/BACKOFF; STOPPED with a timestamp detail
+          // (e.g. "May 06 04:06 AM") was previously running and is now down.
+          const isIntentionallyDisabled = status === 'STOPPED' && /^Not started/i.test(detail);
+          if (!isIntentionallyDisabled && (status === 'FATAL' || status === 'STOPPED' || status === 'BACKOFF')) {
             failures.push({ name, fullName, status, detail });
           }
         }

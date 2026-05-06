@@ -106,6 +106,7 @@ tmux_session_wrapper() {
   if [ "${AGENT_ENABLE_PIPE_CAPTURE}" = "true" ]; then
     local capture_dir="${COPI_LOG_DIR:-${coding_repo}/.logs/capture}"
     mkdir -p "$capture_dir"
+    find "$capture_dir" -type f -mtime +14 -delete 2>/dev/null || true
     local capture_file="${capture_dir}/capture-${session_name}-$(date +%s).txt"
     export TMUX_CAPTURE_FILE="$capture_file"
 

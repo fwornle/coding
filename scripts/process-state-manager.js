@@ -683,8 +683,19 @@ class ProcessStateManager {
           // Parse lsof output: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
           const match = lines[1].match(/\s+(\d+)\s+/);
           if (match) {
-            health.levelDB.locked = true;
-            health.levelDB.lockedBy = parseInt(match[1]);
+            const holderPid = parseInt(match[1]);
+            // Locks held by macOS Docker Desktop's VirtualMachine helper
+            // surface as held by that single host PID via virtiofs — even
+            // though the real owner is a process inside a container. Treat
+            // these as healthy: the in-container service has the lock.
+            const holderCmd = (lines[1].split(/\s+/)[0] || '').toLowerCase();
+            const isDockerVm = holderCmd.startsWith('com.apple') ||
+              holderCmd.includes('virtualization') ||
+              holderCmd === 'qemu-system';
+            if (!isDockerVm) {
+              health.levelDB.locked = true;
+              health.levelDB.lockedBy = holderPid;
+            }
           }
         }
       }

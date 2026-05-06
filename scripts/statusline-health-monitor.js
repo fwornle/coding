@@ -135,6 +135,10 @@ class StatusLineHealthMonitor {
     }
     
     try {
+      try {
+        const sz = fs.statSync(this.logPath).size;
+        if (sz > 10 * 1024 * 1024) fs.renameSync(this.logPath, this.logPath + '.1');
+      } catch { /* missing/unwritable on first call is fine */ }
       fs.appendFileSync(this.logPath, logEntry);
     } catch (error) {
       console.error(`Failed to write log: ${error.message}`);
