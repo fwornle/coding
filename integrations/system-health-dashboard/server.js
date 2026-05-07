@@ -69,7 +69,6 @@ class SystemHealthAPIServer {
         this.dashboardPort = dashboardPort;
         this.app = express();
         this.server = null;
-        this.lastAutoVerifyTime = null; // Track last auto-triggered verification to rate limit
         this.lastValidWorkflowProgress = null; // Cache for last valid workflow progress (to avoid 0/0 race conditions)
 
         // WebSocket state for event-driven workflow updates
@@ -301,245 +300,208 @@ class SystemHealthAPIServer {
     }
 
     /**
-     * Get current health verifier status
-     * Auto-triggers verification when data is stale to ensure freshness
+     * Reverse-proxy a request to the host health-coordinator (Phase 33).
+     * Mirrors the obs-api `_forwardObsApi` pattern. On upstream failure,
+     * returns 503 with the SPEC R8 envelope using overallStatus: 'unknown'
+     * (NEVER 'healthy' — SPEC R6).
+     */
+    async _forwardCoordinator(req, res, pathAndQuery) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
+        const url = `${base}${pathAndQuery}`;
+        try {
+            const upstream = await fetch(url, { method: req.method, headers: { 'Content-Type': 'application/json' } });
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
+        } catch (err) {
+            process.stderr.write(`[HealthCoordinatorProxy] forward to ${url} failed: ${err.message}\n`);
+            // SPEC R6 + R8: 503 with overallStatus: 'unknown', never 'healthy'.
+            res.status(503).json({
+                status: 'success',
+                data: {
+                    overallStatus: 'unknown',
+                    violationCount: 0,
+                    criticalCount: 0,
+                    lastUpdate: new Date().toISOString(),
+                    autoHealingActive: false,
+                    upstream: 'unreachable'
+                }
+            });
+        }
+    }
+
+    /**
+     * Get current health verifier status (Phase 33: reverse-proxy to
+     * coordinator). Reshapes coordinator's /health/state into the existing
+     * SPEC R8 envelope so the dashboard frontend in dist/ keeps working.
      */
     async handleGetHealthStatus(req, res) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
         try {
-            const statusPath = join(codingRoot, '.health/verification-status.json');
-
-            if (!existsSync(statusPath)) {
-                // No status file - trigger verification and return pending state
-                this.triggerBackgroundVerification();
-                return res.json({
+            const upstream = await fetch(`${base}/health/state`);
+            if (!upstream.ok) {
+                return res.status(503).json({
                     status: 'success',
                     data: {
-                        status: 'offline',
-                        message: 'Health verifier is not running - verification triggered',
-                        ageMs: 0,
-                        autoHealingActive: false
+                        overallStatus: 'unknown',
+                        violationCount: 0,
+                        criticalCount: 0,
+                        lastUpdate: new Date().toISOString(),
+                        autoHealingActive: false,
+                        upstream: `HTTP ${upstream.status}`
                     }
                 });
             }
-
-            const statusData = JSON.parse(readFileSync(statusPath, 'utf8'));
-            const age = Date.now() - new Date(statusData.lastUpdate).getTime();
-
-            // Check if data is stale (>2 minutes)
-            if (age > 120000) {
-                statusData.status = 'stale';
-                statusData.ageMs = age;
-
-                // Auto-trigger verification when stale (but rate limit to avoid spam)
-                // Only trigger if we haven't triggered recently (within 30 seconds)
-                if (!this.lastAutoVerifyTime || (Date.now() - this.lastAutoVerifyTime) > 30000) {
-                    console.log('🔄 Data is stale, auto-triggering health verification...');
-                    this.triggerBackgroundVerification();
-                    this.lastAutoVerifyTime = Date.now();
-                }
-            } else {
-                statusData.status = 'operational';
-                statusData.ageMs = age;
+            const state = await upstream.json();
+            // Reshape coordinator state into existing dashboard envelope (SPEC R8).
+            const violations = [];
+            if (state && state.container && state.container.healthcheck === 'unhealthy') {
+                violations.push({ kind: 'container', severity: 'critical' });
             }
-
+            if (state && state.databases && state.databases.status && state.databases.status !== 'healthy') {
+                violations.push({ kind: `databases.${state.databases.status}`, severity: 'high' });
+            }
+            if (state && Array.isArray(state.services)) {
+                for (const svc of state.services) {
+                    if (svc && svc.status && svc.status !== 'running') {
+                        violations.push({ kind: `service.${svc.name}`, severity: 'high' });
+                    }
+                }
+            }
+            const overallStatus = violations.length === 0 ? 'healthy' :
+                violations.some(v => v.severity === 'critical') ? 'unhealthy' : 'degraded';
             res.json({
                 status: 'success',
-                data: statusData
-            });
-        } catch (error) {
-            console.error('Failed to get health status:', error);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to retrieve health status',
-                error: error.message
-            });
-        }
-    }
-
-    /**
-     * Check if the health-verifier daemon is alive via heartbeat file
-     * Returns: { alive: boolean, staleMs: number, pid: number|null }
-     */
-    checkDaemonHeartbeat() {
-        const heartbeatPath = join(codingRoot, '.health/verifier-heartbeat.json');
-
-        try {
-            if (!existsSync(heartbeatPath)) {
-                return { alive: false, staleMs: Infinity, pid: null, reason: 'no heartbeat file' };
-            }
-
-            const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8'));
-            const age = Date.now() - new Date(heartbeat.timestamp).getTime();
-
-            // Check if process is still running
-            let processAlive = false;
-            if (heartbeat.pid) {
-                try {
-                    process.kill(heartbeat.pid, 0); // Signal 0 = check if process exists
-                    processAlive = true;
-                } catch (e) {
-                    processAlive = false;
+                data: {
+                    overallStatus,
+                    violationCount: violations.length,
+                    criticalCount: violations.filter(v => v.severity === 'critical').length,
+                    lastUpdate: state && state.generated_at ? state.generated_at : new Date().toISOString(),
+                    autoHealingActive: false  // D-08: narrow heals; not "actively healing"
                 }
-            }
-
-            // Daemon is alive if: process exists AND heartbeat is fresh (<60s)
-            const isAlive = processAlive && age < 60000;
-
-            return {
-                alive: isAlive,
-                staleMs: age,
-                pid: heartbeat.pid,
-                cycleCount: heartbeat.cycleCount,
-                reason: !processAlive ? 'process dead' : (age >= 60000 ? 'heartbeat stale' : 'ok')
-            };
-        } catch (error) {
-            return { alive: false, staleMs: Infinity, pid: null, reason: error.message };
+            });
+        } catch (err) {
+            process.stderr.write(`[Dashboard] health-verifier/status proxy failed: ${err.message}\n`);
+            // SPEC R6: NOT 'healthy' on exception. Surface 'unknown'.
+            res.status(503).json({
+                status: 'success',
+                data: {
+                    overallStatus: 'unknown',
+                    violationCount: 0,
+                    criticalCount: 0,
+                    lastUpdate: new Date().toISOString(),
+                    autoHealingActive: false,
+                    upstream: 'unreachable'
+                }
+            });
         }
     }
 
     /**
-     * Restart the health-verifier daemon
-     */
-    restartDaemon() {
-        const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
-
-        if (!existsSync(verifierScript)) {
-            console.warn('⚠️ Health verifier script not found:', verifierScript);
-            return false;
-        }
-
-        console.log('🔄 Restarting health-verifier daemon...');
-
-        try {
-            // First try to stop any existing daemon
-            execSync(`node "${verifierScript}" stop`, {
-                cwd: codingRoot,
-                timeout: 5000,
-                stdio: 'ignore'
-            });
-        } catch (e) {
-            // Ignore stop errors
-        }
-
-        try {
-            // Start new daemon
-            const daemonProcess = spawn('node', [verifierScript, 'start'], {
-                cwd: codingRoot,
-                detached: true,
-                stdio: 'ignore'
-            });
-            daemonProcess.unref();
-            console.log('✅ Health-verifier daemon restarted');
-            return true;
-        } catch (error) {
-            console.error('❌ Failed to restart daemon:', error.message);
-            return false;
-        }
-    }
-
-    /**
-     * Trigger health verification in the background (non-blocking)
-     * Now includes watchdog: restarts daemon if heartbeat is stale
-     */
-    triggerBackgroundVerification() {
-        const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
-
-        if (!existsSync(verifierScript)) {
-            console.warn('⚠️ Health verifier script not found:', verifierScript);
-            return;
-        }
-
-        // WATCHDOG: Check daemon heartbeat before triggering verification
-        const heartbeatStatus = this.checkDaemonHeartbeat();
-
-        if (!heartbeatStatus.alive) {
-            console.log(`🚨 WATCHDOG: Daemon not healthy (${heartbeatStatus.reason}). Restarting...`);
-            this.restartDaemon();
-            return; // Daemon restart will run verification
-        }
-
-        // Daemon is alive, just trigger a one-time verification
-        try {
-            const verifyProcess = spawn('node', [verifierScript, 'verify'], {
-                cwd: codingRoot,
-                detached: true,
-                stdio: 'ignore'
-            });
-            verifyProcess.unref();
-            console.log('✅ Background health verification started');
-        } catch (error) {
-            console.error('❌ Failed to trigger background verification:', error.message);
-        }
-    }
-
-    /**
-     * Get detailed health verification report
+     * Get detailed health verification report (Phase 33: reverse-proxy).
+     * Reshapes coordinator state into the legacy `{ checks, violations }`
+     * envelope so the dashboard frontend in dist/ keeps rendering.
      */
     async handleGetHealthReport(req, res) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
         try {
-            const reportPath = join(codingRoot, '.health/verification-report.json');
-
-            if (!existsSync(reportPath)) {
-                return res.json({
+            const upstream = await fetch(`${base}/health/state`);
+            if (!upstream.ok) {
+                return res.status(503).json({
                     status: 'success',
                     data: {
-                        message: 'No health report available',
+                        overallStatus: 'unknown',
                         checks: [],
-                        violations: []
+                        violations: [],
+                        upstream: `HTTP ${upstream.status}`
                     }
                 });
             }
+            const state = await upstream.json();
+            const checks = [];
+            const violations = [];
 
-            const reportData = JSON.parse(readFileSync(reportPath, 'utf8'));
+            // Container check
+            if (state && state.container) {
+                const c = state.container.healthcheck || 'unknown';
+                checks.push({ name: 'container', status: c, source: 'docker.healthcheck' });
+                if (c === 'unhealthy') violations.push({ kind: 'container', severity: 'critical', detail: c });
+            }
+
+            // Services
+            if (state && Array.isArray(state.services)) {
+                for (const svc of state.services) {
+                    if (!svc || !svc.name) continue;
+                    checks.push({ name: `service.${svc.name}`, status: svc.status || 'unknown', last_seen: svc.last_seen });
+                    if (svc.status && svc.status !== 'running') {
+                        violations.push({ kind: `service.${svc.name}`, severity: 'high', detail: svc.status });
+                    }
+                }
+            }
+
+            // Processes
+            if (state && Array.isArray(state.processes)) {
+                for (const p of state.processes) {
+                    if (!p || !p.name) continue;
+                    checks.push({ name: `process.${p.name}`, status: p.status || 'unknown' });
+                    if (p.status && p.status !== 'running' && p.status !== 'healthy') {
+                        violations.push({ kind: `process.${p.name}`, severity: 'medium', detail: p.status });
+                    }
+                }
+            }
+
+            // LSL by project
+            if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
+                for (const [project, status] of Object.entries(state.lsl_by_project)) {
+                    checks.push({ name: `lsl.${project}`, status });
+                    if (status !== 'healthy') {
+                        violations.push({ kind: `lsl.${project}`, severity: 'medium', detail: status });
+                    }
+                }
+            }
+
+            // Databases
+            if (state && state.databases && state.databases.status) {
+                checks.push({ name: 'databases', status: state.databases.status });
+                if (state.databases.status !== 'healthy') {
+                    violations.push({ kind: 'databases', severity: 'high', detail: state.databases.status });
+                }
+            }
 
             res.json({
                 status: 'success',
-                data: reportData
+                data: {
+                    checks,
+                    violations,
+                    generated_at: state && state.generated_at ? state.generated_at : new Date().toISOString()
+                }
             });
-        } catch (error) {
-            console.error('Failed to get health report:', error);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to retrieve health report',
-                error: error.message
+        } catch (err) {
+            process.stderr.write(`[Dashboard] health-verifier/report proxy failed: ${err.message}\n`);
+            res.status(503).json({
+                status: 'success',
+                data: {
+                    overallStatus: 'unknown',
+                    checks: [],
+                    violations: [],
+                    upstream: 'unreachable'
+                }
             });
         }
     }
 
     /**
-     * Trigger a health verification run
+     * Trigger a health verification run (Phase 33: POST coordinator's
+     * /health/refresh — coordinator force-ticks and returns fresh state).
      */
     async handleTriggerVerification(req, res) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
         try {
-            const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
-
-            if (!existsSync(verifierScript)) {
-                return res.status(404).json({
-                    status: 'error',
-                    message: 'Health verifier script not found'
-                });
-            }
-
-            // Run verification in background
-            execSync(`node "${verifierScript}" verify > /dev/null 2>&1 &`, {
-                cwd: codingRoot,
-                timeout: 1000
-            });
-
-            res.json({
-                status: 'success',
-                message: 'Health verification triggered',
-                data: {
-                    triggered_at: new Date().toISOString()
-                }
-            });
-        } catch (error) {
-            console.error('Failed to trigger verification:', error);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to trigger health verification',
-                error: error.message
-            });
+            const upstream = await fetch(`${base}/health/refresh`, { method: 'POST' });
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
+        } catch (err) {
+            process.stderr.write(`[Dashboard] health-verifier/verify proxy failed: ${err.message}\n`);
+            res.status(503).json({ status: 'error', error: 'coordinator unreachable' });
         }
     }
 
@@ -593,17 +555,14 @@ class SystemHealthAPIServer {
             });
             restartProcess.unref();
 
-            // Schedule health verification to run after service has time to start
+            // Schedule a coordinator refresh after the service has time to
+            // start (Phase 33 / D-04: dashboard never spawns the verifier
+            // script — it pings the coordinator instead).
             setTimeout(() => {
-                const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
-                if (existsSync(verifierScript)) {
-                    const verifyProcess = spawn('node', [verifierScript, 'verify'], {
-                        cwd: codingRoot,
-                        detached: true,
-                        stdio: 'ignore'
-                    });
-                    verifyProcess.unref();
-                }
+                const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
+                fetch(`${base}/health/refresh`, { method: 'POST' }).catch((err) => {
+                    process.stderr.write(`[Dashboard] post-restart coordinator refresh failed: ${err.message}\n`);
+                });
             }, 2000);
 
             res.json({
