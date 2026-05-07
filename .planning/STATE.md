@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 33 (health-monitoring-consolidation) — EXECUTING
-Plan: 6 of 8
-Status: Wave 4 complete (33-05 merged); waves 5-6 pending (rules cleanup + cutover + acceptance)
-Last activity: 2026-05-07 -- 33-05 reader migration (prompt-hook + 2 dashboards) merged
+Plan: 8 of 8
+Status: Wave 5 complete (33-06 + 33-07 merged with cutover patch); wave 6 (33-08 acceptance) pending
+Last activity: 2026-05-07 -- 33-07 cutover landed + Option A patch (zombies killed); 6 known gaps (G1-G6) deferred to 33-08
 
 Progress: [██████████] 100%
 
