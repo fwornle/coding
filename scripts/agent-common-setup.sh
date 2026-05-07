@@ -506,16 +506,13 @@ start_statusline_health_monitor() {
 }
 
 # ==============================================================================
-# GLOBAL LSL MONITORING (Phase 33: removed)
+# (Phase 33 plan 33-14): start_global_lsl_monitoring() function and call sites
+# fully removed. The host-side health-coordinator at :3034
+# (com.coding.health-coordinator launchd job) owns LSL signal collection —
+# ETM POSTs lsl_heartbeat directly to /signals; the coordinator records
+# last_seen in /health/state.lsl[<sid>]; the statusline reader (33-04) GETs
+# /health/state. No standalone monitoring daemon needed.
 # ==============================================================================
-# global-lsl-coordinator.js was deleted in plan 33-07. The host-side
-# health-coordinator at :3034 (com.coding.health-coordinator launchd job) now
-# owns LSL recovery via the signal protocol — ETM POSTs lsl_heartbeat, the
-# coordinator records last_seen in /health/state.lsl[<sid>], and the statusline
-# reader (33-04) GETs /health/state. No standalone monitoring daemon needed.
-start_global_lsl_monitoring() {
-  return 0  # no-op stub — kept for callers; remove in a future plan
-}
 
 # ==============================================================================
 # CLAUDE.md SETUP
@@ -730,8 +727,8 @@ agent_common_init() {
   # Start the health monitor for global session monitoring
   start_statusline_health_monitor "$coding_repo"
 
-  # Start the Global LSL Coordinator monitoring for auto-recovery
-  start_global_lsl_monitoring "$coding_repo"
+  # Phase 33 (plan 33-14): start_global_lsl_monitoring removed. ETM POSTs
+  # lsl_heartbeat directly to coordinator at :3034; no standalone daemon needed.
 
   # Ensure CLAUDE.md exists with mandatory skill instructions (especially for new projects)
   ensure_claude_md_with_skill_instruction "$target_project_dir" "$coding_repo"
@@ -756,7 +753,6 @@ export -f ensure_private_history_repo
 export -f show_session_reminder
 export -f start_transcript_monitoring
 export -f start_statusline_health_monitor
-export -f start_global_lsl_monitoring
 export -f ensure_claude_md_with_skill_instruction
 export -f ensure_agent_instructions
 export -f ensure_statusline_config
