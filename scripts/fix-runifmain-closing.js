@@ -11,11 +11,14 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Phase 33 plan 07 deleted four legacy host daemons: the system watchdog,
+// the per-session process supervisor, the global service coordinator, and
+// the per-project LSL coordinator. Their entries were removed from this
+// list as part of that cutover.
 const filesToCheck = [
   'scripts/user-hash-generator.js',
   'scripts/validate-lsl-config.js',
   'scripts/statusline-health-monitor.js',
-  'scripts/system-monitor-watchdog.js',
   'scripts/start-services-robust.js',
   'scripts/monitoring-verifier.js',
   'scripts/process-state-manager.js',
@@ -24,9 +27,7 @@ const filesToCheck = [
   'scripts/migrate-knowledge-to-databases.js',
   'scripts/live-logging-coordinator.js',
   'scripts/live-logging-status.js',
-  'scripts/global-service-coordinator.js',
   'scripts/health-verifier.js',
-  'scripts/global-lsl-coordinator.js',
   'scripts/find-latest-session.js',
   'scripts/enhanced-transcript-monitor.js',
   'scripts/event-logger.js',

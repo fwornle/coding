@@ -401,25 +401,21 @@ start_transcript_monitoring() {
   # Ensure .specstory/history/logs/ is tracked in git
   ensure_specstory_logs_tracked "$project_dir"
 
-  # Use global coordinator to ensure robust LSL
-  if node "$coding_repo/scripts/global-lsl-coordinator.js" ensure "$project_dir" $$; then
-    log "Global LSL Coordinator: LSL setup successful"
+  # Phase 33: global-lsl-coordinator.js is gone (deleted in 33-07). The host-side
+  # coordinator at :3034 owns lifecycle now; this function just spawns ETM directly.
+  # ETM (enhanced-transcript-monitor.js, reduced to a reporter in 33-04) POSTs
+  # lsl_heartbeat signals to the coordinator on every poll cycle.
+  pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
+  cd "$project_dir"
+  # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
+  CODING_AGENT="${CODING_AGENT:-claude}" nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
+  local new_pid=$!
+
+  sleep 1
+  if kill -0 "$new_pid" 2>/dev/null; then
+    log "Transcript monitoring started (PID: $new_pid)"
   else
-    log "Warning: Global LSL Coordinator setup failed, falling back to direct monitor"
-
-    # Fallback: direct monitor startup (backward compatibility)
-    pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
-    cd "$project_dir"
-    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
-    CODING_AGENT="${CODING_AGENT:-claude}" nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
-    local new_pid=$!
-
-    sleep 1
-    if kill -0 "$new_pid" 2>/dev/null; then
-      log "Fallback transcript monitoring started (PID: $new_pid)"
-    else
-      log "Error: Both coordinator and fallback transcript monitoring failed"
-    fi
+    log "Error: Transcript monitoring failed to start"
   fi
 }
 
@@ -510,32 +506,15 @@ start_statusline_health_monitor() {
 }
 
 # ==============================================================================
-# GLOBAL LSL MONITORING
+# GLOBAL LSL MONITORING (Phase 33: removed)
 # ==============================================================================
-# Start Global LSL Coordinator monitoring daemon for auto-recovery
+# global-lsl-coordinator.js was deleted in plan 33-07. The host-side
+# health-coordinator at :3034 (com.coding.health-coordinator launchd job) now
+# owns LSL recovery via the signal protocol — ETM POSTs lsl_heartbeat, the
+# coordinator records last_seen in /health/state.lsl[<sid>], and the statusline
+# reader (33-04) GETs /health/state. No standalone monitoring daemon needed.
 start_global_lsl_monitoring() {
-  local coding_repo="$1"
-
-  # Check if Global LSL Coordinator monitoring is already running
-  if pgrep -f "global-lsl-coordinator.js monitor" >/dev/null 2>&1; then
-    log "Global LSL Coordinator monitoring already running"
-    return 0
-  fi
-
-  log "Starting Global LSL Coordinator monitoring daemon for auto-recovery..."
-
-  # Start the coordinator monitoring daemon in background
-  cd "$coding_repo"
-  nohup node scripts/global-lsl-coordinator.js monitor > .logs/global-lsl-coordinator-monitor.log 2>&1 &
-  local coordinator_pid=$!
-
-  # Brief wait to check if it started successfully
-  sleep 1
-  if kill -0 "$coordinator_pid" 2>/dev/null; then
-    log "✅ Global LSL Coordinator monitoring started (PID: $coordinator_pid)"
-  else
-    log "⚠️ Global LSL Coordinator monitoring may have failed to start"
-  fi
+  return 0  # no-op stub — kept for callers; remove in a future plan
 }
 
 # ==============================================================================

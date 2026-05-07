@@ -59,6 +59,10 @@ services:
       # (single-owner pattern; bind-mount of .observations/ will be removed
       # once retrieval is also migrated)
       - OBS_API_URL=http://host.docker.internal:12436
+      # Health Coordinator — host-side SoT for system health (Phase 33)
+      # In-container readers (dashboard, constraint-monitor) reach the host
+      # coordinator via host.docker.internal (extra_hosts wires this on Linux).
+      - HEALTH_COORDINATOR_URL=http://host.docker.internal:3034
     ports:
       - "8080:8080"     # VKB Server
       - "3848:3848"     # Semantic Analysis SSE

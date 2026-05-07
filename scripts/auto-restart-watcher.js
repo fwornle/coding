@@ -2,8 +2,9 @@
  * Auto-Restart Watcher
  *
  * Watches script files on disk and triggers graceful exit when they change.
- * Relies on existing process supervision (combined-status-line, global-process-supervisor)
- * to restart the daemon with the updated code.
+ * Relies on existing process supervision (combined-status-line / launchd
+ * KeepAlive on the health coordinator post-Phase-33) to restart the daemon
+ * with the updated code.
  *
  * Usage:
  *   import { enableAutoRestart } from './auto-restart-watcher.js';

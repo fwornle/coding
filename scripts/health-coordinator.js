@@ -11,11 +11,11 @@
  *     throwing check tags its slice as 'unknown' — never 'healthy' (SPEC R6).
  *   - Per-session LSL tracking with 15s staleness threshold and 5min eviction (D-10).
  *
- * Replaces the four legacy daemons:
- *   - system-monitor-watchdog.js
- *   - global-process-supervisor.js
- *   - global-service-coordinator.js
- *   - global-lsl-coordinator.js
+ * Replaces the four legacy host daemons (deleted in plan 33-07):
+ *   - the system watchdog (legacy launchd: com.coding.system-watchdog)
+ *   - the per-session process supervisor
+ *   - the global service coordinator
+ *   - the per-project LSL coordinator
  *
  * Defense-in-depth: the rules `bind_mount_freshness` (D-06) and `supervisord_status`
  * (D-08) are SKIPPED with a WARN log even if config still contains them — plan 33-06
