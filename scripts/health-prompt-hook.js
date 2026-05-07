@@ -1,357 +1,212 @@
 #!/usr/bin/env node
 
 /**
- * Health Verification Pre-Prompt Hook
+ * Health Verification Pre-Prompt Hook (Phase 33-05)
  *
- * Purpose: Ensure system health is verified before every Claude prompt
- * - Checks if health data is stale (> 5 minutes)
- * - Triggers async verification if stale
- * - Provides health status context to Claude
- * - Blocks critical failures
+ * Purpose: Provide a one-line system-health summary to Claude before every
+ * user prompt is processed. Reads the canonical SoT from the host
+ * health-coordinator (`/health/state`) — never from `.health/*.json` files.
  *
  * Hook Type: UserPromptSubmit
- * Execution: Before every user prompt is processed
+ * Execution: Before every user prompt is processed.
+ *
+ * Phase 33 contract:
+ *   - SPEC R6: never silently treat exceptions as 'healthy'. Coordinator
+ *     unreachable / HTTP error / JSON parse error / unknown shape ALL
+ *     surface as `overallStatus: 'unknown'`.
+ *   - SPEC R8: output JSON shape preserved —
+ *       { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } }
+ *   - Q3 carve-out: when invoked outside the coding repo (heuristic:
+ *     scripts/health-verifier.js does not exist next to this script),
+ *     return the same SPEC-R8 envelope with `additionalContext: ''` and
+ *     exit 0. SPEC R6's no-fallback-to-healthy applies to coordinator-side
+ *     checks, not to this consumer-side env-detection branch.
+ *
+ * The hook MUST always `process.exit(0)` so Claude never blocks on errors.
  */
 
-import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
-import { join, dirname, basename, resolve as resolvePath } from 'path';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_TOOLS_PATH || join(__dirname, '..');
 
-// Configuration
-const STALENESS_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-const STATUS_FILE = join(codingRoot, '.health/verification-status.json');
+// Verifier script is the heuristic for "running inside the coding repo".
+// We do NOT spawn it (legacy behaviour); we only check existence so the
+// out-of-coding-env graceful no-op branch (Q3) still fires.
 const VERIFIER_SCRIPT = join(codingRoot, 'scripts/health-verifier.js');
 
 /**
- * Main hook execution
+ * Main hook execution. Always exits 0 so Claude never blocks.
  */
 async function main() {
     try {
-        // Read hook input from stdin
         const input = await readStdin();
-        const hookData = JSON.parse(input);
+        const hookData = input ? JSON.parse(input) : {};
 
-        // Check health status staleness
-        const healthStatus = checkHealthStatus();
+        const healthStatus = await checkHealthStatus();
 
-        // If services aren't available, exit gracefully (running outside coding environment)
+        // Q3: outside coding repo — emit empty additionalContext, exit 0.
         if (!healthStatus.servicesAvailable) {
-            // No output needed - just allow Claude to continue normally
+            outputEnvelope('');
             process.exit(0);
         }
 
-        // If stale, trigger async verification (don't wait for it)
-        if (healthStatus.isStale) {
-            triggerAsyncVerification();
-        }
-
-        // Determine if we should block the prompt
-        if (healthStatus.shouldBlock) {
-            // Block critical failures
-            outputBlockedResponse(healthStatus);
-            process.exit(0);
-        }
-
-        // Normal flow: provide health context to Claude
         outputHealthContext(healthStatus, hookData);
         process.exit(0);
-
     } catch (error) {
-        // On any error, don't block Claude - just log and continue
-        console.error(`Health hook error: ${error.message}`);
+        // SPEC R8: preserve envelope shape even on fatal errors so Claude
+        // sees a well-formed hook response. Hooks must never block.
+        process.stderr.write(`Health hook error: ${error.message}\n`);
+        try { outputEnvelope(''); } catch { /* last-ditch */ }
         process.exit(0);
     }
 }
 
 /**
- * Check current health status and staleness
+ * Single coordinator fetch — the only data source for this hook (Phase 33).
+ *
+ * Returns one of these shapes (always):
+ *   { servicesAvailable: false, exists: false, isStale: false,
+ *     shouldBlock: false, status: null }
+ *     -> Q3 carve-out: outside coding repo. Hook emits empty
+ *        additionalContext.
+ *
+ *   { servicesAvailable: true, exists: true, isStale: false,
+ *     shouldBlock: false, status: { overallStatus: 'healthy' | 'unhealthy' | 'unknown', ... } }
+ *     -> Inside coding repo. Coordinator reachable or surfacing 'unknown'.
  */
-function checkHealthStatus() {
-    // Check if health verifier exists (indicates we're in coding environment)
+async function checkHealthStatus() {
+    // Q3 carve-out: outside the coding repo. Maintain the existing graceful
+    // no-op branch — SPEC R6's no-fallback-to-healthy applies to
+    // coordinator-side checks, not to this consumer-side env-detection.
     if (!existsSync(VERIFIER_SCRIPT)) {
         return {
+            servicesAvailable: false,
             exists: false,
             isStale: false,
             shouldBlock: false,
-            servicesAvailable: false,
-            message: 'Health services not available (running outside coding environment)',
-            ageMs: null
+            status: null
         };
     }
 
-    if (!existsSync(STATUS_FILE)) {
+    const coordinator = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+    try {
+        const r = await fetch(`${coordinator}/health/state`);
+        if (!r.ok) {
+            return {
+                servicesAvailable: true,
+                exists: true,
+                isStale: false,
+                shouldBlock: false,
+                status: { overallStatus: 'unknown', upstream: `http_${r.status}` }
+            };
+        }
+        const state = await r.json();
         return {
-            exists: false,
-            isStale: true,
-            shouldBlock: false,
             servicesAvailable: true,
-            message: 'Health verification pending (first run)',
-            ageMs: null
+            exists: true,
+            isStale: false,
+            shouldBlock: false,
+            status: deriveSummary(state)
+        };
+    } catch (err) {
+        // SPEC R6: NOT 'healthy' on exception. Surface 'unknown'.
+        return {
+            servicesAvailable: true,
+            exists: true,
+            isStale: false,
+            shouldBlock: false,
+            status: { overallStatus: 'unknown', upstream: 'unreachable', error: err.message }
         };
     }
-
-    const status = JSON.parse(readFileSync(STATUS_FILE, 'utf-8'));
-    const stats = statSync(STATUS_FILE);
-    const ageMs = Date.now() - new Date(stats.mtime).getTime();
-    const isStale = ageMs > STALENESS_THRESHOLD_MS;
-
-    // Block only if critical issues exist and data is recent
-    const shouldBlock = !isStale &&
-                       status.criticalCount > 0 &&
-                       status.overallStatus === 'critical';
-
-    return {
-        exists: true,
-        isStale,
-        shouldBlock,
-        servicesAvailable: true,
-        status,
-        ageMs,
-        message: isStale
-            ? `Health data stale (${Math.floor(ageMs / 1000)}s old) - refreshing...`
-            : `System healthy (verified ${Math.floor(ageMs / 1000)}s ago)`
-    };
 }
 
 /**
- * Trigger async health verification (non-blocking)
+ * Reduce coordinator state to the prompt-hook's summary shape. Only
+ * extracts known fields and converts each to a fixed-format string —
+ * no unsanitised passthrough (T-33-05-02 mitigation).
  */
-function triggerAsyncVerification() {
-    // Only trigger if verifier script exists
-    if (!existsSync(VERIFIER_SCRIPT)) {
-        return;
+function deriveSummary(state) {
+    const issues = [];
+    if (state && state.container && state.container.healthcheck === 'unhealthy') {
+        issues.push('container unhealthy');
     }
-
-    try {
-        const child = spawn('node', [VERIFIER_SCRIPT, 'verify'], {
-            detached: true,
-            stdio: 'ignore',
-            cwd: codingRoot,
-            env: {
-                ...process.env,
-                CODING_TOOLS_PATH: codingRoot
+    if (state && state.databases && state.databases.status && state.databases.status !== 'healthy') {
+        issues.push(`db ${state.databases.status}`);
+    }
+    if (state && Array.isArray(state.services)) {
+        for (const svc of state.services) {
+            if (svc && svc.status && svc.status !== 'running') {
+                issues.push(`service ${svc.name} ${svc.status}`);
             }
-        });
-
-        child.unref(); // Allow parent to exit without waiting
-    } catch (error) {
-        // Fail silently - we're in a degraded environment
-    }
-}
-
-/**
- * Output blocked response for critical failures
- */
-function outputBlockedResponse(healthStatus) {
-    const response = {
-        decision: 'block',
-        reason: `🚨 CRITICAL SYSTEM FAILURE DETECTED\n\n${healthStatus.status.criticalCount} critical issues prevent operation.\n\nRun: node scripts/health-verifier.js --auto-heal`,
-        hookSpecificOutput: {
-            hookEventName: 'UserPromptSubmit'
         }
+    }
+    if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
+        for (const [project, status] of Object.entries(state.lsl_by_project)) {
+            if (status !== 'healthy') {
+                issues.push(`LSL ${project} ${status}`);
+            }
+        }
+    }
+    return {
+        overallStatus: issues.length === 0 ? 'healthy' : 'unhealthy',
+        issues,
+        generated_at: state && state.generated_at
     };
-
-    console.log(JSON.stringify(response, null, 2));
 }
 
 /**
- * Independent LSL health check — runs regardless of health verifier status.
- * Checks whether the transcript monitor is actively producing session logs.
- * If LSL is down, attempts auto-recovery before reporting.
- * Returns a warning string if LSL is down, empty string if healthy.
- *
- * Project-aware: derives the health file name from the current working
- * directory so it checks the correct project's transcript monitor, not
- * just the coding project.
+ * Output the SPEC R8 envelope:
+ *   { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } }
  */
-function checkLSLHealth(hookCwd) {
-    try {
-        // Prefer the cwd Claude Code passes in via the hook payload, then
-        // fall back to process.cwd(). Resolve to an absolute path so
-        // basename() returns the project directory and not "" for "/".
-        const rawCwd = hookCwd || process.cwd();
-        const cwd = resolvePath(rawCwd);
-
-        // If we're invoked from anywhere inside the coding repo (e.g. a
-        // subdirectory like .specstory/history), the monitor we care
-        // about is the coding project's monitor — not "history" or any
-        // other intermediate directory's name.
-        const insideCoding = cwd === codingRoot || cwd.startsWith(codingRoot + '/');
-        const projectName = insideCoding ? basename(codingRoot) : basename(cwd);
-        const healthFile = join(codingRoot, '.health', `${projectName}-transcript-monitor-health.json`);
-
-        // If we're outside the coding repo and there is no health file
-        // for this project, treat it as "no monitor configured" rather
-        // than a failure — this hook is global and runs from arbitrary
-        // working directories.
-        if (!insideCoding && !existsSync(healthFile)) return '';
-
-        const isDown = !existsSync(healthFile);
-        let isStopped = false;
-        let isStale = false;
-        let ageSec = 0;
-        let monitorPid = null;
-
-        if (!isDown) {
-            const health = JSON.parse(readFileSync(healthFile, 'utf-8'));
-            const ageMs = Date.now() - (health.timestamp || 0);
-            ageSec = Math.floor(ageMs / 1000);
-            isStopped = health.status === 'stopped';
-            isStale = ageMs > 120_000; // 2 minutes
-            monitorPid = health.metrics?.processId || null;
-        }
-
-        if (!isDown && !isStopped && !isStale) return ''; // Healthy
-
-        // Suppress false alarms when SafeDatabase is mid-rotation. The
-        // transcript monitor briefly stalls reopening the DB; that's an
-        // expected stall, not a failure. Marker auto-cleared by the
-        // recovery routine; we apply a 60s ceiling in case it crashes.
-        const dbMarker = join(codingRoot, '.observations', 'db-recovering.json');
-        if ((isStale || isStopped) && existsSync(dbMarker)) {
-            try {
-                const m = JSON.parse(readFileSync(dbMarker, 'utf-8'));
-                if (Date.now() - (m.startedAt || 0) < 60_000) return '';
-            } catch { /* ignore malformed marker */ }
-        }
-
-        // Suppress false alarms when the LSL watchdog has been ticking
-        // recently AND the monitor process is alive. The watchdog runs
-        // every 30s and will recover anything actually broken; we don't
-        // need to also alarm the user on every prompt.
-        if (isStale && !isStopped && monitorPid && _isPidAlive(monitorPid)) {
-            const watchdogFresh = _watchdogIsFresh();
-            if (watchdogFresh) return '';
-        }
-
-        // Attempt auto-recovery: spawn global-lsl-coordinator in background
-        // Rate-limited by a lockfile to prevent spawning on every prompt
-        const lockFile = join(codingRoot, '.health', '.lsl-recovery-lock');
-        let shouldRecover = true;
-        if (existsSync(lockFile)) {
-            try {
-                const lockAge = Date.now() - statSync(lockFile).mtimeMs;
-                shouldRecover = lockAge > 60_000; // At most once per minute
-            } catch { /* proceed with recovery */ }
-        }
-
-        if (shouldRecover) {
-            try {
-                writeFileSync(lockFile, String(Date.now()));
-                const coordinator = spawn('node', [
-                    join(codingRoot, 'scripts', 'global-lsl-coordinator.js'),
-                    'ensure',
-                    codingRoot
-                ], { detached: true, stdio: 'ignore', cwd: codingRoot });
-                coordinator.unref();
-            } catch { /* recovery is best-effort */ }
-        }
-
-        // Differentiate DOWN (file missing or status=stopped — real failure)
-        // from STALE (file exists but timestamp is old — usually transient).
-        if (isDown) return '🔴 LSL DOWN: No transcript monitor health file found. Session history is NOT being recorded. Auto-recovery attempted.\n';
-        if (isStopped) return '🔴 LSL DOWN: Transcript monitor reports stopped. Session history is NOT being recorded. Auto-recovery attempted.\n';
-        return `⚠️ LSL STALE: Transcript monitor health not updated for ${ageSec}s (process ${monitorPid ? `PID ${monitorPid} alive` : 'unknown'}). Auto-recovery attempted.\n`;
-    } catch {
-        // If we can't check, don't block — but warn
-        return '⚠️ LSL: Unable to verify transcript monitor status\n';
-    }
-}
-
-/**
- * Check if a PID is alive (signal 0 probe).
- */
-function _isPidAlive(pid) {
-    try { process.kill(pid, 0); return true; } catch { return false; }
-}
-
-/**
- * Check whether the LSL watchdog has stamped a recent health-check tick.
- * Prefers the lightweight dedicated heartbeat file written by
- * global-lsl-coordinator's performHealthCheck; falls back to the
- * coordinator entry in the registry for older daemons. Returns true when
- * the watchdog is actively monitoring (within ~2 ticks of its 30s
- * interval).
- */
-function _watchdogIsFresh() {
-    const FRESH_WINDOW_MS = 75_000;
-    try {
-        const hbPath = join(codingRoot, '.health', 'lsl-watchdog-heartbeat.json');
-        if (existsSync(hbPath)) {
-            const hb = JSON.parse(readFileSync(hbPath, 'utf-8'));
-            if (hb?.timestamp && (Date.now() - hb.timestamp) < FRESH_WINDOW_MS) return true;
-        }
-    } catch { /* fall through to registry check */ }
-    try {
-        const registryPath = join(codingRoot, '.global-lsl-registry.json');
-        if (!existsSync(registryPath)) return false;
-        const reg = JSON.parse(readFileSync(registryPath, 'utf-8'));
-        const last = reg?.coordinator?.lastHealthCheck;
-        if (!last) return false;
-        return (Date.now() - last) < FRESH_WINDOW_MS;
-    } catch { return false; }
-}
-
-/**
- * Output health context for Claude (normal flow)
- * Simplified: no counts, just status. Details on dashboard.
- */
-function outputHealthContext(healthStatus, hookData) {
-    let context = '';
-
-    // Always check LSL independently — this must never be suppressed.
-    // Pass the hook payload's cwd so the project lookup uses Claude Code's
-    // notion of "current project" rather than process.cwd(), which can
-    // drift after subshell `cd` calls and produce false LSL DOWN alarms.
-    const lslWarning = checkLSLHealth(hookData?.cwd);
-
-    if (healthStatus.isStale) {
-        context = `🔄 System Health: Verification triggered (data was stale)\n`;
-    } else if (healthStatus.exists && healthStatus.status) {
-        const ageSeconds = Math.floor(healthStatus.ageMs / 1000);
-        const criticalCount = healthStatus.status.criticalCount || 0;
-        const violations = healthStatus.status.violationCount || 0;
-        // Trust the verifier's verdict: when it has classified the run as
-        // healthy (and isn't currently auto-healing), accepted/non-critical
-        // violations should not produce a permanent yellow banner.
-        const overallHealthy = healthStatus.status.overallStatus === 'healthy'
-            && !healthStatus.status.autoHealingActive;
-
-        if (criticalCount > 0) {
-            context = `❌ System Health: Critical issues detected - check dashboard\n`;
-        } else if (lslWarning) {
-            context = lslWarning;
-        } else if (violations === 0 || overallHealthy) {
-            context = `✅ System Health: All systems operational (verified ${ageSeconds}s ago)\n`;
-        } else {
-            context = `⚠️ System Health: Issues detected - auto-healing active\n`;
-        }
-    } else {
-        context = `🔄 System Health: Initial verification in progress\n`;
-    }
-
-    // Output as JSON for structured response
+function outputEnvelope(additionalContext) {
     const response = {
         hookSpecificOutput: {
             hookEventName: 'UserPromptSubmit',
-            additionalContext: context
+            additionalContext: typeof additionalContext === 'string' ? additionalContext : ''
         }
     };
-
-    console.log(JSON.stringify(response, null, 2));
+    process.stdout.write(JSON.stringify(response, null, 2));
+    process.stdout.write('\n');
 }
 
 /**
- * Read all data from stdin
+ * Output health context for Claude (normal flow). Preserves SPEC R8 shape;
+ * only the additionalContext STRING content varies.
+ */
+function outputHealthContext(healthStatus /*, hookData */) {
+    let context = '';
+    const status = healthStatus.status;
+
+    if (!status) {
+        context = '';
+    } else if (status.overallStatus === 'unknown') {
+        const reason = status.upstream || 'unknown';
+        context = `⚪ System Health: unknown (${reason})\n`;
+    } else if (status.overallStatus === 'unhealthy') {
+        const issues = Array.isArray(status.issues) ? status.issues : [];
+        const summary = issues.length ? issues.slice(0, 3).join(', ') : 'see dashboard';
+        context = `⚠️ System Health: ${summary}\n`;
+    } else {
+        context = '✅ System Health: All systems operational\n';
+    }
+
+    outputEnvelope(context);
+}
+
+/**
+ * Read all data from stdin.
  */
 function readStdin() {
     return new Promise((resolve, reject) => {
         const chunks = [];
-
+        // If stdin is a TTY (e.g. invoked manually with no pipe), resolve immediately.
+        if (process.stdin.isTTY) {
+            resolve('');
+            return;
+        }
         process.stdin.on('data', chunk => chunks.push(chunk));
         process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
         process.stdin.on('error', reject);
@@ -360,6 +215,7 @@ function readStdin() {
 
 // Execute
 main().catch(error => {
-    console.error(`Fatal error in health hook: ${error.message}`);
-    process.exit(0); // Don't block Claude on errors
+    process.stderr.write(`Fatal error in health hook: ${error.message}\n`);
+    try { outputEnvelope(''); } catch { /* last-ditch */ }
+    process.exit(0);
 });
