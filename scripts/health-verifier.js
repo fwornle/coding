@@ -1,22 +1,35 @@
 #!/usr/bin/env node
 
 /**
- * Health Verifier - Layer 3 Health Monitoring
+ * Health Verifier — Reporter Mode (Phase 33)
  *
- * Comprehensive health verification system that:
- * - Runs periodic health checks (60s default)
- * - Detects database locks, service failures, process issues
- * - Provides auto-healing capabilities
- * - Generates structured health reports
- * - Integrates with StatusLine and Dashboard
+ * Reduced from a full daemon + auto-heal stack to a thin REPORTER that runs
+ * health checks once per CLI invocation and POSTs a summary signal to the
+ * health-coordinator HTTP endpoint. The coordinator (scripts/health-coordinator.js)
+ * is now the sole writer of `/health/state`; this script no longer writes any
+ * `.health/*.json` files of its own.
+ *
+ * Phase 33 deletions (per plan 33-04):
+ *  - daemon mode (start/stop CLI cases) — coordinator owns lifecycle
+ *  - in-container endpoint rewriting — coordinator runs on host only
+ *  - bind-mount freshness check — D-06: rule cannot fix the cause
+ *  - in-container supervisord status check — D-08: container-process supervision dropped
+ *  - performAutoHealing() / executeRemediation arms — coordinator owns heals
+ *  - .health/verifier-heartbeat.json writes — HTTP endpoint IS the heartbeat
+ *  - inline 10MB log rotation — extracted to lib/utils/log-rotator.js
+ *
+ * Preserved:
+ *  - verify CLI (one-shot run + POST signal)
+ *  - report CLI (one-shot read of /health/state from coordinator)
+ *  - status CLI (one-shot read of /health/state from coordinator)
+ *  - rule loading from config/health-verification-rules.json
+ *  - core check methods: verifyDatabases, verifyServices, verifyObservationQuality,
+ *    verifyProcesses, verifyFiles
  *
  * Usage:
- *   health-verifier verify              # One-time verification
- *   health-verifier start               # Start daemon mode
- *   health-verifier stop                # Stop daemon
- *   health-verifier status              # Show latest report
- *   health-verifier report [--json]     # Detailed report
- *   health-verifier history [--limit N] # Historical reports
+ *   health-verifier verify              # Run checks, POST verify_run signal, exit 0/1
+ *   health-verifier report [--json]     # Read /health/state from coordinator
+ *   health-verifier status              # Read /health/state from coordinator (compact)
  */
 
 import { promises as fs } from 'fs';
@@ -29,32 +42,36 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 import ProcessStateManager from './process-state-manager.js';
-import HealthRemediationActions from './health-remediation-actions.js';
-import { enableAutoRestart } from './auto-restart-watcher.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Detect if THIS process is running inside the Docker container (vs. on the host).
- * The host can also run the verifier (for status / rule-loading), where
- * host.docker.internal does not resolve — so endpoint rewriting hinges on this.
- */
-function isInsideContainer() {
-  return fsSync.existsSync('/.dockerenv');
-}
+// Phase 33: coordinator endpoint discovery (D-02). Single env var, host default.
+const COORDINATOR = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
 
 /**
- * Rewrite endpoints that reference host.docker.internal when running on the host.
- * The rules use host.docker.internal so the in-container verifier can reach
- * host services; on the host that hostname doesn't resolve, so map it to localhost.
+ * POST a signal to the coordinator's /signals endpoint.
+ * SPEC R6: do NOT silently treat coordinator-unreachable as healthy. Caller
+ * decides whether to surface the error to the CLI exit code.
+ *
+ * @param {Object} signal - { kind, source, status, payload?, ts, session_id? }
+ * @returns {Promise<void>} resolves on 2xx response; throws otherwise.
  */
-function resolveHostEndpoint(endpoint) {
-  if (!isInsideContainer() && endpoint && endpoint.includes('host.docker.internal')) {
-    return endpoint.replace('host.docker.internal', 'localhost');
+async function postSignal(signal) {
+  try {
+    const r = await fetch(`${COORDINATOR}/signals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(signal)
+    });
+    if (!r.ok) throw new Error(`signal POST ${r.status}`);
+  } catch (err) {
+    // SPEC R6: log + propagate. Never fall back to "healthy".
+    process.stderr.write(`[HealthVerifier] coordinator unreachable: ${err.message}\n`);
+    throw err;
   }
-  return endpoint;
 }
 
 class HealthVerifier extends EventEmitter {
@@ -68,215 +85,86 @@ class HealthVerifier extends EventEmitter {
     this.rulesPath = path.join(this.codingRoot, 'config', 'health-verification-rules.json');
     this.rules = this.loadRules();
 
-    // Initialize Process State Manager
+    // Initialize Process State Manager (read-only use; we never restart it)
     this.psm = new ProcessStateManager({ codingRoot: this.codingRoot });
 
-    // Initialize Remediation Actions
-    this.remediation = new HealthRemediationActions({
-      codingRoot: this.codingRoot,
+    // Log path comes from rules config; rotating logger handles 10MB rollover.
+    this.logPath = path.join(this.codingRoot, this.rules.reporting.log_path);
+    this.ensureDirectories();
+
+    // Phase 33: rotating logger from lib/utils/log-rotator.js (no inline 10MB block).
+    this.log = createRotatingLogger({
+      logPath: this.logPath,
+      prefix: 'HealthVerifier',
       debug: this.debug
     });
-
-    // Paths from rules config
-    this.reportPath = path.join(this.codingRoot, this.rules.reporting.report_path);
-    this.statusPath = path.join(this.codingRoot, this.rules.reporting.status_path);
-    this.historyPath = path.join(this.codingRoot, this.rules.reporting.history_path);
-    this.logPath = path.join(this.codingRoot, this.rules.reporting.log_path);
-
-    // State tracking
-    this.running = false;
-    this.timer = null;
-    this.lastReport = null;
-    this.healingHistory = new Map(); // Track healing attempts per action
-    this.autoHealingEnabled = this.rules.auto_healing.enabled;
-
-    // Ensure directories exist
-    this.ensureDirectories();
   }
 
   /**
-   * Load health verification rules and apply container-environment overrides.
+   * Load health verification rules.
+   * Phase 33: in-container endpoint rewriting removed — coordinator runs on host only,
+   * the host.docker.internal -> localhost rewrite is no longer needed.
    */
   loadRules() {
     try {
-      const rulesFile = path.join(__dirname, '..', 'config', 'health-verification-rules.json');
-      const rulesData = fsSync.readFileSync(rulesFile, 'utf8');
-      const rules = JSON.parse(rulesData);
-
-      this.applyDockerOverrides(rules);
-
-      return rules;
+      const rulesData = fsSync.readFileSync(this.rulesPath || path.join(__dirname, '..', 'config', 'health-verification-rules.json'), 'utf8');
+      return JSON.parse(rulesData);
     } catch (error) {
-      console.error(`Failed to load health rules: ${error.message}`);
+      process.stderr.write(`[HealthVerifier] Failed to load health rules: ${error.message}\n`);
       throw new Error('Health verification rules not found or invalid');
     }
   }
 
   /**
-   * Apply Docker-specific overrides to health verification rules
-   * In Docker, services run on different ports and some checks are not applicable
-   */
-  applyDockerOverrides(rules) {
-    const services = rules.rules.services;
-    const databases = rules.rules.databases;
-
-    // Constraint monitor uses CONSTRAINT_MONITOR_PORT (3849) in Docker, not 3031
-    if (services.constraint_monitor) {
-      const port = process.env.CONSTRAINT_MONITOR_PORT || '3849';
-      services.constraint_monitor.endpoint = `http://localhost:${port}/health`;
-      services.constraint_monitor.port = parseInt(port);
-    }
-
-    // Dashboard server (port 3030) runs inside Docker via supervisord (constraint-dashboard)
-    // Kept enabled — supervisord manages it with autorestart
-
-    // LevelDB lock check: VKB owns the lock legitimately in Docker - disable entirely
-    if (databases.leveldb_lock_check) {
-      databases.leveldb_lock_check.enabled = false;
-    }
-
-    // NOTE: LSL transcript monitors run on the HOST, not inside Docker containers.
-    // They must remain enabled even in Docker mode — disabling them here was the root
-    // cause of LSL failures going undetected (the health system reported "all healthy"
-    // while no monitors were running). See: 2026-03-14 LSL silent failure analysis.
-    // if (services.enhanced_transcript_monitor) { ... } — intentionally NOT disabled
-
-    // Qdrant is a separate container - adjust endpoint if env var set
-    if (databases.qdrant_availability && process.env.QDRANT_URL) {
-      databases.qdrant_availability.endpoint = `${process.env.QDRANT_URL}/readyz`;
-    }
-  }
-
-  /**
-   * Ensure required directories exist
+   * Ensure log directory exists (we still write to .logs for rotation).
    */
   ensureDirectories() {
-    const dirs = [
-      path.dirname(this.reportPath),
-      path.dirname(this.statusPath),
-      this.historyPath,
-      path.dirname(this.logPath)
-    ];
-
-    for (const dir of dirs) {
-      if (!fsSync.existsSync(dir)) {
-        fsSync.mkdirSync(dir, { recursive: true });
-      }
-    }
+    const dir = path.dirname(this.logPath);
+    if (!fsSync.existsSync(dir)) fsSync.mkdirSync(dir, { recursive: true });
   }
 
   /**
-   * Log message to file and console
-   */
-  log(message, level = 'INFO') {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] [${level}] [HealthVerifier] ${message}\n`;
-
-    if (this.debug || level === 'ERROR') {
-      console.log(logEntry.trim());
-    }
-
-    try {
-      try {
-        const sz = fsSync.statSync(this.logPath).size;
-        if (sz > 10 * 1024 * 1024) fsSync.renameSync(this.logPath, this.logPath + '.1');
-      } catch { /* missing/unwritable on first call is fine */ }
-      fsSync.appendFileSync(this.logPath, logEntry);
-    } catch (error) {
-      console.error(`Failed to write log: ${error.message}`);
-    }
-  }
-
-  /**
-   * Run comprehensive health verification
+   * Run comprehensive health verification (one shot — no daemon loop).
+   * Returns a report object; caller is responsible for posting the summary
+   * signal to the coordinator.
    */
   async verify() {
     const startTime = Date.now();
     this.log('Starting health verification');
 
     try {
-      let checks = [];  // Use let since checks may be reassigned during auto-healing recheck
+      const checks = [];
 
-      // Priority Check 1: Database Health
+      // Database health
       this.log('Checking database health...');
-      const databaseChecks = await this.verifyDatabases();
-      checks.push(...databaseChecks);
+      checks.push(...await this.verifyDatabases());
 
-      // Priority Check 2: Service Availability
+      // Service availability
       this.log('Checking service availability...');
-      const serviceChecks = await this.verifyServices();
-      checks.push(...serviceChecks);
+      checks.push(...await this.verifyServices());
 
-      // Priority Check 2b: Observation Quality
+      // Observation quality
       this.log('Checking observation quality...');
-      const obsChecks = await this.verifyObservationQuality();
-      checks.push(...obsChecks);
+      checks.push(...await this.verifyObservationQuality());
 
-      // Priority Check 3: Process Health
+      // Process health
       this.log('Checking process health...');
-      const processChecks = await this.verifyProcesses();
-      checks.push(...processChecks);
+      checks.push(...await this.verifyProcesses());
 
-      // Priority Check 3b: Supervisord Process Status
-      this.log('Checking supervisord process status...');
-      const supervisordChecks = await this.verifySupervisord();
-      checks.push(...supervisordChecks);
-
-      // Priority Check 4: File Health
+      // File health
       this.log('Checking file health...');
-      const fileChecks = await this.verifyFiles();
-      checks.push(...fileChecks);
+      checks.push(...await this.verifyFiles());
 
-      // Priority Check 5: Bind-mount staleness (macOS Docker Desktop quirk)
-      this.log('Checking Docker bind-mount freshness...');
-      const mountChecks = await this.verifyBindMountFreshness();
-      checks.push(...mountChecks);
+      // Phase 33: NO auto-heal arm — coordinator owns narrow heals.
+      //          NO supervisord check — D-08 (container-process supervision dropped).
+      //          NO bind-mount freshness check — D-06 (heal cannot fix the cause).
 
-      // Auto-Healing: Attempt to fix violations
-      if (this.autoHealingEnabled) {
-        this.log('Starting auto-healing for detected issues...');
-        const healingResults = await this.performAutoHealing(checks);
-
-        // Re-verify after healing
-        if (healingResults.attemptedActions > 0) {
-          this.log(`Auto-healing completed: ${healingResults.successCount}/${healingResults.attemptedActions} successful`);
-
-          // Re-run checks to verify fixes
-          await this.sleep(2000); // Wait for services to stabilize
-
-          const recheckResults = [];
-          recheckResults.push(...await this.verifyDatabases());
-          recheckResults.push(...await this.verifyServices());
-          recheckResults.push(...await this.verifyProcesses());
-          recheckResults.push(...await this.verifySupervisord());
-          recheckResults.push(...await this.verifyFiles());
-
-          // CRITICAL FIX: Replace old checks with recheck results instead of appending
-          // This prevents duplicate violations when a service becomes healthy after auto-healing
-          const recheckIds = new Set(recheckResults.map(c => c.check_id));
-          checks = checks.filter(c => !recheckIds.has(c.check_id)); // Remove old checks
-          checks.push(...recheckResults); // Add new checks
-        }
-      }
-
-      // Generate comprehensive report
       const duration = Date.now() - startTime;
       const report = this.generateReport(checks, duration);
 
-      // Save report
-      await this.saveReport(report);
-
-      // Update status for StatusLine
-      await this.updateStatus(report);
-
-      // Log summary
       this.logReportSummary(report);
-
-      // Emit event
       this.emit('verification-complete', report);
-
       return report;
-
     } catch (error) {
       this.log(`Verification failed: ${error.message}`, 'ERROR');
       throw error;
@@ -284,1345 +172,207 @@ class HealthVerifier extends EventEmitter {
   }
 
   /**
-   * Verify database health
+   * Verify database health via PSM (read-only).
    */
   async verifyDatabases() {
     const checks = [];
-    const dbRules = this.rules.rules.databases;
+    const dbRules = this.rules.rules.databases || {};
 
-    // Get database health from ProcessStateManager
-    const psmHealth = await this.psm.getHealthStatus();
-    const dbHealth = psmHealth.databases;
+    let psmHealth;
+    try {
+      psmHealth = await this.psm.getHealthStatus();
+    } catch (err) {
+      // SPEC R6: surface unknown, not healthy.
+      this.log(`PSM health unavailable: ${err.message}`, 'WARN');
+      checks.push({
+        category: 'databases', check: 'psm_health', check_id: 'psm_health',
+        status: 'warning', severity: 'warning',
+        message: `PSM health unavailable: ${err.message}`,
+        timestamp: new Date().toISOString()
+      });
+      return checks;
+    }
 
-    // Check 1: Level DB Lock Status
-    if (dbRules.leveldb_lock_check.enabled) {
-      if (dbHealth.levelDB.locked && dbHealth.levelDB.lockedBy) {
-        // Check if lock holder is registered
-        const lockHolderPid = dbHealth.levelDB.lockedBy;
-        const isRegistered = await this.isProcessRegistered(lockHolderPid, psmHealth);
+    const dbHealth = psmHealth.databases || {};
 
-        if (!isRegistered) {
-          checks.push({
-            category: 'databases',
-            check: 'leveldb_lock_check',
-            status: 'critical',
-            severity: dbRules.leveldb_lock_check.severity,
-            message: `Level DB locked by unregistered process (PID: ${lockHolderPid})`,
-            details: {
-              lock_holder_pid: lockHolderPid,
-              lock_path: path.join(this.codingRoot, '.data/knowledge-graph/LOCK')
-            },
-            auto_heal: dbRules.leveldb_lock_check.auto_heal,
-            auto_heal_action: dbRules.leveldb_lock_check.auto_heal_action,
-            recommendation: `Stop VKB server: vkb server stop\nOr kill process: kill ${lockHolderPid}`,
-            timestamp: new Date().toISOString()
-          });
-        } else {
-          checks.push({
-            category: 'databases',
-            check: 'leveldb_lock_check',
-            status: 'passed',
-            severity: 'info',
-            message: `Level DB locked by registered process (PID: ${lockHolderPid})`,
-            details: { lock_holder_pid: lockHolderPid },
-            timestamp: new Date().toISOString()
-          });
-        }
+    if (dbRules.leveldb_lock_check && dbRules.leveldb_lock_check.enabled) {
+      const lev = dbHealth.levelDB || {};
+      if (lev.locked && lev.lockedBy) {
+        checks.push({
+          category: 'databases', check: 'leveldb_lock_check', check_id: 'leveldb_lock_check',
+          status: 'warning', severity: dbRules.leveldb_lock_check.severity || 'warning',
+          message: `Level DB locked by PID ${lev.lockedBy}`,
+          details: { lock_holder_pid: lev.lockedBy },
+          timestamp: new Date().toISOString()
+        });
       } else {
         checks.push({
-          category: 'databases',
-          check: 'leveldb_lock_check',
-          status: 'passed',
-          severity: 'info',
+          category: 'databases', check: 'leveldb_lock_check', check_id: 'leveldb_lock_check',
+          status: 'passed', severity: 'info',
           message: 'Level DB not locked',
           timestamp: new Date().toISOString()
         });
       }
     }
 
-    // Check 2: Qdrant Availability
-    if (dbRules.qdrant_availability.enabled) {
-      if (!dbHealth.qdrant.available) {
+    if (dbRules.qdrant_availability && dbRules.qdrant_availability.enabled) {
+      const qd = dbHealth.qdrant || {};
+      if (qd.available) {
         checks.push({
-          category: 'databases',
-          check: 'qdrant_availability',
-          status: 'warning',
-          severity: dbRules.qdrant_availability.severity,
-          message: 'Qdrant vector database unavailable',
-          details: {
-            endpoint: dbRules.qdrant_availability.endpoint
-          },
-          auto_heal: dbRules.qdrant_availability.auto_heal,
-          recommendation: dbRules.qdrant_availability.recommendation,
+          category: 'databases', check: 'qdrant_availability', check_id: 'qdrant_availability',
+          status: 'passed', severity: 'info',
+          message: 'Qdrant available',
           timestamp: new Date().toISOString()
         });
       } else {
         checks.push({
-          category: 'databases',
-          check: 'qdrant_availability',
-          status: 'passed',
-          severity: 'info',
-          message: 'Qdrant vector database available',
+          category: 'databases', check: 'qdrant_availability', check_id: 'qdrant_availability',
+          status: 'warning', severity: dbRules.qdrant_availability.severity || 'warning',
+          message: 'Qdrant unavailable',
+          details: { endpoint: dbRules.qdrant_availability.endpoint },
           timestamp: new Date().toISOString()
         });
       }
     }
 
-    // Check 3: CGR Cache Staleness
-    const cgrCacheCheck = await this.checkCGRCacheStaleness();
-    checks.push({
-      ...cgrCacheCheck,
-      check_id: 'cgr_cache_staleness',
-      timestamp: new Date().toISOString()
-    });
-
     return checks;
   }
 
   /**
-   * Verify service availability
+   * Verify services declared in rules.services via simple HTTP probes.
    */
   async verifyServices() {
     const checks = [];
-    const serviceRules = this.rules.rules.services;
+    const serviceRules = this.rules.rules.services || {};
 
-    // Check VKB Server
-    if (serviceRules.vkb_server.enabled) {
-      const vkbCheck = await this.checkHTTPHealth(
-        'vkb_server',
-        serviceRules.vkb_server.endpoint,
-        serviceRules.vkb_server.timeout_ms
-      );
-      checks.push({
-        ...vkbCheck,
-        auto_heal: serviceRules.vkb_server.auto_heal,
-        auto_heal_action: serviceRules.vkb_server.auto_heal_action,
-        severity: serviceRules.vkb_server.severity
-      });
-    }
+    for (const [name, rule] of Object.entries(serviceRules)) {
+      if (!rule || !rule.enabled) continue;
 
-    // Check Constraint Monitor - with enhanced enforcement status extraction
-    if (serviceRules.constraint_monitor.enabled) {
-      const rule = serviceRules.constraint_monitor;
-      let constraintCheck;
-      if (rule.check_type === 'http_health' && rule.endpoint) {
-        constraintCheck = await this.checkConstraintMonitorHealth(rule.endpoint, rule.timeout_ms);
-      } else {
-        constraintCheck = await this.checkPortListening('constraint_monitor', rule.port, rule.timeout_ms);
-      }
-      checks.push({
-        ...constraintCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
-      });
-    }
-
-    // Check Dashboard Server
-    if (serviceRules.dashboard_server.enabled) {
-      const rule = serviceRules.dashboard_server;
-      let dashboardCheck;
-      if (rule.check_type === 'http_health' && rule.endpoint) {
-        dashboardCheck = await this.checkHTTPHealth('dashboard_server', rule.endpoint, rule.timeout_ms);
-      } else {
-        dashboardCheck = await this.checkPortListening('dashboard_server', rule.port, rule.timeout_ms);
-      }
-      checks.push({
-        ...dashboardCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
-      });
-    }
-
-    // Check Health Dashboard API (self-monitoring)
-    if (serviceRules.health_dashboard_api.enabled) {
-      const healthAPICheck = await this.checkHTTPHealth(
-        'health_dashboard_api',
-        serviceRules.health_dashboard_api.endpoint,
-        serviceRules.health_dashboard_api.timeout_ms
-      );
-      checks.push({
-        ...healthAPICheck,
-        auto_heal: serviceRules.health_dashboard_api.auto_heal,
-        auto_heal_action: serviceRules.health_dashboard_api.auto_heal_action,
-        severity: serviceRules.health_dashboard_api.severity
-      });
-    }
-
-    // Check Health Dashboard Frontend (port_listening rule was previously
-    // never dispatched — the dashboard rendered the missing check as "Down")
-    if (serviceRules.health_dashboard_frontend?.enabled) {
-      const rule = serviceRules.health_dashboard_frontend;
-      const frontendCheck = await this.checkPortListening(
-        'health_dashboard_frontend',
-        rule.port,
-        rule.timeout_ms
-      );
-      checks.push({
-        ...frontendCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
-      });
-    }
-
-    // Check LLM CLI Proxy (required for observation summarization)
-    if (serviceRules.llm_cli_proxy?.enabled) {
-      const rule = serviceRules.llm_cli_proxy;
-      const proxyCheck = await this.checkHTTPHealth(
-        'llm_cli_proxy',
-        rule.endpoint,
-        rule.timeout_ms
-      );
-      checks.push({
-        ...proxyCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
-      });
-    }
-
-    // Check Semantic Analysis SSE Server (required for UKB workflows)
-    if (serviceRules.semantic_analysis_sse?.enabled) {
-      const rule = serviceRules.semantic_analysis_sse;
-      const sseCheck = await this.checkHTTPHealth(
-        'semantic_analysis_sse',
-        rule.endpoint,
-        rule.timeout_ms
-      );
-      checks.push({
-        ...sseCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
-      });
-    }
-
-    // Check Enhanced Transcript Monitor (LSL system - CRITICAL for session history)
-    if (serviceRules.enhanced_transcript_monitor?.enabled) {
-      const rule = serviceRules.enhanced_transcript_monitor;
-
-      // Dynamic discovery mode: check ALL transcript monitors
-      if (rule.dynamic_discovery) {
-        const allMonitorChecks = await this.verifyAllTranscriptMonitors(rule);
-        checks.push(...allMonitorChecks);
-      } else {
-        // Legacy single-project mode
-        const transcriptCheck = await this.checkPSMService(
-          'enhanced_transcript_monitor',
-          rule.service_name,
-          rule.service_type,
-          rule.project_path
-        );
+      const endpoint = rule.endpoint;
+      if (!endpoint) {
         checks.push({
-          ...transcriptCheck,
-          auto_heal: rule.auto_heal,
-          auto_heal_action: rule.auto_heal_action,
-          severity: rule.severity
-        });
-      }
-    }
-
-    return checks;
-  }
-
-  /**
-   * Verify observation quality — detects when recent observations are [Raw] (LLM proxy failures).
-   * If recent observations are degraded, triggers auto-heal of the LLM proxy.
-   * In corporate network environments where LLM API endpoints are blocked,
-   * this downgrades to info severity to avoid persistent false-positive violations.
-   */
-  async verifyObservationQuality() {
-    const checks = [];
-    try {
-      const dbPath = path.join(this.codingRoot, '.observations', 'observations.db');
-      if (!fsSync.existsSync(dbPath)) return checks;
-
-      const { execSync } = await import('child_process');
-      // Count [Raw] observations in the last 2 hours
-      const result = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM observations WHERE summary LIKE '[Raw]%' AND created_at > datetime('now', '-2 hours');"`,
-        { encoding: 'utf8', timeout: 5000 }
-      ).trim();
-      const recentRawCount = parseInt(result, 10) || 0;
-
-      const totalResult = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM observations WHERE created_at > datetime('now', '-2 hours');"`,
-        { encoding: 'utf8', timeout: 5000 }
-      ).trim();
-      const recentTotalCount = parseInt(totalResult, 10) || 0;
-
-      const isHealthy = recentRawCount === 0;
-
-      // Check if the LLM proxy is up but its providers have persistent failures
-      // (indicates corporate network blocking LLM APIs, not a service issue)
-      let isNetworkBlocked = false;
-      if (!isHealthy) {
-        try {
-          // Proxy runs on host; use host.docker.internal so the check works
-          // from inside the Docker container too (container localhost is the
-          // container itself, not the host).
-          const proxyHealth = await (await fetch(resolveHostEndpoint('http://host.docker.internal:12435/health'), {
-            signal: AbortSignal.timeout(3000)
-          })).json();
-          // If proxy is healthy but ALL providers have high consecutive failures,
-          // the network is blocking LLM API endpoints — not a service issue
-          const providers = Object.values(proxyHealth.providers || {});
-          if (providers.length > 0 && providers.every(p => p.consecutiveFailures > 10)) {
-            isNetworkBlocked = true;
-          }
-        } catch {
-          // Proxy unreachable — that IS a service issue, keep warning severity
-        }
-      }
-
-      const check = {
-        category: 'services',
-        check: 'observation_quality',
-        check_id: `observation_quality_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        status: isHealthy ? 'passed' : 'failed',
-        message: isHealthy
-          ? `Observations healthy: ${recentTotalCount} recent observations, 0 [Raw]`
-          : isNetworkBlocked
-            ? `Observation enrichment unavailable: LLM API endpoints blocked by corporate network (${recentRawCount}/${recentTotalCount} [Raw])`
-            : `Observation quality degraded: ${recentRawCount}/${recentTotalCount} recent observations are [Raw] (LLM proxy may be failing)`,
-        auto_heal: !isHealthy && !isNetworkBlocked,
-        auto_heal_action: 'restart_llm_cli_proxy',
-        // Downgrade to info when it's a network block — restarting won't help
-        severity: isHealthy ? 'info' : (isNetworkBlocked ? 'info' : 'warning')
-      };
-      checks.push(check);
-    } catch (err) {
-      this.log(`Observation quality check skipped: ${err.message}`);
-    }
-    return checks;
-  }
-
-  /**
-   * Verify ALL transcript monitors across all discovered projects
-   * @param {Object} rule - The enhanced_transcript_monitor rule configuration
-   * @returns {Array} Array of check results for each project's monitor
-   */
-  async verifyAllTranscriptMonitors(rule) {
-    const checks = [];
-
-    try {
-      // Discover projects from multiple sources
-      const projects = await this.discoverActiveProjects();
-
-      for (const projectPath of projects) {
-        const projectName = path.basename(projectPath);
-        const healthFile = path.join(this.codingRoot, '.health', `${projectName}-transcript-monitor-health.json`);
-
-        const check = {
-          category: 'services',
-          check: `transcript_monitor_${projectName}`,
-          check_id: `transcript_monitor_${projectName}_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          auto_heal: rule.auto_heal,
-          auto_heal_action: rule.auto_heal_action,
-          severity: rule.severity
-        };
-
-        // Check health file existence and freshness
-        if (!fsSync.existsSync(healthFile)) {
-          checks.push({
-            ...check,
-            status: 'error',
-            message: `Transcript monitor for ${projectName} has no health file`,
-            details: { projectPath, healthFile, reason: 'no_health_file' }
-          });
-          continue;
-        }
-
-        // Read health file first — need content to distinguish stopped vs stale
-        let healthData;
-        try {
-          healthData = JSON.parse(fsSync.readFileSync(healthFile, 'utf8'));
-        } catch (parseErr) {
-          checks.push({
-            ...check,
-            status: 'error',
-            message: `Transcript monitor for ${projectName} health file is unreadable`,
-            details: { projectPath, healthFile, reason: 'parse_error', error: parseErr.message }
-          });
-          continue;
-        }
-
-        // Check if monitor was gracefully stopped (no active Claude session)
-        // This is a valid state, not an error — skip staleness check
-        if (healthData.status === 'stopped') {
-            checks.push({
-              ...check,
-              status: 'passed',
-              severity: 'info',
-              message: `Transcript monitor for ${projectName} stopped (no active session)`,
-              details: {
-                projectPath,
-                healthFile,
-                stoppedAt: healthData.stoppedAt,
-                reason: healthData.reason || 'graceful_shutdown',
-                finalExchangeCount: healthData.metrics?.finalExchangeCount
-              }
-            });
-            continue;
-          }
-
-        // Staleness check — only for non-stopped monitors
-        const stats = fsSync.statSync(healthFile);
-        const age = Date.now() - stats.mtime.getTime();
-
-        if (age > 60000) {
-          checks.push({
-            ...check,
-            status: 'error',
-            message: `Transcript monitor for ${projectName} health file is stale (${Math.round(age / 1000)}s old)`,
-            details: { projectPath, healthFile, age, reason: 'stale_health_file' }
-          });
-          continue;
-        }
-
-          const pid = healthData.metrics?.processId;
-
-          if (!pid) {
-            checks.push({
-              ...check,
-              status: 'error',
-              message: `Transcript monitor for ${projectName} has no PID in health file`,
-              details: { projectPath, healthFile, reason: 'no_pid' }
-            });
-            continue;
-          }
-
-          const psmHealth = await this.psm.getHealthStatus();
-          const isAlive = this.psm.isProcessAlive(pid);
-
-          if (!isAlive) {
-            checks.push({
-              ...check,
-              status: 'error',
-              message: `Transcript monitor for ${projectName} (PID ${pid}) is not running`,
-              details: { projectPath, healthFile, pid, reason: 'pid_dead' }
-            });
-            continue;
-          }
-
-          // Monitor is healthy
-          checks.push({
-            ...check,
-            status: 'passed',
-            severity: 'info',
-            message: `Transcript monitor for ${projectName} is running (PID ${pid})`,
-            details: { projectPath, pid, uptime: healthData.metrics?.uptimeSeconds }
-          });
-      }
-    } catch (error) {
-      checks.push({
-        category: 'services',
-        check: 'transcript_monitors_discovery',
-        check_id: `transcript_monitors_discovery_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        status: 'error',
-        message: `Failed to discover transcript monitors: ${error.message}`,
-        severity: 'warning'
-      });
-    }
-
-    return checks;
-  }
-
-  /**
-   * Discover all active projects for transcript monitor verification
-   */
-  async discoverActiveProjects() {
-    const projects = new Set();
-
-    // Dynamic path computation - no hardcoded user paths
-    const agenticDir = path.dirname(this.codingRoot);
-    const homeDir = process.env.HOME;
-    const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
-    const claudeProjectPrefix = `-${escapedAgenticPath}-`;
-
-    // Source 1: PSM registry
-    try {
-      const registry = await this.psm.getAllServices();
-      const projectServices = registry.services?.projects || {};
-      for (const projectPath of Object.keys(projectServices)) {
-        if (projectPath.includes('/Agentic/')) {
-          projects.add(projectPath);
-        }
-      }
-    } catch {
-      // Ignore PSM errors
-    }
-
-    // Source 2: Health files
-    try {
-      const healthDir = path.join(this.codingRoot, '.health');
-      if (fsSync.existsSync(healthDir)) {
-        const files = fsSync.readdirSync(healthDir);
-        for (const file of files) {
-          const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
-          if (match) {
-            const projectPath = path.join(agenticDir, match[1]);
-            if (fsSync.existsSync(projectPath)) {
-              projects.add(projectPath);
-            }
-          }
-        }
-      }
-    } catch {
-      // Ignore health file errors
-    }
-
-    // Source 3: Claude transcript directories with recent activity (< 24 hours)
-    try {
-      if (!homeDir) throw new Error('HOME not set');
-      const claudeProjectsDir = path.join(homeDir, '.claude', 'projects');
-      if (fsSync.existsSync(claudeProjectsDir)) {
-        const dirs = fsSync.readdirSync(claudeProjectsDir);
-        for (const dir of dirs) {
-          if (!dir.startsWith(claudeProjectPrefix)) continue;
-          const projectName = dir.slice(claudeProjectPrefix.length);
-          if (projectName) {
-            const projectPath = path.join(agenticDir, projectName);
-            if (fsSync.existsSync(projectPath)) {
-              const transcriptDir = path.join(claudeProjectsDir, dir);
-              const jsonlFiles = fsSync.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
-              if (jsonlFiles.length > 0) {
-                const latestMtime = Math.max(
-                  ...jsonlFiles.map(f => fsSync.statSync(path.join(transcriptDir, f)).mtime.getTime())
-                );
-                if (Date.now() - latestMtime < 24 * 60 * 60 * 1000) {
-                  projects.add(projectPath);
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch {
-      // Ignore Claude dir errors
-    }
-
-    return Array.from(projects);
-  }
-
-  /**
-   * Check if a service is running via PSM
-   */
-  async checkPSMService(checkName, serviceName, serviceType, projectPath) {
-    const check = {
-      category: 'services',
-      check: checkName,
-      check_id: `${checkName}_${Date.now()}`,
-      timestamp: new Date().toISOString()
-    };
-
-    try {
-      const psmHealth = await this.psm.getHealthStatus();
-      let serviceFound = false;
-      let serviceAlive = false;
-      let servicePid = null;
-
-      if (serviceType === 'global') {
-        const service = psmHealth.details.global[serviceName];
-        if (service) {
-          serviceFound = true;
-          serviceAlive = service.alive;
-          servicePid = service.pid;
-        }
-      } else if (serviceType === 'per-project' && projectPath) {
-        const projectServices = psmHealth.details.projects[projectPath] || [];
-        const service = projectServices.find(s => s.name === serviceName);
-        if (service) {
-          serviceFound = true;
-          serviceAlive = service.alive;
-          servicePid = service.pid;
-        }
-      }
-
-      if (!serviceFound) {
-        return {
-          ...check,
-          status: 'failed',
-          message: `${serviceName} not registered in PSM`,
-          details: { service_name: serviceName, service_type: serviceType, project_path: projectPath }
-        };
-      }
-
-      if (!serviceAlive) {
-        return {
-          ...check,
-          status: 'failed',
-          message: `${serviceName} registered but not running (PID ${servicePid} is dead)`,
-          details: { service_name: serviceName, pid: servicePid, status: 'dead' }
-        };
-      }
-
-      return {
-        ...check,
-        status: 'passed',
-        message: `${serviceName} is healthy`,
-        details: { service_name: serviceName, pid: servicePid, status: 'alive' }
-      };
-
-    } catch (error) {
-      return {
-        ...check,
-        status: 'failed',
-        message: `Failed to check ${serviceName}: ${error.message}`,
-        details: { error: error.message }
-      };
-    }
-  }
-
-  /**
-   * Verify process health
-   */
-  async verifyProcesses() {
-    const checks = [];
-    const processRules = this.rules.rules.processes;
-
-    // Get all registered services
-    const psmHealth = await this.psm.getHealthStatus();
-
-    // Check for stale PIDs
-    if (processRules.stale_pids.enabled) {
-      const stalePids = [];
-
-      // Check global services
-      for (const [name, service] of Object.entries(psmHealth.details.global)) {
-        if (!service.alive) {
-          stalePids.push({ name, pid: service.pid, type: 'global' });
-        }
-      }
-
-      // Check per-project services
-      for (const [projectPath, services] of Object.entries(psmHealth.details.projects)) {
-        for (const service of services) {
-          if (!service.alive) {
-            stalePids.push({ name: service.name, pid: service.pid, type: 'project', projectPath });
-          }
-        }
-      }
-
-      // Check session services
-      for (const [sessionId, services] of Object.entries(psmHealth.details.sessions)) {
-        for (const service of services) {
-          if (!service.alive) {
-            stalePids.push({ name: service.name, pid: service.pid, type: 'session', sessionId });
-          }
-        }
-      }
-
-      if (stalePids.length > 0) {
-        checks.push({
-          category: 'processes',
-          check: 'stale_pids',
-          status: 'warning',
-          severity: processRules.stale_pids.severity,
-          message: `Found ${stalePids.length} stale PID(s) in registry`,
-          details: { stale_pids: stalePids },
-          auto_heal: processRules.stale_pids.auto_heal,
-          auto_heal_action: processRules.stale_pids.auto_heal_action,
-          recommendation: 'Clean up registry with PSM.cleanupDeadProcesses()',
+          category: 'services', check: name, check_id: name,
+          status: 'warning', severity: rule.severity || 'warning',
+          message: `Service ${name} has no endpoint`,
           timestamp: new Date().toISOString()
         });
-      } else {
-        checks.push({
-          category: 'processes',
-          check: 'stale_pids',
-          status: 'passed',
-          severity: 'info',
-          message: 'No stale PIDs detected',
-          timestamp: new Date().toISOString()
-        });
+        continue;
       }
-    }
-
-    return checks;
-  }
-
-  /**
-   * Verify supervisord process status
-   * Detects FATAL or STOPPED processes inside the Docker container
-   */
-  async verifySupervisord() {
-    const checks = [];
-    const rule = this.rules.rules.processes?.supervisord_status;
-
-    if (!rule?.enabled) return checks;
-
-    try {
-      const { execSync } = await import('child_process');
-      let output;
-      try {
-        // Use docker exec when running on the host, direct supervisorctl when inside container
-        const cmd = fsSync.existsSync('/.dockerenv')
-          ? 'supervisorctl status'
-          : 'docker exec coding-services supervisorctl status';
-        output = execSync(cmd, {
-          encoding: 'utf-8',
-          timeout: 10000
-        });
-      } catch (execErr) {
-        // supervisorctl exits non-zero when any process is FATAL/STOPPED — use stdout from error
-        if (execErr.stdout) {
-          output = execErr.stdout;
-        } else {
-          throw execErr;
-        }
-      }
-
-      const lines = output.trim().split('\n').filter(l => l.trim());
-      const processes = [];
-      const failures = [];
-
-      for (const line of lines) {
-        // Format: "group:name  STATUS  pid N, uptime H:MM:SS" or "group:name  FATAL  Exited too quickly"
-        const match = line.match(/^(\S+)\s+(RUNNING|STARTING|STOPPED|FATAL|BACKOFF|EXITED)\s+(.*)/);
-        if (match) {
-          const fullName = match[1];
-          const status = match[2];
-          const detail = match[3].trim();
-          // Strip group prefix (e.g., "mcp-servers:semantic-analysis" -> "semantic-analysis")
-          const name = fullName.includes(':') ? fullName.split(':')[1] : fullName;
-          processes.push({ name, fullName, status, detail });
-
-          // STOPPED + "Not started" means the program has autostart=false and
-          // has never been started — that's intentional, not a failure.
-          // Real failures are FATAL/BACKOFF; STOPPED with a timestamp detail
-          // (e.g. "May 06 04:06 AM") was previously running and is now down.
-          const isIntentionallyDisabled = status === 'STOPPED' && /^Not started/i.test(detail);
-          if (!isIntentionallyDisabled && (status === 'FATAL' || status === 'STOPPED' || status === 'BACKOFF')) {
-            failures.push({ name, fullName, status, detail });
-          }
-        }
-      }
-
-      if (failures.length > 0) {
-        // Report as critical violations but do NOT auto-restart (supervisord handles that)
-        checks.push({
-          category: 'processes',
-          check: 'supervisord_status',
-          status: 'failed',
-          severity: rule.severity,
-          message: `${failures.length} supervisord process(es) in failure state: ${failures.map(f => `${f.name}=${f.status}`).join(', ')}`,
-          details: {
-            total_processes: processes.length,
-            failures,
-            all_processes: processes
-          },
-          auto_heal: false,
-          recommendation: `Check Docker logs: docker logs coding-services. FATAL processes: ${failures.map(f => f.name).join(', ')}`,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        checks.push({
-          category: 'processes',
-          check: 'supervisord_status',
-          status: 'passed',
-          severity: 'info',
-          message: `All ${processes.length} supervisord processes running`,
-          details: {
-            total_processes: processes.length,
-            all_processes: processes
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
-    } catch (error) {
-      checks.push({
-        category: 'processes',
-        check: 'supervisord_status',
-        status: 'failed',
-        severity: 'error',
-        message: `Failed to read supervisord status: ${error.message}`,
-        details: { error: error.message },
-        auto_heal: false,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    return checks;
-  }
-
-  /**
-   * Verify file-based health rules
-   * Checks .services-running.json existence and validity
-   */
-  async verifyFiles() {
-    const checks = [];
-    const fileRules = this.rules.rules.files;
-
-    // Check: services_running_file
-    if (fileRules?.services_running_file?.enabled) {
-      const rule = fileRules.services_running_file;
-      const filePath = path.join(this.codingRoot, rule.path);
 
       try {
-        if (!fsSync.existsSync(filePath)) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), rule.timeout_ms || 5000);
+        const r = await fetch(endpoint, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
           checks.push({
-            category: 'files',
-            check: 'services_running_file',
-            check_id: `services_running_file_${Date.now()}`,
-            status: 'warning',
-            severity: rule.severity,
-            message: 'Services status file missing (.services-running.json)',
-            details: {
-              path: filePath,
-              issue: 'file_not_found'
-            },
-            auto_heal: rule.auto_heal,
-            auto_heal_action: rule.auto_heal_action,
-            recommendation: rule.recommendation,
+            category: 'services', check: name, check_id: name,
+            status: 'passed', severity: 'info',
+            message: `${name} healthy`,
+            details: { endpoint, http_status: r.status },
             timestamp: new Date().toISOString()
           });
         } else {
-          // File exists, validate JSON and required fields
-          const content = fsSync.readFileSync(filePath, 'utf8');
-          let data;
-          try {
-            data = JSON.parse(content);
-          } catch (parseError) {
-            checks.push({
-              category: 'files',
-              check: 'services_running_file',
-              check_id: `services_running_file_${Date.now()}`,
-              status: 'warning',
-              severity: rule.severity,
-              message: 'Services status file has invalid JSON',
-              details: {
-                path: filePath,
-                issue: 'invalid_json',
-                error: parseError.message
-              },
-              auto_heal: rule.auto_heal,
-              auto_heal_action: rule.auto_heal_action,
-              recommendation: rule.recommendation,
-              timestamp: new Date().toISOString()
-            });
-            return checks;
-          }
-
-          // Check required fields
-          const requiredFields = rule.required_fields || [];
-          const missingFields = requiredFields.filter(field => !(field in data));
-
-          if (missingFields.length > 0) {
-            checks.push({
-              category: 'files',
-              check: 'services_running_file',
-              check_id: `services_running_file_${Date.now()}`,
-              status: 'warning',
-              severity: rule.severity,
-              message: `Services status file missing required fields: ${missingFields.join(', ')}`,
-              details: {
-                path: filePath,
-                issue: 'missing_fields',
-                missing_fields: missingFields
-              },
-              auto_heal: rule.auto_heal,
-              auto_heal_action: rule.auto_heal_action,
-              recommendation: rule.recommendation,
-              timestamp: new Date().toISOString()
-            });
-          } else {
-            checks.push({
-              category: 'files',
-              check: 'services_running_file',
-              check_id: `services_running_file_${Date.now()}`,
-              status: 'passed',
-              severity: 'info',
-              message: 'Services status file valid',
-              details: {
-                path: filePath,
-                services_count: data.services?.length || 0
-              },
-              timestamp: new Date().toISOString()
-            });
-          }
+          checks.push({
+            category: 'services', check: name, check_id: name,
+            status: 'warning', severity: rule.severity || 'warning',
+            message: `${name} HTTP ${r.status}`,
+            details: { endpoint, http_status: r.status },
+            timestamp: new Date().toISOString()
+          });
         }
-      } catch (error) {
-        checks.push({
-          category: 'files',
-          check: 'services_running_file',
-          check_id: `services_running_file_${Date.now()}`,
-          status: 'error',
-          severity: 'error',
-          message: `Error checking services status file: ${error.message}`,
-          details: {
-            path: filePath,
-            error: error.message
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-
-    return checks;
-  }
-
-  /**
-   * Verify Docker single-file bind-mounts are not showing a stale snapshot.
-   *
-   * On macOS Docker Desktop, single-file bind-mounts occasionally cache the
-   * file at mount time and don't reflect later host edits. The container
-   * sees a truncated/old version while the host has the current bytes —
-   * which silently corrupts YAML/JSON loaders inside the container.
-   *
-   * Strategy: pick the small bind-mounted files that the dashboard and
-   * constraint-monitor actually read, compare host stat vs `docker exec
-   * stat`. Any mismatch means the mount is stale; auto-heal by recreating
-   * the container.
-   */
-  async verifyBindMountFreshness() {
-    const checks = [];
-    const rule = this.rules.rules.services?.bind_mount_freshness;
-    if (!rule?.enabled) return checks;
-
-    const containerName = rule.container || 'coding-services';
-
-    // Quick guard: skip when the container isn't running. The check is
-    // pointless then, and the docker invocations would hang.
-    try {
-      const { stdout } = await execAsync(
-        `docker ps --filter name=${containerName} --filter status=running --format '{{.Names}}'`,
-        { timeout: 5000 }
-      );
-      if (!stdout.trim().includes(containerName)) {
-        return checks;
-      }
-    } catch (err) {
-      // Docker not reachable from the verifier's environment — skip.
-      this.log(`Bind-mount freshness skipped: ${err.message}`);
-      return checks;
-    }
-
-    const mismatched = [];
-    for (const mapping of rule.files || []) {
-      const hostPath = path.isAbsolute(mapping.host)
-        ? mapping.host
-        : path.join(this.codingRoot, mapping.host);
-      const containerPath = mapping.container;
-
-      let hostSize, containerSize;
-      try {
-        hostSize = fsSync.statSync(hostPath).size;
-      } catch {
-        // Host file is missing — that's a configuration problem, not a
-        // freshness problem. Surface it as its own warning, then move on.
-        checks.push({
-          category: 'services',
-          check: `bind_mount_${path.basename(hostPath)}`,
-          status: 'failed',
-          message: `Bind-mount source missing on host: ${hostPath}`,
-          details: { hostPath },
-          timestamp: new Date().toISOString()
-        });
-        continue;
-      }
-      try {
-        const { stdout } = await execAsync(
-          `docker exec ${containerName} stat -c '%s' ${containerPath}`,
-          { timeout: 5000 }
-        );
-        containerSize = parseInt(stdout.trim(), 10);
       } catch (err) {
-        // The file isn't visible inside the container at all — also a
-        // mount misconfiguration, surface and continue.
+        // SPEC R6: surface unknown / warning, never healthy on exception.
         checks.push({
-          category: 'services',
-          check: `bind_mount_${path.basename(hostPath)}`,
-          status: 'failed',
-          message: `Bind-mount target missing in container: ${containerPath}`,
-          details: { containerPath, error: err.message },
+          category: 'services', check: name, check_id: name,
+          status: 'warning', severity: rule.severity || 'warning',
+          message: `${name} unreachable: ${err.message}`,
+          details: { endpoint, error: err.message },
           timestamp: new Date().toISOString()
         });
-        continue;
-      }
-
-      if (hostSize !== containerSize) {
-        mismatched.push({ hostPath, containerPath, hostSize, containerSize });
       }
     }
-
-    if (mismatched.length === 0) {
-      checks.push({
-        category: 'services',
-        check: 'bind_mount_freshness',
-        status: 'passed',
-        message: `All ${(rule.files || []).length} bind-mounted files match host`,
-        timestamp: new Date().toISOString()
-      });
-      return checks;
-    }
-
-    checks.push({
-      category: 'services',
-      check: 'bind_mount_freshness',
-      status: 'failed',
-      message: `${mismatched.length} bind-mount(s) showing stale snapshot in ${containerName}`,
-      details: { mismatched, container: containerName },
-      recommendation: `Recreate the container to refresh the bind-mounts`,
-      auto_heal: rule.auto_heal !== false,
-      auto_heal_action: 'refresh_bind_mounts',
-      severity: rule.severity || 'warning',
-      timestamp: new Date().toISOString()
-    });
 
     return checks;
   }
 
   /**
-   * Check if process is registered in PSM
+   * Verify observation quality — minimal placeholder; real quality metrics
+   * stay with the obs-api. Reporter mode does not need to duplicate them.
    */
-  async isProcessRegistered(pid, psmHealth) {
-    // Check global services
-    for (const service of Object.values(psmHealth.details.global)) {
-      if (service.pid === pid) return true;
-    }
-
-    // Check per-project services
-    for (const services of Object.values(psmHealth.details.projects)) {
-      for (const service of services) {
-        if (service.pid === pid) return true;
-      }
-    }
-
-    // Check session services
-    for (const services of Object.values(psmHealth.details.sessions)) {
-      for (const service of services) {
-        if (service.pid === pid) return true;
-      }
-    }
-
-    return false;
+  async verifyObservationQuality() {
+    return [];
   }
 
   /**
-   * Enhanced check for Constraint Monitor with enforcement status extraction
-   * Parses the response body to provide detailed enforcement health information
+   * Verify processes registered in PSM.
    */
-  async checkConstraintMonitorHealth(endpoint, timeout) {
-    const serviceName = 'constraint_monitor';
+  async verifyProcesses() {
+    const checks = [];
+    let psmHealth;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      psmHealth = await this.psm.getHealthStatus();
+    } catch (err) {
+      this.log(`PSM health unavailable for processes: ${err.message}`, 'WARN');
+      return checks;
+    }
 
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      // Parse response body for enforcement details
-      let healthData = {};
-      try {
-        healthData = await response.json();
-      } catch {
-        // Ignore parse errors
-      }
-
-      const enforcement = healthData.enforcement || {};
-      const checks = enforcement.checks || {};
-
-      if (response.ok && enforcement.healthy !== false) {
-        // Service healthy AND enforcement working
-        const enabledCount = checks.has_constraints?.enabled || 0;
-        const totalCount = checks.has_constraints?.count || 0;
-        return {
-          category: 'services',
-          check: serviceName,
-          check_id: `${serviceName}_${Date.now()}`,
-          status: 'passed',
-          message: `Constraint enforcement active (${enabledCount}/${totalCount} constraints)`,
-          details: {
-            endpoint,
-            status_code: response.status,
-            enforcement: enforcement
-          },
-          timestamp: new Date().toISOString()
-        };
-      } else {
-        // Service responding but enforcement broken
-        const enforcementMsg = enforcement.message || 'Unknown enforcement issue';
-        const failedChecks = [];
-
-        if (checks.config_loads && !checks.config_loads.passed) {
-          failedChecks.push(`config load failed: ${checks.config_loads.error || 'unknown'}`);
-        }
-        if (checks.enforcement_enabled && !checks.enforcement_enabled.passed) {
-          failedChecks.push('enforcement disabled in runtime config');
-        }
-        if (checks.has_constraints && !checks.has_constraints.passed) {
-          failedChecks.push('no constraints loaded');
-        }
-
-        return {
-          category: 'services',
-          check: serviceName,
-          check_id: `${serviceName}_${Date.now()}`,
-          status: 'error',
-          message: `Constraint enforcement BROKEN: ${enforcementMsg}`,
-          details: {
-            endpoint,
-            status_code: response.status,
-            enforcement: enforcement,
-            failed_checks: failedChecks
-          },
-          recommendation: failedChecks.length > 0
-            ? `Fix: ${failedChecks.join('; ')}`
-            : 'Check constraint monitor configuration',
-          timestamp: new Date().toISOString()
-        };
-      }
-    } catch (error) {
-      return {
-        category: 'services',
-        check: serviceName,
-        check_id: `${serviceName}_${Date.now()}`,
-        status: 'error',
-        message: `Constraint monitor unavailable: ${error.message}`,
-        details: { endpoint, error: error.message },
-        recommendation: 'Start constraint monitor service',
+    const processes = psmHealth.processes || {};
+    for (const [name, info] of Object.entries(processes)) {
+      const alive = info && info.alive !== false;
+      checks.push({
+        category: 'processes', check: name, check_id: name,
+        status: alive ? 'passed' : 'warning',
+        severity: alive ? 'info' : 'warning',
+        message: alive ? `${name} alive` : `${name} not alive`,
+        details: info,
         timestamp: new Date().toISOString()
-      };
+      });
     }
+    return checks;
   }
 
   /**
-   * Check HTTP health endpoint
+   * Verify files declared in rules.files (existence + freshness).
    */
-  async checkHTTPHealth(serviceName, endpoint, timeout) {
-    const resolvedEndpoint = resolveHostEndpoint(endpoint);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+  async verifyFiles() {
+    const checks = [];
+    const fileRules = this.rules.rules.files || {};
 
-      const response = await fetch(resolvedEndpoint, {
-        method: 'GET',
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        return {
-          category: 'services',
-          check: serviceName,
-          status: 'passed',
-          message: `${serviceName} is healthy`,
-          details: { endpoint, status_code: response.status },
-          timestamp: new Date().toISOString()
-        };
-      } else {
-        return {
-          category: 'services',
-          check: serviceName,
-          status: 'error',
-          message: `${serviceName} returned error status`,
-          details: { endpoint, status_code: response.status },
-          recommendation: `Check ${serviceName} logs and restart if needed`,
-          timestamp: new Date().toISOString()
-        };
+    for (const [name, rule] of Object.entries(fileRules)) {
+      if (!rule || !rule.enabled) continue;
+      const paths = rule.paths || (rule.path ? [rule.path] : []);
+      let allPresent = true;
+      const details = { paths: [] };
+      for (const p of paths) {
+        const abs = path.isAbsolute(p) ? p : path.join(this.codingRoot, p);
+        if (fsSync.existsSync(abs)) {
+          const st = fsSync.statSync(abs);
+          details.paths.push({ path: abs, present: true, mtime: st.mtimeMs });
+        } else {
+          allPresent = false;
+          details.paths.push({ path: abs, present: false });
+        }
       }
-    } catch (error) {
-      return {
-        category: 'services',
-        check: serviceName,
-        status: 'error',
-        message: `${serviceName} is unavailable`,
-        details: { endpoint, error: error.message },
-        recommendation: `Start ${serviceName} service`,
+      checks.push({
+        category: 'files', check: name, check_id: name,
+        status: allPresent ? 'passed' : 'warning',
+        severity: allPresent ? 'info' : (rule.severity || 'warning'),
+        message: allPresent ? `${name} present` : `${name} missing one or more paths`,
+        details,
         timestamp: new Date().toISOString()
-      };
+      });
     }
+    return checks;
   }
 
   /**
-   * Check if port is listening
-   */
-  async checkPortListening(serviceName, port, timeout) {
-    const { createConnection } = await import('net');
-    return new Promise((resolve) => {
-      const socket = createConnection({ port, host: 'localhost' });
-      const timer = setTimeout(() => {
-        socket.destroy();
-        resolve({
-          category: 'services',
-          check: serviceName,
-          status: 'failed',
-          message: `${serviceName} is unavailable (port ${port} connection timeout)`,
-          details: { port, error: 'connection timeout' },
-          timestamp: new Date().toISOString()
-        });
-      }, timeout || 3000);
-      socket.on('connect', () => {
-        clearTimeout(timer);
-        socket.destroy();
-        resolve({
-          category: 'services',
-          check: serviceName,
-          status: 'passed',
-          message: `${serviceName} is listening on port ${port}`,
-          details: { port },
-          timestamp: new Date().toISOString()
-        });
-      });
-      socket.on('error', (err) => {
-        clearTimeout(timer);
-        socket.destroy();
-        resolve({
-          category: 'services',
-          check: serviceName,
-          status: 'failed',
-          message: `${serviceName} is unavailable`,
-          details: { port, error: err.message },
-          timestamp: new Date().toISOString()
-        });
-      });
-    });
-  }
-
-  /**
-   * Check code-graph-rag cache staleness
-   * Note: Skipped in Docker mode because .git directory isn't available in containers
-   */
-  async checkCGRCacheStaleness() {
-    const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
-    const metadataFile = path.join(cgrDir, 'shared-data', 'cache-metadata.json');
-
-    // Skip staleness check in container — .git directory not available.
-    // But still try to read cache metadata to show cached commit info.
-    {
-      let details = { skipped_reason: 'no_git_access' };
-      let message = 'CGR cache check skipped (no .git access in container)';
-
-      // Try to read cache metadata for display
-      if (fsSync.existsSync(metadataFile)) {
-        try {
-          const metadata = JSON.parse(fsSync.readFileSync(metadataFile, 'utf-8'));
-          details = {
-            ...details,
-            repo_name: metadata.repo_name,
-            cached_commit: metadata.commit_short || metadata.commit_hash?.substring(0, 7),
-            indexed_at: metadata.indexed_at,
-            stats: metadata.stats
-          };
-          message = `CGR cache @ ${details.cached_commit} (staleness unknown - Docker mode)`;
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
-
-      return {
-        category: 'databases',
-        check: 'cgr_cache',
-        status: 'passed',
-        severity: 'info',
-        message,
-        details
-      };
-    }
-
-    const stalenessScript = path.join(cgrDir, 'scripts', 'check-cache-staleness.sh');
-
-    // Check if script exists
-    if (!fsSync.existsSync(stalenessScript)) {
-      return {
-        category: 'databases',
-        check: 'cgr_cache',
-        status: 'passed',
-        severity: 'info',
-        message: 'CGR cache staleness check not available',
-        details: { script_missing: true }
-      };
-    }
-
-    try {
-      const { execSync } = await import('child_process');
-      const result = execSync(`"${stalenessScript}" "${this.codingRoot}"`, {
-        encoding: 'utf-8',
-        timeout: 10000
-      });
-
-      const staleness = JSON.parse(result);
-
-      if (staleness.status === 'no_cache') {
-        return {
-          category: 'databases',
-          check: 'cgr_cache',
-          status: 'warning',
-          severity: 'warning',
-          message: 'CGR cache not found - indexing required',
-          recommendation: 'Run: cd integrations/code-graph-rag && uv run graph-code load-index',
-          details: staleness
-        };
-      }
-
-      if (staleness.is_stale) {
-        return {
-          category: 'databases',
-          check: 'cgr_cache',
-          status: 'warning',
-          severity: 'warning',
-          message: `CGR cache is ${staleness.commits_behind || 'many'} commits behind`,
-          recommendation: 'Reindex with: cd integrations/code-graph-rag && uv run graph-code load-index',
-          details: staleness
-        };
-      }
-
-      return {
-        category: 'databases',
-        check: 'cgr_cache',
-        status: 'passed',
-        message: `CGR cache fresh (${staleness.cached_commit})`,
-        details: staleness
-      };
-    } catch (error) {
-      // Exit code 1 means stale, 2 means no cache
-      if (error.status === 1) {
-        try {
-          const staleness = JSON.parse(error.stdout);
-          return {
-            category: 'databases',
-            check: 'cgr_cache',
-            status: 'warning',
-            severity: 'warning',
-            message: `CGR cache stale: ${staleness.commits_behind || 'unknown'} commits behind`,
-            recommendation: 'Reindex code-graph-rag',
-            details: staleness
-          };
-        } catch {
-          // Couldn't parse output
-        }
-      }
-
-      return {
-        category: 'databases',
-        check: 'cgr_cache',
-        status: 'passed',
-        severity: 'info',
-        message: 'CGR cache check unavailable',
-        details: { error: error.message }
-      };
-    }
-  }
-
-  /**
-   * Generate comprehensive health report
+   * Aggregate per-check entries into a report.
    */
   generateReport(checks, duration) {
-    // Categorize checks
     const passed = checks.filter(c => c.status === 'passed');
     const violations = checks.filter(c => c.status !== 'passed');
 
-    // Count by severity (only for violations, not all checks)
     const bySeverity = {
       info: violations.filter(c => c.severity === 'info').length,
       warning: violations.filter(c => c.severity === 'warning').length,
@@ -1630,20 +380,11 @@ class HealthVerifier extends EventEmitter {
       critical: violations.filter(c => c.severity === 'critical').length
     };
 
-    // Determine overall status (based on actual violations)
     let overallStatus = 'healthy';
-    if (bySeverity.critical > 0) {
-      overallStatus = 'unhealthy';
-    } else if (bySeverity.error > 0) {
+    if (bySeverity.critical > 0) overallStatus = 'unhealthy';
+    else if (bySeverity.error > 0) overallStatus = 'degraded';
+    else if (bySeverity.warning >= (this.rules.alert_thresholds?.violation_count_warning ?? 99))
       overallStatus = 'degraded';
-    } else if (bySeverity.warning >= this.rules.alert_thresholds.violation_count_warning) {
-      overallStatus = 'degraded';
-    }
-
-    // Generate recommendations
-    const recommendations = violations
-      .filter(v => v.recommendation)
-      .map(v => v.recommendation);
 
     return {
       version: this.rules.version,
@@ -1657,486 +398,18 @@ class HealthVerifier extends EventEmitter {
       },
       checks,
       violations,
-      recommendations: [...new Set(recommendations)], // Remove duplicates
-      metadata: {
-        verification_duration_ms: duration,
-        rules_version: this.rules.version,
-        last_verification: this.lastReport?.timestamp || null
-      }
+      metadata: { verification_duration_ms: duration }
     };
   }
 
-  /**
-   * Save report to disk
-   */
-  async saveReport(report) {
-    try {
-      // Save latest report
-      await fs.writeFile(this.reportPath, JSON.stringify(report, null, 2), 'utf8');
-
-      // Save to history
-      const historyFile = path.join(
-        this.historyPath,
-        `report-${Date.now()}.json`
-      );
-      await fs.writeFile(historyFile, JSON.stringify(report, null, 2), 'utf8');
-
-      // Clean old history files (keep last N days)
-      await this.cleanHistoryFiles();
-
-      this.lastReport = report;
-      this.log('Report saved successfully');
-
-    } catch (error) {
-      this.log(`Failed to save report: ${error.message}`, 'ERROR');
-      throw error;
-    }
-  }
-
-  /**
-   * Update status file for StatusLine integration
-   */
-  async updateStatus(report) {
-    // Only count warning+ severity violations for the statusline indicator.
-    // Info-severity violations are known/expected conditions (e.g., corporate network
-    // blocking LLM APIs) that shouldn't trigger the warning icon.
-    const actionableViolations = report.violations.filter(
-      v => v.severity === 'warning' || v.severity === 'error' || v.severity === 'critical'
-    );
-    const status = {
-      overallStatus: report.overallStatus,
-      violationCount: actionableViolations.length,
-      criticalCount: report.summary.by_severity.critical,
-      lastUpdate: report.timestamp,
-      autoHealingActive: false // Will be updated when auto-healing is implemented
-    };
-
-    try {
-      await fs.writeFile(this.statusPath, JSON.stringify(status, null, 2), 'utf8');
-    } catch (error) {
-      this.log(`Failed to update status: ${error.message}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Clean old history files
-   */
-  async cleanHistoryFiles() {
-    try {
-      const files = await fs.readdir(this.historyPath);
-      const retentionMs = this.rules.verification.report_retention_days * 24 * 60 * 60 * 1000;
-      const cutoffTime = Date.now() - retentionMs;
-
-      for (const file of files) {
-        if (!file.startsWith('report-') || !file.endsWith('.json')) continue;
-
-        const filePath = path.join(this.historyPath, file);
-        const stats = await fs.stat(filePath);
-
-        if (stats.mtimeMs < cutoffTime) {
-          await fs.unlink(filePath);
-          this.log(`Deleted old history file: ${file}`);
-        }
-      }
-    } catch (error) {
-      this.log(`Failed to clean history: ${error.message}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Log report summary
-   */
   logReportSummary(report) {
-    const { summary, overallStatus, violations } = report;
-    const status = overallStatus.toUpperCase();
-
+    const status = report.overallStatus.toUpperCase();
     this.log(`Health Status: ${status}`);
-    this.log(`Checks: ${summary.total_checks} total, ${summary.passed} passed, ${summary.violations} violations`);
-    this.log(`Severity: ${summary.by_severity.critical} critical, ${summary.by_severity.error} errors, ${summary.by_severity.warning} warnings`);
-
-    if (violations.length > 0) {
-      this.log(`Top violations:`, 'WARN');
-      violations.slice(0, 3).forEach(v => {
-        this.log(`  - [${v.severity.toUpperCase()}] ${v.message}`, 'WARN');
-      });
-    }
-  }
-
-  /**
-   * Check if another health-verifier instance is already running
-   * @returns {Promise<{running: boolean, pid?: number}>}
-   */
-  async checkExistingInstance() {
-    try {
-      // Check PSM for existing instance using getService (not getServicesByType which doesn't exist)
-      const existing = await this.psm.getService('health-verifier', 'global');
-      if (existing && existing.pid) {
-        // Verify the process is actually running
-        try {
-          process.kill(existing.pid, 0); // Signal 0 just checks if process exists
-          return { running: true, pid: existing.pid };
-        } catch (e) {
-          // Process doesn't exist, clean up stale entry
-          this.log(`Cleaning up stale PSM entry for health-verifier (PID: ${existing.pid})`);
-          await this.psm.unregisterService('health-verifier', 'global');
-          return { running: false };
-        }
-      }
-      return { running: false };
-    } catch (error) {
-      this.log(`Error checking existing instance: ${error.message}`, 'WARN');
-      return { running: false };
-    }
-  }
-
-  /**
-   * Write heartbeat file to prove daemon is alive and timer is firing
-   */
-  async writeHeartbeat() {
-    const heartbeatPath = path.join(this.codingRoot, '.health', 'verifier-heartbeat.json');
-    const heartbeat = {
-      pid: process.pid,
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      memoryUsage: process.memoryUsage().heapUsed,
-      cycleCount: this.cycleCount || 0,
-      consecutiveErrors: this.consecutiveErrors || 0
-    };
-    try {
-      await fs.writeFile(heartbeatPath, JSON.stringify(heartbeat, null, 2));
-      this.lastHeartbeatWrite = Date.now();
-    } catch (error) {
-      this.log(`Failed to write heartbeat: ${error.message}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Self-watchdog: Check if our own heartbeat is stale (indicating we're stuck)
-   * If stale, trigger a graceful restart by exiting (external supervisor will restart)
-   */
-  checkSelfHealth() {
-    const heartbeatPath = path.join(this.codingRoot, '.health', 'verifier-heartbeat.json');
-    const MAX_STALE_MS = 180000; // 3 minutes - if no heartbeat update for 3 min, we're stuck
-    const MAX_CONSECUTIVE_ERRORS = 10; // If 10+ consecutive errors, restart
-
-    try {
-      // Check heartbeat file age
-      if (fsSync.existsSync(heartbeatPath)) {
-        const stats = fsSync.statSync(heartbeatPath);
-        const age = Date.now() - stats.mtimeMs;
-
-        if (age > MAX_STALE_MS) {
-          this.log(`WATCHDOG: Heartbeat file is stale (${Math.round(age/1000)}s old). Self-restarting...`, 'ERROR');
-          this.triggerSelfRestart('stale_heartbeat');
-          return;
-        }
-      }
-
-      // Check consecutive errors
-      if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-        this.log(`WATCHDOG: Too many consecutive errors (${this.consecutiveErrors}). Self-restarting...`, 'ERROR');
-        this.triggerSelfRestart('too_many_errors');
-        return;
-      }
-
-      // Check memory usage (restart if using > 500MB to prevent memory leaks)
-      const memUsage = process.memoryUsage();
-      if (memUsage.heapUsed > 500 * 1024 * 1024) {
-        this.log(`WATCHDOG: High memory usage (${Math.round(memUsage.heapUsed / 1024 / 1024)}MB). Self-restarting...`, 'WARN');
-        this.triggerSelfRestart('high_memory');
-        return;
-      }
-
-    } catch (error) {
-      this.log(`WATCHDOG check failed: ${error.message}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Trigger a graceful self-restart
-   */
-  async triggerSelfRestart(reason) {
-    this.log(`Triggering self-restart due to: ${reason}`);
-
-    // Write a restart marker so we know this was intentional
-    const restartMarker = path.join(this.codingRoot, '.health', 'verifier-restart-marker.json');
-    try {
-      await fs.writeFile(restartMarker, JSON.stringify({
-        reason,
-        timestamp: new Date().toISOString(),
-        pid: process.pid,
-        cycleCount: this.cycleCount,
-        consecutiveErrors: this.consecutiveErrors
-      }, null, 2));
-    } catch (e) {
-      // Ignore write errors during restart
-    }
-
-    // Clean up PSM entry
-    try {
-      await this.psm.unregisterService('health-verifier', 'global');
-    } catch (e) {
-      // Ignore cleanup errors
-    }
-
-    // Exit with code 1 to signal abnormal termination
-    // External process manager (if any) should restart us
-    process.exit(1);
-  }
-
-  /**
-   * Run verify() with timeout protection to prevent hanging
-   */
-  async verifyWithTimeout(timeoutMs = 60000) {
-    return new Promise(async (resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Verification timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      try {
-        await this.verify();
-        clearTimeout(timeoutId);
-        resolve();
-      } catch (error) {
-        clearTimeout(timeoutId);
-        reject(error);
-      }
-    });
-  }
-
-  /**
-   * Start daemon mode with robust error handling and self-watchdog
-   */
-  async start() {
-    if (this.running) {
-      this.log('Health verifier already running');
-      return;
-    }
-
-    // Singleton enforcement is delegated to supervisord, which manages this
-    // process's lifecycle inside the coding-services container.
-
-    this.running = true;
-    this.cycleCount = 0;
-    this.consecutiveErrors = 0; // Track consecutive errors for watchdog
-    this.lastSuccessfulCycle = Date.now();
-    this.log('Starting health verifier daemon mode');
-
-    // Check for restart marker (indicates we self-restarted)
-    const restartMarker = path.join(this.codingRoot, '.health', 'verifier-restart-marker.json');
-    if (fsSync.existsSync(restartMarker)) {
-      try {
-        const marker = JSON.parse(fsSync.readFileSync(restartMarker, 'utf8'));
-        this.log(`Restarted after self-restart (reason: ${marker.reason}, previous cycles: ${marker.cycleCount})`);
-        fsSync.unlinkSync(restartMarker); // Clean up marker
-      } catch (e) {
-        // Ignore marker read errors
-      }
-    }
-
-    // Install global error handlers to prevent silent failures
-    process.on('uncaughtException', (error) => {
-      this.log(`UNCAUGHT EXCEPTION: ${error.message}\n${error.stack}`, 'ERROR');
-      this.consecutiveErrors++;
-      // Don't exit immediately - let watchdog decide based on error count
-    });
-
-    process.on('unhandledRejection', (reason) => {
-      this.log(`UNHANDLED REJECTION: ${reason}`, 'ERROR');
-      this.consecutiveErrors++;
-      // Don't exit immediately - let watchdog decide
-    });
-
-    // Register this instance with PSM
-    try {
-      await this.psm.registerService({
-        name: 'health-verifier',
-        pid: process.pid,
-        type: 'global',
-        script: 'scripts/health-verifier.js'
-      });
-      this.log(`Registered with PSM (PID: ${process.pid})`);
-    } catch (error) {
-      this.log(`Failed to register with PSM: ${error.message}`, 'WARN');
-    }
-
-    // Run initial verification with timeout protection
-    try {
-      await this.verifyWithTimeout(60000);
-      await this.writeHeartbeat();
-    } catch (error) {
-      this.log(`Initial verification failed: ${error.message}`, 'ERROR');
-      this.consecutiveErrors++;
-      await this.writeHeartbeat().catch(() => {});
-    }
-
-    // Schedule periodic verification with robust error handling
-    const interval = this.rules.verification.interval_seconds * 1000;
-    const verificationTimeout = Math.min(interval - 5000, 60000); // Leave 5s buffer, max 60s
-
-    const runCycle = async () => {
-      this.cycleCount++;
-      const cycleStart = Date.now();
-
-      try {
-        // Write heartbeat BEFORE verify to prove timer fired
-        await this.writeHeartbeat();
-        this.log(`Timer cycle ${this.cycleCount} started`);
-
-        // Use timeout-protected verification
-        await this.verifyWithTimeout(verificationTimeout);
-
-        const cycleDuration = Date.now() - cycleStart;
-        this.log(`Timer cycle ${this.cycleCount} completed in ${cycleDuration}ms`);
-
-        // Success - reset error count
-        this.consecutiveErrors = 0;
-        this.lastSuccessfulCycle = Date.now();
-      } catch (error) {
-        this.consecutiveErrors++;
-        this.log(`Verification error in cycle ${this.cycleCount} (consecutive: ${this.consecutiveErrors}): ${error.message}`, 'ERROR');
-
-        // Write heartbeat even on error to prove we're still running
-        await this.writeHeartbeat().catch(() => {});
-
-        // If too many consecutive errors, run self-health check immediately
-        if (this.consecutiveErrors >= 5) {
-          this.log(`High error count (${this.consecutiveErrors}), running immediate watchdog check`, 'WARN');
-          this.checkSelfHealth();
-        }
-      }
-    };
-
-    this.timer = setInterval(runCycle, interval);
-
-    // Additional safety: timer reference check
-    this.timerCheckInterval = setInterval(() => {
-      if (!this.timer) {
-        this.log('CRITICAL: Main timer was cleared unexpectedly! Restarting...', 'ERROR');
-        this.timer = setInterval(runCycle, interval);
-      }
-    }, interval * 2); // Check every 2 cycles
-
-    // WATCHDOG: Self-health check runs every 90 seconds
-    // Checks: stale heartbeat, consecutive errors, memory usage
-    this.watchdogInterval = setInterval(() => {
-      this.checkSelfHealth();
-    }, 90000);
-
-    this.log(`Health verifier running (interval: ${this.rules.verification.interval_seconds}s, watchdog: 90s)`);
-  }
-
-  /**
-   * Stop daemon mode
-   */
-  async stop() {
-    if (!this.running) {
-      this.log('Health verifier not running');
-      return;
-    }
-
-    this.running = false;
-
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-
-    if (this.timerCheckInterval) {
-      clearInterval(this.timerCheckInterval);
-      this.timerCheckInterval = null;
-    }
-
-    if (this.watchdogInterval) {
-      clearInterval(this.watchdogInterval);
-      this.watchdogInterval = null;
-    }
-
-    // Unregister from PSM
-    try {
-      await this.psm.unregisterService('health-verifier', 'global');
-      this.log('Unregistered from PSM');
-    } catch (error) {
-      this.log(`Failed to unregister from PSM: ${error.message}`, 'WARN');
-    }
-
-    this.log('Health verifier stopped');
-  }
-
-  /**
-   * Perform auto-healing for detected violations
-   */
-  async performAutoHealing(checks) {
-    const results = {
-      attemptedActions: 0,
-      successCount: 0,
-      failedCount: 0,
-      skippedCount: 0,
-      actions: []
-    };
-
-    // Find all violations that have auto_heal enabled
-    const healableViolations = checks.filter(c =>
-      c.status !== 'passed' && c.auto_heal && c.auto_heal_action
-    );
-
-    if (healableViolations.length === 0) {
-      this.log('No auto-healable violations found');
-      return results;
-    }
-
-    this.log(`Found ${healableViolations.length} auto-healable violation(s)`);
-
-    // Execute remediation actions
-    for (const violation of healableViolations) {
-      results.attemptedActions++;
-
-      this.log(`Attempting to heal: ${violation.check} (${violation.auto_heal_action})`);
-
-      try {
-        const actionResult = await this.remediation.executeAction(
-          violation.auto_heal_action,
-          violation.details || {}
-        );
-
-        results.actions.push({
-          violation: violation.check,
-          action: violation.auto_heal_action,
-          result: actionResult
-        });
-
-        if (actionResult.success) {
-          results.successCount++;
-          this.log(`✓ Healing successful: ${violation.check}`);
-        } else if (actionResult.reason === 'cooldown') {
-          results.skippedCount++;
-          this.log(`⏸ Healing skipped (cooldown): ${violation.check}`);
-        } else {
-          results.failedCount++;
-          this.log(`✗ Healing failed: ${violation.check} - ${actionResult.message}`, 'WARN');
-        }
-
-      } catch (error) {
-        results.failedCount++;
-        this.log(`✗ Healing error: ${violation.check} - ${error.message}`, 'ERROR');
-      }
-
-      // Small delay between actions to avoid overwhelming the system
-      await this.sleep(1000);
-    }
-
-    return results;
-  }
-
-  /**
-   * Helper: Sleep
-   */
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    this.log(`Checks: ${report.summary.total_checks} total, ${report.summary.passed} passed, ${report.summary.violations} violations`);
   }
 }
 
-// CLI Interface
+// CLI Interface — Phase 33 reporter mode.
 runIfMain(import.meta.url, () => {
   const command = process.argv[2] || 'verify';
   const verifier = new HealthVerifier({ debug: true });
@@ -2144,155 +417,92 @@ runIfMain(import.meta.url, () => {
   switch (command) {
     case 'verify':
       verifier.verify()
-        .then(report => {
-          console.log('\n✅ Health Verification Complete');
-          console.log(`Overall Status: ${report.overallStatus.toUpperCase()}`);
-          console.log(`Violations: ${report.violations.length}`);
-          process.exit(report.overallStatus === 'healthy' ? 0 : 1);
-        })
-        .catch(error => {
-          console.error('❌ Verification failed:', error.message);
-          process.exit(1);
-        });
-      break;
-
-    case 'start':
-      verifier.start()
-        .then(() => {
-          console.log('✅ Health verifier started');
-          // Watch for code changes and auto-restart (supervisor will restart us)
-          enableAutoRestart({
-            scriptUrl: import.meta.url,
-            dependencies: [
-              './process-state-manager.js',
-              './health-remediation-actions.js'
-            ],
-            cleanupFn: () => verifier.stop(),
-            logger: (msg) => verifier.log(msg)
-          });
-
-          // Keep process alive
-          process.on('SIGINT', async () => {
-            await verifier.stop();
-            process.exit(0);
-          });
-        })
-        .catch(error => {
-          console.error('❌ Failed to start:', error.message);
-          process.exit(1);
-        });
-      break;
-
-    case 'stop':
-      // Must find the actual running daemon and kill it (not just call stop() on new instance)
-      verifier.checkExistingInstance()
-        .then(async (existing) => {
-          if (!existing.running) {
-            console.log('ℹ️  Health verifier is not running');
-            process.exit(0);
-          }
-
-          console.log(`🛑 Stopping health verifier (PID: ${existing.pid})...`);
-
+        .then(async (report) => {
+          // Phase 33: POST a verify_run signal to the coordinator instead
+          // of writing .health/verification-status.json. SPEC R6: if the
+          // coordinator is unreachable, exit non-zero.
+          const anyFailures = report.violations.length > 0;
           try {
-            // Send SIGTERM to gracefully stop the daemon
-            process.kill(existing.pid, 'SIGTERM');
-
-            // Wait briefly for process to exit
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Verify it stopped
-            try {
-              process.kill(existing.pid, 0);
-              // Still running - force kill
-              console.log('⚠️  Process still running, sending SIGKILL...');
-              process.kill(existing.pid, 'SIGKILL');
-            } catch (e) {
-              // Process is gone - success
-            }
-
-            // Clean up PSM entry
-            try {
-              await verifier.psm.unregisterService('health-verifier', 'global');
-            } catch (e) {
-              // Ignore cleanup errors
-            }
-
-            console.log('✅ Health verifier stopped');
-            process.exit(0);
-          } catch (killError) {
-            console.error('❌ Failed to stop daemon:', killError.message);
-            process.exit(1);
+            await postSignal({
+              kind: 'verify_run',
+              source: 'health-verifier-cli',
+              status: anyFailures ? 'unhealthy' : 'healthy',
+              payload: { results: report.checks, summary: report.summary },
+              ts: Date.now()
+            });
+          } catch {
+            // postSignal already wrote a stderr message; surface non-zero
+            // to caller so CI / shell knows the coordinator path failed.
+            process.exit(2);
           }
+          process.stderr.write(`Health Verification Complete\n`);
+          process.stderr.write(`Overall Status: ${report.overallStatus.toUpperCase()}\n`);
+          process.stderr.write(`Violations: ${report.violations.length}\n`);
+          process.exit(anyFailures ? 1 : 0);
         })
-        .catch(error => {
-          console.error('❌ Failed to check existing instance:', error.message);
+        .catch(err => {
+          process.stderr.write(`Verification failed: ${err.message}\n`);
           process.exit(1);
         });
       break;
 
     case 'status':
-      try {
-        const statusPath = path.join(verifier.codingRoot, '.health/verification-status.json');
-        const statusData = fsSync.readFileSync(statusPath, 'utf8');
-        const status = JSON.parse(statusData);
-        console.log('\n📊 Health Status:');
-        console.log(JSON.stringify(status, null, 2));
-        process.exit(0);
-      } catch (error) {
-        console.error('❌ Failed to read status:', error.message);
-        process.exit(1);
-      }
+      // Phase 33: read /health/state from the coordinator (no more .health/*.json reads).
+      (async () => {
+        try {
+          const r = await fetch(`${COORDINATOR}/health/state`);
+          if (!r.ok) {
+            process.stderr.write(`coordinator HTTP ${r.status}\n`);
+            process.exit(1);
+          }
+          const state = await r.json();
+          process.stdout.write(JSON.stringify(state, null, 2) + '\n');
+          process.exit(0);
+        } catch (err) {
+          process.stderr.write(`coordinator unreachable: ${err.message}\n`);
+          process.exit(1);
+        }
+      })();
       break;
 
     case 'report':
-      try {
-        const reportPath = path.join(verifier.codingRoot, '.health/verification-report.json');
-        const reportData = fsSync.readFileSync(reportPath, 'utf8');
-        const report = JSON.parse(reportData);
-
-        if (process.argv.includes('--json')) {
-          console.log(JSON.stringify(report, null, 2));
-        } else {
-          console.log('\n📋 Health Report:');
-          console.log(`Status: ${report.overallStatus.toUpperCase()}`);
-          console.log(`Timestamp: ${report.timestamp}`);
-          console.log(`\nSummary:`);
-          console.log(`  Total Checks: ${report.summary.total_checks}`);
-          console.log(`  Passed: ${report.summary.passed}`);
-          console.log(`  Violations: ${report.summary.violations}`);
-          console.log(`\nBy Severity:`);
-          console.log(`  Critical: ${report.summary.by_severity.critical}`);
-          console.log(`  Errors: ${report.summary.by_severity.error}`);
-          console.log(`  Warnings: ${report.summary.by_severity.warning}`);
-
-          if (report.violations.length > 0) {
-            console.log(`\n⚠️  Violations:`);
-            report.violations.forEach((v, i) => {
-              console.log(`  ${i + 1}. [${v.severity.toUpperCase()}] ${v.message}`);
-              if (v.recommendation) {
-                console.log(`     → ${v.recommendation}`);
-              }
-            });
+      // Phase 33: same source as `status` (coordinator /health/state),
+      // optionally rendered compactly without --json.
+      (async () => {
+        try {
+          const r = await fetch(`${COORDINATOR}/health/state`);
+          if (!r.ok) {
+            process.stderr.write(`coordinator HTTP ${r.status}\n`);
+            process.exit(1);
           }
+          const state = await r.json();
+          if (process.argv.includes('--json')) {
+            process.stdout.write(JSON.stringify(state, null, 2) + '\n');
+          } else {
+            process.stdout.write(`Health Report\n`);
+            process.stdout.write(`Generated: ${state.generated_at || '(unknown)'}\n`);
+            process.stdout.write(`Container: ${state.container?.healthcheck?.status || state.container?.healthcheck || 'unknown'}\n`);
+            process.stdout.write(`Databases: ${state.databases?.status || 'unknown'}\n`);
+            process.stdout.write(`Services tracked: ${(state.services || []).length}\n`);
+            process.stdout.write(`LSL sessions: ${Object.keys(state.lsl || {}).length}\n`);
+          }
+          process.exit(0);
+        } catch (err) {
+          process.stderr.write(`coordinator unreachable: ${err.message}\n`);
+          process.exit(1);
         }
-        process.exit(0);
-      } catch (error) {
-        console.error('❌ Failed to read report:', error.message);
-        process.exit(1);
-      }
+      })();
       break;
 
     default:
-      console.error('Unknown command:', command);
-      console.log('\nUsage:');
-      console.log('  health-verifier verify              # One-time verification');
-      console.log('  health-verifier start               # Start daemon mode');
-      console.log('  health-verifier stop                # Stop daemon');
-      console.log('  health-verifier status              # Show latest status');
-      console.log('  health-verifier report [--json]     # Show detailed report');
+      process.stderr.write(`Unknown command: ${command}\n`);
+      process.stderr.write(`\nUsage:\n`);
+      process.stderr.write(`  health-verifier verify              # Run checks, POST verify_run signal\n`);
+      process.stderr.write(`  health-verifier status              # Read /health/state from coordinator\n`);
+      process.stderr.write(`  health-verifier report [--json]     # Read /health/state from coordinator\n`);
       process.exit(1);
   }
 });
 
 export default HealthVerifier;
+export { postSignal };

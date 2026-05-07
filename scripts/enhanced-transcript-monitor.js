@@ -106,7 +106,10 @@ class EnhancedTranscriptMonitor {
       debug: this.debug_enabled,
       sessionDuration: config.sessionDuration || 7200000, // 2 hours (generous for debugging)
       timezone: config.timezone || getTimezone(), // Use central timezone config
-      healthFile: this.getCentralizedHealthFile(config.projectPath || this.getProjectPath(config)),
+      // Phase 33: healthFile path retired — coordinator owns the SoT now.
+      // The field is left undefined; legacy callers that referenced it are
+      // replaced by _postSignal calls in updateHealthFile/cleanupHealthFile.
+      healthFile: undefined,
       mode: config.mode || 'all', // Processing mode: 'all' or 'foreign'
       ...config
     };
@@ -223,20 +226,36 @@ class EnhancedTranscriptMonitor {
 
     // Track LSL line numbers for each exchange
     this.exchangeLineNumbers = new Map(); // Map exchange ID to {start, end} line numbers
+
+    // Phase 33 D-09: read session id from env vars set by bin/coding via
+    // scripts/launch-agent-common.sh:67-76. Fall back to a process-derived id only
+    // for diagnostic display — the env-var path is authoritative.
+    this.sessionId =
+      process.env.CLAUDE_SESSION_ID ||
+      process.env.SESSION_ID ||
+      `etm-${process.pid}-${Date.now()}`;
   }
+
   /**
-   * Get centralized health file path in coding project to avoid cluttering individual projects
+   * Phase 33: POST a signal to the coordinator instead of writing to disk.
+   * Failure is logged at debug level only — coordinator marks this session
+   * 'stopped' after >15s with no signal (D-10), which is the correct
+   * R6 surface (NEVER 'healthy' on exception).
    */
-  getCentralizedHealthFile(projectPath) {
-    // Get coding project path
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
-    
-    // Create project-specific health file name based on project path
-    const projectName = path.basename(projectPath);
-    const healthFileName = `${projectName}-transcript-monitor-health.json`;
-    
-    // Store in coding project's .health directory
-    return path.join(codingPath, '.health', healthFileName);
+  async _postSignal(signal) {
+    const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+    try {
+      const r = await fetch(`${url}/signals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signal)
+      });
+      if (!r.ok) {
+        this.debug(`signal POST returned ${r.status}`);
+      }
+    } catch (err) {
+      this.debug(`signal POST failed: ${err.message}`);
+    }
   }
 
   /**
@@ -4271,27 +4290,29 @@ ORDER BY m.time_created ASC;`;
   }
 
   /**
-   * Update health file to indicate monitor is running
+   * Phase 33: POST an lsl_heartbeat signal to the coordinator on each poll
+   * cycle. Replaces the legacy .health/<projectName>-transcript-monitor-health.json
+   * file write — coordinator owns the SoT now (D-09).
    */
-  updateHealthFile() {
+  async updateHealthFile() {
     try {
       // Generate user hash for multi-user collision prevention
       const userHash = UserHashGenerator.generateHash({ debug: false });
-      
+
       // Get current process and system metrics
       const memUsage = process.memoryUsage();
       const cpuUsage = process.cpuUsage();
       const uptime = process.uptime();
-      
+
       // CRITICAL FIX: Add suspicious activity detection
       const uptimeHours = uptime / 3600;
       const isSuspiciousActivity = this.exchangeCount === 0 && uptimeHours > 0.5; // No exchanges after 30+ minutes
-      
+
       // Check if transcript file exists and get its info
       let transcriptStatus = 'unknown';
       let transcriptSize = 0;
       let transcriptAge = 0;
-      
+
       if (this.transcriptPath) {
         try {
           const stats = fs.statSync(this.transcriptPath);
@@ -4304,12 +4325,9 @@ ORDER BY m.time_created ASC;`;
       } else {
         transcriptStatus = 'not_found';
       }
-      
+
       const healthData = {
         timestamp: Date.now(),
-        projectPath: this.config.projectPath,
-        transcriptPath: this.transcriptPath,
-        status: isSuspiciousActivity ? 'suspicious' : 'running',
         userHash: userHash,
         metrics: {
           memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
@@ -4337,17 +4355,32 @@ ORDER BY m.time_created ASC;`;
         trajectory: this.trajectoryAnalyzer ? this.trajectoryAnalyzer.getCurrentTrajectoryState() : null,
         knowledgeExtraction: this.getKnowledgeExtractionStatus()
       };
-      
+
       // Add warning if suspicious activity detected
       if (isSuspiciousActivity) {
         console.warn(`⚠️ HEALTH WARNING: Monitor has processed 0 exchanges in ${uptimeHours.toFixed(1)} hours`);
         console.warn(`   Current transcript: ${this.transcriptPath ? path.basename(this.transcriptPath) : 'none'}`);
         console.warn(`   Transcript status: ${transcriptStatus} (${transcriptSize} bytes, age: ${Math.round(transcriptAge/1000)}s)`);
       }
-      
-      fs.writeFileSync(this.config.healthFile, JSON.stringify(healthData, null, 2));
+
+      // Phase 33 D-09: POST lsl_heartbeat signal to coordinator (replaces
+      // the legacy file write). session_id comes from CLAUDE_SESSION_ID ||
+      // SESSION_ID env vars set by bin/coding via launch-agent-common.sh.
+      await this._postSignal({
+        kind: 'lsl_heartbeat',
+        session_id: this.sessionId,
+        source: 'enhanced-transcript-monitor',
+        status: isSuspiciousActivity ? 'degraded' : 'running',
+        payload: {
+          projectPath: this.config.projectPath,
+          transcriptPath: this.transcriptPath,
+          exchangeCount: this.exchangeCount,
+          ...healthData
+        },
+        ts: Date.now()
+      });
     } catch (error) {
-      this.debug(`Failed to update health file: ${error.message}`);
+      this.debug(`Failed to update health signal: ${error.message}`);
     }
   }
 
@@ -4379,30 +4412,29 @@ ORDER BY m.time_created ASC;`;
   }
 
   /**
-   * Update health file on shutdown with 'stopped' status
-   * Previously this deleted the file, but that caused health verifier to report
-   * false errors when no Claude session was active for a project.
-   * Now we keep the file but mark it as stopped.
+   * Phase 33: POST a 'stopped' lsl_heartbeat signal on graceful shutdown.
+   * Replaces the legacy file write at this position. The coordinator's
+   * 5-minute eviction window (D-10) drops the entry from /health/state.lsl
+   * after this signal lands.
    */
-  cleanupHealthFile() {
+  async cleanupHealthFile() {
     try {
-      const stoppedHealth = {
-        timestamp: Date.now(),
-        projectPath: this.config.projectPath,
-        transcriptPath: this.transcriptPath,
+      await this._postSignal({
+        kind: 'lsl_heartbeat',
+        session_id: this.sessionId,
+        source: 'enhanced-transcript-monitor',
         status: 'stopped',
-        stoppedAt: new Date().toISOString(),
-        reason: 'graceful_shutdown',
-        metrics: {
-          processId: process.pid,
-          uptimeSeconds: Math.round(process.uptime()),
-          finalExchangeCount: this.exchangeCount || 0
-        }
-      };
-      fs.writeFileSync(this.config.healthFile, JSON.stringify(stoppedHealth, null, 2));
-      this.debug('Health file updated with stopped status');
+        payload: {
+          reason: 'graceful_shutdown',
+          projectPath: this.config.projectPath,
+          finalExchangeCount: this.exchangeCount || 0,
+          uptimeSeconds: Math.round(process.uptime())
+        },
+        ts: Date.now()
+      });
+      this.debug('Stopped signal posted');
     } catch (error) {
-      this.debug(`Failed to update health file on shutdown: ${error.message}`);
+      this.debug(`Failed to post stopped signal: ${error.message}`);
     }
   }
 }

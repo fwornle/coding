@@ -251,6 +251,23 @@ function ingestSignal(signal) {
       currentState.databases = { status: signal.status || 'unknown' };
       break;
     }
+    case 'verify_run': {
+      // Phase 33 plan 33-04: health-verifier-cli POSTs a verify_run summary
+      // signal after a one-shot verify. We surface it as a service entry so
+      // the SoT records that the verifier ran and what its overall status was.
+      if (!signal.source) throw new Error('verify_run requires source');
+      const idx = currentState.services.findIndex(s => s.name === signal.source);
+      const entry = {
+        name: signal.source,
+        status: signal.status || 'unknown',
+        last_seen: ts,
+        last_run: ts,
+        violations: signal.payload?.summary?.violations
+      };
+      if (idx >= 0) currentState.services[idx] = entry;
+      else currentState.services.push(entry);
+      break;
+    }
     default:
       // Tolerant: accept unknown kinds in the skeleton stage; later plans tighten.
       log(`ingestSignal: unknown kind '${signal.kind}'`, 'WARN');
