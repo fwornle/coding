@@ -409,6 +409,7 @@ class SystemHealthAPIServer {
                 return res.status(503).json({
                     status: 'success',
                     data: {
+                        summary: { passed: 0, total_checks: 0 },
                         overallStatus: 'unknown',
                         checks: [],
                         violations: [],
@@ -485,9 +486,15 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // SPEC R8 frontend-compat: bundle gates dispatch on `n.data && n.data.summary`.
+            // Without `summary`, the entire payload is silently dropped (UI shows "no check data yet").
+            // Frontend reads `summary.passed` and `summary.total_checks`.
+            const passed = checks.filter(c => c.status === 'healthy' || c.status === 'running' || c.status === 'ok').length;
+            const summary = { passed, total_checks: checks.length };
             res.json({
                 status: 'success',
                 data: {
+                    summary,
                     checks,
                     violations,
                     generated_at: state && state.generated_at ? state.generated_at : new Date().toISOString()
