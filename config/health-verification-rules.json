@@ -124,6 +124,17 @@
         "auto_heal_note": "Proxy runs on host, not in supervisord. Auto-heal disabled \u2014 manual start: cd integrations/llm-cli-proxy && npm start",
         "expected_status": "required"
       },
+      "obs_api": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "http_health",
+        "endpoint": "http://localhost:12436/health",
+        "timeout_ms": 3000,
+        "description": "Observations API server (obs-api) - REST + SSE for live observation feed",
+        "auto_heal": false,
+        "auto_heal_note": "No host-side supervisor for obs-api in this environment; restart manually: nohup node scripts/observations-api-server.mjs &",
+        "expected_status": "required"
+      },
       "enhanced_transcript_monitor": {
         "enabled": true,
         "severity": "error",

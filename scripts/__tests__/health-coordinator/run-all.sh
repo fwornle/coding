@@ -14,6 +14,7 @@ for t in \
   docker-health-passthrough.test.sh \
   injection.test.sh \
   two-session-agreement.test.sh \
+  service-liveness.test.sh \
   keepalive.test.sh \
   detection-latency.test.sh \
   eviction.test.sh
