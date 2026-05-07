@@ -240,22 +240,39 @@ class CombinedStatusLine {
    * Get trajectory state from live-state.json
    */
   /**
-   * Check LSL transcript monitor health independently.
+   * Check LSL transcript monitor health for the CURRENT pane (D-11 / G3 fix, plan 33-13).
+   *
+   * Per-pane semantics: status reflects THIS session's lsl heartbeat, not the
+   * project rollup. With two tmux panes / same project, a dead pane shows red,
+   * a live pane shows green — making it visually obvious which session is sick.
+   *
+   * Reads from coordinator's /health/state.lsl[<sid>] where <sid> matches
+   * `process.env.CLAUDE_SESSION_ID` (the canonical session-id form per D-09:
+   * `claude-<pid>-<ts>`, set by bin/coding/launch-agent-common.sh and emitted
+   * by ETM as the lsl_heartbeat signal's session_id).
+   *
+   * Synchronous because this is a tmux statusline tick (~1Hz). 2s timeout via
+   * AbortController; fail-closed to 'down' on coordinator unreachable, missing
+   * sid env var, or no entry — consistent with SPEC R6 (never silently 'healthy'
+   * on error).
+   *
    * Returns 'healthy', 'stale', or 'down'.
    */
   getLSLHealthStatus() {
+    const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
+    if (!sid) return 'down';
+    const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
     try {
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const healthFile = join(codingPath, '.health', 'coding-transcript-monitor-health.json');
-
-      if (!existsSync(healthFile)) return 'down';
-
-      const health = JSON.parse(readFileSync(healthFile, 'utf8'));
-      if (health.status === 'stopped') return 'down';
-
-      const ageMs = Date.now() - (health.timestamp || 0);
-      if (ageMs > 120_000) return 'stale'; // 2 minutes
-
+      const out = execSync(
+        `curl -fs --max-time 2 "${url}/health/state"`,
+        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      const state = JSON.parse(out);
+      const entry = state.lsl?.[sid];
+      if (!entry) return 'down';
+      if (entry.status === 'stopped') return 'down';
+      const ageMs = Date.now() - (entry.lastBeat || entry.last_seen || 0);
+      if (ageMs > 120_000) return 'stale';
       return 'healthy';
     } catch {
       return 'down';
