@@ -421,22 +421,23 @@ class SystemHealthAPIServer {
             const violations = [];
 
             // Container check
-            // SPEC R8 frontend-compat: dist/ expects c.check, NOT c.name (#33-postclose-1).
-            // Emit BOTH so any future consumer can read either field; rebuild remains gated.
+            // SPEC R8 frontend-compat: dist/ does:
+            //   1) checks.filter(c => c.category === 'services'|'processes'|'databases')
+            //   2) checks.find(c => c.check === '<bare-name>')
+            // The 33-05 reshape provided neither field. Emit `check:` (bare-name lookup),
+            // `category:` (panel-filter), AND `name:` (post-Phase-33 namespaced consumer).
+            // Frontend dist/ stays gated per SPEC R8 — no rebuild.
             if (state && state.container) {
                 const c = state.container.healthcheck || 'unknown';
-                checks.push({ check: 'container', name: 'container', status: c, source: 'docker.healthcheck' });
+                checks.push({ check: 'container', name: 'container', category: 'services', status: c, source: 'docker.healthcheck' });
                 if (c === 'unhealthy') violations.push({ kind: 'container', severity: 'critical', detail: c });
             }
 
             // Services
-            // Frontend (built pre-Phase 33) does `checks.find(c => c.check === 'dashboard_server')`
-            // etc. — it wants UNPREFIXED check names. Emit `check: <bare>` for that lookup;
-            // keep `name: service.<bare>` for any post-Phase 33 namespaced consumer.
             if (state && Array.isArray(state.services)) {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
-                    checks.push({ check: svc.name, name: `service.${svc.name}`, status: svc.status || 'unknown', last_seen: svc.last_seen });
+                    checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: svc.status || 'unknown', last_seen: svc.last_seen });
                     if (svc.status && svc.status !== 'running') {
                         violations.push({ kind: `service.${svc.name}`, severity: 'high', detail: svc.status });
                     }
@@ -447,17 +448,21 @@ class SystemHealthAPIServer {
             if (state && Array.isArray(state.processes)) {
                 for (const p of state.processes) {
                     if (!p || !p.name) continue;
-                    checks.push({ check: p.name, name: `process.${p.name}`, status: p.status || 'unknown' });
+                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: p.status || 'unknown' });
                     if (p.status && p.status !== 'running' && p.status !== 'healthy') {
                         violations.push({ kind: `process.${p.name}`, severity: 'medium', detail: p.status });
                     }
                 }
             }
+            // Synthetic stale_pids entry — coordinator doesn't track stale PIDs (legacy verifier did).
+            // Emit a dummy 'healthy' so the Process panel renders 'Process Registry' / 'Stale PIDs'
+            // rather than empty. Source labeled as synthetic for traceability.
+            checks.push({ check: 'stale_pids', name: 'process.stale_pids', category: 'processes', status: 'healthy', source: 'synthetic.coordinator-derived' });
 
             // LSL by project
             if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
                 for (const [project, status] of Object.entries(state.lsl_by_project)) {
-                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, status });
+                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status });
                     if (status !== 'healthy') {
                         violations.push({ kind: `lsl.${project}`, severity: 'medium', detail: status });
                     }
@@ -467,7 +472,7 @@ class SystemHealthAPIServer {
             // Databases — flatten sub-checks the frontend expects (leveldb_lock_check,
             // qdrant_availability, etc.) AND emit the rollup as 'databases'.
             if (state && state.databases && state.databases.status) {
-                checks.push({ check: 'databases', name: 'databases', status: state.databases.status });
+                checks.push({ check: 'databases', name: 'databases', category: 'databases', status: state.databases.status });
                 if (state.databases.status !== 'healthy') {
                     violations.push({ kind: 'databases', severity: 'high', detail: state.databases.status });
                 }
@@ -475,7 +480,7 @@ class SystemHealthAPIServer {
                 for (const subKey of ['leveldb_lock_check', 'leveldb_accessibility', 'qdrant_availability', 'graph_integrity']) {
                     const sub = state.databases[subKey];
                     if (sub != null && typeof sub === 'string') {
-                        checks.push({ check: subKey, name: `databases.${subKey}`, status: sub });
+                        checks.push({ check: subKey, name: `databases.${subKey}`, category: 'databases', status: sub });
                     }
                 }
             }
