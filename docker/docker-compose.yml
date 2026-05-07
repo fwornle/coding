@@ -96,6 +96,10 @@ services:
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
       # Dashboard server (live-mounted to avoid Docker rebuild for API changes)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/server.js:/coding/integrations/system-health-dashboard/server.js:ro
+      # Dashboard SPA static-server (live-mounted; Phase 33 plan 33-10 G2 fix
+      # added /api/* reverse-proxy and we need host edits to take effect without
+      # a Docker image rebuild — same pattern as server.js above).
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/static-server.js:/coding/integrations/system-health-dashboard/static-server.js:ro
       # Constraint monitor source (live-mounted so dashboard-server changes
       # don't require an image rebuild).
       - ${CODING_REPO:-.}/integrations/mcp-constraint-monitor/src:/coding/integrations/mcp-constraint-monitor/src:ro
