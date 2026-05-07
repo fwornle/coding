@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 33 (health-monitoring-consolidation) — VERIFICATION GAPS FOUND (8/8 plans done; phase NOT yet complete)
-Plan: 8 of 8 done — 33-08 surfaced 5 SPEC AC failures + 1 timing issue
-Status: Awaiting `/gsd-plan-phase 33 --gaps`. Gap inventory: G1 (services probe absent — 33-03), G2 (dashboard verify route — 33-05), G3/G4 (schema drift — 33-03/04), G5/G6 (cleanup), G7 NEW (plist EnvironmentVariables doesn't propagate launchctl setenv), G8 NEW (eviction test 17s vs ~19s actual)
-Last activity: 2026-05-07 -- 33-08 acceptance run: 7 PASS / 1 PASS-DEVIATION / 5 FAIL / 1 FAIL-no-run
+Phase: 33 (health-monitoring-consolidation) — GAP-CLOSURE PLANNED (8 main plans done; 6 gap-closure plans 33-09..33-14 created; ready for execute --gaps-only)
+Plan: 14 plans total (8 main complete, 6 gap-closure pending)
+Status: Awaiting `/gsd-execute-phase 33 --gaps-only`. Wave layout: W1 parallel (33-09 G1, 33-10 G2, 33-12 G7, 33-14 cleanup), W2 (33-11 G4, after 33-09), W3 (33-13 G3, after 33-09 + 33-11). 33-12 and 33-13 contain blocking checkpoints (human-verify, decision).
+Last activity: 2026-05-07 -- gap-closure plans 33-09..33-14 created and verified by gsd-plan-checker (PASSED across 12 dimensions)
 
 Progress: [██████████] 100%
 
