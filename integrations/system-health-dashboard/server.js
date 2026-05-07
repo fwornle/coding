@@ -413,6 +413,7 @@ class SystemHealthAPIServer {
                         overallStatus: 'unknown',
                         checks: [],
                         violations: [],
+                        recommendations: [],
                         upstream: `HTTP ${upstream.status}`
                     }
                 });
@@ -497,6 +498,7 @@ class SystemHealthAPIServer {
                     summary,
                     checks,
                     violations,
+                    recommendations: [],
                     generated_at: state && state.generated_at ? state.generated_at : new Date().toISOString()
                 }
             });
