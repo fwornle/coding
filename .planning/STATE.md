@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 33 (health-monitoring-consolidation) — GAP-CLOSURE PLANNED (8 main plans done; 6 gap-closure plans 33-09..33-14 created; ready for execute --gaps-only)
-Plan: 14 plans total (8 main complete, 6 gap-closure pending)
-Status: Awaiting `/gsd-execute-phase 33 --gaps-only`. Wave layout: W1 parallel (33-09 G1, 33-10 G2, 33-12 G7, 33-14 cleanup), W2 (33-11 G4, after 33-09), W3 (33-13 G3, after 33-09 + 33-11). 33-12 and 33-13 contain blocking checkpoints (human-verify, decision).
-Last activity: 2026-05-07 -- gap-closure plans 33-09..33-14 created and verified by gsd-plan-checker (PASSED across 12 dimensions)
+Phase: 33 (health-monitoring-consolidation) — GAP-CLOSURE EXECUTING (8 main + 4 of 6 gap-closure plans done; 33-12 BLOCKED → 33-15 to author)
+Plan: 12 of 14 done (33-09 G1 ✓, 33-10 G2 ✓, 33-12 G7 BLOCKED — hypothesis falsified, 33-14 G5+G6+G8 ✓; remaining: 33-11 wave 2, 33-13 wave 3, 33-15 NEW for G7)
+Status: Wave 1 merged. AC #5 + AC #9 PASS at runtime (G2 closed). G1 service probes live: 7/9 services running w/ measured latency. Awaiting wave 2 (33-11). Plan 33-15 to be authored for G7 via POST /test/inject (per user decision A on architectural checkpoint — plist propagation hypothesis falsified).
+Last activity: 2026-05-07 -- wave 1 merged (4 worktrees), 33-12 closed-blocked, 33-15 G7 alternative pending author
 
 Progress: [██████████] 100%
 
