@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 33 (health-monitoring-consolidation) — GAP-CLOSURE EXECUTING (8 main + 4 of 6 gap-closure plans done; 33-12 BLOCKED → 33-15 to author)
-Plan: 12 of 14 done (33-09 G1 ✓, 33-10 G2 ✓, 33-12 G7 BLOCKED — hypothesis falsified, 33-14 G5+G6+G8 ✓; remaining: 33-11 wave 2, 33-13 wave 3, 33-15 NEW for G7)
-Status: Wave 1 merged. AC #5 + AC #9 PASS at runtime (G2 closed). G1 service probes live: 7/9 services running w/ measured latency. Awaiting wave 2 (33-11). Plan 33-15 to be authored for G7 via POST /test/inject (per user decision A on architectural checkpoint — plist propagation hypothesis falsified).
-Last activity: 2026-05-07 -- wave 1 merged (4 worktrees), 33-12 closed-blocked, 33-15 G7 alternative pending author
+Phase: 33 (health-monitoring-consolidation) — GAP-CLOSURE: 7/8 GAPS CLOSED (G7 only outstanding)
+Plan: 14 of 14 plans have SUMMARY (incl. 33-12 closed-blocked). G7 deferred to NEW plan 33-15 (POST /test/inject per user option A).
+Status: G1, G2, G3, G4, G5, G6, G8 closed at runtime. G7 outstanding. Live verification: services[] populated, dashboard /api/* JSON, .container.healthcheck unified, statusline LSL badge per-pane (D-11 locked). Next: author 33-15, execute, re-run 33-08 to verify final AC count goes from 7/13 → 12/13 (or 13/13 if AC#2 deviation accepted).
+Last activity: 2026-05-07 -- wave 3 (33-13 G3 per-pane LSL) merged; D-11 locked; per-pane statusline live-verified
 
 Progress: [██████████] 100%
 
