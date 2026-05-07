@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 33 (health-monitoring-consolidation) — EXECUTING
-Plan: 8 of 8
-Status: Wave 5 complete (33-06 + 33-07 merged with cutover patch); wave 6 (33-08 acceptance) pending
-Last activity: 2026-05-07 -- 33-07 cutover landed + Option A patch (zombies killed); 6 known gaps (G1-G6) deferred to 33-08
+Phase: 33 (health-monitoring-consolidation) — VERIFICATION GAPS FOUND (8/8 plans done; phase NOT yet complete)
+Plan: 8 of 8 done — 33-08 surfaced 5 SPEC AC failures + 1 timing issue
+Status: Awaiting `/gsd-plan-phase 33 --gaps`. Gap inventory: G1 (services probe absent — 33-03), G2 (dashboard verify route — 33-05), G3/G4 (schema drift — 33-03/04), G5/G6 (cleanup), G7 NEW (plist EnvironmentVariables doesn't propagate launchctl setenv), G8 NEW (eviction test 17s vs ~19s actual)
+Last activity: 2026-05-07 -- 33-08 acceptance run: 7 PASS / 1 PASS-DEVIATION / 5 FAIL / 1 FAIL-no-run
 
 Progress: [██████████] 100%
 
