@@ -14,7 +14,9 @@ curl -sf -X POST -H 'Content-Type: application/json' \
   -d "{\"kind\":\"lsl_heartbeat\",\"session_id\":\"$SID\",\"source\":\"mock\",\"status\":\"running\",\"payload\":{\"projectPath\":\"/tmp\"},\"ts\":$(python3 -c 'import time; print(int(time.time()*1000))')}" \
   "$URL/signals" >/dev/null
 
-sleep 17  # > 15s threshold → status: stopped
+sleep 22  # > 15s threshold + 5s tick + 2s slack → status: stopped
+# G8 (plan 33-14): was 17s; transition actually fires at age 15-20s
+# (next tick boundary after >15s threshold), so 17s was timing-fragile.
 assert_state_field ".lsl[\"$SID\"].status" 'stopped' 'session stopped' || exit 1
 
 # Wait 5 min + slack — D-10: stopped sessions evict after 5min
