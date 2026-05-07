@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
 status: executing
-stopped_at: Phase 33 context gathered
-last_updated: "2026-05-07T05:32:16.367Z"
-last_activity: 2026-05-07 -- Phase 33 execution started
+stopped_at: Phase 33 — 33-05 reader migration complete (wave 4)
+last_updated: "2026-05-07T06:30:00.000Z"
+last_activity: 2026-05-07 -- 33-05 reader migration (prompt-hook + 2 dashboards) merged
 progress:
   total_phases: 7
   completed_phases: 6
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 33 (health-monitoring-consolidation) — EXECUTING
-Plan: 5 of 8
-Status: Wave 3 complete (33-04 merged); waves 4-6 pending
-Last activity: 2026-05-07 -- 33-04 reporter-mode conversion + smoke test merged
+Plan: 6 of 8
+Status: Wave 4 complete (33-05 merged); waves 5-6 pending (rules cleanup + cutover + acceptance)
+Last activity: 2026-05-07 -- 33-05 reader migration (prompt-hook + 2 dashboards) merged
 
 Progress: [██████████] 100%
 
@@ -73,6 +73,7 @@ Progress: [██████████] 100%
 - Working memory (300-token KG+state prefix) integrated into retrieve() pipeline with fail-open VKB fetch and STATE.md parsing
 - Per-agent RRF scoring profiles: agent identity flows from adapters through context.agent to rrf-fusion for two-pass tier weighting
 - Session state written to .coding/session-state.json with 2-hour staleness window for cross-agent continuity
+- [33-05]: Three consumer migrations done — prompt-hook + system-health-dashboard + constraint-monitor dashboard all fetch /health/state from coordinator instead of readFileSync of `.health/*.json`. SPEC AC #7 grep gate clean. Coordinator unreachable surfaces as `overallStatus: 'unknown'` (NEVER 'healthy'). Q3 graceful no-op preserved when prompt-hook is invoked outside the coding repo (empty additionalContext). Dashboard frontend `dist/` NOT rebuilt — backward-compat preserved per SPEC R8.
 
 ### Blockers/Concerns
 
