@@ -197,3 +197,44 @@ This corrected framing should be locked into D-11's text (whichever option the u
    - Writes D-11 entry into 33-CONTEXT.md after D-10
    - Implements the chosen option (TDD if option-b or option-d; pure-doc if user insists on option-a or option-c despite the evidence)
    - Returns to Task 3 (checkpoint:human-verify) for the two-pane tmux verification
+
+## Implementation (Task 2 — option b chosen)
+
+**User decision:** option (b) — per-pane semantics. Locked as **D-11** in `33-CONTEXT.md` after D-10.
+
+**Code change (one file, ~20 lines):** `scripts/combined-status-line.js` `getLSLHealthStatus()` rewritten.
+
+- **Before:** read `.health/coding-transcript-monitor-health.json` (deleted file → always `'down'`).
+- **After:** `execSync('curl -fs --max-time 2 ${HEALTH_COORDINATOR_URL}/health/state')` → JSON parse → look up `state.lsl[process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID]` → return `'healthy'` if entry fresh (< 120s), `'stale'` if older, `'down'` if missing/stopped.
+- Keeps the existing `'healthy' | 'stale' | 'down'` return contract — caller code at `combined-status-line.js:1607-1612` works unchanged.
+- Fail-closed to `'down'` on coordinator unreachable, missing sid env, missing entry, or any exception — consistent with SPEC R6.
+
+**Live verification (post-edit, post-cache-clear):**
+- Run with `CLAUDE_SESSION_ID=claude-60474-1777723363` (matching coordinator key, `lastBeat` ~1s old) → no `[LSL...]` badge in output (compact-on-healthy convention).
+- Run with `CLAUDE_SESSION_ID=bogus-sid-xyz` → `[LSL🔴]` shown.
+- Both verified by direct invocation against the live `:3034` coordinator.
+
+**Discovered: 30s output cache** at `.logs/combined-status-line-cache*.txt` bypasses `getLSLHealthStatus()` entirely on hits. Not a bug — it's the documented fast-path for tmux statusline ticks. The post-merge live test deletes the cache once; subsequent ticks regenerate it with the new logic.
+
+**G3 closed.** Per-pane semantics deliver:
+- This pane (`claude-60474-1777723363`) — green, no badge.
+- A new tmux pane spawned via `coding` will get a fresh `CLAUDE_SESSION_ID` and its statusline will show whatever its own session reports.
+- A pane whose session has died but the tmux process lingers — red `[LSL🔴]`, distinguishing dead from live in a multi-pane view.
+
+## AC #5 (two-session-agreement) — closure
+
+Already PASSes after wave 1's G2 fix (verified on main at commit `eb38edfd5`). G3's per-pane semantics add the visual distinction the user explicitly requested in the original screenshots; AC #5's automated assertion is unchanged.
+
+## Self-Check: PASSED
+
+| Artifact | Status |
+|---|---|
+| `combined-status-line.js` `getLSLHealthStatus()` reads coordinator | PASS |
+| Returns 'healthy' for matching sid w/ fresh entry | PASS (live verified) |
+| Returns 'down' for missing/bogus sid | PASS (live verified) |
+| Fail-closed to 'down' on coordinator unreachable / parse failure | PASS (try/catch path) |
+| `node --check` exits 0 | PASS |
+| No debug residue (LSL_DEBUG removed) | PASS |
+| D-11 locked in CONTEXT.md after D-10 | PASS |
+| No `console.log` calls (no-console-log constraint) | PASS (only `process.stderr` if it had been kept) |
+| STATE.md / ROADMAP.md NOT modified | PASS |

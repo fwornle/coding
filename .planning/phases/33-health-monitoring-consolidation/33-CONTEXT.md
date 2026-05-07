@@ -83,6 +83,8 @@ Downstream agents MUST read `33-SPEC.md` before planning or implementing. Requir
 
 - **D-10: Stopped sessions linger 5 min then evict.** When a session's heartbeat is >15s stale, coordinator marks `lsl[<sid>].status = 'stopped'` but keeps the entry visible in `/health/state.lsl`. After 5 min in `stopped`, coordinator drops the entry. Per-project rollup recomputes on each tick: `lsl_by_project[name] = healthy ⇔ ≥1 session_id under that project is fresh`. Lets users see "session X stopped" in the dashboard without stale entries accumulating forever.
 
+- **D-11: Statusline LSL badge uses per-pane semantics** (locked 2026-05-07 in plan 33-13 for G3 closure; user picked option (b) from the decision checkpoint). The tmux statusline reads `state.lsl[CLAUDE_SESSION_ID]` from the coordinator (the canonical D-09 session-id form), NOT the project rollup `lsl_by_project[name]`. Rationale: per-pane semantics let the user see WHICH pane is sick — with two tmux panes / same project, a dead pane shows red, a live pane stays green. This is strictly more informative than the project rollup at the same implementation cost. Consumer: `scripts/combined-status-line.js` `getLSLHealthStatus()`. Fail-closed to `'down'` on coordinator unreachable, missing `CLAUDE_SESSION_ID`, or missing entry — consistent with SPEC R6 (never silently `'healthy'` on error).
+
 ### Claude's Discretion
 
 The following lower-impact decisions are left to the planner/researcher to recommend; they were intentionally not pinned in discussion:
