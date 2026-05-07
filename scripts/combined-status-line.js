@@ -62,16 +62,11 @@ class CombinedStatusLine {
       const healthVerifierStatus = await this.getHealthVerifierStatus();
       const ukbStatus = this.getUKBStatus();
 
-      // Only run ensure* supervision when GPS is NOT running.
-      // GPS + Coordinator are the authoritative supervisors; CSL should be display-only
-      // when they're active. This prevents triple-spawning from 3 overlapping supervisors.
-      const gpsRunning = await this.isGlobalProcessSupervisorRunning();
-      if (!gpsRunning) {
-        await this.ensureTranscriptMonitorRunning();
-        await this.ensureAllTranscriptMonitorsRunning();
-        await this.ensureStatuslineHealthMonitorRunning();
-        await this.ensureGlobalProcessSupervisorRunning();
-      }
+      // Phase 33 plan 07: launchd's com.coding.health-coordinator KeepAlive
+      // is the authoritative supervisor for the host-side health stack;
+      // combined-status-line is purely display-only post-cutover. The
+      // legacy ensure*Running spawn paths and the GPS heartbeat probe were
+      // removed along with the four legacy daemons.
 
       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
 
@@ -1494,126 +1489,13 @@ class CombinedStatusLine {
   }
 
 
-  /**
-   * Ensure global-process-supervisor is running
-   * This supervisor watches health-verifier and statusline-health-monitor
-   * and restarts them if they die
-   */
-  /**
-   * Quick check if GPS is running (heartbeat file-based, no PSM overhead)
-   */
-  async isGlobalProcessSupervisorRunning() {
-    try {
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const heartbeatFile = join(codingPath, '.health', 'supervisor-heartbeat.json');
-      if (!existsSync(heartbeatFile)) return false;
-      const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf8'));
-      const age = Date.now() - new Date(heartbeat.timestamp).getTime();
-      return age < 60000; // Fresh heartbeat = GPS is running
-    } catch {
-      return false;
-    }
-  }
-
-  async ensureGlobalProcessSupervisorRunning() {
-    try {
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-
-      // Check PSM for existing healthy instance
-      try {
-        const ProcessStateManager = (await import('./process-state-manager.js')).default;
-        const psm = new ProcessStateManager();
-        await psm.initialize();
-
-        // Check if global-process-supervisor is running
-        const isRunning = await psm.isServiceRunning('global-process-supervisor', 'global');
-
-        if (isRunning) {
-          // Already running, nothing to do
-          if (process.env.DEBUG_STATUS) {
-            console.error('DEBUG: Global process supervisor already running via PSM');
-          }
-          return;
-        }
-      } catch (psmError) {
-        if (process.env.DEBUG_STATUS) {
-          console.error('DEBUG: PSM check failed:', psmError.message);
-        }
-        // Fall through to heartbeat check
-      }
-
-      // Fallback: Check heartbeat file freshness
-      const heartbeatFile = join(codingPath, '.health', 'supervisor-heartbeat.json');
-
-      if (existsSync(heartbeatFile)) {
-        try {
-          const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf8'));
-          const age = Date.now() - new Date(heartbeat.timestamp).getTime();
-
-          // If heartbeat updated in last 60 seconds, supervisor is likely running
-          if (age < 60000) {
-            if (process.env.DEBUG_STATUS) {
-              console.error('DEBUG: Supervisor heartbeat fresh, likely running');
-            }
-            return;
-          }
-        } catch {
-          // Ignore heartbeat read errors
-        }
-      }
-
-      // Supervisor not running or stale - start it
-      if (process.env.DEBUG_STATUS) {
-        console.error('DEBUG: Global process supervisor not detected, starting...');
-      }
-      await this.startGlobalProcessSupervisor();
-    } catch (error) {
-      if (process.env.DEBUG_STATUS) {
-        console.error('DEBUG: Error checking global process supervisor:', error.message);
-      }
-    }
-  }
-
-  /**
-   * Start the global process supervisor daemon
-   */
-  async startGlobalProcessSupervisor() {
-    try {
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const supervisorScript = join(codingPath, 'scripts', 'global-process-supervisor.js');
-
-      if (!existsSync(supervisorScript)) {
-        if (process.env.DEBUG_STATUS) {
-          console.error('DEBUG: Global process supervisor script not found');
-        }
-        return;
-      }
-
-      const { spawn } = await import('child_process');
-
-      // Start supervisor in daemon mode
-      const supervisor = spawn('node', [supervisorScript, '--daemon'], {
-        detached: true,
-        stdio: 'ignore',
-        cwd: codingPath,
-        env: {
-          ...process.env,
-          CODING_REPO: codingPath
-        }
-      });
-
-      supervisor.unref(); // Allow parent to exit without waiting
-
-      if (process.env.DEBUG_STATUS) {
-        console.error('DEBUG: Started global process supervisor with PID:', supervisor.pid);
-      }
-
-    } catch (error) {
-      if (process.env.DEBUG_STATUS) {
-        console.error('DEBUG: Failed to start global process supervisor:', error.message);
-      }
-    }
-  }
+  // Phase 33 plan 07: the legacy host process-supervisor daemon is gone
+  // (deleted in plan 33-07 cutover); launchd's com.coding.health-coordinator
+  // KeepAlive is the authoritative supervisor for the host-side health
+  // stack. The methods that used to probe the legacy supervisor's
+  // heartbeat file and spawn it on demand were removed along with their
+  // `.health/supervisor-heartbeat.json` dependency. combined-status-line
+  // is now display-only.
 
   async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus) {
     const parts = [];

@@ -43,8 +43,11 @@ class MonitoringVerifier {
     this.timeout = options.timeout || 30000; // 30 seconds
     
     this.logPath = path.join(this.codingRepoPath, '.logs', 'monitoring-verifier.log');
-    this.systemWatchdogScript = path.join(this.codingRepoPath, 'scripts', 'system-monitor-watchdog.js');
-    this.coordinatorScript = path.join(this.codingRepoPath, 'scripts', 'global-service-coordinator.js');
+    // Phase 33 plan 07: the four legacy daemon scripts (system watchdog,
+    // host process supervisor, global service coordinator, per-project LSL
+    // coordinator) were deleted. The new authoritative supervisor is the
+    // health coordinator HTTP server reached via this URL.
+    this.healthCoordinatorUrl = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
 
     this.results = {
       systemWatchdog: { status: 'pending', details: null },
@@ -121,56 +124,34 @@ class MonitoringVerifier {
   }
 
   /**
-   * STEP 1: Verify System Watchdog is configured and operational
+   * STEP 1: Verify the host-side launchd job for the health coordinator
+   * is loaded.
+   *
+   * Phase 33 plan 07: the legacy launchd job com.coding.system-watchdog
+   * was retired in favor of com.coding.health-coordinator (whose
+   * KeepAlive is the authoritative supervisor for the host-side health
+   * stack). This step now checks the new plist is loaded.
    */
   async verifySystemWatchdog() {
-    this.log('🔍 STEP 1: Verifying System Watchdog...');
-    
-    try {
-      // Check if watchdog script exists
-      if (!fs.existsSync(this.systemWatchdogScript)) {
-        this.results.systemWatchdog = {
-          status: 'error',
-          details: 'System watchdog script not found'
-        };
-        return false;
-      }
+    this.log('🔍 STEP 1: Verifying launchd com.coding.health-coordinator job...');
 
-      // Run watchdog status check
-      const { stdout } = await execAsync(`node "${this.systemWatchdogScript}" --status`);
-      const status = this.parseJsonFromOutput(stdout);
-      
-      if (status.coordinator.alive) {
+    try {
+      const { stdout } = await execAsync('launchctl list 2>/dev/null || true');
+      const loaded = stdout.split('\n').some(line => line.includes('com.coding.health-coordinator'));
+      if (loaded) {
         this.results.systemWatchdog = {
           status: 'success',
-          details: `Coordinator healthy (PID: ${status.coordinator.pid})`
+          details: 'launchd job com.coding.health-coordinator is loaded'
         };
-        this.success('✅ System Watchdog: Coordinator verified healthy');
+        this.success('✅ System Watchdog: launchd com.coding.health-coordinator loaded');
         return true;
-      } else {
-        // Watchdog detected dead coordinator - trigger recovery
-        this.warn('⚠️ System Watchdog: Coordinator dead, triggering recovery...');
-
-        try {
-          await execAsync(`node "${this.systemWatchdogScript}"`);
-          // If we get here, recovery succeeded (exit code 0)
-          this.results.systemWatchdog = {
-            status: 'warning',
-            details: 'Coordinator was dead but successfully recovered'
-          };
-          this.success('✅ System Watchdog: Recovery successful');
-          return true;
-        } catch (recoveryError) {
-          // Recovery failed (non-zero exit code)
-          this.results.systemWatchdog = {
-            status: 'error',
-            details: 'Coordinator dead and recovery failed'
-          };
-          this.error(`❌ System Watchdog: Recovery failed - ${recoveryError.message}`);
-          return false;
-        }
       }
-
+      this.results.systemWatchdog = {
+        status: 'error',
+        details: 'launchd job com.coding.health-coordinator not loaded'
+      };
+      this.error('❌ System Watchdog: launchd com.coding.health-coordinator not loaded');
+      return false;
     } catch (error) {
       this.results.systemWatchdog = {
         status: 'error',
@@ -182,68 +163,49 @@ class MonitoringVerifier {
   }
 
   /**
-   * STEP 2: Verify Global Service Coordinator is running and healthy
+   * STEP 2: Verify the host-side health coordinator HTTP server is
+   * responding (Phase 33 plan 07 cutover replaced the legacy global
+   * service coordinator daemon with this single HTTP-served SoT).
    */
   async verifyCoordinator() {
-    this.log('🔍 STEP 2: Verifying Global Service Coordinator...');
-    
+    this.log(`🔍 STEP 2: Verifying Health Coordinator at ${this.healthCoordinatorUrl}...`);
+
     try {
-      // Check if coordinator script exists
-      if (!fs.existsSync(this.coordinatorScript)) {
+      const probe = await fetch(`${this.healthCoordinatorUrl}/health`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!probe.ok) {
         this.results.coordinator = {
           status: 'error',
-          details: 'Coordinator script not found'
+          details: `Coordinator HTTP ${probe.status}`
         };
+        this.error(`❌ Health Coordinator: HTTP ${probe.status}`);
         return false;
       }
-
-      // Check coordinator status
-      const { stdout } = await execAsync(`node "${this.coordinatorScript}" --status`);
-      const status = this.parseJsonFromOutput(stdout);
-      
-      if (status.coordinator.healthy && status.coordinator.pid) {
+      const stateProbe = await fetch(`${this.healthCoordinatorUrl}/health/state`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!stateProbe.ok) {
         this.results.coordinator = {
-          status: 'success',
-          details: `Coordinator running (PID: ${status.coordinator.pid}, uptime: ${status.coordinator.uptime}ms)`
+          status: 'warning',
+          details: `Coordinator /health ok but /health/state HTTP ${stateProbe.status}`
         };
-        this.success(`✅ Global Coordinator: Healthy (${status.services} services, ${status.projects} projects)`);
-        return true;
-      } else {
-        // Start coordinator
-        this.warn('⚠️ Global Coordinator: Not running, starting daemon...');
-        
-        const startCommand = `nohup node "${this.coordinatorScript}" --daemon > /dev/null 2>&1 &`;
-        await execAsync(startCommand);
-        
-        // Wait for startup
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Verify startup
-        const { stdout: newStatus } = await execAsync(`node "${this.coordinatorScript}" --status`);
-        const verifyStatus = this.parseJsonFromOutput(newStatus);
-        
-        if (verifyStatus.coordinator.healthy) {
-          this.results.coordinator = {
-            status: 'warning',
-            details: 'Coordinator was not running but successfully started'
-          };
-          this.success('✅ Global Coordinator: Started successfully');
-          return true;
-        } else {
-          this.results.coordinator = {
-            status: 'error',
-            details: 'Failed to start coordinator'
-          };
-          return false;
-        }
+        this.warn(`⚠️ Health Coordinator: /health ok but /health/state HTTP ${stateProbe.status}`);
+        return !this.strict;
       }
-
+      const state = await stateProbe.json();
+      this.results.coordinator = {
+        status: 'success',
+        details: `Coordinator healthy (uptime ${state.coordinator_uptime_s ?? '?'}s)`
+      };
+      this.success(`✅ Health Coordinator: Healthy (uptime ${state.coordinator_uptime_s ?? '?'}s)`);
+      return true;
     } catch (error) {
       this.results.coordinator = {
         status: 'error',
         details: `Coordinator verification failed: ${error.message}`
       };
-      this.error(`❌ Global Coordinator: ${error.message}`);
+      this.error(`❌ Health Coordinator: ${error.message}`);
       return false;
     }
   }
@@ -411,29 +373,28 @@ class MonitoringVerifier {
     this.log('🔍 STEP 5: Verifying Recovery Mechanisms...');
 
     try {
-      // Verify that the recovery infrastructure scripts exist
-      // Note: .global-service-registry.json is not checked because the coordinator
-      // now uses Process State Manager (PSM) for persistence instead
-      const recoveryComponents = [
-        this.systemWatchdogScript,
-        this.coordinatorScript
-      ];
-
-      const missingComponents = recoveryComponents.filter(component => !fs.existsSync(component));
-
-      if (missingComponents.length === 0) {
+      // Phase 33 plan 07: legacy recovery scripts are gone; the launchd
+      // KeepAlive on com.coding.health-coordinator owns recovery for the
+      // single host coordinator process. We verify here that the plist
+      // file exists on disk so a stale `launchctl bootout` could be
+      // re-bootstrapped without restoring the file from git.
+      const plistPath = path.join(
+        process.env.HOME || '/Users/Q284340',
+        'Library', 'LaunchAgents', 'com.coding.health-coordinator.plist'
+      );
+      if (fs.existsSync(plistPath)) {
         this.results.recoveryTest = {
           status: 'success',
-          details: 'All recovery components present'
+          details: 'Recovery infrastructure: launchd plist present on disk'
         };
-        this.success('✅ Recovery Test: All components verified');
+        this.success('✅ Recovery Test: launchd plist present');
         return true;
       } else {
         this.results.recoveryTest = {
           status: 'error',
-          details: `Missing components: ${missingComponents.join(', ')}`
+          details: `launchd plist missing on disk: ${plistPath}`
         };
-        this.error(`❌ Recovery Test: Missing ${missingComponents.length} components`);
+        this.error(`❌ Recovery Test: launchd plist missing at ${plistPath}`);
         return false;
       }
 
@@ -524,24 +485,32 @@ class MonitoringVerifier {
   }
 
   /**
-   * Install all monitoring components
+   * Install / repair all monitoring components.
+   *
+   * Phase 33 plan 07: this used to install the legacy launchd
+   * com.coding.system-watchdog plist. Post-cutover, monitoring
+   * installation is owned by launchctl bootstrap of
+   * com.coding.health-coordinator (handled by the cutover commit /
+   * a fresh checkout's setup script). All this method does now is
+   * verify the new launchd job is loaded and the coordinator HTTP
+   * server is up; it does NOT mutate launchd state.
    */
   async installAll() {
-    this.log('🔧 Installing all monitoring components...');
-    
+    this.log('🔧 Verifying monitoring components are installed...');
+
     try {
-      // Install system watchdog
-      await execAsync(`node "${this.systemWatchdogScript}" --install-launchd`);
-      this.success('✅ System watchdog launchd configuration installed');
-      
-      // Start coordinator if not running
-      await this.verifyCoordinator();
-      
-      this.success('🎉 All monitoring components installed and configured');
-      return true;
-      
+      const watchdog = await this.verifySystemWatchdog();
+      const coordinator = await this.verifyCoordinator();
+
+      if (watchdog && coordinator) {
+        this.success('🎉 All monitoring components verified');
+        return true;
+      }
+      this.error('Installation verification failed — bootstrap com.coding.health-coordinator manually:');
+      this.error('  launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.coding.health-coordinator.plist');
+      return false;
     } catch (error) {
-      this.error(`Installation failed: ${error.message}`);
+      this.error(`Installation verification failed: ${error.message}`);
       return false;
     }
   }

@@ -194,8 +194,10 @@ const SERVICE_CONFIGS = {
         return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
       }
 
-      // CRITICAL: Check if a per-project monitor is already running for this project via PSM
-      // This handles the case where global-lsl-coordinator spawned one
+      // CRITICAL: Check if a per-project monitor is already running for this project via PSM.
+      // (Phase 33 plan 07 retired the per-project LSL coordinator that historically
+      // spawned these monitors; bin/coding now spawns enhanced-transcript-monitor
+      // directly per session.)
       const isRunningPerProject = await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH });
       if (isRunningPerProject) {
         console.log(`[TranscriptMonitor] Already running for project ${path.basename(TARGET_PROJECT_PATH)} (PSM) - using existing instance`);
@@ -585,84 +587,11 @@ const SERVICE_CONFIGS = {
     }
   },
 
-  globalProcessSupervisor: {
-    name: 'Global Process Supervisor',
-    required: false, // OPTIONAL - active supervision of all monitors
-    maxRetries: 2,
-    timeout: 10000,
-    startFn: async () => {
-      console.log('[GlobalSupervisor] Starting global process supervisor...');
-
-      // Check if already running globally (singleton pattern)
-      const isRunning = await psm.isServiceRunning('global-process-supervisor', 'global');
-      if (isRunning) {
-        console.log('[GlobalSupervisor] Already running globally - skipping startup');
-        return { pid: 'already-running', service: 'global-process-supervisor', skipRegistration: true };
-      }
-
-      // ALSO check OS-level to catch orphaned processes PSM doesn't know about
-      const osCheck = await isProcessRunningByScript('global-process-supervisor.js');
-      if (osCheck.running) {
-        console.log(`[GlobalSupervisor] Already running at OS level (PID: ${osCheck.pid}) - reusing`);
-        // Re-register this orphan with PSM so future checks work
-        try {
-          await psm.registerService({
-            name: 'global-process-supervisor',
-            pid: osCheck.pid,
-            type: 'global',
-            script: 'scripts/global-process-supervisor.js'
-          });
-        } catch (e) {
-          console.log(`[GlobalSupervisor] Warning: Could not re-register with PSM: ${e.message}`);
-        }
-        return { pid: osCheck.pid, service: 'global-process-supervisor', skipRegistration: true };
-      }
-
-      const child = spawn('node', [
-        path.join(SCRIPT_DIR, 'global-process-supervisor.js'),
-        '--daemon'
-      ], {
-        detached: true,
-        stdio: ['ignore', 'ignore', 'ignore'],
-        cwd: CODING_DIR
-      });
-
-      child.unref();
-
-      // Brief wait for process to start
-      await sleep(500);
-
-      // Check if process is still running
-      if (!isProcessRunning(child.pid)) {
-        throw new Error('Global process supervisor died immediately');
-      }
-
-      return { pid: child.pid, service: 'global-process-supervisor' };
-    },
-    healthCheckFn: async (result) => {
-      if (result.skipRegistration) return true;
-
-      // Check heartbeat file freshness
-      const heartbeatPath = path.join(CODING_DIR, '.health', 'supervisor-heartbeat.json');
-      if (!fs.existsSync(heartbeatPath)) {
-        // Give it time to create first heartbeat
-        return createPidHealthCheck()(result);
-      }
-
-      try {
-        const stats = fs.statSync(heartbeatPath);
-        const ageMs = Date.now() - stats.mtime.getTime();
-        // Heartbeat should be updated within 60 seconds
-        if (ageMs > 60000) {
-          console.log(`[GlobalSupervisor] Warning: Heartbeat file is ${Math.round(ageMs/1000)}s old`);
-          return false;
-        }
-        return true;
-      } catch (err) {
-        return createPidHealthCheck()(result);
-      }
-    }
-  },
+  // Phase 33 plan 07: the legacy host process-supervisor daemon was
+  // deleted in the cutover. launchd's com.coding.health-coordinator
+  // KeepAlive replaces its supervision role. The service config block
+  // (and the invocation that spawned it from main()) was removed along
+  // with the deleted script.
 
   memgraph: {
     name: 'Memgraph (Code Graph RAG)',
@@ -1067,7 +996,8 @@ async function createServicesStatusFile(results) {
  *
  * IMPORTANT: We no longer kill ALL transcript monitors globally because:
  * 1. Other Claude sessions may have their own monitors running
- * 2. The global-lsl-coordinator spawns per-project monitors
+ * 2. Per-project monitors are spawned per session by bin/coding (Phase 33
+ *    plan 07 retired the legacy per-project LSL coordinator)
  * 3. Killing them all causes a race condition where they get respawned
  *
  * Instead, we only clean up truly orphaned processes (not registered in PSM)
@@ -1280,26 +1210,8 @@ async function startAllServices() {
 
   console.log('');
 
-  // 6. OPTIONAL: Global Process Supervisor (active supervision of all monitors)
-  const globalSupervisorResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.globalProcessSupervisor.name,
-    SERVICE_CONFIGS.globalProcessSupervisor.startFn,
-    SERVICE_CONFIGS.globalProcessSupervisor.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.globalProcessSupervisor.required,
-      maxRetries: SERVICE_CONFIGS.globalProcessSupervisor.maxRetries,
-      timeout: SERVICE_CONFIGS.globalProcessSupervisor.timeout
-    }
-  );
-
-  if (globalSupervisorResult.status === 'success') {
-    results.successful.push(globalSupervisorResult);
-    await registerWithPSM(globalSupervisorResult, 'scripts/global-process-supervisor.js');
-  } else {
-    results.degraded.push(globalSupervisorResult);
-  }
-
-  console.log('');
+  // 6. (removed) Legacy host process-supervisor — Phase 33 plan 07 cutover.
+  //    launchd's com.coding.health-coordinator KeepAlive owns supervision now.
 
   // 7. OPTIONAL: System Health Dashboard API (renumbered from 6)
   const systemHealthAPIResult = await startServiceWithRetry(
