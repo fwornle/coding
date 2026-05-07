@@ -220,7 +220,47 @@ Task 5 — `checkpoint:human-verify` blocking gate. Per the plan's `<how-to-veri
 
 Human types **"approved"** when items 1-6 (and ideally 7) all pass; otherwise reports the failure with the diagnostic captures from the plan's how-to-verify section.
 
-## Self-Check: PASSED (partial — pre-checkpoint state)
+## Post-Checkpoint Patch (Option A from human-verify) — 2026-05-07
+
+Human-verify revealed gaps the agent's pre-checkpoint smoke test (`quick.sh`) didn't catch — `quick.sh` only checks HTTP responsiveness and key presence, not data correctness. The user chose **Option A: kill zombie daemons in this plan, defer the rest to 33-08**.
+
+### Patch applied (Deviation #4)
+
+**Problem:** SPEC AC #1 (`pgrep` for legacy daemons returns empty) was VIOLATED at the checkpoint:
+
+```
+5299  global-lsl-coordinator.js monitor          (ppid=1, detached nohup daemon)
+32167 global-service-coordinator.js --daemon     (ppid=1)
+88822 global-process-supervisor.js --daemon      (ppid=1)
+```
+
+These were spawned by `bin/coding/launch-agent-common.sh` -> `scripts/agent-common-setup.sh` in earlier sessions via `nohup ... &`. The plan's `launchctl bootout` step couldn't reach them because they're children of launchd (PID 1), not children of the legacy plist's job.
+
+**Fixed by:**
+
+1. **Killed the 3 zombie PIDs** with `kill` then `kill -9` for the LSL one. Post-kill: `pgrep -fl '<legacy-names>'` returns empty. SPEC AC #1 now satisfied.
+
+2. **Patched `scripts/agent-common-setup.sh`** to remove residual spawn calls so future session restarts don't re-spawn deleted daemons:
+   - Lines 404-423 (function `start_transcript_monitoring`): removed the `if node ".../global-lsl-coordinator.js" ensure ... ; then ... else fallback ...` wrapper. The "fallback" path (which spawns ETM directly via `nohup node enhanced-transcript-monitor.js`) is now the always-path. ETM (reduced to a reporter in 33-04) POSTs `lsl_heartbeat` to the coordinator.
+   - Lines 516-539 (function `start_global_lsl_monitoring`): replaced body with `return 0` no-op stub. Function definition retained so the call at line 755 and `export -f` at line 780 don't break — to be cleaned up in 33-08 gap-closure.
+
+3. **Verified** `bash -n scripts/agent-common-setup.sh` exits 0 (syntax OK).
+
+### Known gaps for 33-08 to surface (NOT fixed in this plan)
+
+These are real gaps the human-verify uncovered. Deferred to **plan 33-08 acceptance suite + `/gsd-plan-phase 33 --gaps` cycle**, not patched inline because they cross plan boundaries:
+
+| # | Symptom | Root cause | Owner phase |
+|---|---|---|---|
+| G1 | Coordinator's `services[]` returns ALL `status: "unknown"` (vkb_server, constraint_monitor, dashboard_server, health_dashboard_api/frontend, etc.) — dashboard at :3032 shows 8 violations + all ports "Down" | **33-03 gap.** Coordinator's check registry has no active probe for services that don't POST signals. Legacy `global-service-coordinator.js` did periodic port liveness probes; that logic wasn't ported into `health-coordinator.js`'s registry. | 33-08 -> gap-closure |
+| G2 | Dashboard "Run Verification" button -> `[HEALTH] [ERROR] Failed to trigger verification: Verification trigger failed` in browser console | **33-05 bug.** Dashboard's POST `/api/health-verifier/verify` reverse-proxy isn't successfully reaching coordinator's POST `/health/refresh`. Likely method/header issue in `_forwardCoordinator`. | 33-08 -> gap-closure |
+| G3 | Tmux statusline shows `[LSL🔴]` red on both panes; project names missing — but coordinator reports `lsl_by_project: {coding: 'healthy', daFrankTeam: 'healthy'}` | **33-04 gap.** Session-ID mismatch between ETM signals (`claude-60474-1777723363`) and statusline reader's expected key (`coding-claude-85122`). Reader's key derivation or ETM payload's `session_id` differs across reader/coordinator. | 33-08 -> gap-closure |
+| G4 (already documented as Deviation #3) | `.container.healthcheck` is `null` (SPEC AC #4 jq path) | **33-03 schema drift.** Coordinator emits `.container.{status, last_probe_end}` not `.container.healthcheck`. | 33-08 -> gap-closure (or SPEC patch) |
+| G5 (low priority) | `scripts/free-coding-ports.sh` lines 21-28 still reference `global-service-coordinator` | Pgrep-guarded no-op — only runs at coding-stop time, harmless when target process doesn't exist. | 33-08 cleanup |
+
+**Expected 33-08 outcome:** AC #1 will now pass after this patch, AC #2 will deviation-pass, AC #3 will pass, AC #4 will deviation-pass, AC #5 (two-session-agreement) will likely fail due to G3, AC #6 (verification-trigger-via-dashboard) will fail due to G2. **That's expected and OK** — 33-08's job is to surface these, then `/gsd-plan-phase 33 --gaps` writes the closure plan.
+
+## Self-Check: PASSED (post-patch checkpoint state)
 
 | Artifact | Status |
 |----------|--------|
