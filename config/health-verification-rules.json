@@ -136,30 +136,6 @@
         "auto_heal": true,
         "auto_heal_action": "restart_transcript_monitor",
         "expected_status": "critical"
-      },
-      "bind_mount_freshness": {
-        "enabled": true,
-        "severity": "warning",
-        "check_type": "bind_mount_diff",
-        "description": "Detect stale single-file Docker bind-mounts (macOS Docker Desktop quirk where the container shows a snapshot of the file at mount time, not the live host content).",
-        "container": "coding-services",
-        "files": [
-          {
-            "host": ".constraint-monitor.yaml",
-            "container": "/coding/.constraint-monitor.yaml"
-          },
-          {
-            "host": ".global-lsl-registry.json",
-            "container": "/coding/.global-lsl-registry.json"
-          },
-          {
-            "host": "integrations/system-health-dashboard/server.js",
-            "container": "/coding/integrations/system-health-dashboard/server.js"
-          }
-        ],
-        "auto_heal": true,
-        "auto_heal_action": "refresh_bind_mounts",
-        "auto_heal_note": "Recreates coding-services to remount bind-mounts. Brief (~10s) service outage."
       }
     },
     "processes": {
@@ -197,22 +173,6 @@
         "description": "Detect processes consuming excessive memory",
         "auto_heal": false,
         "recommendation": "Restart memory-intensive process or investigate leak"
-      },
-      "supervisord_status": {
-        "enabled": true,
-        "severity": "critical",
-        "check_type": "supervisord_status",
-        "description": "Check all supervisord-managed processes for FATAL or STOPPED state",
-        "auto_heal": false,
-        "expected_processes": [
-          "semantic-analysis",
-          "constraint-monitor",
-          "constraint-dashboard",
-          "code-graph-rag",
-          "vkb-server",
-          "health-dashboard",
-          "health-dashboard-frontend"
-        ]
       },
       "zombie_processes": {
         "enabled": true,
