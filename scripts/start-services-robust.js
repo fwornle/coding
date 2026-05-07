@@ -561,8 +561,10 @@ const SERVICE_CONFIGS = {
 
       const child = spawn('node', [
         path.join(SCRIPT_DIR, 'statusline-health-monitor.js'),
-        '--daemon',
-        '--auto-heal'
+        '--daemon'
+        // Phase 33 (plan 33-04): --auto-heal arm removed from statusline source;
+        // arg dropped here to avoid passing dead flags. Coordinator on :3034
+        // owns supervision now.
       ], {
         detached: true,
         stdio: ['ignore', 'ignore', 'ignore'],
