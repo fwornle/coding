@@ -36,6 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
+import { probeHttpHealth, probeTcpPort } from '../lib/utils/service-probe.js';
 import ProcessStateManager from './process-state-manager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -427,17 +428,66 @@ async function runAllChecks() {
     }
   });
 
-  // services: ensure each enabled service rule appears in currentState.services.
-  // Signals from reduced reporters (statusline-health-monitor, health-verifier-cli,
-  // enhanced-transcript-monitor) update these via ingestSignal('service_status', ...).
-  // Rule iteration ensures the entry exists even before the first signal.
+  // services: probe each enabled service rule (Phase 33 G1 closure — plan 33-09).
+  // Replaces the previous stub that left every service as 'unknown' forever.
+  //
+  // Per-rule isolation: a throwing probe surfaces 'unknown' for that rule only
+  // (SPEC R6 — never 'healthy' on exception). Probes run CONCURRENTLY via
+  // Promise.all so a slow timeout does not serialize the whole tick: the worst
+  // case is max(timeouts) ~3s, well under the 5s tick interval.
+  //
+  // check_type dispatch:
+  //   - 'http_health'    → probeHttpHealth(rule.endpoint, rule.timeout_ms ?? 3000)
+  //   - 'port_listening' → probeTcpPort('127.0.0.1', rule.port, rule.timeout_ms ?? 2000)
+  //   - 'psm_service'    → signal-driven (reporter POSTs service_status); leave for ingestSignal
+  //   - other            → status='unknown', NEVER 'healthy' (SPEC R6)
   if (!Array.isArray(currentState.services)) currentState.services = [];
-  await forEachEnabledRule('services', async (name, _rule) => {
-    const idx = currentState.services.findIndex(s => s.name === name);
-    if (idx < 0) {
-      currentState.services.push({ name, status: 'unknown', last_seen: null });
-    }
+  const serviceRulePromises = [];
+  await forEachEnabledRule('services', async (name, rule) => {
+    serviceRulePromises.push((async () => {
+      let result;
+      try {
+        if (INJECT_THROW.includes(`services.${name}`)) {
+          throw new Error(`forced (services.${name})`);
+        }
+        if (rule.check_type === 'http_health' && rule.endpoint) {
+          result = await probeHttpHealth(rule.endpoint, rule.timeout_ms || 3000);
+        } else if (rule.check_type === 'port_listening' && rule.port) {
+          result = await probeTcpPort('127.0.0.1', rule.port, rule.timeout_ms || 2000);
+        } else if (rule.check_type === 'psm_service' || rule.check_type === 'process_running') {
+          // Signal-driven: reporter POSTs service_status; leave entry for ingestSignal
+          // to populate. Ensure a placeholder slot exists so the rule is greppable.
+          const idx = currentState.services.findIndex(s => s.name === name);
+          if (idx < 0) {
+            currentState.services.push({ name, status: 'unknown', last_seen: null });
+          }
+          return;
+        } else {
+          // Unknown / unsupported check_type — DO NOT default to 'healthy' (SPEC R6).
+          result = {
+            status: 'unknown',
+            latency_ms: null,
+            error: `unsupported check_type: ${rule.check_type}`
+          };
+        }
+      } catch (err) {
+        log(`services.${name} probe threw: ${err.message}`, 'ERROR');
+        result = { status: 'unknown', latency_ms: null, error: err.message };
+      }
+      const idx = currentState.services.findIndex(s => s.name === name);
+      const prevLastSeen = idx >= 0 ? currentState.services[idx].last_seen : null;
+      const entry = {
+        name,
+        status: result.status,
+        last_seen: result.status === 'running' ? Date.now() : prevLastSeen,
+        latency_ms: result.latency_ms,
+        probe_error: result.error
+      };
+      if (idx < 0) currentState.services.push(entry);
+      else currentState.services[idx] = entry;
+    })());
   });
+  await Promise.all(serviceRulePromises);
 
   // files: each enabled rule may carry a `path` or `paths` field; coordinator
   // performs an fs.statSync mtime check. If the file is missing, surface
